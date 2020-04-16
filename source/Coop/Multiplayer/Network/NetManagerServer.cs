@@ -66,7 +66,7 @@ namespace Coop.Multiplayer.Network
                 m_SinceLastDiscovery = TimeSpan.Zero;
             }
 
-            if(m_wanManager != null && m_SinceLastKeepAlive > m_Config.wanKeepAliveInterval)
+            if(m_SinceLastKeepAlive > m_Config.keepAliveInterval)
             {
                 m_Server.SendToAll(new Packet(Protocol.EPacket.Server_KeepAlive, new Protocol.Server_KeepAlive(++m_iKeepAliveID).Serialize()));
                 m_SinceLastKeepAlive = TimeSpan.Zero;

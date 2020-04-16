@@ -18,7 +18,7 @@ namespace Coop.Network
         // statically initialized fields
         public uint uiTickRate = 120; // in [Hz]. 0 for no limit.
         public uint uiMaxPlayerCount = 8;
-        public TimeSpan wanKeepAliveInterval = TimeSpan.FromSeconds(5);
+        public TimeSpan keepAliveInterval = TimeSpan.FromSeconds(5);
         public TimeSpan lanDiscoveryInterval = TimeSpan.FromSeconds(2);
     }
 }
