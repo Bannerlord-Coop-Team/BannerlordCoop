@@ -15,7 +15,7 @@
         <SubModule>
             <Name value="${name}"/>
             <DLLName value="${name}.dll"/>
-            <SubModuleClassType value="${name}.Client.Main"/>
+            <SubModuleClassType value="${name}.Multiplayer.Main"/>
             <Tags>
                 <Tag key="DedicatedServerType" value="none" />
                 <Tag key="IsNoRenderModeElement" value="false" />
