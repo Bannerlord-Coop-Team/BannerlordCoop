@@ -9,7 +9,18 @@ namespace Coop.Network
 {
     public class PacketDispatcher
     {
-        public delegate void PacketHandlerDelegate(Packet packet);
+        public class PacketEventArgs : EventArgs
+        {
+            public PacketEventArgs(EConnectionState eState, Packet packet)
+            {
+                State = eState;
+                Packet = packet;
+            }
+            public readonly EConnectionState State;
+            public readonly Packet Packet;
+        }
+        public event EventHandler<PacketEventArgs> OnDispatch;
+        private delegate void PacketHandlerDelegate(Packet packet);
         private readonly Dictionary<(EConnectionState, Protocol.EPacket), List<PacketHandlerDelegate>> m_PacketHandlers = new Dictionary<(EConnectionState, Protocol.EPacket), List<PacketHandlerDelegate>>();
         public PacketDispatcher()
         {
@@ -47,6 +58,7 @@ namespace Coop.Network
         }
         public void Dispatch(EConnectionState state, Packet packet)
         {
+            OnDispatch?.Invoke(this, new PacketEventArgs(state, packet));
             var key = (state, packet.Type);
             if (m_PacketHandlers.ContainsKey(key))
             {

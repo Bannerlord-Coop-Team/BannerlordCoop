@@ -90,7 +90,7 @@ namespace Coop.Tests
 
         void PollUntil(Func<bool> condition, List<Client> clients)
         {
-            PollUntil(condition, clients.Select(client => client.Manager).Append(m_NetManagerServer).ToList());
+            PollUntil(condition, clients.Select(client => client.Manager).Prepend(m_NetManagerServer).ToList());
         }
 
         void PollUntil(Func<bool> condition, List<NetManager> managers)
@@ -99,7 +99,6 @@ namespace Coop.Tests
             TimeSpan waitTimeBetweenTries = TimeSpan.FromMilliseconds(10);
             while (true)
             {
-                m_NetManagerServer.PollEvents();
                 foreach (var manager in managers)
                 {
                     manager.PollEvents();
@@ -150,7 +149,7 @@ namespace Coop.Tests
         [Fact]
         void TestMultipleClients()
         {
-            const int iNumberOfClients = 64;
+            const int iNumberOfClients = 8;
 
             // Create clients
             List<Client> clients = new List<Client>();

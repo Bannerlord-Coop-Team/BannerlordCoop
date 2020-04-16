@@ -199,6 +199,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Common\UpdateableList.cs" />
     <Compile Include="Multiplayer\ConnectionServer.cs" />
     <Compile Include="Multiplayer\Exceptions.cs" />
     <Compile Include="Multiplayer\Globals.cs" />
@@ -208,8 +209,9 @@
     <Compile Include="Common\MovingAverage.cs" />
     <Compile Include="Multiplayer\ConnectionClient.cs" />
     <Compile Include="Multiplayer\Network\Extensions.cs" />
+    <Compile Include="Multiplayer\Network\NetManagerClient.cs" />
     <Compile Include="Multiplayer\Network\NetListenerClient.cs" />
-    <Compile Include="Multiplayer\Network\NetModule.cs" />
+    <Compile Include="Multiplayer\Network\NetManagerServer.cs" />
     <Compile Include="Multiplayer\Network\NetConnection.cs" />
     <Compile Include="Multiplayer\ClientSession.cs" />
     <Compile Include="Multiplayer\Network\NetListenerServer.cs" />
@@ -217,7 +219,7 @@
     <Compile Include="Network\ConnectionBase.cs" />
     <Compile Include="Network\INetwork.cs" />
     <Compile Include="Network\INetworkConnection.cs" />
-    <Compile Include="Network\IServerModule.cs" />
+    <Compile Include="Common\IUpdatable.cs" />
     <Compile Include="Network\Packet.cs" />
     <Compile Include="Network\PacketHandler.cs" />
     <Compile Include="Network\PacketDispatcher.cs" />

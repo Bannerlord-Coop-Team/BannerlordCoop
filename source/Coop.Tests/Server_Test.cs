@@ -9,7 +9,7 @@ namespace Coop.Tests
 {
     public class Server_Test
     {
-        class TimingModule : IServerModule
+        class TimingModule : IUpdateable
         {
             public readonly object Lock = new object();
             public AutoResetEvent OnTick = new AutoResetEvent(false);
@@ -18,7 +18,7 @@ namespace Coop.Tests
             private Stopwatch m_Timer = null;
             public MovingAverage AverageTicksPerFrame = new MovingAverage(100000);
 
-            public void Tick(TimeSpan frameTime)
+            public void Update(TimeSpan frameTime)
             {
                 ++iCounter;
                 OnTick.Set();
@@ -36,15 +36,15 @@ namespace Coop.Tests
         }
 
         private readonly Server m_Server;
-        private TimingModule m_Module;
-        private ServerConfiguration m_Config;
+        private readonly TimingModule m_Module;
+        private readonly ServerConfiguration m_Config;
 
         public Server_Test()
         {
             m_Server = new Server();
             m_Module = new TimingModule();
             m_Config = new ServerConfiguration();
-            m_Server.Register(m_Module);
+            m_Server.Updateables.Add(m_Module);
             m_Config.uiTickRate = 0;
         }        
 

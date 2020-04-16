@@ -18,4 +18,10 @@ namespace Coop.Multiplayer
         {
         }
     }
+    public class NetworkConnectionFailedException : Exception
+    {
+        public NetworkConnectionFailedException(string msg) : base(msg)
+        {
+        }
+    }
 }

@@ -17,22 +17,8 @@ namespace Coop.Network
         }
         public EState State { get { return m_State.State; } }
         public ServerConfiguration ActiveConfig = null;
+        public readonly UpdateableList Updateables;
 
-        public void Register(IServerModule module)
-        {
-            lock (m_ServerThreadLock)
-            {
-                m_Modules.Add(module);
-            }
-        }
-        public void Unregister(IServerModule module)
-        {
-            lock (m_ServerThreadLock)
-            {
-                m_Modules.Remove(module);
-            }
-        }
-        
         public void Start(ServerConfiguration config)
         {
             if(m_State.IsInState(EState.Inactive))
@@ -84,7 +70,7 @@ namespace Coop.Network
         }
         public Server()
         {
-            m_Modules = new List<IServerModule>();
+            Updateables = new UpdateableList();
             m_ActiveConnections = new List<ConnectionBase>();
             m_State = new StateMachine<EState, ETrigger>(EState.Inactive);
 
@@ -130,15 +116,14 @@ namespace Coop.Network
             m_State.Fire(ETrigger.Stopped);
         }
 
-        private readonly List<IServerModule> m_Modules;
         private readonly StateMachine<EState, ETrigger> m_State;
         private bool m_bStopRequest = false;
-        private readonly object m_ServerThreadLock = new object();
+        private readonly object m_StopRequestLock = new object();
         private Thread m_Thread = null;
         private void startMainLoop()
         {
             m_Thread = new Thread(() => run());
-            lock (m_ServerThreadLock)
+            lock (m_StopRequestLock)
             {
                 m_bStopRequest = false;
             }
@@ -151,19 +136,16 @@ namespace Coop.Network
             bool bRunning = true;
             while (bRunning)
             {
-                lock (m_ServerThreadLock)
+                if (bRunning)
                 {
-                    bRunning = !m_bStopRequest;
-                    if(bRunning)
-                    {
-                        foreach(var module in m_Modules)
-                        {
-                            module.Tick(frameLimiter.LastFrameTime);
-                        }
-                    }
+                    Updateables.UpdateAll(frameLimiter.LastFrameTime);
                 }
 
                 frameLimiter.Throttle();
+                lock (m_StopRequestLock)
+                {
+                    bRunning = !m_bStopRequest;
+                }
             }
         }
 
@@ -174,7 +156,7 @@ namespace Coop.Network
                 throw new InvalidStateException("Cannot stop: main loop is not running.");
             }
 
-            lock (m_ServerThreadLock)
+            lock (m_StopRequestLock)
             {
                 m_bStopRequest = true;
             }
