@@ -61,6 +61,10 @@
     <Reference Include="LiteNetLib, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\LiteNetLib.0.8.3.1\lib\net35\LiteNetLib.dll</HintPath>
     </Reference>
+    <Reference Include="Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="Stateless, Version=4.0.0.0, Culture=neutral, PublicKeyToken=93038f0927583c9a, processorArchitecture=MSIL">
       <HintPath>..\packages\Stateless.5.1.1\lib\net472\Stateless.dll</HintPath>
     </Reference>
@@ -200,10 +204,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Common\UpdateableList.cs" />
+    <Compile Include="Game\Debug\CLICommands.cs" />
+    <Compile Include="Game\Debug\Console.cs" />
+    <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Multiplayer\ConnectionServer.cs" />
     <Compile Include="Multiplayer\Exceptions.cs" />
     <Compile Include="Multiplayer\Globals.cs" />
-    <Compile Include="Multiplayer\Main.cs" />
+    <Compile Include="Game\Main.cs" />
     <Compile Include="Common\FrameLimiter.cs" />
     <Compile Include="Common\Log.cs" />
     <Compile Include="Common\MovingAverage.cs" />
@@ -231,7 +238,7 @@
     <Compile Include="Network\Protocol.cs" />
     <Compile Include="Network\Server.cs" />
     <Compile Include="Network\ServerConfiguration.cs" />
-    <Compile Include="Patch\ModulePatch.cs" />
+    <Compile Include="Game\Patch\ModulePatch.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
