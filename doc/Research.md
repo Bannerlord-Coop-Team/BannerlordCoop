@@ -5,8 +5,8 @@ Main entry point: `SandBox.View.Map.MapScreen HandleLeftMouseButtonClick`
 
 ### Sync
 Idea:
-1. Prefix MapState.ProcessTravel(Vec2): Send to server -> Return immediately
-2. Server processes input position -> sends repsonse with confirmed position to all players
+1. Prefix `MapState.ProcessTravel(Vec2)`, `MobileParty.SetMoveGoToSettlement`, `MobileParty.SetMoveEngageParty` (for main party only?): Send to server -> Return immediately
+2. Server processes input position -> sends response with confirmed position to all players
 3. All player apply position locally trough direct call of MobileParty.SetMoveGoToPoint
 
 ## Randomness
