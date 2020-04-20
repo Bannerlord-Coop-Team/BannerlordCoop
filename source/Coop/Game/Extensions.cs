@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
 namespace Coop.Game
@@ -20,6 +21,11 @@ namespace Coop.Game
 				}
 			}
 			return null;
+		}
+
+		public static bool IsPlayerControlled(this MobileParty party)
+		{
+			return CoopClient.Client.GameState.IsPlayerControlledParty(party);
 		}
 	}
 }

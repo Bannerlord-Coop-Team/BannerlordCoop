@@ -134,6 +134,10 @@ namespace Coop.Network
         /// </summary>
         /// <param name="eReason">Reason that caused the disconnect.</param>
         public abstract void Disconnect(EDisconnectReason eReason);
+        public override string ToString()
+        {
+            return $"State: {State}, Ping: {Latency}, ";
+        }
         #endregion
         #region Internals
         private MemoryStream m_Stream = new MemoryStream();

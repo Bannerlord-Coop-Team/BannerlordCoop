@@ -20,11 +20,11 @@ namespace Coop.Multiplayer.Network
         {
             if (!m_Server.CanPlayerJoin())
             {
-                Log.Info($"Connection request {request.ToString()} rejected: server is full.");
+                Log.Info($"Connection request from {request} rejected: server is full.");
                 request.Reject(new byte[] { Convert.ToByte(EDisconnectReason.ServerIsFull) });
                 return;
             }
-            Log.Info($"Connection request received {request.ToString()}.");
+            Log.Info($"Connection request from {request}.");
             request.Accept();
         }
         public void OnPeerConnected(NetPeer peer)

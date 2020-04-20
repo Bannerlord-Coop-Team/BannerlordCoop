@@ -8,6 +8,8 @@ namespace Coop.Game
 {
     public static class CoopClient
     {
-        public static WeakReference<ClientModel> Client = new WeakReference<ClientModel>(null);
+        public static ClientModel Client = null;
+
+
     }
 }

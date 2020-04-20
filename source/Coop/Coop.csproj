@@ -204,12 +204,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Common\UpdateableList.cs" />
+    <Compile Include="Game\CoopGameState.cs" />
     <Compile Include="Game\ClientModel.cs" />
     <Compile Include="Game\CoopClient.cs" />
     <Compile Include="Game\CoopServer.cs" />
     <Compile Include="Game\Debug\CLICommands.cs" />
     <Compile Include="Game\Debug\Console.cs" />
     <Compile Include="Game\Extensions.cs" />
+    <Compile Include="Game\Patch\CampaignMapMovement.cs" />
+    <Compile Include="Game\Behaviour\PlayerJoinedBehaviour.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Multiplayer\ConnectionServer.cs" />
     <Compile Include="Multiplayer\Exceptions.cs" />
@@ -242,7 +245,6 @@
     <Compile Include="Network\Protocol.cs" />
     <Compile Include="Network\Server.cs" />
     <Compile Include="Network\ServerConfiguration.cs" />
-    <Compile Include="Game\Patch\ModulePatch.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -28,6 +28,7 @@ namespace Coop.Game
         public override void NoHarmonyLoad()
         {
             AddModel<ClientModel>();
+            AddBehavior<PlayerJoinedBehaviour>();
 
             var harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
             harmony.PatchAll();
@@ -97,10 +98,10 @@ namespace Coop.Game
         {
             base.OnGameInitializationFinished(game);
             m_ClientModel = game.GetGameModel<ClientModel>();
-            CoopClient.Client.SetTarget(m_ClientModel);
+            CoopClient.Client = m_ClientModel;
         }
 
         private readonly UpdateableList m_Updateables;
-        private ClientModel m_ClientModel;
+        private ClientModel m_ClientModel = null;
     }
 }

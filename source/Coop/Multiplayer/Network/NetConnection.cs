@@ -23,5 +23,9 @@ namespace Coop.Multiplayer.Network
             m_Peer.Flush();
             m_Peer.NetManager.DisconnectPeer(m_Peer, new byte[] { Convert.ToByte(EDisconnectReason.ServerIsFull) });
         }
+        public override string ToString()
+        {
+            return $"{base.ToString()}-{m_Peer.EndPoint}-{m_Peer.ConnectionState}";
+        }
     }
 }

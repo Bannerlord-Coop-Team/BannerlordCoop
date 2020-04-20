@@ -63,15 +63,15 @@ namespace Coop.Network
         virtual public void OnConnected(ConnectionBase con)
         {
             m_ActiveConnections.Add(con);
-            Log.Info($"Client connection established: {con.ToString()}.");
+            Log.Info($"Client connection established: {con}.");
         }
         virtual public void OnDisconnected(ConnectionBase con, EDisconnectReason eReason)
         {
-            Log.Info($"Client connection closed: {con.ToString()}. {eReason}.");
+            Log.Info($"Client connection closed: {con}. {eReason}.");
             con.Disconnect(eReason);
             if (!m_ActiveConnections.Remove(con))
             {
-                Log.Error($"Unknown connection {con.ToString()}.");
+                Log.Error($"Unknown connection: {con}.");
             }
         }
         virtual public bool CanPlayerJoin()

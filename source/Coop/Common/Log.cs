@@ -9,18 +9,22 @@ namespace Coop.Common
     public static class Log
     {
         public static Action<ELevel, string> s_OnLogEntry;
-        public static ELevel s_ActiveLevels = ELevel.Debug | ELevel.Info | ELevel.Warning | ELevel.Error;
+        public static ELevel s_ActiveLevels = ELevel.Trace | ELevel.Debug | ELevel.Info | ELevel.Warning | ELevel.Error;
 
         [Flags]
         public enum ELevel
         {
             None = 0,
-            Debug = 1,
-            Info = 2,
-            Warning = 4,
-            Error = 8
+            Trace = 1,
+            Debug = 2,
+            Info = 4,
+            Warning = 8,
+            Error = 16
         }
-
+        public static void Trace(string str)
+        {
+            write(ELevel.Trace, str);
+        }
         public static void Debug(string str)
         {
             write(ELevel.Debug, str);
@@ -42,7 +46,7 @@ namespace Coop.Common
             if(s_ActiveLevels.HasFlag(eLevel))
             {
                 string sTimeStamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                string sLogEntry = $"{sTimeStamp} [{eLevel.ToString()}] \t{sMessage}";
+                string sLogEntry = $"{sTimeStamp} [{eLevel.ToString(), -10}] {sMessage}";
                 if (s_OnLogEntry != null)
                 {
                     s_OnLogEntry(eLevel, sLogEntry);
