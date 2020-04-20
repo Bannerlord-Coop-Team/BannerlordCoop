@@ -12,24 +12,26 @@ namespace Coop.Multiplayer.Network
     public class NetListenerServer : INetEventListener
     {
         private readonly Server m_Server;
-        public NetListenerServer(Server server)
+        private readonly IWorldData m_WorldData;
+        public NetListenerServer(Server server, IWorldData worldData)
         {
             m_Server = server;
+            m_WorldData = worldData;
         }
         public void OnConnectionRequest(ConnectionRequest request)
         {
             if (!m_Server.CanPlayerJoin())
             {
-                Log.Info($"Connection request from {request} rejected: server is full.");
+                Log.Info($"Connection request from {request.ToFriendlyString()} rejected: server is full.");
                 request.Reject(new byte[] { Convert.ToByte(EDisconnectReason.ServerIsFull) });
                 return;
             }
-            Log.Info($"Connection request from {request}.");
+            Log.Info($"Connection request from {request.ToFriendlyString()}.");
             request.Accept();
         }
         public void OnPeerConnected(NetPeer peer)
         {
-            ConnectionServer con = new ConnectionServer(new NetConnection(peer));
+            ConnectionServer con = new ConnectionServer(new NetConnection(peer), m_WorldData);
             con.PrepareForClientConnection();
             peer.Tag = con;
             m_Server.OnConnected(con);

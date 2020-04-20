@@ -41,12 +41,16 @@ namespace Coop.Common
         {
             write(ELevel.Error, str);
         }
+        private static string toUserFriendlyString(ELevel eLevel)
+        {
+            return $"[{eLevel}]";
+        }
         private static void write(ELevel eLevel, string sMessage)
         {
             if(s_ActiveLevels.HasFlag(eLevel))
             {
                 string sTimeStamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                string sLogEntry = $"{sTimeStamp} [{eLevel.ToString(), -10}] {sMessage}";
+                string sLogEntry = $"{sTimeStamp} {toUserFriendlyString(eLevel), -10} {sMessage}";
                 if (s_OnLogEntry != null)
                 {
                     s_OnLogEntry(eLevel, sLogEntry);

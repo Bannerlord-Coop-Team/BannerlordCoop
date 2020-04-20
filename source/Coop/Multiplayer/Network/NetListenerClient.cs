@@ -14,14 +14,14 @@ namespace Coop.Multiplayer.Network
 {
     public class NetListenerClient : INetEventListener
     {
-        private readonly ClientSession m_Session;
-        public NetListenerClient(ClientSession session)
+        private readonly GameSession m_Session;
+        public NetListenerClient(GameSession session)
         {
             m_Session = session;
         }
         public void OnPeerConnected(NetPeer peer)
         {
-            var conn = new ConnectionClient(new NetConnection(peer));
+            var conn = new ConnectionClient(new NetConnection(peer), m_Session.World);
             m_Session.OnConnectionCreated(conn);
             peer.Tag = conn;
         }

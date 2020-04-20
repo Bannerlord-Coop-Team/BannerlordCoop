@@ -12,6 +12,7 @@ namespace Coop.Network
         ServerIsFull,
         ServerShutDown,
         WrongProtocolVersion,
+        WorldDataTransferIssue,
         Unknown
     }
     public interface INetworkConnection

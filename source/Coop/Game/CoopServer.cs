@@ -7,7 +7,6 @@ namespace Coop.Game
     public static class CoopServer
     {
         public static Server Current = null;
-
         private static NetManagerServer NetManager = null;
 
         public static bool TryStartServer()
@@ -22,7 +21,7 @@ namespace Coop.Game
 
             if(NetManager == null)
             {
-                NetManager = new NetManagerServer(Current);
+                NetManager = new NetManagerServer(Current, new WorldData());
                 NetManager.StartListening();
                 Log.Debug("Setup network connection for server.");
             }

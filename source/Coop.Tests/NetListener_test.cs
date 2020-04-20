@@ -18,7 +18,7 @@ namespace Coop.Tests
         private readonly int m_iServerPort;
         private class Client
         {
-            public readonly ClientSession Session;
+            public readonly GameSession Session;
             public readonly NetListenerClient Listener;
             public readonly NetManager Manager;
             public NetPeer PeerServer;
@@ -27,7 +27,7 @@ namespace Coop.Tests
             public Client(int iPort)
             {
                 m_iPort = iPort;
-                Session = new ClientSession();
+                Session = new GameSession(Mock.Of<IWorldData>());
                 Listener = new NetListenerClient(Session);
                 Manager = new NetManager(Listener);
                 Manager.Start();
@@ -73,7 +73,7 @@ namespace Coop.Tests
         {
             // Setup server mock
             m_Server = new Mock<Server>();
-            m_ListenerServer = new NetListenerServer(m_Server.Object);
+            m_ListenerServer = new NetListenerServer(m_Server.Object, Mock.Of<IWorldData>());
             m_ServerSideConnected = new List<ConnectionBase>();
             m_ServerSideDisconnects = new List<(ConnectionBase, EDisconnectReason)>();
             m_Server.Setup(server => server.CanPlayerJoin()).Returns(true);

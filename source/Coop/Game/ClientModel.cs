@@ -10,11 +10,13 @@ namespace Coop.Game
     public class ClientModel : GameModel, IUpdateable
     {
         public CoopGameState GameState { get; private set; }
+        public CoopEvents Events { get; private set; }
         public ClientModel()
         {
-            m_Session = new ClientSession();
+            m_Session = new GameSession(new WorldData());
             m_Manager = new NetManagerClient(m_Session);
             GameState = new CoopGameState();
+            Events = new CoopEvents();
         }
 
         public void TryConnectToServer(IPAddress ip, int port)
@@ -27,7 +29,7 @@ namespace Coop.Game
             m_Manager.Update(frameTime);
         }
 
-        private readonly ClientSession m_Session;
+        private readonly GameSession m_Session;
         private readonly NetManagerClient m_Manager;
     }
 }

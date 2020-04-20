@@ -8,10 +8,12 @@ namespace Coop.Network
         {
             Client_Hello,               // Introduces the client to the server.
             Client_Info,                // Contains ClientInfo.
+            Client_Joined,              // Sent once the client has loaded the initial world state.
             Client_KeepAlive,
 
             Server_RequestClientInfo,   // Instructs the client to send its ClientInfo.
             Server_JoinRequestAccepted, // Client is allowed to join the server.
+            Server_WorldData,           // Contains data about the game world.
             Server_KeepAlive
         }
         public const int Version = 0;
@@ -53,6 +55,20 @@ namespace Coop.Network
             public static Client_Info Deserialize(ByteReader reader)
             {
                 return new Client_Info(new Player(reader.Binary.ReadString()));
+            }
+        }
+        public class Client_Joined
+        {
+            public byte[] Serialize()
+            {
+                // Empty
+                return new byte[0];
+            }
+
+            public static Client_Joined Deserialize(ByteReader reader)
+            {
+                // Empty
+                return new Client_Joined();
             }
         }
         public class Client_KeepAlive

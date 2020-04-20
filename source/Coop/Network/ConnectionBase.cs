@@ -11,7 +11,7 @@ namespace Coop.Network
                                  * - ClientJoining: The server accepted the request.
                                  * - Disconnecting: Request timeout or the server rejected the request.
                                  */
-        ClientJoining,          /** [client side] Client is joining a server, e.g. downloading data.
+        ClientAwaitingWorldData,/** [client side] Client is joining a server, e.g. downloading data.
                                  *
                                  * Possible transitions to
                                  * - ClientConnected:   Client successfully connected to the server.
@@ -28,7 +28,7 @@ namespace Coop.Network
                                  * - ServerJoining: Join request from client received & approved.
                                  * - Disconnecting:  Timeout or request denied.
                                  */
-        ServerJoining,          /** [server side] Client is joining the server.
+        ServerSendingWorldData, /** [server side] Client is joining the server.
                                  *
                                  * Possible transitions to:
                                  * - ServerConnected: Join request from client received & approved.
@@ -136,7 +136,7 @@ namespace Coop.Network
         public abstract void Disconnect(EDisconnectReason eReason);
         public override string ToString()
         {
-            return $"State: {State}, Ping: {Latency}, ";
+            return $"{base.ToString()} - State: {State}, Ping: {Latency}, Netinfo: {m_Network}";
         }
         #endregion
         #region Internals

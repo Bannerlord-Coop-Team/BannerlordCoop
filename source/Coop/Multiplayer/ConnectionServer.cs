@@ -16,16 +16,18 @@ namespace Coop.Multiplayer
         {
             WaitForClient,
             JoinRequestAccepted,
-            ConnectionEstablished,
+            ClientJoined,
             Disconnect,
             Disconnected
         }
         private readonly StateMachine<EConnectionState, ETrigger> m_StateMachine;
         public override EConnectionState State => m_StateMachine.State;
+        private readonly IWorldData m_WorldData;
 
-        public ConnectionServer(INetworkConnection network)
+        public ConnectionServer(INetworkConnection network, IWorldData worldData)
             : base(network)
         {
+            m_WorldData = worldData;
             m_StateMachine = new StateMachine<EConnectionState, ETrigger>(EConnectionState.Disconnected);
 
             m_StateMachine.Configure(EConnectionState.Disconnected)
@@ -38,12 +40,12 @@ namespace Coop.Multiplayer
 
             m_StateMachine.Configure(EConnectionState.ServerAwaitingClient)
                 .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
-                .Permit(ETrigger.JoinRequestAccepted, EConnectionState.ServerJoining);
+                .Permit(ETrigger.JoinRequestAccepted, EConnectionState.ServerSendingWorldData);
 
-            m_StateMachine.Configure(EConnectionState.ServerJoining)
-                .OnEntry(() => SendJoinRequestAccepted())
+            m_StateMachine.Configure(EConnectionState.ServerSendingWorldData)
+                .OnEntry(() => { SendJoinRequestAccepted(); SendInitialWorldData(); })
                 .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
-                .Permit(ETrigger.ConnectionEstablished, EConnectionState.ServerConnected);
+                .Permit(ETrigger.ClientJoined, EConnectionState.ServerConnected);
 
             m_StateMachine.Configure(EConnectionState.ServerConnected)
                 .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting);
@@ -98,17 +100,28 @@ namespace Coop.Multiplayer
             m_StateMachine.Fire(ETrigger.JoinRequestAccepted);
         }
         #endregion
-        #region ServerJoining
+        #region ServerSendingWorldData & ServerConnected
         private void SendJoinRequestAccepted()
         {
             Send(new Packet(Protocol.EPacket.Server_JoinRequestAccepted, new Protocol.Server_JoinRequestAccepted().Serialize()));
         }
-        #endregion
-        [PacketHandler(EConnectionState.ServerJoining, Protocol.EPacket.Client_KeepAlive)]
+        private void SendInitialWorldData()
+        {
+            Send(new Packet(Protocol.EPacket.Server_WorldData, m_WorldData.SerializeWorldState()));
+        }
+        [PacketHandler(EConnectionState.ServerSendingWorldData, Protocol.EPacket.Client_Joined)]
+        private void receiveClientJoined(Packet packet)
+        {
+            Protocol.Client_Joined payload = Protocol.Client_Joined.Deserialize(new ByteReader(packet.Payload));
+            m_StateMachine.Fire(ETrigger.ClientJoined);
+        }
+
+        [PacketHandler(EConnectionState.ServerSendingWorldData, Protocol.EPacket.Client_KeepAlive)]
         [PacketHandler(EConnectionState.ServerConnected, Protocol.EPacket.Client_KeepAlive)]
         private void receiveClientKeepAlive(Packet packet)
         {
             Protocol.Client_KeepAlive payload = Protocol.Client_KeepAlive.Deserialize(new ByteReader(packet.Payload));
         }
+        #endregion
     }
 }

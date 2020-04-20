@@ -10,14 +10,14 @@ namespace Coop.Multiplayer.Network
         {
             return (ConnectionBase)peer.Tag;
         }
-        public static string ToString(this IPEndPoint endPoint)
+        public static string ToFriendlyString(this IPEndPoint endPoint)
         {
             return $"{endPoint.Address.ToString()}:{endPoint.Port}";
         }
 
-        public static string ToString(this ConnectionRequest request)
+        public static string ToFriendlyString(this ConnectionRequest request)
         {
-            return $"{request.RemoteEndPoint}";
+            return $"{request.RemoteEndPoint.ToFriendlyString()}";
         }
     }
 }

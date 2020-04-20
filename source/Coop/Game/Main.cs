@@ -14,7 +14,6 @@ namespace Coop.Game
     class Main : NoHarmony.NoHarmonyLoader
     {
         public static Main Instance;
-        
         public Main()
         {
             Instance = this;
@@ -96,9 +95,9 @@ namespace Coop.Game
 
         public override void OnGameInitializationFinished(TaleWorlds.Core.Game game)
         {
-            base.OnGameInitializationFinished(game);
             m_ClientModel = game.GetGameModel<ClientModel>();
             CoopClient.Client = m_ClientModel;
+            base.OnGameInitializationFinished(game);
         }
 
         private readonly UpdateableList m_Updateables;

@@ -12,11 +12,11 @@ namespace Coop.Multiplayer.Network
 {
     public class NetManagerClient : IUpdateable
     {
-        private readonly ClientSession m_Session;
+        private readonly GameSession m_Session;
         private readonly NetListenerClient m_Listener;
         private readonly NetManager m_NetManager;
         private NetPeer m_Peer;
-        public NetManagerClient(ClientSession session)
+        public NetManagerClient(GameSession session)
         {
             if (session == null)
             {

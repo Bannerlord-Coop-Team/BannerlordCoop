@@ -2,10 +2,8 @@
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Network;
-using LiteNetLib;
-using System;
+using Moq;
 using System.Collections.Generic;
-using System.Threading;
 using Xunit;
 
 namespace Coop.Tests
@@ -17,18 +15,18 @@ namespace Coop.Tests
         public NetManager_Test()
         {
             m_Server = TestUtils.StartNewServer();
-            m_NetManagerServer = new NetManagerServer(m_Server);
+            m_NetManagerServer = new NetManagerServer(m_Server, Mock.Of<IWorldData>());
             m_NetManagerServer.StartListening();
         }
 
         private class Client
         {
-            public readonly ClientSession Session;
+            public readonly GameSession Session;
             public readonly NetManagerClient Manager;
 
             public Client()
             {
-                Session = new ClientSession();
+                Session = new GameSession(Mock.Of<IWorldData>());
                 Manager = new NetManagerClient(Session);
             }
         }

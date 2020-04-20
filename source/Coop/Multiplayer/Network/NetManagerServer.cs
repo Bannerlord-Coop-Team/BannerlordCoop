@@ -10,12 +10,13 @@ namespace Coop.Multiplayer.Network
     public class NetManagerServer : IUpdateable
     {
         private readonly Server m_Server;
+        private readonly IWorldData m_WorldData;
         private readonly ServerConfiguration m_Config;
         private readonly NetManager m_wanManager;
         private readonly NetManager m_lanManager;
-        public NetManagerServer(Server server)
+        public NetManagerServer(Server server, IWorldData worldData)
         {
-            if(server == null || server.ActiveConfig == null)
+            if(server == null || server.ActiveConfig == null || worldData == null)
             {
                 throw new ArgumentNullException();
             }
@@ -24,15 +25,16 @@ namespace Coop.Multiplayer.Network
             {
                 throw new InvalidServerConfiguration($"Invalid server configuration {m_Server}. Unable to attach NetAdapter.");
             }
+            m_WorldData = worldData;
 
             m_Server = server;
             if(m_Config.wanAddress != null)
             {
-                m_wanManager = new NetManager(new NetListenerServer(m_Server));
+                m_wanManager = new NetManager(new NetListenerServer(m_Server, m_WorldData));
             }
             if(m_Config.lanAddress != null)
             {
-                m_lanManager = new NetManager(new NetListenerServer(m_Server));
+                m_lanManager = new NetManager(new NetListenerServer(m_Server, m_WorldData));
             }
             m_SinceLastDiscovery = TimeSpan.Zero;
             m_SinceLastKeepAlive = TimeSpan.Zero;

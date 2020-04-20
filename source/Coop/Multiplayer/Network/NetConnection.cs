@@ -25,7 +25,7 @@ namespace Coop.Multiplayer.Network
         }
         public override string ToString()
         {
-            return $"{base.ToString()}-{m_Peer.EndPoint}-{m_Peer.ConnectionState}";
+            return $"{base.ToString()}-{m_Peer.EndPoint.ToFriendlyString()}-{m_Peer.ConnectionState}";
         }
     }
 }
