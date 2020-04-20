@@ -204,8 +204,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Common\UpdateableList.cs" />
+    <Compile Include="Game\ClientModel.cs" />
+    <Compile Include="Game\CoopClient.cs" />
+    <Compile Include="Game\CoopServer.cs" />
     <Compile Include="Game\Debug\CLICommands.cs" />
     <Compile Include="Game\Debug\Console.cs" />
+    <Compile Include="Game\Extensions.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Multiplayer\ConnectionServer.cs" />
     <Compile Include="Multiplayer\Exceptions.cs" />
@@ -247,6 +251,6 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs 0harmony.dll,LiteNetLib.dll</PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs 0harmony.dll,LiteNetLib.dll,Stateless.dll</PostBuildEvent>
   </PropertyGroup>
 </Project>

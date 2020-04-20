@@ -52,7 +52,7 @@ namespace Coop.Multiplayer.Network
         }
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
         {
-            Log.Info($"OnNetworkReceiveUnconnected({remoteEndPoint}, {reader}, {messageType}).");
+            Log.Debug($"OnNetworkReceiveUnconnected({remoteEndPoint}, {reader}, {messageType}).");
         }
 
         public void OnConnectionRequest(ConnectionRequest request) { }

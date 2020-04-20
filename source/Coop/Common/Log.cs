@@ -8,34 +8,49 @@ namespace Coop.Common
 {
     public static class Log
     {
-        public static Action<string> debugAction;
-        public static Action<string> infoAction;
-        public static Action<string> errorAction;
+        public static Action<ELevel, string> s_OnLogEntry;
+        public static ELevel s_ActiveLevels = ELevel.Debug | ELevel.Info | ELevel.Warning | ELevel.Error;
+
+        [Flags]
+        public enum ELevel
+        {
+            None = 0,
+            Debug = 1,
+            Info = 2,
+            Warning = 4,
+            Error = 8
+        }
 
         public static void Debug(string str)
         {
-            write("DEBUG", str, infoAction);
+            write(ELevel.Debug, str);
         }
         public static void Info(string str)
         {
-            write("INFO", str, infoAction);            
+            write(ELevel.Info, str);            
         }
-
+        public static void Warn(string str)
+        {
+            write(ELevel.Warning, str);
+        }
         public static void Error(string str)
         {
-            write("ERROR", str, infoAction);
+            write(ELevel.Error, str);
         }
-        private static void write(string sPrefix, string sMessage, Action<string> action)
+        private static void write(ELevel eLevel, string sMessage)
         {
-            
-            string sLogEntry = $"{DateTime.Now.ToString()} {sPrefix}:\t{sMessage}.";
-            if (infoAction != null)
+            if(s_ActiveLevels.HasFlag(eLevel))
             {
-                infoAction(sLogEntry);
-            }
-            else
-            {
-                Console.WriteLine(sLogEntry);
+                string sTimeStamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                string sLogEntry = $"{sTimeStamp} [{eLevel.ToString()}] \t{sMessage}";
+                if (s_OnLogEntry != null)
+                {
+                    s_OnLogEntry(eLevel, sLogEntry);
+                }
+                else
+                {
+                    Console.WriteLine(sLogEntry);
+                }
             }
         }
     }

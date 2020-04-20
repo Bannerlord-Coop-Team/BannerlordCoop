@@ -25,7 +25,7 @@ namespace Coop.Multiplayer
             Connection = connection;
             Connection.Connect();
             
-            Log.Info($"Client connection created {Connection}.");
+            Log.Debug($"Connection to server created {Connection.ToString()}.");
         }
 
         public void OnDisconnect(EDisconnectReason eReason)
@@ -35,7 +35,7 @@ namespace Coop.Multiplayer
                 throw new InvalidStateException($"Client is not connected. Cannot disconnect.");
             }
             Connection.Disconnect(eReason);
-            Log.Info($"Disconnect from server {Connection}. Reason: {eReason}.");
+            Log.Debug($"Disconnect from server {Connection.ToString()}. Reason: {eReason}.");
             Connection = null;
         }
     }

@@ -94,7 +94,7 @@ namespace Coop.Multiplayer
         private void ReceiveClientInfo(Packet packet)
         {
             Protocol.Client_Info info = Protocol.Client_Info.Deserialize(new ByteReader(packet.Payload));
-            Log.Info($"Received client info: {info}.");
+            Log.Info($"Received client join request from {info.m_Player.Name}.");
             m_StateMachine.Fire(ETrigger.JoinRequestAccepted);
         }
         #endregion

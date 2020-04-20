@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using System.IO;
 using System.Collections.Generic;
 using TaleWorlds.Core;
@@ -6,8 +7,7 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 
-
-namespace NoHarmony //Exp v0.9.8
+namespace NoHarmony
 {
     public abstract class NoHarmonyLoader : MBSubModuleBase
     {
@@ -27,23 +27,15 @@ namespace NoHarmony //Exp v0.9.8
         public abstract void NoHarmonyLoad();
         //End config
 
-        //Submodule methodes representing various game initialisation phases,
-        /// <summary>
-        /// Called before the main menu.
-        /// </summary>
+        //NoHarmony will initialize here, don't forget to call base if you override.
         protected override void OnSubModuleLoad()
         {
             NoHarmonyInit();
-            IsInit = true;
             NoHarmonyLoad();
             Log(LogLvl.Info, "Pending tasks : " + ModelDelegates.Count + " models, " + BehaviorDelegates.Count + " behaviors.");
         }
 
-        /// <summary>
-        /// Called first in order, always executed. Models are loaded here usually.
-        /// </summary>
-        /// <param name="game"></param>
-        /// <param name="gameStarterObject"></param>
+        //Models will be loaded here, don't forget to call base if you override. 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
         {
             if (!(game.GameType is Campaign))
@@ -63,10 +55,7 @@ namespace NoHarmony //Exp v0.9.8
             }
         }
 
-        /// <summary>
-        /// Executed after the initializer is integrated to the campaign object. You can't add models anymore.
-        /// </summary>
-        /// <param name="game"></param>
+        //Behaviors operations wille be done here, don't forget to call base if you override.
         public override void OnGameInitializationFinished(Game game)
         {
             if (!(game.GameType is Campaign campaign))
@@ -101,27 +90,58 @@ namespace NoHarmony //Exp v0.9.8
         public enum TypeLog { None = 0, Models = 1, Behaviors = 2, All = 3 }
         public enum LogLvl { Tracking = 0, Info = 1, Warning = 2, Error = 3 }
         public enum TaskStatus { Pending, Completed, Warning, Error }
-        protected bool IsInit { get; private set; }
 
+        /// <summary>
+        /// Use this method in your NoHarmonyLoad() method to add new models to the game.
+        /// </summary>
+        /// <typeparam name="AddType">Model type to add</typeparam>
         public void AddModel<AddType>()
             where AddType : GameModel, new()
         {
             ModelDelegates.Add(NHLModel<AddType, GameModel>);
             ModelModes.Add(TaskMode.Add);
         }
+        /// <summary>
+        /// Use this method in your NoHarmonyLoad() method to replace a specified model by a new specified one.
+        /// </summary>
+        /// <typeparam name="AddType">Model type to add</typeparam>
+        /// <typeparam name="RemoveType">Model type to be replaced</typeparam>
+        /// <param name="m">Not required. The replace mode to use. (Do not pick add or remove)</param>
         public void ReplaceModel<AddType, RemoveType>(TaskMode m = TaskMode.Replace)
             where AddType : GameModel, new()
             where RemoveType : GameModel
         {
+            if (TaskMode.Add == m || m == TaskMode.Remove)
+                return;
             ModelDelegates.Add(NHLModel<AddType, RemoveType>);
             ModelModes.Add(m);
         }
+        /// <summary>
+        /// Use this method in your NoHarmonyLoad() method to remove a specified model. (Dangerous)
+        /// </summary>
+        /// <typeparam name="RemoveType">Model type to remove</typeparam>
+        public void RemoveModel<RemoveType>()
+            where RemoveType : GameModel
+        {
+            ModelDelegates.Add(NHLModel<DummyModel, RemoveType>);
+            ModelModes.Add(TaskMode.Remove);
+        }
+        /// <summary>
+        /// Use this method in your NoHarmonyLoad() method to add new behavior to the game.
+        /// </summary>
+        /// <typeparam name="AddType">Behavior type to add</typeparam>
         public void AddBehavior<AddType>()
             where AddType : CampaignBehaviorBase, new()
         {
             BehaviorDelegates.Add(NHLBehavior<AddType, CampaignBehaviorBase>);
             BehaviorModes.Add(TaskMode.Add);
         }
+        /// <summary>
+        /// Use this method in your NoHarmonyLoad() method to replace a specified behavior by a new specified one.
+        /// </summary>
+        /// <typeparam name="AddType">Behavior type to add</typeparam>
+        /// <typeparam name="RemoveType">Behavior type to remove</typeparam>
+        /// <param name="m">Not required. The replace mode to use. (Do not pick add or remove)</param>
         public void ReplaceBehavior<AddType, RemoveType>(TaskMode m = TaskMode.Replace)
             where AddType : CampaignBehaviorBase, new()
             where RemoveType : CampaignBehaviorBase
@@ -159,7 +179,7 @@ namespace NoHarmony //Exp v0.9.8
                     }
                     else if (mode == TaskMode.Remove || mode == TaskMode.RemoveAndAdd)
                     {
-                        models.RemoveAt(index);
+                        models.RemoveAt(index); // C# rearrange the for loop on it's own. 
                         rm++;
                     }
                 }
@@ -227,6 +247,20 @@ namespace NoHarmony //Exp v0.9.8
             }
             using (StreamWriter sw = new StreamWriter(LogFile, true))
                 sw.WriteLine(DateTime.Now.ToString("dd/MM/yy HH:mm:ss.fff") + " > " + message);
+        }
+    }
+
+    public sealed class DummyModel : GameModel { }
+    public sealed class DummyBehavior : CampaignBehaviorBase
+    {
+        public override void RegisterEvents()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void SyncData(IDataStore dataStore)
+        {
+            throw new NotImplementedException();
         }
     }
 }

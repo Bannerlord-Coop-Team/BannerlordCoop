@@ -41,18 +41,37 @@ namespace Coop.Network
                 conn.Send(packet);
             }
         }
+        public override string ToString()
+        {
+            var sDump = String.Join(
+                                Environment.NewLine,
+                                $"Server is '{State.ToString()}' with '{m_ActiveConnections.Count}/{ActiveConfig.uiMaxPlayerCount}' players.",
+                                $"LAN:   {ActiveConfig.lanAddress}:{ActiveConfig.lanPort}",
+                                $"WAN:   {ActiveConfig.wanAddress}:{ActiveConfig.wanPort}");
+
+            if (m_ActiveConnections.Count > 0)
+            {
+                sDump += Environment.NewLine + $"Connections to clients:";
+                sDump += Environment.NewLine + $"Latency   " + $"Connection State";
+                foreach (var conn in m_ActiveConnections)
+                {
+                    sDump += Environment.NewLine + $"{conn.Latency,-10}" + $"{conn.State}";
+                }
+            }
+            return sDump;
+        }
         virtual public void OnConnected(ConnectionBase con)
         {
             m_ActiveConnections.Add(con);
-            Log.Info($"New connection: {con}.");
+            Log.Info($"Client connection established: {con.ToString()}.");
         }
         virtual public void OnDisconnected(ConnectionBase con, EDisconnectReason eReason)
         {
-            Log.Info($"Connection closed: {con}. {eReason}.");
+            Log.Info($"Client connection closed: {con.ToString()}. {eReason}.");
             con.Disconnect(eReason);
             if (!m_ActiveConnections.Remove(con))
             {
-                Log.Error($"Unknown connection {con}.");
+                Log.Error($"Unknown connection {con.ToString()}.");
             }
         }
         virtual public bool CanPlayerJoin()
