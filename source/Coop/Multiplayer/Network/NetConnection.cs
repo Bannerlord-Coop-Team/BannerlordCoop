@@ -11,8 +11,8 @@ namespace Coop.Multiplayer.Network
         {
             m_Peer = peer;
         }
-        public int FragmentLength => 50_000;
-        public int MaxPackageLength => 50_000_000;
+        public int FragmentLength => 100_000;
+        public int MaxPackageLength => 100_000_000;
 
         public void SendRaw(byte[] raw)
         {

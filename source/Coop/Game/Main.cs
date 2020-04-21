@@ -16,8 +16,11 @@ namespace Coop.Game
         public static Main Instance;
         public Main()
         {
+            AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(OnUnhandledException);
             Instance = this;
             m_Updateables = new UpdateableList();
+            m_Updateables.Add(CoopClient.Instance);
+            m_Updateables.Add(GameLoopRunner.Instance);
         }
         public override void NoHarmonyInit()
         {
@@ -26,7 +29,6 @@ namespace Coop.Game
 
         public override void NoHarmonyLoad()
         {
-            AddModel<ClientModel>();
             AddBehavior<PlayerJoinedBehaviour>();
 
             var harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
@@ -56,16 +58,19 @@ namespace Coop.Game
 
         protected override void OnApplicationTick(float dt)
         {
+            if(m_bFirstTick)
+            {
+                GameLoopRunner.Instance.SetGameLoopThread();
+                m_bFirstTick = false;
+            }
+
             base.OnApplicationTick(dt);
             if (Input.DebugInput.IsControlDown() && Input.DebugInput.IsKeyDown(InputKey.Tilde))
             {
                 Debug.Console.Toggle();
             }
 
-            if(m_ClientModel != null)
-            {
-                m_ClientModel.Update(TimeSpan.FromMilliseconds(dt));
-            }
+            m_Updateables.UpdateAll(TimeSpan.FromMilliseconds(dt));
         }
 
         private void initLogger()
@@ -92,15 +97,13 @@ namespace Coop.Game
                 }
             };
         }
-
-        public override void OnGameInitializationFinished(TaleWorlds.Core.Game game)
+        private static void OnUnhandledException(Object sender, UnhandledExceptionEventArgs e)
         {
-            m_ClientModel = game.GetGameModel<ClientModel>();
-            CoopClient.Client = m_ClientModel;
-            base.OnGameInitializationFinished(game);
+            Exception ex = (Exception)e.ExceptionObject;
+            Common.Log.Error($"Unhandled exception: {ex} - {ex.Message}.");
         }
 
         private readonly UpdateableList m_Updateables;
-        private ClientModel m_ClientModel = null;
+        private bool m_bFirstTick = true;
     }
 }

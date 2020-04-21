@@ -3,7 +3,7 @@ using System;
 using Steamworks;
 using Coop.Network;
 
-namespace Coop.Muliplayer.Steam
+namespace Coop.Multiplayer.Steam
 {
     class NetworkSteam : INetwork
     {

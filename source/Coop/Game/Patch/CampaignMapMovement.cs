@@ -189,7 +189,7 @@ namespace Coop.Game.Patch
 
         private static bool IsMovementRelevantForServer(MobileParty partyToMove)
         {
-            return CoopClient.Client.GameState.IsPlayerControlledParty(partyToMove);
+            return CoopClient.Instance.GameState.IsPlayerControlledParty(partyToMove);
         }
     }
 }

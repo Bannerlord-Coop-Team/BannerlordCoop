@@ -1,4 +1,4 @@
-﻿using Coop.Muliplayer.Steam;
+﻿using Coop.Multiplayer.Steam;
 using System;
 using System.Collections.Generic;
 using System.Linq;

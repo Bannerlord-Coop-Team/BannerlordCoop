@@ -65,6 +65,18 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\Newtonsoft.Json.dll</HintPath>
     </Reference>
+    <Reference Include="SandBox">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
+    </Reference>
+    <Reference Include="SandBox.GauntletUI">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="SandBox.View">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
+    </Reference>
+    <Reference Include="SandBox.ViewModelCollection">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
+    </Reference>
     <Reference Include="Stateless, Version=4.0.0.0, Culture=neutral, PublicKeyToken=93038f0927583c9a, processorArchitecture=MSIL">
       <HintPath>..\packages\Stateless.5.1.1\lib\net472\Stateless.dll</HintPath>
     </Reference>
@@ -204,10 +216,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Common\UpdateableList.cs" />
+    <Compile Include="Game\GameLoopRunner.cs" />
+    <Compile Include="Game\Patch\Exceptions.cs" />
+    <Compile Include="Game\Patch\Utils.cs" />
+    <Compile Include="Game\SaveLoad.cs" />
     <Compile Include="Game\WorldData.cs" />
     <Compile Include="Game\CoopEvents.cs" />
     <Compile Include="Game\CoopGameState.cs" />
-    <Compile Include="Game\ClientModel.cs" />
     <Compile Include="Game\CoopClient.cs" />
     <Compile Include="Game\CoopServer.cs" />
     <Compile Include="Game\Debug\CLICommands.cs" />
