@@ -21,7 +21,7 @@ namespace Coop.Tests
             m_WorldData = new Mock<IWorldData>();
             m_WorldData.Setup(w => w.Receive(It.IsAny<byte[]>()))
                 .Returns(true);
-            m_WorldData.Setup(w => w.SerializeWorldState())
+            m_WorldData.Setup(w => w.SerializeInitialWorldState())
                 .Returns(new byte[0]);
 
             ServerConfiguration config = TestUtils.GetTestingConfig();
@@ -57,7 +57,7 @@ namespace Coop.Tests
             // Setup server hooks.
             void OnClientDispatch(EConnectionState eState, Packet packet)
             {
-                if(packet.Type == Protocol.EPacket.Client_KeepAlive)
+                if(packet.Type == Protocol.EPacket.KeepAlive)
                 {
                     ++iKeepAlivesReceived;
                 }
@@ -91,7 +91,7 @@ namespace Coop.Tests
             Assert.Equal(EConnectionState.ServerConnected, connServerSide.State);
             Assert.Equal(expectedReceiveOrderOnServer.Count, iPacketsReceived);
             m_WorldData.Verify(w => w.Receive(It.IsAny<byte[]>()), Times.Once());
-            m_WorldData.Verify(w => w.SerializeWorldState(), Times.Once());
+            m_WorldData.Verify(w => w.SerializeInitialWorldState(), Times.Once());
 
             // Check if keep alive gets sent
             if (iKeepAlivesReceived == 0)
@@ -99,6 +99,13 @@ namespace Coop.Tests
                 TestUtils.UpdateUntil(() => iKeepAlivesReceived > 0, new List<IUpdateable>() { client.Manager });
                 Assert.True(iKeepAlivesReceived > 0);
             }
+
+            // Send a sync package from client to server
+            expectedReceiveOrderOnServer.Add((EConnectionState.ServerConnected, Protocol.EPacket.Sync));
+            client.Session.Connection.Send(new Packet(Protocol.EPacket.Sync, new byte[] { }));
+            TestUtils.UpdateUntil(() => iPacketsReceived == expectedReceiveOrderOnServer.Count, new List<IUpdateable>() { client.Manager, m_NetManagerServer });
+            Assert.Equal(expectedReceiveOrderOnServer.Count, iPacketsReceived);
+            m_WorldData.Verify(w => w.Receive(It.IsAny<byte[]>()), Times.Exactly(2));
         }
     }
 }

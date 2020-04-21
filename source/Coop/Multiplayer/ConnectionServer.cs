@@ -107,7 +107,7 @@ namespace Coop.Multiplayer
         }
         private void SendInitialWorldData()
         {
-            Send(new Packet(Protocol.EPacket.Server_WorldData, m_WorldData.SerializeWorldState()));
+            Send(new Packet(Protocol.EPacket.Server_WorldData, m_WorldData.SerializeInitialWorldState()));
         }
         [PacketHandler(EConnectionState.ServerSendingWorldData, Protocol.EPacket.Client_Joined)]
         private void receiveClientJoined(Packet packet)
@@ -115,12 +115,24 @@ namespace Coop.Multiplayer
             Protocol.Client_Joined payload = Protocol.Client_Joined.Deserialize(new ByteReader(packet.Payload));
             m_StateMachine.Fire(ETrigger.ClientJoined);
         }
-
-        [PacketHandler(EConnectionState.ServerSendingWorldData, Protocol.EPacket.Client_KeepAlive)]
-        [PacketHandler(EConnectionState.ServerConnected, Protocol.EPacket.Client_KeepAlive)]
+        [PacketHandler(EConnectionState.ServerConnected, Protocol.EPacket.Sync)]
+        private void receiveSyncPacket(Packet packet)
+        {
+            bool bSuccess = false;
+            try
+            {
+                bSuccess = m_WorldData.Receive(packet.Payload);
+            }
+            catch (Exception e)
+            {
+                Log.Error($"Sync data received from client {this} could not be parsed '{e}'. Ignored.");
+            }
+        }
+        [PacketHandler(EConnectionState.ServerSendingWorldData, Protocol.EPacket.KeepAlive)]
+        [PacketHandler(EConnectionState.ServerConnected, Protocol.EPacket.KeepAlive)]
         private void receiveClientKeepAlive(Packet packet)
         {
-            Protocol.Client_KeepAlive payload = Protocol.Client_KeepAlive.Deserialize(new ByteReader(packet.Payload));
+            Protocol.KeepAlive payload = Protocol.KeepAlive.Deserialize(new ByteReader(packet.Payload));
         }
         #endregion
     }

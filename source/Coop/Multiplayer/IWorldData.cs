@@ -10,7 +10,6 @@ namespace Coop.Multiplayer
     public interface IWorldData
     {
         bool Receive(byte[] rawData);
-
-        byte[] SerializeWorldState();
+        byte[] SerializeInitialWorldState();
     }
 }

@@ -125,13 +125,25 @@ namespace Coop.Multiplayer
         {
             Send(new Packet(Protocol.EPacket.Client_Joined, new Protocol.Client_Joined().Serialize()));
         }
-        
-        [PacketHandler(EConnectionState.ClientAwaitingWorldData, Protocol.EPacket.Server_KeepAlive)]
-        [PacketHandler(EConnectionState.ClientConnected, Protocol.EPacket.Server_KeepAlive)]
+        [PacketHandler(EConnectionState.ClientConnected, Protocol.EPacket.Sync)]
+        private void receiveSyncPacket(Packet packet)
+        {
+            bool bSuccess = false;
+            try
+            {
+                bSuccess = m_WorldData.Receive(packet.Payload);
+            }
+            catch (Exception e)
+            {
+                Log.Error($"Sync data received from server could not be parsed '{e}'. Ignored.");
+            }
+        }
+        [PacketHandler(EConnectionState.ClientAwaitingWorldData, Protocol.EPacket.KeepAlive)]
+        [PacketHandler(EConnectionState.ClientConnected, Protocol.EPacket.KeepAlive)]
         private void receiveServerKeepAlive(Packet packet)
         {
-            Protocol.Server_KeepAlive payload = Protocol.Server_KeepAlive.Deserialize(new ByteReader(packet.Payload));
-            Send(new Packet(Protocol.EPacket.Client_KeepAlive, new Protocol.Client_KeepAlive(payload.m_iKeepAliveID).Serialize()));
+            Protocol.KeepAlive payload = Protocol.KeepAlive.Deserialize(new ByteReader(packet.Payload));
+            Send(new Packet(Protocol.EPacket.KeepAlive, new Protocol.KeepAlive(payload.m_iKeepAliveID).Serialize()));
         }
         #endregion
     }

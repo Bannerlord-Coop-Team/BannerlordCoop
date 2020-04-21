@@ -13,29 +13,25 @@ using TaleWorlds.SaveSystem.Save;
 
 namespace Coop.Game
 {
+    enum ECommand
+    {
+        InitialWorldState
+    }
     class WorldData : IWorldData
     {
-        public WorldData()
-        {
-
-        }
-        enum EData
-        {
-            WorldState
-        }
         public bool Receive(byte[] rawData)
         {
             ByteReader reader = new ByteReader(rawData);
-            EData eData = (EData)reader.Binary.ReadInt32();
+            ECommand eData = (ECommand)reader.Binary.ReadInt32();
             switch(eData)
             {
-                case EData.WorldState:
+                case ECommand.InitialWorldState:
                     return ReceiveWorldState(rawData);
                 default:
                     return false;
             }
         }
-        public byte[] SerializeWorldState()
+        public byte[] SerializeInitialWorldState()
         {
             CampaignEventDispatcher.Instance.OnBeforeSave();
 
@@ -47,7 +43,7 @@ namespace Coop.Game
 
             // Write packet
             ByteWriter writer = new ByteWriter();
-            writer.Binary.Write((int)EData.WorldState);
+            writer.Binary.Write((int)ECommand.InitialWorldState);
             writer.Binary.Write(save.Data.GetData());
             return writer.ToArray();
         }

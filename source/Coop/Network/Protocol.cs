@@ -9,12 +9,13 @@ namespace Coop.Network
             Client_Hello,               // Introduces the client to the server.
             Client_Info,                // Contains ClientInfo.
             Client_Joined,              // Sent once the client has loaded the initial world state.
-            Client_KeepAlive,
 
             Server_RequestClientInfo,   // Instructs the client to send its ClientInfo.
             Server_JoinRequestAccepted, // Client is allowed to join the server.
-            Server_WorldData,           // Contains data about the game world.
-            Server_KeepAlive
+            Server_WorldData,           // Contains the initial state of the game world.
+
+            Sync,
+            KeepAlive
         }
         public const int Version = 0;
 
@@ -71,25 +72,6 @@ namespace Coop.Network
                 return new Client_Joined();
             }
         }
-        public class Client_KeepAlive
-        {
-            public readonly int m_iKeepAliveID;
-            public Client_KeepAlive(int iKeepAliveID)
-            {
-                m_iKeepAliveID = iKeepAliveID;
-            }
-            public byte[] Serialize()
-            {
-                ByteWriter writer = new ByteWriter();
-                writer.Binary.Write(m_iKeepAliveID);
-                return writer.ToArray();
-            }
-
-            public static Client_KeepAlive Deserialize(ByteReader reader)
-            {
-                return new Client_KeepAlive(reader.Binary.ReadInt32());
-            }
-        }
         #endregion
 
         #region Server payload serializers
@@ -121,10 +103,12 @@ namespace Coop.Network
                 return new Server_JoinRequestAccepted();
             }
         }
-        public class Server_KeepAlive
+        #endregion
+
+        public class KeepAlive
         {
             public readonly int m_iKeepAliveID;
-            public Server_KeepAlive(int iKeepAliveID)
+            public KeepAlive(int iKeepAliveID)
             {
                 m_iKeepAliveID = iKeepAliveID;
             }
@@ -135,11 +119,10 @@ namespace Coop.Network
                 return writer.ToArray();
             }
 
-            public static Server_KeepAlive Deserialize(ByteReader reader)
+            public static KeepAlive Deserialize(ByteReader reader)
             {
-                return new Server_KeepAlive(reader.Binary.ReadInt32());
+                return new KeepAlive(reader.Binary.ReadInt32());
             }
         }
-        #endregion
     }
 }

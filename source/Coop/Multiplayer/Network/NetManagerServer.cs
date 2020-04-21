@@ -70,7 +70,7 @@ namespace Coop.Multiplayer.Network
 
             if(m_SinceLastKeepAlive > m_Config.keepAliveInterval)
             {
-                m_Server.SendToAll(new Packet(Protocol.EPacket.Server_KeepAlive, new Protocol.Server_KeepAlive(++m_iKeepAliveID).Serialize()));
+                m_Server.SendToAll(new Packet(Protocol.EPacket.KeepAlive, new Protocol.KeepAlive(++m_iKeepAliveID).Serialize()));
                 m_SinceLastKeepAlive = TimeSpan.Zero;
             }
         }
