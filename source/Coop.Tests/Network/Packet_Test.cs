@@ -10,7 +10,7 @@ namespace Coop.Tests
         private readonly byte[] m_raw = { 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf };
         public Packet_Test()
         {
-            
+
             m_Packet = new Packet(Protocol.EPacket.Client_Hello, m_raw);
         }
 
@@ -61,7 +61,7 @@ namespace Coop.Tests
             var writerBinary = new BinaryWriter(stream);
 
             var writer = new PacketWriter(m_Packet);
-            while(!writer.Done)
+            while (!writer.Done)
             {
                 writer.Write(writerBinary, iFragmentLength);
             }
@@ -70,7 +70,7 @@ namespace Coop.Tests
             var readerBinary = new ByteReader(stream);
             var reader = new PacketReader();
             Packet serializedPacket = null;
-            while(!reader.Done)
+            while (!reader.Done)
             {
                 serializedPacket = reader.Read(readerBinary);
             }

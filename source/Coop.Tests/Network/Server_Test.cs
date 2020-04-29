@@ -46,7 +46,7 @@ namespace Coop.Tests
             m_Config = new ServerConfiguration();
             m_Server.Updateables.Add(m_Module);
             m_Config.uiTickRate = 0;
-        }        
+        }
 
         [Fact]
         public void StartAndStop()
@@ -93,5 +93,5 @@ namespace Coop.Tests
         }
     }
 
-    
+
 }

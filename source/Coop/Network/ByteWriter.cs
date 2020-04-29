@@ -4,8 +4,9 @@ namespace Coop.Network
 {
     public class ByteWriter
     {
-        private readonly MemoryStream Stream;
         public readonly BinaryWriter Binary;
+        private readonly MemoryStream Stream;
+
         public ByteWriter()
         {
             Stream = new MemoryStream();

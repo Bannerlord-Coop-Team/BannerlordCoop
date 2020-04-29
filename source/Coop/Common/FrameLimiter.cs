@@ -6,11 +6,12 @@ namespace Coop.Common
 {
     public class FrameLimiter
     {
-        private readonly Action<long> m_WaitUntilTick;
+        private readonly MovingAverage m_Avg;
         private readonly long m_TargetTicksPerFrame;
         private readonly Stopwatch m_Timer;
-        private readonly MovingAverage m_Avg;
+        private readonly Action<long> m_WaitUntilTick;
         public TimeSpan LastFrameTime;
+
         public FrameLimiter(TimeSpan targetFrameTime)
         {
             m_TargetTicksPerFrame = targetFrameTime.Ticks;
@@ -37,17 +38,19 @@ namespace Coop.Common
                     SpinWait.SpinUntil(() => { return m_Timer.ElapsedTicks >= tick; });
                 };
             }
+
             m_Avg = new MovingAverage(32);
         }
 
         public void Throttle()
         {
             long elapsedTicks = m_Timer.Elapsed.Ticks;
-            var avgTicksPerFrame = m_Avg.Push(elapsedTicks);
+            double avgTicksPerFrame = m_Avg.Push(elapsedTicks);
             if (avgTicksPerFrame < m_TargetTicksPerFrame)
             {
-                m_WaitUntilTick(elapsedTicks + (m_TargetTicksPerFrame - (long)avgTicksPerFrame));
+                m_WaitUntilTick(elapsedTicks + (m_TargetTicksPerFrame - (long) avgTicksPerFrame));
             }
+
             LastFrameTime = m_Timer.Elapsed;
             m_Timer.Restart();
         }

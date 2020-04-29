@@ -79,7 +79,7 @@ namespace Coop.Tests
             {
                 int iPort = FindAvailablePort(3000);
                 UsedPorts.Add(iPort);
-                if(iPort == 0)
+                if (iPort == 0)
                 {
                     throw new Exception("Could not find any available ports.");
                 }

@@ -1,14 +1,20 @@
-﻿using Coop.Common;
-using System;
-using Steamworks;
+﻿using System;
+using Coop.Common;
 using Coop.Network;
+using Steamworks;
 
 namespace Coop.Multiplayer.Steam
 {
-    class NetworkSteam : INetwork
+    internal class NetworkSteam : INetwork
     {
         private const int APP_ID_INT = 261550;
         private static readonly AppId_t APP_ID = new AppId_t(APP_ID_INT);
+
+        public NetworkSteam()
+        {
+            Environment.SetEnvironmentVariable("SteamAppId", APP_ID_INT.ToString());
+        }
+
         public bool IsConnected { get; private set; }
 
         public bool Connect()
@@ -19,15 +25,21 @@ namespace Coop.Multiplayer.Steam
                 {
                     IsConnected = SteamAPI.Init();
                     if (!IsConnected)
+                    {
                         Log.Error("Steam API failed to initialize.");
+                    }
                     else
-                        SteamClient.SetWarningMessageHook((severity, text) => Console.WriteLine(text.ToString()));
+                    {
+                        SteamClient.SetWarningMessageHook(
+                            (severity, text) => Console.WriteLine(text.ToString()));
+                    }
                 }
                 catch (Exception e)
                 {
                     Log.Error(e.Message);
                 }
             }
+
             return IsConnected;
         }
 
@@ -37,11 +49,6 @@ namespace Coop.Multiplayer.Steam
             {
                 SteamAPI.Shutdown();
             }
-        }
-
-        public NetworkSteam()
-        {
-            Environment.SetEnvironmentVariable("SteamAppId", APP_ID_INT.ToString());
         }
 
         ~NetworkSteam()

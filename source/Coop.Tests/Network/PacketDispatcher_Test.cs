@@ -30,7 +30,7 @@ namespace Coop.Tests
         public void StaticHandlerRegistered()
         {
             bool wasCalled = false;
-            EventHandlerStatic.s_OnStaticHandlerCalled = (packet) => 
+            EventHandlerStatic.s_OnStaticHandlerCalled = (packet) =>
             {
                 wasCalled = true;
                 Assert.Equal(m_Packet, packet);

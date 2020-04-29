@@ -1,32 +1,37 @@
 ﻿using System;
 using System.Diagnostics;
 using Coop.Network;
-using LiteNetLib;
 using RailgunNet.Connection.Traffic;
 
 namespace Coop.Multiplayer.Network
 {
-    public class RailNetPeerWrapper  : IRailNetPeer, IGameStatePersistence
+    public class RailNetPeerWrapper : IRailNetPeer, IGameStatePersistence
     {
         private readonly INetworkConnection m_Connection;
-        public event EventHandler OnDisconnected;
+
         public RailNetPeerWrapper(INetworkConnection connection)
         {
             m_Connection = connection;
         }
 
-        [Conditional("DEBUG")]private static void AssertIsPersistencePayload(ArraySegment<byte> buffer)
+        public void Receive(ArraySegment<byte> buffer)
+        {
+            AssertIsPersistencePayload(buffer);
+            PayloadReceived?.Invoke(
+                this,
+                new ArraySegment<byte>(buffer.Array, buffer.Offset + 1, buffer.Count - 1));
+        }
+
+        public event EventHandler OnDisconnected;
+
+        [Conditional("DEBUG")]
+        private static void AssertIsPersistencePayload(ArraySegment<byte> buffer)
         {
             Protocol.EPacket eType = PacketReader.DecodePacketType(buffer.Array[buffer.Offset]);
             if (eType != Protocol.EPacket.Persistence)
             {
                 throw new ArgumentException(nameof(buffer));
             }
-        }
-        public void Receive(ArraySegment<byte> buffer)
-        {
-            AssertIsPersistencePayload(buffer);
-            PayloadReceived?.Invoke(this, new ArraySegment<byte>(buffer.Array, buffer.Offset + 1, buffer.Count - 1));
         }
 
         public void Disconnect()

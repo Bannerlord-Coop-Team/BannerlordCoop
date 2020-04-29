@@ -22,6 +22,7 @@ namespace Coop.Game.Persistence
                     reg.AddEntityType<WorldEntityServer, WorldState>();
                     break;
             }
+
             reg.SetCommandType<DummyCommand>();
             reg.AddEventType<DummyEvent>();
 
@@ -46,6 +47,7 @@ namespace Coop.Game.Persistence
             {
             }
         }
+
         public class DummyEvent : RailEvent<DummyEvent>
         {
             protected override void CopyDataFrom(DummyEvent other)

@@ -1,6 +1,6 @@
-﻿using Coop.Network;
+﻿using System.Net;
+using Coop.Network;
 using LiteNetLib;
-using System.Net;
 
 namespace Coop.Multiplayer.Network
 {
@@ -8,11 +8,12 @@ namespace Coop.Multiplayer.Network
     {
         public static ConnectionBase GetConnection(this NetPeer peer)
         {
-            return (ConnectionBase)peer.Tag;
+            return (ConnectionBase) peer.Tag;
         }
+
         public static string ToFriendlyString(this IPEndPoint endPoint)
         {
-            return $"{endPoint.Address.ToString()}:{endPoint.Port}";
+            return $"{endPoint.Address}:{endPoint.Port}";
         }
 
         public static string ToFriendlyString(this ConnectionRequest request)

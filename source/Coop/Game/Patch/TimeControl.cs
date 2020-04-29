@@ -1,6 +1,5 @@
-﻿using Coop.Common;
+﻿using System;
 using HarmonyLib;
-using System;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game.Patch
@@ -12,15 +11,19 @@ namespace Coop.Game.Patch
 
         public static void SetForced_Campaign_TimeControlMode(CampaignTimeControlMode eMode)
         {
-            Utils.InvokePrivateMethod(typeof(Campaign), "SetTimeControlMode", Campaign.Current, new object[]{ eMode });
+            Utils.InvokePrivateMethod(
+                typeof(Campaign),
+                "SetTimeControlMode",
+                Campaign.Current,
+                new object[] {eMode});
         }
 
         [HarmonyPatch(typeof(Campaign))]
         [HarmonyPatch(nameof(Campaign.TimeControlMode), MethodType.Setter)]
-        [HarmonyPatch(new Type[] { typeof(CampaignTimeControlMode) })]
+        [HarmonyPatch(new[] {typeof(CampaignTimeControlMode)})]
         private static class Campaign_TimeControlMode
         {
-            static bool Prefix(CampaignTimeControlMode value)
+            private static bool Prefix(CampaignTimeControlMode value)
             {
                 On_Campaign_TimeControlMode?.Invoke(value);
                 return !IsRemoteControlled;

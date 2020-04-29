@@ -12,6 +12,13 @@ namespace Coop.Game
 {
     public class CoopServerRail : IUpdateable
     {
+        private readonly RailServer m_Instance;
+
+        private readonly Dictionary<ConnectionServer, RailNetPeerWrapper> m_RailConnections =
+            new Dictionary<ConnectionServer, RailNetPeerWrapper>();
+
+        private readonly Server m_Server;
+
         public CoopServerRail(Server server)
         {
             m_Server = server;
@@ -21,21 +28,23 @@ namespace Coop.Game
             m_Server.Updateables.Add(this);
         }
 
+        public void Update(TimeSpan frameTime)
+        {
+            m_Instance.Update();
+        }
+
         ~CoopServerRail()
         {
             m_Server.Updateables.Remove(this);
         }
 
-        public void Update(TimeSpan frameTime)
-        {
-            m_Instance.Update();
-        }
         public void ClientJoined(ConnectionServer connection)
         {
-            var peer = new RailNetPeerWrapper(connection.Network);
+            RailNetPeerWrapper peer = new RailNetPeerWrapper(connection.Network);
             m_RailConnections.Add(connection, peer);
             m_Instance.AddClient(peer, ""); // TODO: Name
         }
+
         public void Disconnected(ConnectionServer connection)
         {
             if (m_RailConnections.ContainsKey(connection))
@@ -43,9 +52,5 @@ namespace Coop.Game
                 m_Instance.RemoveClient(m_RailConnections[connection]);
             }
         }
-
-        private readonly Dictionary<ConnectionServer, RailNetPeerWrapper> m_RailConnections = new Dictionary<ConnectionServer, RailNetPeerWrapper>();
-        private readonly Server m_Server;
-        private readonly RailServer m_Instance;
     }
 }

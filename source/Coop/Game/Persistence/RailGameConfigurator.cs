@@ -1,4 +1,5 @@
-﻿using RailgunNet;
+﻿using Coop.Game.Patch;
+using RailgunNet;
 
 namespace Coop.Game.Persistence
 {
@@ -6,7 +7,7 @@ namespace Coop.Game.Persistence
     {
         public static void SetInstanceAs(Component eComponent)
         {
-            Patch.TimeControl.IsRemoteControlled = eComponent == Component.Client;
+            TimeControl.IsRemoteControlled = eComponent == Component.Client;
         }
     }
 }

@@ -9,7 +9,7 @@ namespace Coop.Tests
         public List<CampaignTimeControlMode> Values = new List<CampaignTimeControlMode>() { CampaignTimeControlMode.Stop };
         public CampaignTimeControlMode TimeControlMode
         {
-            get => Values[^1]; 
+            get => Values[^1];
             set => Values.Add(value);
         }
     }

@@ -1,5 +1,4 @@
 ﻿using Coop.Common;
-using System;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game
@@ -8,8 +7,10 @@ namespace Coop.Game
     {
         public override void RegisterEvents()
         {
-            CampaignEvents.OnGameLoadedEvent.AddNonSerializedListener(this, new Action<CampaignGameStarter>(this.OnGameLoaded));
-            CoopClient.Instance.Events.OnBeforePlayerPartySpawned.AddNonSerializedListener(this, new Action<MobileParty>(this.OnPlayerControlledPartySpawned));
+            CampaignEvents.OnGameLoadedEvent.AddNonSerializedListener(this, OnGameLoaded);
+            CoopClient.Instance.Events.OnBeforePlayerPartySpawned.AddNonSerializedListener(
+                this,
+                OnPlayerControlledPartySpawned);
         }
 
         public override void SyncData(IDataStore dataStore)

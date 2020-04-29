@@ -1,9 +1,9 @@
-﻿using Coop.Common;
-using RailgunNet;
-using RailgunNet.Connection.Client;
-using System;
+﻿using System;
+using Coop.Common;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
+using RailgunNet;
+using RailgunNet.Connection.Client;
 
 namespace Coop.Game.Persistence
 {
@@ -15,19 +15,23 @@ namespace Coop.Game.Persistence
         {
             m_RailClient = new RailClient(Registry.Get(Component.Client));
         }
+
         public void Update(TimeSpan frameTime)
         {
             m_RailClient.Update();
         }
+
         public void OnConnectionCreated(ConnectionClient connection)
         {
             connection.OnClientJoined += OnClientJoined;
             connection.OnDisconnected += OnDisconnected;
         }
+
         private void OnClientJoined(ConnectionClient connection)
         {
             m_RailClient.SetPeer((RailNetPeerWrapper) connection.GameStatePersistence);
         }
+
         private void OnDisconnected()
         {
             m_RailClient.SetPeer(null);

@@ -7,10 +7,11 @@ namespace Coop.Network
     {
         public readonly EConnectionState State;
         public readonly Protocol.EPacket Type;
+
         public PacketHandlerAttribute(EConnectionState state, Protocol.EPacket eType)
         {
-            this.State = state;
-            this.Type = eType;
+            State = state;
+            Type = eType;
         }
     }
 }

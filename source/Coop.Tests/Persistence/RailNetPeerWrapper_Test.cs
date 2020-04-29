@@ -35,7 +35,7 @@ namespace Coop.Tests
         {
             byte[] payload = Enumerable.Range(7, iPayloadLength).Select(i => (byte)i).ToArray();
             m_Instance.SendPayload(payload);
-            
+
             ByteWriter writer = new ByteWriter();
             writer.Binary.Write(PacketWriter.EncodePacketType(Protocol.EPacket.Persistence));
             writer.Binary.Write(payload);

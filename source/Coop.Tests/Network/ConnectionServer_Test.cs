@@ -47,7 +47,7 @@ namespace Coop.Tests
 
             // Respond with client info
             var clientInfo = TestUtils.MakeRaw(
-                Protocol.EPacket.Client_Info, 
+                Protocol.EPacket.Client_Info,
                 new Protocol.Client_Info(new Player("Unknown")).Serialize());
             m_Connection.Receive(clientInfo);
             Assert.Equal(EConnectionState.ServerSendingWorldData, m_Connection.State);
@@ -64,7 +64,7 @@ namespace Coop.Tests
 
             // client joined
             var joined = TestUtils.MakeRaw(
-                Protocol.EPacket.Client_Joined, 
+                Protocol.EPacket.Client_Joined,
                 new Protocol.Client_Joined().Serialize());
             m_Connection.Receive(joined);
             Assert.Equal(EConnectionState.ServerConnected, m_Connection.State);

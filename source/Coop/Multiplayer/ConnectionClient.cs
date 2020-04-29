@@ -1,74 +1,77 @@
-﻿using Coop.Common;
+﻿using System;
+using Coop.Common;
 using Coop.Network;
 using Stateless;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Coop.Multiplayer
 {
     public class ConnectionClient : ConnectionBase
     {
-        public event Action<ConnectionClient> OnClientJoined;
-        public event Action OnDisconnected;
-        private enum ETrigger
-        {
-            TryJoinServer,
-            ServerAcceptedJoinRequest,
-            InitialWorldDataReceived,
-            Disconnect,
-            Disconnected
-        }
         private readonly StateMachine<EConnectionState, ETrigger> m_StateMachine;
-        public override EConnectionState State => m_StateMachine.State;
         private readonly ISaveData m_WorldData;
 
-        public ConnectionClient(INetworkConnection network, IGameStatePersistence persistence, ISaveData worldData)
-            : base(network, persistence)
+        public ConnectionClient(
+            INetworkConnection network,
+            IGameStatePersistence persistence,
+            ISaveData worldData) : base(network, persistence)
         {
             m_WorldData = worldData;
 
-            m_StateMachine = new StateMachine<EConnectionState, ETrigger>(EConnectionState.Disconnected);
+            m_StateMachine =
+                new StateMachine<EConnectionState, ETrigger>(EConnectionState.Disconnected);
 
             m_StateMachine.Configure(EConnectionState.Disconnected)
-                .Permit(ETrigger.TryJoinServer, EConnectionState.ClientJoinRequesting);
+                          .Permit(ETrigger.TryJoinServer, EConnectionState.ClientJoinRequesting);
 
-            var disconnectTrigger = m_StateMachine.SetTriggerParameters<EDisconnectReason>(ETrigger.Disconnect);
+            StateMachine<EConnectionState, ETrigger>.TriggerWithParameters<EDisconnectReason>
+                disconnectTrigger =
+                    m_StateMachine.SetTriggerParameters<EDisconnectReason>(ETrigger.Disconnect);
             m_StateMachine.Configure(EConnectionState.Disconnecting)
-                .OnEntryFrom(disconnectTrigger, closeConnection)
-                .Permit(ETrigger.Disconnected, EConnectionState.Disconnected);
+                          .OnEntryFrom(disconnectTrigger, closeConnection)
+                          .Permit(ETrigger.Disconnected, EConnectionState.Disconnected);
 
             m_StateMachine.Configure(EConnectionState.ClientJoinRequesting)
-                .OnEntry(sendClientHello)
-                .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
-                .Permit(ETrigger.ServerAcceptedJoinRequest, EConnectionState.ClientAwaitingWorldData);
+                          .OnEntry(sendClientHello)
+                          .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
+                          .Permit(
+                              ETrigger.ServerAcceptedJoinRequest,
+                              EConnectionState.ClientAwaitingWorldData);
 
             m_StateMachine.Configure(EConnectionState.ClientAwaitingWorldData)
-                .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
-                .Permit(ETrigger.InitialWorldDataReceived, EConnectionState.ClientConnected);
+                          .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
+                          .Permit(
+                              ETrigger.InitialWorldDataReceived,
+                              EConnectionState.ClientConnected);
 
             m_StateMachine.Configure(EConnectionState.ClientConnected)
-                .OnEntry(onConnected)
-                .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting);
+                          .OnEntry(onConnected)
+                          .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting);
 
             Dispatcher.RegisterPacketHandlers(this);
         }
+
+        public override EConnectionState State => m_StateMachine.State;
+        public event Action<ConnectionClient> OnClientJoined;
+        public event Action OnDisconnected;
+
         ~ConnectionClient()
         {
             Dispatcher.UnregisterPacketHandlers(this);
         }
+
         public void Connect()
         {
             m_StateMachine.Fire(ETrigger.TryJoinServer);
         }
+
         public override void Disconnect(EDisconnectReason eReason)
         {
             if (!m_StateMachine.IsInState(EConnectionState.Disconnected))
             {
-                m_StateMachine.Fire(new StateMachine<EConnectionState, ETrigger>.TriggerWithParameters<EDisconnectReason>(ETrigger.Disconnect), eReason);
+                m_StateMachine.Fire(
+                    new StateMachine<EConnectionState, ETrigger>.TriggerWithParameters<
+                        EDisconnectReason>(ETrigger.Disconnect),
+                    eReason);
             }
         }
 
@@ -78,28 +81,54 @@ namespace Coop.Multiplayer
             Network.Close(eReason);
             m_StateMachine.Fire(ETrigger.Disconnected);
         }
+
+        private enum ETrigger
+        {
+            TryJoinServer,
+            ServerAcceptedJoinRequest,
+            InitialWorldDataReceived,
+            Disconnect,
+            Disconnected
+        }
+
         #region ClientJoinRequesting
         private void sendClientHello()
         {
-            Send(new Packet(Protocol.EPacket.Client_Hello, new Protocol.Client_Hello(Protocol.Version).Serialize()));
+            Send(
+                new Packet(
+                    Protocol.EPacket.Client_Hello,
+                    new Protocol.Client_Hello(Protocol.Version).Serialize()));
         }
-        [PacketHandler(EConnectionState.ClientJoinRequesting, Protocol.EPacket.Server_RequestClientInfo)]
+
+        [PacketHandler(
+            EConnectionState.ClientJoinRequesting,
+            Protocol.EPacket.Server_RequestClientInfo)]
         private void receiveClientInfoRequest(Packet packet)
         {
-            Protocol.Server_RequestClientInfo payload = Protocol.Server_RequestClientInfo.Deserialize(new ByteReader(packet.Payload));
+            Protocol.Server_RequestClientInfo payload =
+                Protocol.Server_RequestClientInfo.Deserialize(new ByteReader(packet.Payload));
             sendClientInfo();
         }
+
         private void sendClientInfo()
         {
-            Send(new Packet(Protocol.EPacket.Client_Info, new Protocol.Client_Info(new Player("Unknown")).Serialize()));
+            Send(
+                new Packet(
+                    Protocol.EPacket.Client_Info,
+                    new Protocol.Client_Info(new Player("Unknown")).Serialize()));
         }
-        [PacketHandler(EConnectionState.ClientJoinRequesting, Protocol.EPacket.Server_JoinRequestAccepted)]
+
+        [PacketHandler(
+            EConnectionState.ClientJoinRequesting,
+            Protocol.EPacket.Server_JoinRequestAccepted)]
         private void receiveJoinRequestAccepted(Packet packet)
         {
-            Protocol.Server_JoinRequestAccepted payload = Protocol.Server_JoinRequestAccepted.Deserialize(new ByteReader(packet.Payload));
+            Protocol.Server_JoinRequestAccepted payload =
+                Protocol.Server_JoinRequestAccepted.Deserialize(new ByteReader(packet.Payload));
             m_StateMachine.Fire(ETrigger.ServerAcceptedJoinRequest);
         }
         #endregion
+
         #region ClientAwaitingWorldData & ClientConnected
         [PacketHandler(EConnectionState.ClientAwaitingWorldData, Protocol.EPacket.Server_WorldData)]
         private void receiveInitialWorldData(Packet packet)
@@ -109,26 +138,33 @@ namespace Coop.Multiplayer
             {
                 bSuccess = m_WorldData.Receive(packet.Payload);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                Log.Error($"World data received from server could not be parsed '{e}' . Disconnect {this}.");
+                Log.Error(
+                    $"World data received from server could not be parsed '{e}' . Disconnect {this}.");
             }
 
-            if(bSuccess)
+            if (bSuccess)
             {
                 m_StateMachine.Fire(ETrigger.InitialWorldDataReceived);
             }
             else
             {
-                Log.Error($"World data received from server could not be parsed. Disconnect {this}.");
+                Log.Error(
+                    $"World data received from server could not be parsed. Disconnect {this}.");
                 Disconnect(EDisconnectReason.WorldDataTransferIssue);
             }
         }
-        void onConnected()
+
+        private void onConnected()
         {
-            Send(new Packet(Protocol.EPacket.Client_Joined, new Protocol.Client_Joined().Serialize()));
+            Send(
+                new Packet(
+                    Protocol.EPacket.Client_Joined,
+                    new Protocol.Client_Joined().Serialize()));
             OnClientJoined?.Invoke(this);
         }
+
         [PacketHandler(EConnectionState.ClientConnected, Protocol.EPacket.Sync)]
         private void receiveSyncPacket(Packet packet)
         {
@@ -142,12 +178,17 @@ namespace Coop.Multiplayer
                 Log.Error($"Sync data received from server could not be parsed '{e}'. Ignored.");
             }
         }
+
         [PacketHandler(EConnectionState.ClientAwaitingWorldData, Protocol.EPacket.KeepAlive)]
         [PacketHandler(EConnectionState.ClientConnected, Protocol.EPacket.KeepAlive)]
         private void receiveServerKeepAlive(Packet packet)
         {
-            Protocol.KeepAlive payload = Protocol.KeepAlive.Deserialize(new ByteReader(packet.Payload));
-            Send(new Packet(Protocol.EPacket.KeepAlive, new Protocol.KeepAlive(payload.m_iKeepAliveID).Serialize()));
+            Protocol.KeepAlive payload =
+                Protocol.KeepAlive.Deserialize(new ByteReader(packet.Payload));
+            Send(
+                new Packet(
+                    Protocol.EPacket.KeepAlive,
+                    new Protocol.KeepAlive(payload.m_iKeepAliveID).Serialize()));
         }
         #endregion
     }

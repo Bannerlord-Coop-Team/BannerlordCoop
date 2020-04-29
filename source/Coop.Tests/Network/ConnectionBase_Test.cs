@@ -15,7 +15,7 @@ namespace Coop.Tests
         private ArraySegment<byte> m_ReceiveParam;
         public ConnectionBase_Test()
         {
-            
+
             m_GamePersistence = new Mock<IGameStatePersistence>();
             m_GamePersistence.Setup(per => per.Receive(It.IsAny<ArraySegment<byte>>())).Callback((ArraySegment<byte> arg) => m_ReceiveParam = arg);
             m_Connection = new Mock<ConnectionBase>(m_NetworkConnection.Object, m_GamePersistence.Object).Object;

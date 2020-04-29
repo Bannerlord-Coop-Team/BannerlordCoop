@@ -13,8 +13,8 @@ namespace Coop.Tests
         private readonly RailClient m_Client;
         private readonly RailServer m_Server;
 
-        private Mock<RailNetPeerWrapper> m_PeerClientSide;
-        private Mock<RailNetPeerWrapper> m_PeerServerSide;
+        private readonly Mock<RailNetPeerWrapper> m_PeerClientSide;
+        private readonly Mock<RailNetPeerWrapper> m_PeerServerSide;
 
         private readonly InMemoryConnection m_ConClientSide = new InMemoryConnection();
         private readonly InMemoryConnection m_ConServerSide = new InMemoryConnection();
@@ -26,7 +26,7 @@ namespace Coop.Tests
             Environment.Current = m_Environment;
             m_Client = new RailClient(Registry.Get(Component.Client));
             m_Server = new RailServer(Registry.Get(Component.Server));
-            
+
 
             m_PeerClientSide = new Mock<RailNetPeerWrapper>(m_ConServerSide)
             {

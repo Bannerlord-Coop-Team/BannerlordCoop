@@ -31,7 +31,7 @@ namespace Coop.Tests
             {
                 long value = random.Next();
                 queue.Enqueue(i);
-                if(queue.Count > iSize)
+                if (queue.Count > iSize)
                 {
                     queue.Dequeue();
                 }

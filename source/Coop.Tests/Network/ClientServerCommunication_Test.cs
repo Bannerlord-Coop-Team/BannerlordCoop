@@ -51,7 +51,7 @@ namespace Coop.Tests
             // Setup server hooks.
             void OnClientDispatch(EConnectionState eState, Packet packet)
             {
-                if(packet.Type == Protocol.EPacket.KeepAlive)
+                if (packet.Type == Protocol.EPacket.KeepAlive)
                 {
                     ++iKeepAlivesReceived;
                 }
@@ -64,7 +64,7 @@ namespace Coop.Tests
             };
             ConnectionBase connServerSide = null;
             m_Server.Setup(s => s.Connected(It.IsAny<ConnectionServer>()))
-                .Callback<ConnectionBase>((con) => 
+                .Callback<ConnectionBase>((con) =>
                 {
                     connServerSide = con;
                     con.Dispatcher.OnDispatch += (obj, args) => OnClientDispatch(args.State, args.Packet);
