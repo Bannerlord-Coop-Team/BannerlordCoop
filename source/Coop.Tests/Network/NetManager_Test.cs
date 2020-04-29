@@ -11,23 +11,23 @@ namespace Coop.Tests
     public class NetManager_Test
     {
         private readonly Server m_Server;
-        private readonly NetManagerServer m_NetManagerServer;
+        private readonly LiteNetManagerServer m_NetManagerServer;
         public NetManager_Test()
         {
             m_Server = TestUtils.StartNewServer();
-            m_NetManagerServer = new NetManagerServer(m_Server, Mock.Of<IWorldData>());
+            m_NetManagerServer = new LiteNetManagerServer(m_Server, Mock.Of<ISaveData>());
             m_NetManagerServer.StartListening();
         }
 
         private class Client
         {
             public readonly GameSession Session;
-            public readonly NetManagerClient Manager;
+            public readonly LiteNetManagerClient Manager;
 
             public Client()
             {
-                Session = new GameSession(Mock.Of<IWorldData>());
-                Manager = new NetManagerClient(Session);
+                Session = new GameSession(Mock.Of<ISaveData>());
+                Manager = new LiteNetManagerClient(Session);
             }
         }
 

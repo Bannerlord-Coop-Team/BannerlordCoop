@@ -1,30 +1,34 @@
 ﻿using Coop.Common;
+using Coop.Multiplayer.Network;
 using Coop.Network;
+using System;
 
 namespace Coop.Multiplayer
 {
     public class GameSession
     {
-        public IWorldData World { get; private set; } 
+        public ISaveData World { get; private set; } 
         public ConnectionClient Connection { get; private set; }
-        public GameSession(IWorldData worldData)
+        public event Action<ConnectionClient> OnConnectionCreated;
+        public GameSession(ISaveData worldData)
         {
             this.World = worldData;
         }
 
-        public void OnConnectionCreated(ConnectionClient connection)
+        public void ConnectionCreated(ConnectionClient connection)
         {
             if (Connection != null)
             {
                 throw new InvalidStateException($"Client already connected to {Connection}. Cannot create a second connection to {connection}.");
             }
             Connection = connection;
+            OnConnectionCreated?.Invoke(Connection);
             Connection.Connect();
             
             Log.Debug($"Connection to server created {Connection.ToString()}.");
         }
 
-        public void OnDisconnect(EDisconnectReason eReason)
+        public void Disconnect(EDisconnectReason eReason)
         {
             if (Connection == null)
             {

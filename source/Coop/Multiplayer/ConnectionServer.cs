@@ -12,6 +12,8 @@ namespace Coop.Multiplayer
 {
     public class ConnectionServer : ConnectionBase
     {
+        public event Action<ConnectionServer> OnClientJoined;
+        public event Action<ConnectionServer> OnDisconnected;
         private enum ETrigger
         {
             WaitForClient,
@@ -22,10 +24,10 @@ namespace Coop.Multiplayer
         }
         private readonly StateMachine<EConnectionState, ETrigger> m_StateMachine;
         public override EConnectionState State => m_StateMachine.State;
-        private readonly IWorldData m_WorldData;
+        private readonly ISaveData m_WorldData;
 
-        public ConnectionServer(INetworkConnection network, IWorldData worldData)
-            : base(network)
+        public ConnectionServer(INetworkConnection network, IGameStatePersistence persistence, ISaveData worldData)
+            : base(network, persistence)
         {
             m_WorldData = worldData;
             m_StateMachine = new StateMachine<EConnectionState, ETrigger>(EConnectionState.Disconnected);
@@ -48,6 +50,7 @@ namespace Coop.Multiplayer
                 .Permit(ETrigger.ClientJoined, EConnectionState.ServerConnected);
 
             m_StateMachine.Configure(EConnectionState.ServerConnected)
+                .OnEntry(onConnected)
                 .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting);
 
             Dispatcher.RegisterPacketHandlers(this);
@@ -70,8 +73,13 @@ namespace Coop.Multiplayer
         }
         private void closeConnection(EDisconnectReason eReason)
         {
-            m_Network.Close(eReason);
+            OnDisconnected?.Invoke(this);
+            Network.Close(eReason);
             m_StateMachine.Fire(ETrigger.Disconnected);
+        }
+        private void onConnected()
+        {
+            OnClientJoined?.Invoke(this);
         }
         #region ServerAwaitingClient
         [PacketHandler(EConnectionState.ServerAwaitingClient, Protocol.EPacket.Client_Hello)]

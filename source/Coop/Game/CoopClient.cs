@@ -3,6 +3,9 @@ using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using System;
 using System.Net;
+using Coop.Game.Persistence;
+using RailgunNet;
+using RailgunNet.Connection.Client;
 
 namespace Coop.Game
 {
@@ -20,18 +23,21 @@ namespace Coop.Game
         public CoopEvents Events { get; private set; }
         private CoopClient()
         {
-            m_Session = new GameSession(new WorldData());
-            m_Manager = new NetManagerClient(m_Session);
+            m_Session = new GameSession(new SaveData());
+            m_NetManager = new LiteNetManagerClient(m_Session);
+            m_Persistence = new PersistenceClient();
+            m_Session.OnConnectionCreated += m_Persistence.OnConnectionCreated;
             GameState = new CoopGameState();
             Events = new CoopEvents();
         }
         public void TryConnect(IPAddress ip, int iPort)
         {
-            m_Manager.Connect(ip.ToString(), iPort);
+            m_NetManager.Connect(ip.ToString(), iPort);
         }
         public void Update(TimeSpan frameTime)
         {
-            m_Manager.Update(frameTime);
+            m_NetManager.Update(frameTime);
+            m_Persistence.Update(frameTime);
         }
 
         public override string ToString()
@@ -45,8 +51,8 @@ namespace Coop.Game
                 return m_Session.Connection.ToString();
             }
         }
-
         private readonly GameSession m_Session;
-        private readonly NetManagerClient m_Manager;
+        private readonly LiteNetManagerClient m_NetManager;
+        private readonly PersistenceClient m_Persistence;
     }
 }

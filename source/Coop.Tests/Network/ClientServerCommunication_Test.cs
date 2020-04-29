@@ -13,34 +13,28 @@ namespace Coop.Tests
     public class ClientServerCommunication_Test
     {
         private readonly Mock<Server> m_Server;
-        private readonly NetManagerServer m_NetManagerServer;
-        private TimeSpan m_keepAliveInterval = TimeSpan.FromMilliseconds(50);
-        private readonly Mock<IWorldData> m_WorldData;
+        private readonly LiteNetManagerServer m_NetManagerServer;
+        private readonly TimeSpan m_keepAliveInterval = TimeSpan.FromMilliseconds(50);
+        private readonly Mock<ISaveData> m_WorldData = TestUtils.CreateMockSaveData();
         public ClientServerCommunication_Test()
         {
-            m_WorldData = new Mock<IWorldData>();
-            m_WorldData.Setup(w => w.Receive(It.IsAny<byte[]>()))
-                .Returns(true);
-            m_WorldData.Setup(w => w.SerializeInitialWorldState())
-                .Returns(new byte[0]);
-
             ServerConfiguration config = TestUtils.GetTestingConfig();
             config.keepAliveInterval = m_keepAliveInterval;
             m_Server = new Mock<Server> { CallBase = true };
             m_Server.Object.Start(config);
-            m_NetManagerServer = new NetManagerServer(m_Server.Object, m_WorldData.Object);
+            m_NetManagerServer = new LiteNetManagerServer(m_Server.Object, m_WorldData.Object);
             m_NetManagerServer.StartListening();
         }
 
         private class Client
         {
             public readonly GameSession Session;
-            public readonly NetManagerClient Manager;
+            public readonly LiteNetManagerClient Manager;
 
-            public Client(IWorldData worldData)
+            public Client(ISaveData worldData)
             {
                 Session = new GameSession(worldData);
-                Manager = new NetManagerClient(Session);
+                Manager = new LiteNetManagerClient(Session);
             }
         }
 
@@ -69,7 +63,7 @@ namespace Coop.Tests
                 }
             };
             ConnectionBase connServerSide = null;
-            m_Server.Setup(s => s.OnConnected(It.IsAny<ConnectionBase>()))
+            m_Server.Setup(s => s.Connected(It.IsAny<ConnectionServer>()))
                 .Callback<ConnectionBase>((con) => 
                 {
                     connServerSide = con;
@@ -90,7 +84,7 @@ namespace Coop.Tests
             TestUtils.UpdateUntil(() => connServerSide.State == EConnectionState.ServerConnected || connServerSide.State == EConnectionState.Disconnected, new List<IUpdateable>() { client.Manager, m_NetManagerServer });
             Assert.Equal(EConnectionState.ServerConnected, connServerSide.State);
             Assert.Equal(expectedReceiveOrderOnServer.Count, iPacketsReceived);
-            m_WorldData.Verify(w => w.Receive(It.IsAny<byte[]>()), Times.Once());
+            m_WorldData.Verify(w => w.Receive(It.IsAny<ArraySegment<byte>>()), Times.Once());
             m_WorldData.Verify(w => w.SerializeInitialWorldState(), Times.Once());
 
             // Check if keep alive gets sent
@@ -100,12 +94,12 @@ namespace Coop.Tests
                 Assert.True(iKeepAlivesReceived > 0);
             }
 
-            // Send a sync package from client to server
+            // SendSync a sync package from client to server
             expectedReceiveOrderOnServer.Add((EConnectionState.ServerConnected, Protocol.EPacket.Sync));
             client.Session.Connection.Send(new Packet(Protocol.EPacket.Sync, new byte[] { }));
             TestUtils.UpdateUntil(() => iPacketsReceived == expectedReceiveOrderOnServer.Count, new List<IUpdateable>() { client.Manager, m_NetManagerServer });
             Assert.Equal(expectedReceiveOrderOnServer.Count, iPacketsReceived);
-            m_WorldData.Verify(w => w.Receive(It.IsAny<byte[]>()), Times.Exactly(2));
+            m_WorldData.Verify(w => w.Receive(It.IsAny<ArraySegment<byte>>()), Times.Exactly(2));
         }
     }
 }

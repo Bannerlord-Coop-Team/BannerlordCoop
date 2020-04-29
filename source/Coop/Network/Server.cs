@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using Coop.Common;
+using Coop.Multiplayer;
 using Stateless;
 
 namespace Coop.Network
@@ -18,6 +19,7 @@ namespace Coop.Network
         public EState State { get { return m_State.State; } }
         public ServerConfiguration ActiveConfig = null;
         public readonly UpdateableList Updateables;
+        public event Action<ConnectionServer> OnClientConnected;
 
         public void Start(ServerConfiguration config)
         {
@@ -60,12 +62,13 @@ namespace Coop.Network
             }
             return sDump;
         }
-        virtual public void OnConnected(ConnectionBase con)
+        virtual public void Connected(ConnectionServer con)
         {
             m_ActiveConnections.Add(con);
+            OnClientConnected?.Invoke(con);
             Log.Info($"Client connection established: {con}.");
         }
-        virtual public void OnDisconnected(ConnectionBase con, EDisconnectReason eReason)
+        virtual public void Disconnected(ConnectionServer con, EDisconnectReason eReason)
         {
             Log.Info($"Client connection closed: {con}. {eReason}.");
             con.Disconnect(eReason);
@@ -90,7 +93,7 @@ namespace Coop.Network
         public Server()
         {
             Updateables = new UpdateableList();
-            m_ActiveConnections = new List<ConnectionBase>();
+            m_ActiveConnections = new List<ConnectionServer>();
             m_State = new StateMachine<EState, ETrigger>(EState.Inactive);
 
             m_State.Configure(EState.Inactive)
@@ -117,7 +120,7 @@ namespace Coop.Network
             Stop();
         }
 
-        private readonly List<ConnectionBase> m_ActiveConnections;
+        private readonly List<ConnectionServer> m_ActiveConnections;
         private void load(ServerConfiguration config)
         {
             ActiveConfig = config;

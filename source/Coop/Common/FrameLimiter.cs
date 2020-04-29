@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace Coop.Common
 {
-    class FrameLimiter
+    public class FrameLimiter
     {
         private readonly Action<long> m_WaitUntilTick;
         private readonly long m_TargetTicksPerFrame;

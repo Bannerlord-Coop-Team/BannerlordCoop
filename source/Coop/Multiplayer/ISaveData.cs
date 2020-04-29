@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 
 namespace Coop.Multiplayer
 {
-    public interface IWorldData
+    public interface ISaveData
     {
-        bool Receive(byte[] rawData);
+        bool Receive(ArraySegment<byte> rawData);
         byte[] SerializeInitialWorldState();
     }
 }

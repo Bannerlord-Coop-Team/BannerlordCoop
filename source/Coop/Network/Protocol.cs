@@ -15,7 +15,8 @@ namespace Coop.Network
             Server_WorldData,           // Contains the initial state of the game world.
 
             Sync,
-            KeepAlive
+            KeepAlive,
+            Persistence                 // Will be forwarded to the game state persistence layer.
         }
         public const int Version = 0;
 

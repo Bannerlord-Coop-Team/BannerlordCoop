@@ -1,39 +1,67 @@
-﻿using Coop.Common;
+﻿using System;
+using System.Collections.Generic;
+using Coop.Common;
+using Coop.Game.Persistence;
+using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Network;
+using RailgunNet;
+using RailgunNet.Connection.Server;
+using RailgunNet.Connection.Traffic;
 
 namespace Coop.Game
 {
-    public static class CoopServer
+    public class CoopServer
     {
-        public static Server Current = null;
-        private static NetManagerServer NetManager = null;
+        private static readonly Lazy<CoopServer> m_Instance = new Lazy<CoopServer>(() => new CoopServer());
+        public static CoopServer Instance 
+        { 
+            get 
+            {
+                return m_Instance.Value;
+            } 
+        }
 
-        public static bool TryStartServer()
+        public Server Current { get; private set; }
+        private CoopServer()
+        {
+
+        }
+        public bool TryStartServer()
         {
             if(Current == null)
             {
                 Current = new Server();
+                m_RailServer = new CoopServerRail(Current);
+                Current.OnClientConnected += OnClientConnected;
                 ServerConfiguration config = new ServerConfiguration();
                 Current.Start(config);
                 Log.Debug("Created server.");
             }
 
-            if(NetManager == null)
+            if(m_NetManager == null)
             {
-                NetManager = new NetManagerServer(Current, new WorldData());
-                NetManager.StartListening();
+                m_NetManager = new LiteNetManagerServer(Current, new SaveData());
+                m_NetManager.StartListening();
                 Log.Debug("Setup network connection for server.");
             }
             return true;
         }
 
-        public static void ShutDownServer()
+        public void ShutDownServer()
         {
             Current?.Stop();
-            NetManager?.Stop();
-            NetManager = null;            
+            m_NetManager?.Stop();
+            m_NetManager = null;            
             Current = null;
         }
-	}
+        private void OnClientConnected(ConnectionServer connection)
+        {
+            connection.OnClientJoined += m_RailServer.ClientJoined;
+            connection.OnDisconnected += m_RailServer.Disconnected;
+        }
+
+        private LiteNetManagerServer m_NetManager;
+        private CoopServerRail m_RailServer;
+    }
 }

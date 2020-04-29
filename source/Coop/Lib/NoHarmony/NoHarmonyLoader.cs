@@ -2,7 +2,9 @@
 using System.Reflection;
 using System.IO;
 using System.Collections.Generic;
+using JetBrains.Annotations;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
@@ -15,11 +17,14 @@ namespace NoHarmony
         public TypeLog ObjectsToLog = TypeLog.None;
         public LogLvl MinLogLvl = LogLvl.Info;
         public string LogFile = "NoHarmony.txt";
+        public string LogDateFormat = "dd/MM/yy HH:mm:ss.fff";
+        public bool UseConfFile = false;
 
         /// <summary>
         /// Put NoHarmony Initialise code here
         /// </summary>
         public abstract void NoHarmonyInit();
+        
 
         /// <summary>
         /// Use add and replace NoHarmony methods here to load your modules;
@@ -27,17 +32,28 @@ namespace NoHarmony
         public abstract void NoHarmonyLoad();
         //End config
 
-        //NoHarmony will initialize here, don't forget to call base if you override.
+        /// <summary>
+        /// NoHarmony will initialize here, don't forget to call base.OnSubModuleLoad() if you override.
+        /// </summary>
         protected override void OnSubModuleLoad()
         {
+            base.OnSubModuleLoad();
             NoHarmonyInit();
+            if(UseConfFile)
+                LoadConf();
+            Log(LogLvl.Info, "NoHarmony initilized successfully.");
             NoHarmonyLoad();
             Log(LogLvl.Info, "Pending tasks : " + ModelDelegates.Count + " models, " + BehaviorDelegates.Count + " behaviors.");
         }
 
-        //Models will be loaded here, don't forget to call base if you override. 
+        /// <summary>
+        /// Models will be loaded here, don't forget to call base.OnGameStart(game, gameStarterObject) if you override.
+        /// </summary>
+        /// <param name="game"></param>
+        /// <param name="gameStarterObject"></param>
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
         {
+            base.OnGameStart(game, gameStarterObject);
             if (!(game.GameType is Campaign))
             {
                 Log(LogLvl.Error, "Game is not a campaign.");
@@ -45,7 +61,7 @@ namespace NoHarmony
             }
             if (ModelDelegates.Count != ModelModes.Count)
             {
-                Log(LogLvl.Error, "Task lost during Init, skiping all models modification.");
+                Log(LogLvl.Error, "Task lost during preprocessing, skiping all models modification.");
                 return;
             }
             for (int index = 0; index < ModelDelegates.Count; ++index)
@@ -55,17 +71,21 @@ namespace NoHarmony
             }
         }
 
-        //Behaviors operations wille be done here, don't forget to call base if you override.
+        /// <summary>
+        /// Behaviors operations wille be done here, don't forget to call.OnGameInitializationFinished(game) base if you override.
+        /// </summary>
+        /// <param name="game"></param>
         public override void OnGameInitializationFinished(Game game)
         {
+            base.OnGameInitializationFinished(game);
             if (!(game.GameType is Campaign campaign))
             {
                 Log(LogLvl.Error, "Game is not a campaign.");
                 return;
             }
-            if (BehaviorDelegates.Count != BehaviorModes.Count)
+            if(BehaviorDelegates.Count != BehaviorModes.Count)
             {
-                Log(LogLvl.Error, "Task lost during Init, skiping all behaviors modification.");
+                Log(LogLvl.Error, "Task lost during preprocessing, skiping all behaviors modification.");
                 return;
             }
             for (int index = 0; index < BehaviorDelegates.Count; ++index)
@@ -73,7 +93,6 @@ namespace NoHarmony
                 TaskStatus result = BehaviorDelegates[index].Invoke(campaign, BehaviorModes[index]);
                 TSBehaviors.Add(result);
             }
-
         }
 
         // NoHarmony core features past this point
@@ -86,10 +105,10 @@ namespace NoHarmony
         private List<TaskStatus> TSBehaviors = new List<TaskStatus>();
         private List<TaskMode> ModelModes = new List<TaskMode>();
         private List<TaskMode> BehaviorModes = new List<TaskMode>();
-        public enum TaskMode { Add = 0, Replace = 1, ReplaceOrAdd = 2, RemoveAndAdd = 3, Remove = 4 }
+        public enum TaskMode {Add = 0, Replace = 1, ReplaceOrAdd = 2, RemoveAndAdd = 3, Remove = 4 }
         public enum TypeLog { None = 0, Models = 1, Behaviors = 2, All = 3 }
         public enum LogLvl { Tracking = 0, Info = 1, Warning = 2, Error = 3 }
-        public enum TaskStatus { Pending, Completed, Warning, Error }
+        public enum TaskStatus { Pending, Completed, Warning, Error}
 
         /// <summary>
         /// Use this method in your NoHarmonyLoad() method to add new models to the game.
@@ -107,13 +126,13 @@ namespace NoHarmony
         /// <typeparam name="AddType">Model type to add</typeparam>
         /// <typeparam name="RemoveType">Model type to be replaced</typeparam>
         /// <param name="m">Not required. The replace mode to use. (Do not pick add or remove)</param>
-        public void ReplaceModel<AddType, RemoveType>(TaskMode m = TaskMode.Replace)
+        public void ReplaceModel<AddType,RemoveType>(TaskMode m = TaskMode.Replace)
             where AddType : GameModel, new()
             where RemoveType : GameModel
         {
             if (TaskMode.Add == m || m == TaskMode.Remove)
                 return;
-            ModelDelegates.Add(NHLModel<AddType, RemoveType>);
+            ModelDelegates.Add(NHLModel<AddType,RemoveType>);
             ModelModes.Add(m);
         }
         /// <summary>
@@ -146,12 +165,12 @@ namespace NoHarmony
             where AddType : CampaignBehaviorBase, new()
             where RemoveType : CampaignBehaviorBase
         {
-            BehaviorDelegates.Add(NHLBehavior<AddType, RemoveType>);
+            BehaviorDelegates.Add(NHLBehavior<AddType,RemoveType>);
             BehaviorModes.Add(m);
         }
 
 
-        private TaskStatus NHLModel<AddType, RemoveType>(IGameStarter gameI, TaskMode mode)
+        private TaskStatus NHLModel<AddType,RemoveType>(IGameStarter gameI, TaskMode mode)
             where RemoveType : GameModel
             where AddType : GameModel, new()
         {
@@ -161,7 +180,7 @@ namespace NoHarmony
 
             for (int index = 0; index < models.Count; ++index)
             {
-                if (mode != TaskMode.Remove && models[index] is AddType)
+                if (mode !=TaskMode.Remove && models[index] is AddType)
                 {
                     Log(LogLvl.Warning, typeof(AddType) + " already installed, skipping.");
                     if (mode == TaskMode.RemoveAndAdd)
@@ -171,16 +190,16 @@ namespace NoHarmony
                 }
                 if (models[index] is RemoveType)
                 {
-                    if (mode == TaskMode.Replace || mode == TaskMode.ReplaceOrAdd)
+                    if (mode == TaskMode.Replace || mode == TaskMode.ReplaceOrAdd) 
                     {
                         models[index] = new AddType();
                         Log(LogLvl.Info, typeof(RemoveType) + " found and replaced with " + typeof(AddType) + ".");
-                        return TaskStatus.Completed;
-                    }
-                    else if (mode == TaskMode.Remove || mode == TaskMode.RemoveAndAdd)
+                        return TaskStatus.Completed; 
+                    }else if(mode == TaskMode.Remove || mode == TaskMode.RemoveAndAdd)
                     {
                         models.RemoveAt(index); // C# rearrange the for loop on it's own. 
                         rm++;
+                        index--;
                     }
                 }
             }
@@ -189,7 +208,7 @@ namespace NoHarmony
                 gameI.AddModel(new AddType());
                 Log(LogLvl.Info, typeof(AddType) + " added.");
             }
-            if (mode == TaskMode.RemoveAndAdd)
+            if(mode == TaskMode.RemoveAndAdd) 
             {
                 if (rm == 0)
                 {
@@ -200,7 +219,7 @@ namespace NoHarmony
                     st = TaskStatus.Completed;
                 return st;
             }
-            if (mode == TaskMode.Remove && rm == 0)
+            if(mode == TaskMode.Remove && rm == 0)
             {
                 Log(LogLvl.Warning, typeof(RemoveType) + " not found.");
                 return TaskStatus.Warning;
@@ -225,7 +244,11 @@ namespace NoHarmony
         }
 
 
-        //Logging Core
+        /// <summary>
+        /// Add a message to NoHarmony log file
+        /// </summary>
+        /// <param name="mLvl">Message logging level</param>
+        /// <param name="message">Message core</param>
         public void Log(LogLvl mLvl, string message)
         {
             if (mLvl.CompareTo(MinLogLvl) < 0 || !Logging)
@@ -246,12 +269,16 @@ namespace NoHarmony
                     break;
             }
             using (StreamWriter sw = new StreamWriter(LogFile, true))
-                sw.WriteLine(DateTime.Now.ToString("dd/MM/yy HH:mm:ss.fff") + " > " + message);
+                sw.WriteLine(DateTime.Now.ToString(LogDateFormat) + " > " + message);
+        }
+        public void LoadConf()
+        {
+            
         }
     }
 
-    public sealed class DummyModel : GameModel { }
-    public sealed class DummyBehavior : CampaignBehaviorBase
+    public sealed class DummyModel : GameModel { }// used to replace null, should never end in the game.
+    public sealed class DummyBehavior : CampaignBehaviorBase// used to replace null, should never end in the game.
     {
         public override void RegisterEvents()
         {

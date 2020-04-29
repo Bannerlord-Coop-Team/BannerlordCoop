@@ -19,7 +19,8 @@ namespace Coop.Network
     {
         int FragmentLength { get; }
         int MaxPackageLength { get; }
-        void SendRaw(byte[] raw);        
+        int Latency { get; }
+        void SendRaw(ArraySegment<byte> raw);        
         void Close(EDisconnectReason eReason);
     }
 }

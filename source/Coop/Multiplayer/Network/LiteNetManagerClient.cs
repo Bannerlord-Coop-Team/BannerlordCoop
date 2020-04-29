@@ -10,20 +10,20 @@ using System.Threading.Tasks;
 
 namespace Coop.Multiplayer.Network
 {
-    public class NetManagerClient : IUpdateable
+    public class LiteNetManagerClient : IUpdateable
     {
         private readonly GameSession m_Session;
-        private readonly NetListenerClient m_Listener;
+        private readonly LiteNetListenerClient m_Listener;
         private readonly NetManager m_NetManager;
         private NetPeer m_Peer;
-        public NetManagerClient(GameSession session)
+        public LiteNetManagerClient(GameSession session)
         {
             if (session == null)
             {
                 throw new ArgumentNullException("session may not be null.");
             }
             m_Session = session;
-            m_Listener = new NetListenerClient(session);
+            m_Listener = new LiteNetListenerClient(session);
             m_NetManager = new NetManager(m_Listener);
             m_NetManager.ReconnectDelay = 100;
             m_NetManager.MaxConnectAttempts = 5;
@@ -48,7 +48,7 @@ namespace Coop.Multiplayer.Network
             {
                 m_NetManager.DisconnectPeer(m_Peer, new byte[] { Convert.ToByte(eReason) });
                 m_NetManager.Stop();
-                m_Session.OnDisconnect(eReason);
+                m_Session.Disconnect(eReason);
             }
         }
         public bool Connected

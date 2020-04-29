@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using Coop.Multiplayer.Network;
 
 namespace Coop.Network
 {
@@ -62,25 +63,27 @@ namespace Coop.Network
         /// <summary>
         /// </summary>
         /// <param name="network">Networking implementation.</param>
-        public ConnectionBase(INetworkConnection network)
+        public ConnectionBase(INetworkConnection network, IGameStatePersistence persistence)
         {
             Dispatcher = new PacketDispatcher();
-            m_Network = network;
+            Network = network;
+            GameStatePersistence = persistence;
         }
 
         #region Send and Receive
+        public IGameStatePersistence GameStatePersistence { get; private set; }
         public void Send(Packet packet)
         {
             if (State != EConnectionState.Disconnected)
             {
-                if (packet.Length > m_Network.MaxPackageLength)
+                if (packet.Length > Network.MaxPackageLength)
                 {
-                    throw new PacketSendException($"Payload for package {packet.Type} too large ({packet.Length}>{m_Network.MaxPackageLength}).");
+                    throw new PacketSendException($"Payload for package {packet.Type} too large ({packet.Length}>{Network.MaxPackageLength}).");
                 }
                 else
                 {
                     new PacketWriter(packet).Write(new BinaryWriter(m_Stream));
-                    m_Network.SendRaw(m_Stream.ToArray());
+                    Network.SendRaw(new ArraySegment<byte>(m_Stream.ToArray()));
                     m_Stream.SetLength(0);
                 }
             }
@@ -89,9 +92,9 @@ namespace Coop.Network
         {
             if (State != EConnectionState.Disconnected)
             {
-                if (packet.Length > m_Network.MaxPackageLength)
+                if (packet.Length > Network.MaxPackageLength)
                 {
-                    throw new PacketSendException($"Payload for package {packet.Type} too large ({packet.Length}>{m_Network.MaxPackageLength}).");
+                    throw new PacketSendException($"Payload for package {packet.Type} too large ({packet.Length}>{Network.MaxPackageLength}).");
                 }
                 else
                 {
@@ -99,32 +102,40 @@ namespace Coop.Network
                     var packetWriter = new PacketWriter(packet);
                     while (!packetWriter.Done)
                     {
-                        packetWriter.Write(writer, m_Network.FragmentLength);
-                        m_Network.SendRaw(m_Stream.ToArray());
+                        packetWriter.Write(writer, Network.FragmentLength);
+                        Network.SendRaw(new ArraySegment<byte>(m_Stream.ToArray()));
                         m_Stream.SetLength(0);
                     }
                 }
             }
         }
-        public void Receive(ByteReader reader)
+        public void Receive(ArraySegment<byte> buffer)
         {
             if (State != EConnectionState.Disconnected)
             {
-                if (m_PackageReader == null)
+                Protocol.EPacket eType = PacketReader.DecodePacketType(buffer.Array[buffer.Offset]);
+                if (eType == Protocol.EPacket.Persistence)
                 {
-                    m_PackageReader = new PacketReader();
+                    GameStatePersistence.Receive(buffer);
                 }
-                Packet packet = m_PackageReader.Read(reader);
-                if (packet != null)
+                else
                 {
-                    m_PackageReader = null;
-                    Dispatcher.Dispatch(State, packet);
+                    if (m_PackageReader == null)
+                    {
+                        m_PackageReader = new PacketReader();
+                    }
+                    Packet packet = m_PackageReader.Read(new ByteReader(buffer));
+                    if (packet != null)
+                    {
+                        m_PackageReader = null;
+                        Dispatcher.Dispatch(State, packet);
+                    }
                 }
             }
         }
         #endregion
         #region State & transitions
-        protected readonly INetworkConnection m_Network;
+        public INetworkConnection Network { get; private set; }
         public abstract EConnectionState State { get; }
         public int Latency = 0;
         /// <summary>
@@ -136,7 +147,7 @@ namespace Coop.Network
         public abstract void Disconnect(EDisconnectReason eReason);
         public override string ToString()
         {
-            return $"{base.ToString()} - State: {State}, Ping: {Latency}, Netinfo: {m_Network}";
+            return $"{base.ToString()} - State: {State}, Ping: {Latency}, Netinfo: {Network}";
         }
         #endregion
         #region Internals

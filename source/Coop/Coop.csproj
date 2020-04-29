@@ -58,9 +58,6 @@
     <Reference Include="0Harmony, Version=2.0.0.9, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Lib.Harmony.2.0.0.9\lib\net472\0Harmony.dll</HintPath>
     </Reference>
-    <Reference Include="LiteNetLib, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\LiteNetLib.0.8.3.1\lib\net35\LiteNetLib.dll</HintPath>
-    </Reference>
     <Reference Include="Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\Newtonsoft.Json.dll</HintPath>
@@ -216,11 +213,25 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Common\UpdateableList.cs" />
+    <Compile Include="Game\Behaviour\InitServerBehaviour.cs" />
+    <Compile Include="Game\GameEnvironment.cs" />
     <Compile Include="Game\GameLoopRunner.cs" />
     <Compile Include="Game\Patch\Exceptions.cs" />
+    <Compile Include="Game\Patch\TimeControl.cs" />
     <Compile Include="Game\Patch\Utils.cs" />
+    <Compile Include="Game\Persistence\Compare.cs" />
+    <Compile Include="Game\Persistence\Compression.cs" />
+    <Compile Include="Game\Persistence\IEnvironment.cs" />
+    <Compile Include="Game\Persistence\PersistenceClient.cs" />
+    <Compile Include="Game\Persistence\RailGameConfigurator.cs" />
+    <Compile Include="Game\Persistence\RailPopulator.cs" />
+    <Compile Include="Game\Persistence\Registry.cs" />
+    <Compile Include="Game\Persistence\World\World.cs" />
+    <Compile Include="Game\Persistence\World\WorldEntity.cs" />
+    <Compile Include="Game\Persistence\World\WorldState.cs" />
+    <Compile Include="Game\CoopServerRail.cs" />
     <Compile Include="Game\SaveLoad.cs" />
-    <Compile Include="Game\WorldData.cs" />
+    <Compile Include="Game\SaveData.cs" />
     <Compile Include="Game\CoopEvents.cs" />
     <Compile Include="Game\CoopGameState.cs" />
     <Compile Include="Game\CoopClient.cs" />
@@ -239,19 +250,22 @@
     <Compile Include="Common\Log.cs" />
     <Compile Include="Common\MovingAverage.cs" />
     <Compile Include="Multiplayer\ConnectionClient.cs" />
-    <Compile Include="Multiplayer\IWorldData.cs" />
+    <Compile Include="Multiplayer\ISaveData.cs" />
     <Compile Include="Multiplayer\Network\Extensions.cs" />
-    <Compile Include="Multiplayer\Network\NetManagerClient.cs" />
-    <Compile Include="Multiplayer\Network\NetListenerClient.cs" />
-    <Compile Include="Multiplayer\Network\NetManagerServer.cs" />
-    <Compile Include="Multiplayer\Network\NetConnection.cs" />
+    <Compile Include="Multiplayer\Network\LiteNetManagerClient.cs" />
+    <Compile Include="Multiplayer\Network\LiteNetListenerClient.cs" />
+    <Compile Include="Multiplayer\Network\LiteNetManagerServer.cs" />
+    <Compile Include="Multiplayer\Network\LiteNetConnection.cs" />
     <Compile Include="Multiplayer\GameSession.cs" />
-    <Compile Include="Multiplayer\Network\NetListenerServer.cs" />
+    <Compile Include="Multiplayer\Network\LiteNetListenerServer.cs" />
+    <Compile Include="Multiplayer\Network\RailNetPeerWrapper.cs" />
     <Compile Include="Network\Exceptions.cs" />
     <Compile Include="Network\ConnectionBase.cs" />
+    <Compile Include="Network\IGameStatePersistence.cs" />
     <Compile Include="Network\INetwork.cs" />
     <Compile Include="Network\INetworkConnection.cs" />
     <Compile Include="Common\IUpdatable.cs" />
+    <Compile Include="Network\MemoryStreamSegment.cs" />
     <Compile Include="Network\Packet.cs" />
     <Compile Include="Network\PacketHandler.cs" />
     <Compile Include="Network\PacketDispatcher.cs" />
@@ -268,9 +282,19 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj">
+      <Project>{d8f65198-a926-4c46-9599-2d5d4349486f}</Project>
+      <Name>LiteNetLib</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\RailgunNet\RailgunNet\RailgunNet.csproj">
+      <Project>{d8389325-85ae-4a1d-9b8e-e4742349a531}</Project>
+      <Name>RailgunNet</Name>
+    </ProjectReference>
+  </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs 0harmony.dll,LiteNetLib.dll,Stateless.dll</PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs 0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll</PostBuildEvent>
   </PropertyGroup>
 </Project>

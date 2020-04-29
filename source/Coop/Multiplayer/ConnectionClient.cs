@@ -12,6 +12,8 @@ namespace Coop.Multiplayer
 {
     public class ConnectionClient : ConnectionBase
     {
+        public event Action<ConnectionClient> OnClientJoined;
+        public event Action OnDisconnected;
         private enum ETrigger
         {
             TryJoinServer,
@@ -22,10 +24,10 @@ namespace Coop.Multiplayer
         }
         private readonly StateMachine<EConnectionState, ETrigger> m_StateMachine;
         public override EConnectionState State => m_StateMachine.State;
-        private readonly IWorldData m_WorldData;
+        private readonly ISaveData m_WorldData;
 
-        public ConnectionClient(INetworkConnection network, IWorldData worldData)
-            : base(network)
+        public ConnectionClient(INetworkConnection network, IGameStatePersistence persistence, ISaveData worldData)
+            : base(network, persistence)
         {
             m_WorldData = worldData;
 
@@ -36,11 +38,11 @@ namespace Coop.Multiplayer
 
             var disconnectTrigger = m_StateMachine.SetTriggerParameters<EDisconnectReason>(ETrigger.Disconnect);
             m_StateMachine.Configure(EConnectionState.Disconnecting)
-                .OnEntryFrom(disconnectTrigger, eReason => closeConnection(eReason))
+                .OnEntryFrom(disconnectTrigger, closeConnection)
                 .Permit(ETrigger.Disconnected, EConnectionState.Disconnected);
 
             m_StateMachine.Configure(EConnectionState.ClientJoinRequesting)
-                .OnEntry(() => sendClientHello())
+                .OnEntry(sendClientHello)
                 .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
                 .Permit(ETrigger.ServerAcceptedJoinRequest, EConnectionState.ClientAwaitingWorldData);
 
@@ -49,7 +51,7 @@ namespace Coop.Multiplayer
                 .Permit(ETrigger.InitialWorldDataReceived, EConnectionState.ClientConnected);
 
             m_StateMachine.Configure(EConnectionState.ClientConnected)
-                .OnEntry(() => sendClientJoined())
+                .OnEntry(onConnected)
                 .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting);
 
             Dispatcher.RegisterPacketHandlers(this);
@@ -72,7 +74,8 @@ namespace Coop.Multiplayer
 
         private void closeConnection(EDisconnectReason eReason)
         {
-            m_Network.Close(eReason);
+            OnDisconnected?.Invoke();
+            Network.Close(eReason);
             m_StateMachine.Fire(ETrigger.Disconnected);
         }
         #region ClientJoinRequesting
@@ -121,9 +124,10 @@ namespace Coop.Multiplayer
                 Disconnect(EDisconnectReason.WorldDataTransferIssue);
             }
         }
-        void sendClientJoined()
+        void onConnected()
         {
             Send(new Packet(Protocol.EPacket.Client_Joined, new Protocol.Client_Joined().Serialize()));
+            OnClientJoined?.Invoke(this);
         }
         [PacketHandler(EConnectionState.ClientConnected, Protocol.EPacket.Sync)]
         private void receiveSyncPacket(Packet packet)

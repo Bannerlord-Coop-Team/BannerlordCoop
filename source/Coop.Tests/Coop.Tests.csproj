@@ -13,7 +13,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LiteNetLib" Version="0.8.3.1" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
     <PackageReference Include="Moq" Version="4.13.1" />
     <PackageReference Include="Stateless" Version="5.1.1" />
@@ -30,6 +29,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Coop\Coop.csproj" />
+    <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="TaleWorlds.CampaignSystem">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>

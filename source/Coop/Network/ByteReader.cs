@@ -18,9 +18,9 @@ namespace Coop.Network
                 return m_Stream.Length - m_Stream.Position;
             }
         }
-        public ByteReader(byte[] buffer)
+        public ByteReader(ArraySegment<byte> buffer)
         {
-            m_Stream = new MemoryStream(buffer);
+            m_Stream = new MemoryStreamSegment(buffer);
             Binary = new BinaryReader(m_Stream);
         }
         public ByteReader(MemoryStream stream)
@@ -28,10 +28,15 @@ namespace Coop.Network
             m_Stream = stream;
             Binary = new BinaryReader(m_Stream);
         }
-
         public byte[] ToArray()
         {
             return m_Stream.ToArray();
+        }
+        public byte PeekByte()
+        {
+            byte val = Convert.ToByte(m_Stream.ReadByte());
+            m_Stream.Position -= 1;
+            return val;
         }
     }
 }

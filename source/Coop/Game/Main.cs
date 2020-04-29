@@ -21,6 +21,8 @@ namespace Coop.Game
             m_Updateables = new UpdateableList();
             m_Updateables.Add(CoopClient.Instance);
             m_Updateables.Add(GameLoopRunner.Instance);
+
+            Persistence.Environment.Current = new GameEnvironment();
         }
         public override void NoHarmonyInit()
         {
@@ -29,6 +31,7 @@ namespace Coop.Game
 
         public override void NoHarmonyLoad()
         {
+            AddBehavior<InitServerBehaviour>();
             AddBehavior<PlayerJoinedBehaviour>();
 
             var harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
@@ -39,20 +42,20 @@ namespace Coop.Game
              9990,
              () =>
              {
-                 if(CoopServer.Current == null)
+                 if(CoopServer.Instance.Current == null)
                  {
                     Common.Log.Info("No server found.");
                  }
                  else
                  {
-                    Common.Log.Info($"Server state: {CoopServer.Current.State}.");
+                    Common.Log.Info($"Server state: {CoopServer.Instance.Current.State}.");
                  }
              },
              false));
         }
         protected override void OnSubModuleUnloaded()
         {
-            CoopServer.ShutDownServer();
+            CoopServer.Instance.ShutDownServer();
             base.OnSubModuleUnloaded();
         }
 

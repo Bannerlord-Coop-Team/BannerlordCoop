@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 
 namespace Coop.Network
 {
@@ -9,15 +10,23 @@ namespace Coop.Network
         // 1 byte header + int32 payload length
         public const int MetaDataLength = 1 + 4;
 
-        public const byte BitMaskType           = 0b00111111;
-        public const byte BitMaskFragment_None  = 0b00000000;
-        public const byte BitMaskFragment_More  = 0b01000000;
-        public const byte BitMaskFragment_End   = 0b10000000;
+        public const byte BitMaskType           = 0b0011_1111;
+        public const byte BitMaskFragment_None  = 0b0000_0000;
+        public const byte BitMaskFragment_More  = 0b0100_0000;
+        public const byte BitMaskFragment_End   = 0b1000_0000;
 
-        public Packet(Protocol.EPacket eType, byte[] payload)
+        public Packet(Protocol.EPacket eType, ArraySegment<byte> payload)
         {
             Type = eType;
             Payload = payload;
+        }
+        public Packet(Protocol.EPacket eType, byte[] payload)
+        : this(eType, new ArraySegment<byte>(payload))
+        {
+        }
+        public Packet(Protocol.EPacket eType, MemoryStream stream)
+        : this(eType, stream.ToArray())
+        {
         }
         public Protocol.EPacket Type
         {
@@ -28,15 +37,20 @@ namespace Coop.Network
         {
             get
             {
-                return MetaDataLength + Payload.Length;
+                return MetaDataLength + Payload.Count;
             }
         }
 
-        public byte[] Payload;        
+        public ArraySegment<byte> Payload;
     }
 
     public class PacketWriter
     {
+        public static byte EncodePacketType(Protocol.EPacket eType)
+        {
+            return (byte)(Convert.ToByte(eType) & Packet.BitMaskType);
+        }
+
         public PacketWriter(Packet packet)
         {
             m_Packet = packet;
@@ -48,7 +62,7 @@ namespace Coop.Network
         /// <param name="writer"></param>
         public void Write(BinaryWriter writer)
         {
-            Write(writer, m_Packet.Payload.Length + Packet.MetaDataLength);
+            Write(writer, m_Packet.Length);
         }
 
         /// <summary>
@@ -61,7 +75,7 @@ namespace Coop.Network
         /// <param name="iNumberOfBytes">Maximum number of bytes that may be written.</param>
         public void Write(BinaryWriter writer, int iNumberOfBytes)
         {
-            int iMinLength = Packet.MetaDataLength + Math.Min(m_Packet.Payload.Length, 1);
+            int iMinLength = Packet.MetaDataLength + Math.Min(m_Packet.Payload.Count, 1);
             if (iNumberOfBytes < iMinLength)
             {
                 throw new PacketSerializingException($"Requested fragment size of {iNumberOfBytes} is too small to fit meta data & payload.");
@@ -80,7 +94,7 @@ namespace Coop.Network
                 {
                     // Single package
                     header = HeaderByte;
-                    iPayloadLength = m_Packet.Payload.Length;
+                    iPayloadLength = m_Packet.Payload.Count;
                 }
                 else
                 {
@@ -92,8 +106,8 @@ namespace Coop.Network
             else
             {
                 // Continuation of a fragmented package
-                iPayloadLength = Math.Min(iNumberOfBytes - Packet.MetaDataLength, m_Packet.Payload.Length - m_iNumberOfWrittenPayloadBytes);
-                bool bIsLastFragment = iPayloadLength + m_iNumberOfWrittenPayloadBytes >= m_Packet.Payload.Length;
+                iPayloadLength = Math.Min(iNumberOfBytes - Packet.MetaDataLength, m_Packet.Payload.Count - m_iNumberOfWrittenPayloadBytes);
+                bool bIsLastFragment = iPayloadLength + m_iNumberOfWrittenPayloadBytes >= m_Packet.Payload.Count;
                 header = (byte)(HeaderByte | (bIsLastFragment ? Packet.BitMaskFragment_End : Packet.BitMaskFragment_More));
             }
 
@@ -102,10 +116,10 @@ namespace Coop.Network
             writer.Write(iPayloadLength);
 
             // Payload
-            writer.Write(m_Packet.Payload, m_iNumberOfWrittenPayloadBytes, iPayloadLength);
+            writer.Write(m_Packet.Payload.ToArray(), m_iNumberOfWrittenPayloadBytes, iPayloadLength);
             m_iNumberOfWrittenPayloadBytes += iPayloadLength;
 
-            Done = m_iNumberOfWrittenPayloadBytes >= m_Packet.Payload.Length;
+            Done = m_iNumberOfWrittenPayloadBytes >= m_Packet.Payload.Count;
         }
 
         /// <summary>
@@ -117,7 +131,7 @@ namespace Coop.Network
         {
             get
             {
-                return (byte)(Convert.ToByte(m_Packet.Type) & Packet.BitMaskType);
+                return EncodePacketType(m_Packet.Type);
             }
         }
 
@@ -127,6 +141,11 @@ namespace Coop.Network
 
     public class PacketReader
     {
+        public static Protocol.EPacket DecodePacketType(byte header)
+        {
+            return (Protocol.EPacket) (header & Packet.BitMaskType);
+        }
+
         /// <summary>
         /// Reads a <see cref="Packet"/> from the given reader. Returns null if the packet is fragmented and
         /// parts are still missing.
@@ -137,7 +156,7 @@ namespace Coop.Network
         {
             // 1 Byte header
             byte header = reader.Binary.ReadByte();
-            Protocol.EPacket eType = (Protocol.EPacket)(header & Packet.BitMaskType);
+            Protocol.EPacket eType = DecodePacketType(header);
 
             // 4 Bytes size of payload
             int iPayloadSize = reader.Binary.ReadInt32();
@@ -163,7 +182,7 @@ namespace Coop.Network
 
                 m_FragmentedBuffer.Write(reader.Binary.ReadBytes(iPayloadSize));
                 Done = true;
-                return new Packet(eType, m_FragmentedStream.ToArray());
+                return new Packet(eType, m_FragmentedStream);
             }
             else
             {

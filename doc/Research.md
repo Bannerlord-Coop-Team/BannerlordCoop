@@ -17,6 +17,11 @@ Idea:
 ## Randomness
 TaleWorld.Core.MBRandom
 
+## Time control
+Campaign.SetTimeSpeed
+Campaign.TimeControlMode
+Campaign.SetTimeControlModeLock
+
 ## MBSubModuleBase initialization
 ### Order
 ```

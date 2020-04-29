@@ -4,6 +4,7 @@ using Coop.Multiplayer;
 using Coop.Network;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
@@ -17,9 +18,9 @@ namespace Coop.Game
     {
         InitialWorldState
     }
-    class WorldData : IWorldData
+    class SaveData : ISaveData
     {
-        public bool Receive(byte[] rawData)
+        public bool Receive(ArraySegment<byte> rawData)
         {
             ByteReader reader = new ByteReader(rawData);
             ECommand eData = (ECommand)reader.Binary.ReadInt32();
@@ -47,7 +48,7 @@ namespace Coop.Game
             writer.Binary.Write(save.Data.GetData());
             return writer.ToArray();
         }
-        public bool ReceiveWorldState(byte[] rawData)
+        private bool ReceiveWorldState(ArraySegment<byte> rawData)
         {
             InMemDriver stream = DeserializeWorldState(rawData);
             if(stream == null)
@@ -75,10 +76,10 @@ namespace Coop.Game
             GameLoopRunner.RunOnMainThread(new Action(() => SaveLoad.LoadGame(loadResult.LoadResult)));
             return true;
         }
-        public InMemDriver DeserializeWorldState(byte[] rawData)
+        public InMemDriver DeserializeWorldState(ArraySegment<byte> rawData)
         {
             InMemDriver memStream = new InMemDriver();
-            memStream.SetBuffer(rawData);
+            memStream.SetBuffer(rawData.ToArray());
             return memStream;
         }
 
