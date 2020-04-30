@@ -7,6 +7,7 @@ using Coop.Multiplayer.Network;
 using Coop.Network;
 using RailgunNet;
 using RailgunNet.Connection.Server;
+using Environment = Coop.Game.Persistence.Environment;
 
 namespace Coop.Game
 {
@@ -22,7 +23,7 @@ namespace Coop.Game
         public CoopServerRail(Server server)
         {
             m_Server = server;
-            m_Instance = new RailServer(Registry.Get(Component.Server));
+            m_Instance = new RailServer(Registry.Get(Component.Server, Environment.Current));
             RailGameConfigurator.SetInstanceAs(Component.Server);
             RailPopulator.Populate(m_Instance.StartRoom());
             m_Server.Updateables.Add(this);

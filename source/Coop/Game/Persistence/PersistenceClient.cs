@@ -13,7 +13,7 @@ namespace Coop.Game.Persistence
 
         public PersistenceClient()
         {
-            m_RailClient = new RailClient(Registry.Get(Component.Client));
+            m_RailClient = new RailClient(Registry.Get(Component.Client, Environment.Current));
         }
 
         public void Update(TimeSpan frameTime)

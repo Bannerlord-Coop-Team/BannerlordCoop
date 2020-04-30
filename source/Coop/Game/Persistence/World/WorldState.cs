@@ -7,11 +7,16 @@ namespace Coop.Game.Persistence.World
 {
     public class WorldState : RailState<WorldState>
     {
-        private readonly World m_Data = new World();
+        public World Data { get; }
+
+        public WorldState(IEnvironment env)
+        {
+            Data = new World(env);
+        }
 
         protected override void ResetAllData()
         {
-            m_Data.Reset();
+            Data.Reset();
         }
 
         #region Mutable
@@ -29,12 +34,12 @@ namespace Coop.Game.Persistence.World
         {
             Field flag = (Field) uField;
             if (flag.HasFlag(Field.TimeControlMode))
-                m_Data.TimeControlMode = source.m_Data.TimeControlMode;
+                Data.TimeControlMode = source.Data.TimeControlMode;
         }
 
         protected override uint CompareMutableData(WorldState other)
         {
-            return (uint) (m_Data.TimeControlMode == other.m_Data.TimeControlMode ?
+            return (uint) (Data.TimeControlMode == other.Data.TimeControlMode_LastWritten ?
                 Field.None :
                 Field.TimeControlMode);
         }
@@ -43,14 +48,14 @@ namespace Coop.Game.Persistence.World
         {
             Field flag = (Field) uField;
             if (flag.HasFlag(Field.TimeControlMode))
-                m_Data.TimeControlMode = (CampaignTimeControlMode) buffer.ReadByte();
+                Data.TimeControlMode = (CampaignTimeControlMode) buffer.ReadByte();
         }
 
         protected override void EncodeMutableData(RailBitBuffer buffer, uint uField)
         {
             Field flag = (Field) uField;
             if (flag.HasFlag(Field.TimeControlMode))
-                buffer.WriteByte(Convert.ToByte(m_Data.TimeControlMode));
+                buffer.WriteByte(Convert.ToByte(Data.TimeControlMode));
         }
         #endregion
 

@@ -9,17 +9,17 @@ namespace Coop.Game.Persistence
 {
     public static class Registry
     {
-        public static RailRegistry Get(Component eComponent)
+        public static RailRegistry Get(Component eComponent, IEnvironment environment)
         {
             RailRegistry reg = new RailRegistry(eComponent);
 
             switch (eComponent)
             {
                 case Component.Client:
-                    reg.AddEntityType<WorldEntityClient, WorldState>();
+                    reg.AddEntityType<WorldEntityClient, WorldState>(null, new []{environment});
                     break;
                 case Component.Server:
-                    reg.AddEntityType<WorldEntityServer, WorldState>();
+                    reg.AddEntityType<WorldEntityServer, WorldState>(null, new []{environment});
                     break;
             }
 

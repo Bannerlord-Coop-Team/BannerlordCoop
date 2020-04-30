@@ -1,5 +1,6 @@
 ﻿using Coop.Network;
 using System;
+using System.Collections.Generic;
 using Coop.Multiplayer;
 
 namespace Coop.Tests
@@ -23,9 +24,17 @@ namespace Coop.Tests
             throw new NotImplementedException();
         }
 
+        private readonly List<byte[]> sendBuffer = new List<byte[]>();
+
         public void SendRaw(ArraySegment<byte> raw)
         {
-            OnSend?.Invoke(raw);
+            sendBuffer.Add(raw.ToArray());
+        }
+
+        public void ExecuteSends()
+        {
+            sendBuffer.ForEach(buffer => OnSend?.Invoke(buffer));
+            sendBuffer.Clear();
         }
     }
 }
