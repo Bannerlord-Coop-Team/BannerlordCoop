@@ -15,7 +15,7 @@ namespace Coop.Game
 
         private void OnGameLoaded(CampaignGameStarter gameStarter)
         {
-            // CoopServer.Instance.TryStartServer();
+            // CoopServer.Instance.StartServer();
         }
     }
 }

@@ -35,14 +35,14 @@ namespace Coop.Tests
         void ClientCanConnect()
         {
             Client client = new Client();
-            client.Manager.Connect(m_Server.ActiveConfig.lanAddress.ToString(), m_Server.ActiveConfig.lanPort);
+            client.Manager.Connect(m_Server.ActiveConfig.lanAddress, m_Server.ActiveConfig.lanPort);
             TestUtils.UpdateUntil(() => client.Session.Connection != null, new List<IUpdateable>() { client.Manager });
         }
         [Fact]
         void ClientCanDisconnect()
         {
             Client client = new Client();
-            client.Manager.Connect(m_Server.ActiveConfig.lanAddress.ToString(), m_Server.ActiveConfig.lanPort);
+            client.Manager.Connect(m_Server.ActiveConfig.lanAddress, m_Server.ActiveConfig.lanPort);
             TestUtils.UpdateUntil(() => client.Session.Connection != null, new List<IUpdateable>() { client.Manager });
             Assert.NotNull(client.Session.Connection);
             Assert.True(client.Manager.Connected);

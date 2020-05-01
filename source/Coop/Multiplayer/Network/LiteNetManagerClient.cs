@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using Coop.Common;
 using Coop.Network;
 using LiteNetLib;
@@ -37,19 +38,28 @@ namespace Coop.Multiplayer.Network
             }
         }
 
-        public void Connect(string sAddress, int iPort)
+        public void Connect(IPAddress address, int iPort)
         {
-            if (!Connected)
+            IPEndPoint toConnectTo = new IPEndPoint(address, iPort);
+            if (Connected)
             {
-                if (m_NetManager.Start())
+                if (m_Peer.EndPoint.Equals(toConnectTo))
                 {
-                    m_Peer = m_NetManager.Connect(sAddress, iPort, "");
+                    Log.Debug($"Client is already connected to the endpoint. Ignoring request.");
+                    return;
                 }
-                else
-                {
-                    throw new NetworkConnectionFailedException(
-                        $"Could not connect to {sAddress}:{iPort}.");
-                }
+                Log.Debug("Switching servers.");
+                Disconnect(EDisconnectReason.ClientJoinedAnotherServer);
+            }
+
+            if (m_NetManager.Start())
+            {
+                m_Peer = m_NetManager.Connect(address.ToString(), iPort, "");
+            }
+            else
+            {
+                throw new NetworkConnectionFailedException(
+                    $"Could not connect to {address.ToString()}:{iPort}.");
             }
         }
 

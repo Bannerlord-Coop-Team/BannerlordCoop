@@ -73,7 +73,7 @@ namespace Coop.Tests
 
             // Setup client
             Client client = new Client(m_WorldData.Object);
-            client.Manager.Connect(m_Server.Object.ActiveConfig.lanAddress.ToString(), m_Server.Object.ActiveConfig.lanPort);
+            client.Manager.Connect(m_Server.Object.ActiveConfig.lanAddress, m_Server.Object.ActiveConfig.lanPort);
 
             // Wait until the client is connected
             TestUtils.UpdateUntil(() => connServerSide != null && client.Session.Connection != null && (client.Session.Connection.State == EConnectionState.ClientConnected || client.Session.Connection.State == EConnectionState.Disconnected), new List<IUpdateable>() { client.Manager, m_NetManagerServer });

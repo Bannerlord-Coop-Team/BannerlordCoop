@@ -20,7 +20,7 @@ namespace Coop.Game
         {
             m_Session = new GameSession(new SaveData());
             m_NetManager = new LiteNetManagerClient(m_Session);
-            m_Persistence = new PersistenceClient();
+            m_Persistence = new PersistenceClient(new GameEnvironment());
             m_Session.OnConnectionCreated += m_Persistence.OnConnectionCreated;
             GameState = new CoopGameState();
             Events = new CoopEvents();
@@ -37,9 +37,9 @@ namespace Coop.Game
             m_Persistence.Update(frameTime);
         }
 
-        public void TryConnect(IPAddress ip, int iPort)
+        public void Connect(IPAddress ip, int iPort)
         {
-            m_NetManager.Connect(ip.ToString(), iPort);
+            m_NetManager.Connect(ip, iPort);
         }
 
         public override string ToString()
@@ -49,7 +49,7 @@ namespace Coop.Game
                 return "Client not connected.";
             }
 
-            return m_Session.Connection.ToString();
+            return $"Client connected using a {m_Session.Connection.ToString()}.";
         }
     }
 }

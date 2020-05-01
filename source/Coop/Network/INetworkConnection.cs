@@ -5,6 +5,7 @@ namespace Coop.Network
     public enum EDisconnectReason : byte
     {
         ClientLeft,
+        ClientJoinedAnotherServer,
         ServerIsFull,
         ServerShutDown,
         WrongProtocolVersion,

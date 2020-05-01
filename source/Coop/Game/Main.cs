@@ -8,8 +8,7 @@ using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
-using Console = Coop.Game.Debug.Console;
-using Environment = Coop.Game.Persistence.Environment;
+using Console = Coop.Game.CLI.Console;
 
 namespace Coop.Game
 {
@@ -27,8 +26,6 @@ namespace Coop.Game
             m_Updateables = new UpdateableList();
             m_Updateables.Add(CoopClient.Instance);
             m_Updateables.Add(GameLoopRunner.Instance);
-
-            Environment.Current = new GameEnvironment();
         }
 
         public override void NoHarmonyInit()

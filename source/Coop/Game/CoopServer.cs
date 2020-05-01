@@ -22,12 +22,12 @@ namespace Coop.Game
 
         public Server Current { get; private set; }
 
-        public bool TryStartServer()
+        public void StartServer()
         {
             if (Current == null)
             {
                 Current = new Server();
-                m_RailServer = new CoopServerRail(Current);
+                m_RailServer = new CoopServerRail(Current, new GameEnvironment());
                 Current.OnClientConnected += OnClientConnected;
                 ServerConfiguration config = new ServerConfiguration();
                 Current.Start(config);
@@ -40,8 +40,6 @@ namespace Coop.Game
                 m_NetManager.StartListening();
                 Log.Debug("Setup network connection for server.");
             }
-
-            return true;
         }
 
         public void ShutDownServer()
@@ -50,6 +48,16 @@ namespace Coop.Game
             m_NetManager?.Stop();
             m_NetManager = null;
             Current = null;
+        }
+
+        public override string ToString()
+        {
+            if (Current == null)
+            {
+                return "Server not running.";
+            }
+
+            return Current.ToString();
         }
 
         private void OnClientConnected(ConnectionServer connection)

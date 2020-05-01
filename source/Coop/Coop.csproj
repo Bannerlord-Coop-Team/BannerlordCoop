@@ -214,6 +214,8 @@
   <ItemGroup>
     <Compile Include="Common\UpdateableList.cs" />
     <Compile Include="Game\Behaviour\InitServerBehaviour.cs" />
+    <Compile Include="Game\CLI\CLICommands.cs" />
+    <Compile Include="Game\CLI\Console.cs" />
     <Compile Include="Game\GameEnvironment.cs" />
     <Compile Include="Game\GameLoopRunner.cs" />
     <Compile Include="Game\Patch\Exceptions.cs" />
@@ -236,8 +238,6 @@
     <Compile Include="Game\CoopGameState.cs" />
     <Compile Include="Game\CoopClient.cs" />
     <Compile Include="Game\CoopServer.cs" />
-    <Compile Include="Game\Debug\CLICommands.cs" />
-    <Compile Include="Game\Debug\Console.cs" />
     <Compile Include="Game\Extensions.cs" />
     <Compile Include="Game\Patch\CampaignMapMovement.cs" />
     <Compile Include="Game\Behaviour\PlayerJoinedBehaviour.cs" />

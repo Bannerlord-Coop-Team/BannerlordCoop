@@ -11,9 +11,9 @@ namespace Coop.Game.Persistence
     {
         private readonly RailClient m_RailClient;
 
-        public PersistenceClient()
+        public PersistenceClient(IEnvironment environment)
         {
-            m_RailClient = new RailClient(Registry.Get(Component.Client, Environment.Current));
+            m_RailClient = new RailClient(Registry.Get(Component.Client, environment));
         }
 
         public void Update(TimeSpan frameTime)
