@@ -31,11 +31,9 @@ namespace Coop.Game.CLI
         [CommandLineFunctionality.CommandLineArgumentFunction("connect_to", sGroupName)]
         public static string ConnectTo(List<string> parameters)
         {
-            IPAddress ip;
-            int iPort;
             if (parameters.Count != 2 ||
-                !IPAddress.TryParse(parameters[0], out ip) ||
-                int.TryParse(parameters[1], out iPort))
+                !IPAddress.TryParse(parameters[0], out IPAddress ip) ||
+                int.TryParse(parameters[1], out int iPort))
             {
                 return $"Usage: \"{sGroupName}.ConnectTo [IP] [Port]\"." +
                        Environment.NewLine +

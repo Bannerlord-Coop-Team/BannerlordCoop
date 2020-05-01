@@ -14,8 +14,7 @@ namespace Coop.Game
         {
             foreach (GameModel model in game.BasicModels.GetGameModels())
             {
-                T t = model as T;
-                if (t != null)
+                if(model is T t)
                 {
                     return t;
                 }

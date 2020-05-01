@@ -46,15 +46,10 @@ namespace Coop.Game
                     9990,
                     () =>
                     {
-                        if (CoopServer.Instance.Current == null)
-                        {
-                            Common.Log.Info("No server found.");
-                        }
-                        else
-                        {
-                            Common.Log.Info(
-                                $"Server state: {CoopServer.Instance.Current.State}.");
-                        }
+                        Common.Log.Info(
+                            CoopServer.Instance.Current == null ?
+                                "No server found."
+                                : $"Server state: {CoopServer.Instance.Current.State}.");
                     },
                     false));
         }

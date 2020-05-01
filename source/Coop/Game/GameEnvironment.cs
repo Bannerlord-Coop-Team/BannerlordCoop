@@ -9,7 +9,7 @@ namespace Coop.Game
         public CampaignTimeControlMode TimeControlMode
         {
             get => Campaign.Current.TimeControlMode;
-            set => TimeControl.SetForced_Campaign_TimeControlMode(CampaignTimeControlMode.Stop);
+            set => TimeControl.SetForced_Campaign_TimeControlMode(value);
         }
     }
 }
