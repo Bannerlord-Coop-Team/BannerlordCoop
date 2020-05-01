@@ -37,6 +37,17 @@ namespace Coop.Network
          */
         ServerAwaitingClient,
 
+        /**
+         * [server side] Server is waiting for the client to either request data or
+         * ack the join.
+         * 
+         * Possible transitions to:
+         * - ServerSendingWorldData: Client wants to be sent a save game.
+         * - ServerConnected: Client confirmed that it joined the server.
+         * - Disconnecting:  Timeout or request denied.
+         */
+        ServerJoining,
+
         /** [server side] Client is joining the server.
          *
          * Possible transitions to:
@@ -81,11 +92,14 @@ namespace Coop.Network
         /// </summary>
         /// <param name="network">Networking implementation.</param>
         /// <param name="persistence">Implementation to relay Persistance packets to.</param>
-        protected ConnectionBase([NotNull] INetworkConnection network, [NotNull] IGameStatePersistence persistence)
+        protected ConnectionBase(
+            [NotNull] INetworkConnection network,
+            [NotNull] IGameStatePersistence persistence)
         {
             Dispatcher = new PacketDispatcher();
             Network = network ?? throw new ArgumentNullException(nameof(network));
-            GameStatePersistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
+            GameStatePersistence =
+                persistence ?? throw new ArgumentNullException(nameof(persistence));
         }
 
         #region Send and Receive
