@@ -7,12 +7,12 @@ namespace Coop.Game.Persistence.World
 {
     public class WorldState : RailState<WorldState>
     {
-        public World Data { get; }
-
         public WorldState(IEnvironment env)
         {
             Data = new World(env);
         }
+
+        public World Data { get; }
 
         protected override void ResetAllData()
         {
@@ -34,7 +34,9 @@ namespace Coop.Game.Persistence.World
         {
             Field flag = (Field) uField;
             if (flag.HasFlag(Field.TimeControlMode))
+            {
                 Data.TimeControlMode = source.Data.TimeControlMode;
+            }
         }
 
         protected override uint CompareMutableData(WorldState other)
@@ -48,14 +50,18 @@ namespace Coop.Game.Persistence.World
         {
             Field flag = (Field) uField;
             if (flag.HasFlag(Field.TimeControlMode))
+            {
                 Data.TimeControlMode = (CampaignTimeControlMode) buffer.ReadByte();
+            }
         }
 
         protected override void EncodeMutableData(RailBitBuffer buffer, uint uField)
         {
             Field flag = (Field) uField;
             if (flag.HasFlag(Field.TimeControlMode))
+            {
                 buffer.WriteByte(Convert.ToByte(Data.TimeControlMode));
+            }
         }
         #endregion
 

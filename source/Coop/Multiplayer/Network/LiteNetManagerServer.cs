@@ -26,7 +26,7 @@ namespace Coop.Multiplayer.Network
             }
 
             m_Config = server.ActiveConfig;
-            if (m_Config.wanAddress == null && m_Config.lanAddress == null)
+            if (m_Config.WanAddress == null && m_Config.LanAddress == null)
             {
                 throw new InvalidServerConfiguration(
                     $"Invalid server configuration {m_Server}. Unable to attach NetAdapter.");
@@ -35,12 +35,12 @@ namespace Coop.Multiplayer.Network
             m_WorldData = worldData;
 
             m_Server = server;
-            if (m_Config.wanAddress != null)
+            if (m_Config.WanAddress != null)
             {
                 m_wanManager = new NetManager(new LiteNetListenerServer(m_Server, m_WorldData));
             }
 
-            if (m_Config.lanAddress != null)
+            if (m_Config.LanAddress != null)
             {
                 m_lanManager = new NetManager(new LiteNetListenerServer(m_Server, m_WorldData));
             }
@@ -57,14 +57,14 @@ namespace Coop.Multiplayer.Network
             m_lanManager?.PollEvents();
             m_wanManager?.PollEvents();
 
-            if (m_lanManager != null && m_SinceLastDiscovery > m_Config.lanDiscoveryInterval)
+            if (m_lanManager != null && m_SinceLastDiscovery > m_Config.LanDiscoveryInterval)
             {
                 // TODO: LiteNetLib removed SendDiscoveryRequest in 0.9. Replacement?
                 // m_lanManager.SendDiscoveryRequest(Encoding.UTF8.GetBytes(Globals.LanDiscoveryString), Globals.LanDiscoveryPort);
                 m_SinceLastDiscovery = TimeSpan.Zero;
             }
 
-            if (m_SinceLastKeepAlive > m_Config.keepAliveInterval)
+            if (m_SinceLastKeepAlive > m_Config.KeepAliveInterval)
             {
                 m_Server.SendToAll(
                     new Packet(
@@ -76,8 +76,8 @@ namespace Coop.Multiplayer.Network
 
         public void StartListening()
         {
-            m_wanManager?.Start(m_Config.wanAddress, IPAddress.IPv6Any, m_Config.wanPort);
-            m_lanManager?.Start(m_Config.lanAddress, IPAddress.IPv6Any, m_Config.lanPort);
+            m_wanManager?.Start(m_Config.WanAddress, IPAddress.IPv6Any, m_Config.WanPort);
+            m_lanManager?.Start(m_Config.LanAddress, IPAddress.IPv6Any, m_Config.LanPort);
             m_Server.Updateables.Add(this);
         }
 

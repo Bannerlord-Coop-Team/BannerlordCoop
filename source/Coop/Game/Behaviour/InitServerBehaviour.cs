@@ -1,6 +1,6 @@
 ﻿using TaleWorlds.CampaignSystem;
 
-namespace Coop.Game
+namespace Coop.Game.Behaviour
 {
     public class InitServerBehaviour : CampaignBehaviorBase
     {

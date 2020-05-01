@@ -49,7 +49,7 @@ namespace Coop.Game
                 return "Client not connected.";
             }
 
-            return $"Client connected using a {m_Session.Connection.ToString()}.";
+            return $"Client connected using a {m_Session.Connection}.";
         }
     }
 }

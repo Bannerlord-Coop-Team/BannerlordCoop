@@ -53,9 +53,9 @@ namespace Coop.Network
         {
             string sDump = string.Join(
                 Environment.NewLine,
-                $"Server is '{State.ToString()}' with '{m_ActiveConnections.Count}/{ActiveConfig.uiMaxPlayerCount}' players.",
-                $"LAN:   {ActiveConfig.lanAddress}:{ActiveConfig.lanPort}",
-                $"WAN:   {ActiveConfig.wanAddress}:{ActiveConfig.wanPort}");
+                $"Server is '{State.ToString()}' with '{m_ActiveConnections.Count}/{ActiveConfig.MaxPlayerCount}' players.",
+                $"LAN:   {ActiveConfig.LanAddress}:{ActiveConfig.LanPort}",
+                $"WAN:   {ActiveConfig.WanAddress}:{ActiveConfig.WanPort}");
 
             if (m_ActiveConnections.Count > 0)
             {
@@ -90,7 +90,7 @@ namespace Coop.Network
         public virtual bool CanPlayerJoin()
         {
             return State == EState.Running &&
-                   m_ActiveConnections.Count < ActiveConfig.uiMaxPlayerCount;
+                   m_ActiveConnections.Count < ActiveConfig.MaxPlayerCount;
         }
 
         #region internals
@@ -171,8 +171,8 @@ namespace Coop.Network
         private void run()
         {
             FrameLimiter frameLimiter = new FrameLimiter(
-                ActiveConfig.uiTickRate > 0 ?
-                    TimeSpan.FromMilliseconds(1000 / (double) ActiveConfig.uiTickRate) :
+                ActiveConfig.TickRate > 0 ?
+                    TimeSpan.FromMilliseconds(1000 / (double) ActiveConfig.TickRate) :
                     TimeSpan.Zero);
             bool bRunning = true;
             while (bRunning)

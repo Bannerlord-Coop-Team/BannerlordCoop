@@ -19,7 +19,7 @@ namespace Coop.Tests
         public ClientServerCommunication_Test()
         {
             ServerConfiguration config = TestUtils.GetTestingConfig();
-            config.keepAliveInterval = m_keepAliveInterval;
+            config.KeepAliveInterval = m_keepAliveInterval;
             m_Server = new Mock<Server> { CallBase = true };
             m_Server.Object.Start(config);
             m_NetManagerServer = new LiteNetManagerServer(m_Server.Object, m_WorldData.Object);
@@ -73,7 +73,7 @@ namespace Coop.Tests
 
             // Setup client
             Client client = new Client(m_WorldData.Object);
-            client.Manager.Connect(m_Server.Object.ActiveConfig.lanAddress, m_Server.Object.ActiveConfig.lanPort);
+            client.Manager.Connect(m_Server.Object.ActiveConfig.LanAddress, m_Server.Object.ActiveConfig.LanPort);
 
             // Wait until the client is connected
             TestUtils.UpdateUntil(() => connServerSide != null && client.Session.Connection != null && (client.Session.Connection.State == EConnectionState.ClientConnected || client.Session.Connection.State == EConnectionState.Disconnected), new List<IUpdateable>() { client.Manager, m_NetManagerServer });

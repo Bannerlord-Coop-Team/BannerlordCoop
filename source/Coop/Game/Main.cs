@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using Coop.Common;
+using Coop.Game.Behaviour;
+using Coop.Game.CLI;
 using HarmonyLib;
 using NoHarmony;
 using TaleWorlds.Core;
@@ -8,21 +10,17 @@ using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
-using Console = Coop.Game.CLI.Console;
 
 namespace Coop.Game
 {
     internal class Main : NoHarmonyLoader
     {
-        public static Main Instance;
-
         private readonly UpdateableList m_Updateables;
-        private bool m_bFirstTick = true;
+        private bool m_IsFirstTick = true;
 
         public Main()
         {
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
-            Instance = this;
             m_Updateables = new UpdateableList();
             m_Updateables.Add(CoopClient.Instance);
             m_Updateables.Add(GameLoopRunner.Instance);
@@ -69,16 +67,16 @@ namespace Coop.Game
 
         protected override void OnApplicationTick(float dt)
         {
-            if (m_bFirstTick)
+            if (m_IsFirstTick)
             {
                 GameLoopRunner.Instance.SetGameLoopThread();
-                m_bFirstTick = false;
+                m_IsFirstTick = false;
             }
 
             base.OnApplicationTick(dt);
             if (Input.DebugInput.IsControlDown() && Input.DebugInput.IsKeyDown(InputKey.Tilde))
             {
-                Console.Toggle();
+                DebugConsole.Toggle();
             }
 
             m_Updateables.UpdateAll(TimeSpan.FromMilliseconds(dt));

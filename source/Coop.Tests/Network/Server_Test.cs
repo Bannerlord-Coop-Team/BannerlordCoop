@@ -43,9 +43,11 @@ namespace Coop.Tests
         {
             m_Server = new Server();
             m_Module = new TimingModule();
-            m_Config = new ServerConfiguration();
+            m_Config = new ServerConfiguration()
+            {
+                TickRate =  0
+            };
             m_Server.Updateables.Add(m_Module);
-            m_Config.uiTickRate = 0;
         }
 
         [Fact]
@@ -78,7 +80,7 @@ namespace Coop.Tests
         [InlineData(500)]
         public void TickLimiter(uint uiTickRate)
         {
-            m_Config.uiTickRate = uiTickRate;
+            m_Config.TickRate = uiTickRate;
             TimeSpan sleepTime = TimeSpan.FromMilliseconds(250);
             TimeSpan expectedTickTime = TimeSpan.FromMilliseconds(1000 / (double)uiTickRate);
 

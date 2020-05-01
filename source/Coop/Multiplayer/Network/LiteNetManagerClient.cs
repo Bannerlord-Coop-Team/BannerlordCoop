@@ -45,9 +45,10 @@ namespace Coop.Multiplayer.Network
             {
                 if (m_Peer.EndPoint.Equals(toConnectTo))
                 {
-                    Log.Debug($"Client is already connected to the endpoint. Ignoring request.");
+                    Log.Debug("Client is already connected to the endpoint. Ignoring request.");
                     return;
                 }
+
                 Log.Debug("Switching servers.");
                 Disconnect(EDisconnectReason.ClientJoinedAnotherServer);
             }
@@ -59,7 +60,7 @@ namespace Coop.Multiplayer.Network
             else
             {
                 throw new NetworkConnectionFailedException(
-                    $"Could not connect to {address.ToString()}:{iPort}.");
+                    $"Could not connect to {address}:{iPort}.");
             }
         }
 

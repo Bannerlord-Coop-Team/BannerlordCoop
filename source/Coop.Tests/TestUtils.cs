@@ -36,11 +36,12 @@ namespace Coop.Tests
         }
         public static ServerConfiguration GetTestingConfig()
         {
-            ServerConfiguration config = new ServerConfiguration();
-            config.lanPort = TestUtils.GetPort();
-            config.uiMaxPlayerCount = 4;
-            config.uiTickRate = 0;
-            return config;
+            return new ServerConfiguration()
+            {
+                LanPort = TestUtils.GetPort(),
+                MaxPlayerCount = 4,
+                TickRate = 0
+            };
         }
         public static Server StartNewServer()
         {

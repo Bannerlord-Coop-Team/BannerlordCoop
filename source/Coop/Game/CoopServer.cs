@@ -29,8 +29,7 @@ namespace Coop.Game
                 Current = new Server();
                 m_RailServer = new CoopServerRail(Current, new GameEnvironment());
                 Current.OnClientConnected += OnClientConnected;
-                ServerConfiguration config = new ServerConfiguration();
-                Current.Start(config);
+                Current.Start(new ServerConfiguration());
                 Log.Debug("Created server.");
             }
 

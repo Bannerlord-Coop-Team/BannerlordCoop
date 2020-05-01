@@ -5,17 +5,13 @@ namespace Coop.Network
 {
     public class ServerConfiguration
     {
-        public TimeSpan keepAliveInterval = TimeSpan.FromSeconds(5);
-        public IPAddress lanAddress = IPAddress.Parse("127.0.0.1");
-        public TimeSpan lanDiscoveryInterval = TimeSpan.FromSeconds(2);
-        public int lanPort = 4201;
-        public uint uiMaxPlayerCount = 8;
-
-        // statically initialized fields
-        public uint uiTickRate = 120; // in [Hz]. 0 for no limit.
-
-        // To be set during runtime
-        public IPAddress wanAddress = null;
-        public int wanPort = 4200;
+        public IPAddress LanAddress { get; set; } = IPAddress.Parse("127.0.0.1");
+        public int LanPort { get; set; } = 4201;
+        public IPAddress WanAddress { get; set; } = null;
+        public int WanPort { get; set; } = 4200;
+        public TimeSpan KeepAliveInterval { get; } = TimeSpan.FromSeconds(5);
+        public TimeSpan LanDiscoveryInterval { get; } = TimeSpan.FromSeconds(2);
+        public uint MaxPlayerCount { get; set; } = 8;
+        public uint TickRate { get; set; } = 120; // in [Hz]. 0 for no limit.
     }
 }

@@ -16,7 +16,7 @@ namespace Coop.Network
 
         public ArraySegment<byte> Payload;
 
-        public Packet(Protocol.EPacket eType, ArraySegment<byte> payload)
+        private Packet(Protocol.EPacket eType, ArraySegment<byte> payload)
         {
             Type = eType;
             Payload = payload;
@@ -39,9 +39,8 @@ namespace Coop.Network
 
     public class PacketWriter
     {
-        private int m_iNumberOfWrittenPayloadBytes;
-
         private readonly Packet m_Packet;
+        private int m_iNumberOfWrittenPayloadBytes;
 
         public PacketWriter(Packet packet)
         {

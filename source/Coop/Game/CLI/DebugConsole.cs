@@ -1,7 +1,8 @@
-﻿namespace Coop.Game.CLI
+﻿using System.Runtime.InteropServices;
+
+namespace Coop.Game.CLI
 {
-    using System.Runtime.InteropServices;
-    public static class Console
+    public static class DebugConsole
     {
         [DllImport(
             "Rgl.dll",

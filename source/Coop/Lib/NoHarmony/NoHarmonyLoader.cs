@@ -45,16 +45,16 @@ namespace NoHarmony
 
         private readonly List<BehaviorDelegate> BehaviorDelegates = new List<BehaviorDelegate>();
         private readonly List<TaskMode> BehaviorModes = new List<TaskMode>();
+
+        private readonly List<ModelDelegate> ModelDelegates = new List<ModelDelegate>();
+        private readonly List<TaskMode> ModelModes = new List<TaskMode>();
+        private readonly List<TaskStatus> TSBehaviors = new List<TaskStatus>();
+        private readonly List<TaskStatus> TSModels = new List<TaskStatus>();
         public string LogDateFormat = "dd/MM/yy HH:mm:ss.fff";
         public string LogFile = "NoHarmony.txt";
         public bool Logging = true;
         public LogLvl MinLogLvl = LogLvl.Info;
-
-        private readonly List<ModelDelegate> ModelDelegates = new List<ModelDelegate>();
-        private readonly List<TaskMode> ModelModes = new List<TaskMode>();
         public TypeLog ObjectsToLog = TypeLog.None;
-        private readonly List<TaskStatus> TSBehaviors = new List<TaskStatus>();
-        private readonly List<TaskStatus> TSModels = new List<TaskStatus>();
         public bool UseConfFile = false;
 
         /// <summary>

@@ -215,7 +215,7 @@
     <Compile Include="Common\UpdateableList.cs" />
     <Compile Include="Game\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Game\CLI\CLICommands.cs" />
-    <Compile Include="Game\CLI\Console.cs" />
+    <Compile Include="Game\CLI\DebugConsole.cs" />
     <Compile Include="Game\GameEnvironment.cs" />
     <Compile Include="Game\GameLoopRunner.cs" />
     <Compile Include="Game\Patch\Exceptions.cs" />

@@ -5,18 +5,21 @@ namespace Coop.Game.Persistence.World
     public class World
     {
         private readonly IEnvironment m_Environment;
+
         public World(IEnvironment env)
         {
             m_Environment = env;
             TimeControlMode_LastWritten = TimeControlMode;
         }
 
-        #region synced data
-        public CampaignTimeControlMode TimeControlMode_LastWritten
+        public void Reset()
         {
-            get;
-            private set;
+            // intentionally left blank
         }
+
+        #region synced data
+        public CampaignTimeControlMode TimeControlMode_LastWritten { get; private set; }
+
         public CampaignTimeControlMode TimeControlMode
         {
             get => m_Environment.TimeControlMode;
@@ -27,10 +30,5 @@ namespace Coop.Game.Persistence.World
             }
         }
         #endregion
-
-        public void Reset()
-        {
-            // intentionally left blank
-        }
     }
 }
