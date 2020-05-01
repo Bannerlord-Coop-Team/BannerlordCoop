@@ -30,6 +30,7 @@ namespace Coop.Game
 
         public CoopGameState GameState { get; }
         public CoopEvents Events { get; }
+        public bool Connected => m_NetManager.Connected;
 
         public void Update(TimeSpan frameTime)
         {

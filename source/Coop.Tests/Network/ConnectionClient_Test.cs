@@ -25,9 +25,13 @@ namespace Coop.Tests
             m_Connection = new ConnectionClient(m_NetworkConnection.Object, m_GamePersistence.Object, m_WorldData.Object);
         }
 
-        [Fact]
-        void VerifyStateTransitionsUntilConnected()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        void VerifyStateTransitionsUntilConnected(bool bExchangeWorldData)
         {
+            m_WorldData.Setup(d => d.RequiresInitialWorldData).Returns(bExchangeWorldData);
+
             // Init
             Assert.Equal(EConnectionState.Disconnected, m_Connection.State);
             m_Connection.Connect();
@@ -60,14 +64,22 @@ namespace Coop.Tests
                 Protocol.EPacket.Server_JoinRequestAccepted,
                 new Protocol.Server_JoinRequestAccepted().Serialize());
             m_Connection.Receive(response);
-            Assert.Equal(EConnectionState.ClientAwaitingWorldData, m_Connection.State);
 
-            // Send world data to client
-            response = TestUtils.MakeRaw(
-                Protocol.EPacket.Server_WorldData,
-                m_WorldData.Object.SerializeInitialWorldState());
-            m_Connection.Receive(response);
-            Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
+            if (bExchangeWorldData)
+            {
+                expectedSentData = TestUtils.MakeRaw(
+                    Protocol.EPacket.Client_RequestWorldData,
+                    new Protocol.Client_RequestWorldData().Serialize());
+                Assert.Equal(expectedSentData, m_SendRawParam);
+                Assert.Equal(EConnectionState.ClientAwaitingWorldData, m_Connection.State);
+
+                // Send world data to client
+                response = TestUtils.MakeRaw(
+                    Protocol.EPacket.Server_WorldData,
+                    m_WorldData.Object.SerializeInitialWorldState());
+                m_Connection.Receive(response);
+                Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
+            }
 
             // Expect client joined
             expectedSentData = TestUtils.MakeRaw(
@@ -90,7 +102,7 @@ namespace Coop.Tests
         void ReceiveForPersistenceIsRelayed()
         {
             // Bring connection to EConnectionState.ClientConnected
-            VerifyStateTransitionsUntilConnected();
+            VerifyStateTransitionsUntilConnected(false);
             Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
 
             // Persistence has not received anything yet

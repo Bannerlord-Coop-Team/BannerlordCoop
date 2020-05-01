@@ -33,11 +33,17 @@ namespace Coop.Multiplayer
             m_StateMachine.Configure(EConnectionState.ClientJoinRequesting)
                           .OnEntry(sendClientHello)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
-                          .Permit(
+                          .PermitIf(
                               ETrigger.ServerAcceptedJoinRequest,
-                              EConnectionState.ClientAwaitingWorldData);
+                              EConnectionState.ClientAwaitingWorldData,
+                              () => m_WorldData.RequiresInitialWorldData)
+                          .PermitIf(
+                              ETrigger.ServerAcceptedJoinRequest,
+                              EConnectionState.ClientConnected,
+                              () => !m_WorldData.RequiresInitialWorldData);
 
             m_StateMachine.Configure(EConnectionState.ClientAwaitingWorldData)
+                          .OnEntry(sendClientRequestInitialWorldData)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
                           .Permit(
                               ETrigger.InitialWorldDataReceived,
@@ -130,6 +136,14 @@ namespace Coop.Multiplayer
         #endregion
 
         #region ClientAwaitingWorldData & ClientConnected
+        private void sendClientRequestInitialWorldData()
+        {
+            Send(
+                new Packet(
+                    Protocol.EPacket.Client_RequestWorldData,
+                    new Protocol.Client_RequestWorldData().Serialize()));
+        }
+
         [PacketHandler(EConnectionState.ClientAwaitingWorldData, Protocol.EPacket.Server_WorldData)]
         private void receiveInitialWorldData(Packet packet)
         {
@@ -168,10 +182,9 @@ namespace Coop.Multiplayer
         [PacketHandler(EConnectionState.ClientConnected, Protocol.EPacket.Sync)]
         private void receiveSyncPacket(Packet packet)
         {
-            bool bSuccess = false;
             try
             {
-                bSuccess = m_WorldData.Receive(packet.Payload);
+                m_WorldData.Receive(packet.Payload);
             }
             catch (Exception e)
             {

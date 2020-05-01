@@ -26,22 +26,23 @@ namespace Coop.Multiplayer
                 disconnectTrigger =
                     m_StateMachine.SetTriggerParameters<EDisconnectReason>(ETrigger.Disconnect);
             m_StateMachine.Configure(EConnectionState.Disconnecting)
-                          .OnEntryFrom(disconnectTrigger, eReason => closeConnection(eReason))
+                          .OnEntryFrom(disconnectTrigger, closeConnection)
                           .Permit(ETrigger.Disconnected, EConnectionState.Disconnected);
 
             m_StateMachine.Configure(EConnectionState.ServerAwaitingClient)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
+                          .Permit(ETrigger.ClientInfoVerified, EConnectionState.ServerJoining);
+
+            m_StateMachine.Configure(EConnectionState.ServerJoining)
+                          .OnEntry(SendJoinRequestAccepted)
+                          .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
                           .Permit(
-                              ETrigger.JoinRequestAccepted,
-                              EConnectionState.ServerSendingWorldData);
+                              ETrigger.ClientRequestedWorldData,
+                              EConnectionState.ServerSendingWorldData)
+                          .Permit(ETrigger.ClientJoined, EConnectionState.ServerConnected);
 
             m_StateMachine.Configure(EConnectionState.ServerSendingWorldData)
-                          .OnEntry(
-                              () =>
-                              {
-                                  SendJoinRequestAccepted();
-                                  SendInitialWorldData();
-                              })
+                          .OnEntry(SendInitialWorldData)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
                           .Permit(ETrigger.ClientJoined, EConnectionState.ServerConnected);
 
@@ -92,7 +93,8 @@ namespace Coop.Multiplayer
         private enum ETrigger
         {
             WaitForClient,
-            JoinRequestAccepted,
+            ClientInfoVerified,
+            ClientRequestedWorldData,
             ClientJoined,
             Disconnect,
             Disconnected
@@ -130,17 +132,26 @@ namespace Coop.Multiplayer
             Protocol.Client_Info info =
                 Protocol.Client_Info.Deserialize(new ByteReader(packet.Payload));
             Log.Info($"Received client join request from {info.m_Player.Name}.");
-            m_StateMachine.Fire(ETrigger.JoinRequestAccepted);
+            m_StateMachine.Fire(ETrigger.ClientInfoVerified);
         }
         #endregion
 
-        #region ServerSendingWorldData & ServerConnected
+        #region ServerJoining, ServerSendingWorldData & ServerConnected
         private void SendJoinRequestAccepted()
         {
             Send(
                 new Packet(
                     Protocol.EPacket.Server_JoinRequestAccepted,
                     new Protocol.Server_JoinRequestAccepted().Serialize()));
+        }
+
+        [PacketHandler(EConnectionState.ServerJoining, Protocol.EPacket.Client_RequestWorldData)]
+        private void ReceiveClientRequestWorldData(Packet packet)
+        {
+            Protocol.Client_RequestWorldData info =
+                Protocol.Client_RequestWorldData.Deserialize(new ByteReader(packet.Payload));
+            Log.Info("Client requested world data.");
+            m_StateMachine.Fire(ETrigger.ClientRequestedWorldData);
         }
 
         private void SendInitialWorldData()
@@ -151,6 +162,7 @@ namespace Coop.Multiplayer
                     m_WorldData.SerializeInitialWorldState()));
         }
 
+        [PacketHandler(EConnectionState.ServerJoining, Protocol.EPacket.Client_Joined)]
         [PacketHandler(EConnectionState.ServerSendingWorldData, Protocol.EPacket.Client_Joined)]
         private void receiveClientJoined(Packet packet)
         {
@@ -162,10 +174,9 @@ namespace Coop.Multiplayer
         [PacketHandler(EConnectionState.ServerConnected, Protocol.EPacket.Sync)]
         private void receiveSyncPacket(Packet packet)
         {
-            bool bSuccess = false;
             try
             {
-                bSuccess = m_WorldData.Receive(packet.Payload);
+                m_WorldData.Receive(packet.Payload);
             }
             catch (Exception e)
             {

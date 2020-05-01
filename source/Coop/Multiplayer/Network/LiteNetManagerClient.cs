@@ -8,27 +8,22 @@ namespace Coop.Multiplayer.Network
 {
     public class LiteNetManagerClient : IUpdateable
     {
-        private readonly LiteNetListenerClient m_Listener;
         private readonly NetManager m_NetManager;
         private readonly GameSession m_Session;
         private NetPeer m_Peer;
 
         public LiteNetManagerClient(GameSession session)
         {
-            if (session == null)
+            m_Session = session ?? throw new ArgumentNullException(nameof(session));
+            m_NetManager = new NetManager(new LiteNetListenerClient(session))
             {
-                throw new ArgumentNullException("session may not be null.");
-            }
-
-            m_Session = session;
-            m_Listener = new LiteNetListenerClient(session);
-            m_NetManager = new NetManager(m_Listener);
-            m_NetManager.ReconnectDelay = 100;
-            m_NetManager.MaxConnectAttempts = 5;
+                ReconnectDelay = 100,
+                MaxConnectAttempts = 5
+            };
         }
 
         public bool Connected =>
-            m_Peer != null ? m_Peer.ConnectionState.HasFlag(ConnectionState.Connected) : false;
+            m_Peer != null && m_Peer.ConnectionState.HasFlag(ConnectionState.Connected);
 
         public void Update(TimeSpan frameTime)
         {

@@ -24,8 +24,11 @@ namespace Coop.Tests
             m_Connection = new ConnectionServer(m_NetworkConnection.Object, m_GamePersistence.Object, m_WorldData.Object);
         }
 
-        [Fact]
-        void VerifyStateTransitionsUntilConnected()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+
+        void VerifyStateTransitionsUntilConnected(bool bWithWorldDataExchange)
         {
             // Init
             Assert.Equal(EConnectionState.Disconnected, m_Connection.State);
@@ -50,17 +53,27 @@ namespace Coop.Tests
                 Protocol.EPacket.Client_Info,
                 new Protocol.Client_Info(new Player("Unknown")).Serialize());
             m_Connection.Receive(clientInfo);
-            Assert.Equal(EConnectionState.ServerSendingWorldData, m_Connection.State);
 
-            // Server sent 2 packets:
             var joinRequestAccepted = TestUtils.MakeRaw(
                 Protocol.EPacket.Server_JoinRequestAccepted,
                 new Protocol.Server_JoinRequestAccepted().Serialize());
-            Assert.Equal(joinRequestAccepted, m_SendRawParams[^2]);
-            var worldData = TestUtils.MakeRaw(
-                Protocol.EPacket.Server_WorldData,
-                m_WorldData.Object.SerializeInitialWorldState());
-            Assert.Equal(worldData, m_SendRawParams[^1]);
+            Assert.Equal(joinRequestAccepted, m_SendRawParams[^1]);
+            Assert.Equal(EConnectionState.ServerJoining, m_Connection.State);
+
+            if (bWithWorldDataExchange)
+            {
+                // Request world data
+                var worldDataRequest = TestUtils.MakeRaw(
+                    Protocol.EPacket.Client_RequestWorldData,
+                    new Protocol.Client_RequestWorldData().Serialize());
+                m_Connection.Receive(worldDataRequest);
+
+                var worldData = TestUtils.MakeRaw(
+                    Protocol.EPacket.Server_WorldData,
+                    m_WorldData.Object.SerializeInitialWorldState());
+                Assert.Equal(worldData, m_SendRawParams[^1]);
+                Assert.Equal(EConnectionState.ServerSendingWorldData, m_Connection.State);
+            }
 
             // client joined
             var joined = TestUtils.MakeRaw(

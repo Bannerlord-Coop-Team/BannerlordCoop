@@ -17,6 +17,8 @@ namespace Coop.Game
 
     internal class SaveData : ISaveData
     {
+        public bool RequiresInitialWorldData => Coop.IsClient && !Coop.IsServer;
+
         public bool Receive(ArraySegment<byte> rawData)
         {
             ByteReader reader = new ByteReader(rawData);

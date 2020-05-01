@@ -38,13 +38,26 @@ namespace Coop.Tests
             }
         }
 
-        [Fact]
-        void ClientSendOrder()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        void ClientSendOrder(bool bExchangeWorldData)
         {
+            m_WorldData.Setup(d => d.RequiresInitialWorldData).Returns(bExchangeWorldData);
+
             List<(EConnectionState, Protocol.EPacket)> expectedReceiveOrderOnServer = new List<(EConnectionState, Protocol.EPacket)>();
             expectedReceiveOrderOnServer.Add((EConnectionState.ServerAwaitingClient, Protocol.EPacket.Client_Hello));
             expectedReceiveOrderOnServer.Add((EConnectionState.ServerAwaitingClient, Protocol.EPacket.Client_Info));
-            expectedReceiveOrderOnServer.Add((EConnectionState.ServerSendingWorldData, Protocol.EPacket.Client_Joined));
+            if (bExchangeWorldData)
+            {
+                expectedReceiveOrderOnServer.Add((EConnectionState.ServerJoining, Protocol.EPacket.Client_RequestWorldData));
+                expectedReceiveOrderOnServer.Add((EConnectionState.ServerSendingWorldData, Protocol.EPacket.Client_Joined));
+            }
+            else
+            {
+                expectedReceiveOrderOnServer.Add((EConnectionState.ServerJoining, Protocol.EPacket.Client_Joined));
+            }
+            
             int iPacketsReceived = 0;
             int iKeepAlivesReceived = 0;
 
@@ -84,8 +97,8 @@ namespace Coop.Tests
             TestUtils.UpdateUntil(() => connServerSide.State == EConnectionState.ServerConnected || connServerSide.State == EConnectionState.Disconnected, new List<IUpdateable>() { client.Manager, m_NetManagerServer });
             Assert.Equal(EConnectionState.ServerConnected, connServerSide.State);
             Assert.Equal(expectedReceiveOrderOnServer.Count, iPacketsReceived);
-            m_WorldData.Verify(w => w.Receive(It.IsAny<ArraySegment<byte>>()), Times.Once());
-            m_WorldData.Verify(w => w.SerializeInitialWorldState(), Times.Once());
+            m_WorldData.Verify(w => w.Receive(It.IsAny<ArraySegment<byte>>()), bExchangeWorldData ? Times.Once() : Times.Never());
+            m_WorldData.Verify(w => w.SerializeInitialWorldState(), bExchangeWorldData ? Times.Once() : Times.Never());
 
             // Check if keep alive gets sent
             if (iKeepAlivesReceived == 0)
@@ -99,7 +112,7 @@ namespace Coop.Tests
             client.Session.Connection.Send(new Packet(Protocol.EPacket.Sync, new byte[] { }));
             TestUtils.UpdateUntil(() => iPacketsReceived == expectedReceiveOrderOnServer.Count, new List<IUpdateable>() { client.Manager, m_NetManagerServer });
             Assert.Equal(expectedReceiveOrderOnServer.Count, iPacketsReceived);
-            m_WorldData.Verify(w => w.Receive(It.IsAny<ArraySegment<byte>>()), Times.Exactly(2));
+            m_WorldData.Verify(w => w.Receive(It.IsAny<ArraySegment<byte>>()), Times.Exactly(bExchangeWorldData ? 2 : 1));
         }
     }
 }

@@ -12,7 +12,6 @@ namespace Coop.Multiplayer.Network
         private readonly NetManager m_lanManager;
         private readonly Server m_Server;
         private readonly NetManager m_wanManager;
-        private readonly ISaveData m_WorldData;
 
         private int m_iKeepAliveID;
         private TimeSpan m_SinceLastDiscovery;
@@ -20,7 +19,7 @@ namespace Coop.Multiplayer.Network
 
         public LiteNetManagerServer(Server server, ISaveData worldData)
         {
-            if (server == null || server.ActiveConfig == null || worldData == null)
+            if (server?.ActiveConfig == null || worldData == null)
             {
                 throw new ArgumentNullException();
             }
@@ -32,17 +31,15 @@ namespace Coop.Multiplayer.Network
                     $"Invalid server configuration {m_Server}. Unable to attach NetAdapter.");
             }
 
-            m_WorldData = worldData;
-
             m_Server = server;
             if (m_Config.WanAddress != null)
             {
-                m_wanManager = new NetManager(new LiteNetListenerServer(m_Server, m_WorldData));
+                m_wanManager = new NetManager(new LiteNetListenerServer(m_Server, worldData));
             }
 
             if (m_Config.LanAddress != null)
             {
-                m_lanManager = new NetManager(new LiteNetListenerServer(m_Server, m_WorldData));
+                m_lanManager = new NetManager(new LiteNetListenerServer(m_Server, worldData));
             }
 
             m_SinceLastDiscovery = TimeSpan.Zero;
