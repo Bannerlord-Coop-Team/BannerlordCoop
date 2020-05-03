@@ -6,6 +6,7 @@
         {
             Client_Hello, // Introduces the client to the server.
             Client_Info, // Contains ClientInfo.
+            Client_RequestWorldData, // Client wants to be sent a save game of the current state.
             Client_Joined, // Sent once the client has loaded the initial world state.
 
             Server_RequestClientInfo, // Instructs the client to send its ClientInfo.
@@ -83,6 +84,21 @@
             public static Client_Info Deserialize(ByteReader reader)
             {
                 return new Client_Info(new Player(reader.Binary.ReadString()));
+            }
+        }
+
+        public class Client_RequestWorldData
+        {
+            public byte[] Serialize()
+            {
+                // Empty
+                return new byte[0];
+            }
+
+            public static Client_RequestWorldData Deserialize(ByteReader reader)
+            {
+                // Empty
+                return new Client_RequestWorldData();
             }
         }
 

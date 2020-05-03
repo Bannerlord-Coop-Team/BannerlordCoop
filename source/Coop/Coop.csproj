@@ -216,6 +216,7 @@
     <Compile Include="Game\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Game\CLI\CLICommands.cs" />
     <Compile Include="Game\CLI\DebugConsole.cs" />
+    <Compile Include="Game\Coop.cs" />
     <Compile Include="Game\GameEnvironment.cs" />
     <Compile Include="Game\GameLoopRunner.cs" />
     <Compile Include="Game\Patch\Exceptions.cs" />
@@ -225,7 +226,6 @@
     <Compile Include="Game\Persistence\Compression.cs" />
     <Compile Include="Game\Persistence\IEnvironment.cs" />
     <Compile Include="Game\Persistence\PersistenceClient.cs" />
-    <Compile Include="Game\Persistence\RailGameConfigurator.cs" />
     <Compile Include="Game\Persistence\RailPopulator.cs" />
     <Compile Include="Game\Persistence\Registry.cs" />
     <Compile Include="Game\Persistence\World\World.cs" />

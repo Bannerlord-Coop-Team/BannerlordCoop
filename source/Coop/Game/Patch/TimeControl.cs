@@ -6,7 +6,7 @@ namespace Coop.Game.Patch
 {
     public static class TimeControl
     {
-        public static bool IsRemoteControlled = false;
+        private static bool IsRemoteControlled => Coop.IsClient;
         public static event Func<CampaignTimeControlMode, bool> On_Campaign_TimeControlMode;
 
         public static void SetForced_Campaign_TimeControlMode(CampaignTimeControlMode eMode)

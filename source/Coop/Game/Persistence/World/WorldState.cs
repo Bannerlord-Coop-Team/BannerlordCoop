@@ -7,12 +7,7 @@ namespace Coop.Game.Persistence.World
 {
     public class WorldState : RailState<WorldState>
     {
-        public WorldState(IEnvironment env)
-        {
-            Data = new World(env);
-        }
-
-        public World Data { get; }
+        public World Data { get; } = new World();
 
         protected override void ResetAllData()
         {
@@ -41,7 +36,7 @@ namespace Coop.Game.Persistence.World
 
         protected override uint CompareMutableData(WorldState other)
         {
-            return (uint) (Data.TimeControlMode == other.Data.TimeControlMode_LastWritten ?
+            return (uint) (Data.TimeControlMode == other.Data.TimeControlMode ?
                 Field.None :
                 Field.TimeControlMode);
         }

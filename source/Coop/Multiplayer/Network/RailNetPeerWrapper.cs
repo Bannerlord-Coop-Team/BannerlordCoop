@@ -27,6 +27,11 @@ namespace Coop.Multiplayer.Network
         [Conditional("DEBUG")]
         private static void AssertIsPersistencePayload(ArraySegment<byte> buffer)
         {
+            if (buffer.Array == null)
+            {
+                throw new ArgumentNullException(nameof(buffer));
+            }
+
             Protocol.EPacket eType = PacketReader.DecodePacketType(buffer.Array[buffer.Offset]);
             if (eType != Protocol.EPacket.Persistence)
             {

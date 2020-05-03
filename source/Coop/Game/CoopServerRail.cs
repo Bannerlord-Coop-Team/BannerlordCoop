@@ -23,9 +23,7 @@ namespace Coop.Game
         {
             m_Server = server;
             m_Instance = new RailServer(Registry.Get(Component.Server, environment));
-            RailGameConfigurator.SetInstanceAs(Component.Server);
             RailPopulator.Populate(m_Instance.StartRoom());
-            m_Server.Updateables.Add(this);
         }
 
         public void Update(TimeSpan frameTime)

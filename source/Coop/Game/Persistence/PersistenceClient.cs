@@ -14,6 +14,7 @@ namespace Coop.Game.Persistence
         public PersistenceClient(IEnvironment environment)
         {
             m_RailClient = new RailClient(Registry.Get(Component.Client, environment));
+            m_RailClient.StartRoom();
         }
 
         public void Update(TimeSpan frameTime)

@@ -35,7 +35,7 @@ namespace Coop.Common
             {
                 m_WaitUntilTick = tick =>
                 {
-                    SpinWait.SpinUntil(() => { return m_Timer.ElapsedTicks >= tick; });
+                    SpinWait.SpinUntil(() => m_Timer.ElapsedTicks >= tick);
                 };
             }
 

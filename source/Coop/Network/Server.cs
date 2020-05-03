@@ -60,10 +60,10 @@ namespace Coop.Network
             if (m_ActiveConnections.Count > 0)
             {
                 sDump += Environment.NewLine + "Connections to clients:";
-                sDump += Environment.NewLine + "Latency   " + "Connection State";
+                sDump += Environment.NewLine + "Ping " + "State                         Network";
                 foreach (ConnectionServer conn in m_ActiveConnections)
                 {
-                    sDump += Environment.NewLine + $"{conn.Latency,-10}" + $"{conn.State}";
+                    sDump += Environment.NewLine + $"{conn}";
                 }
             }
 
@@ -113,17 +113,17 @@ namespace Coop.Network
             StateMachine<EState, ETrigger>.TriggerWithParameters<ServerConfiguration> startTrigger =
                 m_State.SetTriggerParameters<ServerConfiguration>(ETrigger.Start);
             m_State.Configure(EState.Starting)
-                   .OnEntryFrom(startTrigger, config => load(config))
+                   .OnEntryFrom(startTrigger, Load)
                    .Permit(ETrigger.Initialized, EState.Running)
                    .Permit(ETrigger.Stop, EState.Stopping);
 
             m_State.Configure(EState.Running)
-                   .OnEntryFrom(ETrigger.Initialized, () => startMainLoop())
-                   .OnExit(() => stopMainLoop())
+                   .OnEntryFrom(ETrigger.Initialized, StartMainLoop)
+                   .OnExit(StopMainLoop)
                    .Permit(ETrigger.Stop, EState.Stopping);
 
             m_State.Configure(EState.Stopping)
-                   .OnEntry(() => shutDown())
+                   .OnEntry(ShutDown)
                    .Permit(ETrigger.Stopped, EState.Inactive);
         }
 
@@ -134,13 +134,13 @@ namespace Coop.Network
 
         private readonly List<ConnectionServer> m_ActiveConnections;
 
-        private void load(ServerConfiguration config)
+        private void Load(ServerConfiguration config)
         {
             ActiveConfig = config;
             m_State.Fire(ETrigger.Initialized);
         }
 
-        private void shutDown()
+        private void ShutDown()
         {
             ActiveConfig = null;
             foreach (ConnectionServer conn in m_ActiveConnections)
@@ -153,22 +153,22 @@ namespace Coop.Network
         }
 
         private readonly StateMachine<EState, ETrigger> m_State;
-        private bool m_bStopRequest;
+        private bool m_IsStopRequest;
         private readonly object m_StopRequestLock = new object();
         private Thread m_Thread;
 
-        private void startMainLoop()
+        private void StartMainLoop()
         {
-            m_Thread = new Thread(() => run());
+            m_Thread = new Thread(Run);
             lock (m_StopRequestLock)
             {
-                m_bStopRequest = false;
+                m_IsStopRequest = false;
             }
 
             m_Thread.Start();
         }
 
-        private void run()
+        private void Run()
         {
             FrameLimiter frameLimiter = new FrameLimiter(
                 ActiveConfig.TickRate > 0 ?
@@ -177,20 +177,16 @@ namespace Coop.Network
             bool bRunning = true;
             while (bRunning)
             {
-                if (bRunning)
-                {
-                    Updateables.UpdateAll(frameLimiter.LastFrameTime);
-                }
-
+                Updateables.UpdateAll(frameLimiter.LastFrameTime);
                 frameLimiter.Throttle();
                 lock (m_StopRequestLock)
                 {
-                    bRunning = !m_bStopRequest;
+                    bRunning = !m_IsStopRequest;
                 }
             }
         }
 
-        private void stopMainLoop()
+        private void StopMainLoop()
         {
             if (m_Thread == null)
             {
@@ -199,7 +195,7 @@ namespace Coop.Network
 
             lock (m_StopRequestLock)
             {
-                m_bStopRequest = true;
+                m_IsStopRequest = true;
             }
 
             m_Thread.Join();

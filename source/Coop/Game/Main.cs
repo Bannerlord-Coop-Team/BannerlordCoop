@@ -15,16 +15,18 @@ namespace Coop.Game
 {
     internal class Main : NoHarmonyLoader
     {
-        private readonly UpdateableList m_Updateables;
         private bool m_IsFirstTick = true;
 
         public Main()
         {
+            Instance = this;
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
-            m_Updateables = new UpdateableList();
-            m_Updateables.Add(CoopClient.Instance);
-            m_Updateables.Add(GameLoopRunner.Instance);
+            Updateables.Add(CoopClient.Instance);
+            Updateables.Add(GameLoopRunner.Instance);
         }
+
+        public static Main Instance { get; private set; }
+        public UpdateableList Updateables { get; } = new UpdateableList();
 
         public override void NoHarmonyInit()
         {
@@ -48,8 +50,8 @@ namespace Coop.Game
                     {
                         Common.Log.Info(
                             CoopServer.Instance.Current == null ?
-                                "No server found."
-                                : $"Server state: {CoopServer.Instance.Current.State}.");
+                                "No server found." :
+                                $"Server state: {CoopServer.Instance.Current.State}.");
                     },
                     false));
         }
@@ -74,7 +76,7 @@ namespace Coop.Game
                 DebugConsole.Toggle();
             }
 
-            m_Updateables.UpdateAll(TimeSpan.FromMilliseconds(dt));
+            Updateables.UpdateAll(TimeSpan.FromSeconds(dt));
         }
 
         private void initLogger()

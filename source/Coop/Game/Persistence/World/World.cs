@@ -4,31 +4,13 @@ namespace Coop.Game.Persistence.World
 {
     public class World
     {
-        private readonly IEnvironment m_Environment;
-
-        public World(IEnvironment env)
-        {
-            m_Environment = env;
-            TimeControlMode_LastWritten = TimeControlMode;
-        }
-
         public void Reset()
         {
-            // intentionally left blank
+            TimeControlMode = CampaignTimeControlMode.Stop;
         }
-
+        
         #region synced data
-        public CampaignTimeControlMode TimeControlMode_LastWritten { get; private set; }
-
-        public CampaignTimeControlMode TimeControlMode
-        {
-            get => m_Environment.TimeControlMode;
-            set
-            {
-                m_Environment.TimeControlMode = value;
-                TimeControlMode_LastWritten = value;
-            }
-        }
+        public CampaignTimeControlMode TimeControlMode { get; set; }
         #endregion
     }
 }

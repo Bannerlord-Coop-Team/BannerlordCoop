@@ -182,7 +182,7 @@ namespace Coop.Network
 
         public override string ToString()
         {
-            return $"{base.ToString()} - State: {State}, Ping: {Latency}, Netinfo: {Network}";
+            return $"{Latency,-5}{State,-30}{Network}";
         }
         #endregion
 

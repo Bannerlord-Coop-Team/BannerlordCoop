@@ -50,7 +50,7 @@ namespace Coop.Game
                 return "Client not connected.";
             }
 
-            return $"Client connected using a {m_Session.Connection}.";
+            return $"{m_Session.Connection}";
         }
     }
 }

@@ -16,10 +16,14 @@ namespace Coop.Game.Persistence
             switch (eComponent)
             {
                 case Component.Client:
-                    reg.AddEntityType<WorldEntityClient, WorldState>(null, new object[] {environment});
+                    reg.AddEntityType<WorldEntityClient, WorldState>(
+                        new object[] {environment},
+                        null);
                     break;
                 case Component.Server:
-                    reg.AddEntityType<WorldEntityServer, WorldState>(null, new object[] {environment});
+                    reg.AddEntityType<WorldEntityServer, WorldState>(
+                        new object[] {environment},
+                        null);
                     break;
             }
 
