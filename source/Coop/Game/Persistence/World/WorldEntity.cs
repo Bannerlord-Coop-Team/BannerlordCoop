@@ -1,9 +1,10 @@
 ﻿using System;
 using RailgunNet.Logic;
+using RailgunNet.Logic.State;
 
 namespace Coop.Game.Persistence.World
 {
-    public class WorldEntityClient : RailEntityClient<WorldState>
+    public class WorldEntityClient : RailEntityClient<RailStateGeneric<WorldState>>
     {
         private readonly IEnvironment m_Environment;
         public WorldEntityClient(IEnvironment environment)
@@ -17,7 +18,7 @@ namespace Coop.Game.Persistence.World
         }
     }
 
-    public class WorldEntityServer : RailEntityServer<WorldState>
+    public class WorldEntityServer : RailEntityServer<RailStateGeneric<WorldState>>
     {
         private readonly IEnvironment m_Environment;
         public WorldEntityServer(IEnvironment environment)

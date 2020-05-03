@@ -2,6 +2,7 @@
 using RailgunNet;
 using RailgunNet.Factory;
 using RailgunNet.Logic;
+using RailgunNet.Logic.State;
 using RailgunNet.System.Encoding;
 using RailgunNet.System.Types;
 
@@ -17,13 +18,11 @@ namespace Coop.Game.Persistence
             {
                 case Component.Client:
                     reg.AddEntityType<WorldEntityClient, WorldState>(
-                        new object[] {environment},
-                        null);
+                        new object[] {environment});
                     break;
                 case Component.Server:
                     reg.AddEntityType<WorldEntityServer, WorldState>(
-                        new object[] {environment},
-                        null);
+                        new object[] {environment});
                     break;
             }
 
