@@ -6,6 +6,7 @@ using Moq;
 using RailgunNet;
 using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
+using RailgunNet.Logic;
 using TaleWorlds.CampaignSystem;
 using Xunit;
 
@@ -73,15 +74,15 @@ namespace Coop.Tests
             Assert.Single(serverRoom.Entities);
 
             // Clients representation of the entity is identical to the server
-            IRailEntity entityProxy = clientRoom.Entities.First();
+            RailEntityBase entityProxy = clientRoom.Entities.First();
             Assert.IsType<WorldEntityClient>(entityProxy);
             WorldEntityClient entityClientSide = entityProxy as WorldEntityClient;
             Assert.NotNull(entityClientSide);
             Assert.Equal(entityServerSide.Id, entityProxy.Id);
-            Assert.Equal(expectedTimeControl, entityServerSide.State.Data.TimeControlMode);
-            Assert.Equal(expectedTimeControl, entityClientSide.State.Data.TimeControlMode);
-            Assert.Equal(entityClientSide.State.Data.TimeControlMode, m_EnvironmentClient.TimeControlMode);
-            Assert.Equal(entityServerSide.State.Data.TimeControlMode, m_EnvironmentServer.TimeControlMode);
+            Assert.Equal(expectedTimeControl, entityServerSide.State.TimeControlMode);
+            Assert.Equal(expectedTimeControl, entityClientSide.State.TimeControlMode);
+            Assert.Equal(entityClientSide.State.TimeControlMode, m_EnvironmentClient.TimeControlMode);
+            Assert.Equal(entityServerSide.State.TimeControlMode, m_EnvironmentServer.TimeControlMode);
 
             // Change the entity on server side and sync to the client
             expectedTimeControl = CampaignTimeControlMode.Stop;

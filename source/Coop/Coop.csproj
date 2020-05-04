@@ -228,7 +228,6 @@
     <Compile Include="Game\Persistence\PersistenceClient.cs" />
     <Compile Include="Game\Persistence\RailPopulator.cs" />
     <Compile Include="Game\Persistence\Registry.cs" />
-    <Compile Include="Game\Persistence\World\World.cs" />
     <Compile Include="Game\Persistence\World\WorldEntity.cs" />
     <Compile Include="Game\Persistence\World\WorldState.cs" />
     <Compile Include="Game\CoopServerRail.cs" />

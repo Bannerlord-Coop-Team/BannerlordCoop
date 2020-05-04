@@ -2,7 +2,6 @@
 using RailgunNet;
 using RailgunNet.Factory;
 using RailgunNet.Logic;
-using RailgunNet.Logic.State;
 using RailgunNet.System.Encoding;
 using RailgunNet.System.Types;
 
@@ -17,12 +16,10 @@ namespace Coop.Game.Persistence
             switch (eComponent)
             {
                 case Component.Client:
-                    reg.AddEntityType<WorldEntityClient, WorldState>(
-                        new object[] {environment});
+                    reg.AddEntityType<WorldEntityClient, WorldState>(new object[] {environment});
                     break;
                 case Component.Server:
-                    reg.AddEntityType<WorldEntityServer, WorldState>(
-                        new object[] {environment});
+                    reg.AddEntityType<WorldEntityServer, WorldState>(new object[] {environment});
                     break;
             }
 
@@ -51,21 +48,9 @@ namespace Coop.Game.Persistence
             }
         }
 
-        public class DummyEvent : RailEvent<DummyEvent>
+        public class DummyEvent : RailEvent
         {
-            protected override void CopyDataFrom(DummyEvent other)
-            {
-            }
-
-            protected override void ReadData(RailBitBuffer buffer, Tick packetTick)
-            {
-            }
-
-            protected override void ResetData()
-            {
-            }
-
-            protected override void WriteData(RailBitBuffer buffer, Tick packetTick)
+            protected override void Execute(RailRoom room, RailController sender)
             {
             }
         }

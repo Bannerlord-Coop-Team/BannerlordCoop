@@ -1,9 +1,9 @@
-﻿using RailgunNet.Logic.State;
+﻿using RailgunNet.Logic;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game.Persistence.World
 {
-    public class WorldState
+    public class WorldState : RailState
     {
         public CampaignTimeControlMode TimeControlMode
         {
