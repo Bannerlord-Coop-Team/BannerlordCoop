@@ -41,5 +41,19 @@ namespace Coop.Tests
             writer.Binary.Write(payload);
             Assert.Equal(writer.ToArray(), m_SendRawParam);
         }
+
+        [Fact]
+        void BufferOffsetIsRespected()
+        {
+            byte[] payload = Enumerable.Range(7, 64).Select(i => (byte)i).ToArray();
+            int offset = 7;
+            ArraySegment<byte> buffer = new ArraySegment<byte>(payload, offset, payload.Length - offset);
+            m_Instance.SendPayload(buffer);
+
+            ByteWriter writer = new ByteWriter();
+            writer.Binary.Write(PacketWriter.EncodePacketType(Protocol.EPacket.Persistence));
+            writer.Binary.Write(buffer);
+            Assert.Equal(writer.ToArray(), m_SendRawParam);
+        }
     }
 }
