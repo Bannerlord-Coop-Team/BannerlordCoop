@@ -19,7 +19,7 @@ namespace Coop.Tests
         private ArraySegment<byte> m_SendRawParam;
         public ConnectionClient_Test()
         {
-            m_NetworkConnection.Setup(con => con.SendRaw(It.IsAny<ArraySegment<byte>>())).Callback((ArraySegment<byte> arg) => m_SendRawParam = arg);
+            m_NetworkConnection.Setup(con => con.SendRaw(It.IsAny<ArraySegment<byte>>(), It.IsAny<EDeliveryMethod>())).Callback((ArraySegment<byte> arg, EDeliveryMethod eMethod) => m_SendRawParam = arg);
             m_GamePersistence = new Mock<IGameStatePersistence>();
             m_GamePersistence.Setup(per => per.Receive(It.IsAny<ArraySegment<byte>>())).Callback((ArraySegment<byte> arg) => m_PersistenceReceiveParam = arg);
             m_Connection = new ConnectionClient(m_NetworkConnection.Object, m_GamePersistence.Object, m_WorldData.Object);
@@ -37,7 +37,7 @@ namespace Coop.Tests
             m_Connection.Connect();
 
             // Expect client hello
-            m_NetworkConnection.Verify(c => c.SendRaw(It.IsAny<ArraySegment<byte>>()), Times.Once);
+            m_NetworkConnection.Verify(c => c.SendRaw(It.IsAny<ArraySegment<byte>>(), It.IsAny<EDeliveryMethod>()), Times.Once);
             var expectedSentData = TestUtils.MakeRaw(
                 Protocol.EPacket.Client_Hello,
                 new Protocol.Client_Hello(Protocol.Version).Serialize());

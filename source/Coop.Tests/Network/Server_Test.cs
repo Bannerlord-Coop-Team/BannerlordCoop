@@ -41,7 +41,7 @@ namespace Coop.Tests
 
         public Server_Test()
         {
-            m_Server = new Server();
+            m_Server = new Server(Server.EType.Threaded);
             m_Module = new TimingModule();
             m_Config = new ServerConfiguration()
             {

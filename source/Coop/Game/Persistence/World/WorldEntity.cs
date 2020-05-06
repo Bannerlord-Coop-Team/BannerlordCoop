@@ -1,5 +1,6 @@
 ﻿using System;
 using RailgunNet.Logic;
+using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game.Persistence.World
 {
@@ -15,6 +16,19 @@ namespace Coop.Game.Persistence.World
         protected override void UpdateProxy()
         {
             m_Environment.TimeControlMode = State.TimeControlMode;
+            if (m_Environment.RequestedTimeControlMode.HasValue)
+            {
+                CampaignTimeControlMode requestedValue =
+                    m_Environment.RequestedTimeControlMode.Value;
+                if (requestedValue != State.TimeControlMode)
+                {
+                    WorldEventTimeControl evnt = EventCreator.CreateEvent<WorldEventTimeControl>();
+                    evnt.RequestedTimeControlMode = requestedValue;
+                    Room.RaiseEvent(evnt);
+                }
+
+                m_Environment.RequestedTimeControlMode = null;
+            }
         }
     }
 

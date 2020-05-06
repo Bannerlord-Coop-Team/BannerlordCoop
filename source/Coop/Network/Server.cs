@@ -7,7 +7,7 @@ using Stateless;
 
 namespace Coop.Network
 {
-    public class Server
+    public class Server : IUpdateable
     {
         public enum EState
         {
@@ -102,8 +102,17 @@ namespace Coop.Network
             Stopped
         }
 
-        public Server()
+        public enum EType
         {
+            Threaded,
+            Direct
+        }
+
+        private readonly EType m_ServerType;
+
+        public Server(EType eType)
+        {
+            m_ServerType = eType;
             Updateables = new UpdateableList();
             m_ActiveConnections = new List<ConnectionServer>();
             m_State = new StateMachine<EState, ETrigger>(EState.Inactive);
@@ -159,13 +168,16 @@ namespace Coop.Network
 
         private void StartMainLoop()
         {
-            m_Thread = new Thread(Run);
-            lock (m_StopRequestLock)
+            if (m_ServerType == EType.Threaded)
             {
-                m_IsStopRequest = false;
-            }
+                m_Thread = new Thread(Run);
+                lock (m_StopRequestLock)
+                {
+                    m_IsStopRequest = false;
+                }
 
-            m_Thread.Start();
+                m_Thread.Start();
+            }
         }
 
         private void Run()
@@ -177,7 +189,7 @@ namespace Coop.Network
             bool bRunning = true;
             while (bRunning)
             {
-                Updateables.UpdateAll(frameLimiter.LastFrameTime);
+                Update(frameLimiter.LastFrameTime);
                 frameLimiter.Throttle();
                 lock (m_StopRequestLock)
                 {
@@ -190,7 +202,7 @@ namespace Coop.Network
         {
             if (m_Thread == null)
             {
-                throw new InvalidStateException("Cannot stop: main loop is not running.");
+                return;
             }
 
             lock (m_StopRequestLock)
@@ -200,6 +212,11 @@ namespace Coop.Network
 
             m_Thread.Join();
             m_Thread = null;
+        }
+
+        public void Update(TimeSpan frameTime)
+        {
+            Updateables.UpdateAll(frameTime);
         }
         #endregion
     }

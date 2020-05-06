@@ -18,9 +18,15 @@ namespace Coop.Multiplayer.Network
 
         public int Latency => m_Peer.Ping;
 
-        public void SendRaw(ArraySegment<byte> raw)
+        public void SendRaw(ArraySegment<byte> raw, EDeliveryMethod eMethod)
         {
-            m_Peer.Send(raw.Array, raw.Offset, raw.Count, DeliveryMethod.ReliableOrdered);
+            m_Peer.Send(
+                raw.Array,
+                raw.Offset,
+                raw.Count,
+                eMethod == EDeliveryMethod.Reliable ?
+                    DeliveryMethod.ReliableOrdered :
+                    DeliveryMethod.Unreliable);
         }
 
         public void Close(EDisconnectReason eReason)

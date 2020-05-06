@@ -2,8 +2,6 @@
 using RailgunNet;
 using RailgunNet.Factory;
 using RailgunNet.Logic;
-using RailgunNet.System.Encoding;
-using RailgunNet.System.Types;
 
 namespace Coop.Game.Persistence
 {
@@ -24,35 +22,13 @@ namespace Coop.Game.Persistence
             }
 
             reg.SetCommandType<DummyCommand>();
-            reg.AddEventType<DummyEvent>();
+            reg.AddEventType<WorldEventTimeControl>(new object[] {environment});
 
             return reg;
         }
 
-        public class DummyCommand : RailCommand<DummyCommand>
+        public class DummyCommand : RailCommand
         {
-            protected override void CopyDataFrom(DummyCommand other)
-            {
-            }
-
-            protected override void DecodeData(RailBitBuffer buffer)
-            {
-            }
-
-            protected override void EncodeData(RailBitBuffer buffer)
-            {
-            }
-
-            protected override void ResetData()
-            {
-            }
-        }
-
-        public class DummyEvent : RailEvent
-        {
-            protected override void Execute(RailRoom room, RailController sender)
-            {
-            }
         }
     }
 }

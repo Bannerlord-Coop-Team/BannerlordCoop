@@ -38,7 +38,7 @@ namespace Coop.Game
 
         public void ClientJoined(ConnectionServer connection)
         {
-            RailNetPeerWrapper peer = new RailNetPeerWrapper(connection.Network);
+            RailNetPeerWrapper peer = connection.GameStatePersistence as RailNetPeerWrapper;
             m_RailConnections.Add(connection, peer);
             m_Instance.AddClient(peer, ""); // TODO: Name
         }

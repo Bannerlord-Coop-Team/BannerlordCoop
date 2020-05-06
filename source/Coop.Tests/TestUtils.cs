@@ -45,7 +45,7 @@ namespace Coop.Tests
         }
         public static Server StartNewServer()
         {
-            Server server = new Server();
+            Server server = new Server(Server.EType.Threaded);
             server.Start(GetTestingConfig());
             return server;
         }

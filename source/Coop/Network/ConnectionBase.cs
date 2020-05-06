@@ -116,7 +116,9 @@ namespace Coop.Network
                 }
 
                 new PacketWriter(packet).Write(new BinaryWriter(m_Stream));
-                Network.SendRaw(new ArraySegment<byte>(m_Stream.ToArray()));
+                Network.SendRaw(
+                    new ArraySegment<byte>(m_Stream.ToArray()),
+                    EDeliveryMethod.Reliable);
                 m_Stream.SetLength(0);
             }
         }
@@ -136,7 +138,9 @@ namespace Coop.Network
                 while (!packetWriter.Done)
                 {
                     packetWriter.Write(writer, Network.FragmentLength);
-                    Network.SendRaw(new ArraySegment<byte>(m_Stream.ToArray()));
+                    Network.SendRaw(
+                        new ArraySegment<byte>(m_Stream.ToArray()),
+                        EDeliveryMethod.Reliable);
                     m_Stream.SetLength(0);
                 }
             }

@@ -33,7 +33,7 @@ namespace Coop.Tests
             m_Connection.Send(packet);
 
             // Verify
-            m_NetworkConnection.Verify(con => con.SendRaw(It.Is<ArraySegment<byte>>(arg => arg.SequenceEqual(stream.ToArray()))));
+            m_NetworkConnection.Verify(con => con.SendRaw(It.Is<ArraySegment<byte>>(arg => arg.SequenceEqual(stream.ToArray())), EDeliveryMethod.Reliable));
         }
 
         [Theory]

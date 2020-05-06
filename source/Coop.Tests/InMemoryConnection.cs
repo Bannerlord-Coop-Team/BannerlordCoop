@@ -26,7 +26,7 @@ namespace Coop.Tests
 
         private readonly List<byte[]> sendBuffer = new List<byte[]>();
 
-        public void SendRaw(ArraySegment<byte> raw)
+        public void SendRaw(ArraySegment<byte> raw, EDeliveryMethod _)
         {
             sendBuffer.Add(raw.ToArray());
         }

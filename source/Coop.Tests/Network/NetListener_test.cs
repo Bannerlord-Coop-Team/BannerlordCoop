@@ -72,7 +72,7 @@ namespace Coop.Tests
         public NetListener_test()
         {
             // Setup server mock
-            m_Server = new Mock<Server>();
+            m_Server = new Mock<Server>(Server.EType.Threaded);
             m_ListenerServer = new LiteNetListenerServer(m_Server.Object, Mock.Of<ISaveData>());
             m_ServerSideConnected = new List<ConnectionBase>();
             m_ServerSideDisconnects = new List<(ConnectionBase, EDisconnectReason)>();

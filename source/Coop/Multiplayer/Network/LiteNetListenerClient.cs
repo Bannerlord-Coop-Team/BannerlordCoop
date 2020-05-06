@@ -57,6 +57,10 @@ namespace Coop.Multiplayer.Network
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
         {
             Log.Error($"OnNetworkError({endPoint}, {socketError}).");
+            if (m_Session.Connection != null)
+            {
+                m_Session.Disconnect(EDisconnectReason.Unknown);
+            }
         }
 
         public void OnNetworkReceiveUnconnected(
@@ -65,6 +69,10 @@ namespace Coop.Multiplayer.Network
             UnconnectedMessageType messageType)
         {
             Log.Debug($"OnNetworkReceiveUnconnected({remoteEndPoint}, {reader}, {messageType}).");
+            if (m_Session.Connection != null)
+            {
+                m_Session.Disconnect(EDisconnectReason.Unknown);
+            }
         }
 
         public void OnConnectionRequest(ConnectionRequest request)

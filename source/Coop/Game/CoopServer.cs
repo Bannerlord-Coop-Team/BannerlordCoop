@@ -26,10 +26,11 @@ namespace Coop.Game
         {
             if (Current == null)
             {
-                Current = new Server();
-                m_RailServer = new CoopServerRail(Current, new GameEnvironment());
+                Current = new Server(Server.EType.Direct);
+                m_RailServer = new CoopServerRail(Current, new ServerEnvironment());
+                Current.Updateables.Add(m_RailServer);
                 Current.OnClientConnected += OnClientConnected;
-                Main.Instance.Updateables.Add(m_RailServer);
+                Main.Instance.Updateables.Add(Current);
                 Current.Start(new ServerConfiguration());
                 Log.Debug("Created server.");
             }

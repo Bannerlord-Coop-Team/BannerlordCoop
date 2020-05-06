@@ -19,8 +19,7 @@ namespace Coop.Multiplayer
         {
             if (Connection != null)
             {
-                throw new InvalidStateException(
-                    $"Client already connected to {Connection}. Cannot create a second connection to {connection}.");
+                Disconnect(EDisconnectReason.ClientJoinedAnotherServer);
             }
 
             Connection = connection;

@@ -8,18 +8,13 @@ namespace Coop.Multiplayer.Network
 {
     public class LiteNetManagerClient : IUpdateable
     {
-        private readonly NetManager m_NetManager;
         private readonly GameSession m_Session;
+        private NetManager m_NetManager;
         private NetPeer m_Peer;
 
         public LiteNetManagerClient(GameSession session)
         {
             m_Session = session ?? throw new ArgumentNullException(nameof(session));
-            m_NetManager = new NetManager(new LiteNetListenerClient(session))
-            {
-                ReconnectDelay = 100,
-                MaxConnectAttempts = 5
-            };
         }
 
         public bool Connected =>
@@ -48,6 +43,12 @@ namespace Coop.Multiplayer.Network
                 Disconnect(EDisconnectReason.ClientJoinedAnotherServer);
             }
 
+            m_NetManager = new NetManager(new LiteNetListenerClient(m_Session))
+            {
+                ReconnectDelay = 100,
+                MaxConnectAttempts = 5
+            };
+
             if (m_NetManager.Start())
             {
                 m_Peer = m_NetManager.Connect(address.ToString(), iPort, "");
@@ -66,6 +67,7 @@ namespace Coop.Multiplayer.Network
                 m_NetManager.DisconnectPeer(m_Peer, new[] {Convert.ToByte(eReason)});
                 m_NetManager.Stop();
                 m_Session.Disconnect(eReason);
+                m_NetManager = null;
             }
         }
     }

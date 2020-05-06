@@ -20,7 +20,7 @@ namespace Coop.Tests
         {
             ServerConfiguration config = TestUtils.GetTestingConfig();
             config.KeepAliveInterval = m_keepAliveInterval;
-            m_Server = new Mock<Server> { CallBase = true };
+            m_Server = new Mock<Server>(Server.EType.Threaded) { CallBase = true };
             m_Server.Object.Start(config);
             m_NetManagerServer = new LiteNetManagerServer(m_Server.Object, m_WorldData.Object);
             m_NetManagerServer.StartListening();

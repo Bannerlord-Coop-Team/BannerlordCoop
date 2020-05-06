@@ -18,7 +18,7 @@ namespace Coop.Tests
         private List<ArraySegment<byte>> m_SendRawParams = new List<ArraySegment<byte>>();
         public ConnectionServer_Test()
         {
-            m_NetworkConnection.Setup(con => con.SendRaw(It.IsAny<ArraySegment<byte>>())).Callback((ArraySegment<byte> arg) => m_SendRawParams.Add(arg));
+            m_NetworkConnection.Setup(con => con.SendRaw(It.IsAny<ArraySegment<byte>>(), It.IsAny<EDeliveryMethod>())).Callback((ArraySegment<byte> arg, EDeliveryMethod eMethod) => m_SendRawParams.Add(arg));
             m_GamePersistence = new Mock<IGameStatePersistence>();
             m_GamePersistence.Setup(per => per.Receive(It.IsAny<ArraySegment<byte>>())).Callback((ArraySegment<byte> arg) => m_PersistenceReceiveParam = arg);
             m_Connection = new ConnectionServer(m_NetworkConnection.Object, m_GamePersistence.Object, m_WorldData.Object);

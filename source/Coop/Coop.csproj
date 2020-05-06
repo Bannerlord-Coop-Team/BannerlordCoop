@@ -229,6 +229,7 @@
     <Compile Include="Game\Persistence\RailPopulator.cs" />
     <Compile Include="Game\Persistence\Registry.cs" />
     <Compile Include="Game\Persistence\World\WorldEntity.cs" />
+    <Compile Include="Game\Persistence\World\WorldEventTimeControl.cs" />
     <Compile Include="Game\Persistence\World\WorldState.cs" />
     <Compile Include="Game\CoopServerRail.cs" />
     <Compile Include="Game\SaveLoad.cs" />
@@ -240,6 +241,7 @@
     <Compile Include="Game\Extensions.cs" />
     <Compile Include="Game\Patch\CampaignMapMovement.cs" />
     <Compile Include="Game\Behaviour\PlayerJoinedBehaviour.cs" />
+    <Compile Include="Game\ServerEnvironment.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Multiplayer\ConnectionServer.cs" />
     <Compile Include="Multiplayer\Exceptions.cs" />

@@ -15,7 +15,7 @@ namespace Coop.Tests
         private ArraySegment<byte> m_ReceiveParam;
         public RailNetPeerWrapper_Test()
         {
-            m_NetworkConnection.Setup(con => con.SendRaw(It.IsAny<ArraySegment<byte>>())).Callback((ArraySegment<byte> arg) => m_SendRawParam = arg);
+            m_NetworkConnection.Setup(con => con.SendRaw(It.IsAny<ArraySegment<byte>>(), It.IsAny<EDeliveryMethod>())).Callback((ArraySegment<byte> arg, EDeliveryMethod eMethod) => m_SendRawParam = arg);
             m_Instance = new RailNetPeerWrapper(m_NetworkConnection.Object);
         }
         void Callback(ArraySegment<byte> buffer)

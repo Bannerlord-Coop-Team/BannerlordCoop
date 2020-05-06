@@ -90,8 +90,7 @@ namespace Coop.Tests
             Assert.NotEqual(m_EnvironmentServer.TimeControlMode, m_EnvironmentClient.TimeControlMode); // not directly linked!
 
             // Let the server detect the change and send the packet
-            m_Server.Update();
-            bool bWasSendTick = serverRoom.Tick.IsSendTick(RailConfig.SERVER_SEND_RATE);
+            bool bWasSendTick = false;
             while (!bWasSendTick)
             {
                 m_Server.Update();
@@ -106,6 +105,36 @@ namespace Coop.Tests
             }
 
             Assert.Equal(expectedTimeControl, m_EnvironmentServer.TimeControlMode);
+            Assert.Equal(expectedTimeControl, m_EnvironmentClient.TimeControlMode);
+
+            // Request a time change on the client
+            expectedTimeControl = CampaignTimeControlMode.StoppableFastForward;
+            m_EnvironmentClient.RequestedTimeControlMode = expectedTimeControl;
+
+            // Let the client detect the request & send an event to the server
+            bWasSendTick = false;
+            while (!bWasSendTick)
+            {
+                m_Client.Update();
+                bWasSendTick = serverRoom.Tick.IsSendTick(RailConfig.SERVER_SEND_RATE);
+            }
+
+            // Let the server receive & process it
+            m_ConClientSide.ExecuteSends();
+            Assert.Equal(expectedTimeControl, m_EnvironmentServer.TimeControlMode);
+
+            // And sync back to client
+            bWasSendTick = false;
+            while (!bWasSendTick)
+            {
+                m_Server.Update();
+                bWasSendTick = serverRoom.Tick.IsSendTick(RailConfig.SERVER_SEND_RATE);
+            }
+            while (clientRoom.Tick <= serverRoom.Tick)
+            {
+                m_ConServerSide.ExecuteSends();
+                m_Client.Update();
+            }
             Assert.Equal(expectedTimeControl, m_EnvironmentClient.TimeControlMode);
         }
     }
