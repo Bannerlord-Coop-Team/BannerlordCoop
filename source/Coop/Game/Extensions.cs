@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Coop.Game.Patch;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -73,6 +74,19 @@ namespace Coop.Game
         public static void SetBuffer(this InMemDriver driver, byte[] buffer)
         {
             Utils.SetPrivateField(typeof(InMemDriver), "_data", driver, buffer);
+        }
+
+        public static TValue Assert<TKey, TValue>(this IDictionary<TKey, TValue> dict, TKey key)
+            where TValue : new()
+        {
+            if (dict.TryGetValue(key, out TValue val))
+            {
+                return val;
+            }
+
+            val = new TValue();
+            dict.Add(key, val);
+            return val;
         }
     }
 }

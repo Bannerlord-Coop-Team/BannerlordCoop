@@ -58,7 +58,7 @@ namespace Coop.Multiplayer
 
         public override EConnectionState State => m_StateMachine.State;
         public event Action<ConnectionClient> OnClientJoined;
-        public event Action OnDisconnected;
+        public event Action OnDisconnect;
 
         ~ConnectionClient()
         {
@@ -83,7 +83,7 @@ namespace Coop.Multiplayer
 
         private void closeConnection(EDisconnectReason eReason)
         {
-            OnDisconnected?.Invoke();
+            OnDisconnect?.Invoke();
             Network.Close(eReason);
             m_StateMachine.Fire(ETrigger.Disconnected);
         }

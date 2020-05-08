@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Coop.Game.Persistence;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 
 namespace Coop.Tests
 {
@@ -13,6 +15,25 @@ namespace Coop.Tests
         {
             get => Values[^1];
             set => Values.Add(value);
+        }
+        #endregion
+
+        #region MobileParty
+        public IReadOnlyDictionary<MobileParty, RemoteValue<Vec2>> RemoteMoveTo => throw new NotImplementedException();
+
+        public void AddRemoteMoveTo(MobileParty party, RemoteValue<Vec2> moveTo)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RemoveRemoteMoveTo(MobileParty party)
+        {
+            throw new NotImplementedException();
+        }
+
+        public MobileParty GetMobilePartyByIndex(int iPartyIndex)
+        {
+            throw new NotImplementedException();
         }
         #endregion
     }

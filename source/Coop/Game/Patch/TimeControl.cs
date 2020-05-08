@@ -13,11 +13,11 @@ namespace Coop.Game.Patch
         {
             if (Campaign.Current != null)
             {
-                Utils.InvokePrivateMethod(
+                Utils.SetPrivateField(
                     typeof(Campaign),
-                    "SetTimeControlMode",
+                    "_timeControlMode",
                     Campaign.Current,
-                    new object[] {eMode});
+                    eMode);
             }
         }
 

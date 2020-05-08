@@ -1,17 +1,32 @@
-﻿using RailgunNet.System.Encoding.Compressors;
+﻿using System;
+using RailgunNet.System.Encoding;
+using RailgunNet.System.Encoding.Compressors;
+using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game.Persistence
 {
     public class Compression
     {
-        public static readonly RailFloatCompressor GameSpeed = new RailFloatCompressor(
-            1.0f,
-            10.0f,
-            Compare.GAMESPEED_PRECISION / 10.0f);
+        public class Coordinate : RailFloatCompressor
+        {
+            public Coordinate() : base(
+                0.0f,
+                Math.Max(Campaign.MapWidth, Campaign.MapHeight),
+                Compare.COORDINATE_PRECISION / 10.0f)
+            {
+            }
 
-        public static readonly RailFloatCompressor Coordinate = new RailFloatCompressor(
-            -512.0f,
-            512.0f,
-            Compare.COORDINATE_PRECISION / 10.0f);
+            [Encoder(Encoders.SupportedType.Float_t)]
+            public void Write(RailBitBuffer buffer, float f)
+            {
+                buffer.WriteFloat(this, f);
+            }
+
+            [Decoder(Encoders.SupportedType.Float_t)]
+            public float Read(RailBitBuffer buffer)
+            {
+                return buffer.ReadFloat(this);
+            }
+        }
     }
 }

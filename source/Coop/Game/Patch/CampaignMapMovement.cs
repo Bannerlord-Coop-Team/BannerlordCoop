@@ -1,4 +1,5 @@
 ﻿using Coop.Common;
+using Coop.Game.Persistence;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
@@ -7,10 +8,8 @@ namespace Coop.Game.Patch
 {
     public static class CampaignMapMovement
     {
-        private static bool IsMovementRelevantForServer(MobileParty partyToMove)
-        {
-            return CoopClient.Instance.GameState.IsPlayerControlledParty(partyToMove);
-        }
+        public static IEnvironment s_Environment = null;
+        public static bool s_IsRemoteUpdate = false;
 
         [HarmonyPatch(typeof(MobileParty))]
         [HarmonyPatch(nameof(MobileParty.SetMoveEngageParty))]
@@ -19,13 +18,7 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, MobileParty party)
             {
-                if (!IsMovementRelevantForServer(__instance))
-                {
-                    return true;
-                }
-
-                Log.Trace($"{__instance} wants to engage {party}.");
-                return true;
+                return false;
             }
         }
 
@@ -36,13 +29,7 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, MobileParty party)
             {
-                if (!IsMovementRelevantForServer(__instance))
-                {
-                    return true;
-                }
-
-                Log.Trace($"{__instance} wants to move around {party}.");
-                return true;
+                return false;
             }
         }
 
@@ -53,13 +40,7 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, Settlement settlement)
             {
-                if (!IsMovementRelevantForServer(__instance))
-                {
-                    return true;
-                }
-
-                Log.Trace($"{__instance} wants to move to {settlement}.");
-                return true;
+                return false;
             }
         }
 
@@ -70,12 +51,18 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, Vec2 point)
             {
-                if (!IsMovementRelevantForServer(__instance))
+                if (s_IsRemoteUpdate || s_Environment == null)
                 {
                     return true;
                 }
 
-                Log.Trace($"{__instance} wants to move to {point}.");
+                if (s_Environment.RemoteMoveTo.TryGetValue(__instance, out RemoteValue<Vec2> val))
+                {
+                    Log.Trace($"{__instance} wants to move to {point}.");
+                    val.Request(point);
+                    return false;
+                }
+
                 return true;
             }
         }
@@ -87,12 +74,6 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, MobileParty mobileParty)
             {
-                if (!IsMovementRelevantForServer(__instance))
-                {
-                    return true;
-                }
-
-                Log.Trace($"{__instance} wants to escort {mobileParty}.");
                 return true;
             }
         }
@@ -104,12 +85,6 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, Vec2 point)
             {
-                if (!IsMovementRelevantForServer(__instance))
-                {
-                    return true;
-                }
-
-                Log.Trace($"{__instance} wants to patrol around {point}.");
                 return true;
             }
         }
@@ -121,12 +96,6 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, Settlement settlement)
             {
-                if (!IsMovementRelevantForServer(__instance))
-                {
-                    return true;
-                }
-
-                Log.Trace($"{__instance} wants to patrol around {settlement}.");
                 return true;
             }
         }
@@ -138,12 +107,6 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, Settlement settlement)
             {
-                if (!IsMovementRelevantForServer(__instance))
-                {
-                    return true;
-                }
-
-                Log.Trace($"{__instance} wants to move to raid {settlement}.");
                 return true;
             }
         }
@@ -155,12 +118,6 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, Settlement settlement)
             {
-                if (!IsMovementRelevantForServer(__instance))
-                {
-                    return true;
-                }
-
-                Log.Trace($"{__instance} wants to move to besiege {settlement}.");
                 return true;
             }
         }
@@ -172,12 +129,6 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, Settlement settlement)
             {
-                if (!IsMovementRelevantForServer(__instance))
-                {
-                    return true;
-                }
-
-                Log.Trace($"{__instance} wants to move to defend {settlement}.");
                 return true;
             }
         }
@@ -188,12 +139,6 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance)
             {
-                if (!IsMovementRelevantForServer(__instance))
-                {
-                    return true;
-                }
-
-                Log.Trace($"{__instance} wants to hold.");
                 return true;
             }
         }

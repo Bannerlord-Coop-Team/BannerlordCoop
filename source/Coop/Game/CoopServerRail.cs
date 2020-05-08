@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Coop.Common;
 using Coop.Game.Persistence;
+using Coop.Game.Persistence.Party;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Network;
@@ -12,6 +13,7 @@ namespace Coop.Game
 {
     public class CoopServerRail : IUpdateable
     {
+        private readonly EntityManager m_EntityManager;
         private readonly RailServer m_Instance;
 
         private readonly Dictionary<ConnectionServer, RailNetPeerWrapper> m_RailConnections =
@@ -22,8 +24,9 @@ namespace Coop.Game
         public CoopServerRail(Server server, IEnvironment environment)
         {
             m_Server = server;
-            m_Instance = new RailServer(Registry.Get(Component.Server, environment));
-            RailPopulator.Populate(m_Instance.StartRoom());
+            EntityMapping mapping = new EntityMapping();
+            m_Instance = new RailServer(Registry.Get(Component.Server, environment, mapping));
+            m_EntityManager = new EntityManager(m_Instance, mapping);
         }
 
         public void Update(TimeSpan frameTime)

@@ -1,5 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props" Condition="Exists('..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -12,6 +13,8 @@
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -55,12 +58,15 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony, Version=2.0.0.9, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Lib.Harmony.2.0.0.9\lib\net472\0Harmony.dll</HintPath>
+    <Reference Include="0Harmony, Version=2.0.0.10, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Lib.Harmony.2.0.0.10\lib\net472\0Harmony.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="PropertyChanged, Version=3.2.8.0, Culture=neutral, PublicKeyToken=ee3ee20bcf148ddd, processorArchitecture=MSIL">
+      <HintPath>..\packages\PropertyChanged.Fody.3.2.8\lib\net40\PropertyChanged.dll</HintPath>
     </Reference>
     <Reference Include="SandBox">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
@@ -75,7 +81,7 @@
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="Stateless, Version=4.0.0.0, Culture=neutral, PublicKeyToken=93038f0927583c9a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Stateless.5.1.1\lib\net472\Stateless.dll</HintPath>
+      <HintPath>..\packages\Stateless.5.1.2\lib\net472\Stateless.dll</HintPath>
     </Reference>
     <Reference Include="Steamworks.NET, Version=7.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -180,6 +186,9 @@
     <Reference Include="TaleWorlds.Network">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.Network.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.ObjectSystem">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.PlatformService">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.dll</HintPath>
     </Reference>
@@ -217,6 +226,7 @@
     <Compile Include="Game\CLI\CLICommands.cs" />
     <Compile Include="Game\CLI\DebugConsole.cs" />
     <Compile Include="Game\Coop.cs" />
+    <Compile Include="Game\Exceptions.cs" />
     <Compile Include="Game\GameEnvironment.cs" />
     <Compile Include="Game\GameLoopRunner.cs" />
     <Compile Include="Game\Patch\Exceptions.cs" />
@@ -225,9 +235,14 @@
     <Compile Include="Game\Persistence\Compare.cs" />
     <Compile Include="Game\Persistence\Compression.cs" />
     <Compile Include="Game\Persistence\IEnvironment.cs" />
+    <Compile Include="Game\Persistence\Party\EventPartyMoveTo.cs" />
+    <Compile Include="Game\Persistence\Party\MobilePartyEntity.cs" />
+    <Compile Include="Game\Persistence\EntityMapping.cs" />
+    <Compile Include="Game\Persistence\Party\MobilePartyState.cs" />
     <Compile Include="Game\Persistence\PersistenceClient.cs" />
-    <Compile Include="Game\Persistence\RailPopulator.cs" />
+    <Compile Include="Game\Persistence\EntityManager.cs" />
     <Compile Include="Game\Persistence\Registry.cs" />
+    <Compile Include="Game\Persistence\RemoteValue.cs" />
     <Compile Include="Game\Persistence\World\WorldEntity.cs" />
     <Compile Include="Game\Persistence\World\WorldEventTimeControl.cs" />
     <Compile Include="Game\Persistence\World\WorldState.cs" />
@@ -240,7 +255,7 @@
     <Compile Include="Game\CoopServer.cs" />
     <Compile Include="Game\Extensions.cs" />
     <Compile Include="Game\Patch\CampaignMapMovement.cs" />
-    <Compile Include="Game\Behaviour\PlayerJoinedBehaviour.cs" />
+    <Compile Include="Game\Behaviour\GameLoadedBehaviour.cs" />
     <Compile Include="Game\ServerEnvironment.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Multiplayer\ConnectionServer.cs" />
@@ -293,9 +308,19 @@
       <Name>RailgunNet</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Content Include="FodyWeavers.xml" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs 0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll</PostBuildEvent>
   </PropertyGroup>
+  <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\Fody.6.1.1\build\Fody.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Fody.6.1.1\build\Fody.targets'))" />
+    <Error Condition="!Exists('..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props'))" />
+  </Target>
 </Project>

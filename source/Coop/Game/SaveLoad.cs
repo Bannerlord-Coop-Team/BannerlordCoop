@@ -54,7 +54,7 @@ namespace Coop.Game
         public static LoadGameResult LoadSaveGameData(ISaveDriver driver)
         {
             List<ModuleInfo> currentModules = GetModules();
-            LoadResult loadResult = SaveManager.Load(driver);
+            LoadResult loadResult = SaveManager.Load(driver, true);
             if (loadResult.Successful)
             {
                 return new LoadGameResult(

@@ -36,7 +36,7 @@ namespace Coop.Game
         public override void NoHarmonyLoad()
         {
             AddBehavior<InitServerBehaviour>();
-            AddBehavior<PlayerJoinedBehaviour>();
+            AddBehavior<GameLoadedBehaviour>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
             harmony.PatchAll();
@@ -84,10 +84,16 @@ namespace Coop.Game
             // NoHarmony
             Logging = true;
 
+            int iNrOfInstances = System.Diagnostics.Process.GetProcessesByName(
+                                           System.IO.Path.GetFileNameWithoutExtension(
+                                               System.Reflection.Assembly.GetEntryAssembly()
+                                                     .Location))
+                                       .Length;
+            string sLogFileName = $"Coop_{iNrOfInstances - 1}.txt";
             // our own logger
             Common.Log.s_OnLogEntry = (eLevel, sMessage) =>
             {
-                using (StreamWriter sw = new StreamWriter("Coop.txt", true))
+                using (StreamWriter sw = new StreamWriter(sLogFileName, true))
                 {
                     sw.WriteLine(sMessage);
                 }
