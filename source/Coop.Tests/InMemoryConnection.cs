@@ -1,17 +1,12 @@
-﻿using Coop.Network;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using Coop.Multiplayer;
+using Coop.Network;
 
 namespace Coop.Tests
 {
     public class InMemoryConnection : INetworkConnection
     {
-        public event Action<ArraySegment<byte>> OnSend;
-
-        public InMemoryConnection()
-        {
-        }
+        private readonly List<byte[]> sendBuffer = new List<byte[]>();
 
         public int FragmentLength => 100;
 
@@ -24,12 +19,12 @@ namespace Coop.Tests
             throw new NotImplementedException();
         }
 
-        private readonly List<byte[]> sendBuffer = new List<byte[]>();
-
         public void SendRaw(ArraySegment<byte> raw, EDeliveryMethod _)
         {
             sendBuffer.Add(raw.ToArray());
         }
+
+        public event Action<ArraySegment<byte>> OnSend;
 
         public void ExecuteSends()
         {

@@ -4,7 +4,6 @@ using Coop.Game.Behaviour;
 using Coop.Game.CLI;
 using HarmonyLib;
 using NLog;
-using NLog.LayoutRenderers;
 using NLog.Layouts;
 using NLog.Targets;
 using NoHarmony;
@@ -72,7 +71,14 @@ namespace Coop.Game
 
             // NLog
             Target.Register<MbLogTarget>("MbLog");
-            Common.Logging.Init(new Target[] {new MbLogTarget() { Layout = NLog.Layouts.Layout.FromString("[${level:uppercase=true}] ${message}") }});
+            Common.Logging.Init(
+                new Target[]
+                {
+                    new MbLogTarget
+                    {
+                        Layout = Layout.FromString("[${level:uppercase=true}] ${message}")
+                    }
+                });
         }
 
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)

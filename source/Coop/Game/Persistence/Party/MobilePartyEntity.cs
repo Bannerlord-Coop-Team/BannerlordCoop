@@ -9,11 +9,11 @@ namespace Coop.Game.Persistence.Party
 {
     public class MobilePartyEntityClient : RailEntityClient<MobilePartyState>
     {
-        private readonly IEnvironment m_Environment;
+        private readonly IEnvironmentClient m_Environment;
         private readonly IDictionary<EntityId, MobileParty> m_Mapping;
 
         public MobilePartyEntityClient(
-            IEnvironment environment,
+            IEnvironmentClient environment,
             IDictionary<EntityId, MobileParty> mapping)
         {
             m_Environment = environment;
@@ -53,11 +53,11 @@ namespace Coop.Game.Persistence.Party
 
     public class MobilePartyEntityServer : RailEntityServer<MobilePartyState>
     {
-        private readonly IEnvironment m_Environment;
+        private readonly IEnvironmentServer m_Environment;
         private readonly IDictionary<EntityId, MobileParty> m_Mapping;
 
         public MobilePartyEntityServer(
-            IEnvironment environment,
+            IEnvironmentServer environment,
             IDictionary<EntityId, MobileParty> mapping)
         {
             m_Environment = environment;

@@ -1,4 +1,4 @@
-﻿using System;
+﻿using Coop.Game.Persistence;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 
@@ -6,8 +6,7 @@ namespace Coop.Game.Patch
 {
     public static class TimeControl
     {
-        private static bool IsRemoteControlled => Coop.IsClient;
-        public static event Action<CampaignTimeControlMode> OnTimeControlChangeAttempt;
+        public static IEnvironmentClient s_Environment = null;
 
         public static void SetForced_Campaign_TimeControlMode(CampaignTimeControlMode eMode)
         {
@@ -28,9 +27,9 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(CampaignTimeControlMode value)
             {
-                if (IsRemoteControlled)
+                if (s_Environment?.TimeControlMode != null)
                 {
-                    OnTimeControlChangeAttempt?.Invoke(value);
+                    s_Environment.TimeControlMode.Request(value);
                     return false;
                 }
 

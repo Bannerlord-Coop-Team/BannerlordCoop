@@ -8,9 +8,6 @@ namespace Coop.Game
     [Target("MbLog")]
     public class MbLogTarget : TargetWithLayout
     {
-        public MbLogTarget()
-        {
-        }
         protected override void Write(LogEventInfo logEvent)
         {
             Color textColor = Color.White;
@@ -22,6 +19,7 @@ namespace Coop.Game
             {
                 textColor = Color.FromUint(0xFFFF00);
             }
+
             InformationManager.DisplayMessage(
                 new InformationMessage(Layout.Render(logEvent), textColor));
         }

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Reflection;
+using NLog;
 using RailgunNet.Logic;
 using TaleWorlds.CampaignSystem;
 
@@ -6,37 +8,52 @@ namespace Coop.Game.Persistence.World
 {
     public class WorldEntityClient : RailEntityClient<WorldState>
     {
-        private readonly IEnvironment m_Environment;
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public WorldEntityClient(IEnvironment environment)
+        private readonly IEnvironmentClient m_Environment;
+
+        public WorldEntityClient(IEnvironmentClient environment)
         {
             m_Environment = environment ?? throw new ArgumentNullException(nameof(environment));
         }
 
+        protected override void OnAdded()
+        {
+            if (m_Environment.TimeControlMode != null)
+            {
+                Logger.Error(
+                    "TimeControlMode was not null indicating another WorldEntity instance exists. WorldEntity should only exist once.");
+            }
+
+            PropertyInfo position = typeof(WorldState).GetProperty(nameof(State.TimeControlMode));
+            m_Environment.TimeControlMode =
+                new RemoteValue<CampaignTimeControlMode>(State, position);
+        }
+
+        protected override void OnRemoved()
+        {
+            m_Environment.TimeControlMode = null;
+        }
+
         protected override void UpdateProxy()
         {
-            m_Environment.TimeControlMode = State.TimeControlMode;
-            if (m_Environment.RequestedTimeControlMode.HasValue)
+            CampaignTimeControlMode? requestedMode = m_Environment.TimeControlMode?.DrainRequest();
+            if (requestedMode.HasValue)
             {
-                CampaignTimeControlMode requestedValue =
-                    m_Environment.RequestedTimeControlMode.Value;
-                if (requestedValue != State.TimeControlMode)
+                if (requestedMode.Value != State.TimeControlMode)
                 {
-                    WorldEventTimeControl evnt = EventCreator.CreateEvent<WorldEventTimeControl>();
-                    evnt.RequestedTimeControlMode = requestedValue;
-                    Room.RaiseEvent(evnt);
+                    Room.RaiseEvent<WorldEventTimeControl>(
+                        e => { e.RequestedTimeControlMode = requestedMode.Value; });
                 }
-
-                m_Environment.RequestedTimeControlMode = null;
             }
         }
     }
 
     public class WorldEntityServer : RailEntityServer<WorldState>
     {
-        private readonly IEnvironment m_Environment;
+        private readonly IEnvironmentServer m_Environment;
 
-        public WorldEntityServer(IEnvironment environment)
+        public WorldEntityServer(IEnvironmentServer environment)
         {
             m_Environment = environment ?? throw new ArgumentNullException(nameof(environment));
         }

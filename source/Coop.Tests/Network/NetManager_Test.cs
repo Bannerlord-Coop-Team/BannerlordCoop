@@ -1,17 +1,15 @@
-﻿using Coop.Common;
+﻿using System.Collections.Generic;
+using Coop.Common;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Network;
 using Moq;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Coop.Tests
 {
     public class NetManager_Test
     {
-        private readonly Server m_Server;
-        private readonly LiteNetManagerServer m_NetManagerServer;
         public NetManager_Test()
         {
             m_Server = TestUtils.StartNewServer();
@@ -19,10 +17,13 @@ namespace Coop.Tests
             m_NetManagerServer.StartListening();
         }
 
+        private readonly Server m_Server;
+        private readonly LiteNetManagerServer m_NetManagerServer;
+
         private class Client
         {
-            public readonly GameSession Session;
             public readonly LiteNetManagerClient Manager;
+            public readonly GameSession Session;
 
             public Client()
             {
@@ -32,23 +33,39 @@ namespace Coop.Tests
         }
 
         [Fact]
-        void ClientCanConnect()
+        private void ClientCanConnect()
         {
             Client client = new Client();
             client.Manager.Connect(m_Server.ActiveConfig.LanAddress, m_Server.ActiveConfig.LanPort);
-            TestUtils.UpdateUntil(() => client.Session.Connection != null, new List<IUpdateable>() { client.Manager });
+            TestUtils.UpdateUntil(
+                () => client.Session.Connection != null,
+                new List<IUpdateable>
+                {
+                    client.Manager
+                });
         }
+
         [Fact]
-        void ClientCanDisconnect()
+        private void ClientCanDisconnect()
         {
             Client client = new Client();
             client.Manager.Connect(m_Server.ActiveConfig.LanAddress, m_Server.ActiveConfig.LanPort);
-            TestUtils.UpdateUntil(() => client.Session.Connection != null, new List<IUpdateable>() { client.Manager });
+            TestUtils.UpdateUntil(
+                () => client.Session.Connection != null,
+                new List<IUpdateable>
+                {
+                    client.Manager
+                });
             Assert.NotNull(client.Session.Connection);
             Assert.True(client.Manager.Connected);
 
             client.Manager.Disconnect(EDisconnectReason.ClientLeft);
-            TestUtils.UpdateUntil(() => client.Session.Connection == null, new List<IUpdateable>() { client.Manager });
+            TestUtils.UpdateUntil(
+                () => client.Session.Connection == null,
+                new List<IUpdateable>
+                {
+                    client.Manager
+                });
             Assert.Null(client.Session.Connection);
             Assert.False(client.Manager.Connected);
         }

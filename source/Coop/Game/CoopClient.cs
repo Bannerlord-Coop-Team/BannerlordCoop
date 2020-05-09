@@ -59,7 +59,7 @@ namespace Coop.Game
 
             if (m_Persistence == null)
             {
-                m_Persistence = new PersistenceClient(new GameEnvironment());
+                m_Persistence = new PersistenceClient(new GameEnvironmentClient());
             }
 
             m_Persistence.SetConnection(con);

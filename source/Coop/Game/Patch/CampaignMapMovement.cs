@@ -11,7 +11,7 @@ namespace Coop.Game.Patch
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public static IEnvironment s_Environment = null;
+        public static IEnvironmentClient s_Environment = null;
         public static bool s_IsRemoteUpdate = false;
 
         [HarmonyPatch(typeof(MobileParty))]

@@ -235,7 +235,7 @@
     <Compile Include="Game\CLI\DebugConsole.cs" />
     <Compile Include="Game\Coop.cs" />
     <Compile Include="Game\Exceptions.cs" />
-    <Compile Include="Game\GameEnvironment.cs" />
+    <Compile Include="Game\GameEnvironmentClient.cs" />
     <Compile Include="Game\GameLoopRunner.cs" />
     <Compile Include="Game\MbLogTarget.cs" />
     <Compile Include="Game\Patch\Exceptions.cs" />
@@ -243,7 +243,8 @@
     <Compile Include="Game\Patch\Utils.cs" />
     <Compile Include="Game\Persistence\Compare.cs" />
     <Compile Include="Game\Persistence\Compression.cs" />
-    <Compile Include="Game\Persistence\IEnvironment.cs" />
+    <Compile Include="Game\Persistence\IEnvironmentClient.cs" />
+    <Compile Include="Game\Persistence\IEnvironmentServer.cs" />
     <Compile Include="Game\Persistence\Party\EventPartyMoveTo.cs" />
     <Compile Include="Game\Persistence\Party\MobilePartyEntity.cs" />
     <Compile Include="Game\Persistence\EntityMapping.cs" />
@@ -265,7 +266,7 @@
     <Compile Include="Game\Extensions.cs" />
     <Compile Include="Game\Patch\CampaignMapMovement.cs" />
     <Compile Include="Game\Behaviour\GameLoadedBehaviour.cs" />
-    <Compile Include="Game\ServerEnvironment.cs" />
+    <Compile Include="Game\GameEnvironmentServer.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Multiplayer\ConnectionServer.cs" />
     <Compile Include="Multiplayer\Exceptions.cs" />

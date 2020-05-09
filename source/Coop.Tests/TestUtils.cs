@@ -1,21 +1,21 @@
-﻿using Coop.Common;
-using Coop.Network;
-using Moq;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
-using System.Reflection;
-using System.Text;
 using System.Threading;
+using Coop.Common;
 using Coop.Multiplayer;
-using Xunit;
+using Coop.Network;
+using Moq;
 
 namespace Coop.Tests
 {
-    static class TestUtils
+    internal static class TestUtils
     {
+        private static readonly object UsedPortsLock = new object();
+        private static readonly HashSet<int> UsedPorts = new HashSet<int>();
+
         public static Mock<INetworkConnection> CreateMockConnection()
         {
             Mock<INetworkConnection> connection = new Mock<INetworkConnection>();
@@ -28,52 +28,50 @@ namespace Coop.Tests
         {
             Mock<ISaveData> saveData = new Mock<ISaveData>();
             saveData = new Mock<ISaveData>();
-            saveData.Setup(w => w.Receive(It.IsAny<ArraySegment<byte>>()))
-                    .Returns(true);
-            saveData.Setup(w => w.SerializeInitialWorldState())
-                    .Returns(new byte[0]);
+            saveData.Setup(w => w.Receive(It.IsAny<ArraySegment<byte>>())).Returns(true);
+            saveData.Setup(w => w.SerializeInitialWorldState()).Returns(new byte[0]);
             return saveData;
         }
+
         public static ServerConfiguration GetTestingConfig()
         {
-            return new ServerConfiguration()
+            return new ServerConfiguration
             {
-                LanPort = TestUtils.GetPort(),
+                LanPort = GetPort(),
                 MaxPlayerCount = 4,
                 TickRate = 0
             };
         }
+
         public static Server StartNewServer()
         {
             Server server = new Server(Server.EType.Threaded);
             server.Start(GetTestingConfig());
             return server;
         }
+
         public static void UpdateUntil(Func<bool> condition, List<IUpdateable> updateables)
         {
             TimeSpan totalWaitTime = TimeSpan.Zero;
             TimeSpan waitTimeBetweenTries = TimeSpan.FromMilliseconds(10);
             while (true)
             {
-                foreach (var updateable in updateables)
+                foreach (IUpdateable updateable in updateables)
                 {
                     updateable.Update(waitTimeBetweenTries);
                 }
+
                 if (condition())
                 {
                     break;
                 }
-                else
-                {
-                    Thread.Sleep(waitTimeBetweenTries);
-                    totalWaitTime += waitTimeBetweenTries;
-                    // Assert.True(totalWaitTime < TimeSpan.FromMilliseconds(500), "Maximum wait time reached. Abort.");
-                }
+
+                Thread.Sleep(waitTimeBetweenTries);
+                totalWaitTime += waitTimeBetweenTries;
+                // Assert.True(totalWaitTime < TimeSpan.FromMilliseconds(500), "Maximum wait time reached. Abort.");
             }
         }
 
-        private static object UsedPortsLock = new object();
-        private static HashSet<int> UsedPorts = new HashSet<int>();
         public static int GetPort()
         {
             lock (UsedPortsLock)
@@ -84,42 +82,47 @@ namespace Coop.Tests
                 {
                     throw new Exception("Could not find any available ports.");
                 }
+
                 return iPort;
             }
         }
+
         private static int FindAvailablePort(int startingPort)
         {
-            var properties = IPGlobalProperties.GetIPGlobalProperties();
+            IPGlobalProperties properties = IPGlobalProperties.GetIPGlobalProperties();
 
             //getting active connections
-            var tcpConnectionPorts = properties.GetActiveTcpConnections()
-                                .Where(n => n.LocalEndPoint.Port >= startingPort)
-                                .Select(n => n.LocalEndPoint.Port);
+            IEnumerable<int> tcpConnectionPorts = properties.GetActiveTcpConnections()
+                                                            .Where(
+                                                                n => n.LocalEndPoint.Port >=
+                                                                     startingPort)
+                                                            .Select(n => n.LocalEndPoint.Port);
 
             //getting active tcp listners - WCF service listening in tcp
-            var tcpListenerPorts = properties.GetActiveTcpListeners()
-                                .Where(n => n.Port >= startingPort)
-                                .Select(n => n.Port);
+            IEnumerable<int> tcpListenerPorts = properties.GetActiveTcpListeners()
+                                                          .Where(n => n.Port >= startingPort)
+                                                          .Select(n => n.Port);
 
             //getting active udp listeners
-            var udpListenerPorts = properties.GetActiveUdpListeners()
-                                .Where(n => n.Port >= startingPort)
-                                .Select(n => n.Port);
+            IEnumerable<int> udpListenerPorts = properties.GetActiveUdpListeners()
+                                                          .Where(n => n.Port >= startingPort)
+                                                          .Select(n => n.Port);
 
-            var port = Enumerable.Range(startingPort, ushort.MaxValue)
-                .Where(i => !UsedPorts.Contains(i))
-                .Where(i => !tcpConnectionPorts.Contains(i))
-                .Where(i => !tcpListenerPorts.Contains(i))
-                .Where(i => !udpListenerPorts.Contains(i))
-                .FirstOrDefault();
+            int port = Enumerable.Range(startingPort, ushort.MaxValue)
+                                 .Where(i => !UsedPorts.Contains(i))
+                                 .Where(i => !tcpConnectionPorts.Contains(i))
+                                 .Where(i => !tcpListenerPorts.Contains(i))
+                                 .Where(i => !udpListenerPorts.Contains(i))
+                                 .FirstOrDefault();
 
             return port;
         }
+
         public static ArraySegment<byte> MakeRaw(Protocol.EPacket eType, byte[] payload)
         {
-            var packet = new Packet(eType, payload);
-            var stream = new MemoryStream();
-            var writer = new BinaryWriter(stream);
+            Packet packet = new Packet(eType, payload);
+            MemoryStream stream = new MemoryStream();
+            BinaryWriter writer = new BinaryWriter(stream);
             new PacketWriter(packet).Write(writer);
             return stream.ToArray();
         }
@@ -131,10 +134,24 @@ namespace Coop.Tests
                 new Protocol.KeepAlive(iKeepAliveID).Serialize());
         }
 
+        public static ArraySegment<byte> MakePersistencePayload(int iPayloadLength)
+        {
+            byte[] payload = Enumerable.Range(7, iPayloadLength).Select(i => (byte) i).ToArray();
+            ByteWriter writer = new ByteWriter();
+            writer.Binary.Write(PacketWriter.EncodePacketType(Protocol.EPacket.Persistence));
+            writer.Binary.Write(payload);
+            return writer.ToArray();
+        }
+
         public class UpdateThread
         {
             private readonly Action action;
+            private readonly object m_StopRequestLock = new object();
             private readonly TimeSpan targetTickTime;
+
+            private bool m_bStopRequest;
+            private Thread m_Thread;
+
             public UpdateThread(Action action, TimeSpan targetTickTime)
             {
                 this.action = action;
@@ -146,6 +163,7 @@ namespace Coop.Tests
             {
                 Stop();
             }
+
             public void Start()
             {
                 startMainLoop();
@@ -156,9 +174,6 @@ namespace Coop.Tests
                 stopMainLoop();
             }
 
-            private bool m_bStopRequest = false;
-            private readonly object m_StopRequestLock = new object();
-            private Thread m_Thread = null;
             private void startMainLoop()
             {
                 m_Thread = new Thread(() => run());
@@ -166,6 +181,7 @@ namespace Coop.Tests
                 {
                     m_bStopRequest = false;
                 }
+
                 m_Thread.Start();
             }
 
@@ -199,18 +215,10 @@ namespace Coop.Tests
                 {
                     m_bStopRequest = true;
                 }
+
                 m_Thread.Join();
                 m_Thread = null;
             }
-        }
-
-        public static ArraySegment<byte> MakePersistencePayload(int iPayloadLength)
-        {
-            byte[] payload = Enumerable.Range(7, iPayloadLength).Select(i => (byte)i).ToArray();
-            ByteWriter writer = new ByteWriter();
-            writer.Binary.Write(PacketWriter.EncodePacketType(Protocol.EPacket.Persistence));
-            writer.Binary.Write(payload);
-            return writer.ToArray();
         }
     }
 }

@@ -1,24 +1,32 @@
-﻿using Coop.Network;
-using Moq;
-using System;
+﻿using System;
 using System.Linq;
 using Coop.Multiplayer.Network;
+using Coop.Network;
+using Moq;
 using Xunit;
 
 namespace Coop.Tests
 {
     public class RailNetPeerWrapper_Test
     {
-        private readonly Mock<INetworkConnection> m_NetworkConnection = TestUtils.CreateMockConnection();
+        public RailNetPeerWrapper_Test()
+        {
+            m_NetworkConnection
+                .Setup(
+                    con => con.SendRaw(It.IsAny<ArraySegment<byte>>(), It.IsAny<EDeliveryMethod>()))
+                .Callback(
+                    (ArraySegment<byte> arg, EDeliveryMethod eMethod) => m_SendRawParam = arg);
+            m_Instance = new RailNetPeerWrapper(m_NetworkConnection.Object);
+        }
+
+        private readonly Mock<INetworkConnection> m_NetworkConnection =
+            TestUtils.CreateMockConnection();
+
         private readonly RailNetPeerWrapper m_Instance;
         private ArraySegment<byte> m_SendRawParam;
         private ArraySegment<byte> m_ReceiveParam;
-        public RailNetPeerWrapper_Test()
-        {
-            m_NetworkConnection.Setup(con => con.SendRaw(It.IsAny<ArraySegment<byte>>(), It.IsAny<EDeliveryMethod>())).Callback((ArraySegment<byte> arg, EDeliveryMethod eMethod) => m_SendRawParam = arg);
-            m_Instance = new RailNetPeerWrapper(m_NetworkConnection.Object);
-        }
-        void Callback(ArraySegment<byte> buffer)
+
+        private void Callback(ArraySegment<byte> buffer)
         {
             m_ReceiveParam = buffer;
         }
@@ -31,9 +39,9 @@ namespace Coop.Tests
         [InlineData(512)]
         [InlineData(1024)]
         [InlineData(2048)]
-        void SendRawPrependsPersistenceFlag(int iPayloadLength)
+        private void SendRawPrependsPersistenceFlag(int iPayloadLength)
         {
-            byte[] payload = Enumerable.Range(7, iPayloadLength).Select(i => (byte)i).ToArray();
+            byte[] payload = Enumerable.Range(7, iPayloadLength).Select(i => (byte) i).ToArray();
             m_Instance.SendPayload(payload);
 
             ByteWriter writer = new ByteWriter();
@@ -43,11 +51,14 @@ namespace Coop.Tests
         }
 
         [Fact]
-        void BufferOffsetIsRespected()
+        private void BufferOffsetIsRespected()
         {
-            byte[] payload = Enumerable.Range(7, 64).Select(i => (byte)i).ToArray();
+            byte[] payload = Enumerable.Range(7, 64).Select(i => (byte) i).ToArray();
             int offset = 7;
-            ArraySegment<byte> buffer = new ArraySegment<byte>(payload, offset, payload.Length - offset);
+            ArraySegment<byte> buffer = new ArraySegment<byte>(
+                payload,
+                offset,
+                payload.Length - offset);
             m_Instance.SendPayload(buffer);
 
             ByteWriter writer = new ByteWriter();

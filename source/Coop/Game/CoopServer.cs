@@ -29,7 +29,7 @@ namespace Coop.Game
             if (Current == null)
             {
                 Current = new Server(Server.EType.Direct);
-                m_RailServer = new CoopServerRail(Current, new ServerEnvironment());
+                m_RailServer = new CoopServerRail(Current, new GameEnvironmentServer());
                 Current.Updateables.Add(m_RailServer);
                 Current.OnClientConnected += OnClientConnected;
                 Main.Instance.Updateables.Add(Current);

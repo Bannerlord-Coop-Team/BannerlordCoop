@@ -1,28 +1,43 @@
-﻿using Coop.Common;
-using Coop.Network;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Threading;
+using Coop.Common;
+using Coop.Network;
 using Xunit;
 
 namespace Coop.Tests
 {
     public class Server_Test
     {
-        class TimingModule : IUpdateable
+        public Server_Test()
+        {
+            m_Server = new Server(Server.EType.Threaded);
+            m_Module = new TimingModule();
+            m_Config = new ServerConfiguration
+            {
+                TickRate = 0
+            };
+            m_Server.Updateables.Add(m_Module);
+        }
+
+        private class TimingModule : IUpdateable
         {
             public readonly object Lock = new object();
-            public AutoResetEvent OnTick = new AutoResetEvent(false);
-            public int iCounter = 0;
+            public readonly MovingAverage AverageTicksPerFrame = new MovingAverage(100000);
+            public int iCounter;
 
-            private Stopwatch m_Timer = null;
-            public MovingAverage AverageTicksPerFrame = new MovingAverage(100000);
+            private Stopwatch m_Timer;
+            public readonly AutoResetEvent OnTick = new AutoResetEvent(false);
 
             public void Update(TimeSpan frameTime)
             {
                 ++iCounter;
                 OnTick.Set();
-                lock (Lock) { };
+                lock (Lock)
+                {
+                }
+
+                ;
                 if (m_Timer == null)
                 {
                     m_Timer = Stopwatch.StartNew();
@@ -39,15 +54,27 @@ namespace Coop.Tests
         private readonly TimingModule m_Module;
         private readonly ServerConfiguration m_Config;
 
-        public Server_Test()
+        [Theory]
+        [InlineData(5)]
+        [InlineData(10)]
+        [InlineData(60)]
+        [InlineData(100)]
+        [InlineData(144)]
+        [InlineData(500)]
+        public void TickLimiter(uint uiTickRate)
         {
-            m_Server = new Server(Server.EType.Threaded);
-            m_Module = new TimingModule();
-            m_Config = new ServerConfiguration()
-            {
-                TickRate =  0
-            };
-            m_Server.Updateables.Add(m_Module);
+            m_Config.TickRate = uiTickRate;
+            TimeSpan sleepTime = TimeSpan.FromMilliseconds(250);
+            TimeSpan expectedTickTime = TimeSpan.FromMilliseconds(1000 / (double) uiTickRate);
+
+            Assert.True(m_Server.State == Server.EState.Inactive);
+            m_Server.Start(m_Config);
+
+            Thread.Sleep(sleepTime);
+            m_Server.Stop();
+            Assert.True(m_Server.State == Server.EState.Inactive);
+            double diff = Math.Abs(m_Module.AverageTicksPerFrame.Average - expectedTickTime.Ticks);
+            Assert.True(diff < 0.2 * expectedTickTime.Ticks);
         }
 
         [Fact]
@@ -70,30 +97,5 @@ namespace Coop.Tests
             m_Module.OnTick.WaitOne(5);
             Assert.Equal(iCounterAfterStop, m_Module.iCounter);
         }
-
-        [Theory]
-        [InlineData(5)]
-        [InlineData(10)]
-        [InlineData(60)]
-        [InlineData(100)]
-        [InlineData(144)]
-        [InlineData(500)]
-        public void TickLimiter(uint uiTickRate)
-        {
-            m_Config.TickRate = uiTickRate;
-            TimeSpan sleepTime = TimeSpan.FromMilliseconds(250);
-            TimeSpan expectedTickTime = TimeSpan.FromMilliseconds(1000 / (double)uiTickRate);
-
-            Assert.True(m_Server.State == Server.EState.Inactive);
-            m_Server.Start(m_Config);
-
-            Thread.Sleep(sleepTime);
-            m_Server.Stop();
-            Assert.True(m_Server.State == Server.EState.Inactive);
-            double diff = Math.Abs(m_Module.AverageTicksPerFrame.Average - expectedTickTime.Ticks);
-            Assert.True(diff < (0.2 * expectedTickTime.Ticks));
-        }
     }
-
-
 }

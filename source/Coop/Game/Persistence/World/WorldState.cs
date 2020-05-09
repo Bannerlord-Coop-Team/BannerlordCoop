@@ -1,9 +1,10 @@
-﻿using RailgunNet.Logic;
+﻿using System.ComponentModel;
+using RailgunNet.Logic;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game.Persistence.World
 {
-    public class WorldState : RailState
+    public class WorldState : RailState, INotifyPropertyChanged
     {
         public CampaignTimeControlMode TimeControlMode
         {
@@ -14,5 +15,9 @@ namespace Coop.Game.Persistence.World
         #region synced data
         [Mutable] private byte m_TimeControlMode { get; set; }
         #endregion
+
+#pragma warning disable 67
+        public event PropertyChangedEventHandler PropertyChanged;
+#pragma warning restore 67
     }
 }

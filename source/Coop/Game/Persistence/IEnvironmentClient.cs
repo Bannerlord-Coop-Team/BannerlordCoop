@@ -1,14 +1,14 @@
 ﻿using System.Collections.Generic;
+using JetBrains.Annotations;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
 namespace Coop.Game.Persistence
 {
-    public interface IEnvironment
+    public interface IEnvironmentClient
     {
         #region TimeControl
-        CampaignTimeControlMode? RequestedTimeControlMode { get; set; }
-        CampaignTimeControlMode TimeControlMode { get; set; }
+        [CanBeNull] RemoteValue<CampaignTimeControlMode> TimeControlMode { get; set; }
         #endregion
 
         #region MobileParty

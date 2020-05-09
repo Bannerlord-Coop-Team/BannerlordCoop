@@ -2,26 +2,36 @@
 using System.Linq;
 using Coop.Game.Patch;
 using Coop.Game.Persistence;
+using JetBrains.Annotations;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
 namespace Coop.Game
 {
-    internal class GameEnvironment : IEnvironment
+    internal class GameEnvironmentClient : IEnvironmentClient
     {
-        public GameEnvironment()
-        {
-            TimeControl.OnTimeControlChangeAttempt += value => RequestedTimeControlMode = value;
-        }
-
         #region TimeControl
-        public CampaignTimeControlMode TimeControlMode
-        {
-            get => Campaign.Current.TimeControlMode;
-            set => TimeControl.SetForced_Campaign_TimeControlMode(value);
-        }
+        [CanBeNull] private RemoteValue<CampaignTimeControlMode> m_TimeControlMode;
 
-        public CampaignTimeControlMode? RequestedTimeControlMode { get; set; }
+        public RemoteValue<CampaignTimeControlMode> TimeControlMode
+        {
+            get => m_TimeControlMode;
+            set
+            {
+                if (m_TimeControlMode != null)
+                {
+                    m_TimeControlMode.OnValueChanged -=
+                        TimeControl.SetForced_Campaign_TimeControlMode;
+                }
+
+                m_TimeControlMode = value;
+                if (m_TimeControlMode != null)
+                {
+                    m_TimeControlMode.OnValueChanged +=
+                        TimeControl.SetForced_Campaign_TimeControlMode;
+                }
+            }
+        }
         #endregion
 
         #region MobileParty

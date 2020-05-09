@@ -1,6 +1,4 @@
 ﻿using System;
-using System.IO;
-using System.Linq;
 using Coop.Multiplayer;
 using Coop.Network;
 using Moq;
@@ -10,25 +8,37 @@ namespace Coop.Tests
 {
     public class ConnectionClient_Test
     {
-        private readonly Mock<INetworkConnection> m_NetworkConnection = TestUtils.CreateMockConnection();
+        public ConnectionClient_Test()
+        {
+            m_NetworkConnection
+                .Setup(
+                    con => con.SendRaw(It.IsAny<ArraySegment<byte>>(), It.IsAny<EDeliveryMethod>()))
+                .Callback(
+                    (ArraySegment<byte> arg, EDeliveryMethod eMethod) => m_SendRawParam = arg);
+            m_GamePersistence = new Mock<IGameStatePersistence>();
+            m_GamePersistence.Setup(per => per.Receive(It.IsAny<ArraySegment<byte>>()))
+                             .Callback(
+                                 (ArraySegment<byte> arg) => m_PersistenceReceiveParam = arg);
+            m_Connection = new ConnectionClient(
+                m_NetworkConnection.Object,
+                m_GamePersistence.Object,
+                m_WorldData.Object);
+        }
+
+        private readonly Mock<INetworkConnection> m_NetworkConnection =
+            TestUtils.CreateMockConnection();
+
         private readonly Mock<IGameStatePersistence> m_GamePersistence;
         private readonly Mock<ISaveData> m_WorldData = TestUtils.CreateMockSaveData();
         private readonly ConnectionClient m_Connection;
         private ArraySegment<byte> m_PersistenceReceiveParam;
 
         private ArraySegment<byte> m_SendRawParam;
-        public ConnectionClient_Test()
-        {
-            m_NetworkConnection.Setup(con => con.SendRaw(It.IsAny<ArraySegment<byte>>(), It.IsAny<EDeliveryMethod>())).Callback((ArraySegment<byte> arg, EDeliveryMethod eMethod) => m_SendRawParam = arg);
-            m_GamePersistence = new Mock<IGameStatePersistence>();
-            m_GamePersistence.Setup(per => per.Receive(It.IsAny<ArraySegment<byte>>())).Callback((ArraySegment<byte> arg) => m_PersistenceReceiveParam = arg);
-            m_Connection = new ConnectionClient(m_NetworkConnection.Object, m_GamePersistence.Object, m_WorldData.Object);
-        }
 
         [Theory]
         [InlineData(false)]
         [InlineData(true)]
-        void VerifyStateTransitionsUntilConnected(bool bExchangeWorldData)
+        private void VerifyStateTransitionsUntilConnected(bool bExchangeWorldData)
         {
             m_WorldData.Setup(d => d.RequiresInitialWorldData).Returns(bExchangeWorldData);
 
@@ -37,16 +47,17 @@ namespace Coop.Tests
             m_Connection.Connect();
 
             // Expect client hello
-            m_NetworkConnection.Verify(c => c.SendRaw(It.IsAny<ArraySegment<byte>>(), It.IsAny<EDeliveryMethod>()), Times.Once);
-            var expectedSentData = TestUtils.MakeRaw(
+            m_NetworkConnection.Verify(
+                c => c.SendRaw(It.IsAny<ArraySegment<byte>>(), It.IsAny<EDeliveryMethod>()),
+                Times.Once);
+            ArraySegment<byte> expectedSentData = TestUtils.MakeRaw(
                 Protocol.EPacket.Client_Hello,
                 new Protocol.Client_Hello(Protocol.Version).Serialize());
             Assert.Equal(expectedSentData, m_SendRawParam);
             Assert.Equal(EConnectionState.ClientJoinRequesting, m_Connection.State);
 
-
             // Ack client hello
-            var response = TestUtils.MakeRaw(
+            ArraySegment<byte> response = TestUtils.MakeRaw(
                 Protocol.EPacket.Server_RequestClientInfo,
                 new Protocol.Server_RequestClientInfo().Serialize());
             m_Connection.Receive(response);
@@ -89,7 +100,7 @@ namespace Coop.Tests
             Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
 
             // Send keep alive
-            var keepAliveFromServer = TestUtils.MakeKeepAlive(42);
+            ArraySegment<byte> keepAliveFromServer = TestUtils.MakeKeepAlive(42);
             m_Connection.Receive(keepAliveFromServer);
             Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
 
@@ -99,7 +110,7 @@ namespace Coop.Tests
         }
 
         [Fact]
-        void ReceiveForPersistenceIsRelayed()
+        private void ReceiveForPersistenceIsRelayed()
         {
             // Bring connection to EConnectionState.ClientConnected
             VerifyStateTransitionsUntilConnected(false);
@@ -109,7 +120,7 @@ namespace Coop.Tests
             Assert.Null(m_PersistenceReceiveParam.Array);
 
             // Generate a payload
-            var persistencePayload = TestUtils.MakePersistencePayload(50);
+            ArraySegment<byte> persistencePayload = TestUtils.MakePersistencePayload(50);
 
             // Receive
             m_Connection.Receive(persistencePayload);
@@ -119,7 +130,7 @@ namespace Coop.Tests
             Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
 
             // Interweave a keep alive
-            var keepAliveFromServer = TestUtils.MakeKeepAlive(42);
+            ArraySegment<byte> keepAliveFromServer = TestUtils.MakeKeepAlive(42);
             m_Connection.Receive(keepAliveFromServer);
             Assert.Equal(keepAliveFromServer, m_SendRawParam); // Client ack
 

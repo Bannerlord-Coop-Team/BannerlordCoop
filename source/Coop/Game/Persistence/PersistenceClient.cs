@@ -5,7 +5,6 @@ using Coop.Game.Persistence.Party;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using JetBrains.Annotations;
-using RailgunNet;
 using RailgunNet.Connection.Client;
 
 namespace Coop.Game.Persistence
@@ -16,11 +15,12 @@ namespace Coop.Game.Persistence
         private readonly RailClient m_RailClient;
         private readonly RailClientRoom m_Room;
 
-        public PersistenceClient(IEnvironment environment)
+        public PersistenceClient(IEnvironmentClient environment)
         {
             m_Mapping = new EntityMapping();
-            m_RailClient = new RailClient(Registry.Get(Component.Client, environment, m_Mapping));
+            m_RailClient = new RailClient(Registry.Client(environment, m_Mapping));
             CampaignMapMovement.s_Environment = environment;
+            TimeControl.s_Environment = environment;
             m_Room = m_RailClient.StartRoom();
         }
 

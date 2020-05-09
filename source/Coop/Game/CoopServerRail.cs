@@ -6,7 +6,6 @@ using Coop.Game.Persistence.Party;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Network;
-using RailgunNet;
 using RailgunNet.Connection.Server;
 
 namespace Coop.Game
@@ -21,11 +20,11 @@ namespace Coop.Game
 
         private readonly Server m_Server;
 
-        public CoopServerRail(Server server, IEnvironment environment)
+        public CoopServerRail(Server server, IEnvironmentServer environment)
         {
             m_Server = server;
             EntityMapping mapping = new EntityMapping();
-            m_Instance = new RailServer(Registry.Get(Component.Server, environment, mapping));
+            m_Instance = new RailServer(Registry.Server(environment, mapping));
             m_EntityManager = new EntityManager(m_Instance, mapping);
         }
 

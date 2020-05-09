@@ -8,32 +8,46 @@ namespace Coop.Game.Persistence
 {
     public static class Registry
     {
-        public static RailRegistry Get(
-            Component eComponent,
-            IEnvironment environment,
+        public static RailRegistry Server(
+            IEnvironmentServer environment,
             EntityMapping entityMapping = null)
         {
-            RailRegistry reg = new RailRegistry(eComponent);
+            RailRegistry reg = new RailRegistry(Component.Server);
             EntityMapping mapping = entityMapping ?? new EntityMapping();
 
-            switch (eComponent)
-            {
-                case Component.Client:
-                    reg.AddEntityType<WorldEntityClient, WorldState>(new object[] {environment});
-                    reg.AddEntityType<MobilePartyEntityClient, MobilePartyState>(
-                        new object[] {environment, mapping.Parties});
+            // Entities
+            reg.AddEntityType<WorldEntityServer, WorldState>(new object[] {environment});
+            reg.AddEntityType<MobilePartyEntityServer, MobilePartyState>(
+                new object[] {environment, mapping.Parties});
 
-                    break;
-                case Component.Server:
-                    reg.AddEntityType<WorldEntityServer, WorldState>(new object[] {environment});
-                    reg.AddEntityType<MobilePartyEntityServer, MobilePartyState>(
-                        new object[] {environment, mapping.Parties});
-                    break;
-            }
-
-            reg.SetCommandType<DummyCommand>();
+            // Events
             reg.AddEventType<WorldEventTimeControl>(new object[] {environment});
             reg.AddEventType<EventPartyMoveTo>();
+
+            // Commands
+            reg.SetCommandType<DummyCommand>();
+
+            return reg;
+        }
+
+        public static RailRegistry Client(
+            IEnvironmentClient environment,
+            EntityMapping entityMapping = null)
+        {
+            RailRegistry reg = new RailRegistry(Component.Client);
+            EntityMapping mapping = entityMapping ?? new EntityMapping();
+
+            // Entities
+            reg.AddEntityType<WorldEntityClient, WorldState>(new object[] {environment});
+            reg.AddEntityType<MobilePartyEntityClient, MobilePartyState>(
+                new object[] {environment, mapping.Parties});
+
+            // Events
+            reg.AddEventType<WorldEventTimeControl>();
+            reg.AddEventType<EventPartyMoveTo>();
+
+            // Commands
+            reg.SetCommandType<DummyCommand>();
 
             return reg;
         }

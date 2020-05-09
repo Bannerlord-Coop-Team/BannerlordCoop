@@ -1,5 +1,8 @@
-﻿using NLog;
+﻿using JetBrains.Annotations;
+using NLog;
+using RailgunNet;
 using RailgunNet.Logic;
+using RailgunNet.Util;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game.Persistence.World
@@ -7,9 +10,15 @@ namespace Coop.Game.Persistence.World
     public class WorldEventTimeControl : RailEvent
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        private readonly IEnvironment m_Environment;
+        [CanBeNull] private readonly IEnvironmentServer m_Environment;
 
-        public WorldEventTimeControl(IEnvironment env)
+        [OnlyIn(Component.Client)]
+        public WorldEventTimeControl()
+        {
+        }
+
+        [OnlyIn(Component.Server)]
+        public WorldEventTimeControl(IEnvironmentServer env)
         {
             m_Environment = env;
         }
@@ -24,10 +33,14 @@ namespace Coop.Game.Persistence.World
         [EventData] private byte m_RequestedTimeControlMode { get; set; }
         #endregion
 
+        [OnlyIn(Component.Server)]
         protected override void Execute(RailRoom room, RailController sender)
         {
             Logger.Trace("Time control change request to {request}.", RequestedTimeControlMode);
-            m_Environment.TimeControlMode = RequestedTimeControlMode;
+            if (m_Environment != null)
+            {
+                m_Environment.TimeControlMode = RequestedTimeControlMode;
+            }
         }
     }
 }
