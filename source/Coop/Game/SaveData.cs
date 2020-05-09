@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Linq;
-using Coop.Common;
 using Coop.Multiplayer;
 using Coop.Network;
+using NLog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.SaveSystem;
@@ -17,6 +17,7 @@ namespace Coop.Game
 
     internal class SaveData : ISaveData
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         public bool RequiresInitialWorldData => Coop.IsClient && !Coop.IsServer;
 
         public bool Receive(ArraySegment<byte> rawData)
@@ -41,7 +42,7 @@ namespace Coop.Game
             SaveOutput save = null;
             GameLoopRunner.RunOnMainThread(
                 () => save = SaveLoad.SaveGame(TaleWorlds.Core.Game.Current, memStream));
-            Log.Info(save.ToFriendlyString());
+            Logger.Info(save.ToFriendlyString());
 
             // Write packet
             ByteWriter writer = new ByteWriter();
@@ -55,24 +56,24 @@ namespace Coop.Game
             InMemDriver stream = DeserializeWorldState(rawData);
             if (stream == null)
             {
-                Log.Error("Error during world state serialization. Abort.");
+                Logger.Error("Error during world state serialization. Abort.");
                 return false;
             }
 
             LoadGameResult loadResult = SaveLoad.LoadSaveGameData(stream);
             if (loadResult == null)
             {
-                Log.Error("Unable to load world state. Abort.");
+                Logger.Error("Unable to load world state. Abort.");
                 return false;
             }
 
             if (loadResult.LoadResult.Successful)
             {
-                Log.Info(loadResult.ToFriendlyString());
+                Logger.Info(loadResult.ToFriendlyString());
             }
             else
             {
-                Log.Error(loadResult.ToFriendlyString());
+                Logger.Error(loadResult.ToFriendlyString());
             }
 
             GameLoopRunner.RunOnMainThread(() => SaveLoad.LoadGame(loadResult.LoadResult));

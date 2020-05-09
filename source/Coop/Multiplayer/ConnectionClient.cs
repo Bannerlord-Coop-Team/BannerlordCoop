@@ -1,12 +1,13 @@
 ﻿using System;
-using Coop.Common;
 using Coop.Network;
+using NLog;
 using Stateless;
 
 namespace Coop.Multiplayer
 {
     public class ConnectionClient : ConnectionBase
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly StateMachine<EConnectionState, ETrigger> m_StateMachine;
         private readonly ISaveData m_WorldData;
 
@@ -154,8 +155,10 @@ namespace Coop.Multiplayer
             }
             catch (Exception e)
             {
-                Log.Error(
-                    $"World data received from server could not be parsed '{e}' . Disconnect {this}.");
+                Logger.Error(
+                    e,
+                    "World data received from server could not be parsed . Disconnect {client}.",
+                    this);
             }
 
             if (bSuccess)
@@ -164,8 +167,9 @@ namespace Coop.Multiplayer
             }
             else
             {
-                Log.Error(
-                    $"World data received from server could not be parsed. Disconnect {this}.");
+                Logger.Error(
+                    "World data received from server could not be parsed. Disconnect {client}.",
+                    this);
                 Disconnect(EDisconnectReason.WorldDataTransferIssue);
             }
         }
@@ -188,7 +192,7 @@ namespace Coop.Multiplayer
             }
             catch (Exception e)
             {
-                Log.Error($"Sync data received from server could not be parsed '{e}'. Ignored.");
+                Logger.Error(e, "Sync data received from server could not be parsed. Ignored.");
             }
         }
 

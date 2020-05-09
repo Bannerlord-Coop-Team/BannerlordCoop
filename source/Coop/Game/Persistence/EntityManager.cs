@@ -1,7 +1,7 @@
 ﻿using System;
-using Coop.Common;
 using Coop.Game.Persistence.Party;
 using Coop.Game.Persistence.World;
+using NLog;
 using RailgunNet.Connection.Server;
 using TaleWorlds.CampaignSystem;
 
@@ -9,6 +9,7 @@ namespace Coop.Game.Persistence
 {
     public class EntityManager
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly EntityMapping m_Mapping;
         private readonly RailServerRoom m_Room;
         private readonly RailServer m_Server;
@@ -45,7 +46,7 @@ namespace Coop.Game.Persistence
             MobileParty party = GetPlayerParty(peer);
             if (party == null)
             {
-                Log.Warn("Player party not found.");
+                Logger.Warn("Player party not found.");
                 return;
             }
 
@@ -53,7 +54,7 @@ namespace Coop.Game.Persistence
                 m_Room.AddNewEntity<MobilePartyEntityServer>(
                     e => e.State.PartyId = party.Party.Index);
             peer.GrantControl(playerParty);
-            Log.Info($"{party} control granted to {peer}.");
+            Logger.Info($"{party} control granted to {peer}.");
         }
 
         private void OnClientRemoved(RailServerPeer peer)

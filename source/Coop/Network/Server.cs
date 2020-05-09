@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Coop.Common;
 using Coop.Multiplayer;
+using NLog;
 using Stateless;
 
 namespace Coop.Network
@@ -16,6 +17,8 @@ namespace Coop.Network
             Running,
             Stopping
         }
+
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         public readonly UpdateableList Updateables;
         public ServerConfiguration ActiveConfig;
@@ -74,16 +77,16 @@ namespace Coop.Network
         {
             m_ActiveConnections.Add(con);
             OnClientConnected?.Invoke(con);
-            Log.Info($"Client connection established: {con}.");
+            Logger.Info("Connection established: {connection}.", con);
         }
 
         public virtual void Disconnected(ConnectionServer con, EDisconnectReason eReason)
         {
-            Log.Info($"Client connection closed: {con}. {eReason}.");
+            Logger.Info("Connection closed: {connection}. {reason}.", con, eReason);
             con.Disconnect(eReason);
             if (!m_ActiveConnections.Remove(con))
             {
-                Log.Error($"Unknown connection: {con}.");
+                Logger.Error("Unknown connection: {connection}.", con);
             }
         }
 

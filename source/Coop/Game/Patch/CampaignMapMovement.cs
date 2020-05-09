@@ -1,13 +1,16 @@
-﻿using Coop.Common;
-using Coop.Game.Persistence;
+﻿using Coop.Game.Persistence;
 using HarmonyLib;
+using NLog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
+using Logger = NLog.Logger;
 
 namespace Coop.Game.Patch
 {
     public static class CampaignMapMovement
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         public static IEnvironment s_Environment = null;
         public static bool s_IsRemoteUpdate = false;
 
@@ -58,7 +61,7 @@ namespace Coop.Game.Patch
 
                 if (s_Environment.RemoteMoveTo.TryGetValue(__instance, out RemoteValue<Vec2> val))
                 {
-                    Log.Trace($"{__instance} wants to move to {point}.");
+                    Logger.Trace("{party} wants to move to {point}.", __instance, point);
                     val.Request(point);
                     return false;
                 }

@@ -1,13 +1,15 @@
 ﻿using System;
-using Coop.Common;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Network;
+using NLog;
 
 namespace Coop.Game
 {
     public class CoopServer
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         private static readonly Lazy<CoopServer> m_Instance =
             new Lazy<CoopServer>(() => new CoopServer());
 
@@ -32,14 +34,14 @@ namespace Coop.Game
                 Current.OnClientConnected += OnClientConnected;
                 Main.Instance.Updateables.Add(Current);
                 Current.Start(new ServerConfiguration());
-                Log.Debug("Created server.");
+                Logger.Debug("Created server.");
             }
 
             if (m_NetManager == null)
             {
                 m_NetManager = new LiteNetManagerServer(Current, new SaveData());
                 m_NetManager.StartListening();
-                Log.Debug("Setup network connection for server.");
+                Logger.Debug("Setup network connection for server.");
             }
         }
 

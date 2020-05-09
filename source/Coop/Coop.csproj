@@ -65,6 +65,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\Newtonsoft.Json.dll</HintPath>
     </Reference>
+    <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
+      <HintPath>..\packages\NLog.4.7.0\lib\net45\NLog.dll</HintPath>
+    </Reference>
     <Reference Include="PropertyChanged, Version=3.2.8.0, Culture=neutral, PublicKeyToken=ee3ee20bcf148ddd, processorArchitecture=MSIL">
       <HintPath>..\packages\PropertyChanged.Fody.3.2.8\lib\net40\PropertyChanged.dll</HintPath>
     </Reference>
@@ -88,8 +91,13 @@
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\Steamworks.NET.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.IO.Compression" />
     <Reference Include="System.Runtime.InteropServices.RuntimeInformation" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Transactions" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -229,6 +237,7 @@
     <Compile Include="Game\Exceptions.cs" />
     <Compile Include="Game\GameEnvironment.cs" />
     <Compile Include="Game\GameLoopRunner.cs" />
+    <Compile Include="Game\MbLogTarget.cs" />
     <Compile Include="Game\Patch\Exceptions.cs" />
     <Compile Include="Game\Patch\TimeControl.cs" />
     <Compile Include="Game\Patch\Utils.cs" />
@@ -263,7 +272,7 @@
     <Compile Include="Multiplayer\Globals.cs" />
     <Compile Include="Game\Main.cs" />
     <Compile Include="Common\FrameLimiter.cs" />
-    <Compile Include="Common\Log.cs" />
+    <Compile Include="Common\Logging.cs" />
     <Compile Include="Common\MovingAverage.cs" />
     <Compile Include="Multiplayer\ConnectionClient.cs" />
     <Compile Include="Multiplayer\ISaveData.cs" />
@@ -313,7 +322,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs 0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll</PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs 0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll</PostBuildEvent>
   </PropertyGroup>
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

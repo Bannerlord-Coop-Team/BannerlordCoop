@@ -4,10 +4,10 @@ namespace Coop.Game
 {
     public class CoopEvents
     {
-        public readonly MbEvent
-            OnGameLoaded = new MbEvent();
         public readonly MbEvent<MobileParty>
             OnBeforePlayerPartySpawned = new MbEvent<MobileParty>();
+
+        public readonly MbEvent OnGameLoaded = new MbEvent();
 
         public void RemoveListeners(object obj)
         {

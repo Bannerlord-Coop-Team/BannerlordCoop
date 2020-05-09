@@ -3,11 +3,8 @@ Main entry point: `SandBox.View.Map.MapScreen HandleLeftMouseButtonClick`
 `MobileParty.Position2D` - Teleports party directly to position
 `MapState.ProcessTravel` - Sends party to position. Already contains some defunct multiplayer logic.
 
-### Sync
-Idea:
-1. Prefix `MapState.ProcessTravel(Vec2)`, `MobileParty.SetMoveGoToSettlement`, `MobileParty.SetMoveEngageParty` (for main party only?): Send to server -> Return immediately
-2. Server processes input position -> sends response with confirmed position to all players
-3. All player apply position locally trough direct call of MobileParty.SetMoveGoToXYZ
+## Sync
+Ticks are generated in `CampaignEvents.SignalPeriodicEvents` with `Campaign.Current.CampaignStartTime.ElapsedHoursUntilNow` (=> delta to `Campaign.Current.MapTimeTracker`) as a base timer. Updated in `Campaign.TickMapTime`.
 
 ## Saving & Loading
 `MBSaveLoad`

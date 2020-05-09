@@ -1,12 +1,13 @@
 ﻿using System;
-using Coop.Common;
 using Coop.Network;
+using NLog;
 using Stateless;
 
 namespace Coop.Multiplayer
 {
     public class ConnectionServer : ConnectionBase
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly StateMachine<EConnectionState, ETrigger> m_StateMachine;
         private readonly ISaveData m_WorldData;
 
@@ -112,8 +113,11 @@ namespace Coop.Multiplayer
             }
             else
             {
-                Log.Error(
-                    $"Join request denied - version mismatch. {packet.Type}: {payload}. server version: {Protocol.Version}.");
+                Logger.Error(
+                    "Join request denied - version mismatch. {packetType}: {payload}. server version: {protocolVersion}.",
+                    packet.Type,
+                    payload,
+                    Protocol.Version);
                 Disconnect(EDisconnectReason.WrongProtocolVersion);
             }
         }
@@ -131,7 +135,7 @@ namespace Coop.Multiplayer
         {
             Protocol.Client_Info info =
                 Protocol.Client_Info.Deserialize(new ByteReader(packet.Payload));
-            Log.Info($"Received client join request from {info.m_Player.Name}.");
+            Logger.Info("Received client join request from {playerName}.", info.m_Player.Name);
             m_StateMachine.Fire(ETrigger.ClientInfoVerified);
         }
         #endregion
@@ -150,7 +154,7 @@ namespace Coop.Multiplayer
         {
             Protocol.Client_RequestWorldData info =
                 Protocol.Client_RequestWorldData.Deserialize(new ByteReader(packet.Payload));
-            Log.Info("Client requested world data.");
+            Logger.Info("Client requested world data.");
             m_StateMachine.Fire(ETrigger.ClientRequestedWorldData);
         }
 
@@ -180,8 +184,10 @@ namespace Coop.Multiplayer
             }
             catch (Exception e)
             {
-                Log.Error(
-                    $"Sync data received from client {this} could not be parsed '{e}'. Ignored.");
+                Logger.Error(
+                    e,
+                    "Sync data received from {client} could not be parsed. Ignored.",
+                    this);
             }
         }
 

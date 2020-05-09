@@ -1,6 +1,6 @@
 ﻿using System;
-using Coop.Common;
 using Coop.Network;
+using NLog;
 using Steamworks;
 
 namespace Coop.Multiplayer.Steam
@@ -8,6 +8,7 @@ namespace Coop.Multiplayer.Steam
     internal class NetworkSteam : INetwork
     {
         private const int APP_ID_INT = 261550;
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private static readonly AppId_t APP_ID = new AppId_t(APP_ID_INT);
 
         public NetworkSteam()
@@ -26,7 +27,7 @@ namespace Coop.Multiplayer.Steam
                     IsConnected = SteamAPI.Init();
                     if (!IsConnected)
                     {
-                        Log.Error("Steam API failed to initialize.");
+                        Logger.Error("Steam API failed to Initialize");
                     }
                     else
                     {
@@ -36,7 +37,7 @@ namespace Coop.Multiplayer.Steam
                 }
                 catch (Exception e)
                 {
-                    Log.Error(e.Message);
+                    Logger.Error(e);
                 }
             }
 

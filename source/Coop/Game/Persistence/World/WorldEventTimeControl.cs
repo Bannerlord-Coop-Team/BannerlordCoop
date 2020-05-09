@@ -1,4 +1,4 @@
-﻿using Coop.Common;
+﻿using NLog;
 using RailgunNet.Logic;
 using TaleWorlds.CampaignSystem;
 
@@ -6,6 +6,7 @@ namespace Coop.Game.Persistence.World
 {
     public class WorldEventTimeControl : RailEvent
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly IEnvironment m_Environment;
 
         public WorldEventTimeControl(IEnvironment env)
@@ -25,7 +26,7 @@ namespace Coop.Game.Persistence.World
 
         protected override void Execute(RailRoom room, RailController sender)
         {
-            Log.Trace($"Time control request: {RequestedTimeControlMode}.");
+            Logger.Trace("Time control change request to {request}.", RequestedTimeControlMode);
             m_Environment.TimeControlMode = RequestedTimeControlMode;
         }
     }

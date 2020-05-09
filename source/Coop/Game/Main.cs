@@ -1,20 +1,20 @@
 ﻿using System;
-using System.IO;
 using Coop.Common;
 using Coop.Game.Behaviour;
 using Coop.Game.CLI;
 using HarmonyLib;
+using NLog;
+using NLog.LayoutRenderers;
+using NLog.Layouts;
+using NLog.Targets;
 using NoHarmony;
-using TaleWorlds.Core;
 using TaleWorlds.InputSystem;
-using TaleWorlds.Library;
-using TaleWorlds.Localization;
-using TaleWorlds.MountAndBlade;
 
 namespace Coop.Game
 {
     internal class Main : NoHarmonyLoader
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
         public Main()
@@ -40,20 +40,6 @@ namespace Coop.Game
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
             harmony.PatchAll();
-
-            Module.CurrentModule.AddInitialStateOption(
-                new InitialStateOption(
-                    "Check server status.",
-                    new TextObject("Check server status."),
-                    9990,
-                    () =>
-                    {
-                        Common.Log.Info(
-                            CoopServer.Instance.Current == null ?
-                                "No server found." :
-                                $"Server state: {CoopServer.Instance.Current.State}.");
-                    },
-                    false));
         }
 
         protected override void OnSubModuleUnloaded()
@@ -84,43 +70,15 @@ namespace Coop.Game
             // NoHarmony
             Logging = true;
 
-            int iNrOfInstances = System.Diagnostics.Process.GetProcessesByName(
-                                           System.IO.Path.GetFileNameWithoutExtension(
-                                               System.Reflection.Assembly.GetEntryAssembly()
-                                                     .Location))
-                                       .Length;
-            string sLogFileName = $"Coop_{iNrOfInstances - 1}.txt";
-            // our own logger
-            Common.Log.s_OnLogEntry = (eLevel, sMessage) =>
-            {
-                using (StreamWriter sw = new StreamWriter(sLogFileName, true))
-                {
-                    sw.WriteLine(sMessage);
-                }
-
-                if (eLevel == Common.Log.ELevel.Info)
-                {
-                    InformationManager.DisplayMessage(
-                        new InformationMessage(sMessage, Color.White));
-                }
-
-                if (eLevel == Common.Log.ELevel.Warning)
-                {
-                    InformationManager.DisplayMessage(
-                        new InformationMessage(sMessage, Color.FromUint(0xFF0000)));
-                }
-                else if (eLevel == Common.Log.ELevel.Error)
-                {
-                    InformationManager.DisplayMessage(
-                        new InformationMessage(sMessage, Color.FromUint(0xFFFF00)));
-                }
-            };
+            // NLog
+            Target.Register<MbLogTarget>("MbLog");
+            Common.Logging.Init(new Target[] {new MbLogTarget() { Layout = NLog.Layouts.Layout.FromString("[${level:uppercase=true}] ${message}") }});
         }
 
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             Exception ex = (Exception) e.ExceptionObject;
-            Common.Log.Error($"Unhandled exception: {ex} - {ex.Message}.");
+            Logger.Fatal(ex, "Unhandled exception");
         }
     }
 }

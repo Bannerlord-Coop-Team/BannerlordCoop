@@ -1,13 +1,14 @@
 ﻿using System.Net;
 using System.Net.Sockets;
-using Coop.Common;
 using Coop.Network;
 using LiteNetLib;
+using NLog;
 
 namespace Coop.Multiplayer.Network
 {
     public class LiteNetListenerClient : INetEventListener
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly GameSession m_Session;
 
         public LiteNetListenerClient(GameSession session)
@@ -56,7 +57,7 @@ namespace Coop.Multiplayer.Network
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
         {
-            Log.Error($"OnNetworkError({endPoint}, {socketError}).");
+            Logger.Error("OnNetworkError({endPoint}, {socketError}).", endPoint, socketError);
             if (m_Session.Connection != null)
             {
                 m_Session.Disconnect(EDisconnectReason.Unknown);
@@ -68,7 +69,11 @@ namespace Coop.Multiplayer.Network
             NetPacketReader reader,
             UnconnectedMessageType messageType)
         {
-            Log.Debug($"OnNetworkReceiveUnconnected({remoteEndPoint}, {reader}, {messageType}).");
+            Logger.Debug(
+                "OnNetworkReceiveUnconnected({remoteEndPoint}, {reader}, {messageType}).",
+                remoteEndPoint,
+                reader,
+                messageType);
             if (m_Session.Connection != null)
             {
                 m_Session.Disconnect(EDisconnectReason.Unknown);

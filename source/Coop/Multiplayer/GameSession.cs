@@ -1,11 +1,13 @@
 ﻿using System;
-using Coop.Common;
 using Coop.Network;
+using NLog;
 
 namespace Coop.Multiplayer
 {
     public class GameSession
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         public GameSession(ISaveData worldData)
         {
             World = worldData;
@@ -26,7 +28,7 @@ namespace Coop.Multiplayer
             OnConnectionCreated?.Invoke(Connection);
             Connection.Connect();
 
-            Log.Debug($"Connection to server created {Connection}.");
+            Logger.Debug("Connection to server created {connection}", Connection);
         }
 
         public void Disconnect(EDisconnectReason eReason)
@@ -37,7 +39,10 @@ namespace Coop.Multiplayer
             }
 
             Connection.Disconnect(eReason);
-            Log.Debug($"Disconnect from server {Connection}. Reason: {eReason}.");
+            Logger.Debug(
+                "Disconnect from server {connection}. Reason: {reason}.",
+                Connection,
+                eReason);
             Connection = null;
         }
     }

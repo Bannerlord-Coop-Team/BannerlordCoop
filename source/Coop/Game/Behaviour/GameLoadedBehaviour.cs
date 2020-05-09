@@ -1,5 +1,4 @@
-﻿using Coop.Common;
-using TaleWorlds.CampaignSystem;
+﻿using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game.Behaviour
 {
@@ -12,7 +11,6 @@ namespace Coop.Game.Behaviour
 
         public override void SyncData(IDataStore dataStore)
         {
-            Log.Info($"{this}.SyncData");
         }
 
         private static void GameLoaded(CampaignGameStarter gameStarter)

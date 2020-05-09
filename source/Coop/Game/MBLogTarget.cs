@@ -1,0 +1,29 @@
+﻿using NLog;
+using NLog.Targets;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+
+namespace Coop.Game
+{
+    [Target("MbLog")]
+    public class MbLogTarget : TargetWithLayout
+    {
+        public MbLogTarget()
+        {
+        }
+        protected override void Write(LogEventInfo logEvent)
+        {
+            Color textColor = Color.White;
+            if (logEvent.Level == LogLevel.Warn)
+            {
+                textColor = Color.FromUint(0xFF0000);
+            }
+            else if (logEvent.Level >= LogLevel.Error)
+            {
+                textColor = Color.FromUint(0xFFFF00);
+            }
+            InformationManager.DisplayMessage(
+                new InformationMessage(Layout.Render(logEvent), textColor));
+        }
+    }
+}

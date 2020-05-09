@@ -6,7 +6,6 @@ using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Network;
 using JetBrains.Annotations;
-using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game
 {
@@ -25,9 +24,7 @@ namespace Coop.Game
             m_NetManager = new LiteNetManagerClient(m_Session);
             GameState = new CoopGameState();
             Events = new CoopEvents();
-            Events.OnGameLoaded.AddNonSerializedListener(
-                this,
-                Init);
+            Events.OnGameLoaded.AddNonSerializedListener(this, Init);
         }
 
         public static CoopClient Instance => m_Instance.Value;
@@ -59,11 +56,12 @@ namespace Coop.Game
         private void TryInitPersistence(ConnectionClient con)
         {
             if (con == null || con.State != EConnectionState.ClientConnected) return;
-            
+
             if (m_Persistence == null)
             {
                 m_Persistence = new PersistenceClient(new GameEnvironment());
             }
+
             m_Persistence.SetConnection(con);
         }
 
@@ -73,6 +71,7 @@ namespace Coop.Game
             {
                 throw new ArgumentNullException(nameof(con));
             }
+
             TryInitPersistence(con);
             con.OnClientJoined += TryInitPersistence;
             con.OnDisconnect += Disconnect;

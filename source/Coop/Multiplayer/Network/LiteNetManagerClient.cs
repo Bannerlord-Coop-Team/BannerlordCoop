@@ -3,11 +3,13 @@ using System.Net;
 using Coop.Common;
 using Coop.Network;
 using LiteNetLib;
+using NLog;
 
 namespace Coop.Multiplayer.Network
 {
     public class LiteNetManagerClient : IUpdateable
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly GameSession m_Session;
         private NetManager m_NetManager;
         private NetPeer m_Peer;
@@ -35,11 +37,11 @@ namespace Coop.Multiplayer.Network
             {
                 if (m_Peer.EndPoint.Equals(toConnectTo))
                 {
-                    Log.Debug("Client is already connected to the endpoint. Ignoring request.");
+                    Logger.Debug("Client is already connected to the endpoint. Ignoring request.");
                     return;
                 }
 
-                Log.Debug("Switching servers.");
+                Logger.Debug("Switching servers.");
                 Disconnect(EDisconnectReason.ClientJoinedAnotherServer);
             }
 

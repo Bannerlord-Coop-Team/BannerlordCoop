@@ -1,14 +1,16 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
-using Coop.Common;
 using Coop.Network;
 using LiteNetLib;
+using NLog;
 
 namespace Coop.Multiplayer.Network
 {
     public class LiteNetListenerServer : INetEventListener
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         private readonly Server m_Server;
         private readonly ISaveData m_WorldData;
 
@@ -22,13 +24,14 @@ namespace Coop.Multiplayer.Network
         {
             if (!m_Server.CanPlayerJoin())
             {
-                Log.Info(
-                    $"Connection request from {request.ToFriendlyString()} rejected: server is full.");
+                Logger.Info(
+                    "Connection request from {request} rejected: server is full.",
+                    request.ToFriendlyString());
                 request.Reject(new[] {Convert.ToByte(EDisconnectReason.ServerIsFull)});
                 return;
             }
 
-            Log.Info($"Connection request from {request.ToFriendlyString()}.");
+            Logger.Info("Connection request from {request}.", request.ToFriendlyString());
             request.Accept();
         }
 
@@ -69,7 +72,7 @@ namespace Coop.Multiplayer.Network
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
         {
-            Log.Error($"OnNetworkError({endPoint}, {socketError}).");
+            Logger.Error("OnNetworkError({endPoint}, {socketError}).", endPoint, socketError);
         }
 
         public void OnNetworkReceiveUnconnected(
@@ -77,7 +80,11 @@ namespace Coop.Multiplayer.Network
             NetPacketReader reader,
             UnconnectedMessageType messageType)
         {
-            Log.Info($"OnNetworkReceiveUnconnected({remoteEndPoint}, {reader}, {messageType}).");
+            Logger.Info(
+                "OnNetworkReceiveUnconnected({remoteEndPoint}, {reader}, {messageType}).",
+                remoteEndPoint,
+                reader,
+                messageType);
         }
     }
 }
