@@ -256,7 +256,7 @@
     <Compile Include="Game\Persistence\RemoteValue.cs" />
     <Compile Include="Game\Persistence\World\WorldEntityClient.cs" />
     <Compile Include="Game\Persistence\World\WorldEntityServer.cs" />
-    <Compile Include="Game\Persistence\World\WorldEventTimeControl.cs" />
+    <Compile Include="Game\Persistence\World\EventTimeControl.cs" />
     <Compile Include="Game\Persistence\World\WorldState.cs" />
     <Compile Include="Game\CoopServerRail.cs" />
     <Compile Include="Game\SaveLoad.cs" />

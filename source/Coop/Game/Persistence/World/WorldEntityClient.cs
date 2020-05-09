@@ -42,7 +42,7 @@ namespace Coop.Game.Persistence.World
             {
                 if (requestedMode.Value != State.TimeControlMode)
                 {
-                    Room.RaiseEvent<WorldEventTimeControl>(
+                    Room.RaiseEvent<EventTimeControl>(
                         e => { e.RequestedTimeControlMode = requestedMode.Value; });
                 }
             }

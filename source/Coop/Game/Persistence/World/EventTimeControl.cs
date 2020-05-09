@@ -7,18 +7,18 @@ using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game.Persistence.World
 {
-    public class WorldEventTimeControl : RailEvent
+    public class EventTimeControl : RailEvent
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         [CanBeNull] private readonly IEnvironmentServer m_Environment;
 
         [OnlyIn(Component.Client)]
-        public WorldEventTimeControl()
+        public EventTimeControl()
         {
         }
 
         [OnlyIn(Component.Server)]
-        public WorldEventTimeControl(IEnvironmentServer env)
+        public EventTimeControl(IEnvironmentServer env)
         {
             m_Environment = env;
         }

@@ -21,7 +21,7 @@ namespace Coop.Game.Persistence
                 new object[] {environment, mapping.Parties});
 
             // Events
-            reg.AddEventType<WorldEventTimeControl>(new object[] {environment});
+            reg.AddEventType<EventTimeControl>(new object[] {environment});
             reg.AddEventType<EventPartyMoveTo>();
 
             // Commands
@@ -43,7 +43,7 @@ namespace Coop.Game.Persistence
                 new object[] {environment, mapping.Parties});
 
             // Events
-            reg.AddEventType<WorldEventTimeControl>();
+            reg.AddEventType<EventTimeControl>();
             reg.AddEventType<EventPartyMoveTo>();
 
             // Commands
