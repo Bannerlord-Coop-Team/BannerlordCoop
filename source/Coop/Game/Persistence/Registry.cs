@@ -2,7 +2,6 @@
 using Coop.Game.Persistence.World;
 using RailgunNet;
 using RailgunNet.Factory;
-using RailgunNet.Logic;
 
 namespace Coop.Game.Persistence
 {
@@ -18,7 +17,7 @@ namespace Coop.Game.Persistence
                 new object[] {environment});
 
             // Events
-            reg.AddEventType<EventTimeControl>(new object[] {environment});
+            reg.AddEventType<EventTimeControl>();
             reg.AddEventType<EventPartyMoveTo>();
 
             return reg;

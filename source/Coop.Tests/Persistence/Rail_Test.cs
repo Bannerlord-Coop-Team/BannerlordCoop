@@ -49,10 +49,10 @@ namespace Coop.Tests
         {
             // Initialization
             CampaignTimeControlMode expectedTimeControl = CampaignTimeControlMode.StoppablePlay;
-            m_EnvironmentServer.TimeControlMode = expectedTimeControl;
             RailClientRoom clientRoom = m_Client.StartRoom();
             RailServerRoom serverRoom = m_Server.StartRoom();
             WorldEntityServer entityServerSide = serverRoom.AddNewEntity<WorldEntityServer>();
+            entityServerSide.State.TimeControlMode = expectedTimeControl;
             m_Server.AddClient(m_PeerServerSide.Object, "");
             m_Client.SetPeer(m_PeerClientSide.Object);
             Assert.Empty(clientRoom.Entities);
@@ -70,8 +70,6 @@ namespace Coop.Tests
             // The client has received the world entity.
             Assert.Single(clientRoom.Entities);
             Assert.Single(serverRoom.Entities);
-            Assert.NotNull(
-                m_EnvironmentClient.TimeControlMode); // Set from client side entity on creation.
 
             // Clients representation of the entity is identical to the server
             RailEntityBase entityProxy = clientRoom.Entities.First();
@@ -81,17 +79,10 @@ namespace Coop.Tests
             Assert.Equal(entityServerSide.Id, entityProxy.Id);
             Assert.Equal(expectedTimeControl, entityServerSide.State.TimeControlMode);
             Assert.Equal(expectedTimeControl, entityClientSide.State.TimeControlMode);
-            Assert.Equal(entityClientSide.State.TimeControlMode, m_EnvironmentClient.Values[^1]);
-            Assert.Equal(
-                entityServerSide.State.TimeControlMode,
-                m_EnvironmentServer.TimeControlMode);
 
             // Change the entity on server side and sync to the client
             expectedTimeControl = CampaignTimeControlMode.Stop;
-            m_EnvironmentServer.TimeControlMode = expectedTimeControl;
-            Assert.NotEqual(
-                m_EnvironmentServer.TimeControlMode,
-                m_EnvironmentClient.Values[^1]); // not directly linked!
+            entityServerSide.State.TimeControlMode = expectedTimeControl;
 
             // Let the server detect the change and send the packet
             bool bWasSendTick = false;
@@ -102,18 +93,19 @@ namespace Coop.Tests
             }
 
             // Let the client receive & process the packet. We need to bring the client up to the same tick as the server to see the result.
-            while (clientRoom.Tick <= serverRoom.Tick)
+            while (clientRoom.Tick < serverRoom.Tick)
             {
                 m_ConServerSide.ExecuteSends();
                 m_Client.Update();
             }
 
-            Assert.Equal(expectedTimeControl, m_EnvironmentServer.TimeControlMode);
-            Assert.Equal(expectedTimeControl, m_EnvironmentClient.Values[^1]);
+            Assert.Equal(expectedTimeControl,  entityServerSide.State.TimeControlMode);
+            Assert.Equal(expectedTimeControl,  entityClientSide.State.TimeControlMode);
+            Assert.Equal(expectedTimeControl, m_EnvironmentClient.TimeControlMode_Test.Value);
 
             // Request a time change on the client
             expectedTimeControl = CampaignTimeControlMode.StoppableFastForward;
-            m_EnvironmentClient.TimeControlMode.Request(expectedTimeControl);
+            m_EnvironmentClient.TimeControlMode.SyncHandler.Invoke(expectedTimeControl);
 
             // Let the client detect the request & send an event to the server
             bWasSendTick = false;
@@ -125,7 +117,7 @@ namespace Coop.Tests
 
             // Let the server receive & process it
             m_ConClientSide.ExecuteSends();
-            Assert.Equal(expectedTimeControl, m_EnvironmentServer.TimeControlMode);
+            Assert.Equal(expectedTimeControl, entityServerSide.State.TimeControlMode);
 
             // And sync back to client
             bWasSendTick = false;
@@ -135,13 +127,13 @@ namespace Coop.Tests
                 bWasSendTick = serverRoom.Tick.IsSendTick(RailConfig.SERVER_SEND_RATE);
             }
 
-            while (clientRoom.Tick <= serverRoom.Tick)
+            while (clientRoom.Tick < serverRoom.Tick + 1)
             {
                 m_ConServerSide.ExecuteSends();
                 m_Client.Update();
             }
 
-            Assert.Equal(expectedTimeControl, m_EnvironmentClient.Values[^1]);
+            Assert.Equal(expectedTimeControl, m_EnvironmentClient.TimeControlMode_Test.Value);
         }
     }
 }

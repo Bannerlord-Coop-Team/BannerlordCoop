@@ -5,6 +5,11 @@ using HarmonyLib;
 
 namespace Coop.Sync
 {
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+    public class PatchAttribute : Attribute
+    {
+    }
+
     [AttributeUsage(AttributeTargets.Method)]
     public class SyncWatchAttribute : Attribute
     {

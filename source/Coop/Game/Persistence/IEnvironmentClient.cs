@@ -1,5 +1,4 @@
 ﻿using Coop.Sync;
-using JetBrains.Annotations;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game.Persistence
@@ -7,13 +6,11 @@ namespace Coop.Game.Persistence
     public interface IEnvironmentClient
     {
         Field TargetPosition { get; }
+        Field TimeControlMode { get; }
 
-        #region TimeControl
-        [CanBeNull] RemoteValue<CampaignTimeControlMode> TimeControlMode { get; set; }
-        #endregion
-
-        #region MobileParty
+        #region Game state access
         MobileParty GetMobilePartyByIndex(int iPartyIndex);
+        object GetTimeController();
         #endregion
     }
 }

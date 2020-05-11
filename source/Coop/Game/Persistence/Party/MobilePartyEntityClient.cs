@@ -28,7 +28,7 @@ namespace Coop.Game.Persistence.Party
             }
 
             Logger.Trace(
-                "[T {tick}] Request move entity {id} ('{party}') to '{position}'.",
+                "[{tick}] Request move entity {id} ('{party}') to '{position}'.",
                 Room.Tick,
                 Id,
                 m_Instance,
@@ -44,12 +44,11 @@ namespace Coop.Game.Persistence.Party
         private void UpdateLocalPosition()
         {
             Logger.Trace(
-                "[T {tick}] Received move entity {id} ('{party}') to '{position}' on {authTick}.",
+                "[{tick}] Received move entity {id} ('{party}') to '{position}'.",
                 Room.Tick,
                 Id,
                 m_Instance,
-                State.Position,
-                AuthTick);
+                State.Position);
             m_Environment.TargetPosition.Set(m_Instance, State.Position);
         }
 

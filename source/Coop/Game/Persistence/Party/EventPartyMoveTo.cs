@@ -18,10 +18,7 @@ namespace Coop.Game.Persistence.Party
 
         protected override void Execute(RailRoom room, RailController sender)
         {
-            MobilePartyEntityServer entity = Find<MobilePartyEntityServer>(
-                EntityId,
-                RailPolicy.NoProxy);
-            if (entity != null)
+            if (TryFind(EntityId, out MobilePartyEntityServer entity))
             {
                 if (sender.ControlledEntities.Contains(entity))
                 {

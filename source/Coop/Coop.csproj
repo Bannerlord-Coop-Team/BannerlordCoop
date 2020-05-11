@@ -253,7 +253,6 @@
     <Compile Include="Game\Persistence\EntityManager.cs" />
     <Compile Include="Game\Persistence\RailBitBufferExtensions.cs" />
     <Compile Include="Game\Persistence\Registry.cs" />
-    <Compile Include="Game\Persistence\RemoteValue.cs" />
     <Compile Include="Game\Persistence\World\WorldEntityClient.cs" />
     <Compile Include="Game\Persistence\World\WorldEntityServer.cs" />
     <Compile Include="Game\Persistence\World\EventTimeControl.cs" />

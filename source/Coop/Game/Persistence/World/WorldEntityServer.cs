@@ -11,10 +11,5 @@ namespace Coop.Game.Persistence.World
         {
             m_Environment = environment ?? throw new ArgumentNullException(nameof(environment));
         }
-
-        protected override void UpdateAuthoritative()
-        {
-            State.TimeControlMode = m_Environment.TimeControlMode;
-        }
     }
 }

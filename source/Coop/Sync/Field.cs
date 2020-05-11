@@ -8,9 +8,9 @@ namespace Coop.Sync
     public class Field
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        private readonly FieldInfo m_MemberInfo;
 
         private readonly Func<object, object> m_GetterLocal;
+        private readonly FieldInfo m_MemberInfo;
         private readonly Action<object, object> m_Setter;
         public Action<object> SyncHandler;
 

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Coop.Game.Persistence;
 using Coop.Sync;
+using HarmonyLib;
 using JetBrains.Annotations;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
@@ -10,36 +11,24 @@ namespace Coop.Tests
 {
     internal class TestEnvironmentClient : IEnvironmentClient
     {
-        #region TimeControl
-        public List<CampaignTimeControlMode> Values = new List<CampaignTimeControlMode>();
+        public readonly TestableField<Vec2> TargetPosition_Test = new TestableField<Vec2>();
+        public Field TargetPosition => TargetPosition_Test.Field;
 
-        [CanBeNull] private RemoteValue<CampaignTimeControlMode> m_TimeControlMode;
+        public readonly TestableField<CampaignTimeControlMode> TimeControlMode_Test = new TestableField<CampaignTimeControlMode>();
+        public Field TimeControlMode => TimeControlMode_Test.Field;
 
-        public RemoteValue<CampaignTimeControlMode> TimeControlMode
+        public object GetTimeController()
         {
-            get => m_TimeControlMode;
-            set
-            {
-                m_TimeControlMode = value;
-                if (m_TimeControlMode != null)
-                {
-                    m_TimeControlMode.OnValueChanged += Values.Add;
-                }
-            }
+            return TimeControlMode_Test;
         }
-        #endregion
 
-        #region MobileParty
-        public Field TargetPosition => throw new NotImplementedException();
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)
         {
             throw new NotImplementedException();
         }
-        #endregion
     }
 
     internal class TestEnvironmentServer : IEnvironmentServer
     {
-        public CampaignTimeControlMode TimeControlMode { get; set; } = CampaignTimeControlMode.Stop;
     }
 }

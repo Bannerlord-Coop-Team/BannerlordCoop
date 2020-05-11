@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Reflection;
+using System.ComponentModel;
 using NLog;
 using RailgunNet.Logic;
 using TaleWorlds.CampaignSystem;
@@ -17,35 +17,49 @@ namespace Coop.Game.Persistence.World
             m_Environment = environment ?? throw new ArgumentNullException(nameof(environment));
         }
 
-        protected override void OnAdded()
+        private void RequestTimeControlChange(object value)
         {
-            if (m_Environment.TimeControlMode != null)
+            if (!(value is CampaignTimeControlMode))
             {
-                Logger.Error(
-                    "TimeControlMode was not null indicating another WorldEntity instance exists. WorldEntity should only exist once.");
+                throw new ArgumentException(nameof(value));
             }
 
-            PropertyInfo position = typeof(WorldState).GetProperty(nameof(State.TimeControlMode));
-            m_Environment.TimeControlMode =
-                new RemoteValue<CampaignTimeControlMode>(State, position);
+            Logger.Trace(
+                "[{tick}] Request time control mode '{mode}'.",
+                Room.Tick,
+                (CampaignTimeControlMode) value);
+            Room.RaiseEvent<EventTimeControl>(
+                e =>
+                {
+                    e.RequestedTimeControlMode = (CampaignTimeControlMode) value;
+                    e.EntityId = Id;
+                });
+        }
+
+        protected override void OnAdded()
+        {
+            m_Environment.TimeControlMode.SyncHandler += RequestTimeControlChange;
+            State.PropertyChanged += State_PropertyChanged;
+        }
+
+        private void State_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(State.TimeControlMode))
+            {
+                Logger.Trace(
+                    "[{tick}] Received time controle mode change to '{mode}'.",
+                    Room.Tick,
+                    State.TimeControlMode);
+                m_Environment.TimeControlMode.Set(
+                    m_Environment.GetTimeController(),
+                    State.TimeControlMode);
+            }
         }
 
         protected override void OnRemoved()
         {
-            m_Environment.TimeControlMode = null;
-        }
-
-        protected override void UpdateProxy()
-        {
-            CampaignTimeControlMode? requestedMode = m_Environment.TimeControlMode?.DrainRequest();
-            if (requestedMode.HasValue)
-            {
-                if (requestedMode.Value != State.TimeControlMode)
-                {
-                    Room.RaiseEvent<EventTimeControl>(
-                        e => { e.RequestedTimeControlMode = requestedMode.Value; });
-                }
-            }
+            m_Environment.TargetPosition.SyncHandler -= RequestTimeControlChange;
+            State.PropertyChanged -= State_PropertyChanged;
         }
     }
 }

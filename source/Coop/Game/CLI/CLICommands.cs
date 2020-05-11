@@ -1,10 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using Coop.Game.Patch;
 using Coop.Network;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
 namespace Coop.Game.CLI
@@ -46,38 +43,6 @@ namespace Coop.Game.CLI
 
             CoopClient.Instance.Connect(ip, iPort);
             return "Client connection request sent.";
-        }
-
-        [CommandLineFunctionality.CommandLineArgumentFunction("set_time_control", sGroupName)]
-        public static string SetTimeControl(List<string> parameters)
-        {
-            IEnumerable<CampaignTimeControlMode> possibleValues =
-                Enum.GetValues(typeof(CampaignTimeControlMode)).Cast<CampaignTimeControlMode>();
-            string options = string.Join(
-                Environment.NewLine,
-                possibleValues.Select((e, index) => $"[{index}]: {e}"));
-            string sUsage = $"Usage: \"{sGroupName}.set_time_control [value]\". Valid [value]:" +
-                            Environment.NewLine +
-                            options +
-                            Environment.NewLine +
-                            $"\tExample: \"{sGroupName}.set_time_control 2\".";
-
-            if (parameters.Count != 1 || !int.TryParse(parameters[0], out int iValue))
-            {
-                return $"Usage: \"{sGroupName}.set_time_control [value]\". Valid [value] are:" +
-                       Environment.NewLine +
-                       options +
-                       Environment.NewLine +
-                       $"\tExample: \"{sGroupName}.set_time_control 2\".";
-            }
-
-            if (!Enum.IsDefined(typeof(CampaignTimeControlMode), iValue))
-            {
-                return $"Invalid value: {iValue}. Valid values:" + Environment.NewLine + options;
-            }
-
-            TimeControl.SetForced_Campaign_TimeControlMode((CampaignTimeControlMode) iValue);
-            return "Success.";
         }
     }
 }

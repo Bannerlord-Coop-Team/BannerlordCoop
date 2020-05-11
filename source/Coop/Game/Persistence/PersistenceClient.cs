@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using Coop.Common;
-using Coop.Game.Patch;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Sync;
@@ -20,8 +19,6 @@ namespace Coop.Game.Persistence
         {
             m_Environment = environment;
             m_RailClient = new RailClient(Registry.Client(environment));
-            CampaignMapMovement.s_Environment = m_Environment;
-            TimeControl.s_Environment = m_Environment;
             m_Room = m_RailClient.StartRoom();
         }
 

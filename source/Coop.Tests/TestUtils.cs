@@ -7,6 +7,8 @@ using System.Threading;
 using Coop.Common;
 using Coop.Multiplayer;
 using Coop.Network;
+using Coop.Sync;
+using HarmonyLib;
 using Moq;
 
 namespace Coop.Tests
@@ -220,5 +222,21 @@ namespace Coop.Tests
                 m_Thread = null;
             }
         }
+    }
+    public class TestableField<T>
+    {
+        public List<T> ValueHistory { get; set; } = new List<T>();
+        private T m_Latest;
+        public T Value
+        {
+            get => m_Latest;
+            set
+            {
+                ValueHistory.Add(value);
+                m_Latest = ValueHistory[^1];
+            }
+        }
+
+        public readonly Field Field = new Field(AccessTools.Field(typeof(TestableField<T>), "m_Latest"));
     }
 }

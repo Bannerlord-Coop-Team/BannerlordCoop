@@ -1,5 +1,4 @@
-﻿using Coop.Game.Persistence;
-using Coop.Sync;
+﻿using Coop.Sync;
 using HarmonyLib;
 using NLog;
 using TaleWorlds.CampaignSystem;
@@ -8,19 +7,20 @@ using Logger = NLog.Logger;
 
 namespace Coop.Game.Patch
 {
+    [Patch]
     public static class CampaignMapMovement
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public static IEnvironmentClient s_Environment = null;
-        public static bool s_IsRemoteUpdate = false;
+        public static Field TargetPosition { get; } =
+            new Field(AccessTools.Field(typeof(MobileParty), "_targetPosition"));
 
         [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetPosition), MethodType.Setter)]
         private static void Patch_GoToPoint(MobileParty __instance)
         {
             if (__instance == MobileParty.MainParty)
             {
-                s_Environment?.TargetPosition.Watch(__instance);
+                TargetPosition.Watch(__instance);
             }
         }
 
@@ -31,7 +31,7 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, MobileParty party)
             {
-                return false;
+                return true;
             }
         }
 
@@ -42,7 +42,7 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, MobileParty party)
             {
-                return false;
+                return true;
             }
         }
 
@@ -53,7 +53,7 @@ namespace Coop.Game.Patch
         {
             private static bool Prefix(MobileParty __instance, Settlement settlement)
             {
-                return false;
+                return true;
             }
         }
 

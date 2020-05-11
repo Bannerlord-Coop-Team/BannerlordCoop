@@ -1,7 +1,7 @@
-﻿using JetBrains.Annotations;
-using NLog;
+﻿using NLog;
 using RailgunNet;
 using RailgunNet.Logic;
+using RailgunNet.System.Types;
 using RailgunNet.Util;
 using TaleWorlds.CampaignSystem;
 
@@ -10,18 +10,6 @@ namespace Coop.Game.Persistence.World
     public class EventTimeControl : RailEvent
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        [CanBeNull] private readonly IEnvironmentServer m_Environment;
-
-        [OnlyIn(Component.Client)]
-        public EventTimeControl()
-        {
-        }
-
-        [OnlyIn(Component.Server)]
-        public EventTimeControl(IEnvironmentServer env)
-        {
-            m_Environment = env;
-        }
 
         public CampaignTimeControlMode RequestedTimeControlMode
         {
@@ -29,18 +17,26 @@ namespace Coop.Game.Persistence.World
             set => m_RequestedTimeControlMode = (byte) value;
         }
 
-        #region synced data
-        [EventData] private byte m_RequestedTimeControlMode { get; set; }
-        #endregion
-
         [OnlyIn(Component.Server)]
         protected override void Execute(RailRoom room, RailController sender)
         {
-            Logger.Trace("Time control change request to {request}.", RequestedTimeControlMode);
-            if (m_Environment != null)
+            if (TryFind(EntityId, out WorldEntityServer entity))
             {
-                m_Environment.TimeControlMode = RequestedTimeControlMode;
+                Logger.Trace(
+                    "Time control change request from {sender} to {request}.",
+                    sender,
+                    RequestedTimeControlMode);
+                entity.State.TimeControlMode = RequestedTimeControlMode;
+            }
+            else
+            {
+                Logger.Warn("World entity {id} not found.", EntityId);
             }
         }
+
+        #region synced data
+        [EventData] public EntityId EntityId { get; set; }
+        [EventData] private byte m_RequestedTimeControlMode { get; set; }
+        #endregion
     }
 }

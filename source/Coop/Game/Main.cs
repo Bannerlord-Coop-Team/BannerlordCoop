@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Coop.Common;
 using Coop.Game.Behaviour;
 using Coop.Game.CLI;
-using Coop.Game.Patch;
 using Coop.Sync;
 using HarmonyLib;
 using NLog;
@@ -40,7 +42,15 @@ namespace Coop.Game
             AddBehavior<GameLoadedBehaviour>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
-            FieldWatcher.ApplyFieldWatcherPatches(harmony, typeof(CampaignMapMovement));
+            IEnumerable<Type> patches =
+                from t in Assembly.GetExecutingAssembly().GetTypes()
+                where t.IsDefined(typeof(PatchAttribute))
+                select t;
+            foreach (Type patch in patches)
+            {
+                FieldWatcher.ApplyFieldWatcherPatches(harmony, patch);
+            }
+
             harmony.PatchAll();
         }
 
