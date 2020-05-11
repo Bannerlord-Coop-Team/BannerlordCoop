@@ -1,24 +1,20 @@
-﻿using RailgunNet.Logic;
+﻿using System.Linq;
+using NLog;
+using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using TaleWorlds.Library;
+using Logger = NLog.Logger;
 
 namespace Coop.Game.Persistence.Party
 {
     public class EventPartyMoveTo : RailEvent
     {
-        public Vec2 Pos
-        {
-            get => new Vec2(PosX, PosY);
-            set
-            {
-                PosX = value.X;
-                PosY = value.Y;
-            }
-        }
-
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         [EventData] public EntityId EntityId { get; set; }
-        [EventData] [Compressor(typeof(Compression.Coordinate))] private float PosX { get; set; }
-        [EventData] [Compressor(typeof(Compression.Coordinate))] private float PosY { get; set; }
+
+        [EventData]
+        [Compressor(typeof(Compression.Coordinate2d))]
+        public Vec2 Position { get; set; }
 
         protected override void Execute(RailRoom room, RailController sender)
         {
@@ -27,8 +23,22 @@ namespace Coop.Game.Persistence.Party
                 RailPolicy.NoProxy);
             if (entity != null)
             {
-                entity.State.PosX = PosX;
-                entity.State.PosY = PosY;
+                if (sender.ControlledEntities.Contains(entity))
+                {
+                    Logger.Trace(
+                        "[T {}] Ack move entity {id} to {position}.",
+                        room.Tick,
+                        EntityId,
+                        Position);
+                    entity.State.Position = Position;
+                }
+                else
+                {
+                    Logger.Warn(
+                        "{controller} tried to move entity {id} without permission.",
+                        sender,
+                        EntityId);
+                }
             }
         }
     }

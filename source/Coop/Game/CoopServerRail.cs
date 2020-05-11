@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using Coop.Common;
 using Coop.Game.Persistence;
-using Coop.Game.Persistence.Party;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Network;
@@ -23,9 +22,8 @@ namespace Coop.Game
         public CoopServerRail(Server server, IEnvironmentServer environment)
         {
             m_Server = server;
-            EntityMapping mapping = new EntityMapping();
-            m_Instance = new RailServer(Registry.Server(environment, mapping));
-            m_EntityManager = new EntityManager(m_Instance, mapping);
+            m_Instance = new RailServer(Registry.Server(environment));
+            m_EntityManager = new EntityManager(m_Instance);
         }
 
         public void Update(TimeSpan frameTime)

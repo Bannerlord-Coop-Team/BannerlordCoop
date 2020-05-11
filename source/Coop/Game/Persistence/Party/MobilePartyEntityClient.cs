@@ -1,53 +1,71 @@
-﻿using System.Collections.Generic;
-using System.Reflection;
+﻿using System;
+using JetBrains.Annotations;
+using NLog;
 using RailgunNet.Logic;
-using RailgunNet.System.Types;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
+using Logger = NLog.Logger;
 
 namespace Coop.Game.Persistence.Party
 {
     public class MobilePartyEntityClient : RailEntityClient<MobilePartyState>
     {
-        private readonly IEnvironmentClient m_Environment;
-        private readonly IDictionary<EntityId, MobileParty> m_Mapping;
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public MobilePartyEntityClient(
-            IEnvironmentClient environment,
-            IDictionary<EntityId, MobileParty> mapping)
+        [NotNull] private readonly IEnvironmentClient m_Environment;
+        [CanBeNull] private MobileParty m_Instance;
+
+        public MobilePartyEntityClient([NotNull] IEnvironmentClient environment)
         {
             m_Environment = environment;
-            m_Mapping = mapping;
+        }
+
+        private void GoToPosition(object data)
+        {
+            if (!(data is Vec2))
+            {
+                throw new ArgumentException(nameof(data));
+            }
+
+            Logger.Trace(
+                "[T {tick}] Request move entity {id} ('{party}') to '{position}'.",
+                Room.Tick,
+                Id,
+                m_Instance,
+                (Vec2) data);
+            Room.RaiseEvent<EventPartyMoveTo>(
+                e =>
+                {
+                    e.EntityId = Id;
+                    e.Position = (Vec2) data;
+                });
+        }
+
+        private void UpdateLocalPosition()
+        {
+            Logger.Trace(
+                "[T {tick}] Received move entity {id} ('{party}') to '{position}' on {authTick}.",
+                Room.Tick,
+                Id,
+                m_Instance,
+                State.Position,
+                AuthTick);
+            m_Environment.TargetPosition.Set(m_Instance, State.Position);
         }
 
         protected override void OnAdded()
         {
-            m_Mapping[Id] = m_Environment.GetMobilePartyByIndex(State.PartyId);
-            PropertyInfo position = typeof(MobilePartyState).GetProperty(nameof(State.Position));
-            m_Environment.AddRemoteMoveTo(m_Mapping[Id], new RemoteValue<Vec2>(State, position));
+            m_Instance = m_Environment.GetMobilePartyByIndex(State.PartyId);
+
+            m_Environment.TargetPosition.SyncHandler += GoToPosition;
+            State.OnPositionChanged += UpdateLocalPosition;
         }
 
         protected override void OnRemoved()
         {
-            m_Mapping.Remove(Id);
-            m_Environment.RemoveRemoteMoveTo(m_Mapping[Id]);
-        }
-
-        public override void PostUpdate()
-        {
-            if (IsControlled)
-            {
-                Vec2? vTarget = m_Environment.RemoteMoveTo[m_Mapping[Id]].DrainRequest();
-                if (vTarget.HasValue)
-                {
-                    Room.RaiseEvent<EventPartyMoveTo>(
-                        e =>
-                        {
-                            e.EntityId = Id;
-                            e.Pos = vTarget.Value;
-                        });
-                }
-            }
+            m_Environment.TargetPosition.SyncHandler -= GoToPosition;
+            State.OnPositionChanged -= UpdateLocalPosition;
+            m_Instance = null;
         }
     }
 }

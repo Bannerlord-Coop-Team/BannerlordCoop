@@ -2,6 +2,8 @@
 using Coop.Common;
 using Coop.Game.Behaviour;
 using Coop.Game.CLI;
+using Coop.Game.Patch;
+using Coop.Sync;
 using HarmonyLib;
 using NLog;
 using NLog.Layouts;
@@ -38,6 +40,7 @@ namespace Coop.Game
             AddBehavior<GameLoadedBehaviour>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
+            FieldWatcher.ApplyFieldWatcherPatches(harmony, typeof(CampaignMapMovement));
             harmony.PatchAll();
         }
 

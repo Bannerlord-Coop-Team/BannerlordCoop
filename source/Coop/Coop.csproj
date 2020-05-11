@@ -58,8 +58,8 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony, Version=2.0.0.10, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Lib.Harmony.2.0.0.10\lib\net472\0Harmony.dll</HintPath>
+    <Reference Include="0Harmony, Version=2.0.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Lib.Harmony.2.0.1\lib\net472\0Harmony.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -246,12 +246,12 @@
     <Compile Include="Game\Persistence\IEnvironmentClient.cs" />
     <Compile Include="Game\Persistence\IEnvironmentServer.cs" />
     <Compile Include="Game\Persistence\Party\EventPartyMoveTo.cs" />
-    <Compile Include="Game\Persistence\EntityMapping.cs" />
     <Compile Include="Game\Persistence\Party\MobilePartyEntityClient.cs" />
     <Compile Include="Game\Persistence\Party\MobilePartyEntityServer.cs" />
     <Compile Include="Game\Persistence\Party\MobilePartyState.cs" />
     <Compile Include="Game\Persistence\PersistenceClient.cs" />
     <Compile Include="Game\Persistence\EntityManager.cs" />
+    <Compile Include="Game\Persistence\RailBitBufferExtensions.cs" />
     <Compile Include="Game\Persistence\Registry.cs" />
     <Compile Include="Game\Persistence\RemoteValue.cs" />
     <Compile Include="Game\Persistence\World\WorldEntityClient.cs" />
@@ -306,6 +306,17 @@
     <Compile Include="Network\Server.cs" />
     <Compile Include="Network\ServerConfiguration.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Reflection\Extensions.cs" />
+    <Compile Include="Reflection\InvokableFactory.cs" />
+    <Compile Include="Reflection\Util.cs" />
+    <Compile Include="Sync\Attributes.cs" />
+    <Compile Include="Sync\BufferedData.cs" />
+    <Compile Include="Sync\FieldData.cs" />
+    <Compile Include="Sync\FieldWatcher.cs" />
+    <Compile Include="Sync\ISyncable.cs" />
+    <Compile Include="Sync\Field.cs" />
+    <Compile Include="Sync\ISyncHandler.cs" />
+    <Compile Include="Sync\SyncPriority.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -323,6 +334,7 @@
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs 0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll</PostBuildEvent>

@@ -1,4 +1,5 @@
 ﻿using Coop.Game.Persistence;
+using Coop.Sync;
 using HarmonyLib;
 using NLog;
 using TaleWorlds.CampaignSystem;
@@ -13,6 +14,15 @@ namespace Coop.Game.Patch
 
         public static IEnvironmentClient s_Environment = null;
         public static bool s_IsRemoteUpdate = false;
+
+        [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetPosition), MethodType.Setter)]
+        private static void Patch_GoToPoint(MobileParty __instance)
+        {
+            if (__instance == MobileParty.MainParty)
+            {
+                s_Environment?.TargetPosition.Watch(__instance);
+            }
+        }
 
         [HarmonyPatch(typeof(MobileParty))]
         [HarmonyPatch(nameof(MobileParty.SetMoveEngageParty))]
@@ -44,29 +54,6 @@ namespace Coop.Game.Patch
             private static bool Prefix(MobileParty __instance, Settlement settlement)
             {
                 return false;
-            }
-        }
-
-        [HarmonyPatch(typeof(MobileParty))]
-        [HarmonyPatch(nameof(MobileParty.SetMoveGoToPoint))]
-        [HarmonyPatch(new[] {typeof(Vec2)})]
-        private static class MobileParty_SetMoveGoToPoint
-        {
-            private static bool Prefix(MobileParty __instance, Vec2 point)
-            {
-                if (s_IsRemoteUpdate || s_Environment == null)
-                {
-                    return true;
-                }
-
-                if (s_Environment.RemoteMoveTo.TryGetValue(__instance, out RemoteValue<Vec2> val))
-                {
-                    Logger.Trace("{party} wants to move to {point}.", __instance, point);
-                    val.Request(point);
-                    return false;
-                }
-
-                return true;
             }
         }
 

@@ -1,18 +1,29 @@
-﻿using System.ComponentModel;
-using PropertyChanged;
+﻿using System;
 using RailgunNet.Logic;
 using TaleWorlds.Library;
 
 namespace Coop.Game.Persistence.Party
 {
-    public class MobilePartyState : RailState, INotifyPropertyChanged
+    public class MobilePartyState : RailState
     {
-        public Vec2 Position => new Vec2(PosX, PosY);
-        [DoNotNotify] [Immutable] public int PartyId { get; set; }
-        [Mutable] [Compressor(typeof(Compression.Coordinate))] public float PosX { get; set; }
-        [Mutable] [Compressor(typeof(Compression.Coordinate))] public float PosY { get; set; }
-#pragma warning disable 67
-        public event PropertyChangedEventHandler PropertyChanged;
-#pragma warning restore 67
+        private Vec2 m_Position = Vec2.Zero;
+        [Immutable] public int PartyId { get; set; }
+
+        [Mutable]
+        [Compressor(typeof(Compression.Coordinate2d))]
+        public Vec2 Position
+        {
+            get => m_Position;
+            set
+            {
+                if (!Compare.CoordinatesEqual(m_Position, value))
+                {
+                    m_Position = value;
+                    OnPositionChanged?.Invoke();
+                }
+            }
+        }
+
+        public event Action OnPositionChanged;
     }
 }

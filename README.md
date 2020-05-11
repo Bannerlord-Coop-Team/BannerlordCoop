@@ -8,11 +8,10 @@ Implemented:
 - Establish a network connection between 2 game instances.
 - Send the initial world state from host to client.
 - Load the initial world state on client.
-- Persistence framework to keep game state in sync.
 - Sync of time control (pause, play, fastforward) & main party movement (move to position only).
 
 Next:
-- Sync of campaign ticks.
+- Streamline harmony patches
 - Evaluate feasibility of running all clients in lock step with synced RNG. It would require a lot less hooks into the currently very unstable game DLLs, but might end up in desync hell.
 - Evaluate feasibility of a headless server (run only the game simulation, patch out everything else).
 

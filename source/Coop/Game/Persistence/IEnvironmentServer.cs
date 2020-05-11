@@ -7,9 +7,5 @@ namespace Coop.Game.Persistence
         #region TimeControl
         CampaignTimeControlMode TimeControlMode { get; set; }
         #endregion
-
-        #region MobileParty
-        MobileParty GetMobilePartyByIndex(int iPartyIndex);
-        #endregion
     }
 }

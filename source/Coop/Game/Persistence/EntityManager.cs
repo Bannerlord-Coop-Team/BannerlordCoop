@@ -10,25 +10,18 @@ namespace Coop.Game.Persistence
     public class EntityManager
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        private readonly EntityMapping m_Mapping;
         private readonly RailServerRoom m_Room;
         private readonly RailServer m_Server;
 
-        public EntityManager(RailServer server, EntityMapping mapping)
+        public EntityManager(RailServer server)
         {
             if (server == null)
             {
                 throw new ArgumentNullException(nameof(server));
             }
 
-            if (mapping == null)
-            {
-                throw new ArgumentNullException(nameof(mapping));
-            }
-
             m_Server = server;
             m_Room = m_Server.StartRoom();
-            m_Mapping = mapping;
             InitRoom(m_Room);
 
             // Setup callbacks

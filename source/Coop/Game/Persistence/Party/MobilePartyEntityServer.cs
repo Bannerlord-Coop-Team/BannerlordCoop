@@ -1,31 +1,15 @@
-﻿using System.Collections.Generic;
+﻿using JetBrains.Annotations;
 using RailgunNet.Logic;
-using RailgunNet.System.Types;
-using TaleWorlds.CampaignSystem;
 
 namespace Coop.Game.Persistence.Party
 {
     public class MobilePartyEntityServer : RailEntityServer<MobilePartyState>
     {
-        private readonly IEnvironmentServer m_Environment;
-        private readonly IDictionary<EntityId, MobileParty> m_Mapping;
+        [NotNull] private readonly IEnvironmentServer m_Environment;
 
-        public MobilePartyEntityServer(
-            IEnvironmentServer environment,
-            IDictionary<EntityId, MobileParty> mapping)
+        public MobilePartyEntityServer([NotNull] IEnvironmentServer environment)
         {
             m_Environment = environment;
-            m_Mapping = mapping;
-        }
-
-        protected override void OnAdded()
-        {
-            m_Mapping[Id] = m_Environment.GetMobilePartyByIndex(State.PartyId);
-        }
-
-        protected override void OnRemoved()
-        {
-            m_Mapping.Remove(Id);
         }
     }
 }

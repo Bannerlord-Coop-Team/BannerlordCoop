@@ -4,7 +4,9 @@ Main entry point: `SandBox.View.Map.MapScreen HandleLeftMouseButtonClick`
 `MapState.ProcessTravel` - Sends party to position. Already contains some defunct multiplayer logic.
 
 ## Sync
-Ticks are generated in `CampaignEvents.SignalPeriodicEvents` with `Campaign.Current.CampaignStartTime.ElapsedHoursUntilNow` (=> delta to `Campaign.Current.MapTimeTracker`) as a base timer. Updated in `Campaign.TickMapTime`.
+First managed code tick is received in `TaleWorlds.DotNet.Managed.ApplicationTick` which delegates to `IManagedComponent.OnApplicationTick` and eventuelly ends up in `Module.CurrentModule.OnApplicationTick` (base game module).
+
+Campaign ticks are generated in `CampaignEvents.SignalPeriodicEvents` with `Campaign.Current.CampaignStartTime.ElapsedHoursUntilNow` (=> delta to `Campaign.Current.MapTimeTracker`) as a base timer. Updated in `Campaign.TickMapTime`. Base Tick is tied to `MapState.OnMapModeTick` which is invoked from a `MapState.OnTick` (inherited from `GameState`).
 
 ## Saving & Loading
 `MBSaveLoad`

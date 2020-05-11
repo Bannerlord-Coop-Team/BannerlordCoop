@@ -1,15 +1,22 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using Coop.Game.Patch;
 using Coop.Game.Persistence;
+using Coop.Sync;
+using HarmonyLib;
 using JetBrains.Annotations;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
 
 namespace Coop.Game
 {
     internal class GameEnvironmentClient : IEnvironmentClient
     {
+        #region MobileParty
+        public MobileParty GetMobilePartyByIndex(int iPartyIndex)
+        {
+            return MobileParty.All.SingleOrDefault(p => p.Party.Index == iPartyIndex);
+        }
+        #endregion
+
         #region TimeControl
         [CanBeNull] private RemoteValue<CampaignTimeControlMode> m_TimeControlMode;
 
@@ -32,40 +39,9 @@ namespace Coop.Game
                 }
             }
         }
-        #endregion
 
-        #region MobileParty
-        public MobileParty GetMobilePartyByIndex(int iPartyIndex)
-        {
-            return MobileParty.All.SingleOrDefault(p => p.Party.Index == iPartyIndex);
-        }
-
-        public void AddRemoteMoveTo(MobileParty party, RemoteValue<Vec2> moveTo)
-        {
-            m_MoveToPoints[party] = moveTo;
-            moveTo.OnValueChanged += pos =>
-            {
-                CampaignMapMovement.s_IsRemoteUpdate = true;
-                try
-                {
-                    party.SetMoveGoToPoint(pos);
-                }
-                finally
-                {
-                    CampaignMapMovement.s_IsRemoteUpdate = false;
-                }
-            };
-        }
-
-        public void RemoveRemoteMoveTo(MobileParty party)
-        {
-            m_MoveToPoints.Remove(party);
-        }
-
-        public IReadOnlyDictionary<MobileParty, RemoteValue<Vec2>> RemoteMoveTo => m_MoveToPoints;
-
-        private readonly Dictionary<MobileParty, RemoteValue<Vec2>> m_MoveToPoints =
-            new Dictionary<MobileParty, RemoteValue<Vec2>>();
+        public Field TargetPosition { get; } =
+            new Field(AccessTools.Field(typeof(MobileParty), "_targetPosition"));
         #endregion
     }
 }
