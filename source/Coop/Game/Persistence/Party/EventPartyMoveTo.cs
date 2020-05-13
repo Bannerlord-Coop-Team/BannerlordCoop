@@ -12,9 +12,7 @@ namespace Coop.Game.Persistence.Party
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         [EventData] public EntityId EntityId { get; set; }
 
-        [EventData]
-        [Compressor(typeof(Compression.Coordinate2d))]
-        public Vec2 Position { get; set; }
+        [EventData] public MovementState Movement { get; set; }
 
         protected override void Execute(RailRoom room, RailController sender)
         {
@@ -26,8 +24,8 @@ namespace Coop.Game.Persistence.Party
                         "[T {}] Ack move entity {id} to {position}.",
                         room.Tick,
                         EntityId,
-                        Position);
-                    entity.State.Position = Position;
+                        Movement);
+                    entity.State.Movement = Movement;
                 }
                 else
                 {

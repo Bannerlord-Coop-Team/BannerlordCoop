@@ -20,7 +20,7 @@ namespace Coop.Common
             };
             DebuggerTarget debugOutput = new DebuggerTarget("debugOutput");
 
-            config.AddRule(LogLevel.Trace, LogLevel.Fatal, logFile);
+            config.AddRule(LogLevel.Info, LogLevel.Fatal, logFile);
             config.AddRule(LogLevel.Trace, LogLevel.Fatal, debugOutput);
             foreach (Target t in appSpecificTargets)
             {

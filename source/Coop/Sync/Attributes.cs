@@ -10,7 +10,7 @@ namespace Coop.Sync
     {
     }
 
-    [AttributeUsage(AttributeTargets.Method)]
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
     public class SyncWatchAttribute : Attribute
     {
         private readonly MethodType m_eType;

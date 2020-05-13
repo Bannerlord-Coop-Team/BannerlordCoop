@@ -249,6 +249,7 @@
     <Compile Include="Game\Persistence\Party\MobilePartyEntityClient.cs" />
     <Compile Include="Game\Persistence\Party\MobilePartyEntityServer.cs" />
     <Compile Include="Game\Persistence\Party\MobilePartyState.cs" />
+    <Compile Include="Game\Persistence\MovementData.cs" />
     <Compile Include="Game\Persistence\PersistenceClient.cs" />
     <Compile Include="Game\Persistence\EntityManager.cs" />
     <Compile Include="Game\Persistence\RailBitBufferExtensions.cs" />

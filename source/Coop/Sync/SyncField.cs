@@ -52,11 +52,8 @@ namespace Coop.Sync
         {
             if (target == null)
             {
-                Logger.Debug("Apply {field} ignored because target is null.", this);
                 return;
             }
-
-            Logger.Trace("Set {field} in {target} to {value}.", this, target, value);
             m_Setter.Invoke(target, value);
         }
 

@@ -20,9 +20,10 @@ namespace Coop.Game.Persistence.Party
             m_Environment = environment;
         }
 
-        private void GoToPosition(object data)
+        private void GoToPosition(object val)
         {
-            if (!(data is Vec2))
+            MovementData data = val as MovementData;
+            if (data == null)
             {
                 throw new ArgumentException(nameof(data));
             }
@@ -32,24 +33,32 @@ namespace Coop.Game.Persistence.Party
                 Room.Tick,
                 Id,
                 m_Instance,
-                (Vec2) data);
+                data);
             Room.RaiseEvent<EventPartyMoveTo>(
                 e =>
                 {
                     e.EntityId = Id;
-                    e.Position = (Vec2) data;
+                    e.Movement = new MovementState()
+                    {
+                        DefaultBehavior = data.DefaultBehaviour,
+                        Position = data.TargetPosition
+                    };
                 });
         }
 
-        private void UpdateLocalPosition()
+        private void UpdateLocalMovement()
         {
             Logger.Trace(
                 "[{tick}] Received move entity {id} ('{party}') to '{position}'.",
                 Room.Tick,
                 Id,
                 m_Instance,
-                State.Position);
-            m_Environment.TargetPosition.SetTyped(m_Instance, State.Position);
+                State.Movement);
+            m_Environment.TargetPosition.SetTyped(m_Instance, new MovementData()
+            {
+                DefaultBehaviour = State.Movement.DefaultBehavior,
+                TargetPosition = State.Movement.Position
+            });
         }
 
         protected override void OnAdded()
@@ -57,13 +66,13 @@ namespace Coop.Game.Persistence.Party
             m_Instance = m_Environment.GetMobilePartyByIndex(State.PartyId);
 
             m_Environment.TargetPosition.SyncHandler += GoToPosition;
-            State.OnPositionChanged += UpdateLocalPosition;
+            State.OnMovementChanged += UpdateLocalMovement;
         }
 
         protected override void OnRemoved()
         {
             m_Environment.TargetPosition.SyncHandler -= GoToPosition;
-            State.OnPositionChanged -= UpdateLocalPosition;
+            State.OnMovementChanged -= UpdateLocalMovement;
             m_Instance = null;
         }
     }

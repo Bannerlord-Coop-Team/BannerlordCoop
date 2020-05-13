@@ -28,11 +28,18 @@ namespace Coop.Game
         {
             if (Current == null)
             {
-                Current = new Server(Server.EType.Direct);
+                Server.EType eServerType = Server.EType.Threaded;
+                Current = new Server(eServerType);
+
                 m_RailServer = new CoopServerRail(Current, new GameEnvironmentServer());
                 Current.Updateables.Add(m_RailServer);
                 Current.OnClientConnected += OnClientConnected;
-                Main.Instance.Updateables.Add(Current);
+
+                if (eServerType == Server.EType.Direct)
+                {
+                    Main.Instance.Updateables.Add(Current);
+                }
+
                 Current.Start(new ServerConfiguration());
                 Logger.Debug("Created server.");
             }

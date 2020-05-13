@@ -1,29 +1,78 @@
 ﻿using System;
+using System.Text;
 using RailgunNet.Logic;
+using RailgunNet.System.Encoding;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
 namespace Coop.Game.Persistence.Party
 {
     public class MobilePartyState : RailState
     {
-        private Vec2 m_Position = Vec2.Zero;
         [Immutable] public int PartyId { get; set; }
 
+        private MovementState m_Movement = new MovementState();
         [Mutable]
-        [Compressor(typeof(Compression.Coordinate2d))]
-        public Vec2 Position
+        public MovementState Movement
         {
-            get => m_Position;
+            get => m_Movement;
             set
             {
-                if (!Compare.CoordinatesEqual(m_Position, value))
+                if (!m_Movement.Equals(value))
                 {
-                    m_Position = value;
-                    OnPositionChanged?.Invoke();
+                    m_Movement = value;
+                    OnMovementChanged?.Invoke();
                 }
             }
         }
+        public event Action OnMovementChanged;
+    }
 
-        public event Action OnPositionChanged;
+    public class MovementState
+    {
+        public AiBehavior DefaultBehavior { get; set; }
+        public Vec2 Position { get; set; }
+        public override bool Equals(object obj)
+        {
+            MovementState other = obj as MovementState;
+            if (other == null)
+            {
+                return false;
+            }
+
+            if (!Compare.CoordinatesEqual(Position, other.Position))
+            {
+                return false;
+            }
+
+            return DefaultBehavior == other.DefaultBehavior;
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
+    }
+
+    public static class MovementStateSerializer
+    {
+        private static Compression.Coordinate2d CoordinateCompressor { get; } = new Compression.Coordinate2d();
+
+        [Encoder]
+        public static void Encoder(this RailBitBuffer buffer, MovementState state)
+        {
+            buffer.WriteByte((byte) state.DefaultBehavior);
+            CoordinateCompressor.Write(buffer, state.Position);
+        }
+
+        [Decoder]
+        public static MovementState Decode(this RailBitBuffer buffer)
+        {
+            return new MovementState()
+            {
+                DefaultBehavior = (AiBehavior) buffer.ReadByte(),
+                Position = CoordinateCompressor.Read(buffer)
+            };
+        }
     }
 }

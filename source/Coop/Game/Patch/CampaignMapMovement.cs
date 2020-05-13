@@ -1,4 +1,8 @@
-﻿using Coop.Sync;
+﻿using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using Coop.Game.Persistence.Party;
+using Coop.Sync;
 using HarmonyLib;
 using NLog;
 using TaleWorlds.CampaignSystem;
@@ -12,125 +16,26 @@ namespace Coop.Game.Patch
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public static SyncField<MobileParty, Vec2> TargetPosition { get; } =
-            new SyncField<MobileParty, Vec2>(
-                AccessTools.Field(typeof(MobileParty), "_targetPosition"));
+        public static SyncFieldGroup<MobileParty, MovementData> Movement { get; } =
+            new SyncFieldGroup<MobileParty, MovementData>(
+                new List<SyncField>()
+                {
+                    new SyncField<MobileParty, AiBehavior>(AccessTools.Field(typeof(MobileParty), "_defaultBehavior")),
+                    new SyncField<MobileParty, Settlement>(AccessTools.Field(typeof(MobileParty), "_targetSettlement")),
+                    new SyncField<MobileParty, MobileParty>(AccessTools.Field(typeof(MobileParty), "_targetParty")),
+                    new SyncField<MobileParty, Vec2>(AccessTools.Field(typeof(MobileParty), "_targetPosition")),
+                    new SyncField<MobileParty, int>(AccessTools.Field(typeof(MobileParty), "_numberOfFleeingsAtLastTravel"))
+                });
 
+        [SyncWatch(typeof(MobileParty), nameof(MobileParty.DefaultBehavior), MethodType.Setter)]
+        [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetSettlement), MethodType.Setter)]
+        [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetParty), MethodType.Setter)]
         [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetPosition), MethodType.Setter)]
-        private static void Patch_GoToPoint(MobileParty __instance)
+        private static void Patch_Movement(MobileParty __instance)
         {
             if (__instance == MobileParty.MainParty)
             {
-                TargetPosition.Watch(__instance);
-            }
-        }
-
-        [HarmonyPatch(typeof(MobileParty))]
-        [HarmonyPatch(nameof(MobileParty.SetMoveEngageParty))]
-        [HarmonyPatch(new[] {typeof(MobileParty)})]
-        private static class MobileParty_SetMoveEngageParty
-        {
-            private static bool Prefix(MobileParty __instance, MobileParty party)
-            {
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(MobileParty))]
-        [HarmonyPatch(nameof(MobileParty.SetMoveGoAroundParty))]
-        [HarmonyPatch(new[] {typeof(MobileParty)})]
-        private static class MobileParty_SetMoveGoAroundParty
-        {
-            private static bool Prefix(MobileParty __instance, MobileParty party)
-            {
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(MobileParty))]
-        [HarmonyPatch(nameof(MobileParty.SetMoveGoToSettlement))]
-        [HarmonyPatch(new[] {typeof(Settlement)})]
-        private static class MobileParty_SetMoveGoToSettlement
-        {
-            private static bool Prefix(MobileParty __instance, Settlement settlement)
-            {
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(MobileParty))]
-        [HarmonyPatch(nameof(MobileParty.SetMoveEscortParty))]
-        [HarmonyPatch(new[] {typeof(MobileParty)})]
-        private static class MobileParty_SetMoveEscortParty
-        {
-            private static bool Prefix(MobileParty __instance, MobileParty mobileParty)
-            {
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(MobileParty))]
-        [HarmonyPatch(nameof(MobileParty.SetMovePatrolAroundPoint))]
-        [HarmonyPatch(new[] {typeof(Vec2)})]
-        private static class MobileParty_SetMovePatrolAroundPoint
-        {
-            private static bool Prefix(MobileParty __instance, Vec2 point)
-            {
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(MobileParty))]
-        [HarmonyPatch(nameof(MobileParty.SetMovePatrolAroundSettlement))]
-        [HarmonyPatch(new[] {typeof(Settlement)})]
-        private static class MobileParty_SetMovePatrolAroundSettlement
-        {
-            private static bool Prefix(MobileParty __instance, Settlement settlement)
-            {
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(MobileParty))]
-        [HarmonyPatch(nameof(MobileParty.SetMoveRaidSettlement))]
-        [HarmonyPatch(new[] {typeof(Settlement)})]
-        private static class MobileParty_SetMoveRaidSettlement
-        {
-            private static bool Prefix(MobileParty __instance, Settlement settlement)
-            {
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(MobileParty))]
-        [HarmonyPatch(nameof(MobileParty.SetMoveBesiegeSettlement))]
-        [HarmonyPatch(new[] {typeof(Settlement)})]
-        private static class MobileParty_SetMoveBesiegeSettlement
-        {
-            private static bool Prefix(MobileParty __instance, Settlement settlement)
-            {
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(MobileParty))]
-        [HarmonyPatch(nameof(MobileParty.SetMoveDefendSettlement))]
-        [HarmonyPatch(new[] {typeof(Settlement)})]
-        private static class MobileParty_SetMoveDefendSettlement
-        {
-            private static bool Prefix(MobileParty __instance, Settlement settlement)
-            {
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(MobileParty))]
-        [HarmonyPatch(nameof(MobileParty.SetMoveModeHold))]
-        private static class MobileParty_SetMoveModeHold
-        {
-            private static bool Prefix(MobileParty __instance)
-            {
-                return true;
+                Movement.Watch(__instance);
             }
         }
     }
