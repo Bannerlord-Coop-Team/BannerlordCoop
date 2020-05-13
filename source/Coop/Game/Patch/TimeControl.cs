@@ -7,8 +7,8 @@ namespace Coop.Game.Patch
     [Patch]
     public static class TimeControl
     {
-        public static Field TimeControlMode { get; } =
-            new Field(AccessTools.Field(typeof(Campaign), "_timeControlMode"));
+        public static SyncField TimeControlMode { get; } =
+            new SyncField(AccessTools.Field(typeof(Campaign), "_timeControlMode"));
 
         [SyncWatch(typeof(Campaign), nameof(Campaign.TimeControlMode), MethodType.Setter)]
         private static void Patch_TimeControlMode(Campaign __instance)

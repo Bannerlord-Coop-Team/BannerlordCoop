@@ -5,7 +5,7 @@ using NLog;
 
 namespace Coop.Sync
 {
-    public class Field
+    public class SyncField
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -14,7 +14,7 @@ namespace Coop.Sync
         private readonly Action<object, object> m_Setter;
         public Action<object> SyncHandler;
 
-        public Field(FieldInfo memberInfo)
+        public SyncField(FieldInfo memberInfo)
         {
             m_MemberInfo = memberInfo;
             m_GetterLocal = InvokableFactory.CreateUntypedGetter<object>(memberInfo);

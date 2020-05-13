@@ -12,8 +12,8 @@ namespace Coop.Game.Patch
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public static Field TargetPosition { get; } =
-            new Field(AccessTools.Field(typeof(MobileParty), "_targetPosition"));
+        public static SyncField TargetPosition { get; } =
+            new SyncField(AccessTools.Field(typeof(MobileParty), "_targetPosition"));
 
         [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetPosition), MethodType.Setter)]
         private static void Patch_GoToPoint(MobileParty __instance)

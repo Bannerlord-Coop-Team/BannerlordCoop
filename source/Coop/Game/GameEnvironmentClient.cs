@@ -8,8 +8,8 @@ namespace Coop.Game
 {
     internal class GameEnvironmentClient : IEnvironmentClient
     {
-        public Field TargetPosition => CampaignMapMovement.TargetPosition;
-        public Field TimeControlMode => TimeControl.TimeControlMode;
+        public SyncField TargetPosition => CampaignMapMovement.TargetPosition;
+        public SyncField TimeControlMode => TimeControl.TimeControlMode;
 
         #region Game state access
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)

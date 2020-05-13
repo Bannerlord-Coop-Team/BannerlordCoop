@@ -2,16 +2,16 @@
 
 namespace Coop.Sync
 {
-    public class FieldData
+    public class SyncFieldData
     {
-        public FieldData([NotNull] Field field, object target, object value)
+        public SyncFieldData([NotNull] SyncField field, object target, object value)
         {
             Field = field;
             Target = target;
             Value = value;
         }
 
-        public Field Field { get; }
+        public SyncField Field { get; }
         public object Target { get; }
         public object Value { get; }
     }

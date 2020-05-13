@@ -310,10 +310,10 @@
     <Compile Include="Reflection\Util.cs" />
     <Compile Include="Sync\Attributes.cs" />
     <Compile Include="Sync\BufferedData.cs" />
-    <Compile Include="Sync\FieldData.cs" />
+    <Compile Include="Sync\SyncFieldData.cs" />
     <Compile Include="Sync\FieldWatcher.cs" />
     <Compile Include="Sync\ISyncable.cs" />
-    <Compile Include="Sync\Field.cs" />
+    <Compile Include="Sync\SyncField.cs" />
     <Compile Include="Sync\ISyncHandler.cs" />
     <Compile Include="Sync\SyncPriority.cs" />
   </ItemGroup>

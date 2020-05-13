@@ -9,10 +9,10 @@ namespace Coop.Sync
 {
     public static class FieldWatcher
     {
-        private static readonly Stack<FieldData> ActiveFields = new Stack<FieldData>();
+        private static readonly Stack<SyncFieldData> ActiveFields = new Stack<SyncFieldData>();
 
-        public static Dictionary<Field, Dictionary<object, BufferedData>> BufferedChanges { get; } =
-            new Dictionary<Field, Dictionary<object, BufferedData>>();
+        public static Dictionary<SyncField, Dictionary<object, BufferedData>> BufferedChanges { get; } =
+            new Dictionary<SyncField, Dictionary<object, BufferedData>>();
 
         private static void Prefix()
         {
@@ -24,7 +24,7 @@ namespace Coop.Sync
         /// </summary>
         /// <param name="field"></param>
         /// <param name="target"></param>
-        public static void Watch(this Field field, object target)
+        public static void Watch(this SyncField field, object target)
         {
             object value = null;
             if (BufferedChanges.ContainsKey(field) &&
@@ -38,20 +38,20 @@ namespace Coop.Sync
                 value = field.Get(target);
             }
 
-            ActiveFields.Push(new FieldData(field, target, value));
+            ActiveFields.Push(new SyncFieldData(field, target, value));
         }
 
         private static void Postfix()
         {
             while (ActiveFields.Count > 0)
             {
-                FieldData data = ActiveFields.Pop();
+                SyncFieldData data = ActiveFields.Pop();
                 if (data == null)
                 {
                     break; // The marker
                 }
 
-                Field field = data.Field;
+                SyncField field = data.Field;
 
                 object newValue = data.Field.Get(data.Target);
                 bool changed = !Equals(newValue, data.Value);

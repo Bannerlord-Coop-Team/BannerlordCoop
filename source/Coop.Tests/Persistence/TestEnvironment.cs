@@ -12,10 +12,10 @@ namespace Coop.Tests
     internal class TestEnvironmentClient : IEnvironmentClient
     {
         public readonly TestableField<Vec2> TargetPosition_Test = new TestableField<Vec2>();
-        public Field TargetPosition => TargetPosition_Test.Field;
+        public SyncField TargetPosition => TargetPosition_Test.Field;
 
         public readonly TestableField<CampaignTimeControlMode> TimeControlMode_Test = new TestableField<CampaignTimeControlMode>();
-        public Field TimeControlMode => TimeControlMode_Test.Field;
+        public SyncField TimeControlMode => TimeControlMode_Test.Field;
 
         public object GetTimeController()
         {

@@ -5,8 +5,8 @@ namespace Coop.Game.Persistence
 {
     public interface IEnvironmentClient
     {
-        Field TargetPosition { get; }
-        Field TimeControlMode { get; }
+        SyncField TargetPosition { get; }
+        SyncField TimeControlMode { get; }
 
         #region Game state access
         MobileParty GetMobilePartyByIndex(int iPartyIndex);

@@ -237,6 +237,6 @@ namespace Coop.Tests
             }
         }
 
-        public readonly Field Field = new Field(AccessTools.Field(typeof(TestableField<T>), "m_Latest"));
+        public readonly SyncField Field = new SyncField(AccessTools.Field(typeof(TestableField<T>), "m_Latest"));
     }
 }
