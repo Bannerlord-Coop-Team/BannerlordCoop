@@ -9,10 +9,11 @@ namespace Coop.Sync
 {
     public static class FieldWatcher
     {
-        private static readonly Stack<SyncFieldData> ActiveFields = new Stack<SyncFieldData>();
+        private static readonly Stack<SyncableData> ActiveFields = new Stack<SyncableData>();
 
-        public static Dictionary<SyncField, Dictionary<object, BufferedData>> BufferedChanges { get; } =
-            new Dictionary<SyncField, Dictionary<object, BufferedData>>();
+        public static Dictionary<ISyncable, Dictionary<object, BufferedData>>
+            BufferedChanges { get; } =
+            new Dictionary<ISyncable, Dictionary<object, BufferedData>>();
 
         private static void Prefix()
         {
@@ -20,40 +21,40 @@ namespace Coop.Sync
         }
 
         /// <summary>
-        ///     To be called before changing fields in a patched method.
+        ///     To be called before changing a syncable in a patched method.
         /// </summary>
-        /// <param name="field"></param>
+        /// <param name="syncable"></param>
         /// <param name="target"></param>
-        public static void Watch(this SyncField field, object target)
+        public static void Watch(this ISyncable syncable, object target)
         {
             object value = null;
-            if (BufferedChanges.ContainsKey(field) &&
-                BufferedChanges[field].TryGetValue(target, out BufferedData cache))
+            if (BufferedChanges.ContainsKey(syncable) &&
+                BufferedChanges[syncable].TryGetValue(target, out BufferedData cache))
             {
                 value = cache.ToSend;
-                field.Set(target, value);
+                syncable.Set(target, value);
             }
             else
             {
-                value = field.Get(target);
+                value = syncable.Get(target);
             }
 
-            ActiveFields.Push(new SyncFieldData(field, target, value));
+            ActiveFields.Push(new SyncableData(syncable, target, value));
         }
 
         private static void Postfix()
         {
             while (ActiveFields.Count > 0)
             {
-                SyncFieldData data = ActiveFields.Pop();
+                SyncableData data = ActiveFields.Pop();
                 if (data == null)
                 {
                     break; // The marker
                 }
 
-                SyncField field = data.Field;
+                ISyncable field = data.Syncable;
 
-                object newValue = data.Field.Get(data.Target);
+                object newValue = data.Syncable.Get(data.Target);
                 bool changed = !Equals(newValue, data.Value);
 
                 Dictionary<object, BufferedData> fieldBuffer = BufferedChanges.Assert(field);

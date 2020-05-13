@@ -223,11 +223,11 @@ namespace Coop.Tests
             }
         }
     }
-    public class TestableField<T>
+    public class MockedField<TTarget, TField> : Mock<TTarget> where TTarget : class
     {
-        public List<T> ValueHistory { get; set; } = new List<T>();
-        private T m_Latest;
-        public T Value
+        public List<TField> ValueHistory { get; set; } = new List<TField>();
+        private TField m_Latest;
+        public TField Value
         {
             get => m_Latest;
             set
@@ -237,6 +237,19 @@ namespace Coop.Tests
             }
         }
 
-        public readonly SyncField Field = new SyncField(AccessTools.Field(typeof(TestableField<T>), "m_Latest"));
+        public MockedField()
+        : base(MockBehavior.Strict)
+        {
+        }
+    }
+
+    public class TestableField<TTarget, TField> : SyncField<TTarget, TField> where TTarget : class
+    {
+        public MockedField<TTarget, TField> Mock { get; }
+        public TestableField()
+        : base(AccessTools.Field(typeof(MockedField<TTarget, TField>), "m_Latest"))
+        {
+            Mock = new MockedField<TTarget, TField>();
+        }
     }
 }

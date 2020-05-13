@@ -1,9 +1,11 @@
-﻿using JetBrains.Annotations;
+﻿using System;
 
 namespace Coop.Sync
 {
     public interface ISyncable
     {
-        void Apply([CanBeNull] object state, [CanBeNull] object value);
+        Action<object> SyncHandler { get; }
+        object Get(object target);
+        void Set(object target, object value);
     }
 }

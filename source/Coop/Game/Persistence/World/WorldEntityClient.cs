@@ -50,8 +50,8 @@ namespace Coop.Game.Persistence.World
                     "[{tick}] Received time controle mode change to '{mode}'.",
                     Room.Tick,
                     State.TimeControlMode);
-                m_Environment.TimeControlMode.Set(
-                    m_Environment.GetTimeController(),
+                m_Environment.TimeControlMode.SetTyped(
+                    m_Environment.GetCurrentCampaign(),
                     State.TimeControlMode);
             }
         }

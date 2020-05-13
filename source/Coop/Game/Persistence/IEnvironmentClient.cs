@@ -1,16 +1,17 @@
 ﻿using Coop.Sync;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 
 namespace Coop.Game.Persistence
 {
     public interface IEnvironmentClient
     {
-        SyncField TargetPosition { get; }
-        SyncField TimeControlMode { get; }
+        SyncField<MobileParty, Vec2> TargetPosition { get; }
+        SyncField<Campaign, CampaignTimeControlMode> TimeControlMode { get; }
 
         #region Game state access
         MobileParty GetMobilePartyByIndex(int iPartyIndex);
-        object GetTimeController();
+        Campaign GetCurrentCampaign();
         #endregion
     }
 }

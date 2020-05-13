@@ -49,7 +49,7 @@ namespace Coop.Game.Persistence.Party
                 Id,
                 m_Instance,
                 State.Position);
-            m_Environment.TargetPosition.Set(m_Instance, State.Position);
+            m_Environment.TargetPosition.SetTyped(m_Instance, State.Position);
         }
 
         protected override void OnAdded()
