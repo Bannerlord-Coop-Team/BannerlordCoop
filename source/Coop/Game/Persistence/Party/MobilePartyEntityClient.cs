@@ -3,8 +3,6 @@ using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
-using Logger = NLog.Logger;
 
 namespace Coop.Game.Persistence.Party
 {
@@ -28,52 +26,90 @@ namespace Coop.Game.Persistence.Party
                 throw new ArgumentException(nameof(data));
             }
 
-            Logger.Trace(
-                "[{tick}] Request move entity {id} ('{party}') to '{position}'.",
-                Room.Tick,
-                Id,
-                m_Instance,
-                data);
+            Logger.Trace("[{tick}] Request move entity {id} to '{position}'.", Room.Tick, Id, data);
             Room.RaiseEvent<EventPartyMoveTo>(
                 e =>
                 {
                     e.EntityId = Id;
-                    e.Movement = new MovementState()
+                    e.Movement = new MovementState
                     {
                         DefaultBehavior = data.DefaultBehaviour,
-                        Position = data.TargetPosition
+                        Position = data.TargetPosition,
+                        TargetPartyIndex =
+                            data.TargetParty?.Party.Index ?? MovementState.InvalidPartyIndex
                     };
                 });
         }
 
         private void UpdateLocalMovement()
         {
+            MobileParty party = m_Environment.GetMobilePartyByIndex(State.PartyId);
+            if (party == null) return;
             Logger.Trace(
                 "[{tick}] Received move entity {id} ('{party}') to '{position}'.",
                 Room.Tick,
                 Id,
-                m_Instance,
+                party,
                 State.Movement);
-            m_Environment.TargetPosition.SetTyped(m_Instance, new MovementData()
+            m_Environment.TargetPosition.SetTyped(
+                party,
+                new MovementData
+                {
+                    DefaultBehaviour = State.Movement.DefaultBehavior,
+                    TargetPosition = State.Movement.Position,
+                    TargetParty =
+                        State.Movement.TargetPartyIndex !=
+                        MovementState.InvalidPartyIndex ?
+                            m_Environment.GetMobilePartyByIndex(
+                                State.Movement.TargetPartyIndex) :
+                            null
+                });
+        }
+
+        protected override void OnControllerChanged()
+        {
+            if (Controller != null)
             {
-                DefaultBehaviour = State.Movement.DefaultBehavior,
-                TargetPosition = State.Movement.Position
-            });
+                Register();
+            }
+            else
+            {
+                Unregister();
+            }
         }
 
         protected override void OnAdded()
         {
-            m_Instance = m_Environment.GetMobilePartyByIndex(State.PartyId);
-
-            m_Environment.TargetPosition.SyncHandler += GoToPosition;
-            State.OnMovementChanged += UpdateLocalMovement;
+            Register();
         }
 
         protected override void OnRemoved()
         {
-            m_Environment.TargetPosition.SyncHandler -= GoToPosition;
-            State.OnMovementChanged -= UpdateLocalMovement;
-            m_Instance = null;
+            Unregister();
+        }
+
+        private void Register()
+        {
+            if (m_Instance == null && Controller != null)
+            {
+                m_Instance = m_Environment.GetMobilePartyByIndex(State.PartyId);
+                if (m_Instance == null)
+                {
+                    throw new Exception($"Mobile party id {State.PartyId} not found.");
+                }
+
+                m_Environment.TargetPosition.SetSyncHandler(m_Instance, GoToPosition);
+                State.OnMovementChanged += UpdateLocalMovement;
+            }
+        }
+
+        private void Unregister()
+        {
+            if (m_Instance != null)
+            {
+                m_Environment.TargetPosition.RemoveSyncHandler(m_Instance);
+                State.OnMovementChanged -= UpdateLocalMovement;
+            }
         }
     }
 }

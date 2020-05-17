@@ -28,19 +28,20 @@ namespace Coop.Game.Persistence
             foreach (KeyValuePair<ISyncable, Dictionary<object, BufferedData>> fieldBuffer in
                 FieldWatcher.BufferedChanges)
             {
+                ISyncable syncable = fieldBuffer.Key;
                 foreach (KeyValuePair<object, BufferedData> instanceBuffer in fieldBuffer.Value)
                 {
-                    if (CheckShouldRemove(
-                        fieldBuffer.Key,
-                        instanceBuffer.Key,
-                        instanceBuffer.Value))
+                    object instance = instanceBuffer.Key;
+                    if (CheckShouldRemove(syncable, instance, instanceBuffer.Value))
                     {
                         toRemove.Add(instanceBuffer.Key);
                     }
                     else if (!instanceBuffer.Value.Sent)
                     {
                         ISyncable field = fieldBuffer.Key;
-                        field.SyncHandler?.Invoke(instanceBuffer.Value.ToSend);
+                        field.GetSyncHandler(instance)?.Invoke(instanceBuffer.Value.ToSend);
+                        field.GetSyncHandler(SyncableInstance.Any)
+                             ?.Invoke(instanceBuffer.Value.ToSend);
                         instanceBuffer.Value.Sent = true;
                     }
                 }

@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using Coop.Reflection;
+using JetBrains.Annotations;
 using NLog;
 
 namespace Coop.Sync
@@ -34,6 +36,9 @@ namespace Coop.Sync
         private readonly FieldInfo m_MemberInfo;
         private readonly Action<object, object> m_Setter;
 
+        private readonly Dictionary<object, Action<object>> m_SyncHandlers =
+            new Dictionary<object, Action<object>>();
+
         protected SyncField(FieldInfo memberInfo)
         {
             m_MemberInfo = memberInfo;
@@ -41,7 +46,28 @@ namespace Coop.Sync
             m_Setter = InvokableFactory.CreateUntypedSetter<object>(memberInfo);
         }
 
-        public Action<object> SyncHandler { get; set; }
+        public void SetSyncHandler([NotNull] object syncableInstance, Action<object> action)
+        {
+            if (m_SyncHandlers.ContainsKey(syncableInstance))
+            {
+                throw new ArgumentException($"Cannot have multiple sync handlers for {this}.");
+            }
+
+            m_SyncHandlers.Add(syncableInstance, action);
+        }
+
+        public void RemoveSyncHandler([NotNull] object syncableInstance)
+        {
+            m_SyncHandlers.Remove(syncableInstance);
+        }
+
+        [CanBeNull]
+        public Action<object> GetSyncHandler([NotNull] object syncableInstance)
+        {
+            return m_SyncHandlers.TryGetValue(syncableInstance, out Action<object> handler) ?
+                handler :
+                null;
+        }
 
         public object Get(object target)
         {
@@ -54,6 +80,7 @@ namespace Coop.Sync
             {
                 return;
             }
+
             m_Setter.Invoke(target, value);
         }
 

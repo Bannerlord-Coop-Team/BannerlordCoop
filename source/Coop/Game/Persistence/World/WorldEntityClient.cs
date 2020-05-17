@@ -1,5 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
+using Coop.Sync;
+using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
 using TaleWorlds.CampaignSystem;
@@ -10,7 +12,7 @@ namespace Coop.Game.Persistence.World
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        private readonly IEnvironmentClient m_Environment;
+        [NotNull] private readonly IEnvironmentClient m_Environment;
 
         public WorldEntityClient(IEnvironmentClient environment)
         {
@@ -38,7 +40,9 @@ namespace Coop.Game.Persistence.World
 
         protected override void OnAdded()
         {
-            m_Environment.TimeControlMode.SyncHandler += RequestTimeControlChange;
+            m_Environment.TimeControlMode.SetSyncHandler(
+                SyncableInstance.Any,
+                RequestTimeControlChange);
             State.PropertyChanged += State_PropertyChanged;
         }
 
@@ -58,7 +62,7 @@ namespace Coop.Game.Persistence.World
 
         protected override void OnRemoved()
         {
-            m_Environment.TargetPosition.SyncHandler -= RequestTimeControlChange;
+            m_Environment.TargetPosition.RemoveSyncHandler(SyncableInstance.Any);
             State.PropertyChanged -= State_PropertyChanged;
         }
     }

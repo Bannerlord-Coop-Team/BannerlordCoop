@@ -57,7 +57,7 @@ namespace Coop.Multiplayer.Network
             byte[] toSend = new byte[buffer.Count + 1];
             toSend[0] = PacketWriter.EncodePacketType(Protocol.EPacket.Persistence);
             Array.Copy(buffer.Array, buffer.Offset, toSend, 1, buffer.Count);
-            m_Connection.SendRaw(new ArraySegment<byte>(toSend), EDeliveryMethod.Unreliable);
+            m_Connection.SendRaw(new ArraySegment<byte>(toSend), EDeliveryMethod.Reliable);
         }
         #endregion
     }

@@ -2,8 +2,6 @@
 using NLog;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
-using TaleWorlds.Library;
-using Logger = NLog.Logger;
 
 namespace Coop.Game.Persistence.Party
 {

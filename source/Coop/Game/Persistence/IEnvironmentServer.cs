@@ -1,8 +1,13 @@
-﻿namespace Coop.Game.Persistence
+﻿using Coop.Game.Persistence.Party;
+using Coop.Sync;
+using TaleWorlds.CampaignSystem;
+
+namespace Coop.Game.Persistence
 {
     public interface IEnvironmentServer
     {
-        #region TimeControl
-        #endregion
+        SyncFieldGroup<MobileParty, MovementData> TargetPosition { get; }
+        MobileParty GetMobilePartyByIndex(int iPartyIndex);
+        Campaign GetCurrentCampaign();
     }
 }

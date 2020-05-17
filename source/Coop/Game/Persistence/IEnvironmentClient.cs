@@ -1,7 +1,6 @@
 ﻿using Coop.Game.Persistence.Party;
 using Coop.Sync;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
 
 namespace Coop.Game.Persistence
 {

@@ -4,13 +4,13 @@ using Coop.Game.Persistence;
 using Coop.Game.Persistence.Party;
 using Coop.Sync;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
 
 namespace Coop.Game
 {
     internal class GameEnvironmentClient : IEnvironmentClient
     {
-        public SyncFieldGroup<MobileParty, MovementData> TargetPosition => CampaignMapMovement.Movement;
+        public SyncFieldGroup<MobileParty, MovementData> TargetPosition =>
+            CampaignMapMovement.Movement;
 
         public SyncField<Campaign, CampaignTimeControlMode> TimeControlMode =>
             TimeControl.TimeControlMode;
