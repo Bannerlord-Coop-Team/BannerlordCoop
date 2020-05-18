@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Coop.Game;
+using Coop.Mod;
 using Coop.Reflection;
 using HarmonyLib;
 
