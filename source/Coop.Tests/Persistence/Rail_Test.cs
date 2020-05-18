@@ -1,6 +1,6 @@
 ﻿using System.Linq;
 using System.Reflection;
-using Coop.Game.Persistence;
+using Coop.Mod.Persistence;
 using Coop.Multiplayer.Network;
 using Moq;
 using RailgunNet;
