@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Coop.Game.Managers;
 using Coop.Game.Patch;
 using SandBox;
 using TaleWorlds.CampaignSystem;
@@ -48,7 +49,7 @@ namespace Coop.Game
                 GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
             }
 
-            MBGameManager.StartNewGame(new CampaignGameManager(loadResult));
+            MBGameManager.StartNewGame(new ClientGameManager(loadResult));
         }
 
         public static LoadGameResult LoadSaveGameData(ISaveDriver driver)

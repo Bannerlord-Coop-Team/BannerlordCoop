@@ -20,7 +20,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Coop\bin\Win64_Shipping_Client\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -89,6 +89,18 @@
     <Reference Include="Steamworks.NET, Version=7.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\Steamworks.NET.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode.GauntletUI">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode.View">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.View.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode.ViewModelCollection">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -179,11 +191,17 @@
     <Reference Include="TaleWorlds.MountAndBlade.Diamond">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Diamond.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.GauntletUI">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.Helpers">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Helpers.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.View">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
@@ -237,6 +255,8 @@
     <Compile Include="Game\Exceptions.cs" />
     <Compile Include="Game\GameEnvironmentClient.cs" />
     <Compile Include="Game\GameLoopRunner.cs" />
+    <Compile Include="Game\Managers\ClientManager.cs" />
+    <Compile Include="Game\Managers\ServerManager.cs" />
     <Compile Include="Game\MbLogTarget.cs" />
     <Compile Include="Game\Patch\Exceptions.cs" />
     <Compile Include="Game\Patch\TimeControl.cs" />
@@ -269,6 +289,20 @@
     <Compile Include="Game\Patch\CampaignMapMovement.cs" />
     <Compile Include="Game\Behaviour\GameLoadedBehaviour.cs" />
     <Compile Include="Game\GameEnvironmentServer.cs" />
+    <Compile Include="Game\Serializers\CustomSerializer.cs" />
+    <Compile Include="Game\Serializers\CustomSerializers\CampaignTimeSerializer.cs" />
+    <Compile Include="Game\Serializers\CustomSerializers\CharacterObjectSerializer.cs" />
+    <Compile Include="Game\Serializers\CustomSerializers\CharacterPerksSerializer.cs" />
+    <Compile Include="Game\Serializers\CustomSerializers\CharacterSkillsSerializer.cs" />
+    <Compile Include="Game\Serializers\CustomSerializers\CharacterTraitsSerializer.cs" />
+    <Compile Include="Game\Serializers\CustomSerializers\EquipmentElementSerializer.cs" />
+    <Compile Include="Game\Serializers\CustomSerializers\EquipmentSerialzer.cs" />
+    <Compile Include="Game\Serializers\CustomSerializers\HeroSerializer.cs" />
+    <Compile Include="Game\Serializers\CustomSerializers\MobilePartySerializer.cs" />
+    <Compile Include="Game\Serializers\CustomSerializers\PartySerializer.cs" />
+    <Compile Include="Game\Serializers\MBSerializer.cs" />
+    <Compile Include="Game\UI\CharacterCreationUI\CharacterCreationUI.cs" />
+    <Compile Include="Game\UI\LoadGameUI\CoopLoadUI.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Multiplayer\ConnectionServer.cs" />
     <Compile Include="Multiplayer\Exceptions.cs" />
@@ -320,6 +354,9 @@
     <Compile Include="Sync\SyncPriority.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\.editorconfig">
+      <Link>.editorconfig</Link>
+    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
@@ -338,7 +375,8 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs 0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll</PostBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

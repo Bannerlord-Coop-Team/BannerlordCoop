@@ -1,8 +1,13 @@
 ﻿using System;
+using Coop.Game.Managers;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Network;
 using NLog;
+using TaleWorlds.Core;
+using TaleWorlds.Engine;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.SaveSystem.Load;
 
 namespace Coop.Game
 {
@@ -58,6 +63,40 @@ namespace Coop.Game
             m_NetManager?.Stop();
             m_NetManager = null;
             Current = null;
+        }
+
+        public void StartGame()
+        {
+            LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData("MP", Utilities.GetModulesNames());
+            MBGameManager.StartNewGame(CreateGameManager(saveGameData));
+        }
+
+        public ServerGameManager CreateGameManager(LoadGameResult saveGameData = null)
+        {
+            ServerGameManager gameManager;
+            if (saveGameData != null)
+            {
+                gameManager = CreateGameManager(saveGameData.LoadResult);
+            }
+            else
+            {
+                gameManager = new ServerGameManager();
+            }
+            return gameManager;
+        }
+
+        public ServerGameManager CreateGameManager(LoadResult loadResult = null)
+        {
+            ServerGameManager gameManager;
+            if (loadResult != null)
+            {
+                gameManager = new ServerGameManager(loadResult);
+            }
+            else
+            {
+                gameManager = new ServerGameManager();
+            }
+            return gameManager;
         }
 
         public override string ToString()

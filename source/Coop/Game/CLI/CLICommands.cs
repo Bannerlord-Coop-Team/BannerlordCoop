@@ -23,6 +23,7 @@ namespace Coop.Game.CLI
         [CommandLineFunctionality.CommandLineArgumentFunction("start_local_server", sGroupName)]
         public static string StartServer(List<string> parameters)
         {
+            CoopServer.Instance.StartGame();
             CoopServer.Instance.StartServer();
             ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
             CoopClient.Instance.Connect(config.LanAddress, config.LanPort);

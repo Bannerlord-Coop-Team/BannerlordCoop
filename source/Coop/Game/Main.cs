@@ -5,19 +5,29 @@ using System.Reflection;
 using Coop.Common;
 using Coop.Game.Behaviour;
 using Coop.Game.CLI;
+using Coop.Game.UI;
+using Coop.Network;
 using Coop.Sync;
 using HarmonyLib;
+using MBMultiplayerCampaign;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
 using NoHarmony;
+using TaleWorlds.Core;
+using TaleWorlds.Engine.Screens;
 using TaleWorlds.InputSystem;
+using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.View.Missions;
+using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop.Game
 {
     internal class Main : NoHarmonyLoader
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        public static readonly bool DEBUG = true;
         private bool m_IsFirstTick = true;
 
         public Main()
@@ -52,6 +62,34 @@ namespace Coop.Game
             }
 
             harmony.PatchAll();
+
+            Module.CurrentModule.AddInitialStateOption(new InitialStateOption("CoOp Campaign",
+            new TextObject("Co-op Campaign", null),
+            9990,
+            () =>
+            {
+                if (DEBUG)
+                {
+                    try
+                    {
+                        CLICommands.StartServer(new List<string> { });
+                    }
+                    catch (Exception)
+                    {
+                        ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
+                        CLICommands.ConnectTo(new List<string> { config.LanAddress.ToString(), config.LanPort.ToString() });
+                    }
+
+                }
+                else
+                {
+                    InformationManager.DisplayMessage(new InformationMessage("Hello World!"));
+                    ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopLoadScreen>(new object[] { }));
+                }
+            },
+            false));
+
+
         }
 
         protected override void OnSubModuleUnloaded()
