@@ -33,7 +33,7 @@ namespace Coop.Mod
         {
             if (Current == null)
             {
-                Server.EType eServerType = Server.EType.Threaded;
+                Server.EType eServerType = Server.EType.Direct;
                 Current = new Server(eServerType);
 
                 m_RailServer = new CoopServerRail(Current, new GameEnvironmentServer());
@@ -67,6 +67,7 @@ namespace Coop.Mod
 
         public void StartGame()
         {
+            // TODO: Relies on hardcoded save game file being present.
             LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData("MP", Utilities.GetModulesNames());
             MBGameManager.StartNewGame(CreateGameManager(saveGameData));
         }

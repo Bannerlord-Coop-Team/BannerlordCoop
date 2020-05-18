@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Net;
 using Coop.Network;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.CLI
@@ -23,7 +24,11 @@ namespace Coop.Mod.CLI
         [CommandLineFunctionality.CommandLineArgumentFunction("start_local_server", sGroupName)]
         public static string StartServer(List<string> parameters)
         {
-            CoopServer.Instance.StartGame();
+            if (!IsGameLoaded())
+            {
+                CoopServer.Instance.StartGame();
+            }
+            
             CoopServer.Instance.StartServer();
             ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
             CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
@@ -44,6 +49,11 @@ namespace Coop.Mod.CLI
 
             CoopClient.Instance.Connect(ip, iPort);
             return "Client connection request sent.";
+        }
+
+        private static bool IsGameLoaded()
+        {
+            return Campaign.Current != null;
         }
     }
 }
