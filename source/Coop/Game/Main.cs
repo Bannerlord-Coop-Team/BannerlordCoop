@@ -5,18 +5,27 @@ using System.Reflection;
 using Coop.Common;
 using Coop.Game.Behaviour;
 using Coop.Game.CLI;
+using Coop.Game.UI;
+using Coop.Network;
 using Coop.Sync;
 using HarmonyLib;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
 using NoHarmony;
+using TaleWorlds.Core;
+using TaleWorlds.Engine.Screens;
 using TaleWorlds.InputSystem;
+using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.View.Missions;
+using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop.Game
 {
     internal class Main : NoHarmonyLoader
     {
+        public static readonly bool DEBUG = true;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
@@ -34,6 +43,34 @@ namespace Coop.Game
         public override void NoHarmonyInit()
         {
             initLogger();
+            Module.CurrentModule.AddInitialStateOption(new InitialStateOption("Co-op Campaign",
+            new TextObject("Co-op Campaign", null),
+            9990,
+            () =>
+            {
+                Harmony harmony = new Harmony("bannerlord.coopcampaign");
+                harmony.PatchAll();
+
+                if (DEBUG)
+                {
+                    try
+                    {
+                        CLICommands.StartServer(new List<string> { });
+                    }
+                    catch (Exception)
+                    {
+                        ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
+                        CLICommands.ConnectTo(new List<string> { config.LanAddress.ToString(), config.LanPort.ToString() });
+                    }
+
+                }
+                else
+                {
+                    InformationManager.DisplayMessage(new InformationMessage("Hello World!"));
+                    ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopLoadScreen>(new object[] { }));
+                }
+            },
+            false));
         }
 
         public override void NoHarmonyLoad()
