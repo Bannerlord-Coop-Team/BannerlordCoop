@@ -3,6 +3,11 @@ using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Network;
 using NLog;
+using SandBox;
+using TaleWorlds.Core;
+using TaleWorlds.Engine;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.SaveSystem.Load;
 
 namespace Coop.Game
 {
@@ -28,18 +33,11 @@ namespace Coop.Game
         {
             if (Current == null)
             {
-                Server.EType eServerType = Server.EType.Threaded;
-                Current = new Server(eServerType);
-
+                Current = new Server(Server.EType.Direct);
                 m_RailServer = new CoopServerRail(Current, new GameEnvironmentServer());
                 Current.Updateables.Add(m_RailServer);
                 Current.OnClientConnected += OnClientConnected;
-
-                if (eServerType == Server.EType.Direct)
-                {
-                    Main.Instance.Updateables.Add(Current);
-                }
-
+                Main.Instance.Updateables.Add(Current);
                 Current.Start(new ServerConfiguration());
                 Logger.Debug("Created server.");
             }
@@ -51,6 +49,41 @@ namespace Coop.Game
                 Logger.Debug("Setup network connection for server.");
             }
         }
+
+        public void LoadGame()
+        {
+            LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData("MP", Utilities.GetModulesNames());
+            MBGameManager.StartNewGame(CreateGameManager(saveGameData));
+        }
+
+        public CampaignGameManager CreateGameManager(LoadGameResult saveGameData = null)
+        {
+            CampaignGameManager gameManager;
+            if (saveGameData != null)
+            {
+                gameManager = CreateGameManager(saveGameData.LoadResult);
+            }
+            else
+            {
+                gameManager = new CampaignGameManager();
+            }
+            return gameManager;
+        }
+
+        public CampaignGameManager CreateGameManager(LoadResult loadResult = null)
+        {
+            CampaignGameManager gameManager;
+            if (loadResult != null)
+            {
+                gameManager = new CampaignGameManager(loadResult);
+            }
+            else
+            {
+                gameManager = new CampaignGameManager();
+            }
+            return gameManager;
+        }
+
 
         public void ShutDownServer()
         {
