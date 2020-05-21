@@ -3,6 +3,7 @@ using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.Party
 {
@@ -35,8 +36,8 @@ namespace Coop.Mod.Persistence.Party
                     {
                         DefaultBehavior = data.DefaultBehaviour,
                         Position = data.TargetPosition,
-                        TargetPartyIndex =
-                            data.TargetParty?.Party.Index ?? MovementState.InvalidPartyIndex
+                        TargetPartyIndex = data.TargetParty?.Id ?? MovementState.InvalidIndex,
+                        SettlementIndex = data.TargetSettlement?.Id ?? MovementState.InvalidIndex
                     };
                 });
         }
@@ -59,9 +60,16 @@ namespace Coop.Mod.Persistence.Party
                     TargetPosition = State.Movement.Position,
                     TargetParty =
                         State.Movement.TargetPartyIndex !=
-                        MovementState.InvalidPartyIndex ?
-                            m_Environment.GetMobilePartyByIndex(
-                                State.Movement.TargetPartyIndex) :
+                        MovementState.InvalidIndex ?
+                            MBObjectManager.Instance.GetObject(
+                                    State.Movement.TargetPartyIndex) as
+                                MobileParty :
+                            null,
+                    TargetSettlement =
+                        State.Movement.SettlementIndex != MovementState.InvalidIndex ?
+                            MBObjectManager.Instance.GetObject(
+                                    State.Movement.SettlementIndex) as
+                                Settlement :
                             null
                 });
         }

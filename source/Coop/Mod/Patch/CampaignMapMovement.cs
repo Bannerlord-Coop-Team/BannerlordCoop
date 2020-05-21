@@ -31,7 +31,7 @@ namespace Coop.Mod.Patch
                 });
 
         [SyncWatch(typeof(MobileParty), nameof(MobileParty.DefaultBehavior), MethodType.Setter)]
-        // [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetSettlement), MethodType.Setter)]
+        [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetSettlement), MethodType.Setter)]
         [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetParty), MethodType.Setter)]
         [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetPosition), MethodType.Setter)]
         private static void Patch_Movement(MobileParty __instance)

@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using NLog;
+﻿using NLog;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
 
@@ -16,7 +15,8 @@ namespace Coop.Mod.Persistence.Party
         {
             if (TryFind(EntityId, out MobilePartyEntityServer entity))
             {
-                if (sender.ControlledEntities.Contains(entity))
+                // TODO: As we currently share the party control, disable any checks and just allow movement.
+                // if (sender.ControlledEntities.Contains(entity))
                 {
                     Logger.Trace(
                         "[T {}] Ack move entity {id} to {position}.",
@@ -25,13 +25,13 @@ namespace Coop.Mod.Persistence.Party
                         Movement);
                     entity.State.Movement = Movement;
                 }
-                else
-                {
-                    Logger.Warn(
-                        "{controller} tried to move entity {id} without permission.",
-                        sender,
-                        EntityId);
-                }
+                // else
+                // {
+                //     Logger.Warn(
+                //         "{controller} tried to move entity {id} without permission.",
+                //         sender,
+                //         EntityId);
+                // }
             }
         }
     }

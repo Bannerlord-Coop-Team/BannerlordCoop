@@ -3,6 +3,7 @@ using RailgunNet.Logic;
 using RailgunNet.System.Encoding;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.Party
 {
@@ -30,8 +31,9 @@ namespace Coop.Mod.Persistence.Party
 
     public class MovementState
     {
-        public const int InvalidPartyIndex = -1;
-        public int TargetPartyIndex { get; set; } = InvalidPartyIndex;
+        public static MBGUID InvalidIndex = new MBGUID(0xDEADBEEF);
+        public MBGUID TargetPartyIndex { get; set; } = InvalidIndex;
+        public MBGUID SettlementIndex { get; set; } = InvalidIndex;
         public AiBehavior DefaultBehavior { get; set; }
         public Vec2 Position { get; set; }
 
@@ -49,11 +51,13 @@ namespace Coop.Mod.Persistence.Party
             }
 
             return DefaultBehavior == other.DefaultBehavior &&
-                   TargetPartyIndex == other.TargetPartyIndex;
+                   TargetPartyIndex == other.TargetPartyIndex &&
+                   SettlementIndex == other.SettlementIndex;
         }
 
         public override int GetHashCode()
         {
+            // TODO: What's supposed to happen here? The Equals override is necessary because of the coordinates comparision.
             return base.GetHashCode();
         }
     }
@@ -68,7 +72,8 @@ namespace Coop.Mod.Persistence.Party
         {
             buffer.WriteByte((byte) state.DefaultBehavior);
             CoordinateCompressor.Write(buffer, state.Position);
-            buffer.WriteInt(state.TargetPartyIndex);
+            buffer.WriteUInt(state.TargetPartyIndex.InternalValue);
+            buffer.WriteUInt(state.SettlementIndex.InternalValue);
         }
 
         [Decoder]
@@ -78,7 +83,8 @@ namespace Coop.Mod.Persistence.Party
             {
                 DefaultBehavior = (AiBehavior) buffer.ReadByte(),
                 Position = CoordinateCompressor.Read(buffer),
-                TargetPartyIndex = buffer.ReadInt()
+                TargetPartyIndex = new MBGUID(buffer.ReadUInt()),
+                SettlementIndex = new MBGUID(buffer.ReadUInt())
             };
         }
     }

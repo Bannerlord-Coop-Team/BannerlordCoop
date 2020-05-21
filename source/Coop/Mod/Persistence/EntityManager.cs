@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.World;
 using NLog;
@@ -9,6 +10,10 @@ using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence
 {
+    /// <summary>
+    ///     Makes sure that each syncable game entity has a corresponding entity in the
+    ///     persistence framework.
+    /// </summary>
     public class EntityManager
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -31,10 +36,18 @@ namespace Coop.Mod.Persistence
             m_Server.ClientRemoved += OnClientRemoved;
         }
 
+        /// <summary>
+        ///     Called for each player controlled entity when the controlling player leaves the game.
+        ///     The entity control has already been revoked from the player. This callback is expected
+        ///     to handle any necessary clean up in the game entity system.
+        /// </summary>
+        public event Action<RailServerPeer, RailEntityServer> OnPlayerControlledEntityOrphaned;
+
         private void InitRoom(RailServerRoom room)
         {
             room.AddNewEntity<WorldEntityServer>();
 
+            // Parties
             foreach (MobileParty party in Campaign.Current.MobileParties)
             {
                 MobilePartyEntityServer entity = room.AddNewEntity<MobilePartyEntityServer>(
@@ -44,16 +57,32 @@ namespace Coop.Mod.Persistence
 
             CampaignEvents.OnPartyDisbandedEvent.AddNonSerializedListener(this, OnPartyRemoved);
             CampaignEvents.OnLordPartySpawnedEvent.AddNonSerializedListener(this, OnPartyAdded);
+
+            // Settlements
         }
 
         private void OnPartyRemoved(MobileParty party)
         {
-            // TODO:
+            if (!m_Parties.ContainsKey(party))
+            {
+                Logger.Warn(
+                    "Inconsistent internal state: {party} was removed, but never added.",
+                    party);
+                return;
+            }
+
+            m_Room.MarkForRemoval(m_Parties[party]);
             m_Parties.Remove(party);
         }
 
         private void OnPartyAdded(MobileParty party)
         {
+            if (m_Parties.ContainsKey(party))
+            {
+                Logger.Warn("Inconsistent internal state: {party} was already registered.", party);
+                return;
+            }
+
             MobilePartyEntityServer entity =
                 m_Room.AddNewEntity<MobilePartyEntityServer>(
                     e => e.State.PartyId = party.Party.Index);
@@ -71,16 +100,22 @@ namespace Coop.Mod.Persistence
             if (party == null || !m_Parties.ContainsKey(party))
             {
                 Logger.Warn("Player party not found.");
-                return;
             }
 
-            peer.GrantControl(m_Parties[party]);
-            Logger.Info($"{party} control granted to {peer}.");
+            // TODO: Currently the control is shared and remains on the server. In a future version, every player gets their own party.
+            // peer.GrantControl(m_Parties[party]);
+            // Logger.Info("{party} control granted to {peer}.", party, peer);
         }
 
         private void OnClientRemoved(RailServerPeer peer)
         {
-            // TODO: Remove control
+            foreach (RailEntityServer controlledEntity in m_Room
+                                                          .Entities.Where(e => e.Controller == peer)
+                                                          .Select(e => e as RailEntityServer))
+            {
+                peer.RevokeControl(controlledEntity);
+                OnPlayerControlledEntityOrphaned?.Invoke(peer, controlledEntity);
+            }
         }
 
         private MobileParty GetPlayerParty(RailServerPeer peer)

@@ -47,8 +47,8 @@ namespace Coop.Multiplayer.Network
 
             m_NetManager = new NetManager(new LiteNetListenerClient(m_Session))
             {
-                ReconnectDelay = 100,
-                MaxConnectAttempts = 5
+                ReconnectDelay = 500,
+                MaxConnectAttempts = 10
             };
 
             if (m_NetManager.Start())
