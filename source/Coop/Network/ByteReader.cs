@@ -21,6 +21,7 @@ namespace Coop.Network
         }
 
         public long RemainingBytes => m_Stream.Length - m_Stream.Position;
+        public long Position => m_Stream.Position;
 
         public byte[] ToArray()
         {

@@ -20,7 +20,7 @@ namespace Coop.Mod
 
         private CoopClient()
         {
-            m_Session = new GameSession(new SaveData());
+            m_Session = new GameSession(new GameData());
             m_NetManager = new LiteNetManagerClient(m_Session);
             GameState = new CoopGameState();
             Events = new CoopEvents();

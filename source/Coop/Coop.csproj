@@ -233,11 +233,13 @@
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Mod\CLI\CLICommands.cs" />
     <Compile Include="Mod\CLI\DebugConsole.cs" />
+    <Compile Include="Mod\CLI\DebugManager.cs" />
     <Compile Include="Mod\Coop.cs" />
     <Compile Include="Mod\Exceptions.cs" />
     <Compile Include="Mod\GameEnvironmentClient.cs" />
     <Compile Include="Mod\GameLoopRunner.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
+    <Compile Include="Mod\Patch\Debugging.cs" />
     <Compile Include="Mod\Patch\Exceptions.cs" />
     <Compile Include="Mod\Patch\TimeControl.cs" />
     <Compile Include="Mod\Patch\Utils.cs" />
@@ -259,8 +261,9 @@
     <Compile Include="Mod\Persistence\World\EventTimeControl.cs" />
     <Compile Include="Mod\Persistence\World\WorldState.cs" />
     <Compile Include="Mod\CoopServerRail.cs" />
+    <Compile Include="Mod\SaveGameData.cs" />
     <Compile Include="Mod\SaveLoad.cs" />
-    <Compile Include="Mod\SaveData.cs" />
+    <Compile Include="Mod\GameData.cs" />
     <Compile Include="Mod\CoopEvents.cs" />
     <Compile Include="Mod\CoopGameState.cs" />
     <Compile Include="Mod\CoopClient.cs" />

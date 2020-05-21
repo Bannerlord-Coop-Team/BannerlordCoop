@@ -46,7 +46,7 @@ namespace Coop.Mod
 
             if (m_NetManager == null)
             {
-                m_NetManager = new LiteNetManagerServer(Current, new SaveData());
+                m_NetManager = new LiteNetManagerServer(Current, new GameData());
                 m_NetManager.StartListening();
                 Logger.Debug("Setup network connection for server.");
             }

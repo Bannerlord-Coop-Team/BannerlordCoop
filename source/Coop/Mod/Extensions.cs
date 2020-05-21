@@ -4,13 +4,13 @@ using Coop.Mod.Patch;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.SaveSystem;
-using TaleWorlds.SaveSystem.Save;
+using TaleWorlds.SaveSystem.Load;
 
 namespace Coop.Mod
 {
     public static class Extensions
     {
-        public static T GetGameModel<T>(this TaleWorlds.Core.Game game)
+        public static T GetGameModel<T>(this Game game)
             where T : GameModel
         {
             foreach (GameModel model in game.BasicModels.GetGameModels())
@@ -27,22 +27,6 @@ namespace Coop.Mod
         public static bool IsPlayerControlled(this MobileParty party)
         {
             return CoopClient.Instance.GameState.IsPlayerControlledParty(party);
-        }
-
-        public static string ToFriendlyString(this SaveOutput save)
-        {
-            if (save.Successful)
-            {
-                return "Successful save.";
-            }
-
-            string sRet = "Errors during save:";
-            for (int i = 0; i < save.Errors.Length; i++)
-            {
-                sRet += Environment.NewLine + $"[{i}] {save.Errors[i]}";
-            }
-
-            return sRet;
         }
 
         public static string ToFriendlyString(this LoadGameResult loadResult)
@@ -64,6 +48,34 @@ namespace Coop.Mod
             }
 
             return sRet;
+        }
+
+        public static string ToFriendlyString(this LoadResult loadResult)
+        {
+            string sRet = "Loading " + (loadResult.Successful ? "success. " : "failed. ");
+            if (loadResult.MetaData == null)
+            {
+                sRet += "No meta data";
+            }
+            else
+            {
+                sRet += loadResult.MetaData;
+            }
+
+            sRet += Environment.NewLine;
+
+            sRet += loadResult.Errors.Length + " errors:";
+            foreach (LoadError error in loadResult.Errors)
+            {
+                sRet += Environment.NewLine + error.ToFriendlyString();
+            }
+
+            return sRet;
+        }
+
+        public static string ToFriendlyString(this LoadError error)
+        {
+            return $"Error: {error.Message}";
         }
 
         public static byte[] GetBuffer(this InMemDriver driver)

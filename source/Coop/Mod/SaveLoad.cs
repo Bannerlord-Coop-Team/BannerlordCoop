@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Coop.Mod.Patch;
+using NLog;
 using SandBox;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -9,21 +10,23 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.SaveSystem.Save;
+using Logger = NLog.Logger;
 
 namespace Coop.Mod
 {
     public static class SaveLoad
     {
-        public static SaveOutput SaveGame(TaleWorlds.Core.Game game, ISaveDriver driver)
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public static SaveGameData SaveGame(Game game, ISaveDriver driver)
         {
             EntitySystem<GameHandler> entitySystem =
                 Utils.GetPrivateField<EntitySystem<GameHandler>>(
-                    typeof(TaleWorlds.Core.Game),
+                    typeof(Game),
                     "_gameEntitySystem",
                     game);
             MetaData metaData = GetMetaData();
 
-            // Code copied from TaleWorlds.Game.Save(MetaData, ISaveDriver)
             foreach (GameHandler gameHandler in entitySystem.Components)
             {
                 gameHandler.OnBeforeSave();
@@ -35,14 +38,13 @@ namespace Coop.Mod
             {
                 gameHandler2.OnAfterSave();
             }
-            // End code copy
 
-            return saveOutput;
+            return new SaveGameData(metaData, saveOutput);
         }
 
         public static void LoadGame(LoadResult loadResult)
         {
-            if (TaleWorlds.Core.Game.Current != null)
+            if (Game.Current != null)
             {
                 GameStateManager.Current.CleanStates();
                 GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
@@ -61,6 +63,8 @@ namespace Coop.Mod
                     loadResult,
                     CheckModules(driver.LoadMetaData(), currentModules));
             }
+
+            Logger.Error("{loadResult}", loadResult.ToFriendlyString());
 
             return null;
         }

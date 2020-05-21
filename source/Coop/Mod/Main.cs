@@ -5,13 +5,17 @@ using System.Reflection;
 using Coop.Common;
 using Coop.Mod.Behaviour;
 using Coop.Mod.CLI;
+using Coop.Mod.Patch;
 using Coop.Sync;
 using HarmonyLib;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
 using NoHarmony;
+using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
+using TaleWorlds.Library;
+using Logger = NLog.Logger;
 
 namespace Coop.Mod
 {
@@ -22,6 +26,9 @@ namespace Coop.Mod
 
         public Main()
         {
+            Debug.DebugManager = Debugging.DebugManager;
+            MBDebug.DisableLogging = false;
+
             Instance = this;
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             Updateables.Add(CoopClient.Instance);
