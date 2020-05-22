@@ -6,32 +6,51 @@ using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using Coop.Network;
 using JetBrains.Annotations;
+using NLog;
 
 namespace Coop.Mod
 {
     public class CoopClient : IUpdateable
     {
+        private const int MaxReconnectAttempts = 2;
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         private static readonly Lazy<CoopClient> m_Instance =
             new Lazy<CoopClient>(() => new CoopClient());
 
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
-        [NotNull] private readonly GameSession m_Session;
         [CanBeNull] private PersistenceClient m_Persistence;
+        private int m_ReconnectAttempts = MaxReconnectAttempts;
 
-        private CoopClient()
+        public CoopClient()
         {
-            m_Session = new GameSession(new GameData());
-            m_NetManager = new LiteNetManagerClient(m_Session);
+            Session = new GameSession(new GameData());
+            Session.OnConnectionDestroyed += ConnectionDestroyed;
+            m_NetManager = new LiteNetManagerClient(Session);
             GameState = new CoopGameState();
             Events = new CoopEvents();
             Events.OnGameLoaded.AddNonSerializedListener(this, Init);
         }
 
+        [NotNull] public GameSession Session { get; }
+
         public static CoopClient Instance => m_Instance.Value;
 
         public CoopGameState GameState { get; }
         public CoopEvents Events { get; }
-        public bool Connected => m_NetManager.Connected;
+
+        public bool Connected
+        {
+            get
+            {
+                if (Session.Connection == null)
+                {
+                    return false;
+                }
+
+                return Session.Connection.State == EConnectionState.ClientConnected;
+            }
+        }
 
         public void Update(TimeSpan frameTime)
         {
@@ -46,10 +65,10 @@ namespace Coop.Mod
 
         private void Init()
         {
-            m_Session.OnConnectionCreated += ConnectionCreated;
-            if (m_Session.Connection != null)
+            Session.OnConnectionCreated += ConnectionCreated;
+            if (Session.Connection != null)
             {
-                ConnectionCreated(m_Session.Connection);
+                ConnectionCreated(Session.Connection);
             }
         }
 
@@ -72,24 +91,49 @@ namespace Coop.Mod
                 throw new ArgumentNullException(nameof(con));
             }
 
+            m_ReconnectAttempts = MaxReconnectAttempts;
             TryInitPersistence(con);
             con.OnClientJoined += TryInitPersistence;
-            con.OnDisconnect += Disconnect;
+            con.OnDisconnected += ConnectionClosed;
         }
 
-        private void Disconnect()
+        private void ConnectionClosed(EDisconnectReason eReason)
         {
             m_Persistence?.SetConnection(null);
         }
 
+        private void ConnectionDestroyed(EDisconnectReason eReason)
+        {
+            switch (eReason)
+            {
+                case EDisconnectReason.Timeout:
+                case EDisconnectReason.Unknown:
+                    TryReconnect();
+                    break;
+            }
+        }
+
+        private void TryReconnect()
+        {
+            if (m_ReconnectAttempts > 0)
+            {
+                Logger.Info(
+                    "Reconnect attempt [{currentAttempt}/{max}].",
+                    m_ReconnectAttempts,
+                    MaxReconnectAttempts);
+                --m_ReconnectAttempts;
+                m_NetManager.Reconnect();
+            }
+        }
+
         public override string ToString()
         {
-            if (m_Session.Connection == null)
+            if (Session.Connection == null)
             {
                 return "Client not connected.";
             }
 
-            return $"{m_Session.Connection}";
+            return $"{Session.Connection}";
         }
     }
 }

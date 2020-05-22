@@ -47,17 +47,9 @@ namespace Coop.Multiplayer.Network
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            EDisconnectReason eReason = EDisconnectReason.Unknown;
-            if (disconnectInfo.AdditionalData.AvailableBytes == 1)
-            {
-                eReason = (EDisconnectReason) disconnectInfo.AdditionalData.GetByte();
-            }
-            else
-            {
-                disconnectInfo.GetReason(true);
-            }
-
-            m_Server.Disconnected((ConnectionServer) peer.GetConnection(), eReason);
+            m_Server.Disconnected(
+                (ConnectionServer) peer.GetConnection(),
+                disconnectInfo.GetReason(false));
         }
 
         public void OnNetworkLatencyUpdate(NetPeer peer, int latency)

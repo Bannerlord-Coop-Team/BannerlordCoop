@@ -11,6 +11,7 @@ namespace Coop.Network
         public int WanPort { get; set; } = 4200;
         public TimeSpan KeepAliveInterval { get; set; } = TimeSpan.FromSeconds(5);
         public TimeSpan LanDiscoveryInterval { get; } = TimeSpan.FromSeconds(2);
+        public TimeSpan DisconnectTimeout { get; set; } = TimeSpan.FromSeconds(15);
         public uint MaxPlayerCount { get; set; } = 8;
         public uint TickRate { get; set; } = 120; // in [Hz]. 0 for no limit.
     }

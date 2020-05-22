@@ -34,12 +34,12 @@ namespace Coop.Multiplayer.Network
             m_Server = server;
             if (m_Config.WanAddress != null)
             {
-                m_wanManager = new NetManager(new LiteNetListenerServer(m_Server, worldData));
+                m_wanManager = CreateNetManager(worldData);
             }
 
             if (m_Config.LanAddress != null)
             {
-                m_lanManager = new NetManager(new LiteNetListenerServer(m_Server, worldData));
+                m_lanManager = CreateNetManager(worldData);
             }
 
             m_SinceLastDiscovery = TimeSpan.Zero;
@@ -69,6 +69,14 @@ namespace Coop.Multiplayer.Network
                         new Protocol.KeepAlive(++m_iKeepAliveID).Serialize()));
                 m_SinceLastKeepAlive = TimeSpan.Zero;
             }
+        }
+
+        private NetManager CreateNetManager(ISaveData worldData)
+        {
+            return new NetManager(new LiteNetListenerServer(m_Server, worldData))
+            {
+                DisconnectTimeout = m_Config.DisconnectTimeout.Milliseconds
+            };
         }
 
         public void StartListening()

@@ -24,10 +24,23 @@ namespace Coop.Multiplayer.Network
 
         public void Update(TimeSpan frameTime)
         {
+            m_NetManager?.PollEvents();
+        }
+
+        public void Reconnect()
+        {
+            if (m_Peer == null)
+            {
+                throw new Exception("Client was never connected. Cannot reconnect.");
+            }
+
             if (Connected)
             {
-                m_NetManager.PollEvents();
+                throw new Exception("Client is still connected. Cannot reconnect.");
             }
+
+            Logger.Info("Client reconnecting...");
+            Connect(m_Peer.EndPoint.Address, m_Peer.EndPoint.Port);
         }
 
         public void Connect(IPAddress address, int iPort)
@@ -48,7 +61,7 @@ namespace Coop.Multiplayer.Network
             m_NetManager = new NetManager(new LiteNetListenerClient(m_Session))
             {
                 ReconnectDelay = 500,
-                MaxConnectAttempts = 10
+                MaxConnectAttempts = 20
             };
 
             if (m_NetManager.Start())

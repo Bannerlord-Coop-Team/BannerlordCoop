@@ -16,6 +16,7 @@ namespace Coop.Multiplayer
         public ISaveData World { get; }
         public ConnectionClient Connection { get; private set; }
         public event Action<ConnectionClient> OnConnectionCreated;
+        public event Action<EDisconnectReason> OnConnectionDestroyed;
 
         public void ConnectionCreated(ConnectionClient connection)
         {
@@ -44,6 +45,7 @@ namespace Coop.Multiplayer
                 Connection,
                 eReason);
             Connection = null;
+            OnConnectionDestroyed?.Invoke(eReason);
         }
     }
 }

@@ -30,19 +30,9 @@ namespace Coop.Multiplayer.Network
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            EDisconnectReason eReason = EDisconnectReason.Unknown;
-            if (disconnectInfo.AdditionalData.AvailableBytes == 1)
-            {
-                eReason = (EDisconnectReason) disconnectInfo.AdditionalData.GetByte();
-            }
-            else
-            {
-                disconnectInfo.GetReason(false);
-            }
-
             if (m_Session.Connection != null)
             {
-                m_Session.Disconnect(eReason);
+                m_Session.Disconnect(disconnectInfo.GetReason(false));
             }
         }
 

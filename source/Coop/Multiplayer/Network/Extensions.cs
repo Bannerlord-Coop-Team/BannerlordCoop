@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using System.Threading;
 using Coop.Network;
 using LiteNetLib;
 
@@ -24,6 +23,13 @@ namespace Coop.Multiplayer.Network
 
         public static EDisconnectReason GetReason(this DisconnectInfo info, bool bIsServerSide)
         {
+            // If the disconnect was intentional, a reason was attached.
+            if (info.AdditionalData.AvailableBytes == 1)
+            {
+                return (EDisconnectReason) info.AdditionalData.GetByte();
+            }
+
+            // Otherwise the disconnect happened for network reasons. Translate.
             switch (info.Reason)
             {
                 case DisconnectReason.ConnectionFailed:
@@ -39,7 +45,9 @@ namespace Coop.Multiplayer.Network
                     return EDisconnectReason.Timeout;
                 case DisconnectReason.DisconnectPeerCalled:
                 case DisconnectReason.RemoteConnectionClose:
-                    return bIsServerSide ? EDisconnectReason.ClientLeft : EDisconnectReason.ServerShutDown;
+                    return bIsServerSide ?
+                        EDisconnectReason.ClientUnreachable :
+                        EDisconnectReason.Timeout;
             }
 
             return EDisconnectReason.Unknown;
