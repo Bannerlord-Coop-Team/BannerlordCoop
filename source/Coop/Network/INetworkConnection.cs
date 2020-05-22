@@ -4,13 +4,16 @@ namespace Coop.Network
 {
     public enum EDisconnectReason : byte
     {
+        ConnectionRejected,
         ClientLeft,
         ClientJoinedAnotherServer,
         ServerIsFull,
         ServerShutDown,
+        Timeout,
+        Unknown,
+        Unreachable,
         WrongProtocolVersion,
         WorldDataTransferIssue,
-        Unknown
     }
 
     public enum EDeliveryMethod

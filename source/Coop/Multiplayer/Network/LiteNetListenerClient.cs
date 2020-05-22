@@ -35,6 +35,10 @@ namespace Coop.Multiplayer.Network
             {
                 eReason = (EDisconnectReason) disconnectInfo.AdditionalData.GetByte();
             }
+            else
+            {
+                disconnectInfo.GetReason(false);
+            }
 
             if (m_Session.Connection != null)
             {
@@ -57,7 +61,10 @@ namespace Coop.Multiplayer.Network
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
         {
-            Logger.Error("OnNetworkError({endPoint}, {socketError}).", endPoint, socketError);
+            Logger.Error(
+                "OnNetworkError({endPoint}, {socketError}).",
+                endPoint.ToFriendlyString(),
+                socketError);
             if (m_Session.Connection != null)
             {
                 m_Session.Disconnect(EDisconnectReason.Unknown);
@@ -69,15 +76,11 @@ namespace Coop.Multiplayer.Network
             NetPacketReader reader,
             UnconnectedMessageType messageType)
         {
-            Logger.Debug(
+            Logger.Warn(
                 "OnNetworkReceiveUnconnected({remoteEndPoint}, {reader}, {messageType}).",
                 remoteEndPoint,
                 reader,
                 messageType);
-            if (m_Session.Connection != null)
-            {
-                m_Session.Disconnect(EDisconnectReason.Unknown);
-            }
         }
 
         public void OnConnectionRequest(ConnectionRequest request)

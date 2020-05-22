@@ -47,9 +47,17 @@ namespace Coop.Multiplayer.Network
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            m_Server.Disconnected(
-                (ConnectionServer) peer.GetConnection(),
-                EDisconnectReason.ClientLeft);
+            EDisconnectReason eReason = EDisconnectReason.Unknown;
+            if (disconnectInfo.AdditionalData.AvailableBytes == 1)
+            {
+                eReason = (EDisconnectReason) disconnectInfo.AdditionalData.GetByte();
+            }
+            else
+            {
+                disconnectInfo.GetReason(true);
+            }
+
+            m_Server.Disconnected((ConnectionServer) peer.GetConnection(), eReason);
         }
 
         public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
@@ -62,12 +70,10 @@ namespace Coop.Multiplayer.Network
             NetPacketReader reader,
             DeliveryMethod deliveryMethod)
         {
-            if (reader.IsNull)
+            if (!reader.IsNull)
             {
-                throw new InvalidNetworkPackageException($"Received empty package from ${peer}.");
+                peer.GetConnection().Receive(reader.GetRemainingBytesSegment());
             }
-
-            peer.GetConnection().Receive(reader.GetRemainingBytesSegment());
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
@@ -80,9 +86,9 @@ namespace Coop.Multiplayer.Network
             NetPacketReader reader,
             UnconnectedMessageType messageType)
         {
-            Logger.Info(
+            Logger.Warn(
                 "OnNetworkReceiveUnconnected({remoteEndPoint}, {reader}, {messageType}).",
-                remoteEndPoint,
+                remoteEndPoint.ToFriendlyString(),
                 reader,
                 messageType);
         }

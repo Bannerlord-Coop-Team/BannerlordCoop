@@ -32,9 +32,7 @@ namespace Coop.Multiplayer.Network
         public void Close(EDisconnectReason eReason)
         {
             m_Peer.Flush();
-            m_Peer.NetManager.DisconnectPeer(
-                m_Peer,
-                new[] {Convert.ToByte(EDisconnectReason.ServerIsFull)});
+            m_Peer.NetManager.DisconnectPeer(m_Peer, new[] {Convert.ToByte(eReason)});
         }
 
         public override string ToString()
