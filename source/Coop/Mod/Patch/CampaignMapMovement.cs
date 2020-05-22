@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using Coop.Mod.Persistence.Party;
+using Coop.Mod.Persistence;
 using Coop.Sync;
 using HarmonyLib;
 using NLog;

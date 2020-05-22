@@ -5,7 +5,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
-namespace Coop.Mod.Persistence.Party
+namespace Coop.Mod.Persistence
 {
     public class MovementData : IEnumerable<object>
     {
