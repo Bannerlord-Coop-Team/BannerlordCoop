@@ -14,7 +14,10 @@ namespace Coop.Mod.Patch
         [SyncWatch(typeof(Campaign), nameof(Campaign.TimeControlMode), MethodType.Setter)]
         private static void Patch_TimeControlMode(Campaign __instance)
         {
-            TimeControlMode.Watch(__instance);
+            if (Coop.IsClient)
+            {
+                TimeControlMode.Watch(__instance);
+            }
         }
     }
 }
