@@ -53,7 +53,8 @@ namespace Coop.Mod.CLI
             Debug.DebugColor color = Debug.DebugColor.White,
             ulong debugFilter = 17592186044416)
         {
-            Logger.Debug("{message}", message);
+            LogEventInfo eventInfo = new LogEventInfo(LogLevel.Debug, Logger.Name, message);
+            Logger.Log(typeof(DebugManager), eventInfo);
         }
 
         public void PrintError(string error, string stackTrace, ulong debugFilter = 17592186044416)

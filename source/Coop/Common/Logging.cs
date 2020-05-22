@@ -18,10 +18,17 @@ namespace Coop.Common
             {
                 FileName = GetLogFileName()
             };
-            DebuggerTarget debugOutput = new DebuggerTarget("debugOutput");
+            // DebuggerTarget is disabled because it significantly slows down performance
+            // DebuggerTarget debugOutput = new DebuggerTarget("debugOutput");
+            NLogViewerTarget viewer = new NLogViewerTarget("viewer")
+            {
+                Address = "udp://127.0.0.1:9999",
+                IncludeSourceInfo = true
+            };
 
             config.AddRule(LogLevel.Info, LogLevel.Fatal, logFile);
-            config.AddRule(LogLevel.Trace, LogLevel.Fatal, debugOutput);
+            // config.AddRule(LogLevel.Debug, LogLevel.Fatal, debugOutput);
+            config.AddRule(LogLevel.Trace, LogLevel.Fatal, viewer);
             foreach (Target t in appSpecificTargets)
             {
                 config.AddRule(LogLevel.Info, LogLevel.Fatal, t);
