@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using JetBrains.Annotations;
+using Network.Infrastructure;
 using RailgunNet.Connection.Client;
 using Sync;
 

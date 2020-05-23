@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Threading;
 using Coop.Mod;
-using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
-using Coop.Network;
 using Moq;
+using Network.Infrastructure;
 using Xunit;
 
 namespace Coop.Tests

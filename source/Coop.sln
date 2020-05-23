@@ -20,6 +20,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sync", "Sync\Sync.csproj", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csproj", "{9CDD9C4E-92CD-4F19-A4D9-D68CF975480C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Network", "Network\Network.csproj", "{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -76,6 +78,14 @@ Global
 		{9CDD9C4E-92CD-4F19-A4D9-D68CF975480C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{9CDD9C4E-92CD-4F19-A4D9-D68CF975480C}.Release|x64.ActiveCfg = Release|Any CPU
 		{9CDD9C4E-92CD-4F19-A4D9-D68CF975480C}.Release|x64.Build.0 = Release|Any CPU
+		{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}.Debug|x64.Build.0 = Debug|Any CPU
+		{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}.Release|x64.ActiveCfg = Release|Any CPU
+		{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

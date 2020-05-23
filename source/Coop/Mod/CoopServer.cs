@@ -1,7 +1,6 @@
 ﻿using System;
-using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
-using Coop.Network;
+using Network.Infrastructure;
 using NLog;
 
 namespace Coop.Mod

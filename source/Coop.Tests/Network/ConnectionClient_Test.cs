@@ -1,8 +1,9 @@
 ﻿using System;
-using Coop.Multiplayer;
-using Coop.Network;
 using Moq;
+using Network.Infrastructure;
+using Network.Protocol;
 using Xunit;
+using Version = System.Version;
 
 namespace Coop.Tests
 {
@@ -51,42 +52,42 @@ namespace Coop.Tests
                 c => c.SendRaw(It.IsAny<ArraySegment<byte>>(), It.IsAny<EDeliveryMethod>()),
                 Times.Once);
             ArraySegment<byte> expectedSentData = TestUtils.MakeRaw(
-                Protocol.EPacket.Client_Hello,
-                new Protocol.Client_Hello(Protocol.Version).Serialize());
+                EPacket.Client_Hello,
+                new Client_Hello(Network.Protocol.Version.Number).Serialize());
             Assert.Equal(expectedSentData, m_SendRawParam);
             Assert.Equal(EConnectionState.ClientJoinRequesting, m_Connection.State);
 
             // Ack client hello
             ArraySegment<byte> response = TestUtils.MakeRaw(
-                Protocol.EPacket.Server_RequestClientInfo,
-                new Protocol.Server_RequestClientInfo().Serialize());
+                EPacket.Server_RequestClientInfo,
+                new Server_RequestClientInfo().Serialize());
             m_Connection.Receive(response);
             Assert.Equal(EConnectionState.ClientJoinRequesting, m_Connection.State);
 
             // Expect client info
             expectedSentData = TestUtils.MakeRaw(
-                Protocol.EPacket.Client_Info,
-                new Protocol.Client_Info(new Player("Unknown")).Serialize());
+                EPacket.Client_Info,
+                new Client_Info(new Player("Unknown")).Serialize());
             Assert.Equal(expectedSentData, m_SendRawParam);
             Assert.Equal(EConnectionState.ClientJoinRequesting, m_Connection.State);
 
             // Ack client info
             response = TestUtils.MakeRaw(
-                Protocol.EPacket.Server_JoinRequestAccepted,
-                new Protocol.Server_JoinRequestAccepted().Serialize());
+                EPacket.Server_JoinRequestAccepted,
+                new Server_JoinRequestAccepted().Serialize());
             m_Connection.Receive(response);
 
             if (bExchangeWorldData)
             {
                 expectedSentData = TestUtils.MakeRaw(
-                    Protocol.EPacket.Client_RequestWorldData,
-                    new Protocol.Client_RequestWorldData().Serialize());
+                    EPacket.Client_RequestWorldData,
+                    new Client_RequestWorldData().Serialize());
                 Assert.Equal(expectedSentData, m_SendRawParam);
                 Assert.Equal(EConnectionState.ClientAwaitingWorldData, m_Connection.State);
 
                 // Send world data to client
                 response = TestUtils.MakeRaw(
-                    Protocol.EPacket.Server_WorldData,
+                    EPacket.Server_WorldData,
                     m_WorldData.Object.SerializeInitialWorldState());
                 m_Connection.Receive(response);
                 Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
@@ -94,8 +95,8 @@ namespace Coop.Tests
 
             // Expect client joined
             expectedSentData = TestUtils.MakeRaw(
-                Protocol.EPacket.Client_Joined,
-                new Protocol.Client_Joined().Serialize());
+                EPacket.Client_Joined,
+                new Client_Joined().Serialize());
             Assert.Equal(expectedSentData, m_SendRawParam);
             Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
 

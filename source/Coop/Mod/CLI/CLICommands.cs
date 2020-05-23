@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
-using Coop.Network;
+using Network;
+using Network.Infrastructure;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.CLI

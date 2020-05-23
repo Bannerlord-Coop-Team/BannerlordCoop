@@ -4,7 +4,8 @@ using Common;
 using Coop.Mod.Persistence;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
-using Coop.Network;
+using Network;
+using Network.Infrastructure;
 using RailgunNet.Connection.Server;
 
 namespace Coop.Mod

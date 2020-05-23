@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading;
-using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
-using Coop.Network;
 using LiteNetLib;
 using Moq;
+using Network.Infrastructure;
 using Xunit;
 
 namespace Coop.Tests
@@ -130,7 +129,7 @@ namespace Coop.Tests
                 Thread.Sleep(waitTimeBetweenTries);
                 totalWaitTime += waitTimeBetweenTries;
                 Assert.True(
-                    totalWaitTime < TimeSpan.FromMilliseconds(500),
+                    totalWaitTime < TimeSpan.FromMilliseconds(2000),
                     "Maximum wait time reached. Abort.");
             }
         }

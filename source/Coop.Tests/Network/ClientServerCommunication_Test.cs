@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using Common;
-using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
-using Coop.Network;
 using Moq;
+using Network.Infrastructure;
+using Network.Protocol;
 using Xunit;
 
 namespace Coop.Tests
@@ -37,23 +37,23 @@ namespace Coop.Tests
         {
             m_WorldData.Setup(d => d.RequiresInitialWorldData).Returns(bExchangeWorldData);
 
-            List<(EConnectionState, Protocol.EPacket)> expectedReceiveOrderOnServer =
-                new List<(EConnectionState, Protocol.EPacket)>();
+            List<(EConnectionState, EPacket)> expectedReceiveOrderOnServer =
+                new List<(EConnectionState, EPacket)>();
             expectedReceiveOrderOnServer.Add(
-                (EConnectionState.ServerAwaitingClient, Protocol.EPacket.Client_Hello));
+                (EConnectionState.ServerAwaitingClient, EPacket.Client_Hello));
             expectedReceiveOrderOnServer.Add(
-                (EConnectionState.ServerAwaitingClient, Protocol.EPacket.Client_Info));
+                (EConnectionState.ServerAwaitingClient, EPacket.Client_Info));
             if (bExchangeWorldData)
             {
                 expectedReceiveOrderOnServer.Add(
-                    (EConnectionState.ServerJoining, Protocol.EPacket.Client_RequestWorldData));
+                    (EConnectionState.ServerJoining, EPacket.Client_RequestWorldData));
                 expectedReceiveOrderOnServer.Add(
-                    (EConnectionState.ServerSendingWorldData, Protocol.EPacket.Client_Joined));
+                    (EConnectionState.ServerSendingWorldData, EPacket.Client_Joined));
             }
             else
             {
                 expectedReceiveOrderOnServer.Add(
-                    (EConnectionState.ServerJoining, Protocol.EPacket.Client_Joined));
+                    (EConnectionState.ServerJoining, EPacket.Client_Joined));
             }
 
             int iPacketsReceived = 0;
@@ -62,7 +62,7 @@ namespace Coop.Tests
             // Setup server hooks.
             void OnClientDispatch(EConnectionState eState, Packet packet)
             {
-                if (packet.Type == Protocol.EPacket.KeepAlive)
+                if (packet.Type == EPacket.KeepAlive)
                 {
                     ++iKeepAlivesReceived;
                 }
@@ -138,8 +138,8 @@ namespace Coop.Tests
 
             // SendSync a sync package from client to server
             expectedReceiveOrderOnServer.Add(
-                (EConnectionState.ServerPlaying, Protocol.EPacket.Sync));
-            client.Session.Connection.Send(new Packet(Protocol.EPacket.Sync, new byte[] { }));
+                (EConnectionState.ServerPlaying, EPacket.Sync));
+            client.Session.Connection.Send(new Packet(EPacket.Sync, new byte[] { }));
             TestUtils.UpdateUntil(
                 () => iPacketsReceived == expectedReceiveOrderOnServer.Count,
                 new List<IUpdateable>

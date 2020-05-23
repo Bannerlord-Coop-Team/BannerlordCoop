@@ -273,37 +273,16 @@
     <Compile Include="Mod\Behaviour\GameLoadedBehaviour.cs" />
     <Compile Include="Mod\GameEnvironmentServer.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
-    <Compile Include="Multiplayer\ConnectionServer.cs" />
-    <Compile Include="Multiplayer\Exceptions.cs" />
-    <Compile Include="Multiplayer\Globals.cs" />
     <Compile Include="Mod\Main.cs" />
-    <Compile Include="Multiplayer\ConnectionClient.cs" />
-    <Compile Include="Multiplayer\ISaveData.cs" />
-    <Compile Include="Multiplayer\Network\Extensions.cs" />
-    <Compile Include="Multiplayer\Network\LiteNetManagerClient.cs" />
-    <Compile Include="Multiplayer\Network\LiteNetListenerClient.cs" />
-    <Compile Include="Multiplayer\Network\LiteNetManagerServer.cs" />
-    <Compile Include="Multiplayer\Network\LiteNetConnection.cs" />
-    <Compile Include="Multiplayer\GameSession.cs" />
-    <Compile Include="Multiplayer\Network\LiteNetListenerServer.cs" />
-    <Compile Include="Multiplayer\Network\RailNetPeerWrapper.cs" />
-    <Compile Include="Network\Exceptions.cs" />
-    <Compile Include="Network\ConnectionBase.cs" />
-    <Compile Include="Network\IGameStatePersistence.cs" />
-    <Compile Include="Network\INetwork.cs" />
-    <Compile Include="Network\INetworkConnection.cs" />
-    <Compile Include="Network\MemoryStreamSegment.cs" />
-    <Compile Include="Network\Packet.cs" />
-    <Compile Include="Network\PacketHandler.cs" />
-    <Compile Include="Network\PacketDispatcher.cs" />
-    <Compile Include="Network\ByteReader.cs" />
-    <Compile Include="Network\ByteWriter.cs" />
-    <Compile Include="Multiplayer\Steam\NetworkSteam.cs" />
-    <Compile Include="Network\Platform.cs" />
-    <Compile Include="Network\Player.cs" />
-    <Compile Include="Network\Protocol.cs" />
-    <Compile Include="Network\Server.cs" />
-    <Compile Include="Network\ServerConfiguration.cs" />
+    <Compile Include="NetImpl\LiteNet\Extensions.cs" />
+    <Compile Include="NetImpl\LiteNet\LiteNetManagerClient.cs" />
+    <Compile Include="NetImpl\LiteNet\LiteNetListenerClient.cs" />
+    <Compile Include="NetImpl\LiteNet\LiteNetManagerServer.cs" />
+    <Compile Include="NetImpl\LiteNet\LiteNetConnection.cs" />
+    <Compile Include="NetImpl\LiteNet\LiteNetListenerServer.cs" />
+    <Compile Include="NetImpl\LiteNet\RailNetPeerWrapper.cs" />
+    <Compile Include="NetImpl\Platform.cs" />
+    <Compile Include="NetImpl\Steam\NetworkSteam.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -317,6 +296,10 @@
     <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj">
       <Project>{d8f65198-a926-4c46-9599-2d5d4349486f}</Project>
       <Name>LiteNetLib</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Network\Network.csproj">
+      <Project>{b0ff5e24-4d98-4ec8-bbce-6cdb85cb685d}</Project>
+      <Name>Network</Name>
     </ProjectReference>
     <ProjectReference Include="..\RailgunNet\RailgunNet\RailgunNet.csproj">
       <Project>{d8389325-85ae-4a1d-9b8e-e4742349a531}</Project>
@@ -333,7 +316,7 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll</PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll</PostBuildEvent>
   </PropertyGroup>
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

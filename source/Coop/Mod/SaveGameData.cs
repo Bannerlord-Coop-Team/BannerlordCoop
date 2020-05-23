@@ -1,5 +1,5 @@
 ﻿using System;
-using Coop.Network;
+using Network;
 using JetBrains.Annotations;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Save;

@@ -4,8 +4,8 @@ using Common;
 using Coop.Mod.Persistence;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
-using Coop.Network;
 using JetBrains.Annotations;
+using Network.Infrastructure;
 using NLog;
 
 namespace Coop.Mod

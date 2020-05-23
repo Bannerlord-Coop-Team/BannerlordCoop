@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Linq;
 using Coop.Multiplayer.Network;
-using Coop.Network;
 using Moq;
+using Network;
+using Network.Infrastructure;
+using Network.Protocol;
 using Xunit;
 
 namespace Coop.Tests
@@ -45,7 +47,7 @@ namespace Coop.Tests
             m_Instance.SendPayload(payload);
 
             ByteWriter writer = new ByteWriter();
-            writer.Binary.Write(PacketWriter.EncodePacketType(Protocol.EPacket.Persistence));
+            writer.Binary.Write(PacketWriter.EncodePacketType(EPacket.Persistence));
             writer.Binary.Write(payload);
             Assert.Equal(writer.ToArray(), m_SendRawParam);
         }
@@ -62,7 +64,7 @@ namespace Coop.Tests
             m_Instance.SendPayload(buffer);
 
             ByteWriter writer = new ByteWriter();
-            writer.Binary.Write(PacketWriter.EncodePacketType(Protocol.EPacket.Persistence));
+            writer.Binary.Write(PacketWriter.EncodePacketType(EPacket.Persistence));
             writer.Binary.Write(buffer);
             Assert.Equal(writer.ToArray(), m_SendRawParam);
         }

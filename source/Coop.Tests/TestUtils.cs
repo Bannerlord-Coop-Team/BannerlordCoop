@@ -5,10 +5,11 @@ using System.Linq;
 using System.Net.NetworkInformation;
 using System.Threading;
 using Common;
-using Coop.Multiplayer;
-using Coop.Network;
 using HarmonyLib;
 using Moq;
+using Network;
+using Network.Infrastructure;
+using Network.Protocol;
 using NLog;
 using NLog.Config;
 using NLog.Targets;
@@ -152,7 +153,7 @@ namespace Coop.Tests
             return port;
         }
 
-        public static ArraySegment<byte> MakeRaw(Protocol.EPacket eType, byte[] payload)
+        public static ArraySegment<byte> MakeRaw(EPacket eType, byte[] payload)
         {
             Packet packet = new Packet(eType, payload);
             MemoryStream stream = new MemoryStream();
@@ -164,15 +165,15 @@ namespace Coop.Tests
         public static ArraySegment<byte> MakeKeepAlive(int iKeepAliveID)
         {
             return MakeRaw(
-                Protocol.EPacket.KeepAlive,
-                new Protocol.KeepAlive(iKeepAliveID).Serialize());
+                EPacket.KeepAlive,
+                new KeepAlive(iKeepAliveID).Serialize());
         }
 
         public static ArraySegment<byte> MakePersistencePayload(int iPayloadLength)
         {
             byte[] payload = Enumerable.Range(7, iPayloadLength).Select(i => (byte) i).ToArray();
             ByteWriter writer = new ByteWriter();
-            writer.Binary.Write(PacketWriter.EncodePacketType(Protocol.EPacket.Persistence));
+            writer.Binary.Write(PacketWriter.EncodePacketType(EPacket.Persistence));
             writer.Binary.Write(payload);
             return writer.ToArray();
         }

@@ -1,9 +1,8 @@
 ﻿using System.Collections.Generic;
 using Common;
-using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
-using Coop.Network;
 using Moq;
+using Network.Infrastructure;
 using Xunit;
 
 namespace Coop.Tests

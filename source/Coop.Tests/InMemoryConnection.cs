@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Coop.Network;
+using Network.Infrastructure;
 
 namespace Coop.Tests
 {

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
-using Coop.Multiplayer;
-using Coop.Network;
+using Network;
+using Network.Infrastructure;
 using NLog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;

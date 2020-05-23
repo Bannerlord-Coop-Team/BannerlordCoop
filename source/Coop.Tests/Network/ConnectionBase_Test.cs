@@ -1,8 +1,9 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using Coop.Network;
 using Moq;
+using Network.Infrastructure;
+using Network.Protocol;
 using Xunit;
 
 namespace Coop.Tests
@@ -50,7 +51,7 @@ namespace Coop.Tests
         public void DelegatesToSendRaw()
         {
             // Setup
-            Packet packet = new Packet(Protocol.EPacket.Client_Hello, new byte[100]);
+            Packet packet = new Packet(EPacket.Client_Hello, new byte[100]);
             MemoryStream stream = new MemoryStream();
             new PacketWriter(packet).Write(new BinaryWriter(stream));
 

@@ -1,5 +1,6 @@
 using System.IO;
-using Coop.Network;
+using Network;
+using Network.Protocol;
 using Xunit;
 
 namespace Coop.Tests
@@ -8,7 +9,7 @@ namespace Coop.Tests
     {
         public Packet_Test()
         {
-            m_Packet = new Packet(Protocol.EPacket.Client_Hello, m_raw);
+            m_Packet = new Packet(EPacket.Client_Hello, m_raw);
         }
 
         private readonly Packet m_Packet;

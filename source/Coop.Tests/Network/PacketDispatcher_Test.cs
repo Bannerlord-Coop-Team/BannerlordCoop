@@ -1,5 +1,7 @@
 ﻿using System;
-using Coop.Network;
+using Network;
+using Network.Infrastructure;
+using Network.Protocol;
 using Xunit;
 
 namespace Coop.Tests
@@ -9,7 +11,7 @@ namespace Coop.Tests
         public PacketDispatcher_Test()
         {
             m_Dispatcher = new PacketDispatcher();
-            m_Packet = new Packet(Protocol.EPacket.Client_Hello, new byte[0]);
+            m_Packet = new Packet(EPacket.Client_Hello, new byte[0]);
         }
 
         private readonly PacketDispatcher m_Dispatcher;
@@ -19,7 +21,7 @@ namespace Coop.Tests
         {
             [ThreadStatic] public static Action<Packet> s_OnStaticHandlerCalled;
 
-            [PacketHandler(EConnectionState.Disconnected, Protocol.EPacket.Client_Hello)]
+            [PacketHandler(EConnectionState.Disconnected, EPacket.Client_Hello)]
             private static void StaticHandler(Packet packet)
             {
                 s_OnStaticHandlerCalled(packet);
@@ -30,7 +32,7 @@ namespace Coop.Tests
         {
             public Action<Packet> OnHandlerCalled;
 
-            [PacketHandler(EConnectionState.Disconnected, Protocol.EPacket.Client_Hello)]
+            [PacketHandler(EConnectionState.Disconnected, EPacket.Client_Hello)]
             private void NonStaticHandler(Packet packet)
             {
                 OnHandlerCalled(packet);

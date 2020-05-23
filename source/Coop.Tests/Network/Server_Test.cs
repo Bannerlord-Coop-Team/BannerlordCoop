@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Threading;
 using Common;
-using Coop.Network;
+using Network.Infrastructure;
 using Xunit;
 
 namespace Coop.Tests
