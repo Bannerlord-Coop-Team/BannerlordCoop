@@ -1,7 +1,6 @@
-﻿using Common;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using Coop.Multiplayer;
+using Common;
 using Coop.Multiplayer.Network;
 using JetBrains.Annotations;
 using Network.Infrastructure;
@@ -13,15 +12,16 @@ namespace Coop.Mod.Persistence
     public class PersistenceClient : IUpdateable
     {
         private readonly IEnvironmentClient m_Environment;
-        private readonly RailClient m_RailClient;
-        private readonly RailClientRoom m_Room;
+        [NotNull] private readonly RailClient m_RailClient;
 
         public PersistenceClient(IEnvironmentClient environment)
         {
             m_Environment = environment;
             m_RailClient = new RailClient(Registry.Client(environment));
-            m_Room = m_RailClient.StartRoom();
+            Room = m_RailClient.StartRoom();
         }
+
+        [NotNull] public RailClientRoom Room { get; }
 
         public void Update(TimeSpan frameTime)
         {

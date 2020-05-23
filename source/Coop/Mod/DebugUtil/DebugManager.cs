@@ -6,7 +6,7 @@ using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using Debug = TaleWorlds.Library.Debug;
 
-namespace Coop.Mod.CLI
+namespace Coop.Mod.DebugUtil
 {
     
     public class DebugManager : IDebugManager
@@ -50,7 +50,7 @@ namespace Coop.Mod.CLI
         public void Print(
             string message,
             int logLevel = 0,
-            Debug.DebugColor color = Debug.DebugColor.White,
+            TaleWorlds.Library.Debug.DebugColor color = TaleWorlds.Library.Debug.DebugColor.White,
             ulong debugFilter = 17592186044416)
         {
             LogEventInfo eventInfo = new LogEventInfo(LogLevel.Debug, Logger.Name, message);

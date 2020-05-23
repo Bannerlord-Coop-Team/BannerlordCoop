@@ -119,5 +119,10 @@ namespace Coop.Mod.Persistence.Party
                 State.OnMovementChanged -= UpdateLocalMovement;
             }
         }
+
+        public override string ToString()
+        {
+            return $"Party {State.PartyId} ({Id}): {m_Instance}";
+        }
     }
 }

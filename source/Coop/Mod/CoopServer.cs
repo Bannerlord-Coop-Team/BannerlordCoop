@@ -1,5 +1,6 @@
 ﻿using System;
 using Coop.Multiplayer.Network;
+using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
 
@@ -13,11 +14,12 @@ namespace Coop.Mod
             new Lazy<CoopServer>(() => new CoopServer());
 
         private LiteNetManagerServer m_NetManager;
-        private CoopServerRail m_RailServer;
 
         private CoopServer()
         {
         }
+
+        [CanBeNull] public CoopServerRail Persistence { get; private set; }
 
         public static CoopServer Instance => m_Instance.Value;
 
@@ -30,8 +32,8 @@ namespace Coop.Mod
                 Server.EType eServerType = Server.EType.Threaded;
                 Current = new Server(eServerType);
 
-                m_RailServer = new CoopServerRail(Current, new GameEnvironmentServer());
-                Current.Updateables.Add(m_RailServer);
+                Persistence = new CoopServerRail(Current, new GameEnvironmentServer());
+                Current.Updateables.Add(Persistence);
                 Current.OnClientConnected += OnClientConnected;
 
                 if (eServerType == Server.EType.Direct)
@@ -71,8 +73,8 @@ namespace Coop.Mod
 
         private void OnClientConnected(ConnectionServer connection)
         {
-            connection.OnClientJoined += m_RailServer.ClientJoined;
-            connection.OnDisconnected += m_RailServer.Disconnected;
+            connection.OnClientJoined += Persistence.ClientJoined;
+            connection.OnDisconnected += Persistence.Disconnected;
         }
     }
 }

@@ -65,5 +65,10 @@ namespace Coop.Mod.Persistence.World
             m_Environment.TargetPosition.RemoveSyncHandler(SyncableInstance.Any);
             State.PropertyChanged -= State_PropertyChanged;
         }
+
+        public override string ToString()
+        {
+            return $"World ({Id}): {State}.";
+        }
     }
 }

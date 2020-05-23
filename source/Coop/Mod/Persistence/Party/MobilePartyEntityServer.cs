@@ -81,5 +81,10 @@ namespace Coop.Mod.Persistence.Party
             State.Movement.SettlementIndex =
                 data.TargetSettlement?.Id ?? MovementState.InvalidIndex;
         }
+
+        public override string ToString()
+        {
+            return $"Party {State.PartyId} ({Id}): {m_Instance}";
+        }
     }
 }

@@ -21,6 +21,7 @@ namespace Coop.Mod.Persistence
         private readonly Dictionary<MobileParty, RailEntityServer> m_Parties =
             new Dictionary<MobileParty, RailEntityServer>();
 
+        public IReadOnlyCollection<RailEntityServer> Parties => m_Parties.Values;
         private readonly RailServerRoom m_Room;
         private readonly RailServer m_Server;
         private RailServerPeer m_Arbiter;
@@ -102,9 +103,12 @@ namespace Coop.Mod.Persistence
                 Logger.Warn("Player party not found.");
             }
 
-            // TODO: Currently the control is shared and remains on the server. In a future version, every player gets their own party.
-            // peer.GrantControl(m_Parties[party]);
-            // Logger.Info("{party} control granted to {peer}.", party, peer);
+            if (m_Parties[party].Controller == null)
+            {
+                // TODO: Currently only the hosting player gets to control the main party. In a future version, every player gets their own party.
+                peer.GrantControl(m_Parties[party]);
+                Logger.Info("{party} control granted to {peer}.", party, peer);
+            }
         }
 
         private void OnClientRemoved(RailServerPeer peer)

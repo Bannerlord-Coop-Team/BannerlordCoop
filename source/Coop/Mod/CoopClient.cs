@@ -1,12 +1,14 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using Common;
 using Coop.Mod.Persistence;
-using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
+using RailgunNet.Logic;
 
 namespace Coop.Mod
 {
@@ -19,7 +21,6 @@ namespace Coop.Mod
             new Lazy<CoopClient>(() => new CoopClient());
 
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
-        [CanBeNull] private PersistenceClient m_Persistence;
         private int m_ReconnectAttempts = MaxReconnectAttempts;
 
         public CoopClient()
@@ -31,6 +32,8 @@ namespace Coop.Mod
             Events = new CoopEvents();
             Events.OnGameLoaded.AddNonSerializedListener(this, Init);
         }
+
+        [CanBeNull] public PersistenceClient Persistence { get; private set; }
 
         [NotNull] public GameSession Session { get; }
 
@@ -55,7 +58,7 @@ namespace Coop.Mod
         public void Update(TimeSpan frameTime)
         {
             m_NetManager.Update(frameTime);
-            m_Persistence?.Update(frameTime);
+            Persistence?.Update(frameTime);
         }
 
         public void Connect(IPAddress ip, int iPort)
@@ -76,12 +79,12 @@ namespace Coop.Mod
         {
             if (con == null || con.State != EConnectionState.ClientPlaying) return;
 
-            if (m_Persistence == null)
+            if (Persistence == null)
             {
-                m_Persistence = new PersistenceClient(new GameEnvironmentClient());
+                Persistence = new PersistenceClient(new GameEnvironmentClient());
             }
 
-            m_Persistence.SetConnection(con);
+            Persistence.SetConnection(con);
         }
 
         private void ConnectionCreated(ConnectionClient con)
@@ -99,7 +102,7 @@ namespace Coop.Mod
 
         private void ConnectionClosed(EDisconnectReason eReason)
         {
-            m_Persistence?.SetConnection(null);
+            Persistence?.SetConnection(null);
         }
 
         private void ConnectionDestroyed(EDisconnectReason eReason)
@@ -133,7 +136,21 @@ namespace Coop.Mod
                 return "Client not connected.";
             }
 
-            return $"{Session.Connection}";
+            string sLeadingWhitespace = "       ";
+            string sRet =
+                $"{Session.Connection.Latency,-5}{Session.Connection.State,-30}{Session.Connection.Network}";
+            sRet += Environment.NewLine + sLeadingWhitespace;
+            if (Persistence != null)
+            {
+                IEnumerable<RailEntityBase> controlledEntity = Persistence.Room.LocalEntities;
+                sRet += $"Controlling {controlledEntity.Count()} entities.";
+                foreach (RailEntityBase entity in controlledEntity)
+                {
+                    sRet += Environment.NewLine + sLeadingWhitespace + entity;
+                }
+            }
+
+            return sRet;
         }
     }
 }

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Common;
 using Coop.Mod.Behaviour;
-using Coop.Mod.CLI;
+using Coop.Mod.DebugUtil;
 using Coop.Mod.Patch;
 using HarmonyLib;
 using NLog;
@@ -26,7 +26,7 @@ namespace Coop.Mod
 
         public Main()
         {
-            Debug.DebugManager = Debugging.DebugManager;
+            TaleWorlds.Library.Debug.DebugManager = Debugging.DebugManager;
             MBDebug.DisableLogging = false;
 
             Instance = this;
@@ -78,7 +78,8 @@ namespace Coop.Mod
             base.OnApplicationTick(dt);
             if (Input.DebugInput.IsControlDown() && Input.DebugInput.IsKeyDown(InputKey.Tilde))
             {
-                DebugConsole.Toggle();
+                CLICommands.ShowDebugUi(new List<string>());
+                // DebugConsole.Toggle();
             }
 
             Updateables.UpdateAll(TimeSpan.FromSeconds(dt));

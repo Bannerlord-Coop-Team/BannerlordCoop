@@ -230,10 +230,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
-    <Compile Include="Mod\CLI\CLICommands.cs" />
-    <Compile Include="Mod\CLI\DebugConsole.cs" />
-    <Compile Include="Mod\CLI\DebugManager.cs" />
+    <Compile Include="Mod\DebugUtil\CLICommands.cs" />
+    <Compile Include="Mod\DebugUtil\DebugConsole.cs" />
+    <Compile Include="Mod\DebugUtil\DebugManager.cs" />
     <Compile Include="Mod\Coop.cs" />
+    <Compile Include="Mod\DebugUtil\DebugUI.cs" />
     <Compile Include="Mod\Exceptions.cs" />
     <Compile Include="Mod\GameEnvironmentClient.cs" />
     <Compile Include="Mod\GameLoopRunner.cs" />

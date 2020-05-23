@@ -2,9 +2,8 @@
 using System.Collections.Generic;
 using Common;
 using Coop.Mod.Persistence;
-using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
-using Network;
+using JetBrains.Annotations;
 using Network.Infrastructure;
 using RailgunNet.Connection.Server;
 
@@ -12,7 +11,6 @@ namespace Coop.Mod
 {
     public class CoopServerRail : IUpdateable
     {
-        private readonly EntityManager m_EntityManager;
         private readonly RailServer m_Instance;
 
         private readonly Dictionary<ConnectionServer, RailNetPeerWrapper> m_RailConnections =
@@ -24,8 +22,10 @@ namespace Coop.Mod
         {
             m_Server = server;
             m_Instance = new RailServer(Registry.Server(environment));
-            m_EntityManager = new EntityManager(m_Instance);
+            EntityManager = new EntityManager(m_Instance);
         }
+
+        [NotNull] public EntityManager EntityManager { get; }
 
         public void Update(TimeSpan frameTime)
         {

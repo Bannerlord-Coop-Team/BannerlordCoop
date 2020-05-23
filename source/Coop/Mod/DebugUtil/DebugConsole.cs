@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace Coop.Mod.CLI
+namespace Coop.Mod.DebugUtil
 {
     public static class DebugConsole
     {

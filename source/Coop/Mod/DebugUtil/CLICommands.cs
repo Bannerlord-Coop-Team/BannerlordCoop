@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
-using Network;
 using Network.Infrastructure;
 using TaleWorlds.Library;
 
-namespace Coop.Mod.CLI
+namespace Coop.Mod.DebugUtil
 {
     public static class CLICommands
     {
@@ -19,6 +18,20 @@ namespace Coop.Mod.CLI
             sMessage += Environment.NewLine + "*** Client ***" + Environment.NewLine;
             sMessage += CoopClient.Instance + Environment.NewLine;
             return sMessage;
+        }
+
+        private static DebugUI m_DebugUI;
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("show_debug_ui", sGroupName)]
+        public static string ShowDebugUi(List<string> parameters)
+        {
+            if (m_DebugUI == null)
+            {
+                m_DebugUI = new DebugUI();
+                Main.Instance.Updateables.Add(m_DebugUI);
+            }
+            m_DebugUI.Visible = true;
+            return "";
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("start_local_server", sGroupName)]
