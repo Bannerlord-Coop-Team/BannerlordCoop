@@ -26,7 +26,7 @@ namespace Coop.Network
         public EState State => m_State.State;
 
         public bool AreAllClientsPlaying =>
-            m_ActiveConnections.All(con => con.State == EConnectionState.ClientPlaying);
+            m_ActiveConnections.All(con => con.State == EConnectionState.ServerPlaying);
 
         public event Action<ConnectionServer> OnClientConnected;
 
