@@ -10,6 +10,10 @@ using Coop.Network;
 using Coop.Sync;
 using HarmonyLib;
 using Moq;
+using NLog;
+using NLog.Config;
+using NLog.Targets;
+using Xunit;
 
 namespace Coop.Tests
 {
@@ -33,6 +37,32 @@ namespace Coop.Tests
             saveData.Setup(w => w.Receive(It.IsAny<ArraySegment<byte>>())).Returns(true);
             saveData.Setup(w => w.SerializeInitialWorldState()).Returns(new byte[0]);
             return saveData;
+        }
+        private static bool IsLoggerInitialized = false;
+        private static object LoggerLock = new object();
+
+        public static void SetupLogger()
+        {
+            lock (LoggerLock)
+            {
+                if (!IsLoggerInitialized)
+                {
+                    LoggingConfiguration config = new LoggingConfiguration();
+
+                    // Targets
+                    DebuggerTarget debugOutput = new DebuggerTarget("debugOutput");
+                    NLogViewerTarget viewer = new NLogViewerTarget("viewer")
+                    {
+                        Address = "udp://127.0.0.1:9999",
+                        IncludeSourceInfo = true
+                    };
+
+                    config.AddRule(LogLevel.Debug, LogLevel.Fatal, debugOutput);
+                    config.AddRule(LogLevel.Trace, LogLevel.Fatal, viewer);
+                    LogManager.Configuration = config;
+                    IsLoggerInitialized = true;
+                }
+            }
         }
 
         public static ServerConfiguration GetTestingConfig()
@@ -70,7 +100,7 @@ namespace Coop.Tests
 
                 Thread.Sleep(waitTimeBetweenTries);
                 totalWaitTime += waitTimeBetweenTries;
-                // Assert.True(totalWaitTime < TimeSpan.FromMilliseconds(500), "Maximum wait time reached. Abort.");
+                Assert.True(totalWaitTime < TimeSpan.FromMilliseconds(2000), "Maximum wait time reached. Abort.");
             }
         }
 
