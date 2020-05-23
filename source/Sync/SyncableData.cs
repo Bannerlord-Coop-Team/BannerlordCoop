@@ -1,6 +1,6 @@
 ﻿using JetBrains.Annotations;
 
-namespace Coop.Sync
+namespace Sync
 {
     public class SyncableData
     {

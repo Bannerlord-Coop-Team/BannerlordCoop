@@ -2,8 +2,9 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using HarmonyLib;
 
-namespace Coop.Reflection
+namespace Sync.Reflection
 {
     public static class InvokableFactory
     {

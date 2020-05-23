@@ -1,8 +1,7 @@
 ﻿using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.Party;
-using Coop.Sync;
+using Sync;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod

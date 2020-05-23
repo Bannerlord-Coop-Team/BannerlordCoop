@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Coop.Reflection;
+using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
+using Sync.Reflection;
 
-namespace Coop.Sync
+namespace Sync
 {
     public class SyncField<TTarget, TValue> : SyncField
     {

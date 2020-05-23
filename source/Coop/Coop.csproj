@@ -309,18 +309,6 @@
     <Compile Include="Network\Server.cs" />
     <Compile Include="Network\ServerConfiguration.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Reflection\Extensions.cs" />
-    <Compile Include="Reflection\InvokableFactory.cs" />
-    <Compile Include="Reflection\Util.cs" />
-    <Compile Include="Sync\Attributes.cs" />
-    <Compile Include="Sync\BufferedData.cs" />
-    <Compile Include="Sync\SyncableData.cs" />
-    <Compile Include="Sync\FieldWatcher.cs" />
-    <Compile Include="Sync\ISyncable.cs" />
-    <Compile Include="Sync\SyncField.cs" />
-    <Compile Include="Sync\ISyncHandler.cs" />
-    <Compile Include="Sync\SyncFieldGroup.cs" />
-    <Compile Include="Sync\SyncPriority.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -334,6 +322,10 @@
       <Project>{d8389325-85ae-4a1d-9b8e-e4742349a531}</Project>
       <Name>RailgunNet</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Sync\Sync.csproj">
+      <Project>{79b189c9-b667-4997-a361-ab9c7c014184}</Project>
+      <Name>Sync</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
@@ -341,7 +333,7 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs 0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll</PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll</PostBuildEvent>
   </PropertyGroup>
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

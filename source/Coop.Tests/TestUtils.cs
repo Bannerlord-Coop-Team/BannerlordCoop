@@ -7,12 +7,12 @@ using System.Threading;
 using Coop.Common;
 using Coop.Multiplayer;
 using Coop.Network;
-using Coop.Sync;
 using HarmonyLib;
 using Moq;
 using NLog;
 using NLog.Config;
 using NLog.Targets;
+using Sync;
 using Xunit;
 
 namespace Coop.Tests
@@ -21,6 +21,8 @@ namespace Coop.Tests
     {
         private static readonly object UsedPortsLock = new object();
         private static readonly HashSet<int> UsedPorts = new HashSet<int>();
+        private static bool IsLoggerInitialized;
+        private static readonly object LoggerLock = new object();
 
         public static Mock<INetworkConnection> CreateMockConnection()
         {
@@ -38,8 +40,6 @@ namespace Coop.Tests
             saveData.Setup(w => w.SerializeInitialWorldState()).Returns(new byte[0]);
             return saveData;
         }
-        private static bool IsLoggerInitialized = false;
-        private static object LoggerLock = new object();
 
         public static void SetupLogger()
         {
@@ -100,7 +100,9 @@ namespace Coop.Tests
 
                 Thread.Sleep(waitTimeBetweenTries);
                 totalWaitTime += waitTimeBetweenTries;
-                Assert.True(totalWaitTime < TimeSpan.FromMilliseconds(2000), "Maximum wait time reached. Abort.");
+                Assert.True(
+                    totalWaitTime < TimeSpan.FromMilliseconds(2000),
+                    "Maximum wait time reached. Abort.");
             }
         }
 
@@ -253,10 +255,18 @@ namespace Coop.Tests
             }
         }
     }
-    public class MockedField<TTarget, TField> : Mock<TTarget> where TTarget : class
+
+    public class MockedField<TTarget, TField> : Mock<TTarget>
+        where TTarget : class
     {
-        public List<TField> ValueHistory { get; set; } = new List<TField>();
         private TField m_Latest;
+
+        public MockedField() : base(MockBehavior.Strict)
+        {
+        }
+
+        public List<TField> ValueHistory { get; set; } = new List<TField>();
+
         public TField Value
         {
             get => m_Latest;
@@ -266,20 +276,17 @@ namespace Coop.Tests
                 m_Latest = ValueHistory[^1];
             }
         }
-
-        public MockedField()
-        : base(MockBehavior.Strict)
-        {
-        }
     }
 
-    public class TestableField<TTarget, TField> : SyncField<TTarget, TField> where TTarget : class
+    public class TestableField<TTarget, TField> : SyncField<TTarget, TField>
+        where TTarget : class
     {
-        public MockedField<TTarget, TField> Mock { get; }
-        public TestableField()
-        : base(AccessTools.Field(typeof(MockedField<TTarget, TField>), "m_Latest"))
+        public TestableField() : base(
+            AccessTools.Field(typeof(MockedField<TTarget, TField>), "m_Latest"))
         {
             Mock = new MockedField<TTarget, TField>();
         }
+
+        public MockedField<TTarget, TField> Mock { get; }
     }
 }

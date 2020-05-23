@@ -1,7 +1,7 @@
 ﻿using System;
 using JetBrains.Annotations;
 
-namespace Coop.Sync
+namespace Sync
 {
     public interface ISyncable
     {

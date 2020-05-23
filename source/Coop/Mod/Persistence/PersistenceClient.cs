@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using Coop.Common;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
-using Coop.Sync;
 using JetBrains.Annotations;
 using RailgunNet.Connection.Client;
+using Sync;
 
 namespace Coop.Mod.Persistence
 {

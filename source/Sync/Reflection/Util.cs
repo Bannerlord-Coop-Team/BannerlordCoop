@@ -2,7 +2,7 @@
 using System.Reflection;
 using HarmonyLib;
 
-namespace Coop.Reflection
+namespace Sync.Reflection
 {
     public class Util
     {

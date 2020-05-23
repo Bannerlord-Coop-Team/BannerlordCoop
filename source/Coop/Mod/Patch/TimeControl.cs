@@ -1,5 +1,5 @@
-﻿using Coop.Sync;
-using HarmonyLib;
+﻿using HarmonyLib;
+using Sync;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Patch

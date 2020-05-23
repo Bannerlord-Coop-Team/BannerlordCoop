@@ -1,4 +1,4 @@
-﻿namespace Coop.Sync
+﻿namespace Sync
 {
     public interface ISyncHandler
     {

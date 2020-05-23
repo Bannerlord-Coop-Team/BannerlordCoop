@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
 using Coop.Mod.Persistence;
-using Coop.Sync;
 using HarmonyLib;
 using NLog;
+using Sync;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using Logger = NLog.Logger;

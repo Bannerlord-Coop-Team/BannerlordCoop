@@ -1,6 +1,6 @@
 ﻿using HarmonyLib;
 
-namespace Coop.Sync
+namespace Sync
 {
     public class SyncPriority
     {

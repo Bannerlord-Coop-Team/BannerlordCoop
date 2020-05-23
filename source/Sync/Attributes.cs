@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Reflection;
-using Coop.Reflection;
+using Sync.Reflection;
 using HarmonyLib;
 
-namespace Coop.Sync
+namespace Sync
 {
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
     public class PatchAttribute : Attribute

@@ -1,9 +1,9 @@
 ﻿using System;
 using System.ComponentModel;
-using Coop.Sync;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
+using Sync;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence.World

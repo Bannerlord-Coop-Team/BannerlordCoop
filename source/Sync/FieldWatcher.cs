@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Coop.Mod;
-using Coop.Reflection;
+using Sync.Reflection;
 using HarmonyLib;
 
-namespace Coop.Sync
+namespace Sync
 {
     public static class FieldWatcher
     {

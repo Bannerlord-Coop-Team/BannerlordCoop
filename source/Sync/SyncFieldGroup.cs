@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using JetBrains.Annotations;
 
-namespace Coop.Sync
+namespace Sync
 {
     public class SyncFieldGroup<TTarget, TGroup> : ISyncable
         where TGroup : IEnumerable<object>
