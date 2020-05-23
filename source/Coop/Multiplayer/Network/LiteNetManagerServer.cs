@@ -75,7 +75,7 @@ namespace Coop.Multiplayer.Network
         {
             return new NetManager(new LiteNetListenerServer(m_Server, worldData))
             {
-                DisconnectTimeout = m_Config.DisconnectTimeout.Milliseconds
+                DisconnectTimeout = (int) m_Config.DisconnectTimeout.TotalMilliseconds
             };
         }
 
