@@ -92,7 +92,7 @@ namespace Coop.Tests
                 Protocol.EPacket.Client_Joined,
                 new Protocol.Client_Joined().Serialize());
             m_Connection.Receive(joined);
-            Assert.Equal(EConnectionState.ServerConnected, m_Connection.State);
+            Assert.Equal(EConnectionState.ServerPlaying, m_Connection.State);
         }
     }
 }

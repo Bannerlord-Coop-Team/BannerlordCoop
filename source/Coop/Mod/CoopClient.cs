@@ -48,7 +48,7 @@ namespace Coop.Mod
                     return false;
                 }
 
-                return Session.Connection.State == EConnectionState.ClientConnected;
+                return Session.Connection.State == EConnectionState.ClientPlaying;
             }
         }
 
@@ -74,7 +74,7 @@ namespace Coop.Mod
 
         private void TryInitPersistence(ConnectionClient con)
         {
-            if (con == null || con.State != EConnectionState.ClientConnected) return;
+            if (con == null || con.State != EConnectionState.ClientPlaying) return;
 
             if (m_Persistence == null)
             {

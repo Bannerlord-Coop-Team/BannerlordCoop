@@ -17,17 +17,17 @@ namespace Coop.Network
         /** [client side] Client is joining a server, e.g. downloading data.
          *
          * Possible transitions to
-         * - ClientConnected:   Client successfully connected to the server.
+         * - ClientPlaying:   Client successfully connected to the server.
          * - Disconnecting:     Timeout.
          */
         ClientAwaitingWorldData,
 
-        /** [client side] Client is connected to a server.
+        /** [client side] Client is playing on the server.
          *
          * Possible transitions to:
          * - Disconnecting:  Timeout or disconnect request (either server or client side).
          */
-        ClientConnected,
+        ClientPlaying,
 
         /** [server side] Server is awaiting a join request from a client.
          *
@@ -43,7 +43,7 @@ namespace Coop.Network
          * 
          * Possible transitions to:
          * - ServerSendingWorldData: Client wants to be sent a save game.
-         * - ServerConnected: Client confirmed that it joined the server.
+         * - ServerPlaying: Client confirmed that it joined the server.
          * - Disconnecting:  Timeout or request denied.
          */
         ServerJoining,
@@ -51,17 +51,17 @@ namespace Coop.Network
         /** [server side] Client is joining the server.
          *
          * Possible transitions to:
-         * - ServerConnected: Join request from client received & approved.
+         * - ServerPlaying: Join request from client received & approved.
          * - Disconnecting:    Timeout or request denied.
          */
         ServerSendingWorldData,
 
-        /** [server side] Client is connected to the server.
+        /** [server side] Client is playing on the server.
          *
          * Possible transitions to:
          * - Disconnecting:  Timeout or disconnect request (either server or client side).
          */
-        ServerConnected,
+        ServerPlaying,
 
         /** Connection is being closed.
          *

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Coop.Common;
 using Coop.Multiplayer;
@@ -23,6 +24,10 @@ namespace Coop.Network
         public readonly UpdateableList Updateables;
         public ServerConfiguration ActiveConfig;
         public EState State => m_State.State;
+
+        public bool AreAllClientsPlaying =>
+            m_ActiveConnections.All(con => con.State == EConnectionState.ClientPlaying);
+
         public event Action<ConnectionServer> OnClientConnected;
 
         public void Start(ServerConfiguration config)

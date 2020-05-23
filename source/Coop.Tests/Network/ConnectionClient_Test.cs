@@ -89,7 +89,7 @@ namespace Coop.Tests
                     Protocol.EPacket.Server_WorldData,
                     m_WorldData.Object.SerializeInitialWorldState());
                 m_Connection.Receive(response);
-                Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
+                Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
             }
 
             // Expect client joined
@@ -97,12 +97,12 @@ namespace Coop.Tests
                 Protocol.EPacket.Client_Joined,
                 new Protocol.Client_Joined().Serialize());
             Assert.Equal(expectedSentData, m_SendRawParam);
-            Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
+            Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
 
             // Send keep alive
             ArraySegment<byte> keepAliveFromServer = TestUtils.MakeKeepAlive(42);
             m_Connection.Receive(keepAliveFromServer);
-            Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
+            Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
 
             // Expect client keep alive response
             expectedSentData = keepAliveFromServer;
@@ -112,9 +112,9 @@ namespace Coop.Tests
         [Fact]
         private void ReceiveForPersistenceIsRelayed()
         {
-            // Bring connection to EConnectionState.ClientConnected
+            // Bring connection to EConnectionState.ClientPlaying
             VerifyStateTransitionsUntilConnected(false);
-            Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
+            Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
 
             // Persistence has not received anything yet
             Assert.Null(m_PersistenceReceiveParam.Array);
@@ -127,7 +127,7 @@ namespace Coop.Tests
 
             // Verify
             Assert.Equal(persistencePayload, m_PersistenceReceiveParam);
-            Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
+            Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
 
             // Interweave a keep alive
             ArraySegment<byte> keepAliveFromServer = TestUtils.MakeKeepAlive(42);
@@ -140,7 +140,7 @@ namespace Coop.Tests
 
             // Verify
             Assert.Equal(persistencePayload, m_PersistenceReceiveParam);
-            Assert.Equal(EConnectionState.ClientConnected, m_Connection.State);
+            Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
         }
     }
 }

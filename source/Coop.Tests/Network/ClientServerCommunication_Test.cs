@@ -18,6 +18,7 @@ namespace Coop.Tests
 
         public ClientServerCommunication_Test()
         {
+            TestUtils.SetupLogger();
             ServerConfiguration config = TestUtils.GetTestingConfig();
             config.KeepAliveInterval = m_keepAliveInterval;
             m_Server = new Mock<Server>(Server.EType.Threaded)
@@ -95,7 +96,7 @@ namespace Coop.Tests
             TestUtils.UpdateUntil(
                 () => connServerSide != null &&
                       client.Session.Connection != null &&
-                      (client.Session.Connection.State == EConnectionState.ClientConnected ||
+                      (client.Session.Connection.State == EConnectionState.ClientPlaying ||
                        client.Session.Connection.State == EConnectionState.Disconnected),
                 new List<IUpdateable>
                 {
@@ -103,18 +104,18 @@ namespace Coop.Tests
                     m_NetManagerServer
                 });
             Assert.NotNull(connServerSide);
-            Assert.Equal(EConnectionState.ClientConnected, client.Session.Connection.State);
+            Assert.Equal(EConnectionState.ClientPlaying, client.Session.Connection.State);
 
             // Wait until the server received the client joined packet
             TestUtils.UpdateUntil(
-                () => connServerSide.State == EConnectionState.ServerConnected ||
+                () => connServerSide.State == EConnectionState.ServerPlaying ||
                       connServerSide.State == EConnectionState.Disconnected,
                 new List<IUpdateable>
                 {
                     client.Manager,
                     m_NetManagerServer
                 });
-            Assert.Equal(EConnectionState.ServerConnected, connServerSide.State);
+            Assert.Equal(EConnectionState.ServerPlaying, connServerSide.State);
             Assert.Equal(expectedReceiveOrderOnServer.Count, iPacketsReceived);
             m_WorldData.Verify(
                 w => w.Receive(It.IsAny<ArraySegment<byte>>()),
@@ -137,7 +138,7 @@ namespace Coop.Tests
 
             // SendSync a sync package from client to server
             expectedReceiveOrderOnServer.Add(
-                (EConnectionState.ServerConnected, Protocol.EPacket.Sync));
+                (EConnectionState.ServerPlaying, Protocol.EPacket.Sync));
             client.Session.Connection.Send(new Packet(Protocol.EPacket.Sync, new byte[] { }));
             TestUtils.UpdateUntil(
                 () => iPacketsReceived == expectedReceiveOrderOnServer.Count,

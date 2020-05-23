@@ -40,14 +40,14 @@ namespace Coop.Multiplayer
                           .Permit(
                               ETrigger.ClientRequestedWorldData,
                               EConnectionState.ServerSendingWorldData)
-                          .Permit(ETrigger.ClientJoined, EConnectionState.ServerConnected);
+                          .Permit(ETrigger.ClientJoined, EConnectionState.ServerPlaying);
 
             m_StateMachine.Configure(EConnectionState.ServerSendingWorldData)
                           .OnEntry(SendInitialWorldData)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
-                          .Permit(ETrigger.ClientJoined, EConnectionState.ServerConnected);
+                          .Permit(ETrigger.ClientJoined, EConnectionState.ServerPlaying);
 
-            m_StateMachine.Configure(EConnectionState.ServerConnected)
+            m_StateMachine.Configure(EConnectionState.ServerPlaying)
                           .OnEntry(onConnected)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting);
 
@@ -140,7 +140,7 @@ namespace Coop.Multiplayer
         }
         #endregion
 
-        #region ServerJoining, ServerSendingWorldData & ServerConnected
+        #region ServerJoining, ServerSendingWorldData & ServerPlaying
         private void SendJoinRequestAccepted()
         {
             Send(
@@ -175,7 +175,7 @@ namespace Coop.Multiplayer
             m_StateMachine.Fire(ETrigger.ClientJoined);
         }
 
-        [PacketHandler(EConnectionState.ServerConnected, Protocol.EPacket.Sync)]
+        [PacketHandler(EConnectionState.ServerPlaying, Protocol.EPacket.Sync)]
         private void receiveSyncPacket(Packet packet)
         {
             try
@@ -192,7 +192,7 @@ namespace Coop.Multiplayer
         }
 
         [PacketHandler(EConnectionState.ServerSendingWorldData, Protocol.EPacket.KeepAlive)]
-        [PacketHandler(EConnectionState.ServerConnected, Protocol.EPacket.KeepAlive)]
+        [PacketHandler(EConnectionState.ServerPlaying, Protocol.EPacket.KeepAlive)]
         private void receiveClientKeepAlive(Packet packet)
         {
             Protocol.KeepAlive payload =
