@@ -26,7 +26,7 @@ namespace Coop.Mod.Persistence.World
                     "Time control change request from {sender} to {request}.",
                     sender,
                     RequestedTimeControlMode);
-                entity.State.TimeControlMode = RequestedTimeControlMode;
+                entity.RequestedTimeControlMode = RequestedTimeControlMode;
             }
             else
             {

@@ -11,7 +11,7 @@ namespace Coop.Mod.Persistence.World
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly IEnvironmentServer m_Environment;
-        [CanBeNull] private CampaignTimeControlMode? m_RequestedTimeControlMode;
+        [CanBeNull] public CampaignTimeControlMode? RequestedTimeControlMode { get; set; }
 
         public WorldEntityServer(IEnvironmentServer environment)
         {
@@ -20,13 +20,13 @@ namespace Coop.Mod.Persistence.World
 
         protected override void UpdateAuthoritative()
         {
-            if (m_RequestedTimeControlMode.HasValue && m_Environment.CanChangeTimeControlMode)
+            if (RequestedTimeControlMode.HasValue && m_Environment.CanChangeTimeControlMode)
             {
                 Logger.Trace(
                     "Changing time control to {request}.",
-                    m_RequestedTimeControlMode.Value);
-                State.TimeControlMode = m_RequestedTimeControlMode.Value;
-                m_RequestedTimeControlMode = null;
+                    RequestedTimeControlMode.Value);
+                State.TimeControlMode = RequestedTimeControlMode.Value;
+                RequestedTimeControlMode = null;
             }
         }
     }
