@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Net;
-using Coop.Common;
+using Common;
 using Coop.Network;
 using LiteNetLib;
 

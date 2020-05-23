@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading;
-using Coop.Common;
+using Common;
 using Coop.Network;
 using Xunit;
 

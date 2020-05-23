@@ -1,6 +1,6 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
-using Coop.Common;
 using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using JetBrains.Annotations;

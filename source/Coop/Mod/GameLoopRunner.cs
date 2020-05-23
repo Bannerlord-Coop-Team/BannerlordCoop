@@ -1,7 +1,7 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
 using System.Threading;
-using Coop.Common;
 
 namespace Coop.Mod
 {

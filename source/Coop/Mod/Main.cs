@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Coop.Common;
+using Common;
 using Coop.Mod.Behaviour;
 using Coop.Mod.CLI;
 using Coop.Mod.Patch;

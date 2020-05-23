@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Coop.Common
+namespace Common
 {
     public class UpdateableList
     {

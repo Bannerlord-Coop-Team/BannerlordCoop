@@ -5,7 +5,7 @@ using NLog;
 using NLog.Config;
 using NLog.Targets;
 
-namespace Coop.Common
+namespace Common
 {
     public static class Logging
     {

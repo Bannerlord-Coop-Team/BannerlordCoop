@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Coop.Common;
+using Common;
 using Xunit;
 
 namespace Coop.Tests

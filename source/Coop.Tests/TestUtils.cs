@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Threading;
-using Coop.Common;
+using Common;
 using Coop.Multiplayer;
 using Coop.Network;
 using HarmonyLib;
