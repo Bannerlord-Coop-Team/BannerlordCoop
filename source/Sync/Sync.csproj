@@ -59,15 +59,18 @@
     <Compile Include="Attributes.cs" />
     <Compile Include="BufferedData.cs" />
     <Compile Include="FieldWatcher.cs" />
-    <Compile Include="ISyncable.cs" />
+    <Compile Include="SyncValue.cs" />
     <Compile Include="ISyncHandler.cs" />
+    <Compile Include="IWatchable.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Reflection\Extensions.cs" />
     <Compile Include="Reflection\InvokableFactory.cs" />
     <Compile Include="Reflection\Util.cs" />
+    <Compile Include="Patcher.cs" />
     <Compile Include="SyncableData.cs" />
     <Compile Include="SyncField.cs" />
     <Compile Include="SyncFieldGroup.cs" />
+    <Compile Include="SyncMethod.cs" />
     <Compile Include="SyncPriority.cs" />
   </ItemGroup>
   <ItemGroup>

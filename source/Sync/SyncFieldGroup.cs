@@ -6,7 +6,7 @@ using JetBrains.Annotations;
 
 namespace Sync
 {
-    public class SyncFieldGroup<TTarget, TGroup> : ISyncable
+    public class SyncFieldGroup<TTarget, TGroup> : SyncValue
         where TGroup : IEnumerable<object>
     {
         private readonly ConstructorInfo m_Constructor;
@@ -25,35 +25,12 @@ namespace Sync
             }
         }
 
-        public void SetSyncHandler([NotNull] object syncableInstance, Action<object> action)
-        {
-            if (m_SyncHandlers.ContainsKey(syncableInstance))
-            {
-                throw new ArgumentException($"Cannot have multiple sync handlers for {this}.");
-            }
-
-            m_SyncHandlers.Add(syncableInstance, action);
-        }
-
-        public void RemoveSyncHandler([NotNull] object syncableInstance)
-        {
-            m_SyncHandlers.Remove(syncableInstance);
-        }
-
-        [CanBeNull]
-        public Action<object> GetSyncHandler([NotNull] object syncableInstance)
-        {
-            return m_SyncHandlers.TryGetValue(syncableInstance, out Action<object> handler) ?
-                handler :
-                null;
-        }
-
-        public object Get(object target)
+        public override object Get(object target)
         {
             return GetTyped(target);
         }
 
-        public void Set(object target, object value)
+        public override void Set(object target, object value)
         {
             SetTyped((TTarget) target, (TGroup) value);
         }

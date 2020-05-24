@@ -10,9 +10,9 @@ namespace Sync
     {
         private static readonly Stack<SyncableData> ActiveFields = new Stack<SyncableData>();
 
-        public static Dictionary<ISyncable, Dictionary<object, BufferedData>>
+        public static Dictionary<SyncValue, Dictionary<object, BufferedData>>
             BufferedChanges { get; } =
-            new Dictionary<ISyncable, Dictionary<object, BufferedData>>();
+            new Dictionary<SyncValue, Dictionary<object, BufferedData>>();
 
         private static void Prefix()
         {
@@ -24,7 +24,7 @@ namespace Sync
         /// </summary>
         /// <param name="syncable"></param>
         /// <param name="target"></param>
-        public static void Watch(this ISyncable syncable, object target)
+        public static void Watch(this SyncValue syncable, object target)
         {
             object value = null;
             if (BufferedChanges.ContainsKey(syncable) &&
@@ -41,6 +41,22 @@ namespace Sync
             ActiveFields.Push(new SyncableData(syncable, target, value));
         }
 
+        private static readonly HarmonyMethod PatchPrefix = new HarmonyMethod(
+            AccessTools.Method(typeof(FieldWatcher), nameof(Prefix)))
+        {
+            priority = SyncPriority.First
+        };
+        private static readonly HarmonyMethod PatchPostfix = new HarmonyMethod(
+            AccessTools.Method(typeof(FieldWatcher), nameof(Postfix)))
+        {
+            priority = SyncPriority.Last
+        };
+        internal static void Patch(Harmony harmony, MethodBase method, HarmonyMethod patch)
+        {
+            harmony.Patch(method, patch, PatchPostfix);
+            harmony.Patch(method, PatchPrefix, PatchPostfix);
+        }
+
         private static void Postfix()
         {
             while (ActiveFields.Count > 0)
@@ -51,7 +67,7 @@ namespace Sync
                     break; // The marker
                 }
 
-                ISyncable field = data.Syncable;
+                SyncValue field = data.Syncable;
 
                 object newValue = data.Syncable.Get(data.Target);
                 bool changed = !Equals(newValue, data.Value);
@@ -77,31 +93,6 @@ namespace Sync
                     ToSend = newValue
                 };
                 field.Set(data.Target, data.Value);
-            }
-        }
-
-        public static void ApplyFieldWatcherPatches(Harmony harmony, Type type)
-        {
-            HarmonyMethod prefix = new HarmonyMethod(
-                AccessTools.Method(typeof(FieldWatcher), nameof(Prefix)))
-            {
-                priority = SyncPriority.First
-            };
-            HarmonyMethod postfix = new HarmonyMethod(
-                AccessTools.Method(typeof(FieldWatcher), nameof(Postfix)))
-            {
-                priority = SyncPriority.Last
-            };
-
-            foreach (MethodInfo toPatch in type.GetDeclaredMethods())
-            {
-                HarmonyMethod patch = new HarmonyMethod(toPatch);
-                foreach (SyncWatchAttribute attr in
-                    toPatch.GetCustomAttributes<SyncWatchAttribute>())
-                {
-                    harmony.Patch(attr.Method, patch, postfix);
-                    harmony.Patch(attr.Method, prefix, postfix);
-                }
             }
         }
     }

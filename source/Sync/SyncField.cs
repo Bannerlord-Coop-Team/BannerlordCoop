@@ -29,7 +29,7 @@ namespace Sync
         }
     }
 
-    public abstract class SyncField : ISyncable
+    public abstract class SyncField : SyncValue
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -47,35 +47,12 @@ namespace Sync
             m_Setter = InvokableFactory.CreateUntypedSetter<object>(memberInfo);
         }
 
-        public void SetSyncHandler([NotNull] object syncableInstance, Action<object> action)
-        {
-            if (m_SyncHandlers.ContainsKey(syncableInstance))
-            {
-                throw new ArgumentException($"Cannot have multiple sync handlers for {this}.");
-            }
-
-            m_SyncHandlers.Add(syncableInstance, action);
-        }
-
-        public void RemoveSyncHandler([NotNull] object syncableInstance)
-        {
-            m_SyncHandlers.Remove(syncableInstance);
-        }
-
-        [CanBeNull]
-        public Action<object> GetSyncHandler([NotNull] object syncableInstance)
-        {
-            return m_SyncHandlers.TryGetValue(syncableInstance, out Action<object> handler) ?
-                handler :
-                null;
-        }
-
-        public object Get(object target)
+        public override object Get(object target)
         {
             return m_GetterLocal(target);
         }
 
-        public void Set(object target, object value)
+        public override void Set(object target, object value)
         {
             if (target == null)
             {

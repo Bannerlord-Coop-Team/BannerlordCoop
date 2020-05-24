@@ -110,16 +110,17 @@ namespace Sync.Reflection
         }
 
         /// <summary>
-        ///     Returns a member method call of the form `void Method(TDeclaring, object)`.
+        ///     Returns a member method call of the form `void Method(TDeclaring, TParam)`.
         /// </summary>
         /// <typeparam name="TDeclaring">Type of the instance containing the member.</typeparam>
+        /// <typeparam name="TParam">Type of the parameter for the call.</typeparam>
         /// <param name="method"></param>
         /// <returns></returns>
-        public static Action<TDeclaring, object> CreateCall<TDeclaring>(MethodInfo method)
+        public static Action<TDeclaring, TParam> CreateCall<TDeclaring, TParam>(MethodInfo method)
         {
             Type instanceType = method.DeclaringType;
             ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
-            ParameterExpression arg1 = Expression.Parameter(typeof(object), "arg1");
+            ParameterExpression arg1 = Expression.Parameter(typeof(TParam), "arg1");
 
             UnaryExpression exConvertToParam0 = Expression.Convert(
                 arg1,
@@ -145,8 +146,8 @@ namespace Sync.Reflection
                 exCall = Expression.Call(arg0Converted, method, exConvertToParam0);
             }
 
-            Expression<Action<TDeclaring, object>> lambda =
-                Expression.Lambda<Action<TDeclaring, object>>(exCall, arg0, arg1);
+            Expression<Action<TDeclaring, TParam>> lambda =
+                Expression.Lambda<Action<TDeclaring, TParam>>(exCall, arg0, arg1);
             return lambda.Compile();
         }
 

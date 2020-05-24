@@ -2,6 +2,7 @@
 {
     public static class Coop
     {
+        public static bool DoSync => IsClient || IsServer;
         public static bool IsServer => CoopServer.Instance.Current != null;
         public static bool IsClient => CoopClient.Instance.Connected;
         public static bool IsServerSimulation => IsServer && !IsClient;

@@ -36,7 +36,7 @@ namespace Coop.Mod.Patch
         [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetPosition), MethodType.Setter)]
         private static void Patch_Movement(MobileParty __instance)
         {
-            if (Coop.IsClient || Coop.IsServer)
+            if (Coop.DoSync)
             {
                 Movement.Watch(__instance);
             }

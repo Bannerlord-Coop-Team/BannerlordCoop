@@ -81,21 +81,15 @@ namespace Coop.Mod.DebugUtil
             }
             else
             {
+
                 EntityManager manager = CoopServer.Instance.Persistence.EntityManager;
-                Imgui.Columns(3);
+                Imgui.Columns(2);
                 Imgui.Separator();
                 Imgui.Text("ID");
                 foreach (RailEntityServer entity in manager.Parties)
                 {
                     Imgui.Text(entity.Id.ToString());
                 }
-
-                Imgui.NextColumn();
-                foreach (RailEntityServer entity in manager.Parties)
-                {
-                    Imgui.Text(entity.GetType().ToString());
-                }
-
                 Imgui.NextColumn();
                 Imgui.Text("Entity");
                 foreach (RailEntityServer entity in manager.Parties)
