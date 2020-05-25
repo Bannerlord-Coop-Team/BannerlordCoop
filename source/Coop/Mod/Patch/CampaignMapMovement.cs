@@ -3,6 +3,7 @@ using Coop.Mod.Persistence;
 using HarmonyLib;
 using NLog;
 using Sync;
+using Sync.Attributes;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using Logger = NLog.Logger;

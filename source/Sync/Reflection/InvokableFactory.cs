@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
 
@@ -202,11 +205,69 @@ namespace Sync.Reflection
 
         public static Func<TValue> CreateGetter<TValue>(MemberInfo memberInfo, object instance)
         {
-            Type instanceType = memberInfo.DeclaringType;
             ConstantExpression exInstance = Expression.Constant(instance);
             MemberExpression exMemberAccess = Expression.MakeMemberAccess(exInstance, memberInfo);
             UnaryExpression body = Expression.Convert(exMemberAccess, typeof(TValue));
             return Expression.Lambda<Func<TValue>>(body).Compile();
+        }
+
+        public static Action<object, object[]> CreateStandInCaller(MethodInfo method)
+        {
+            ParameterInfo[] parameters = method.GetParameters();
+            ParameterExpression argInstance = Expression.Parameter(typeof(object), "instance");
+            UnaryExpression argInstanceConverted = Expression.Convert(
+                argInstance,
+                parameters[0].ParameterType);
+            ParameterExpression args = Expression.Parameter(typeof(object[]), "args");
+
+            // Unpack parameters
+            List<Expression> exArgs = new List<Expression>();
+            exArgs.Add(argInstanceConverted);
+            for (int i = 1; i < method.GetParameters().Length; ++i)
+            {
+                ParameterInfo param = method.GetParameters()[i];
+                BinaryExpression arrayElement = Expression.ArrayIndex(
+                    args,
+                    Expression.Constant(i - 1));
+                UnaryExpression arrayElementConverted =
+                    Expression.Convert(arrayElement, param.ParameterType);
+                exArgs.Add(arrayElementConverted);
+            }
+
+            // Standins are always static with the first argument being the instance.
+            MethodCallExpression exCall = Expression.Call(null, method, exArgs);
+
+            Expression<Action<object, object[]>> lambda =
+                Expression.Lambda<Action<object, object[]>>(exCall, argInstance, args);
+            return lambda.Compile();
+        }
+
+        public static DynamicMethod CreateStandIn(SyncMethod method)
+        {
+            List<Type> parameters = method.MemberInfo.GetParameters()
+                                          .Select(info => info.ParameterType)
+                                          .ToList();
+            parameters.Insert(0, method.MemberInfo.DeclaringType); // First argument is the instance
+            DynamicMethod dyn = new DynamicMethod(
+                "Original",
+                MethodAttributes.Static | MethodAttributes.Public,
+                CallingConventions.Standard,
+                method.MemberInfo.ReturnType,
+                parameters.ToArray(),
+                method.MemberInfo.DeclaringType,
+                true);
+
+            // The standin as it is will never be called. But it still needs a body for the reverse patching.
+            ILGenerator il = dyn.GetILGenerator(64);
+            il.ThrowException(typeof(NotImplementedException));
+
+            HarmonyMethod standin = new HarmonyMethod(dyn)
+            {
+                method = dyn,
+                reversePatchType = HarmonyReversePatchType.Snapshot
+            };
+            Harmony.ReversePatch(method.MemberInfo, standin);
+            return dyn;
         }
     }
 }

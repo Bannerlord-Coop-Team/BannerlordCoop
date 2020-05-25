@@ -1,15 +1,10 @@
-﻿using JetBrains.Annotations;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System;
+using JetBrains.Annotations;
 
 namespace Sync
 {
     public interface IWatchable
     {
-
         /// <summary>
         ///     Sets the handler to be called when a specific instance of the syncable
         ///     requested a change. Multiple instance specific handlers are not supported.

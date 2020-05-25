@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
-using JetBrains.Annotations;
-using NLog;
 using Sync.Reflection;
 
 namespace Sync
@@ -31,14 +28,9 @@ namespace Sync
 
     public abstract class SyncField : SyncValue
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-
         private readonly Func<object, object> m_GetterLocal;
         private readonly FieldInfo m_MemberInfo;
         private readonly Action<object, object> m_Setter;
-
-        private readonly Dictionary<object, Action<object>> m_SyncHandlers =
-            new Dictionary<object, Action<object>>();
 
         protected SyncField(FieldInfo memberInfo)
         {

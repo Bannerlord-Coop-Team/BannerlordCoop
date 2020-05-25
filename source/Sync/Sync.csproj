@@ -56,9 +56,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Attributes.cs" />
+    <Compile Include="Attributes\PatchAttribute.cs" />
+    <Compile Include="Attributes\SyncAttribute.cs" />
+    <Compile Include="Attributes\SyncCallAttribute.cs" />
+    <Compile Include="Attributes\SyncWatchAttribute.cs" />
     <Compile Include="BufferedData.cs" />
     <Compile Include="FieldWatcher.cs" />
+    <Compile Include="MethodRegistry.cs" />
     <Compile Include="SyncValue.cs" />
     <Compile Include="ISyncHandler.cs" />
     <Compile Include="IWatchable.cs" />
@@ -76,6 +80,5 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

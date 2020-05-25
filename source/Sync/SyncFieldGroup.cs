@@ -2,24 +2,20 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using JetBrains.Annotations;
 
 namespace Sync
 {
     public class SyncFieldGroup<TTarget, TGroup> : SyncValue
-        where TGroup : IEnumerable<object>
+        where TGroup : class, IEnumerable<object>
     {
-        private readonly ConstructorInfo m_Constructor;
         private readonly IEnumerable<SyncField> m_Fields;
-
-        private readonly Dictionary<object, Action<object>> m_SyncHandlers =
-            new Dictionary<object, Action<object>>();
 
         public SyncFieldGroup(IEnumerable<SyncField> fields)
         {
             m_Fields = fields;
-            m_Constructor = typeof(TGroup).GetConstructor(new[] {typeof(IEnumerable<object>[])});
-            if (m_Constructor == null)
+            ConstructorInfo constructor =
+                typeof(TGroup).GetConstructor(new[] {typeof(IEnumerable<object>[])});
+            if (constructor == null)
             {
                 throw new ArgumentException($"{typeof(TGroup)} has no matching constructor.");
             }
@@ -38,7 +34,7 @@ namespace Sync
         public TGroup GetTyped(object target)
         {
             return (TGroup) typeof(TGroup).GetConstructor(new[] {typeof(IEnumerable<object>[])})
-                                          .Invoke(
+                                          ?.Invoke(
                                               new object[] {m_Fields.Select(i => i.Get(target))});
         }
 

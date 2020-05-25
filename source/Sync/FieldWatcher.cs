@@ -1,14 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Reflection;
-using Sync.Reflection;
 using HarmonyLib;
+using Sync.Reflection;
 
 namespace Sync
 {
     public static class FieldWatcher
     {
         private static readonly Stack<SyncableData> ActiveFields = new Stack<SyncableData>();
+
+        private static readonly HarmonyMethod PatchPrefix = new HarmonyMethod(
+            AccessTools.Method(typeof(FieldWatcher), nameof(Prefix)))
+        {
+            priority = SyncPriority.SyncValuePre
+        };
+
+        private static readonly HarmonyMethod PatchPostfix = new HarmonyMethod(
+            AccessTools.Method(typeof(FieldWatcher), nameof(Postfix)))
+        {
+            priority = SyncPriority.SyncValuePost
+        };
 
         public static Dictionary<SyncValue, Dictionary<object, BufferedData>>
             BufferedChanges { get; } =
@@ -41,16 +52,6 @@ namespace Sync
             ActiveFields.Push(new SyncableData(syncable, target, value));
         }
 
-        private static readonly HarmonyMethod PatchPrefix = new HarmonyMethod(
-            AccessTools.Method(typeof(FieldWatcher), nameof(Prefix)))
-        {
-            priority = SyncPriority.First
-        };
-        private static readonly HarmonyMethod PatchPostfix = new HarmonyMethod(
-            AccessTools.Method(typeof(FieldWatcher), nameof(Postfix)))
-        {
-            priority = SyncPriority.Last
-        };
         internal static void Patch(Harmony harmony, MethodBase method, HarmonyMethod patch)
         {
             harmony.Patch(method, patch, PatchPostfix);

@@ -12,6 +12,7 @@ using NLog.Layouts;
 using NLog.Targets;
 using NoHarmony;
 using Sync;
+using Sync.Attributes;
 using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
@@ -26,7 +27,7 @@ namespace Coop.Mod
 
         public Main()
         {
-            TaleWorlds.Library.Debug.DebugManager = Debugging.DebugManager;
+            Debug.DebugManager = Debugging.DebugManager;
             MBDebug.DisableLogging = false;
 
             Instance = this;
