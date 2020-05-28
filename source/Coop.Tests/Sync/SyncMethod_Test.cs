@@ -84,9 +84,11 @@ namespace Coop.Tests.Sync
                 args => { ++iNumberOfHandlerCalls; });
 
             // Call the original
-            SomePatch.MethodSynchronization.CallOriginal(instance, new object[] {42});
+            int iExpectedValue = 42;
+            SomePatch.MethodSynchronization.CallOriginal(instance, new object[] {iExpectedValue});
             Assert.Equal(0, iNumberOfHandlerCalls);
             Assert.Equal(1, instance.NumberOfCalls);
+            Assert.Equal(iExpectedValue, instance.LatestArgument);
         }
     }
 }

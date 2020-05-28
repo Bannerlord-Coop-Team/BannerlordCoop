@@ -5,7 +5,7 @@ using Moq;
 using Network.Infrastructure;
 using Xunit;
 
-namespace Coop.Tests
+namespace Coop.Tests.Network
 {
     public class NetManager_Test
     {

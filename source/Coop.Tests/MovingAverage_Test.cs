@@ -20,14 +20,14 @@ namespace Coop.Tests
             Random random = new Random(0);
             for (int i = 0; i < 10 * iSize; ++i)
             {
-                long value = random.Next();
-                queue.Enqueue(i);
+                int value = random.Next();
+                queue.Enqueue(value);
                 if (queue.Count > iSize)
                 {
                     queue.Dequeue();
                 }
 
-                Assert.Equal(queue.Average(), m_Avg.Push(i));
+                Assert.True(0.0001 > Math.Abs(queue.Average() - m_Avg.Push(value)));
             }
         }
 

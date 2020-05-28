@@ -11,14 +11,10 @@ using RailgunNet.Logic;
 using TaleWorlds.CampaignSystem;
 using Xunit;
 
-namespace Coop.Tests
+namespace Coop.Tests.Persistence
 {
     public class Rail_Test
     {
-        private class SomeState : RailState
-        {
-            [Mutable] public CampaignTimeControlMode Mode { get; set; }
-        }
         public Rail_Test()
         {
             RailSynchronizedFactory.Detect(Assembly.GetAssembly(typeof(RailBitBufferExtensions)));
@@ -28,7 +24,6 @@ namespace Coop.Tests
 
             RailRegistry registryServer = new RailRegistry(Component.Server);
             registryServer.AddEntityType<RailEntityServer<SomeState>, SomeState>();
-
 
             m_Client = new RailClient(registryClient);
             m_Server = new RailServer(registryServer);
@@ -44,6 +39,11 @@ namespace Coop.Tests
 
             m_ConClientSide.OnSend += m_PeerServerSide.Object.Receive;
             m_ConServerSide.OnSend += m_PeerClientSide.Object.Receive;
+        }
+
+        private class SomeState : RailState
+        {
+            [Mutable] public CampaignTimeControlMode Mode { get; set; }
         }
 
         private readonly RailClient m_Client;
@@ -62,7 +62,8 @@ namespace Coop.Tests
             CampaignTimeControlMode expectedTimeControl = CampaignTimeControlMode.StoppablePlay;
             RailClientRoom clientRoom = m_Client.StartRoom();
             RailServerRoom serverRoom = m_Server.StartRoom();
-            RailEntityServer<SomeState> entityServerSide = serverRoom.AddNewEntity<RailEntityServer<SomeState>>();
+            RailEntityServer<SomeState> entityServerSide =
+                serverRoom.AddNewEntity<RailEntityServer<SomeState>>();
             entityServerSide.State.Mode = expectedTimeControl;
             m_Server.AddClient(m_PeerServerSide.Object, "");
             m_Client.SetPeer(m_PeerClientSide.Object);
@@ -85,7 +86,8 @@ namespace Coop.Tests
             // Clients representation of the entity is identical to the server
             RailEntityBase entityProxy = clientRoom.Entities.First();
             Assert.IsType<RailEntityClient<SomeState>>(entityProxy);
-            RailEntityClient<SomeState> entityClientSide = entityProxy as RailEntityClient<SomeState>;
+            RailEntityClient<SomeState> entityClientSide =
+                entityProxy as RailEntityClient<SomeState>;
             Assert.NotNull(entityClientSide);
             Assert.Equal(entityServerSide.Id, entityProxy.Id);
             Assert.Equal(expectedTimeControl, entityServerSide.State.Mode);
@@ -110,8 +112,8 @@ namespace Coop.Tests
                 m_Client.Update();
             }
 
-            Assert.Equal(expectedTimeControl,  entityServerSide.State.Mode);
-            Assert.Equal(expectedTimeControl,  entityClientSide.State.Mode);
+            Assert.Equal(expectedTimeControl, entityServerSide.State.Mode);
+            Assert.Equal(expectedTimeControl, entityClientSide.State.Mode);
         }
     }
 }

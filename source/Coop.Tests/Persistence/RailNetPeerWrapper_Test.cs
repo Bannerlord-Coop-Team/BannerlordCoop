@@ -7,7 +7,7 @@ using Network.Infrastructure;
 using Network.Protocol;
 using Xunit;
 
-namespace Coop.Tests
+namespace Coop.Tests.Persistence
 {
     public class RailNetPeerWrapper_Test
     {
@@ -26,12 +26,6 @@ namespace Coop.Tests
 
         private readonly RailNetPeerWrapper m_Instance;
         private ArraySegment<byte> m_SendRawParam;
-        private ArraySegment<byte> m_ReceiveParam;
-
-        private void Callback(ArraySegment<byte> buffer)
-        {
-            m_ReceiveParam = buffer;
-        }
 
         [Theory]
         [InlineData(0)]

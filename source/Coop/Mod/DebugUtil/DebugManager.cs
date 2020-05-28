@@ -1,17 +1,17 @@
-﻿using NLog;
-using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using NLog;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using Debug = TaleWorlds.Library.Debug;
+using Logger = NLog.Logger;
 
 namespace Coop.Mod.DebugUtil
 {
-    
     public class DebugManager : IDebugManager
     {
-        private static readonly NLog.Logger Logger = LogManager.GetCurrentClassLogger();
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         public void Assert(
             bool condition,
             string message,
@@ -21,7 +21,11 @@ namespace Coop.Mod.DebugUtil
         {
             if (!condition)
             {
-                Logger.Debug("Assert failure in {file}::{method}::{line}: {message}", CallerFile, CallerMethod, CallerLine);
+                Logger.Debug(
+                    "Assert failure in {file}::{method}::{line}: {message}",
+                    CallerFile,
+                    CallerMethod,
+                    CallerLine);
                 if (Debugger.IsAttached)
                 {
                     Debugger.Break();
@@ -50,7 +54,7 @@ namespace Coop.Mod.DebugUtil
         public void Print(
             string message,
             int logLevel = 0,
-            TaleWorlds.Library.Debug.DebugColor color = TaleWorlds.Library.Debug.DebugColor.White,
+            Debug.DebugColor color = Debug.DebugColor.White,
             ulong debugFilter = 17592186044416)
         {
             LogEventInfo eventInfo = new LogEventInfo(LogLevel.Debug, Logger.Name, message);
