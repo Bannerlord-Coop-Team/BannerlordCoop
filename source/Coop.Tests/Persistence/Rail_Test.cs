@@ -1,7 +1,7 @@
 ﻿using System.Linq;
 using System.Reflection;
 using Coop.Mod.Persistence;
-using Coop.Multiplayer.Network;
+using Coop.NetImpl.LiteNet;
 using Moq;
 using RailgunNet;
 using RailgunNet.Connection.Client;

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using Common;
 using Coop.Mod.Persistence;
-using Coop.Multiplayer.Network;
+using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;

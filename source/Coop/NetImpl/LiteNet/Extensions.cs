@@ -2,7 +2,7 @@
 using LiteNetLib;
 using Network.Infrastructure;
 
-namespace Coop.Multiplayer.Network
+namespace Coop.NetImpl.LiteNet
 {
     public static class Extensions
     {

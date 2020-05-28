@@ -66,7 +66,7 @@ namespace Sync
             // 2. return false to prevent the actual call.
             patch.priority = SyncPriority.SyncCallPreUserPatch;
             harmony.Patch(method, PatchPrefix);
-            harmony.Patch(method, patch);
+            harmony.Patch(method, patch, PatchPostfix);
         }
 
         public static void RequestCall(this SyncMethod sync, object instance, object[] args)

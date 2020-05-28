@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Linq;
-using Coop.Multiplayer.Network;
+using Coop.NetImpl.LiteNet;
 using Moq;
 using Network;
 using Network.Infrastructure;

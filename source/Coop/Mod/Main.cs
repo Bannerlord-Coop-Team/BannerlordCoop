@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common;
+using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Patch;
@@ -10,7 +11,6 @@ using HarmonyLib;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
-using NoHarmony;
 using Sync;
 using Sync.Attributes;
 using TaleWorlds.Engine;
@@ -93,7 +93,7 @@ namespace Coop.Mod
 
             // NLog
             Target.Register<MbLogTarget>("MbLog");
-            Common.Logging.Init(
+            Mod.Logging.Init(
                 new Target[]
                 {
                     new MbLogTarget

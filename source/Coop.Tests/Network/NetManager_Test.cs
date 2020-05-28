@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using Common;
-using Coop.Multiplayer.Network;
+using Coop.NetImpl.LiteNet;
 using Moq;
 using Network.Infrastructure;
 using Xunit;

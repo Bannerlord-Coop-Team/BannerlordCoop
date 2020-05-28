@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading;
-using Coop.Multiplayer.Network;
+using Coop.NetImpl.LiteNet;
 using LiteNetLib;
 using Moq;
 using Network.Infrastructure;

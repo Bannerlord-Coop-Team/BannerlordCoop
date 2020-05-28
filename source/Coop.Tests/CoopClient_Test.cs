@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 using Coop.Mod;
-using Coop.Multiplayer.Network;
+using Coop.NetImpl.LiteNet;
 using Moq;
 using Network.Infrastructure;
 using Xunit;

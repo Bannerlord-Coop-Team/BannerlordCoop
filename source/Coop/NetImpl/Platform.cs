@@ -1,7 +1,7 @@
-﻿using Coop.Multiplayer.Steam;
-using Network;
+﻿using Coop.NetImpl.Steam;
+using Network.Infrastructure;
 
-namespace Network.Infrastructure
+namespace Coop.NetImpl
 {
     public static class Platform
     {
