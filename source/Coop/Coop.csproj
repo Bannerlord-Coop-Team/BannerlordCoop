@@ -238,6 +238,12 @@
     <Compile Include="Mod\Persistence\EntityManager.cs" />
     <Compile Include="Mod\Persistence\RailBitBufferExtensions.cs" />
     <Compile Include="Mod\Persistence\Registry.cs" />
+    <Compile Include="Mod\Persistence\RPC\Argument.cs" />
+    <Compile Include="Mod\Persistence\RPC\ArgumentResolver.cs" />
+    <Compile Include="Mod\Persistence\RPC\MethodCall.cs" />
+    <Compile Include="Mod\Persistence\RPC\MethodCallSerializer.cs" />
+    <Compile Include="Mod\Persistence\RPC\ArgumentSerializer.cs" />
+    <Compile Include="Mod\Persistence\RPC\EventMethodCall.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityClient.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityServer.cs" />
     <Compile Include="Mod\Persistence\World\EventTimeControl.cs" />
@@ -295,7 +301,6 @@
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll</PostBuildEvent>

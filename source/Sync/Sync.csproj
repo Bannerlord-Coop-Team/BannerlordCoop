@@ -62,6 +62,7 @@
     <Compile Include="Attributes\SyncWatchAttribute.cs" />
     <Compile Include="BufferedData.cs" />
     <Compile Include="FieldWatcher.cs" />
+    <Compile Include="MethodId.cs" />
     <Compile Include="MethodRegistry.cs" />
     <Compile Include="SyncValue.cs" />
     <Compile Include="ISyncHandler.cs" />

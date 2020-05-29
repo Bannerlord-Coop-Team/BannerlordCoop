@@ -8,15 +8,14 @@ namespace Sync
 {
     public static class MethodRegistry
     {
-        private static readonly Dictionary<SyncMethod, int> MethodIds =
-            new Dictionary<SyncMethod, int>();
+        private static readonly Dictionary<SyncMethod, MethodId> MethodIds =
+            new Dictionary<SyncMethod, MethodId>();
 
-        private static readonly Dictionary<int, SyncMethod> Ids = new Dictionary<int, SyncMethod>();
+        private static readonly Dictionary<MethodId, SyncMethod> Ids =
+            new Dictionary<MethodId, SyncMethod>();
 
         private static readonly Dictionary<Type, SyncMethod> Types =
             new Dictionary<Type, SyncMethod>();
-
-        private static int _nextId;
 
         private static readonly HarmonyMethod PatchPrefix = new HarmonyMethod(
             AccessTools.Method(typeof(MethodRegistry), nameof(Prefix)))
@@ -30,7 +29,8 @@ namespace Sync
             priority = SyncPriority.SyncCallPost
         };
 
-        public static IReadOnlyDictionary<SyncMethod, int> MethodToId => MethodIds;
+        public static IReadOnlyDictionary<SyncMethod, MethodId> MethodToId => MethodIds;
+        public static IReadOnlyDictionary<MethodId, SyncMethod> IdToMethod => Ids;
         public static IReadOnlyDictionary<Type, SyncMethod> TypeToSyncMethod => Types;
 
         public static void Register([NotNull] SyncMethod method)
@@ -40,14 +40,9 @@ namespace Sync
                 throw new ArgumentException($"Duplicate register for: {method}");
             }
 
-            int id = MakeId();
+            MethodId id = MethodId.GetNextId();
             Ids.Add(id, method);
             MethodIds.Add(method, id);
-        }
-
-        private static int MakeId()
-        {
-            return _nextId++;
         }
 
         private static bool Prefix()
