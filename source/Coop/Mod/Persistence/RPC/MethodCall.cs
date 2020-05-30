@@ -7,25 +7,24 @@ namespace Coop.Mod.Persistence.RPC
     public class MethodCall
     {
         public List<Argument> Arguments = new List<Argument>();
-        public Argument Instance = Argument.Null; // Instance to call the method on.
 
-        public MethodId Method = MethodId.Invalid;
+        public MethodId Id = MethodId.Invalid;
+        public Argument Instance = Argument.Null; // Instance to call the method on.
         public static EntityId StaticContext => EntityId.INVALID;
 
         public override string ToString()
         {
-            string sRet = "";
-            if (MethodRegistry.IdToMethod.TryGetValue(Method, out SyncMethod method))
+            string sRet = Instance.EventType == EventArgType.Null ? "static " : $"{Instance} ";
+            if (MethodRegistry.IdToMethod.TryGetValue(Id, out SyncMethod method))
             {
-                sRet = $"Call {method}";
+                sRet = $"{method}";
             }
             else
             {
-                sRet = $"Unknown call {Method.InternalValue}";
+                sRet = $"[UNREGISTRED] {Id.InternalValue}";
             }
 
             sRet += "(" + string.Join(", ", Arguments) + ")";
-            sRet += $" on {Instance}";
             return sRet;
         }
     }

@@ -1,10 +1,11 @@
-﻿using Common;
-using System;
+﻿using System;
+using System.Diagnostics;
+using Common;
 using Coop.Mod.Persistence;
+using Coop.Mod.Persistence.RPC;
 using Network.Infrastructure;
 using RailgunNet.Logic;
 using TaleWorlds.Engine;
-using TaleWorlds.Library;
 
 namespace Coop.Mod.DebugUtil
 {
@@ -12,7 +13,7 @@ namespace Coop.Mod.DebugUtil
     {
         private readonly string m_WindowTitle = "";
 
-        public bool Visible { get; set; } = false;
+        public bool Visible { get; set; }
 
         public void Update(TimeSpan frameTime)
         {
@@ -21,6 +22,7 @@ namespace Coop.Mod.DebugUtil
                 Begin();
                 AddButtons();
                 DisplayConnectionInfo();
+                DisplayClientRpcInfo();
                 DisplayEntities();
                 End();
             }
@@ -44,6 +46,7 @@ namespace Coop.Mod.DebugUtil
             {
                 DebugConsole.Toggle();
             }
+
             if (CoopServer.Instance.Current == null)
             {
                 Imgui.SameLine(200);
@@ -61,7 +64,9 @@ namespace Coop.Mod.DebugUtil
                 if (Imgui.SmallButton("Connect to local host"))
                 {
                     ServerConfiguration defaultConfiguration = new ServerConfiguration();
-                    CoopClient.Instance.Connect(defaultConfiguration.LanAddress, defaultConfiguration.LanPort);
+                    CoopClient.Instance.Connect(
+                        defaultConfiguration.LanAddress,
+                        defaultConfiguration.LanPort);
                 }
             }
         }
@@ -73,7 +78,11 @@ namespace Coop.Mod.DebugUtil
 
         private void DisplayEntities()
         {
-            if (!Imgui.TreeNode("Persistence: Parties")) return;
+            if (!Imgui.TreeNode("Persistence: Parties"))
+            {
+                Imgui.TreePop();
+                return;
+            }
 
             if (CoopServer.Instance?.Persistence?.EntityManager == null)
             {
@@ -81,7 +90,6 @@ namespace Coop.Mod.DebugUtil
             }
             else
             {
-
                 EntityManager manager = CoopServer.Instance.Persistence.EntityManager;
                 Imgui.Columns(2);
                 Imgui.Separator();
@@ -90,14 +98,16 @@ namespace Coop.Mod.DebugUtil
                 {
                     Imgui.Text(entity.Id.ToString());
                 }
+
                 Imgui.NextColumn();
                 Imgui.Text("Entity");
+                Imgui.Separator();
                 foreach (RailEntityServer entity in manager.Parties)
                 {
                     Imgui.Text(entity.ToString());
                 }
-                Imgui.Separator();
             }
+
             Imgui.TreePop();
         }
 
@@ -109,6 +119,63 @@ namespace Coop.Mod.DebugUtil
                 Imgui.Text(CoopClient.Instance.ToString());
                 Imgui.TreePop();
             }
+        }
+
+        private void DisplayClientRpcInfo()
+        {
+            if (!Imgui.TreeNode("Persistence: client synchronized method calls"))
+            {
+                return;
+            }
+
+            if (CoopClient.Instance?.Persistence?.RpcSyncHandlers == null)
+            {
+                Text("Coop client not connected.");
+            }
+            else
+            {
+                RPCSyncHandlers manager = CoopClient.Instance?.Persistence?.RpcSyncHandlers;
+
+                foreach (MethodCallSyncHandler handler in manager.Handlers)
+                {
+                    if (!Imgui.TreeNode(handler.Method.ToString()))
+                    {
+                        continue;
+                    }
+#if DEBUG
+#else
+                    DisplayDebugDisabledText();
+#endif
+
+                    Imgui.Columns(2);
+                    Imgui.Separator();
+                    Imgui.Text("Requested on");
+
+                    foreach (MethodCallSyncHandler.Statistics.Trace trace in handler.Stats.History)
+                    {
+                        Imgui.Text(trace.Tick.ToString());
+                    }
+
+                    Imgui.NextColumn();
+                    Imgui.Text("Request");
+                    Imgui.Separator();
+                    foreach (MethodCallSyncHandler.Statistics.Trace trace in handler.Stats.History)
+                    {
+                        Imgui.Text(trace.Call.ToString());
+                    }
+
+                    Imgui.Columns();
+                    Imgui.TreePop();
+                }
+            }
+
+            Imgui.TreePop();
+        }
+
+        [Conditional("DEBUG")]
+        private void DisplayDebugDisabledText()
+        {
+            Imgui.Text("DEBUG is disabled. No information available.");
         }
 
         private void End()

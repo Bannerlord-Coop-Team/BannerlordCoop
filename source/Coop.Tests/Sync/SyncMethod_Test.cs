@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using System;
+using HarmonyLib;
 using Sync;
 using Sync.Attributes;
 using Xunit;
@@ -9,6 +10,8 @@ namespace Coop.Tests.Sync
     {
         private class A
         {
+            [ThreadStatic] public static int? StaticLatestArgument;
+            [ThreadStatic] public static int StaticNumberOfCalls;
             public int? LatestArgument;
             public int NumberOfCalls;
 
@@ -16,6 +19,12 @@ namespace Coop.Tests.Sync
             {
                 ++NumberOfCalls;
                 LatestArgument = iSomeArgument;
+            }
+
+            public static void StaticSyncedMethod(int iSomeArgument)
+            {
+                ++StaticNumberOfCalls;
+                StaticLatestArgument = iSomeArgument;
             }
         }
 
@@ -25,10 +34,19 @@ namespace Coop.Tests.Sync
             public static readonly SyncMethod MethodSynchronization =
                 new SyncMethod(AccessTools.Method(typeof(A), nameof(A.SyncedMethod)));
 
+            public static readonly SyncMethod StaticMethodSynchronization =
+                new SyncMethod(AccessTools.Method(typeof(A), nameof(A.StaticSyncedMethod)));
+
             [SyncCall(typeof(A), nameof(A.SyncedMethod))]
-            public static void CustomPrefix(A __instance, int iSomeArgument)
+            public static bool CustomPrefix(A __instance, int iSomeArgument)
             {
-                MethodSynchronization.RequestCall(__instance, new object[] {iSomeArgument});
+                return MethodSynchronization.RequestCall(__instance, new object[] {iSomeArgument});
+            }
+
+            [SyncCall(typeof(A), nameof(A.StaticSyncedMethod))]
+            public static bool CustomPrefixStatic(int iSomeArgument)
+            {
+                return StaticMethodSynchronization.RequestCall(null, new object[] {iSomeArgument});
             }
         }
 
@@ -47,8 +65,34 @@ namespace Coop.Tests.Sync
         [Fact]
         private void IsRegistered()
         {
+            ApplyPatch();
+
             // Statically registered
             Assert.True(MethodRegistry.MethodToId.ContainsKey(SomePatch.MethodSynchronization));
+            Assert.True(
+                MethodRegistry.MethodToId.ContainsKey(SomePatch.StaticMethodSynchronization));
+        }
+
+        [Fact]
+        private void IsStaticSyncHandlerCalled()
+        {
+            ApplyPatch();
+
+            // Register sync handler
+            Assert.Equal(0, A.StaticNumberOfCalls);
+            int iNumberOfHandlerCalls = 0;
+            SomePatch.StaticMethodSynchronization.SetGlobalHandler(
+                (instance, args) =>
+                {
+                    Assert.Null(instance);
+                    ++iNumberOfHandlerCalls;
+                });
+
+            // Trigger the handler
+            A.StaticSyncedMethod(42);
+            Assert.Equal(0, A.StaticNumberOfCalls);
+            Assert.Equal(1, iNumberOfHandlerCalls);
+            SomePatch.StaticMethodSynchronization.RemoveGlobalHandler();
         }
 
         [Fact]
@@ -60,7 +104,7 @@ namespace Coop.Tests.Sync
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            SomePatch.MethodSynchronization.SetSyncHandler(
+            SomePatch.MethodSynchronization.SetInstanceHandler(
                 instance,
                 args => { ++iNumberOfHandlerCalls; });
 
@@ -68,6 +112,18 @@ namespace Coop.Tests.Sync
             instance.SyncedMethod(42);
             Assert.Equal(0, instance.NumberOfCalls);
             Assert.Equal(1, iNumberOfHandlerCalls);
+        }
+
+        [Fact]
+        private void OriginalIsCalledIfNoHandlerExists()
+        {
+            ApplyPatch();
+
+            // Trigger the handler
+            A instance = new A();
+            Assert.Equal(0, instance.NumberOfCalls);
+            instance.SyncedMethod(42);
+            Assert.Equal(1, instance.NumberOfCalls);
         }
 
         [Fact]
@@ -79,7 +135,7 @@ namespace Coop.Tests.Sync
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            SomePatch.MethodSynchronization.SetSyncHandler(
+            SomePatch.MethodSynchronization.SetInstanceHandler(
                 instance,
                 args => { ++iNumberOfHandlerCalls; });
 

@@ -242,12 +242,41 @@ namespace Sync.Reflection
             return lambda.Compile();
         }
 
+        public static Action<object[]> CreateStaticStandInCaller(MethodInfo method)
+        {
+            ParameterInfo[] parameters = method.GetParameters();
+            ParameterExpression args = Expression.Parameter(typeof(object[]), "args");
+
+            // Unpack parameters
+            List<Expression> exArgs = new List<Expression>();
+            for (int i = 0; i < method.GetParameters().Length; ++i)
+            {
+                ParameterInfo param = method.GetParameters()[i];
+                BinaryExpression arrayElement = Expression.ArrayIndex(args, Expression.Constant(i));
+                UnaryExpression arrayElementConverted =
+                    Expression.Convert(arrayElement, param.ParameterType);
+                exArgs.Add(arrayElementConverted);
+            }
+
+            // Standins are always static with the first argument being the instance.
+            MethodCallExpression exCall = Expression.Call(null, method, exArgs);
+
+            Expression<Action<object[]>> lambda = Expression.Lambda<Action<object[]>>(exCall, args);
+            return lambda.Compile();
+        }
+
         public static DynamicMethod CreateStandIn(SyncMethod method)
         {
             List<Type> parameters = method.MemberInfo.GetParameters()
                                           .Select(info => info.ParameterType)
                                           .ToList();
-            parameters.Insert(0, method.MemberInfo.DeclaringType); // First argument is the instance
+            if (!method.MemberInfo.IsStatic)
+            {
+                parameters.Insert(
+                    0,
+                    method.MemberInfo.DeclaringType); // First argument is the instance
+            }
+
             DynamicMethod dyn = new DynamicMethod(
                 "Original",
                 MethodAttributes.Static | MethodAttributes.Public,

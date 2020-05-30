@@ -18,6 +18,9 @@ namespace Coop.Mod.Persistence.RPC
                 case EventArgType.MBGUID:
                     buffer.WriteMBGUID(arg.MbGUID.Value);
                     break;
+                case EventArgType.Null:
+                    // Empty
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -33,6 +36,8 @@ namespace Coop.Mod.Persistence.RPC
                     return new Argument(buffer.ReadEntityId());
                 case EventArgType.MBGUID:
                     return new Argument(buffer.ReadMBGUID());
+                case EventArgType.Null:
+                    return Argument.Null;
                 default:
                     throw new ArgumentOutOfRangeException();
             }

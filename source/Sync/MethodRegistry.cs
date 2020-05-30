@@ -17,23 +17,11 @@ namespace Sync
         private static readonly Dictionary<Type, SyncMethod> Types =
             new Dictionary<Type, SyncMethod>();
 
-        private static readonly HarmonyMethod PatchPrefix = new HarmonyMethod(
-            AccessTools.Method(typeof(MethodRegistry), nameof(Prefix)))
-        {
-            priority = SyncPriority.SyncCallPre
-        };
-
-        private static readonly HarmonyMethod PatchPostfix = new HarmonyMethod(
-            AccessTools.Method(typeof(MethodRegistry), nameof(Postfix)))
-        {
-            priority = SyncPriority.SyncCallPost
-        };
-
         public static IReadOnlyDictionary<SyncMethod, MethodId> MethodToId => MethodIds;
         public static IReadOnlyDictionary<MethodId, SyncMethod> IdToMethod => Ids;
         public static IReadOnlyDictionary<Type, SyncMethod> TypeToSyncMethod => Types;
 
-        public static void Register([NotNull] SyncMethod method)
+        public static MethodId Register([NotNull] SyncMethod method)
         {
             if (MethodIds.ContainsKey(method))
             {
@@ -43,30 +31,23 @@ namespace Sync
             MethodId id = MethodId.GetNextId();
             Ids.Add(id, method);
             MethodIds.Add(method, id);
-        }
-
-        private static bool Prefix()
-        {
-            return false;
-        }
-
-        private static void Postfix()
-        {
+            return id;
         }
 
         internal static void Patch(Harmony harmony, MethodBase method, HarmonyMethod patch)
         {
-            // Intended prefix order:
-            // 1. Code in [SyncCall]. Supposed to call `RequestCall`.
-            // 2. return false to prevent the actual call.
             patch.priority = SyncPriority.SyncCallPreUserPatch;
-            harmony.Patch(method, PatchPrefix);
-            harmony.Patch(method, patch, PatchPostfix);
+            harmony.Patch(method, patch);
         }
 
-        public static void RequestCall(this SyncMethod sync, object instance, object[] args)
+        public static bool RequestCall(
+            this SyncMethod sync,
+            [CanBeNull] object instance,
+            [CanBeNull] object[] args)
         {
-            sync.GetSyncHandler(instance)?.Invoke(args);
+            Action<object> handler = sync.GetHandler(instance);
+            handler?.Invoke(args);
+            return handler == null;
         }
     }
 }

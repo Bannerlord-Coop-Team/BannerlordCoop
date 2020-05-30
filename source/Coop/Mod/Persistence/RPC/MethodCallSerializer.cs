@@ -8,7 +8,7 @@ namespace Coop.Mod.Persistence.RPC
         [Encoder]
         public static void WriteMethodCall(this RailBitBuffer buffer, MethodCall pack)
         {
-            buffer.WriteInt(pack.Method.InternalValue);
+            buffer.WriteInt(pack.Id.InternalValue);
             buffer.EncodeEventArg(pack.Instance);
             buffer.WriteInt(pack.Arguments.Count);
             foreach (Argument arg in pack.Arguments)
@@ -21,7 +21,7 @@ namespace Coop.Mod.Persistence.RPC
         public static MethodCall ReadMethodCall(this RailBitBuffer buffer)
         {
             MethodCall pack = new MethodCall();
-            pack.Method = new MethodId(buffer.ReadInt());
+            pack.Id = new MethodId(buffer.ReadInt());
             pack.Instance = buffer.DecodeEventArg();
             int iNumberOfArguments = buffer.ReadInt();
             for (int i = 0; i < iNumberOfArguments; ++i)

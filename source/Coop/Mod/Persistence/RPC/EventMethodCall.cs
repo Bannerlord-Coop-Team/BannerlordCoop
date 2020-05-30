@@ -13,7 +13,7 @@ namespace Coop.Mod.Persistence.RPC
 
         protected override void Execute(RailRoom room, RailController sender)
         {
-            if (MethodRegistry.IdToMethod.TryGetValue(Call.Method, out SyncMethod method))
+            if (MethodRegistry.IdToMethod.TryGetValue(Call.Id, out SyncMethod method))
             {
                 if (room is RailServerRoom serverRoom)
                 {

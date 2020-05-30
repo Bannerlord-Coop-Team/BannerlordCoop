@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Common;
+using Coop.Mod.Persistence.RPC;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
@@ -19,7 +20,10 @@ namespace Coop.Mod.Persistence
             m_Environment = environment;
             m_RailClient = new RailClient(Registry.Client(environment));
             Room = m_RailClient.StartRoom();
+            RpcSyncHandlers = new RPCSyncHandlers();
         }
+
+        [NotNull] public RPCSyncHandlers RpcSyncHandlers { get; }
 
         [NotNull] public RailClientRoom Room { get; }
 
@@ -40,9 +44,7 @@ namespace Coop.Mod.Persistence
                     else if (!instanceBuffer.Value.Sent)
                     {
                         SyncValue field = fieldBuffer.Key;
-                        field.GetSyncHandler(instance)?.Invoke(instanceBuffer.Value.ToSend);
-                        field.GetSyncHandler(SyncableInstance.Any)
-                             ?.Invoke(instanceBuffer.Value.ToSend);
+                        field.GetHandler(instance)?.Invoke(instanceBuffer.Value.ToSend);
                         instanceBuffer.Value.Sent = true;
                     }
                 }

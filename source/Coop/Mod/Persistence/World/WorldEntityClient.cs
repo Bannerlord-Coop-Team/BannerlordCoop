@@ -3,7 +3,6 @@ using System.ComponentModel;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
-using Sync;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence.World
@@ -19,7 +18,7 @@ namespace Coop.Mod.Persistence.World
             m_Environment = environment ?? throw new ArgumentNullException(nameof(environment));
         }
 
-        private void RequestTimeControlChange(object value)
+        private void RequestTimeControlChange(object instance, object value)
         {
             if (!(value is CampaignTimeControlMode))
             {
@@ -40,9 +39,7 @@ namespace Coop.Mod.Persistence.World
 
         protected override void OnAdded()
         {
-            m_Environment.TimeControlMode.SetSyncHandler(
-                SyncableInstance.Any,
-                RequestTimeControlChange);
+            m_Environment.TimeControlMode.SetGlobalHandler(RequestTimeControlChange);
             State.PropertyChanged += State_PropertyChanged;
         }
 
@@ -62,7 +59,7 @@ namespace Coop.Mod.Persistence.World
 
         protected override void OnRemoved()
         {
-            m_Environment.TargetPosition.RemoveSyncHandler(SyncableInstance.Any);
+            m_Environment.TargetPosition.RemoveGlobalHandler();
             State.PropertyChanged -= State_PropertyChanged;
         }
 
