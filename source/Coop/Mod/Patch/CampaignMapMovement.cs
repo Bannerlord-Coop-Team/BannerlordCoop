@@ -1,12 +1,10 @@
 ﻿using System.Collections.Generic;
-using System.Reflection;
 using Coop.Mod.Persistence;
 using HarmonyLib;
 using NLog;
 using Sync;
 using Sync.Attributes;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Library;
 using Logger = NLog.Logger;
 
@@ -44,27 +42,5 @@ namespace Coop.Mod.Patch
                 Movement.Watch(__instance);
             }
         }
-
-        #region EnterSettlement
-        private static readonly MethodInfo m_EnterSettlement_ApplyForParty = AccessTools.Method(
-            typeof(EnterSettlementAction),
-            nameof(EnterSettlementAction.ApplyForParty));
-
-        public static SyncMethod EnterSettlement_ApplyForParty =
-            new SyncMethod(m_EnterSettlement_ApplyForParty);
-
-        [SyncCall(typeof(EnterSettlementAction), nameof(EnterSettlementAction.ApplyForParty))]
-        private static bool Patch_EnterSettlement(MobileParty owner, Settlement settlement)
-        {
-            if (Coop.DoSync)
-            {
-                return EnterSettlement_ApplyForParty.RequestCall(
-                    null,
-                    new object[] {owner, settlement});
-            }
-
-            return true;
-        }
-        #endregion
     }
 }
