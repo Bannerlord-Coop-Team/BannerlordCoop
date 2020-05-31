@@ -3,7 +3,7 @@ using HarmonyLib;
 
 namespace Sync.Attributes
 {
-    [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
+    [AttributeUsage(AttributeTargets.Method)]
     public class SyncCallAttribute : SyncAttribute
     {
         public SyncCallAttribute(

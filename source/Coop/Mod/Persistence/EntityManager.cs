@@ -6,6 +6,7 @@ using Coop.Mod.Persistence.World;
 using NLog;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
+using RailgunNet.System.Types;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence
@@ -21,7 +22,7 @@ namespace Coop.Mod.Persistence
         private readonly Dictionary<MobileParty, RailEntityServer> m_Parties =
             new Dictionary<MobileParty, RailEntityServer>();
 
-        public IReadOnlyCollection<RailEntityServer> Parties => m_Parties.Values;
+        private readonly List<MobileParty> m_PartiesToAdd = new List<MobileParty>();
         private readonly RailServerRoom m_Room;
         private readonly RailServer m_Server;
         private RailServerPeer m_Arbiter;
@@ -31,10 +32,24 @@ namespace Coop.Mod.Persistence
             m_Server = server ?? throw new ArgumentNullException(nameof(server));
             m_Room = m_Server.StartRoom();
             InitRoom(m_Room);
+            m_Room.PostRoomUpdate += AddPendingParties;
 
             // Setup callbacks
             m_Server.ClientAdded += OnClientAdded;
             m_Server.ClientRemoved += OnClientRemoved;
+        }
+
+        public IReadOnlyCollection<RailEntityServer> Parties => m_Parties.Values;
+
+        private void AddPendingParties(Tick tick)
+        {
+            foreach (MobileParty party in m_PartiesToAdd)
+            {
+                MobilePartyEntityServer entity =
+                    m_Room.AddNewEntity<MobilePartyEntityServer>(
+                        e => e.State.PartyId = party.Party.Index);
+                m_Parties.Add(party, entity);
+            }
         }
 
         /// <summary>
@@ -84,10 +99,7 @@ namespace Coop.Mod.Persistence
                 return;
             }
 
-            MobilePartyEntityServer entity =
-                m_Room.AddNewEntity<MobilePartyEntityServer>(
-                    e => e.State.PartyId = party.Party.Index);
-            m_Parties.Add(party, entity);
+            m_PartiesToAdd.Add(party);
         }
 
         private void OnClientAdded(RailServerPeer peer)

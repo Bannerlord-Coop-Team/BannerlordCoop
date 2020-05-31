@@ -17,11 +17,11 @@ namespace Coop.Mod.Persistence.RPC
             string sRet = Instance.EventType == EventArgType.Null ? "static " : $"{Instance} ";
             if (MethodRegistry.IdToMethod.TryGetValue(Id, out SyncMethod method))
             {
-                sRet = $"{method}";
+                sRet += $"{method}";
             }
             else
             {
-                sRet = $"[UNREGISTRED] {Id.InternalValue}";
+                sRet += $"[UNREGISTRED] {Id.InternalValue}";
             }
 
             sRet += "(" + string.Join(", ", Arguments) + ")";
