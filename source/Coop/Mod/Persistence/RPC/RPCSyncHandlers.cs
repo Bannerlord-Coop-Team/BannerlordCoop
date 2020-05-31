@@ -29,15 +29,22 @@ namespace Coop.Mod.Persistence.RPC
 
         private void Init(Type type)
         {
-            foreach (SyncMethod method in type
-                                          .GetFields(
-                                              BindingFlags.Static |
-                                              BindingFlags.Public |
-                                              BindingFlags.NonPublic)
-                                          .Where(f => f.GetUnderlyingType() == typeof(SyncMethod))
-                                          .Select(f => f.GetValue(null) as SyncMethod))
+            foreach (FieldInfo field in type.GetFields(
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
             {
-                m_Handlers.Add(new MethodCallSyncHandler(method));
+                if (field.GetUnderlyingType() == typeof(SyncMethod) &&
+                    field.GetValue(null) is SyncMethod method)
+                {
+                    m_Handlers.Add(new MethodCallSyncHandler(method));
+                }
+                else if (field.GetUnderlyingType() == typeof(MethodPatcher) &&
+                         field.GetValue(null) is MethodPatcher patcher)
+                {
+                    foreach (SyncMethod syncMethod in patcher.Methods)
+                    {
+                        m_Handlers.Add(new MethodCallSyncHandler(syncMethod));
+                    }
+                }
             }
         }
     }

@@ -56,7 +56,7 @@ namespace Coop.Mod
                 select t;
             foreach (Type patch in patches)
             {
-                Patcher.ApplyPatch(harmony, patch);
+                Patcher.ApplyPatch(patch);
             }
 
             harmony.PatchAll();

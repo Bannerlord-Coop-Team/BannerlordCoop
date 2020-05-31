@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reflection;
 using System.Reflection.Emit;
+using HarmonyLib;
 using JetBrains.Annotations;
 using Sync.Reflection;
 
@@ -18,6 +19,7 @@ namespace Sync
             MemberInfo = info;
             Id = MethodRegistry.Register(this);
             m_StandIn = InvokableFactory.CreateStandIn(this);
+            InitOriginal();
             if (MemberInfo.IsStatic)
             {
                 m_CallStatic = InvokableFactory.CreateStaticStandInCaller(m_StandIn);
@@ -31,6 +33,19 @@ namespace Sync
         public MethodId Id { get; }
 
         public MethodInfo MemberInfo { get; }
+
+        private void InitOriginal()
+        {
+            bool bHasPatches = Harmony.GetPatchInfo(MemberInfo) != null;
+            HarmonyMethod standin = new HarmonyMethod(m_StandIn)
+            {
+                method = m_StandIn,
+                reversePatchType = bHasPatches ?
+                    HarmonyReversePatchType.Snapshot :
+                    HarmonyReversePatchType.Original
+            };
+            Harmony.ReversePatch(MemberInfo, standin);
+        }
 
         public void CallOriginal([CanBeNull] object target, [CanBeNull] object[] args)
         {

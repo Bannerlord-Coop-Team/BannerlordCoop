@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
-using HarmonyLib;
 using JetBrains.Annotations;
 
 namespace Sync
@@ -34,16 +32,10 @@ namespace Sync
             return id;
         }
 
-        internal static void Patch(Harmony harmony, MethodBase method, HarmonyMethod patch)
-        {
-            patch.priority = SyncPriority.SyncCallPreUserPatch;
-            harmony.Patch(method, patch);
-        }
-
         public static bool RequestCall(
             this SyncMethod sync,
             [CanBeNull] object instance,
-            [CanBeNull] object[] args)
+            params object[] args)
         {
             Action<object> handler = sync.GetHandler(instance);
             handler?.Invoke(args);

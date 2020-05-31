@@ -290,12 +290,6 @@ namespace Sync.Reflection
             ILGenerator il = dyn.GetILGenerator(64);
             il.ThrowException(typeof(NotImplementedException));
 
-            HarmonyMethod standin = new HarmonyMethod(dyn)
-            {
-                method = dyn,
-                reversePatchType = HarmonyReversePatchType.Snapshot
-            };
-            Harmony.ReversePatch(method.MemberInfo, standin);
             return dyn;
         }
     }

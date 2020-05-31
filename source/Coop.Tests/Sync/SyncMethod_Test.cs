@@ -40,25 +40,24 @@ namespace Coop.Tests.Sync
             [SyncCall(typeof(A), nameof(A.SyncedMethod))]
             public static bool CustomPrefix(A __instance, int iSomeArgument)
             {
-                return MethodSynchronization.RequestCall(__instance, new object[] {iSomeArgument});
+                return MethodSynchronization.RequestCall(__instance, iSomeArgument);
             }
 
             [SyncCall(typeof(A), nameof(A.StaticSyncedMethod))]
             public static bool CustomPrefixStatic(int iSomeArgument)
             {
-                return StaticMethodSynchronization.RequestCall(null, new object[] {iSomeArgument});
+                return StaticMethodSynchronization.RequestCall(null, iSomeArgument);
             }
         }
 
         private static bool m_bHasPatched;
-        private readonly Harmony m_Harmony = new Harmony("Coop.Test");
 
         private void ApplyPatch()
         {
             if (!m_bHasPatched)
             {
                 m_bHasPatched = true;
-                Patcher.ApplyPatch(m_Harmony, typeof(SomePatch));
+                Patcher.ApplyPatch(typeof(SomePatch));
             }
         }
 

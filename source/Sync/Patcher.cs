@@ -8,7 +8,12 @@ namespace Sync
 {
     public static class Patcher
     {
-        public static void ApplyPatch(Harmony harmony, Type type)
+        private static readonly Lazy<Harmony> m_HarmonyInstance =
+            new Lazy<Harmony>(() => new Harmony("Sync.Patcher.Harmony"));
+
+        public static Harmony HarmonyInstance => m_HarmonyInstance.Value;
+
+        public static void ApplyPatch(Type type)
         {
             foreach (MethodInfo toPatch in type.GetDeclaredMethods())
             {
@@ -22,7 +27,7 @@ namespace Sync
                         throw new Exception("Patch methods need to be static.");
                     }
 
-                    FieldWatcher.Patch(harmony, attr.Method, patch);
+                    FieldWatcher.Patch(HarmonyInstance, attr.Method, patch);
                 }
 
                 // [SyncCall]
@@ -33,7 +38,8 @@ namespace Sync
                         throw new Exception("Patch methods need to be static.");
                     }
 
-                    MethodRegistry.Patch(harmony, attr.Method, patch);
+                    patch.priority = SyncPriority.SyncCallPreUserPatch;
+                    HarmonyInstance.Patch(attr.Method, patch);
                 }
             }
         }
