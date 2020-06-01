@@ -1,8 +1,14 @@
 ﻿using System;
+using Coop.Mod.Managers;
+using Coop.Multiplayer;
 using Coop.Multiplayer.Network;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
+using TaleWorlds.Core;
+using TaleWorlds.Engine;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.SaveSystem.Load;
 
 namespace Coop.Mod
 {
@@ -24,12 +30,13 @@ namespace Coop.Mod
         public static CoopServer Instance => m_Instance.Value;
 
         public Server Current { get; private set; }
+        public ServerGameManager gameManager { get; private set; }
 
         public void StartServer()
         {
             if (Current == null)
             {
-                Server.EType eServerType = Server.EType.Threaded;
+                Server.EType eServerType = Server.EType.Direct;
                 Current = new Server(eServerType);
 
                 Persistence = new CoopServerRail(Current, new GameEnvironmentServer());
@@ -59,6 +66,42 @@ namespace Coop.Mod
             m_NetManager?.Stop();
             m_NetManager = null;
             Current = null;
+        }
+
+        public void StartGame(string saveName)
+        {
+            // TODO: Relies on hardcoded save game file being present.
+            if(Main.DEBUG)
+            {
+                LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(saveName, Utilities.GetModulesNames());
+                MBGameManager.StartNewGame(CreateGameManager(saveGameData));
+            }
+        }
+
+        public ServerGameManager CreateGameManager(LoadGameResult saveGameData = null)
+        {
+            if (saveGameData != null)
+            {
+                gameManager = CreateGameManager(saveGameData.LoadResult);
+            }
+            else
+            {
+                gameManager = new ServerGameManager();
+            }
+            return gameManager;
+        }
+
+        public ServerGameManager CreateGameManager(LoadResult loadResult = null)
+        {
+            if (loadResult != null)
+            {
+                gameManager = new ServerGameManager(loadResult);
+            }
+            else
+            {
+                gameManager = new ServerGameManager();
+            }
+            return gameManager;
         }
 
         public override string ToString()

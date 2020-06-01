@@ -20,7 +20,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Coop\bin\Win64_Shipping_Client\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -89,6 +89,18 @@
     <Reference Include="Steamworks.NET, Version=7.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\Steamworks.NET.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode.GauntletUI">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode.View">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.View.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode.ViewModelCollection">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -179,11 +191,17 @@
     <Reference Include="TaleWorlds.MountAndBlade.Diamond">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Diamond.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.GauntletUI">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.Helpers">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Helpers.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.View">
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
@@ -239,6 +257,8 @@
     <Compile Include="Mod\GameEnvironmentClient.cs" />
     <Compile Include="Mod\GameLoopRunner.cs" />
     <Compile Include="Mod\Logging.cs" />
+    <Compile Include="Mod\Managers\ClientManager.cs" />
+    <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
     <Compile Include="Mod\Patch\Debugging.cs" />
     <Compile Include="Mod\Patch\Exceptions.cs" />
@@ -273,6 +293,20 @@
     <Compile Include="Mod\Patch\CampaignMapMovement.cs" />
     <Compile Include="Mod\Behaviour\GameLoadedBehaviour.cs" />
     <Compile Include="Mod\GameEnvironmentServer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\CampaignTimeSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\CharacterObjectSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\CharacterPerksSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\CharacterSkillsSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\CharacterTraitsSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\EquipmentElementSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\EquipmentSerialzer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\HeroSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\MobilePartySerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\PartySerializer.cs" />
+    <Compile Include="Mod\Serializers\MBSerializer.cs" />
+    <Compile Include="Mod\UI\CharacterCreationUI\CharacterCreationUI.cs" />
+    <Compile Include="Mod\UI\LoadGameUI\CoopLoadUI.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Mod\Main.cs" />
     <Compile Include="NetImpl\LiteNet\Extensions.cs" />
@@ -287,6 +321,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\.editorconfig">
+      <Link>.editorconfig</Link>
+    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

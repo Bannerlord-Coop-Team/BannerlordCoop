@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Coop.Mod.Managers;
 using Coop.Mod.Patch;
 using NLog;
 using SandBox;
@@ -50,7 +51,7 @@ namespace Coop.Mod
                 GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
             }
 
-            MBGameManager.StartNewGame(new CampaignGameManager(loadResult));
+            MBGameManager.StartNewGame(new ClientGameManager(loadResult));
         }
 
         public static LoadGameResult LoadSaveGameData(ISaveDriver driver)

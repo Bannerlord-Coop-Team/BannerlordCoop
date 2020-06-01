@@ -46,6 +46,11 @@ namespace Coop.Mod.Persistence
 
         private void InitRoom(RailServerRoom room)
         {
+            if (Campaign.Current == null)
+            {
+                throw new Exception("Unable to initialize game entities: Unexpected state. No game loaded?");
+            }
+            // TODO: If the server runs in a separate thread we need to synchronize modifying state.
             room.AddNewEntity<WorldEntityServer>();
 
             // Parties

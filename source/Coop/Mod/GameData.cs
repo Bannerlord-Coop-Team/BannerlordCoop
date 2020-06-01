@@ -14,6 +14,7 @@ namespace Coop.Mod
         InitialWorldState
     }
 
+    // TODO rename interface to more relevant name
     internal class GameData : ISaveData
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();

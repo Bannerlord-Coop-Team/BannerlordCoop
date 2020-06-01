@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common;
+using Coop.Network;
 using Coop.Mod.Behaviour;
-using Coop.Mod.DebugUtil;
-using Coop.Mod.Patch;
+using Coop.Mod.CLI;
+using Coop.Mod.UI;
 using HarmonyLib;
+using MBMultiplayerCampaign;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
@@ -15,13 +17,22 @@ using Sync;
 using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
+using TaleWorlds.Core;
+using TaleWorlds.Engine.Screens;
+using TaleWorlds.InputSystem;
+using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.View.Missions;
+
 using Logger = NLog.Logger;
+using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop.Mod
 {
     internal class Main : NoHarmonyLoader
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        public static readonly bool DEBUG = true;
         private bool m_IsFirstTick = true;
 
         public Main()
@@ -59,6 +70,43 @@ namespace Coop.Mod
             }
 
             harmony.PatchAll();
+
+            Module.CurrentModule.AddInitialStateOption(new InitialStateOption("CoOp Campaign",
+            new TextObject("Co-op Campaign", null),
+            9990,
+            () =>
+            {
+                string[] array = Utilities.GetFullCommandLineString().Split(new char[]
+                {
+                    ' '
+                });
+
+                
+
+                if (DEBUG)
+                {
+                    foreach (string argument in array)
+                    {
+                        if (argument.ToLower() == "/server")
+                        {
+                            //TODO add name to args
+                            CoopServer.Instance.StartGame("MP");
+                        }
+                        else if (argument.ToLower() == "/client")
+                        {
+                            CLICommands.ConnectTo(new List<string> { "127.0.0.1", "4201" });
+                        }
+                    }
+                }
+                else
+                {
+                    InformationManager.DisplayMessage(new InformationMessage("Hello World!"));
+                    ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopLoadScreen>(new object[] { }));
+                }
+            },
+            false));
+
+
         }
 
         protected override void OnSubModuleUnloaded()

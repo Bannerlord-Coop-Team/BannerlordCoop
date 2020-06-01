@@ -3,6 +3,10 @@ using Network.Infrastructure;
 
 namespace Network.Protocol
 {
+    // TODO add class summary
+    /// <summary>
+    /// 
+    /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
     public class PacketHandlerAttribute : Attribute
     {
