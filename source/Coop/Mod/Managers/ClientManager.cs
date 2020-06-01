@@ -17,26 +17,51 @@ using TaleWorlds.SaveSystem.Load;
 using System.Reflection;
 using NetworkMessages.FromClient;
 using Module = TaleWorlds.MountAndBlade.Module;
-using TGame = TaleWorlds.Core.Game;
+using TaleWorlds.CampaignSystem.Actions;
 
 namespace Coop.Mod.Managers
 {
     class ClientGameManager : StoryModeGameManager
     {
-        public ClientGameManager() : base() { }
+        public ClientGameManager() : base() 
+        {
+            // CharacterCreationState.FinalizeCharacterCreation()
+            StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, GetCreatedCharacter);
+
+            if(Main.DEBUG)
+            {
+                Game.GameStateManager.CleanAndPushState(Game.Current.GameStateManager.CreateState<CharacterCreationState>());
+                SkipCharacterCreation();
+                // TODO use HeroCreator.CreateNewHero
+                // TODO Populate using CharacterCreator
+                // TODO Override 
+                ChangePlayerCharacterAction.Apply(ClientHero);
+            }
+        }
         public ClientGameManager(LoadResult saveGameData) : base(saveGameData) { }
 
         public delegate void OnOnLoadFinishedEventHandler(object source, EventArgs e);
         public event OnOnLoadFinishedEventHandler OnLoadFinishedEvent;
 
+        public Hero ClientHero { get; private set; }
+
         public override void OnLoadFinished()
         {
             base.OnLoadFinished();
-            Game.GameStateManager.CleanAndPushState(TGame.Current.GameStateManager.CreateState<CharacterCreationState>());
-            SkipCharacterCreation();
+            
 
             OnLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
+            
+            
         }
+
+        public void GetCreatedCharacter()
+        {
+            // CharacterCreationContent.ApplySkillAndAttributeEffects()
+            ClientHero = Hero.MainHero;
+        }
+
+        
 
         public new void OnTick(float dt)
         {
@@ -86,7 +111,7 @@ namespace Coop.Mod.Managers
             bool flag6 = characterCreationState.CurrentStage is CharacterCreationOptionsStage;
             if (flag6)
             {
-                (TGame.Current.GameStateManager.ActiveState as CharacterCreationState).CharacterCreation.Name = "Jeff";
+                (Game.Current.GameStateManager.ActiveState as CharacterCreationState).CharacterCreation.Name = "Jeff";
                 characterCreationState.NextStage();
             }
             characterCreationState = (GameStateManager.Current.ActiveState as CharacterCreationState);

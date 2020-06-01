@@ -1,18 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MBMultiplayerCampaign.Serializers;
+﻿using System.Collections.Generic;
+using Coop.Mod.CLI;
 using SandBox;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
-using TaleWorlds.MountAndBlade;
-using TaleWorlds.ObjectSystem;
-using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
-using TGame = TaleWorlds.Core.Game;
 
 namespace Coop.Mod.Managers
 {
@@ -24,6 +14,11 @@ namespace Coop.Mod.Managers
         ~ServerGameManager()
         {
             // TODO save all heros
-        }        
+        }
+        public override void OnGameInitializationFinished(Game game)
+        {
+            base.OnGameInitializationFinished(game);
+            CLICommands.StartServer(new List<string>());
+        }
     }
 }

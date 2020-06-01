@@ -21,6 +21,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Missions;
 using Module = TaleWorlds.MountAndBlade.Module;
+using TaleWorlds.Engine;
 
 namespace Coop.Mod
 {
@@ -68,18 +69,27 @@ namespace Coop.Mod
             9990,
             () =>
             {
+                string[] array = Utilities.GetFullCommandLineString().Split(new char[]
+                {
+                    ' '
+                });
+
+                
+
                 if (DEBUG)
                 {
-                    try
+                    foreach (string argument in array)
                     {
-                        CLICommands.StartServer(new List<string> { });
+                        if (argument.ToLower() == "/server")
+                        {
+                            //TODO add name to args
+                            CoopServer.Instance.StartGame("MP");
+                        }
+                        else if (argument.ToLower() == "/client")
+                        {
+                            CLICommands.ConnectTo(new List<string> { "127.0.0.1", "4201" });
+                        }
                     }
-                    catch (Exception)
-                    {
-                        ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
-                        CLICommands.ConnectTo(new List<string> { config.LanAddress.ToString(), config.LanPort.ToString() });
-                    }
-
                 }
                 else
                 {

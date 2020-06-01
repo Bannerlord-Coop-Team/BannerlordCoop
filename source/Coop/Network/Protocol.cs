@@ -13,8 +13,8 @@
             Server_JoinRequestAccepted, // Client is allowed to join the server.
             Server_WorldData, // Contains the initial state of the game world.
 
-            Sync,
-            KeepAlive,
+            Sync, // Send data serialized/syncronization
+            KeepAlive, // ACK
             Persistence // Will be forwarded to the game state persistence layer.
         }
 

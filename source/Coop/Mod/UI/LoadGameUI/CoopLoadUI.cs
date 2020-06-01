@@ -12,7 +12,6 @@ using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.Engine;
 using TaleWorlds.Localization;
 using System.Linq;
-using TGame = TaleWorlds.Core.Game;
 using System.Collections.Generic;
 using Coop.Mod.CLI;
 
@@ -58,13 +57,12 @@ namespace Coop.Mod.UI
 
 		private void StartGame(LoadResult loadResult)
 		{
-			if (TGame.Current != null)
+			if (Game.Current != null)
 			{
 				ScreenManager.PopScreen();
 				GameStateManager.Current.CleanStates(0);
 				GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
 			}
-            CLICommands.StartServer(new List<string> { });
             MBGameManager.StartNewGame(CoopServer.Instance.CreateGameManager(loadResult));
 		}
 

@@ -15,6 +15,7 @@ namespace Coop.Mod
         InitialWorldState
     }
 
+    // TODO rename more relevant
     internal class SaveData : ISaveData
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();

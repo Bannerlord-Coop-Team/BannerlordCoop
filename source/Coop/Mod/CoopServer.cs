@@ -28,6 +28,7 @@ namespace Coop.Mod
         public static CoopServer Instance => m_Instance.Value;
 
         public Server Current { get; private set; }
+        public ServerGameManager gameManager { get; private set; }
 
         public void StartServer()
         {
@@ -65,16 +66,18 @@ namespace Coop.Mod
             Current = null;
         }
 
-        public void StartGame()
+        public void StartGame(string saveName)
         {
             // TODO: Relies on hardcoded save game file being present.
-            LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData("MP", Utilities.GetModulesNames());
-            MBGameManager.StartNewGame(CreateGameManager(saveGameData));
+            if(Main.DEBUG)
+            {
+                LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(saveName, Utilities.GetModulesNames());
+                MBGameManager.StartNewGame(CreateGameManager(saveGameData));
+            }
         }
 
         public ServerGameManager CreateGameManager(LoadGameResult saveGameData = null)
         {
-            ServerGameManager gameManager;
             if (saveGameData != null)
             {
                 gameManager = CreateGameManager(saveGameData.LoadResult);
@@ -88,7 +91,6 @@ namespace Coop.Mod
 
         public ServerGameManager CreateGameManager(LoadResult loadResult = null)
         {
-            ServerGameManager gameManager;
             if (loadResult != null)
             {
                 gameManager = new ServerGameManager(loadResult);
