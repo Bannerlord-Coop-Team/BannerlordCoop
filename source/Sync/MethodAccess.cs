@@ -7,7 +7,12 @@ using Sync.Reflection;
 
 namespace Sync
 {
-    public class MethodAccess : Watchable
+    /// <summary>
+    ///     Type erased invocation wrapper for patched methods. On creation, a snapshot of the IL
+    ///     representation of the method is stored internally. The snapshot includes all patches
+    ///     to the function already applied. The snapshot can be called using <see cref="CallOriginal" />.
+    /// </summary>
+    public class MethodAccess : Tracker
     {
         [CanBeNull] private readonly Action<object, object[]> m_Call;
         [CanBeNull] private readonly Action<object[]> m_CallStatic;

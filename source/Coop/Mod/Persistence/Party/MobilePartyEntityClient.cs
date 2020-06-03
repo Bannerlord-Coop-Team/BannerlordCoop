@@ -106,7 +106,7 @@ namespace Coop.Mod.Persistence.Party
                     throw new Exception($"Mobile party id {State.PartyId} not found.");
                 }
 
-                m_Environment.TargetPosition.SetInstanceHandler(m_Instance, GoToPosition);
+                m_Environment.TargetPosition.SetHandler(m_Instance, GoToPosition);
                 State.OnMovementChanged += UpdateLocalMovement;
             }
         }
@@ -115,7 +115,7 @@ namespace Coop.Mod.Persistence.Party
         {
             if (m_Instance != null)
             {
-                m_Environment.TargetPosition.RemoveInstanceHandler(m_Instance);
+                m_Environment.TargetPosition.RemoveHandler(m_Instance);
                 State.OnMovementChanged -= UpdateLocalMovement;
             }
         }

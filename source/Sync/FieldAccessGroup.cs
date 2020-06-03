@@ -10,31 +10,23 @@ namespace Sync
     /// <summary>
     ///     A collection of <see cref="FieldAccess" /> that are declared in the same class. All fields of
     ///     the group are manipulated as a single unit. The value of each individual field is stored in an
-    ///     <typeparamref name="TValueObject"> instance.
+    ///     <typeparamref name="TValueObject" /> instance.
     /// </summary>
     /// <typeparam name="TDeclaring">Class that declares all fields contained in this group.</typeparam>
     /// <typeparam name="TValueObject">
-    ///     Class that can store the values for all fields. Needs to implement a
-    ///     <see cref="TValueObject.#ctor(IEnumerable`object)" /> constructor.
+    ///     Class that can store the values for all fields.
     /// </typeparam>
     public class FieldAccessGroup<TDeclaring, TValueObject> : ValueAccess
         where TValueObject : class, IEnumerable<object>
     {
-        [NotNull] private readonly List<FieldAccess> m_Fields;
+        [NotNull] private readonly List<FieldAccess> m_Fields = new List<FieldAccess>();
 
         public FieldAccessGroup()
         {
-            m_Fields = new List<FieldAccess>();
-            Init();
+            VerifyConstructor();
         }
 
-        public FieldAccessGroup([NotNull] List<FieldAccess> fields)
-        {
-            m_Fields = fields;
-            Init();
-        }
-
-        private void Init()
+        private static void VerifyConstructor()
         {
             ConstructorInfo constructor =
                 typeof(TValueObject).GetConstructor(new[] {typeof(IEnumerable<object>[])});
@@ -73,12 +65,6 @@ namespace Sync
         {
             m_Fields.Add(fieldAccess);
             return this;
-        }
-
-        /// <inheritdoc />
-        public override Type GetDeclaringType()
-        {
-            return typeof(TDeclaring);
         }
 
         /// <inheritdoc />

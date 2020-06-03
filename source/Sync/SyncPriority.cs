@@ -2,7 +2,7 @@
 
 namespace Sync
 {
-    public class SyncPriority
+    public static class SyncPriority
     {
         public const int SyncCallPost = SyncValuePost - 1;
         public const int SyncValuePost = Priority.Last - 2;

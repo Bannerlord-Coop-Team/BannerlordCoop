@@ -1,14 +1,14 @@
 ﻿namespace Sync
 {
-    public struct MethodId
+    public readonly struct MethodId
     {
         public int InternalValue { get; }
 
-        private static int _NextId = 1;
+        private static int _nextId = 1;
 
         public static MethodId GetNextId()
         {
-            return new MethodId(_NextId++);
+            return new MethodId(_nextId++);
         }
 
         public static MethodId Invalid { get; } = new MethodId(0);

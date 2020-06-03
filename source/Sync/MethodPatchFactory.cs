@@ -11,31 +11,31 @@ namespace Sync
 {
     public static class MethodPatchFactory
     {
-        private static readonly Dictionary<MethodBase, DynamicMethod> Instances =
+        private static readonly Dictionary<MethodBase, DynamicMethod> Prefixes =
             new Dictionary<MethodBase, DynamicMethod>();
 
-        public static MethodAccess Patch(MethodInfo original, MethodInfo dispatcher)
+        public static MethodAccess AddPrefix(MethodInfo original, MethodInfo dispatcher)
         {
             lock (Patcher.HarmonyLock)
             {
                 MethodAccess sync = new MethodAccess(original);
-                Patch(sync, dispatcher);
+                AddPrefix(sync, dispatcher);
                 return sync;
             }
         }
 
-        public static void Patch(MethodAccess access, MethodInfo dispatcher)
+        public static void AddPrefix(MethodAccess access, MethodInfo dispatcher)
         {
             lock (Patcher.HarmonyLock)
             {
-                if (Instances.ContainsKey(access.MemberInfo))
+                if (Prefixes.ContainsKey(access.MemberInfo))
                 {
                     throw new Exception("Patch already initialized.");
                 }
 
-                Instances[access.MemberInfo] = CreatePrefix(access, dispatcher);
+                Prefixes[access.MemberInfo] = GeneratePrefix(access, dispatcher);
 
-                MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPatch));
+                MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPrefix));
 
                 HarmonyMethod patch = new HarmonyMethod(factoryMethod)
                 {
@@ -45,25 +45,27 @@ namespace Sync
             }
         }
 
-        public static void Unpatch(MethodInfo original)
+        public static void RemovePrefix(MethodInfo original)
         {
             lock (Patcher.HarmonyLock)
             {
-                MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPatch));
+                MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPrefix));
                 Patcher.HarmonyInstance.Unpatch(original, factoryMethod);
-                Instances.Remove(original);
+                Prefixes.Remove(original);
             }
         }
 
-        public static DynamicMethod GetPatch(MethodBase original)
+        public static DynamicMethod GetPrefix(MethodBase original)
         {
             lock (Patcher.HarmonyLock)
             {
-                return Instances[original];
+                return Prefixes[original];
             }
         }
 
-        private static DynamicMethod CreatePrefix(MethodAccess methodAccess, MethodInfo dispatcher)
+        private static DynamicMethod GeneratePrefix(
+            MethodAccess methodAccess,
+            MethodInfo dispatcher)
         {
             List<SMethodParameter> parameters = methodAccess.MemberInfo.GetParameters()
                                                             .Select(

@@ -4,7 +4,11 @@ using JetBrains.Annotations;
 
 namespace Sync
 {
-    public abstract class Watchable
+    /// <summary>
+    ///     Base class for class wrappers that notify when specific instances of the wrapped class
+    ///     change internal state.
+    /// </summary>
+    public abstract class Tracker
     {
         private readonly Dictionary<object, Action<object>> m_InstanceSpecificHandlers =
             new Dictionary<object, Action<object>>();
@@ -12,13 +16,13 @@ namespace Sync
         private Action<object, object> m_GlobalHandler;
 
         /// <summary>
-        ///     Sets the handler to be called when a specific instance of the <see cref="Watchable" />
+        ///     Sets the handler to be called when a specific instance of the <see cref="Tracker" />
         ///     requested a change. Multiple instance specific handlers are not supported.
         ///     The argument passed to the action are the arguments, not the instance!
         /// </summary>
         /// <param name="instance"></param>
         /// <param name="action"></param>
-        public void SetInstanceHandler([NotNull] object instance, Action<object> action)
+        public void SetHandler([NotNull] object instance, [NotNull] Action<object> action)
         {
             if (m_InstanceSpecificHandlers.ContainsKey(instance))
             {
@@ -28,19 +32,24 @@ namespace Sync
             m_InstanceSpecificHandlers.Add(instance, action);
         }
 
-        public Action<object> GetHandler(object syncableInstance)
+        /// <summary>
+        ///     Gets the handler to be called when the given instance changes.
+        /// </summary>
+        /// <param name="instance"></param>
+        /// <returns>Handler or null</returns>
+        public Action<object> GetHandler(object instance)
         {
             bool bHasGlobalHandler = m_GlobalHandler != null;
-            if (syncableInstance != null &&
+            if (instance != null &&
                 m_InstanceSpecificHandlers.TryGetValue(
-                    syncableInstance,
+                    instance,
                     out Action<object> instanceSpecificHandler))
             {
                 if (bHasGlobalHandler)
                 {
                     return args =>
                     {
-                        m_GlobalHandler(syncableInstance, args);
+                        m_GlobalHandler(instance, args);
                         instanceSpecificHandler(args);
                     };
                 }
@@ -50,28 +59,31 @@ namespace Sync
 
             if (m_GlobalHandler != null)
             {
-                return args => m_GlobalHandler(syncableInstance, args);
+                return args => m_GlobalHandler(instance, args);
             }
 
             return null;
         }
 
-        public void RemoveInstanceHandler(object syncableInstance)
+        /// <summary>
+        ///     Removes an instance specific handler.
+        /// </summary>
+        /// <param name="instance"></param>
+        public void RemoveHandler(object instance)
         {
-            m_InstanceSpecificHandlers.Remove(syncableInstance);
+            m_InstanceSpecificHandlers.Remove(instance);
         }
 
         /// <summary>
-        ///     Sets the handler to be called when no instance specific handler is registred.
+        ///     Sets the handler to be called when no instance specific handler is registered.
         ///     The action arguments are the instance followed by the arguments.
         /// </summary>
-        /// <param name="syncableInstance"></param>
         /// <param name="action"></param>
         public void SetGlobalHandler(Action<object, object> action)
         {
             if (m_GlobalHandler != null)
             {
-                throw new ArgumentException("Cannot have multiple global sync handlers.");
+                throw new ArgumentException($"Cannot have multiple global handlers for {this}.");
             }
 
             m_GlobalHandler = action;

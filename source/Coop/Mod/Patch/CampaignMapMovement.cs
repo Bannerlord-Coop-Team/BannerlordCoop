@@ -11,12 +11,12 @@ namespace Coop.Mod.Patch
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        private static readonly PropertyPatcher _MobilePartyPatcher =
-            new PropertyPatcher(typeof(MobileParty))
-                .Setter(nameof(MobileParty.DefaultBehavior))
-                .Setter(nameof(MobileParty.TargetSettlement))
-                .Setter(nameof(MobileParty.TargetParty))
-                .Setter(nameof(MobileParty.TargetPosition));
+        private static readonly PropertyPatch MobilePartyPatch =
+            new PropertyPatch(typeof(MobileParty))
+                .RelaySetter(nameof(MobileParty.DefaultBehavior))
+                .RelaySetter(nameof(MobileParty.TargetSettlement))
+                .RelaySetter(nameof(MobileParty.TargetParty))
+                .RelaySetter(nameof(MobileParty.TargetPosition));
 
         public static FieldAccessGroup<MobileParty, MovementData> Movement { get; } =
             new FieldAccessGroup<MobileParty, MovementData>()
@@ -29,10 +29,7 @@ namespace Coop.Mod.Patch
         [PatchInitializer]
         public static void Init()
         {
-            FieldChangeBuffer.TrackChanges(
-                Movement,
-                _MobilePartyPatcher.Setters,
-                () => Coop.DoSync);
+            FieldChangeBuffer.TrackChanges(Movement, MobilePartyPatch.Setters, () => Coop.DoSync);
         }
     }
 }

@@ -26,9 +26,9 @@ namespace Coop.Tests.Sync
             }
         }
 
-        private static readonly MethodPatcher m_Patcher = new MethodPatcher(typeof(A))
-                                                          .Patch(nameof(A.SyncedMethod))
-                                                          .Patch(nameof(A.StaticSyncedMethod));
+        private static readonly MethodPatch Patch = new MethodPatch(typeof(A))
+                                                    .Relay(nameof(A.SyncedMethod))
+                                                    .Relay(nameof(A.StaticSyncedMethod));
 
         [Fact]
         private void IsSyncHandlerCalled()
@@ -38,15 +38,15 @@ namespace Coop.Tests.Sync
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
 
-            Assert.True(m_Patcher.TryGetMethod(nameof(A.SyncedMethod), out MethodAccess method));
-            method.SetInstanceHandler(instance, args => { ++iNumberOfHandlerCalls; });
+            Assert.True(Patch.TryGetMethod(nameof(A.SyncedMethod), out MethodAccess method));
+            method.SetHandler(instance, args => { ++iNumberOfHandlerCalls; });
 
             // Trigger the handler
             instance.SyncedMethod(42);
             Assert.Equal(0, instance.NumberOfCalls);
             Assert.Equal(1, iNumberOfHandlerCalls);
 
-            method.RemoveInstanceHandler(instance);
+            method.RemoveHandler(instance);
         }
 
         [Fact]

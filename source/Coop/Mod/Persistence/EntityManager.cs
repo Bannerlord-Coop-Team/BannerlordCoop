@@ -12,8 +12,8 @@ using TaleWorlds.CampaignSystem;
 namespace Coop.Mod.Persistence
 {
     /// <summary>
-    ///     Makes sure that each syncable game entity has a corresponding entity in the
-    ///     persistence framework.
+    ///     Makes sure that each game entity the requires synchronization has a corresponding
+    ///     entity in the persistence framework.
     /// </summary>
     public class EntityManager
     {

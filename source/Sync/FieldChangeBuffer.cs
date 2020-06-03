@@ -7,7 +7,7 @@ namespace Sync
 {
     public static class FieldChangeBuffer
     {
-        private static readonly Stack<SyncableData> ActiveFields = new Stack<SyncableData>();
+        private static readonly Stack<ValueData> ActiveFields = new Stack<ValueData>();
 
         private static readonly HarmonyMethod PatchPrefix = new HarmonyMethod(
             AccessTools.Method(typeof(FieldChangeBuffer), nameof(PushActiveFields)))
@@ -21,35 +21,30 @@ namespace Sync
             priority = SyncPriority.SyncValuePost
         };
 
-        public static Dictionary<ValueAccess, Dictionary<object, BufferedData>>
+        public static Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>
             BufferedChanges { get; } =
-            new Dictionary<ValueAccess, Dictionary<object, BufferedData>>();
+            new Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>();
 
         private static void PushActiveFields()
         {
             ActiveFields.Push(null);
         }
 
-        /// <summary>
-        ///     To be called before changing a syncable in a patched method.
-        /// </summary>
-        /// <param name="syncable"></param>
-        /// <param name="target"></param>
-        private static void Watch(this ValueAccess syncable, object target)
+        private static void OnBeforeExpectedChange(this ValueAccess access, object target)
         {
-            object value = null;
-            if (BufferedChanges.ContainsKey(syncable) &&
-                BufferedChanges[syncable].TryGetValue(target, out BufferedData cache))
+            object value;
+            if (BufferedChanges.ContainsKey(access) &&
+                BufferedChanges[access].TryGetValue(target, out ValueChangeRequest cache))
             {
-                value = cache.ToSend;
-                syncable.Set(target, value);
+                value = cache.RequestedValue;
+                access.Set(target, value);
             }
             else
             {
-                value = syncable.Get(target);
+                value = access.Get(target);
             }
 
-            ActiveFields.Push(new SyncableData(syncable, target, value));
+            ActiveFields.Push(new ValueData(access, target, value));
         }
 
         public static void TrackChanges(
@@ -67,7 +62,7 @@ namespace Sync
                         {
                             if (condition())
                             {
-                                value.Watch(instance);
+                                value.OnBeforeExpectedChange(instance);
                             }
                         });
                 }
@@ -78,36 +73,36 @@ namespace Sync
         {
             while (ActiveFields.Count > 0)
             {
-                SyncableData data = ActiveFields.Pop();
+                ValueData data = ActiveFields.Pop();
                 if (data == null)
                 {
                     break; // The marker
                 }
 
-                ValueAccess field = data.Syncable;
+                ValueAccess field = data.Access;
 
-                object newValue = data.Syncable.Get(data.Target);
+                object newValue = data.Access.Get(data.Target);
                 bool changed = !Equals(newValue, data.Value);
 
-                Dictionary<object, BufferedData> fieldBuffer = BufferedChanges.Assert(field);
-                if (fieldBuffer.TryGetValue(data.Target, out BufferedData cached))
+                Dictionary<object, ValueChangeRequest> fieldBuffer = BufferedChanges.Assert(field);
+                if (fieldBuffer.TryGetValue(data.Target, out ValueChangeRequest cached))
                 {
-                    if (changed && cached.Sent)
+                    if (changed && cached.RequestProcessed)
                     {
-                        cached.Sent = false;
+                        cached.RequestProcessed = false;
                     }
 
-                    cached.ToSend = newValue;
-                    field.Set(data.Target, cached.Actual);
+                    cached.RequestedValue = newValue;
+                    field.Set(data.Target, cached.LatestActualValue);
                     continue;
                 }
 
                 if (!changed) continue;
 
-                fieldBuffer[data.Target] = new BufferedData
+                fieldBuffer[data.Target] = new ValueChangeRequest
                 {
-                    Actual = data.Value,
-                    ToSend = newValue
+                    LatestActualValue = data.Value,
+                    RequestedValue = newValue
                 };
                 field.Set(data.Target, data.Value);
             }

@@ -17,7 +17,10 @@ namespace Common
         {
             lock (m_Lock)
             {
-                m_Updateables.ForEach(updateable => updateable.Update(frameTime));
+                foreach (IUpdateable updateable in m_Updateables)
+                {
+                    updateable.Update(frameTime);
+                }
             }
         }
 

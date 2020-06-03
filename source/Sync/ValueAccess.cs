@@ -5,14 +5,8 @@ namespace Sync
     /// <summary>
     ///     Type-erased interface for setting and getting a value from an instance.
     /// </summary>
-    public abstract class ValueAccess : Watchable
+    public abstract class ValueAccess : Tracker
     {
-        /// <summary>
-        ///     Returns the type of an instance the value is declared in.
-        /// </summary>
-        /// <returns>Declaring type</returns>
-        public abstract Type GetDeclaringType();
-
         /// <summary>
         ///     Returns the current value of an instance of this <see cref="ValueAccess" />.
         /// </summary>

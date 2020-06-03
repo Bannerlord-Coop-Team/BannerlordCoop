@@ -8,9 +8,9 @@ namespace Coop.Tests.Sync
     {
         public SyncMethod_Test()
         {
-            Assert.True(SomePatch.Patcher.TryGetMethod(nameof(A.SyncedMethod), out m_SyncedMethod));
+            Assert.True(SomePatch.Patch.TryGetMethod(nameof(A.SyncedMethod), out m_SyncedMethod));
             Assert.True(
-                SomePatch.Patcher.TryGetMethod(
+                SomePatch.Patch.TryGetMethod(
                     nameof(A.StaticSyncedMethod),
                     out m_StaticSyncedMethod));
         }
@@ -37,9 +37,9 @@ namespace Coop.Tests.Sync
 
         private class SomePatch
         {
-            public static readonly MethodPatcher Patcher = new MethodPatcher(typeof(A))
-                                                           .Patch(nameof(A.SyncedMethod))
-                                                           .Patch(nameof(A.StaticSyncedMethod));
+            public static readonly MethodPatch Patch = new MethodPatch(typeof(A))
+                                                       .Relay(nameof(A.SyncedMethod))
+                                                       .Relay(nameof(A.StaticSyncedMethod));
         }
 
         private readonly MethodAccess m_SyncedMethod;
@@ -80,7 +80,7 @@ namespace Coop.Tests.Sync
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            m_SyncedMethod.SetInstanceHandler(instance, args => { ++iNumberOfHandlerCalls; });
+            m_SyncedMethod.SetHandler(instance, args => { ++iNumberOfHandlerCalls; });
 
             // Trigger the handler
             instance.SyncedMethod(42);
@@ -105,7 +105,7 @@ namespace Coop.Tests.Sync
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            m_SyncedMethod.SetInstanceHandler(instance, args => { ++iNumberOfHandlerCalls; });
+            m_SyncedMethod.SetHandler(instance, args => { ++iNumberOfHandlerCalls; });
 
             // Call the original
             int iExpectedValue = 42;

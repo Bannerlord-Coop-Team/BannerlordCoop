@@ -2,16 +2,16 @@
 
 namespace Sync
 {
-    public class SyncableData
+    public class ValueData
     {
-        public SyncableData([NotNull] ValueAccess syncable, object target, object value)
+        public ValueData([NotNull] ValueAccess access, object target, object value)
         {
-            Syncable = syncable;
+            Access = access;
             Target = target;
             Value = value;
         }
 
-        public ValueAccess Syncable { get; }
+        public ValueAccess Access { get; }
         public object Target { get; }
         public object Value { get; }
     }

@@ -21,10 +21,15 @@ namespace Sync.Reflection
             MemberInfo memberInfo)
         {
             Type instanceType = memberInfo.DeclaringType;
+            if (instanceType == null)
+            {
+                throw new ArgumentNullException(nameof(memberInfo.DeclaringType));
+            }
+
             ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
 
             // `TDeclaring` might be a base class or interface of `instanceType`.
-            MemberExpression memberAccess = null;
+            MemberExpression memberAccess;
             if (instanceType == typeof(TDeclaring))
             {
                 memberAccess = Expression.MakeMemberAccess(arg0, memberInfo);
@@ -52,9 +57,14 @@ namespace Sync.Reflection
             MemberInfo memberInfo)
         {
             Type instanceType = memberInfo.DeclaringType;
+            if (instanceType == null)
+            {
+                throw new ArgumentNullException(nameof(memberInfo.DeclaringType));
+            }
+
             ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
 
-            MemberExpression memberAccess = null;
+            MemberExpression memberAccess;
             // `TDeclaring` might be a base class or interface of `instanceType`.
             if (instanceType == typeof(TDeclaring))
             {
@@ -88,7 +98,7 @@ namespace Sync.Reflection
             Type instanceType = method.DeclaringType;
             ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
 
-            MethodCallExpression exCall = null;
+            MethodCallExpression exCall;
             // `TDeclaring` might be a base class or interface of `instanceType`.
             if (instanceType == typeof(TDeclaring))
             {
@@ -129,7 +139,7 @@ namespace Sync.Reflection
                 arg1,
                 method.GetParameters()[0].ParameterType);
 
-            MethodCallExpression exCall = null;
+            MethodCallExpression exCall;
             // `TDeclaring` might be a base class or interface of `instanceType`.
             if (instanceType == typeof(TDeclaring))
             {
@@ -221,8 +231,10 @@ namespace Sync.Reflection
             ParameterExpression args = Expression.Parameter(typeof(object[]), "args");
 
             // Unpack parameters
-            List<Expression> exArgs = new List<Expression>();
-            exArgs.Add(argInstanceConverted);
+            List<Expression> exArgs = new List<Expression>
+            {
+                argInstanceConverted
+            };
             for (int i = 1; i < method.GetParameters().Length; ++i)
             {
                 ParameterInfo param = method.GetParameters()[i];
@@ -244,7 +256,6 @@ namespace Sync.Reflection
 
         public static Action<object[]> CreateStaticStandInCaller(MethodInfo method)
         {
-            ParameterInfo[] parameters = method.GetParameters();
             ParameterExpression args = Expression.Parameter(typeof(object[]), "args");
 
             // Unpack parameters
