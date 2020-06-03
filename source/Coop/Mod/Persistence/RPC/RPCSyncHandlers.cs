@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using HarmonyLib;
+﻿using System.Collections.Generic;
 using Sync;
-using Sync.Attributes;
 
 namespace Coop.Mod.Persistence.RPC
 {
@@ -12,40 +7,19 @@ namespace Coop.Mod.Persistence.RPC
     {
         private readonly List<MethodCallSyncHandler> m_Handlers = new List<MethodCallSyncHandler>();
 
-        public RPCSyncHandlers()
+        public IReadOnlyList<MethodCallSyncHandler> Handlers => m_Handlers;
+
+        public void Register(MethodPatcher patcher)
         {
-            // Create a sync handler for every SyncMethod in our patches
-            IEnumerable<Type> patches =
-                from t in Assembly.GetExecutingAssembly().GetTypes()
-                where t.IsDefined(typeof(PatchAttribute))
-                select t;
-            foreach (Type patch in patches)
+            foreach (MethodAccess syncMethod in patcher.Methods)
             {
-                Init(patch);
+                Register(syncMethod);
             }
         }
 
-        public IReadOnlyList<MethodCallSyncHandler> Handlers => m_Handlers;
-
-        private void Init(Type type)
+        public void Register(MethodAccess method)
         {
-            foreach (FieldInfo field in type.GetFields(
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
-            {
-                if (field.GetUnderlyingType() == typeof(MethodAccess) &&
-                    field.GetValue(null) is MethodAccess method)
-                {
-                    m_Handlers.Add(new MethodCallSyncHandler(method));
-                }
-                else if (field.GetUnderlyingType() == typeof(MethodPatcher) &&
-                         field.GetValue(null) is MethodPatcher patcher)
-                {
-                    foreach (MethodAccess syncMethod in patcher.Methods)
-                    {
-                        m_Handlers.Add(new MethodCallSyncHandler(syncMethod));
-                    }
-                }
-            }
+            m_Handlers.Add(new MethodCallSyncHandler(method));
         }
     }
 }

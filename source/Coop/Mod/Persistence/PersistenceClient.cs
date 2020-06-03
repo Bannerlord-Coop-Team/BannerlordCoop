@@ -31,7 +31,7 @@ namespace Coop.Mod.Persistence
         {
             List<object> toRemove = new List<object>();
             foreach (KeyValuePair<ValueAccess, Dictionary<object, BufferedData>> fieldBuffer in
-                FieldWatcher.BufferedChanges)
+                FieldChangeBuffer.BufferedChanges)
             {
                 ValueAccess syncable = fieldBuffer.Key;
                 foreach (KeyValuePair<object, BufferedData> instanceBuffer in fieldBuffer.Value)

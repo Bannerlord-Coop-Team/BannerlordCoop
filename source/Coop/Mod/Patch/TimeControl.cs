@@ -1,24 +1,25 @@
 ﻿using HarmonyLib;
 using Sync;
-using Sync.Attributes;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Patch
 {
-    [Patch]
     public static class TimeControl
     {
+        private static readonly PropertyPatcher _TimeControlPatcher =
+            new PropertyPatcher(typeof(Campaign)).Setter(nameof(Campaign.TimeControlMode));
+
         public static FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; } =
             new FieldAccess<Campaign, CampaignTimeControlMode>(
                 AccessTools.Field(typeof(Campaign), "_timeControlMode"));
 
-        [SyncWatch(typeof(Campaign), nameof(Campaign.TimeControlMode), MethodType.Setter)]
-        private static void Patch_TimeControlMode(Campaign __instance)
+        [PatchInitializer]
+        public static void Init()
         {
-            if (Coop.DoSync)
-            {
-                TimeControlMode.Watch(__instance);
-            }
+            FieldChangeBuffer.TrackChanges(
+                TimeControlMode,
+                _TimeControlPatcher.Setters,
+                () => Coop.DoSync);
         }
     }
 }

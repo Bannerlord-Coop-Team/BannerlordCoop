@@ -56,16 +56,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Attributes\PatchAttribute.cs" />
-    <Compile Include="Attributes\SyncAttribute.cs" />
-    <Compile Include="Attributes\SyncCallAttribute.cs" />
-    <Compile Include="Attributes\SyncWatchAttribute.cs" />
-    <Compile Include="MethodPatcher.cs" />
-    <Compile Include="BufferedData.cs" />
-    <Compile Include="FieldWatcher.cs" />
-    <Compile Include="MethodId.cs" />
-    <Compile Include="MethodPatchFactory.cs" />
+    <Compile Include="MethodPatcher.cs"/>
+    <Compile Include="BufferedData.cs"/>
+    <Compile Include="FieldChangeBuffer.cs"/>
+    <Compile Include="MethodId.cs"/>
+    <Compile Include="MethodPatchFactory.cs"/>
     <Compile Include="MethodRegistry.cs"/>
+    <Compile Include="PatchInitializerAttribute.cs"/>
+    <Compile Include="PropertyAccess.cs"/>
+    <Compile Include="PropertyPatcher.cs"/>
     <Compile Include="ValueAccess.cs"/>
     <Compile Include="ISyncHandler.cs"/>
     <Compile Include="Watchable.cs"/>

@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
@@ -11,8 +9,6 @@ using HarmonyLib;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
-using Sync;
-using Sync.Attributes;
 using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
@@ -49,17 +45,7 @@ namespace Coop.Mod
             AddBehavior<InitServerBehaviour>();
             AddBehavior<GameLoadedBehaviour>();
 
-            Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
-            IEnumerable<Type> patches =
-                from t in Assembly.GetExecutingAssembly().GetTypes()
-                where t.IsDefined(typeof(PatchAttribute))
-                select t;
-            foreach (Type patch in patches)
-            {
-                Patcher.ApplyPatch(patch);
-            }
-
-            harmony.PatchAll();
+            new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord").PatchAll();
         }
 
         protected override void OnSubModuleUnloaded()

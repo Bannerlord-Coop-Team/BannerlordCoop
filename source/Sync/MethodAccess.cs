@@ -53,6 +53,13 @@ namespace Sync
             m_CallStatic?.Invoke(args);
         }
 
+        public bool RequestCall([CanBeNull] object instance, params object[] args)
+        {
+            Action<object> handler = GetHandler(instance);
+            handler?.Invoke(args);
+            return handler == null;
+        }
+
         public override string ToString()
         {
             return $"{MemberInfo.DeclaringType?.Name}.{MemberInfo.Name}";

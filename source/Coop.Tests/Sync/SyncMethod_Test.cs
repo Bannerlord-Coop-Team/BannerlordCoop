@@ -1,13 +1,20 @@
 ﻿using System;
-using HarmonyLib;
 using Sync;
-using Sync.Attributes;
 using Xunit;
 
 namespace Coop.Tests.Sync
 {
     public class SyncMethod_Test
     {
+        public SyncMethod_Test()
+        {
+            Assert.True(SomePatch.Patcher.TryGetMethod(nameof(A.SyncedMethod), out m_SyncedMethod));
+            Assert.True(
+                SomePatch.Patcher.TryGetMethod(
+                    nameof(A.StaticSyncedMethod),
+                    out m_StaticSyncedMethod));
+        }
+
         private class A
         {
             [ThreadStatic] public static int? StaticLatestArgument;
@@ -28,60 +35,31 @@ namespace Coop.Tests.Sync
             }
         }
 
-        [Patch]
         private class SomePatch
         {
-            public static readonly MethodAccess MethodAccessSynchronization =
-                new MethodAccess(AccessTools.Method(typeof(A), nameof(A.SyncedMethod)));
-
-            public static readonly MethodAccess StaticMethodAccessSynchronization =
-                new MethodAccess(AccessTools.Method(typeof(A), nameof(A.StaticSyncedMethod)));
-
-            [SyncCall(typeof(A), nameof(A.SyncedMethod))]
-            public static bool CustomPrefix(A __instance, int iSomeArgument)
-            {
-                return MethodAccessSynchronization.RequestCall(__instance, iSomeArgument);
-            }
-
-            [SyncCall(typeof(A), nameof(A.StaticSyncedMethod))]
-            public static bool CustomPrefixStatic(int iSomeArgument)
-            {
-                return StaticMethodAccessSynchronization.RequestCall(null, iSomeArgument);
-            }
+            public static readonly MethodPatcher Patcher = new MethodPatcher(typeof(A))
+                                                           .Patch(nameof(A.SyncedMethod))
+                                                           .Patch(nameof(A.StaticSyncedMethod));
         }
 
-        private static bool m_bHasPatched;
-
-        private void ApplyPatch()
-        {
-            if (!m_bHasPatched)
-            {
-                m_bHasPatched = true;
-                Patcher.ApplyPatch(typeof(SomePatch));
-            }
-        }
+        private readonly MethodAccess m_SyncedMethod;
+        private readonly MethodAccess m_StaticSyncedMethod;
 
         [Fact]
         private void IsRegistered()
         {
-            ApplyPatch();
-
             // Statically registered
-            Assert.True(
-                MethodRegistry.MethodToId.ContainsKey(SomePatch.MethodAccessSynchronization));
-            Assert.True(
-                MethodRegistry.MethodToId.ContainsKey(SomePatch.StaticMethodAccessSynchronization));
+            Assert.True(MethodRegistry.MethodToId.ContainsKey(m_SyncedMethod));
+            Assert.True(MethodRegistry.MethodToId.ContainsKey(m_StaticSyncedMethod));
         }
 
         [Fact]
         private void IsStaticSyncHandlerCalled()
         {
-            ApplyPatch();
-
             // Register sync handler
             Assert.Equal(0, A.StaticNumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            SomePatch.StaticMethodAccessSynchronization.SetGlobalHandler(
+            m_StaticSyncedMethod.SetGlobalHandler(
                 (instance, args) =>
                 {
                     Assert.Null(instance);
@@ -92,21 +70,17 @@ namespace Coop.Tests.Sync
             A.StaticSyncedMethod(42);
             Assert.Equal(0, A.StaticNumberOfCalls);
             Assert.Equal(1, iNumberOfHandlerCalls);
-            SomePatch.StaticMethodAccessSynchronization.RemoveGlobalHandler();
+            m_StaticSyncedMethod.RemoveGlobalHandler();
         }
 
         [Fact]
         private void IsSyncHandlerCalled()
         {
-            ApplyPatch();
-
             // Register sync handler
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            SomePatch.MethodAccessSynchronization.SetInstanceHandler(
-                instance,
-                args => { ++iNumberOfHandlerCalls; });
+            m_SyncedMethod.SetInstanceHandler(instance, args => { ++iNumberOfHandlerCalls; });
 
             // Trigger the handler
             instance.SyncedMethod(42);
@@ -117,8 +91,6 @@ namespace Coop.Tests.Sync
         [Fact]
         private void OriginalIsCalledIfNoHandlerExists()
         {
-            ApplyPatch();
-
             // Trigger the handler
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
@@ -129,21 +101,15 @@ namespace Coop.Tests.Sync
         [Fact]
         private void OriginalIsCalledOnInvoke()
         {
-            ApplyPatch();
-
             // Register sync handler
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            SomePatch.MethodAccessSynchronization.SetInstanceHandler(
-                instance,
-                args => { ++iNumberOfHandlerCalls; });
+            m_SyncedMethod.SetInstanceHandler(instance, args => { ++iNumberOfHandlerCalls; });
 
             // Call the original
             int iExpectedValue = 42;
-            SomePatch.MethodAccessSynchronization.CallOriginal(
-                instance,
-                new object[] {iExpectedValue});
+            m_SyncedMethod.CallOriginal(instance, new object[] {iExpectedValue});
             Assert.Equal(0, iNumberOfHandlerCalls);
             Assert.Equal(1, instance.NumberOfCalls);
             Assert.Equal(iExpectedValue, instance.LatestArgument);

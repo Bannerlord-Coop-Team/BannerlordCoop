@@ -12,12 +12,8 @@ namespace Sync
         private static readonly Dictionary<MethodId, MethodAccess> Ids =
             new Dictionary<MethodId, MethodAccess>();
 
-        private static readonly Dictionary<Type, MethodAccess> Types =
-            new Dictionary<Type, MethodAccess>();
-
         public static IReadOnlyDictionary<MethodAccess, MethodId> MethodToId => MethodIds;
         public static IReadOnlyDictionary<MethodId, MethodAccess> IdToMethod => Ids;
-        public static IReadOnlyDictionary<Type, MethodAccess> TypeToSyncMethod => Types;
 
         public static MethodId Register([NotNull] MethodAccess methodAccess)
         {
@@ -30,16 +26,6 @@ namespace Sync
             Ids.Add(id, methodAccess);
             MethodIds.Add(methodAccess, id);
             return id;
-        }
-
-        public static bool RequestCall(
-            this MethodAccess sync,
-            [CanBeNull] object instance,
-            params object[] args)
-        {
-            Action<object> handler = sync.GetHandler(instance);
-            handler?.Invoke(args);
-            return handler == null;
         }
     }
 }

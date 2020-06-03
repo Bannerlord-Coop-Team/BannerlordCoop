@@ -49,6 +49,12 @@ namespace Sync
         }
 
         /// <inheritdoc />
+        public override Type GetDeclaringType()
+        {
+            return m_MemberInfo.DeclaringType;
+        }
+
+        /// <inheritdoc />
         public override object Get([CanBeNull] object target)
         {
             return m_GetterLocal(target);

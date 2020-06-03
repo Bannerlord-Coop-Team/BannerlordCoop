@@ -27,9 +27,8 @@ namespace Coop.Tests.Sync
         }
 
         private static readonly MethodPatcher m_Patcher = new MethodPatcher(typeof(A))
-                                                          .Synchronize(nameof(A.SyncedMethod))
-                                                          .Synchronize(
-                                                              nameof(A.StaticSyncedMethod));
+                                                          .Patch(nameof(A.SyncedMethod))
+                                                          .Patch(nameof(A.StaticSyncedMethod));
 
         [Fact]
         private void IsSyncHandlerCalled()

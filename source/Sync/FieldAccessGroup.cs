@@ -76,6 +76,12 @@ namespace Sync
         }
 
         /// <inheritdoc />
+        public override Type GetDeclaringType()
+        {
+            return typeof(TDeclaring);
+        }
+
+        /// <inheritdoc />
         public override object Get(object target)
         {
             if (target is TDeclaring castedTarget)

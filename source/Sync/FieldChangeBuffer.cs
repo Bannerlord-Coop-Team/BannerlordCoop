@@ -1,22 +1,22 @@
-﻿using System.Collections.Generic;
-using System.Reflection;
+﻿using System;
+using System.Collections.Generic;
 using HarmonyLib;
 using Sync.Reflection;
 
 namespace Sync
 {
-    public static class FieldWatcher
+    public static class FieldChangeBuffer
     {
         private static readonly Stack<SyncableData> ActiveFields = new Stack<SyncableData>();
 
         private static readonly HarmonyMethod PatchPrefix = new HarmonyMethod(
-            AccessTools.Method(typeof(FieldWatcher), nameof(Prefix)))
+            AccessTools.Method(typeof(FieldChangeBuffer), nameof(PushActiveFields)))
         {
             priority = SyncPriority.SyncValuePre
         };
 
         private static readonly HarmonyMethod PatchPostfix = new HarmonyMethod(
-            AccessTools.Method(typeof(FieldWatcher), nameof(Postfix)))
+            AccessTools.Method(typeof(FieldChangeBuffer), nameof(PopActiveFields)))
         {
             priority = SyncPriority.SyncValuePost
         };
@@ -25,7 +25,7 @@ namespace Sync
             BufferedChanges { get; } =
             new Dictionary<ValueAccess, Dictionary<object, BufferedData>>();
 
-        private static void Prefix()
+        private static void PushActiveFields()
         {
             ActiveFields.Push(null);
         }
@@ -35,7 +35,7 @@ namespace Sync
         /// </summary>
         /// <param name="syncable"></param>
         /// <param name="target"></param>
-        public static void Watch(this ValueAccess syncable, object target)
+        private static void Watch(this ValueAccess syncable, object target)
         {
             object value = null;
             if (BufferedChanges.ContainsKey(syncable) &&
@@ -52,13 +52,29 @@ namespace Sync
             ActiveFields.Push(new SyncableData(syncable, target, value));
         }
 
-        internal static void Patch(Harmony harmony, MethodBase method, HarmonyMethod patch)
+        public static void TrackChanges(
+            ValueAccess value,
+            IEnumerable<MethodAccess> triggers,
+            Func<bool> condition)
         {
-            harmony.Patch(method, patch, PatchPostfix);
-            harmony.Patch(method, PatchPrefix, PatchPostfix);
+            lock (Patcher.HarmonyLock)
+            {
+                foreach (MethodAccess method in triggers)
+                {
+                    Patcher.HarmonyInstance.Patch(method.MemberInfo, PatchPrefix, PatchPostfix);
+                    method.SetGlobalHandler(
+                        (instance, args) =>
+                        {
+                            if (condition())
+                            {
+                                value.Watch(instance);
+                            }
+                        });
+                }
+            }
         }
 
-        private static void Postfix()
+        private static void PopActiveFields()
         {
             while (ActiveFields.Count > 0)
             {

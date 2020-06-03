@@ -9,33 +9,33 @@ namespace Sync
 {
     public class MethodPatcher
     {
+        private readonly List<MethodAccess> m_Access = new List<MethodAccess>();
         private readonly Type m_Declaring;
-        private readonly List<MethodAccess> m_Sync = new List<MethodAccess>();
 
         public MethodPatcher([NotNull] Type declaringClass)
         {
             m_Declaring = declaringClass;
         }
 
-        public IEnumerable<MethodAccess> Methods => m_Sync;
+        public IEnumerable<MethodAccess> Methods => m_Access;
 
         ~MethodPatcher()
         {
             MethodInfo factoryMethod =
                 typeof(MethodPatchFactory).GetMethod(nameof(MethodPatchFactory.GetPatch));
-            foreach (MethodAccess syncMethod in m_Sync)
+            foreach (MethodAccess syncMethod in m_Access)
             {
                 MethodPatchFactory.Unpatch(syncMethod.MemberInfo);
             }
         }
 
-        public MethodPatcher Synchronize(MethodInfo method)
+        public MethodPatcher Patch(MethodInfo method)
         {
             PatchMethod(method);
             return this;
         }
 
-        public MethodPatcher Synchronize(string sMethodName)
+        public MethodPatcher Patch(string sMethodName)
         {
             PatchMethod(AccessTools.Method(m_Declaring, sMethodName));
             return this;
@@ -48,13 +48,16 @@ namespace Sync
 
         public bool TryGetMethod(MethodInfo methodInfo, out MethodAccess methodAccess)
         {
-            methodAccess = m_Sync.FirstOrDefault(m => m.MemberInfo.Equals(methodInfo));
+            methodAccess = m_Access.FirstOrDefault(m => m.MemberInfo.Equals(methodInfo));
             return methodAccess != null;
         }
 
         private void PatchMethod(MethodInfo original)
         {
-            m_Sync.Add(MethodPatchFactory.Patch(original));
+            MethodInfo dispatcher = AccessTools.Method(
+                typeof(MethodPatcher),
+                nameof(DispatchCallRequest));
+            m_Access.Add(MethodPatchFactory.Patch(original, dispatcher));
         }
 
         public static bool DispatchCallRequest(
