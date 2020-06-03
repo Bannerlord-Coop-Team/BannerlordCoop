@@ -31,22 +31,22 @@ namespace Coop.Tests.Sync
         [Patch]
         private class SomePatch
         {
-            public static readonly SyncMethod MethodSynchronization =
-                new SyncMethod(AccessTools.Method(typeof(A), nameof(A.SyncedMethod)));
+            public static readonly MethodAccess MethodAccessSynchronization =
+                new MethodAccess(AccessTools.Method(typeof(A), nameof(A.SyncedMethod)));
 
-            public static readonly SyncMethod StaticMethodSynchronization =
-                new SyncMethod(AccessTools.Method(typeof(A), nameof(A.StaticSyncedMethod)));
+            public static readonly MethodAccess StaticMethodAccessSynchronization =
+                new MethodAccess(AccessTools.Method(typeof(A), nameof(A.StaticSyncedMethod)));
 
             [SyncCall(typeof(A), nameof(A.SyncedMethod))]
             public static bool CustomPrefix(A __instance, int iSomeArgument)
             {
-                return MethodSynchronization.RequestCall(__instance, iSomeArgument);
+                return MethodAccessSynchronization.RequestCall(__instance, iSomeArgument);
             }
 
             [SyncCall(typeof(A), nameof(A.StaticSyncedMethod))]
             public static bool CustomPrefixStatic(int iSomeArgument)
             {
-                return StaticMethodSynchronization.RequestCall(null, iSomeArgument);
+                return StaticMethodAccessSynchronization.RequestCall(null, iSomeArgument);
             }
         }
 
@@ -67,9 +67,10 @@ namespace Coop.Tests.Sync
             ApplyPatch();
 
             // Statically registered
-            Assert.True(MethodRegistry.MethodToId.ContainsKey(SomePatch.MethodSynchronization));
             Assert.True(
-                MethodRegistry.MethodToId.ContainsKey(SomePatch.StaticMethodSynchronization));
+                MethodRegistry.MethodToId.ContainsKey(SomePatch.MethodAccessSynchronization));
+            Assert.True(
+                MethodRegistry.MethodToId.ContainsKey(SomePatch.StaticMethodAccessSynchronization));
         }
 
         [Fact]
@@ -80,7 +81,7 @@ namespace Coop.Tests.Sync
             // Register sync handler
             Assert.Equal(0, A.StaticNumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            SomePatch.StaticMethodSynchronization.SetGlobalHandler(
+            SomePatch.StaticMethodAccessSynchronization.SetGlobalHandler(
                 (instance, args) =>
                 {
                     Assert.Null(instance);
@@ -91,7 +92,7 @@ namespace Coop.Tests.Sync
             A.StaticSyncedMethod(42);
             Assert.Equal(0, A.StaticNumberOfCalls);
             Assert.Equal(1, iNumberOfHandlerCalls);
-            SomePatch.StaticMethodSynchronization.RemoveGlobalHandler();
+            SomePatch.StaticMethodAccessSynchronization.RemoveGlobalHandler();
         }
 
         [Fact]
@@ -103,7 +104,7 @@ namespace Coop.Tests.Sync
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            SomePatch.MethodSynchronization.SetInstanceHandler(
+            SomePatch.MethodAccessSynchronization.SetInstanceHandler(
                 instance,
                 args => { ++iNumberOfHandlerCalls; });
 
@@ -134,13 +135,15 @@ namespace Coop.Tests.Sync
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            SomePatch.MethodSynchronization.SetInstanceHandler(
+            SomePatch.MethodAccessSynchronization.SetInstanceHandler(
                 instance,
                 args => { ++iNumberOfHandlerCalls; });
 
             // Call the original
             int iExpectedValue = 42;
-            SomePatch.MethodSynchronization.CallOriginal(instance, new object[] {iExpectedValue});
+            SomePatch.MethodAccessSynchronization.CallOriginal(
+                instance,
+                new object[] {iExpectedValue});
             Assert.Equal(0, iNumberOfHandlerCalls);
             Assert.Equal(1, instance.NumberOfCalls);
             Assert.Equal(iExpectedValue, instance.LatestArgument);

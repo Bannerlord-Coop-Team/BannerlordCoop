@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using Coop.Mod.Persistence;
+﻿using Coop.Mod.Persistence;
 using HarmonyLib;
 using NLog;
 using Sync;
@@ -15,21 +14,13 @@ namespace Coop.Mod.Patch
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public static SyncFieldGroup<MobileParty, MovementData> Movement { get; } =
-            new SyncFieldGroup<MobileParty, MovementData>(
-                new List<SyncField>
-                {
-                    new SyncField<MobileParty, AiBehavior>(
-                        AccessTools.Field(typeof(MobileParty), "_defaultBehavior")),
-                    new SyncField<MobileParty, Settlement>(
-                        AccessTools.Field(typeof(MobileParty), "_targetSettlement")),
-                    new SyncField<MobileParty, MobileParty>(
-                        AccessTools.Field(typeof(MobileParty), "_targetParty")),
-                    new SyncField<MobileParty, Vec2>(
-                        AccessTools.Field(typeof(MobileParty), "_targetPosition")),
-                    new SyncField<MobileParty, int>(
-                        AccessTools.Field(typeof(MobileParty), "_numberOfFleeingsAtLastTravel"))
-                });
+        public static FieldAccessGroup<MobileParty, MovementData> Movement { get; } =
+            new FieldAccessGroup<MobileParty, MovementData>()
+                .AddField<AiBehavior>("_defaultBehavior")
+                .AddField<Settlement>("_targetSettlement")
+                .AddField<MobileParty>("_targetParty")
+                .AddField<Vec2>("_targetPosition")
+                .AddField<int>("_numberOfFleeingsAtLastTravel");
 
         [SyncWatch(typeof(MobileParty), nameof(MobileParty.DefaultBehavior), MethodType.Setter)]
         [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetSettlement), MethodType.Setter)]

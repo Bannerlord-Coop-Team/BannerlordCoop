@@ -7,14 +7,14 @@ using Sync.Reflection;
 
 namespace Sync
 {
-    public class SyncMethod : Watchable
+    public class MethodAccess : Watchable
     {
         [CanBeNull] private readonly Action<object, object[]> m_Call;
         [CanBeNull] private readonly Action<object[]> m_CallStatic;
 
         private readonly DynamicMethod m_StandIn;
 
-        public SyncMethod([NotNull] MethodInfo info)
+        public MethodAccess([NotNull] MethodInfo info)
         {
             MemberInfo = info;
             Id = MethodRegistry.Register(this);
@@ -50,6 +50,7 @@ namespace Sync
         public void CallOriginal([CanBeNull] object target, [CanBeNull] object[] args)
         {
             m_Call?.Invoke(target, args);
+            m_CallStatic?.Invoke(args);
         }
 
         public override string ToString()

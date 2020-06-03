@@ -14,9 +14,9 @@ namespace Sync
         private static readonly Dictionary<MethodBase, DynamicMethod> m_Instances =
             new Dictionary<MethodBase, DynamicMethod>();
 
-        public static SyncMethod Patch(MethodInfo original)
+        public static MethodAccess Patch(MethodInfo original)
         {
-            SyncMethod sync = new SyncMethod(original);
+            MethodAccess sync = new MethodAccess(original);
             if (m_Instances.ContainsKey(original))
             {
                 throw new Exception("Patch already initialized.");
@@ -46,25 +46,26 @@ namespace Sync
             return m_Instances[original];
         }
 
-        private static DynamicMethod CreatePrefix(SyncMethod method)
+        private static DynamicMethod CreatePrefix(MethodAccess methodAccess)
         {
-            List<SMethodParameter> parameters = method.MemberInfo.GetParameters()
-                                                      .Select(
-                                                          p => new SMethodParameter
-                                                          {
-                                                              Info = p,
-                                                              ParameterType = p.ParameterType,
-                                                              Name = p.Name
-                                                          })
-                                                      .ToList();
-            if (!method.MemberInfo.IsStatic)
+            List<SMethodParameter> parameters = methodAccess.MemberInfo.GetParameters()
+                                                            .Select(
+                                                                p => new SMethodParameter
+                                                                {
+                                                                    Info = p,
+                                                                    ParameterType =
+                                                                        p.ParameterType,
+                                                                    Name = p.Name
+                                                                })
+                                                            .ToList();
+            if (!methodAccess.MemberInfo.IsStatic)
             {
                 parameters.Insert(
                     0,
                     new SMethodParameter
                     {
                         Info = null,
-                        ParameterType = method.MemberInfo.DeclaringType,
+                        ParameterType = methodAccess.MemberInfo.DeclaringType,
                         Name = "__instance"
                     }); // Inject an __instance
             }
@@ -73,7 +74,7 @@ namespace Sync
                 "Prefix",
                 typeof(bool),
                 parameters.Select(p => p.ParameterType).ToArray(),
-                method.MemberInfo.DeclaringType,
+                methodAccess.MemberInfo.DeclaringType,
                 true);
 
             for (int i = 0; i < parameters.Count; ++i)
@@ -99,7 +100,7 @@ namespace Sync
 
             // We want to embed the SyncMethod instance into the DynamicMethod. Unsafe code ahead!
             // https://stackoverflow.com/questions/4989681/place-an-object-on-top-of-stack-in-ilgenerator
-            GCHandle gcHandle = GCHandle.Alloc(method);
+            GCHandle gcHandle = GCHandle.Alloc(methodAccess);
             IntPtr pMethod = GCHandle.ToIntPtr(gcHandle);
 
             // Arg0: SyncMethod instance
@@ -112,11 +113,11 @@ namespace Sync
                 il.Emit(OpCodes.Ldc_I8, pMethod.ToInt64());
             }
 
-            il.Emit(OpCodes.Ldobj, typeof(SyncMethod));
+            il.Emit(OpCodes.Ldobj, typeof(MethodAccess));
 
             // Arg1: The instance. For non-static methods this is already added to `parameters`
             //       because of the harmony __instance.
-            if (method.MemberInfo.IsStatic)
+            if (methodAccess.MemberInfo.IsStatic)
             {
                 il.Emit(OpCodes.Ldnull);
             }

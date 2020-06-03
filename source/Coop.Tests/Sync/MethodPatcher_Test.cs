@@ -39,7 +39,7 @@ namespace Coop.Tests.Sync
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
 
-            Assert.True(m_Patcher.TryGetMethod(nameof(A.SyncedMethod), out SyncMethod method));
+            Assert.True(m_Patcher.TryGetMethod(nameof(A.SyncedMethod), out MethodAccess method));
             method.SetInstanceHandler(instance, args => { ++iNumberOfHandlerCalls; });
 
             // Trigger the handler

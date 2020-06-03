@@ -30,10 +30,10 @@ namespace Coop.Mod.Persistence
         public void Update(TimeSpan frameTime)
         {
             List<object> toRemove = new List<object>();
-            foreach (KeyValuePair<SyncValue, Dictionary<object, BufferedData>> fieldBuffer in
+            foreach (KeyValuePair<ValueAccess, Dictionary<object, BufferedData>> fieldBuffer in
                 FieldWatcher.BufferedChanges)
             {
-                SyncValue syncable = fieldBuffer.Key;
+                ValueAccess syncable = fieldBuffer.Key;
                 foreach (KeyValuePair<object, BufferedData> instanceBuffer in fieldBuffer.Value)
                 {
                     object instance = instanceBuffer.Key;
@@ -43,7 +43,7 @@ namespace Coop.Mod.Persistence
                     }
                     else if (!instanceBuffer.Value.Sent)
                     {
-                        SyncValue field = fieldBuffer.Key;
+                        ValueAccess field = fieldBuffer.Key;
                         field.GetHandler(instance)?.Invoke(instanceBuffer.Value.ToSend);
                         instanceBuffer.Value.Sent = true;
                     }
@@ -61,7 +61,7 @@ namespace Coop.Mod.Persistence
             m_RailClient.SetPeer((RailNetPeerWrapper) connection?.GameStatePersistence);
         }
 
-        private bool CheckShouldRemove(SyncValue syncable, object instance, BufferedData buffer)
+        private bool CheckShouldRemove(ValueAccess syncable, object instance, BufferedData buffer)
         {
             if (buffer.Sent && Equals(buffer.ToSend, buffer.Actual))
             {

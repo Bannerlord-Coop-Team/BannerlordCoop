@@ -12,20 +12,20 @@ namespace Sync
         private Action<object, object> m_GlobalHandler;
 
         /// <summary>
-        ///     Sets the handler to be called when a specific instance of the syncable
+        ///     Sets the handler to be called when a specific instance of the <see cref="Watchable" />
         ///     requested a change. Multiple instance specific handlers are not supported.
         ///     The argument passed to the action are the arguments, not the instance!
         /// </summary>
-        /// <param name="syncableInstance"></param>
+        /// <param name="instance"></param>
         /// <param name="action"></param>
-        public void SetInstanceHandler([NotNull] object syncableInstance, Action<object> action)
+        public void SetInstanceHandler([NotNull] object instance, Action<object> action)
         {
-            if (m_InstanceSpecificHandlers.ContainsKey(syncableInstance))
+            if (m_InstanceSpecificHandlers.ContainsKey(instance))
             {
                 throw new ArgumentException($"Cannot have multiple sync handlers for {this}.");
             }
 
-            m_InstanceSpecificHandlers.Add(syncableInstance, action);
+            m_InstanceSpecificHandlers.Add(instance, action);
         }
 
         public Action<object> GetHandler(object syncableInstance)

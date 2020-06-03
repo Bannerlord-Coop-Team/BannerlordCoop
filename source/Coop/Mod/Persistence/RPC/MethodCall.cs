@@ -15,7 +15,7 @@ namespace Coop.Mod.Persistence.RPC
         public override string ToString()
         {
             string sRet = Instance.EventType == EventArgType.Null ? "static " : $"{Instance} ";
-            if (MethodRegistry.IdToMethod.TryGetValue(Id, out SyncMethod method))
+            if (MethodRegistry.IdToMethod.TryGetValue(Id, out MethodAccess method))
             {
                 sRet += $"{method}";
             }

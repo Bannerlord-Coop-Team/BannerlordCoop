@@ -21,9 +21,9 @@ namespace Sync
             priority = SyncPriority.SyncValuePost
         };
 
-        public static Dictionary<SyncValue, Dictionary<object, BufferedData>>
+        public static Dictionary<ValueAccess, Dictionary<object, BufferedData>>
             BufferedChanges { get; } =
-            new Dictionary<SyncValue, Dictionary<object, BufferedData>>();
+            new Dictionary<ValueAccess, Dictionary<object, BufferedData>>();
 
         private static void Prefix()
         {
@@ -35,7 +35,7 @@ namespace Sync
         /// </summary>
         /// <param name="syncable"></param>
         /// <param name="target"></param>
-        public static void Watch(this SyncValue syncable, object target)
+        public static void Watch(this ValueAccess syncable, object target)
         {
             object value = null;
             if (BufferedChanges.ContainsKey(syncable) &&
@@ -68,7 +68,7 @@ namespace Sync
                     break; // The marker
                 }
 
-                SyncValue field = data.Syncable;
+                ValueAccess field = data.Syncable;
 
                 object newValue = data.Syncable.Get(data.Target);
                 bool changed = !Equals(newValue, data.Value);

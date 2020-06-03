@@ -265,25 +265,25 @@ namespace Sync.Reflection
             return lambda.Compile();
         }
 
-        public static DynamicMethod CreateStandIn(SyncMethod method)
+        public static DynamicMethod CreateStandIn(MethodAccess methodAccess)
         {
-            List<Type> parameters = method.MemberInfo.GetParameters()
-                                          .Select(info => info.ParameterType)
-                                          .ToList();
-            if (!method.MemberInfo.IsStatic)
+            List<Type> parameters = methodAccess.MemberInfo.GetParameters()
+                                                .Select(info => info.ParameterType)
+                                                .ToList();
+            if (!methodAccess.MemberInfo.IsStatic)
             {
                 parameters.Insert(
                     0,
-                    method.MemberInfo.DeclaringType); // First argument is the instance
+                    methodAccess.MemberInfo.DeclaringType); // First argument is the instance
             }
 
             DynamicMethod dyn = new DynamicMethod(
                 "Original",
                 MethodAttributes.Static | MethodAttributes.Public,
                 CallingConventions.Standard,
-                method.MemberInfo.ReturnType,
+                methodAccess.MemberInfo.ReturnType,
                 parameters.ToArray(),
-                method.MemberInfo.DeclaringType,
+                methodAccess.MemberInfo.DeclaringType,
                 true);
 
             // The standin as it is will never be called. But it still needs a body for the reverse patching.

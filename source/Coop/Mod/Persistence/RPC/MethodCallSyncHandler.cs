@@ -13,14 +13,14 @@ namespace Coop.Mod.Persistence.RPC
     {
         private bool m_bIsRegistered;
 
-        public MethodCallSyncHandler([NotNull] SyncMethod method)
+        public MethodCallSyncHandler([NotNull] MethodAccess methodAccess)
         {
-            Method = method;
+            MethodAccess = methodAccess;
             Register();
         }
 
         public Statistics Stats { get; } = new Statistics();
-        public SyncMethod Method { get; }
+        public MethodAccess MethodAccess { get; }
 
         [Conditional("DEBUG")]
         private void Trace(MethodCall call, RailClientRoom room)
@@ -40,7 +40,7 @@ namespace Coop.Mod.Persistence.RPC
                 return;
             }
 
-            Method.SetGlobalHandler(
+            MethodAccess.SetGlobalHandler(
                 (instance, args) =>
                 {
                     if (args is object[] objects)
@@ -50,7 +50,7 @@ namespace Coop.Mod.Persistence.RPC
                             {
                                 evt.Call = new MethodCall
                                 {
-                                    Id = Method.Id,
+                                    Id = MethodAccess.Id,
                                     Instance = ArgumentFactory.Create(instance),
                                     Arguments =
                                         objects.Select(o => ArgumentFactory.Create(o))
@@ -74,7 +74,7 @@ namespace Coop.Mod.Persistence.RPC
                 return;
             }
 
-            Method.RemoveGlobalHandler();
+            MethodAccess.RemoveGlobalHandler();
         }
 
         ~MethodCallSyncHandler()

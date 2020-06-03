@@ -138,7 +138,7 @@ namespace Coop.Mod.DebugUtil
 
                 foreach (MethodCallSyncHandler handler in manager.Handlers)
                 {
-                    if (!Imgui.TreeNode(handler.Method.ToString()))
+                    if (!Imgui.TreeNode(handler.MethodAccess.ToString()))
                     {
                         continue;
                     }

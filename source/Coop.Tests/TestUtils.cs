@@ -164,9 +164,7 @@ namespace Coop.Tests
 
         public static ArraySegment<byte> MakeKeepAlive(int iKeepAliveID)
         {
-            return MakeRaw(
-                EPacket.KeepAlive,
-                new KeepAlive(iKeepAliveID).Serialize());
+            return MakeRaw(EPacket.KeepAlive, new KeepAlive(iKeepAliveID).Serialize());
         }
 
         public static ArraySegment<byte> MakePersistencePayload(int iPayloadLength)
@@ -279,10 +277,10 @@ namespace Coop.Tests
         }
     }
 
-    public class TestableField<TTarget, TField> : SyncField<TTarget, TField>
+    public class TestableFieldAccess<TTarget, TField> : FieldAccess<TTarget, TField>
         where TTarget : class
     {
-        public TestableField() : base(
+        public TestableFieldAccess() : base(
             AccessTools.Field(typeof(MockedField<TTarget, TField>), "m_Latest"))
         {
             Mock = new MockedField<TTarget, TField>();

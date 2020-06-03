@@ -10,20 +10,20 @@ namespace Sync
     public class MethodPatcher
     {
         private readonly Type m_Declaring;
-        private readonly List<SyncMethod> m_Sync = new List<SyncMethod>();
+        private readonly List<MethodAccess> m_Sync = new List<MethodAccess>();
 
         public MethodPatcher([NotNull] Type declaringClass)
         {
             m_Declaring = declaringClass;
         }
 
-        public IEnumerable<SyncMethod> Methods => m_Sync;
+        public IEnumerable<MethodAccess> Methods => m_Sync;
 
         ~MethodPatcher()
         {
             MethodInfo factoryMethod =
                 typeof(MethodPatchFactory).GetMethod(nameof(MethodPatchFactory.GetPatch));
-            foreach (SyncMethod syncMethod in m_Sync)
+            foreach (MethodAccess syncMethod in m_Sync)
             {
                 MethodPatchFactory.Unpatch(syncMethod.MemberInfo);
             }
@@ -41,15 +41,15 @@ namespace Sync
             return this;
         }
 
-        public bool TryGetMethod(string sMethodName, out SyncMethod syncMethod)
+        public bool TryGetMethod(string sMethodName, out MethodAccess methodAccess)
         {
-            return TryGetMethod(AccessTools.Method(m_Declaring, sMethodName), out syncMethod);
+            return TryGetMethod(AccessTools.Method(m_Declaring, sMethodName), out methodAccess);
         }
 
-        public bool TryGetMethod(MethodInfo methodInfo, out SyncMethod syncMethod)
+        public bool TryGetMethod(MethodInfo methodInfo, out MethodAccess methodAccess)
         {
-            syncMethod = m_Sync.FirstOrDefault(m => m.MemberInfo.Equals(methodInfo));
-            return syncMethod != null;
+            methodAccess = m_Sync.FirstOrDefault(m => m.MemberInfo.Equals(methodInfo));
+            return methodAccess != null;
         }
 
         private void PatchMethod(MethodInfo original)
@@ -58,11 +58,11 @@ namespace Sync
         }
 
         public static bool DispatchCallRequest(
-            SyncMethod method,
+            MethodAccess methodAccess,
             object instance,
             params object[] args)
         {
-            return method.RequestCall(instance, args);
+            return methodAccess.RequestCall(instance, args);
         }
     }
 }

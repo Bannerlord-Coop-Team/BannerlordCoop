@@ -8,8 +8,8 @@ namespace Coop.Mod.Patch
     [Patch]
     public static class TimeControl
     {
-        public static SyncField<Campaign, CampaignTimeControlMode> TimeControlMode { get; } =
-            new SyncField<Campaign, CampaignTimeControlMode>(
+        public static FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; } =
+            new FieldAccess<Campaign, CampaignTimeControlMode>(
                 AccessTools.Field(typeof(Campaign), "_timeControlMode"));
 
         [SyncWatch(typeof(Campaign), nameof(Campaign.TimeControlMode), MethodType.Setter)]
