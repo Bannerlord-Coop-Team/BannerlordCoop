@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using Common;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RPC;
 using Network.Infrastructure;
 using RailgunNet.Logic;
+using Sync;
 using TaleWorlds.Engine;
 
 namespace Coop.Mod.DebugUtil
@@ -22,17 +24,76 @@ namespace Coop.Mod.DebugUtil
                 Begin();
                 AddButtons();
                 DisplayConnectionInfo();
+                DisplayMethodRegistry();
                 DisplayClientRpcInfo();
                 DisplayEntities();
                 End();
             }
         }
 
+        private static void DisplayMethodRegistry()
+        {
+            if (!Imgui.TreeNode("Patched method registry"))
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<MethodId, MethodAccess> registrar in MethodRegistry.IdToMethod)
+            {
+                MethodAccess access = registrar.Value;
+                string sName = $"{registrar.Key} {access}";
+                if (!Imgui.TreeNode(sName))
+                {
+                    continue;
+                }
+
+#if DEBUG
+                Imgui.Columns(2);
+                Imgui.Separator();
+                Imgui.Text("Instance");
+
+                // first line: global handler
+                Imgui.Text("global");
+
+                // instance specific handlers
+                foreach (KeyValuePair<object, Action<object>> handler in access
+                    .InstanceSpecificHandlers)
+                {
+                    Imgui.Text(handler.Key.ToString());
+                }
+
+                Imgui.NextColumn();
+                Imgui.Text("Handler");
+                Imgui.Separator();
+
+                // first line: global handler
+                Imgui.Text(
+                    access.GlobalHandler != null ?
+                        access.GlobalHandler.Target + "." + access.GlobalHandler.Method.Name :
+                        "-");
+
+                // instance specific handlers
+                foreach (KeyValuePair<object, Action<object>> handler in access
+                    .InstanceSpecificHandlers)
+                {
+                    Imgui.Text(handler.Value.Target + "." + handler.Value.Method.Name);
+                }
+
+                Imgui.Columns();
+                Imgui.TreePop();
+#else
+                DisplayDebugDisabledText();
+#endif
+            }
+
+            Imgui.TreePop();
+        }
+
         private void Begin()
         {
             Imgui.BeginMainThreadScope();
             Imgui.Begin(m_WindowTitle);
-            Text("DO NOT MOVE THIS WINDOW! It will crash the game.");
+            Imgui.Text("DO NOT MOVE THIS WINDOW! It will crash the game.");
         }
 
         private void AddButtons()
@@ -71,12 +132,7 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
-        private void Text(string sText)
-        {
-            Imgui.Text(sText);
-        }
-
-        private void DisplayEntities()
+        private static void DisplayEntities()
         {
             if (!Imgui.TreeNode("Persistence: Parties"))
             {
@@ -86,7 +142,7 @@ namespace Coop.Mod.DebugUtil
 
             if (CoopServer.Instance?.Persistence?.EntityManager == null)
             {
-                Text("No coop server running.");
+                Imgui.Text("No coop server running.");
             }
             else
             {
@@ -111,7 +167,7 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private void DisplayConnectionInfo()
+        private static void DisplayConnectionInfo()
         {
             if (Imgui.TreeNode("Connection info"))
             {
@@ -121,7 +177,7 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
-        private void DisplayClientRpcInfo()
+        private static void DisplayClientRpcInfo()
         {
             if (!Imgui.TreeNode("Persistence: client synchronized method calls"))
             {
@@ -130,7 +186,7 @@ namespace Coop.Mod.DebugUtil
 
             if (CoopClient.Instance?.Persistence?.RpcSyncHandlers == null)
             {
-                Text("Coop client not connected.");
+                Imgui.Text("Coop client not connected.");
             }
             else
             {
@@ -143,10 +199,6 @@ namespace Coop.Mod.DebugUtil
                         continue;
                     }
 #if DEBUG
-#else
-                    DisplayDebugDisabledText();
-#endif
-
                     Imgui.Columns(2);
                     Imgui.Separator();
                     Imgui.Text("Requested on");
@@ -166,6 +218,9 @@ namespace Coop.Mod.DebugUtil
 
                     Imgui.Columns();
                     Imgui.TreePop();
+#else
+                    DisplayDebugDisabledText();
+#endif
                 }
             }
 
@@ -173,12 +228,12 @@ namespace Coop.Mod.DebugUtil
         }
 
         [Conditional("DEBUG")]
-        private void DisplayDebugDisabledText()
+        private static void DisplayDebugDisabledText()
         {
             Imgui.Text("DEBUG is disabled. No information available.");
         }
 
-        private void End()
+        private static void End()
         {
             Imgui.End();
             Imgui.EndMainThreadScope();
