@@ -56,13 +56,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="EPatchBehaviour.cs"/>
     <Compile Include="MethodPatch.cs"/>
     <Compile Include="ValueChangeRequest.cs"/>
     <Compile Include="FieldChangeBuffer.cs"/>
     <Compile Include="MethodId.cs"/>
     <Compile Include="MethodPatchFactory.cs"/>
     <Compile Include="MethodRegistry.cs"/>
-    <Compile Include="PatchInitializerAttribute.cs"/>
     <Compile Include="PropertyPatch.cs"/>
     <Compile Include="ValueAccess.cs"/>
     <Compile Include="Tracker.cs"/>

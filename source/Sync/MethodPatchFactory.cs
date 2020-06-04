@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -14,17 +14,23 @@ namespace Sync
         private static readonly Dictionary<MethodBase, DynamicMethod> Prefixes =
             new Dictionary<MethodBase, DynamicMethod>();
 
-        public static MethodAccess AddPrefix(MethodInfo original, MethodInfo dispatcher)
+        public static MethodAccess AddPrefix(
+            MethodInfo original,
+            MethodInfo dispatcher,
+            EPatchBehaviour eBehaviour)
         {
             lock (Patcher.HarmonyLock)
             {
                 MethodAccess sync = new MethodAccess(original);
-                AddPrefix(sync, dispatcher);
+                AddPrefix(sync, dispatcher, eBehaviour);
                 return sync;
             }
         }
 
-        public static void AddPrefix(MethodAccess access, MethodInfo dispatcher)
+        public static void AddPrefix(
+            MethodAccess access,
+            MethodInfo dispatcher,
+            EPatchBehaviour eBehaviour)
         {
             lock (Patcher.HarmonyLock)
             {
@@ -33,7 +39,7 @@ namespace Sync
                     throw new Exception("Patch already initialized.");
                 }
 
-                Prefixes[access.MemberInfo] = GeneratePrefix(access, dispatcher);
+                Prefixes[access.MemberInfo] = GeneratePrefix(access, dispatcher, eBehaviour);
 
                 MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPrefix));
 
@@ -65,7 +71,8 @@ namespace Sync
 
         private static DynamicMethod GeneratePrefix(
             MethodAccess methodAccess,
-            MethodInfo dispatcher)
+            MethodInfo dispatcher,
+            EPatchBehaviour eBehaviour)
         {
             List<SMethodParameter> parameters = methodAccess.MemberInfo.GetParameters()
                                                             .Select(
@@ -149,7 +156,26 @@ namespace Sync
 
             // Request call
             il.EmitCall(OpCodes.Call, dispatcher, null);
+
+            switch (eBehaviour)
+            {
+                case EPatchBehaviour.AlwaysCallOriginal:
+                    il.Emit(OpCodes.Pop);
+                    il.Emit(OpCodes.Ldc_I4_1);
+                    break;
+                case EPatchBehaviour.NeverCallOriginal:
+                    il.Emit(OpCodes.Pop);
+                    il.Emit(OpCodes.Ldc_I4_0);
+                    break;
+                case EPatchBehaviour.CallOriginalIfNoHandlerExists:
+                    // Correct value is already on the stack
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(eBehaviour), eBehaviour, null);
+            }
+
             il.Emit(OpCodes.Ret);
+
             return dyn;
         }
 

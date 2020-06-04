@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
@@ -45,7 +47,23 @@ namespace Coop.Mod
             AddBehavior<InitServerBehaviour>();
             AddBehavior<GameLoadedBehaviour>();
 
-            new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord").PatchAll();
+            Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
+            IEnumerable<MethodInfo> patchInitializers =
+                from t in Assembly.GetExecutingAssembly().GetTypes()
+                from m in t.GetMethods()
+                where m.IsDefined(typeof(PatchInitializerAttribute))
+                select m;
+            foreach (MethodInfo initializer in patchInitializers)
+            {
+                if (!initializer.IsStatic)
+                {
+                    throw new Exception("Invalid [PatchInitializer]. Has to be static.");
+                }
+
+                initializer.Invoke(null, null);
+            }
+
+            harmony.PatchAll();
         }
 
         protected override void OnSubModuleUnloaded()

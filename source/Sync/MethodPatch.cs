@@ -32,15 +32,18 @@ namespace Sync
 
         /// <summary>
         ///     Creates a <see cref="MethodAccess" /> and patches in a prefix that relays all calls to
-        ///     <see cref="MethodAccess.RequestCall" />.
+        ///     <see cref="MethodAccess.InvokeOnBeforeCallHandler" />.
         /// </summary>
         /// <param name="method">Method to track.</param>
+        /// <param name="eBehaviour"></param>
         /// <returns>this</returns>
         /// <exception cref="ArgumentException">
         ///     If the method is not declared in class
         ///     <see cref="m_Declaring" />
         /// </exception>
-        public MethodPatch Relay(MethodInfo method)
+        public MethodPatch Relay(
+            MethodInfo method,
+            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
             if (method.DeclaringType != m_Declaring)
             {
@@ -49,18 +52,21 @@ namespace Sync
                     nameof(method));
             }
 
-            PatchPrefix(method);
+            PatchPrefix(method, eBehaviour);
             return this;
         }
 
         /// <summary>
         ///     Creates a <see cref="MethodAccess" /> and patches in a prefix that relays all calls to
-        ///     <see cref="MethodAccess.RequestCall" />.
+        ///     <see cref="MethodAccess.InvokeOnBeforeCallHandler" />.
         /// </summary>
         /// <param name="sMethodName">Name of the method</param>
+        /// <param name="eBehaviour"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException">If no method with that name exists.</exception>
-        public MethodPatch Relay(string sMethodName)
+        public MethodPatch Relay(
+            string sMethodName,
+            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
             MethodInfo method = AccessTools.Method(m_Declaring, sMethodName);
             if (method == null)
@@ -70,7 +76,7 @@ namespace Sync
                     nameof(sMethodName));
             }
 
-            PatchPrefix(method);
+            PatchPrefix(method, eBehaviour);
             return this;
         }
 
@@ -85,20 +91,20 @@ namespace Sync
             return methodAccess != null;
         }
 
-        private void PatchPrefix(MethodInfo original)
+        private void PatchPrefix(MethodInfo original, EPatchBehaviour eBehaviour)
         {
             MethodInfo dispatcher = AccessTools.Method(
                 typeof(MethodPatch),
-                nameof(DispatchCallRequest));
-            m_Access.Add(MethodPatchFactory.AddPrefix(original, dispatcher));
+                nameof(DispatchPrefixExecution));
+            m_Access.Add(MethodPatchFactory.AddPrefix(original, dispatcher, eBehaviour));
         }
 
-        private static bool DispatchCallRequest(
+        private static bool DispatchPrefixExecution(
             MethodAccess methodAccess,
             object instance,
             params object[] args)
         {
-            return methodAccess.RequestCall(instance, args);
+            return methodAccess.InvokeOnBeforeCallHandler(instance, args);
         }
     }
 }

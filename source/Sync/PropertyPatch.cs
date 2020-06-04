@@ -11,13 +11,17 @@ namespace Sync
     /// </summary>
     public class PropertyPatch
     {
+        private readonly EPatchBehaviour m_Behaviour;
         private readonly Type m_Declaring;
         private readonly MethodPatch m_GetterPatch;
         private readonly MethodPatch m_SetterPatch;
 
-        public PropertyPatch([NotNull] Type declaringType)
+        public PropertyPatch(
+            [NotNull] Type declaringType,
+            EPatchBehaviour eBehaviour = EPatchBehaviour.AlwaysCallOriginal)
         {
             m_Declaring = declaringType;
+            m_Behaviour = eBehaviour;
             m_SetterPatch = new MethodPatch(m_Declaring);
             m_GetterPatch = new MethodPatch(m_Declaring);
         }
@@ -27,25 +31,29 @@ namespace Sync
 
         public PropertyPatch RelaySetter([NotNull] PropertyInfo property)
         {
-            m_SetterPatch.Relay(AccessTools.PropertySetter(m_Declaring, property.Name));
+            m_SetterPatch.Relay(
+                AccessTools.PropertySetter(m_Declaring, property.Name),
+                m_Behaviour);
             return this;
         }
 
         public PropertyPatch RelaySetter(string sProperty)
         {
-            m_SetterPatch.Relay(AccessTools.PropertySetter(m_Declaring, sProperty));
+            m_SetterPatch.Relay(AccessTools.PropertySetter(m_Declaring, sProperty), m_Behaviour);
             return this;
         }
 
         public PropertyPatch RelayGetter([NotNull] PropertyInfo property)
         {
-            m_SetterPatch.Relay(AccessTools.PropertyGetter(m_Declaring, property.Name));
+            m_SetterPatch.Relay(
+                AccessTools.PropertyGetter(m_Declaring, property.Name),
+                m_Behaviour);
             return this;
         }
 
         public PropertyPatch RelayGetter(string sProperty)
         {
-            m_SetterPatch.Relay(AccessTools.PropertyGetter(m_Declaring, sProperty));
+            m_SetterPatch.Relay(AccessTools.PropertyGetter(m_Declaring, sProperty), m_Behaviour);
             return this;
         }
     }

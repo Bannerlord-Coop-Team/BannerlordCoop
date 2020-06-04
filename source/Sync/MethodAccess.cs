@@ -52,13 +52,25 @@ namespace Sync
             Harmony.ReversePatch(MemberInfo, standin);
         }
 
+        /// <summary>
+        ///     Invokes the original method as it was at the time of creation of this
+        ///     <see cref="MethodAccess" />.
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="args"></param>
         public void CallOriginal([CanBeNull] object target, [CanBeNull] object[] args)
         {
             m_Call?.Invoke(target, args);
             m_CallStatic?.Invoke(args);
         }
 
-        public bool RequestCall([CanBeNull] object instance, params object[] args)
+        /// <summary>
+        ///     Invokes registered handlers for the given instance.
+        /// </summary>
+        /// <param name="instance"></param>
+        /// <param name="args"></param>
+        /// <returns>true if a handler was invoked. False otherwise.</returns>
+        public bool InvokeOnBeforeCallHandler([CanBeNull] object instance, params object[] args)
         {
             Action<object> handler = GetHandler(instance);
             handler?.Invoke(args);

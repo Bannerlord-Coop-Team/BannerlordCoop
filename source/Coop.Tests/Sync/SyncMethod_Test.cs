@@ -38,8 +38,14 @@ namespace Coop.Tests.Sync
         private class SomePatch
         {
             public static readonly MethodPatch Patch = new MethodPatch(typeof(A))
-                                                       .Relay(nameof(A.SyncedMethod))
-                                                       .Relay(nameof(A.StaticSyncedMethod));
+                                                       .Relay(
+                                                           nameof(A.SyncedMethod),
+                                                           EPatchBehaviour
+                                                               .CallOriginalIfNoHandlerExists)
+                                                       .Relay(
+                                                           nameof(A.StaticSyncedMethod),
+                                                           EPatchBehaviour
+                                                               .CallOriginalIfNoHandlerExists);
         }
 
         private readonly MethodAccess m_SyncedMethod;

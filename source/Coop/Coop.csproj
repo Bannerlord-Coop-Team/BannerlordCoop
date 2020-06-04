@@ -223,6 +223,7 @@
     <Compile Include="Mod\MbLogTarget.cs" />
     <Compile Include="Mod\Patch\Debugging.cs" />
     <Compile Include="Mod\Patch\Exceptions.cs" />
+    <Compile Include="Mod\Patch\PatchInitializerAttribute.cs"/>
     <Compile Include="Mod\Patch\TimeControl.cs" />
     <Compile Include="Mod\Patch\Utils.cs" />
     <Compile Include="Mod\Persistence\Compare.cs" />

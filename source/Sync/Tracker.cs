@@ -13,7 +13,10 @@ namespace Sync
         private readonly Dictionary<object, Action<object>> m_InstanceSpecificHandlers =
             new Dictionary<object, Action<object>>();
 
-        private Action<object, object> m_GlobalHandler;
+        public Action<object, object> GlobalHandler { get; private set; }
+
+        public IReadOnlyDictionary<object, Action<object>> InstanceSpecificHandlers =>
+            m_InstanceSpecificHandlers;
 
         /// <summary>
         ///     Sets the handler to be called when a specific instance of the <see cref="Tracker" />
@@ -39,7 +42,7 @@ namespace Sync
         /// <returns>Handler or null</returns>
         public Action<object> GetHandler(object instance)
         {
-            bool bHasGlobalHandler = m_GlobalHandler != null;
+            bool bHasGlobalHandler = GlobalHandler != null;
             if (instance != null &&
                 m_InstanceSpecificHandlers.TryGetValue(
                     instance,
@@ -49,7 +52,7 @@ namespace Sync
                 {
                     return args =>
                     {
-                        m_GlobalHandler(instance, args);
+                        GlobalHandler(instance, args);
                         instanceSpecificHandler(args);
                     };
                 }
@@ -57,9 +60,9 @@ namespace Sync
                 return instanceSpecificHandler;
             }
 
-            if (m_GlobalHandler != null)
+            if (GlobalHandler != null)
             {
-                return args => m_GlobalHandler(instance, args);
+                return args => GlobalHandler(instance, args);
             }
 
             return null;
@@ -81,17 +84,17 @@ namespace Sync
         /// <param name="action"></param>
         public void SetGlobalHandler(Action<object, object> action)
         {
-            if (m_GlobalHandler != null)
+            if (GlobalHandler != null)
             {
                 throw new ArgumentException($"Cannot have multiple global handlers for {this}.");
             }
 
-            m_GlobalHandler = action;
+            GlobalHandler = action;
         }
 
         public void RemoveGlobalHandler()
         {
-            m_GlobalHandler = null;
+            GlobalHandler = null;
         }
     }
 }
