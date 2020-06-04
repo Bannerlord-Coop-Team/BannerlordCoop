@@ -12,13 +12,13 @@ namespace Sync
         private static readonly HarmonyMethod PatchPrefix = new HarmonyMethod(
             AccessTools.Method(typeof(FieldChangeBuffer), nameof(PushActiveFields)))
         {
-            priority = SyncPriority.SyncValuePre
+            priority = SyncPriority.FieldWatcherPre
         };
 
         private static readonly HarmonyMethod PatchPostfix = new HarmonyMethod(
             AccessTools.Method(typeof(FieldChangeBuffer), nameof(PopActiveFields)))
         {
-            priority = SyncPriority.SyncValuePost
+            priority = SyncPriority.FieldWatcherPost
         };
 
         public static Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>

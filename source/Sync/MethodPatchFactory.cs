@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -39,7 +39,7 @@ namespace Sync
 
                 HarmonyMethod patch = new HarmonyMethod(factoryMethod)
                 {
-                    priority = SyncPriority.SyncCallPreUserPatch
+                    priority = SyncPriority.MethodPatchGeneratedPrefix
                 };
                 Patcher.HarmonyInstance.Patch(access.MemberInfo, patch);
             }

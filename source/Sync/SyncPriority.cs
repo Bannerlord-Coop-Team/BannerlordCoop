@@ -4,10 +4,8 @@ namespace Sync
 {
     public static class SyncPriority
     {
-        public const int SyncCallPost = SyncValuePost - 1;
-        public const int SyncValuePost = Priority.Last - 2;
-        public const int SyncValuePre = Priority.First + 1;
-        public const int SyncCallPre = SyncValuePre + 1;
-        public const int SyncCallPreUserPatch = SyncCallPre + 1;
+        public const int FieldWatcherPost = Priority.Last - 100;
+        public const int MethodPatchGeneratedPrefix = Priority.First;
+        public const int FieldWatcherPre = Priority.First + 100;
     }
 }
