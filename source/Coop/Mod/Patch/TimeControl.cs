@@ -16,7 +16,7 @@ namespace Coop.Mod.Patch
         [PatchInitializer]
         public static void Init()
         {
-            FieldChangeBuffer.TrackChanges(
+            FieldChangeBuffer.Intercept(
                 TimeControlMode,
                 TimeControlPatch.Setters,
                 () => Coop.DoSync);

@@ -1,16 +1,12 @@
 ﻿using Coop.Mod.Persistence;
-using NLog;
 using Sync;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
-using Logger = NLog.Logger;
 
 namespace Coop.Mod.Patch
 {
     public static class CampaignMapMovement
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-
         private static readonly PropertyPatch MobilePartyPatch =
             new PropertyPatch(typeof(MobileParty))
                 .RelaySetter(nameof(MobileParty.DefaultBehavior))
@@ -29,7 +25,7 @@ namespace Coop.Mod.Patch
         [PatchInitializer]
         public static void Init()
         {
-            FieldChangeBuffer.TrackChanges(Movement, MobilePartyPatch.Setters, () => Coop.DoSync);
+            FieldChangeBuffer.Intercept(Movement, MobilePartyPatch.Setters, () => Coop.DoSync);
         }
     }
 }

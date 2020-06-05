@@ -23,6 +23,8 @@ namespace Coop.Mod
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
         private int m_ReconnectAttempts = MaxReconnectAttempts;
 
+        public Action<PersistenceClient> OnPersistenceInitialized;
+
         public CoopClient()
         {
             Session = new GameSession(new GameData());
@@ -82,6 +84,7 @@ namespace Coop.Mod
             if (Persistence == null)
             {
                 Persistence = new PersistenceClient(new GameEnvironmentClient());
+                OnPersistenceInitialized?.Invoke(Persistence);
             }
 
             Persistence.SetConnection(con);

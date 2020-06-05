@@ -5,6 +5,13 @@ using Sync.Reflection;
 
 namespace Sync
 {
+    /// <summary>
+    ///     Buffer for pending changes to a value. The changes are detected by creating a snapshot
+    ///     of the value in a prefix to the trigger function and restoring that snapshot in a
+    ///     postfix to the trigger function.
+    ///     The buffer <see cref="BufferedChanges" /> will never be cleared internally. The game
+    ///     loop is responsible to process the buffered changes and apply or discard them.
+    /// </summary>
     public static class FieldChangeBuffer
     {
         private static readonly Stack<ValueData> ActiveFields = new Stack<ValueData>();
@@ -47,7 +54,18 @@ namespace Sync
             ActiveFields.Push(new ValueData(access, target, value));
         }
 
-        public static void TrackChanges(
+        /// <summary>
+        ///     During the execution of any of the <paramref name="triggers" /> methods, any change to the
+        ///     value will not be applied but instead written to the change buffer
+        ///     <see cref="BufferedChanges" />.
+        /// </summary>
+        /// <param name="value">Accessor to the value</param>
+        /// <param name="triggers">
+        ///     Trigger methods during which the changes to the value are written to the
+        ///     buffer instead
+        /// </param>
+        /// <param name="condition">The buffer is only active if the condition evaluates to true</param>
+        public static void Intercept(
             ValueAccess value,
             IEnumerable<MethodAccess> triggers,
             Func<bool> condition)
