@@ -13,7 +13,7 @@ using TaleWorlds.Engine;
 using TaleWorlds.Localization;
 using System.Linq;
 using System.Collections.Generic;
-using Coop.Mod.CLI;
+using Coop.Mod.DebugUtil;
 
 namespace Coop.Mod.UI
 {

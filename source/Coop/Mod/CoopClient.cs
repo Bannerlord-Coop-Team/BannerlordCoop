@@ -51,7 +51,8 @@ namespace Coop.Mod
                     return false;
                 }
 
-                return Session.Connection.State == EConnectionState.ClientPlaying;
+                // TODO change to main menu state
+                return Session.Connection.State == EConnectionState.ClientJoinRequesting;
             }
         }
 

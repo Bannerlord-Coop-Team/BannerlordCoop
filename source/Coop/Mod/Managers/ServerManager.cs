@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using Coop.Mod.CLI;
+using Coop.Mod.DebugUtil;
 using SandBox;
 using TaleWorlds.Core;
 using TaleWorlds.SaveSystem.Load;
@@ -15,9 +15,10 @@ namespace Coop.Mod.Managers
         {
             // TODO save all heros
         }
-        public override void OnGameInitializationFinished(Game game)
+
+        public override void OnLoadFinished()
         {
-            base.OnGameInitializationFinished(game);
+            base.OnLoadFinished();
             CLICommands.StartServer(new List<string>());
         }
     }

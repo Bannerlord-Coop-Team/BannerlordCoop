@@ -341,11 +341,13 @@ namespace NoHarmony
                     message = "[Track] " + message;
                     break;
             }
-
-            using (StreamWriter sw = new StreamWriter(LogFile, true))
+            try
             {
-                sw.WriteLine(DateTime.Now.ToString(LogDateFormat) + " > " + message);
-            }
+                using (StreamWriter sw = new StreamWriter(LogFile, true))
+                {
+                    sw.WriteLine(DateTime.Now.ToString(LogDateFormat) + " > " + message);
+                }
+            } catch(IOException) { }
         }
 
         public void LoadConf()

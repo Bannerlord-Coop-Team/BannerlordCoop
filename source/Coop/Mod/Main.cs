@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common;
-using Coop.Network;
 using Coop.Mod.Behaviour;
-using Coop.Mod.CLI;
+using Coop.Mod.DebugUtil;
 using Coop.Mod.UI;
 using HarmonyLib;
-using MBMultiplayerCampaign;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
@@ -16,23 +14,27 @@ using NoHarmony;
 using Sync;
 using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
-using TaleWorlds.Library;
 using TaleWorlds.Core;
 using TaleWorlds.Engine.Screens;
-using TaleWorlds.InputSystem;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Missions;
 
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
+using Coop.Mod.Patch;
+using Network.Infrastructure;
 
 namespace Coop.Mod
 {
     internal class Main : NoHarmonyLoader
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        // Debug symbols
         public static readonly bool DEBUG = true;
+        public static readonly string LOAD_GAME = "MP";
+        // -------------
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
         public Main()
@@ -94,7 +96,8 @@ namespace Coop.Mod
                         }
                         else if (argument.ToLower() == "/client")
                         {
-                            CLICommands.ConnectTo(new List<string> { "127.0.0.1", "4201" });
+                            ServerConfiguration defaultConfiguration = new ServerConfiguration();
+                            CoopClient.Instance.Connect(defaultConfiguration.LanAddress, defaultConfiguration.LanPort);
                         }
                     }
                 }

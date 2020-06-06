@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Net;
 using Network.Infrastructure;
-using Coop.Network;
+using Network;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
@@ -39,9 +39,9 @@ namespace Coop.Mod.DebugUtil
         [CommandLineFunctionality.CommandLineArgumentFunction("start_local_server", sGroupName)]
         public static string StartServer(List<string> parameters)
         {
-            if (!IsGameLoaded())
+            if (Main.DEBUG && !IsGameLoaded())
             {
-                CoopServer.Instance.StartGame();
+                CoopServer.Instance.StartGame(Main.LOAD_GAME);
             }
             
             CoopServer.Instance.StartServer();

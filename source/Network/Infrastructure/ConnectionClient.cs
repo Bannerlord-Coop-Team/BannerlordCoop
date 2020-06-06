@@ -49,6 +49,13 @@ namespace Network.Infrastructure
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
                           .Permit(
                               ETrigger.InitialWorldDataReceived,
+                              EConnectionState.ClientLoading);
+
+            m_StateMachine.Configure(EConnectionState.ClientLoading)
+                          .OnEntry(sendClientHello)
+                          .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
+                          .Permit(
+                              ETrigger.GameLoaded,
                               EConnectionState.ClientPlaying);
 
             m_StateMachine.Configure(EConnectionState.ClientPlaying)
@@ -95,6 +102,7 @@ namespace Network.Infrastructure
             TryJoinServer,
             ServerAcceptedJoinRequest,
             InitialWorldDataReceived,
+            GameLoaded,
             Disconnect,
             Disconnected
         }
@@ -137,6 +145,14 @@ namespace Network.Infrastructure
                 new Packet(
                     EPacket.Client_RequestWorldData,
                     new Client_RequestWorldData().Serialize()));
+        }
+
+        private void sendGameLoaded()
+        {
+            Send(
+                new Packet(
+                    EPacket.Client_Joined,
+                    new Client_GameLoaded().Serialize()));
         }
 
         [PacketHandler(EConnectionState.ClientAwaitingWorldData, EPacket.Server_WorldData)]

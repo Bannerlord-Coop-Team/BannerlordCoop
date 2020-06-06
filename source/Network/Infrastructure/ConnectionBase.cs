@@ -15,13 +15,29 @@ namespace Network.Infrastructure
          */
         ClientJoinRequesting,
 
+        /** [client side] Client is waiting at the main menu.
+         *
+         * Possible transitions to:
+         * - ClientAwaitingWorldData: The server accepted the request.
+         * - Disconnecting: Request timeout or the server rejected the request.
+         */
+        ClientAtMainMenu,
+
+
         /** [client side] Client is joining a server, e.g. downloading data.
          *
          * Possible transitions to
-         * - ClientPlaying:   Client successfully connected to the server.
-         * - Disconnecting:     Timeout.
+         * - ClientLoading:   Client is loading the requested world data.
+         * - Disconnecting:   Timeout.
          */
         ClientAwaitingWorldData,
+
+        /** [client side] Client is loading the requested world data.
+         *
+         * Possible transitions to:
+         * - Disconnecting:  Timeout or disconnect request (either server or client side).
+         */
+        ClientLoading,
 
         /** [client side] Client is playing on the server.
          *

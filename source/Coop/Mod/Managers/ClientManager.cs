@@ -21,7 +21,7 @@ using TaleWorlds.CampaignSystem.Actions;
 
 namespace Coop.Mod.Managers
 {
-    class ClientGameManager : StoryModeGameManager
+    class ClientGameManager : CampaignGameManager
     {
         public ClientGameManager() : base() 
         {
