@@ -55,7 +55,7 @@ namespace Coop.Mod.DebugUtil
                 }
             }
 
-            if (!CoopClient.Instance.Connected)
+            if (!CoopClient.Instance.ClientPlaying)
             {
                 Imgui.SameLine(400);
                 if (Imgui.SmallButton("Connect to local host"))

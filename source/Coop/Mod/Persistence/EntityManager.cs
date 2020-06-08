@@ -129,7 +129,7 @@ namespace Coop.Mod.Persistence
 
         private MobileParty GetPlayerParty(RailServerPeer peer)
         {
-            if (Coop.IsClient || Coop.IsServer)
+            if (Coop.IsClientPlaying || Coop.IsServer)
             {
                 return MobileParty.MainParty;
             }

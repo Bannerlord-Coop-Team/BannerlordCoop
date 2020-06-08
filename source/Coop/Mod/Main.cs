@@ -71,6 +71,13 @@ namespace Coop.Mod
                 FieldWatcher.ApplyFieldWatcherPatches(harmony, patch);
             }
 
+            if (DEBUG)
+            {
+                typeof(Module)
+                    .GetField("_splashScreenPlayed", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(TaleWorlds.MountAndBlade.Module.CurrentModule, true);
+            }
+
             harmony.PatchAll();
 
             Module.CurrentModule.AddInitialStateOption(new InitialStateOption("CoOp Campaign",

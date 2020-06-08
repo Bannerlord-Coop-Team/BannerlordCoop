@@ -106,6 +106,21 @@ namespace Network.Protocol
         }
     }
 
+    public class Client_GameLoading
+    {
+        public byte[] Serialize()
+        {
+            // Empty
+            return new byte[0];
+        }
+
+        public static Client_GameLoading Deserialize(ByteReader reader)
+        {
+            // Empty
+            return new Client_GameLoading();
+        }
+    }
+
     public class Client_GameLoaded
     {
         public byte[] Serialize()

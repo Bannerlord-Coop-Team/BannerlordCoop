@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using Common;
+using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
 using Coop.Multiplayer.Network;
 using JetBrains.Annotations;
@@ -42,7 +43,21 @@ namespace Coop.Mod
         public CoopGameState GameState { get; }
         public CoopEvents Events { get; }
 
-        public bool Connected
+        public bool ClientPlaying
+        {
+            get
+            {
+                if (Session.Connection == null)
+                {
+                    return false;
+                }
+
+                // TODO change to main menu state
+                return Session.Connection.State == EConnectionState.ClientPlaying;
+            }
+        }
+
+        public bool ClientRequestingWorldData
         {
             get
             {
@@ -97,7 +112,8 @@ namespace Coop.Mod
 
             m_ReconnectAttempts = MaxReconnectAttempts;
             TryInitPersistence(con);
-            con.OnClientJoined += TryInitPersistence;
+            ClientGameManager.OnLoadFinishedEvent += con.sendGameLoaded;
+            con.OnClientLoaded += TryInitPersistence;
             con.OnDisconnected += ConnectionClosed;
         }
 

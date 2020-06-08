@@ -18,6 +18,9 @@ using System.Reflection;
 using NetworkMessages.FromClient;
 using Module = TaleWorlds.MountAndBlade.Module;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
+using Helpers;
 
 namespace Coop.Mod.Managers
 {
@@ -41,18 +44,25 @@ namespace Coop.Mod.Managers
         public ClientGameManager(LoadResult saveGameData) : base(saveGameData) { }
 
         public delegate void OnOnLoadFinishedEventHandler(object source, EventArgs e);
-        public event OnOnLoadFinishedEventHandler OnLoadFinishedEvent;
+        public static event OnOnLoadFinishedEventHandler OnLoadFinishedEvent;
 
+        public MobileParty ClientParty { get; private set; }
         public Hero ClientHero { get; private set; }
+        public CharacterObject ClientCharacterObject { get; private set; }
 
         public override void OnLoadFinished()
         {
             base.OnLoadFinished();
-            
-
             OnLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
-            
-            
+            //CharacterObject player = new CharacterObject();
+            //Hero clientHero = Hero.MainHero;
+            //ClientParty = new MobileParty();
+            //TextObject name = MobilePartyHelper.GeneratePartyName(player);
+            //ClientParty.InitializeMobileParty(name, Game.Current.ObjectManager.GetObject<PartyTemplateObject>("main_hero_party_template"), new Vec2(685.3f, 410.9f), 0f, 0f, MobileParty.PartyTypeEnum.Default, -1);
+            //ClientParty.ItemRoster.AddToCounts(DefaultItems.Grain, 1, true);
+            //ClientParty.Party.Owner = clientHero;
+            //ClientParty.SetAsMainParty();
+            //Campaign.Current.CameraFollowParty = ClientParty.Party;
         }
 
         public void GetCreatedCharacter()

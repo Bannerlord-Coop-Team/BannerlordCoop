@@ -5,8 +5,11 @@ namespace Network.Protocol
 {
     // TODO add class summary
     /// <summary>
-    /// 
+    /// Defines packets
     /// </summary>
+    /// <remarks>
+    /// Used by PacketDispatcher
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
     public class PacketHandlerAttribute : Attribute
     {
