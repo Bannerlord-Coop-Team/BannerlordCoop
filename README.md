@@ -37,7 +37,7 @@ The game is now running a local coop server and is connected to it with a local 
 Only works in LAN, never tested it in WAN.
 
 ## Contributing
-If anyone is interested in contributing to this project, please feel free to open an issue and request additional documentation & information. Until then i'm treating this as a personal project and will not actively communicate any issues, TODOs or design decisions.
+If anyone is interested in contributing to this project, please feel free to open an issue and request additional documentation & information.
 
 ## Acknowledgments
 - Zetrith for [Multiplayer](https://github.com/Zetrith/Multiplayer).
