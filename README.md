@@ -1,6 +1,9 @@
 # Bannerlord Coop
 Mod to enjoy the Mount & Blade II: Bannerlord campaign with other players.
 
+## Mod Discord
+https://discord.gg/ngC4RVb
+
 ## Current state
 Very early in development. There's is absolutely no gameplay so far. [Video created on commit d86c24c](https://youtu.be/Y_htoMXQGqU).
 
