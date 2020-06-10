@@ -24,7 +24,7 @@ namespace Sync
             MemberInfo = info;
             Id = MethodRegistry.Register(this);
             m_StandIn = InvokableFactory.CreateStandIn(this);
-            InitOriginal();
+            InitOriginal(m_StandIn);
             if (MemberInfo.IsStatic)
             {
                 m_CallStatic = InvokableFactory.CreateStaticStandInCaller(m_StandIn);
@@ -39,17 +39,20 @@ namespace Sync
 
         public MethodInfo MemberInfo { get; }
 
-        private void InitOriginal()
+        private void InitOriginal(DynamicMethod toPatch)
         {
-            bool bHasPatches = Harmony.GetPatchInfo(MemberInfo) != null;
-            HarmonyMethod standin = new HarmonyMethod(m_StandIn)
+            lock (Patcher.HarmonyLock)
             {
-                method = m_StandIn,
-                reversePatchType = bHasPatches ?
-                    HarmonyReversePatchType.Snapshot :
-                    HarmonyReversePatchType.Original
-            };
-            Harmony.ReversePatch(MemberInfo, standin);
+                bool bHasPatches = Harmony.GetPatchInfo(MemberInfo) != null;
+                HarmonyMethod standin = new HarmonyMethod(toPatch)
+                {
+                    method = m_StandIn,
+                    reversePatchType = bHasPatches ?
+                        HarmonyReversePatchType.Snapshot :
+                        HarmonyReversePatchType.Original
+                };
+                Harmony.ReversePatch(MemberInfo, standin);
+            }
         }
 
         /// <summary>

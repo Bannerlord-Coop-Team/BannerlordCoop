@@ -6,6 +6,8 @@ namespace Sync
 {
     public static class MethodRegistry
     {
+        private static readonly object m_Lock = new object();
+
         private static readonly Dictionary<MethodAccess, MethodId> MethodIds =
             new Dictionary<MethodAccess, MethodId>();
 
@@ -17,15 +19,18 @@ namespace Sync
 
         public static MethodId Register([NotNull] MethodAccess methodAccess)
         {
-            if (MethodIds.ContainsKey(methodAccess))
+            lock (m_Lock)
             {
-                throw new ArgumentException($"Duplicate register for: {methodAccess}");
-            }
+                if (MethodIds.ContainsKey(methodAccess))
+                {
+                    throw new ArgumentException($"Duplicate register for: {methodAccess}");
+                }
 
-            MethodId id = MethodId.GetNextId();
-            Ids.Add(id, methodAccess);
-            MethodIds.Add(methodAccess, id);
-            return id;
+                MethodId id = MethodId.GetNextId();
+                Ids.Add(id, methodAccess);
+                MethodIds.Add(methodAccess, id);
+                return id;
+            }
         }
     }
 }
