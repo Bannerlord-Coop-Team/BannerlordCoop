@@ -9,9 +9,9 @@ namespace Coop.Mod.Persistence.RPC
 
         public IReadOnlyList<MethodCallSyncHandler> Handlers => m_Handlers;
 
-        public void Register(MethodPatch patch)
+        public void Register(IEnumerable<MethodAccess> patches)
         {
-            foreach (MethodAccess syncMethod in patch.Methods)
+            foreach (MethodAccess syncMethod in patches)
             {
                 Register(syncMethod);
             }

@@ -17,12 +17,12 @@ namespace Coop.Mod.Persistence.RPC
             {
                 if (room is RailServerRoom serverRoom)
                 {
-                    Logger.Trace("Broadcast SyncCall: ", Call);
+                    Logger.Trace("Broadcast SyncCall: {}", Call);
                     serverRoom.BroadcastEvent(this);
                 }
                 else if (room is RailClientRoom clientRoom)
                 {
-                    Logger.Trace("SyncCall: ", Call);
+                    Logger.Trace("SyncCall: {}", Call);
                     method.CallOriginal(
                         clientRoom.Resolve(Call.Instance),
                         clientRoom.Resolve(Call.Arguments));

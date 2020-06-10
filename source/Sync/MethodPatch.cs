@@ -30,6 +30,18 @@ namespace Sync
             }
         }
 
+        public MethodPatch RelayAll(
+            BindingFlags flags,
+            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
+        {
+            foreach (MethodInfo method in m_Declaring.GetMethods(flags))
+            {
+                Relay(method, eBehaviour);
+            }
+
+            return this;
+        }
+
         /// <summary>
         ///     Creates a <see cref="MethodAccess" /> and patches in a prefix that relays all calls to
         ///     <see cref="MethodAccess.InvokeOnBeforeCallHandler" />.
