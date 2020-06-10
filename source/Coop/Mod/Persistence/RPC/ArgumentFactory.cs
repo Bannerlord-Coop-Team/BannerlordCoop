@@ -25,6 +25,8 @@ namespace Coop.Mod.Persistence.RPC
                     return null;
                 case EventArgType.MBGUID:
                     return MBObjectManager.Instance.GetObject(arg.MbGUID.Value);
+                case EventArgType.Int:
+                    return arg.Int.Value;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -60,6 +62,11 @@ namespace Coop.Mod.Persistence.RPC
             if (obj is MBObjectBase mbobj)
             {
                 return new Argument(mbobj.Id);
+            }
+
+            if (obj is int i)
+            {
+                return new Argument(i);
             }
 
             throw new Exception($"Unknown argument type: {obj}.");

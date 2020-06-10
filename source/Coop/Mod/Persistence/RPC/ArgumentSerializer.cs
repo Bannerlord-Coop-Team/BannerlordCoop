@@ -6,10 +6,18 @@ namespace Coop.Mod.Persistence.RPC
 {
     public static class ArgumentSerializer
     {
+        private static int NumberOfBitsForArgType => GetNumberOfBitsForArgType();
+
+        private static int GetNumberOfBitsForArgType()
+        {
+            int numberOfValues = Enum.GetNames(typeof(EventArgType)).Length;
+            return Convert.ToInt32(Math.Ceiling(Math.Log(numberOfValues, 2)));
+        }
+
         [Encoder]
         public static void EncodeEventArg(this RailBitBuffer buffer, Argument arg)
         {
-            buffer.Write(3, Convert.ToByte(arg.EventType));
+            buffer.Write(NumberOfBitsForArgType, Convert.ToByte(arg.EventType));
             switch (arg.EventType)
             {
                 case EventArgType.EntityReference:
@@ -21,6 +29,9 @@ namespace Coop.Mod.Persistence.RPC
                 case EventArgType.Null:
                     // Empty
                     break;
+                case EventArgType.Int:
+                    buffer.WriteInt(arg.Int.Value);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -29,7 +40,7 @@ namespace Coop.Mod.Persistence.RPC
         [Decoder]
         public static Argument DecodeEventArg(this RailBitBuffer buffer)
         {
-            EventArgType eType = (EventArgType) buffer.Read(3);
+            EventArgType eType = (EventArgType) buffer.Read(NumberOfBitsForArgType);
             switch (eType)
             {
                 case EventArgType.EntityReference:
@@ -38,6 +49,8 @@ namespace Coop.Mod.Persistence.RPC
                     return new Argument(buffer.ReadMBGUID());
                 case EventArgType.Null:
                     return Argument.Null;
+                case EventArgType.Int:
+                    return new Argument(buffer.ReadInt());
                 default:
                     throw new ArgumentOutOfRangeException();
             }

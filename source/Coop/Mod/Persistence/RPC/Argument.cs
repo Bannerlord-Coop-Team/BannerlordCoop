@@ -1,16 +1,33 @@
 ﻿using System;
 using JetBrains.Annotations;
+using Network.Protocol;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.RPC
 {
+    /// <summary>
+    ///     Type of an argument used in a <see cref="EventMethodCall" />.
+    ///     ATTENTION: The persistence is intended to reliably transfer very small amount of data
+    ///     that is to be applied at a synchronized point in time on all client. Maximum payload
+    ///     data in a single event is tiny <see cref="RailgunNet.RailConfig.MAXSIZE_EVENT" />.
+    ///     Instead of sending data, only send a reference to it in the already synchronized
+    ///     game state. To transfer new game state use a <see cref="EPacket.Sync" /> message.
+    ///     To add a new argument type:
+    ///     1. Add enum entry
+    ///     2. Extended <see cref="Argument" /> to store the new type in some way
+    ///     3. Implement <see cref="ArgumentFactory.Resolve" />
+    ///     4. Implement <see cref="ArgumentFactory.Create" />
+    ///     5. Implement encoder & decoder in <see cref="ArgumentSerializer" />
+    ///     6. Add case for the new type in <see cref="Argument.ToString" />
+    /// </summary>
     public enum EventArgType
     {
         Null,
         EntityReference,
-        MBGUID
+        MBGUID,
+        Int
     }
 
     public struct Argument
@@ -24,11 +41,19 @@ namespace Coop.Mod.Persistence.RPC
         public EntityId? RailId { get; }
         public MBGUID? MbGUID { get; }
 
+        public int? Int { get; }
+
+        public Argument(int i) : this()
+        {
+            EventType = EventArgType.Int;
+            Int = i;
+        }
+
         public Argument([NotNull] RailEntityBase entity) : this(entity.Id)
         {
         }
 
-        public Argument(EntityId id)
+        public Argument(EntityId id) : this()
         {
             if (id == EntityId.INVALID)
             {
@@ -37,14 +62,12 @@ namespace Coop.Mod.Persistence.RPC
 
             EventType = EventArgType.EntityReference;
             RailId = id;
-            MbGUID = null;
         }
 
-        public Argument(MBGUID guid)
+        public Argument(MBGUID guid) : this()
         {
             EventType = EventArgType.MBGUID;
             MbGUID = guid;
-            RailId = null;
         }
 
         public override string ToString()
@@ -57,6 +80,8 @@ namespace Coop.Mod.Persistence.RPC
                     return RailId.ToString();
                 case EventArgType.MBGUID:
                     return $"MBGUID {MbGUID}";
+                case EventArgType.Int:
+                    return Int.ToString();
                 default:
                     throw new ArgumentOutOfRangeException();
             }
