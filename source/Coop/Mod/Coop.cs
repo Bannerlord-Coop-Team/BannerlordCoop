@@ -5,7 +5,6 @@
         public static bool DoSync => IsClient || IsServer;
         public static bool IsServer => CoopServer.Instance.Current != null;
         public static bool IsClient => CoopClient.Instance.Connected;
-        public static bool IsServerSimulation => IsServer && !IsClient;
 
         /// <summary>
         ///     The arbiter is the game instance with authority over all clients.
