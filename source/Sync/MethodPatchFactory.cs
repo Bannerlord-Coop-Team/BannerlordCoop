@@ -69,7 +69,22 @@ namespace Sync
             }
         }
 
-        private static DynamicMethod GeneratePrefix(
+        /// <summary>
+        ///     Generates a <see cref="DynamicMethod" /> to be used as a harmony prefix. The method
+        ///     signature exactly matches the original method with an additional and automatically
+        ///     captures the instance for non-static functions.
+        ///     The generated Prefix captures the <paramref name="method" /> and calls the
+        ///     <paramref name="dispatcher" /> with the following arguments:
+        ///     `dispatcher(MethodAccess access, object instance, object [] args)`.
+        ///     With `args` containing the original method arguments (excluding __instance).
+        /// </summary>
+        /// <param name="methodAccess">Method that is to be prefixed.</param>
+        /// <param name="dispatcher">Dispatcher to be called in the prefix.</param>
+        /// <param name="eBehaviour">Return value behaviour of the generated prefix.</param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        public static DynamicMethod GeneratePrefix(
             MethodAccess methodAccess,
             MethodInfo dispatcher,
             EPatchBehaviour eBehaviour)
@@ -141,33 +156,75 @@ namespace Sync
 
             il.Emit(OpCodes.Ldobj, typeof(MethodAccess));
 
-            // Arg1: The instance. For non-static methods this is already added to `parameters`
-            //       because of the harmony __instance.
-            if (methodAccess.MemberInfo.IsStatic)
+            // Arg1: The instance. 
+            bool isStatic = methodAccess.MemberInfo.IsStatic;
+            if (isStatic)
             {
                 il.Emit(OpCodes.Ldnull);
             }
-
-            // Push all args to stack
-            for (int i = 0; i < parameters.Count; ++i)
+            else
             {
-                il.Emit(OpCodes.Ldarg, i);
+                // Forwarded the injected "__instance" field
+                il.Emit(OpCodes.Ldarg_0);
+
+                // Remove the injected instance from the parameters
+                parameters.RemoveAt(0);
             }
 
-            // Request call
+            // Arg2: object[] of all args. Prepare the array
+            LocalBuilder args = il.DeclareLocal(typeof(object[]));
+
+            // start off by creating an object[] with correct size
+            il.Emit(OpCodes.Ldc_I4, parameters.Count);
+            il.Emit(OpCodes.Newarr, typeof(object));
+            il.Emit(OpCodes.Stloc, args); // store into local var `args`
+
+            // Place argument in array
+            for (int i = 0; i < parameters.Count; ++i)
+            {
+                int iArgIndex = isStatic ? i : i + 1; // +1 because of the injected __instance
+                il.Emit(OpCodes.Ldloc, args); // Object reference to `args`
+                il.Emit(OpCodes.Ldc_I4, i); // Array index into `args`
+                il.Emit(OpCodes.Ldarg, iArgIndex); // value to put at index
+                if (parameters[i].ParameterType.IsValueType)
+                {
+                    il.Emit(OpCodes.Box, parameters[i].ParameterType);
+                }
+
+                il.Emit(OpCodes.Stelem_Ref); // pops value, index and array reference from stack.
+            }
+
+            // Arg2 done, push it to the stack
+            il.Emit(OpCodes.Ldloc, args); // Object reference to `args`
+
+            // Call dispatcher
             il.EmitCall(OpCodes.Call, dispatcher, null);
 
             switch (eBehaviour)
             {
                 case EPatchBehaviour.AlwaysCallOriginal:
-                    il.Emit(OpCodes.Pop);
+                    if (dispatcher.ReturnType != typeof(void))
+                    {
+                        il.Emit(OpCodes.Pop);
+                    }
+
                     il.Emit(OpCodes.Ldc_I4_1);
                     break;
                 case EPatchBehaviour.NeverCallOriginal:
-                    il.Emit(OpCodes.Pop);
+                    if (dispatcher.ReturnType != typeof(void))
+                    {
+                        il.Emit(OpCodes.Pop);
+                    }
+
                     il.Emit(OpCodes.Ldc_I4_0);
                     break;
-                case EPatchBehaviour.CallOriginalIfNoHandlerExists:
+                case EPatchBehaviour.CallOriginalBaseOnDispatcherReturn:
+                    if (dispatcher.ReturnType != typeof(bool))
+                    {
+                        throw new Exception(
+                            "Invalid dispatcher. Dispatcher function required to return a bool to decided if the original function should be called.");
+                    }
+
                     // Correct value is already on the stack
                     break;
                 default:

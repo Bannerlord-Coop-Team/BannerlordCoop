@@ -41,11 +41,11 @@ namespace Coop.Tests.Sync
                                                        .Relay(
                                                            nameof(A.SyncedMethod),
                                                            EPatchBehaviour
-                                                               .CallOriginalIfNoHandlerExists)
+                                                               .CallOriginalBaseOnDispatcherReturn)
                                                        .Relay(
                                                            nameof(A.StaticSyncedMethod),
                                                            EPatchBehaviour
-                                                               .CallOriginalIfNoHandlerExists);
+                                                               .CallOriginalBaseOnDispatcherReturn);
         }
 
         private readonly MethodAccess m_SyncedMethod;

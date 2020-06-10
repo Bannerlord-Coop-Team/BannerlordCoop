@@ -298,10 +298,18 @@ namespace Sync.Reflection
                 true);
 
             // The standin as it is will never be called. But it still needs a body for the reverse patching.
-            ILGenerator il = dyn.GetILGenerator(64);
-            il.ThrowException(typeof(NotImplementedException));
+            ILGenerator il = dyn.GetILGenerator();
+            il.ThrowException(typeof(StandInNotPatchedException));
 
             return dyn;
+        }
+    }
+
+    public class StandInNotPatchedException : Exception
+    {
+        public StandInNotPatchedException() : base(
+            "Dynamically generated stand in method was not patched by harmony.")
+        {
         }
     }
 }
