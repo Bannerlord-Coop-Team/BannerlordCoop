@@ -88,12 +88,12 @@ namespace Coop.Mod.Persistence.Party
 
         protected override void OnAdded()
         {
-            Register();
+            State.OnMovementChanged += UpdateLocalMovement;
         }
 
         protected override void OnRemoved()
         {
-            Unregister();
+            State.OnMovementChanged -= UpdateLocalMovement;
         }
 
         private void Register()
@@ -107,7 +107,6 @@ namespace Coop.Mod.Persistence.Party
                 }
 
                 m_Environment.TargetPosition.SetHandler(m_Instance, GoToPosition);
-                State.OnMovementChanged += UpdateLocalMovement;
             }
         }
 
@@ -116,7 +115,7 @@ namespace Coop.Mod.Persistence.Party
             if (m_Instance != null)
             {
                 m_Environment.TargetPosition.RemoveHandler(m_Instance);
-                State.OnMovementChanged -= UpdateLocalMovement;
+                m_Instance = null;
             }
         }
 
