@@ -8,7 +8,7 @@ namespace Coop.Mod
 {
     public class GameEnvironmentServer : IEnvironmentServer
     {
-        public SyncFieldGroup<MobileParty, MovementData> TargetPosition =>
+        public FieldAccessGroup<MobileParty, MovementData> TargetPosition =>
             CampaignMapMovement.Movement;
 
         public bool CanChangeTimeControlMode => CoopServer.Instance.Current.AreAllClientsPlaying;

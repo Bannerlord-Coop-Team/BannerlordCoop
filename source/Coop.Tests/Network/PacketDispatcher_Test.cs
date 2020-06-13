@@ -4,7 +4,7 @@ using Network.Infrastructure;
 using Network.Protocol;
 using Xunit;
 
-namespace Coop.Tests
+namespace Coop.Tests.Network
 {
     public class PacketDispatcher_Test
     {

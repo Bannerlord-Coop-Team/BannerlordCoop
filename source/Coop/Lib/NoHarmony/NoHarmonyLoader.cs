@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
-namespace NoHarmony
+namespace Coop.Lib.NoHarmony
 {
     public abstract class NoHarmonyLoader : MBSubModuleBase
     {

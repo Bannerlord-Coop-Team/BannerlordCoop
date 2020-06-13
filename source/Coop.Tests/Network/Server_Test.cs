@@ -5,7 +5,7 @@ using Common;
 using Network.Infrastructure;
 using Xunit;
 
-namespace Coop.Tests
+namespace Coop.Tests.Network
 {
     public class Server_Test
     {
@@ -22,12 +22,12 @@ namespace Coop.Tests
 
         private class TimingModule : IUpdateable
         {
-            public readonly object Lock = new object();
             public readonly MovingAverage AverageTicksPerFrame = new MovingAverage(100000);
+            public readonly object Lock = new object();
+            public readonly AutoResetEvent OnTick = new AutoResetEvent(false);
             public int iCounter;
 
             private Stopwatch m_Timer;
-            public readonly AutoResetEvent OnTick = new AutoResetEvent(false);
 
             public void Update(TimeSpan frameTime)
             {
@@ -37,7 +37,6 @@ namespace Coop.Tests
                 {
                 }
 
-                ;
                 if (m_Timer == null)
                 {
                     m_Timer = Stopwatch.StartNew();

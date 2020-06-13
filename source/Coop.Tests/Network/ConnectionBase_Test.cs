@@ -6,7 +6,7 @@ using Network.Infrastructure;
 using Network.Protocol;
 using Xunit;
 
-namespace Coop.Tests
+namespace Coop.Tests.Network
 {
     public class ConnectionBase_Test
     {

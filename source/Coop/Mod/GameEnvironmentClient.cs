@@ -8,10 +8,10 @@ namespace Coop.Mod
 {
     internal class GameEnvironmentClient : IEnvironmentClient
     {
-        public SyncFieldGroup<MobileParty, MovementData> TargetPosition =>
+        public FieldAccessGroup<MobileParty, MovementData> TargetPosition =>
             CampaignMapMovement.Movement;
 
-        public SyncField<Campaign, CampaignTimeControlMode> TimeControlMode =>
+        public FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode =>
             TimeControl.TimeControlMode;
 
         #region Game state access

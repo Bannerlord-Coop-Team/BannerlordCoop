@@ -19,7 +19,7 @@ namespace Coop.Mod.Persistence.Party
                 // if (sender.ControlledEntities.Contains(entity))
                 {
                     Logger.Trace(
-                        "[T {}] Ack move entity {id} to {position}.",
+                        "[{}] Ack move entity {id} to {position}.",
                         room.Tick,
                         EntityId,
                         Movement);

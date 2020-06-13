@@ -56,23 +56,34 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Attributes.cs" />
-    <Compile Include="BufferedData.cs" />
-    <Compile Include="FieldWatcher.cs" />
-    <Compile Include="ISyncable.cs" />
-    <Compile Include="ISyncHandler.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Reflection\Extensions.cs" />
-    <Compile Include="Reflection\InvokableFactory.cs" />
-    <Compile Include="Reflection\Util.cs" />
-    <Compile Include="SyncableData.cs" />
-    <Compile Include="SyncField.cs" />
-    <Compile Include="SyncFieldGroup.cs" />
-    <Compile Include="SyncPriority.cs" />
+    <Compile Include="EPatchBehaviour.cs"/>
+    <Compile Include="MethodPatch.cs"/>
+    <Compile Include="ValueChangeRequest.cs"/>
+    <Compile Include="FieldChangeBuffer.cs"/>
+    <Compile Include="MethodId.cs"/>
+    <Compile Include="MethodPatchFactory.cs"/>
+    <Compile Include="MethodRegistry.cs"/>
+    <Compile Include="PropertyPatch.cs"/>
+    <Compile Include="ValueAccess.cs"/>
+    <Compile Include="Tracker.cs"/>
+    <Compile Include="Properties\AssemblyInfo.cs"/>
+    <Compile Include="Reflection\Extensions.cs"/>
+    <Compile Include="Reflection\InvokableFactory.cs"/>
+    <Compile Include="Patcher.cs"/>
+    <Compile Include="ValueData.cs"/>
+    <Compile Include="FieldAccess.cs"/>
+    <Compile Include="FieldAccessGroup.cs"/>
+    <Compile Include="MethodAccess.cs"/>
+    <Compile Include="SyncPriority.cs"/>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="..\RailgunNet\RailgunNet\RailgunNet.csproj">
+      <Project>{d8389325-85ae-4a1d-9b8e-e4742349a531}</Project>
+      <Name>RailgunNet</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

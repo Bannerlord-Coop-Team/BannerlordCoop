@@ -3,7 +3,7 @@ using Network.Infrastructure;
 using NLog;
 using Steamworks;
 
-namespace Coop.Multiplayer.Steam
+namespace Coop.NetImpl.Steam
 {
     internal class NetworkSteam : INetwork
     {

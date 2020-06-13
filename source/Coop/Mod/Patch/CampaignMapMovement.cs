@@ -1,45 +1,31 @@
-﻿using System.Collections.Generic;
-using Coop.Mod.Persistence;
-using HarmonyLib;
-using NLog;
+﻿using Coop.Mod.Persistence;
 using Sync;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
-using Logger = NLog.Logger;
 
 namespace Coop.Mod.Patch
 {
-    [Patch]
     public static class CampaignMapMovement
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private static readonly PropertyPatch MobilePartyPatch =
+            new PropertyPatch(typeof(MobileParty))
+                .InterceptSetter(nameof(MobileParty.DefaultBehavior))
+                .InterceptSetter(nameof(MobileParty.TargetSettlement))
+                .InterceptSetter(nameof(MobileParty.TargetParty))
+                .InterceptSetter(nameof(MobileParty.TargetPosition));
 
-        public static SyncFieldGroup<MobileParty, MovementData> Movement { get; } =
-            new SyncFieldGroup<MobileParty, MovementData>(
-                new List<SyncField>
-                {
-                    new SyncField<MobileParty, AiBehavior>(
-                        AccessTools.Field(typeof(MobileParty), "_defaultBehavior")),
-                    new SyncField<MobileParty, Settlement>(
-                        AccessTools.Field(typeof(MobileParty), "_targetSettlement")),
-                    new SyncField<MobileParty, MobileParty>(
-                        AccessTools.Field(typeof(MobileParty), "_targetParty")),
-                    new SyncField<MobileParty, Vec2>(
-                        AccessTools.Field(typeof(MobileParty), "_targetPosition")),
-                    new SyncField<MobileParty, int>(
-                        AccessTools.Field(typeof(MobileParty), "_numberOfFleeingsAtLastTravel"))
-                });
+        public static FieldAccessGroup<MobileParty, MovementData> Movement { get; } =
+            new FieldAccessGroup<MobileParty, MovementData>()
+                .AddField<AiBehavior>("_defaultBehavior")
+                .AddField<Settlement>("_targetSettlement")
+                .AddField<MobileParty>("_targetParty")
+                .AddField<Vec2>("_targetPosition")
+                .AddField<int>("_numberOfFleeingsAtLastTravel");
 
-        [SyncWatch(typeof(MobileParty), nameof(MobileParty.DefaultBehavior), MethodType.Setter)]
-        [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetSettlement), MethodType.Setter)]
-        [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetParty), MethodType.Setter)]
-        [SyncWatch(typeof(MobileParty), nameof(MobileParty.TargetPosition), MethodType.Setter)]
-        private static void Patch_Movement(MobileParty __instance)
+        [PatchInitializer]
+        public static void Init()
         {
-            if (Coop.IsClient || Coop.IsServer)
-            {
-                Movement.Watch(__instance);
-            }
+            FieldChangeBuffer.Intercept(Movement, MobilePartyPatch.Setters, Coop.DoSync);
         }
     }
 }

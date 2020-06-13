@@ -4,20 +4,19 @@ using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Patch
 {
-    [Patch]
     public static class TimeControl
     {
-        public static SyncField<Campaign, CampaignTimeControlMode> TimeControlMode { get; } =
-            new SyncField<Campaign, CampaignTimeControlMode>(
+        private static readonly PropertyPatch TimeControlPatch =
+            new PropertyPatch(typeof(Campaign)).InterceptSetter(nameof(Campaign.TimeControlMode));
+
+        public static FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; } =
+            new FieldAccess<Campaign, CampaignTimeControlMode>(
                 AccessTools.Field(typeof(Campaign), "_timeControlMode"));
 
-        [SyncWatch(typeof(Campaign), nameof(Campaign.TimeControlMode), MethodType.Setter)]
-        private static void Patch_TimeControlMode(Campaign __instance)
+        [PatchInitializer]
+        public static void Init()
         {
-            if (Coop.IsClient)
-            {
-                TimeControlMode.Watch(__instance);
-            }
+            FieldChangeBuffer.Intercept(TimeControlMode, TimeControlPatch.Setters, Coop.DoSync);
         }
     }
 }

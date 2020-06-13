@@ -41,6 +41,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DropoutStack.cs" />
     <Compile Include="FrameLimiter.cs" />
     <Compile Include="IUpdatable.cs" />
     <Compile Include="MovingAverage.cs" />

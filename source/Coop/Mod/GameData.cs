@@ -17,7 +17,7 @@ namespace Coop.Mod
     internal class GameData : ISaveData
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        public bool RequiresInitialWorldData => Coop.IsClient && !Coop.IsServer;
+        public bool RequiresInitialWorldData => !CoopClient.Instance.GameState.IsGameLoaded;
 
         public bool Receive(ArraySegment<byte> rawData)
         {

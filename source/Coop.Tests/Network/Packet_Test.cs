@@ -3,7 +3,7 @@ using Network;
 using Network.Protocol;
 using Xunit;
 
-namespace Coop.Tests
+namespace Coop.Tests.Network
 {
     public class Packet_Test
     {

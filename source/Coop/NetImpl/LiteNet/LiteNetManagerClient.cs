@@ -6,7 +6,7 @@ using Network;
 using Network.Infrastructure;
 using NLog;
 
-namespace Coop.Multiplayer.Network
+namespace Coop.NetImpl.LiteNet
 {
     public class LiteNetManagerClient : IUpdateable
     {

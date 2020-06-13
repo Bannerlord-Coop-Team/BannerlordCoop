@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using Common;
 using Coop.Mod.Persistence;
-using Coop.Multiplayer.Network;
+using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
@@ -22,6 +22,8 @@ namespace Coop.Mod
 
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
         private int m_ReconnectAttempts = MaxReconnectAttempts;
+
+        public Action<PersistenceClient> OnPersistenceInitialized;
 
         public CoopClient()
         {
@@ -82,6 +84,7 @@ namespace Coop.Mod
             if (Persistence == null)
             {
                 Persistence = new PersistenceClient(new GameEnvironmentClient());
+                OnPersistenceInitialized?.Invoke(Persistence);
             }
 
             Persistence.SetConnection(con);
