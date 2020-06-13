@@ -35,6 +35,13 @@ namespace Sync
             }
         }
 
+        /// <summary>
+        ///     If set, this function will be called before invoking any onBeforeCall handlers. If the
+        ///     function evaluates to false, the onBeforeCall handlers will not be called.
+        /// </summary>
+        [CanBeNull]
+        public Func<object, bool> Condition { get; set; }
+
         public MethodId Id { get; }
 
         public MethodInfo MemberInfo { get; }
@@ -75,6 +82,8 @@ namespace Sync
         /// <returns>true if a handler was invoked. False otherwise.</returns>
         public bool InvokeOnBeforeCallHandler([CanBeNull] object instance, params object[] args)
         {
+            if (Condition != null && !Condition(instance)) return false;
+
             Action<object> handler = GetHandler(instance);
             handler?.Invoke(args);
             return handler == null;

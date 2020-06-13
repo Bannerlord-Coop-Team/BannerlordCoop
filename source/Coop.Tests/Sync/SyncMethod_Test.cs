@@ -38,11 +38,11 @@ namespace Coop.Tests.Sync
         private class SomePatch
         {
             public static readonly MethodPatch Patch = new MethodPatch(typeof(A))
-                                                       .Relay(
+                                                       .Intercept(
                                                            nameof(A.SyncedMethod),
                                                            EPatchBehaviour
                                                                .CallOriginalBaseOnDispatcherReturn)
-                                                       .Relay(
+                                                       .Intercept(
                                                            nameof(A.StaticSyncedMethod),
                                                            EPatchBehaviour
                                                                .CallOriginalBaseOnDispatcherReturn);

@@ -111,7 +111,7 @@ namespace Coop.Tests.Network
         }
 
         [Fact]
-        private void ReceiveForPersistenceIsRelayed()
+        private void ReceiveForPersistenceIsIntercepted()
         {
             // Bring connection to EConnectionState.ClientPlaying
             VerifyStateTransitionsUntilConnected(false);

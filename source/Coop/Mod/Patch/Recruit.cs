@@ -9,8 +9,9 @@ namespace Coop.Mod.Patch
     /// </summary>
     public static class Recruit
     {
-        private static readonly MethodPatch Patch = new MethodPatch(typeof(RecruitAction)).RelayAll(
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly);
+        private static readonly MethodPatch Patch =
+            new MethodPatch(typeof(RecruitAction)).InterceptAll(
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly);
 
         [PatchInitializer]
         public static void Init()
@@ -18,6 +19,11 @@ namespace Coop.Mod.Patch
             // TODO: needs to be conditional IsControlling(MobileParty) -> Implement
             CoopClient.Instance.OnPersistenceInitialized += persistence =>
                 persistence.RpcSyncHandlers.Register(Patch.Methods);
+
+            foreach (MethodAccess method in Patch.Methods)
+            {
+                method.Condition = Coop.DoSync;
+            }
         }
     }
 }

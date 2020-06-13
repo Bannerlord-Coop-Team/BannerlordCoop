@@ -9,10 +9,10 @@ namespace Coop.Mod.Patch
     {
         private static readonly PropertyPatch MobilePartyPatch =
             new PropertyPatch(typeof(MobileParty))
-                .RelaySetter(nameof(MobileParty.DefaultBehavior))
-                .RelaySetter(nameof(MobileParty.TargetSettlement))
-                .RelaySetter(nameof(MobileParty.TargetParty))
-                .RelaySetter(nameof(MobileParty.TargetPosition));
+                .InterceptSetter(nameof(MobileParty.DefaultBehavior))
+                .InterceptSetter(nameof(MobileParty.TargetSettlement))
+                .InterceptSetter(nameof(MobileParty.TargetParty))
+                .InterceptSetter(nameof(MobileParty.TargetPosition));
 
         public static FieldAccessGroup<MobileParty, MovementData> Movement { get; } =
             new FieldAccessGroup<MobileParty, MovementData>()
@@ -25,7 +25,7 @@ namespace Coop.Mod.Patch
         [PatchInitializer]
         public static void Init()
         {
-            FieldChangeBuffer.Intercept(Movement, MobilePartyPatch.Setters, () => Coop.DoSync);
+            FieldChangeBuffer.Intercept(Movement, MobilePartyPatch.Setters, Coop.DoSync);
         }
     }
 }

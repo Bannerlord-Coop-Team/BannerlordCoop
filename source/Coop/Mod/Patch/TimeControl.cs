@@ -7,7 +7,7 @@ namespace Coop.Mod.Patch
     public static class TimeControl
     {
         private static readonly PropertyPatch TimeControlPatch =
-            new PropertyPatch(typeof(Campaign)).RelaySetter(nameof(Campaign.TimeControlMode));
+            new PropertyPatch(typeof(Campaign)).InterceptSetter(nameof(Campaign.TimeControlMode));
 
         public static FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; } =
             new FieldAccess<Campaign, CampaignTimeControlMode>(
@@ -16,10 +16,7 @@ namespace Coop.Mod.Patch
         [PatchInitializer]
         public static void Init()
         {
-            FieldChangeBuffer.Intercept(
-                TimeControlMode,
-                TimeControlPatch.Setters,
-                () => Coop.DoSync);
+            FieldChangeBuffer.Intercept(TimeControlMode, TimeControlPatch.Setters, Coop.DoSync);
         }
     }
 }

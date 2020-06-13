@@ -30,13 +30,13 @@ namespace Sync
             }
         }
 
-        public MethodPatch RelayAll(
+        public MethodPatch InterceptAll(
             BindingFlags flags,
             EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
             foreach (MethodInfo method in m_Declaring.GetMethods(flags))
             {
-                Relay(method, eBehaviour);
+                Intercept(method, eBehaviour);
             }
 
             return this;
@@ -53,7 +53,7 @@ namespace Sync
         ///     If the method is not declared in class
         ///     <see cref="m_Declaring" />
         /// </exception>
-        public MethodPatch Relay(
+        public MethodPatch Intercept(
             MethodInfo method,
             EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
@@ -76,7 +76,7 @@ namespace Sync
         /// <param name="eBehaviour"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException">If no method with that name exists.</exception>
-        public MethodPatch Relay(
+        public MethodPatch Intercept(
             string sMethodName,
             EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
