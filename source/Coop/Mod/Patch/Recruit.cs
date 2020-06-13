@@ -16,7 +16,6 @@ namespace Coop.Mod.Patch
         [PatchInitializer]
         public static void Init()
         {
-            // TODO: needs to be conditional IsControlling(MobileParty) -> Implement
             CoopClient.Instance.OnPersistenceInitialized += persistence =>
                 persistence.RpcSyncHandlers.Register(Patch.Methods);
 
