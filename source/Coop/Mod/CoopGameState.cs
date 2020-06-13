@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 
@@ -12,6 +12,8 @@ namespace Coop.Mod
         {
             m_PlayerParties = new HashSet<MobileParty>();
         }
+
+        public bool IsGameLoaded => Campaign.Current != null;
 
         public void AddPlayerControllerParty(MobileParty party)
         {
