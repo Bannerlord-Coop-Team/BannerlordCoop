@@ -19,6 +19,8 @@ namespace Coop.Mod.Persistence
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
+        private readonly object m_Lock = new object();
+
         private readonly Dictionary<MobileParty, RailEntityServer> m_Parties =
             new Dictionary<MobileParty, RailEntityServer>();
 
@@ -43,12 +45,17 @@ namespace Coop.Mod.Persistence
 
         private void AddPendingParties(Tick tick)
         {
-            foreach (MobileParty party in m_PartiesToAdd)
+            lock (m_Lock)
             {
-                MobilePartyEntityServer entity =
-                    m_Room.AddNewEntity<MobilePartyEntityServer>(
-                        e => e.State.PartyId = party.Party.Index);
-                m_Parties.Add(party, entity);
+                foreach (MobileParty party in m_PartiesToAdd)
+                {
+                    MobilePartyEntityServer entity =
+                        m_Room.AddNewEntity<MobilePartyEntityServer>(
+                            e => e.State.PartyId = party.Party.Index);
+                    m_Parties.Add(party, entity);
+                }
+
+                m_PartiesToAdd.Clear();
             }
         }
 
@@ -79,27 +86,35 @@ namespace Coop.Mod.Persistence
 
         private void OnPartyRemoved(MobileParty party)
         {
-            if (!m_Parties.ContainsKey(party))
+            lock (m_Lock)
             {
-                Logger.Warn(
-                    "Inconsistent internal state: {party} was removed, but never added.",
-                    party);
-                return;
-            }
+                if (!m_Parties.ContainsKey(party))
+                {
+                    Logger.Warn(
+                        "Inconsistent internal state: {party} was removed, but never added.",
+                        party);
+                    return;
+                }
 
-            m_Room.MarkForRemoval(m_Parties[party]);
-            m_Parties.Remove(party);
+                m_Room.MarkForRemoval(m_Parties[party]);
+                m_Parties.Remove(party);
+            }
         }
 
         private void OnPartyAdded(MobileParty party)
         {
-            if (m_Parties.ContainsKey(party))
+            lock (m_Lock)
             {
-                Logger.Warn("Inconsistent internal state: {party} was already registered.", party);
-                return;
-            }
+                if (m_Parties.ContainsKey(party))
+                {
+                    Logger.Warn(
+                        "Inconsistent internal state: {party} was already registered.",
+                        party);
+                    return;
+                }
 
-            m_PartiesToAdd.Add(party);
+                m_PartiesToAdd.Add(party);
+            }
         }
 
         private void OnClientAdded(RailServerPeer peer)
@@ -110,27 +125,34 @@ namespace Coop.Mod.Persistence
             }
 
             MobileParty party = GetPlayerParty(peer);
-            if (party == null || !m_Parties.ContainsKey(party))
+            lock (m_Lock)
             {
-                Logger.Warn("Player party not found.");
-            }
+                if (party == null || !m_Parties.ContainsKey(party))
+                {
+                    Logger.Warn("Player party not found.");
+                }
 
-            if (m_Parties[party].Controller == null)
-            {
-                // TODO: Currently only the hosting player gets to control the main party. In a future version, every player gets their own party.
-                peer.GrantControl(m_Parties[party]);
-                Logger.Info("{party} control granted to {peer}.", party, peer);
+                if (m_Parties[party].Controller == null)
+                {
+                    // TODO: Currently only the hosting player gets to control the main party. In a future version, every player gets their own party.
+                    peer.GrantControl(m_Parties[party]);
+                    Logger.Info("{party} control granted to {peer}.", party, peer);
+                }
             }
         }
 
         private void OnClientRemoved(RailServerPeer peer)
         {
-            foreach (RailEntityServer controlledEntity in m_Room
-                                                          .Entities.Where(e => e.Controller == peer)
-                                                          .Select(e => e as RailEntityServer))
+            lock (m_Lock)
             {
-                peer.RevokeControl(controlledEntity);
-                OnPlayerControlledEntityOrphaned?.Invoke(peer, controlledEntity);
+                foreach (RailEntityServer controlledEntity in m_Room
+                                                              .Entities.Where(
+                                                                  e => e.Controller == peer)
+                                                              .Select(e => e as RailEntityServer))
+                {
+                    peer.RevokeControl(controlledEntity);
+                    OnPlayerControlledEntityOrphaned?.Invoke(peer, controlledEntity);
+                }
             }
         }
 
