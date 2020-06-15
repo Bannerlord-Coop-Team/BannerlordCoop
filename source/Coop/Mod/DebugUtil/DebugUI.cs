@@ -136,7 +136,6 @@ namespace Coop.Mod.DebugUtil
         {
             if (!Imgui.TreeNode("Persistence: Parties"))
             {
-                Imgui.TreePop();
                 return;
             }
 
@@ -162,6 +161,8 @@ namespace Coop.Mod.DebugUtil
                 {
                     Imgui.Text(entity.ToString());
                 }
+
+                Imgui.Columns();
             }
 
             Imgui.TreePop();
@@ -169,12 +170,61 @@ namespace Coop.Mod.DebugUtil
 
         private static void DisplayConnectionInfo()
         {
-            if (Imgui.TreeNode("Connection info"))
+            if (!Imgui.TreeNode("Connectioninfo"))
             {
-                Imgui.Text(CoopServer.Instance.ToString());
-                Imgui.Text(CoopClient.Instance.ToString());
+                return;
+            }
+
+            Server server = CoopServer.Instance.Current;
+            GameSession session = CoopClient.Instance.Session;
+
+            if (Imgui.TreeNode($"Client is {session.Connection.State}"))
+            {
+                Imgui.Columns(2);
+                Imgui.Text("Ping");
+                Imgui.Text($"{session.Connection.Latency}");
+
+                Imgui.NextColumn();
+                Imgui.Text("Network");
+                Imgui.Separator();
+                Imgui.Text(session.Connection.Network.ToString());
+
+                Imgui.Columns();
                 Imgui.TreePop();
             }
+
+            if (CoopServer.Instance == null)
+            {
+                Imgui.Text("No coop server running.");
+            }
+            else if (Imgui.TreeNode(
+                $"Server is {server.State.ToString()} with {server.ActiveConnections.Count}/{server.ActiveConfig.MaxPlayerCount} players.")
+            )
+            {
+                Imgui.Text(
+                    $"LAN:   {server.ActiveConfig.LanAddress}:{server.ActiveConfig.LanPort}");
+                Imgui.Text(
+                    $"WAN:   {server.ActiveConfig.WanAddress}:{server.ActiveConfig.WanPort}");
+                Imgui.Text("");
+
+                Imgui.Columns(3);
+                Imgui.Text("Ping");
+                server.ActiveConnections.ForEach(c => Imgui.Text($"{c.Latency}"));
+
+                Imgui.NextColumn();
+                Imgui.Text("State");
+                server.ActiveConnections.ForEach(c => Imgui.Text(c.State.ToString()));
+
+                Imgui.NextColumn();
+                Imgui.Text("Network");
+                Imgui.Separator();
+                server.ActiveConnections.ForEach(c => Imgui.Text(c.Network.ToString()));
+                Imgui.Columns();
+                Imgui.TreePop();
+            }
+
+            Imgui.Columns();
+            Imgui.TreePop();
         }
 
         private static void DisplayClientRpcInfo()

@@ -26,7 +26,7 @@ namespace Network.Infrastructure
         public EState State => m_State.State;
 
         public bool AreAllClientsPlaying =>
-            m_ActiveConnections.All(con => con.State == EConnectionState.ServerPlaying);
+            ActiveConnections.All(con => con.State == EConnectionState.ServerPlaying);
 
         public event Action<ConnectionServer> OnClientConnected;
 
@@ -51,7 +51,7 @@ namespace Network.Infrastructure
 
         public void SendToAll(Packet packet)
         {
-            foreach (ConnectionServer conn in m_ActiveConnections)
+            foreach (ConnectionServer conn in ActiveConnections)
             {
                 conn.Send(packet);
             }
@@ -61,15 +61,15 @@ namespace Network.Infrastructure
         {
             string sDump = string.Join(
                 Environment.NewLine,
-                $"Server is '{State.ToString()}' with '{m_ActiveConnections.Count}/{ActiveConfig.MaxPlayerCount}' players.",
+                $"Server is '{State.ToString()}' with '{ActiveConnections.Count}/{ActiveConfig.MaxPlayerCount}' players.",
                 $"LAN:   {ActiveConfig.LanAddress}:{ActiveConfig.LanPort}",
                 $"WAN:   {ActiveConfig.WanAddress}:{ActiveConfig.WanPort}");
 
-            if (m_ActiveConnections.Count > 0)
+            if (ActiveConnections.Count > 0)
             {
                 sDump += Environment.NewLine + "Connections to clients:";
                 sDump += Environment.NewLine + "Ping " + "State                         Network";
-                foreach (ConnectionServer conn in m_ActiveConnections)
+                foreach (ConnectionServer conn in ActiveConnections)
                 {
                     sDump += Environment.NewLine + $"{conn}";
                 }
@@ -80,7 +80,7 @@ namespace Network.Infrastructure
 
         public virtual void Connected(ConnectionServer con)
         {
-            m_ActiveConnections.Add(con);
+            ActiveConnections.Add(con);
             OnClientConnected?.Invoke(con);
             Logger.Info("Connection established: {connection}.", con);
         }
@@ -89,7 +89,7 @@ namespace Network.Infrastructure
         {
             Logger.Info("Connection closed: {connection}. {reason}.", con, eReason);
             con.Disconnect(eReason);
-            if (!m_ActiveConnections.Remove(con))
+            if (!ActiveConnections.Remove(con))
             {
                 Logger.Error("Unknown connection: {connection}.", con);
             }
@@ -97,8 +97,7 @@ namespace Network.Infrastructure
 
         public virtual bool CanPlayerJoin()
         {
-            return State == EState.Running &&
-                   m_ActiveConnections.Count < ActiveConfig.MaxPlayerCount;
+            return State == EState.Running && ActiveConnections.Count < ActiveConfig.MaxPlayerCount;
         }
 
         #region internals
@@ -122,7 +121,6 @@ namespace Network.Infrastructure
         {
             m_ServerType = eType;
             Updateables = new UpdateableList();
-            m_ActiveConnections = new List<ConnectionServer>();
             m_State = new StateMachine<EState, ETrigger>(EState.Inactive);
 
             m_State.Configure(EState.Inactive).Permit(ETrigger.Start, EState.Starting);
@@ -149,7 +147,7 @@ namespace Network.Infrastructure
             Stop();
         }
 
-        private readonly List<ConnectionServer> m_ActiveConnections;
+        public List<ConnectionServer> ActiveConnections { get; } = new List<ConnectionServer>();
 
         private void Load(ServerConfiguration config)
         {
@@ -160,12 +158,12 @@ namespace Network.Infrastructure
         private void ShutDown()
         {
             ActiveConfig = null;
-            foreach (ConnectionServer conn in m_ActiveConnections)
+            foreach (ConnectionServer conn in ActiveConnections)
             {
                 conn.Disconnect(EDisconnectReason.ServerShutDown);
             }
 
-            m_ActiveConnections.Clear();
+            ActiveConnections.Clear();
             m_State.Fire(ETrigger.Stopped);
         }
 
