@@ -1,4 +1,5 @@
 ﻿using System;
+using JetBrains.Annotations;
 using NLog;
 
 namespace Network.Infrastructure
@@ -13,7 +14,7 @@ namespace Network.Infrastructure
         }
 
         public ISaveData World { get; }
-        public ConnectionClient Connection { get; private set; }
+        [CanBeNull] public ConnectionClient Connection { get; private set; }
         public event Action<ConnectionClient> OnConnectionCreated;
         public event Action<EDisconnectReason> OnConnectionDestroyed;
 

@@ -14,6 +14,7 @@ namespace Coop.Mod.Persistence
     {
         private readonly IEnvironmentClient m_Environment;
         [NotNull] private readonly RailClient m_RailClient;
+        [CanBeNull] public RailClientPeer Peer => m_RailClient.ServerPeer;
 
         public PersistenceClient(IEnvironmentClient environment)
         {

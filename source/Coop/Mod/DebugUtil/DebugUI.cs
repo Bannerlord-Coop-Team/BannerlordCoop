@@ -5,6 +5,9 @@ using Common;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RPC;
 using Network.Infrastructure;
+using RailgunNet.Connection;
+using RailgunNet.Connection.Client;
+using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using Sync;
 using TaleWorlds.Engine;
@@ -25,10 +28,93 @@ namespace Coop.Mod.DebugUtil
                 AddButtons();
                 DisplayConnectionInfo();
                 DisplayMethodRegistry();
-                DisplayClientRpcInfo();
-                DisplayEntities();
+                DisplayPersistenceMenu();
                 End();
             }
+        }
+
+        private static void DisplayPersistenceMenu()
+        {
+            if (!Imgui.TreeNode("Persistence"))
+            {
+                return;
+            }
+
+            DisplayPersistenceInfo();
+            DisplayClientRpcInfo();
+            DisplayEntities();
+
+            Imgui.TreePop();
+        }
+
+        private class SPeer
+        {
+            public enum EType
+            {
+                ClientSide,
+                ServerSide
+            }
+
+            public RailPeer Peer;
+            public EType Type;
+
+            public int Slack
+            {
+                get
+                {
+                    return Peer.RemoteClock.LatestRemote - Peer.RemoteClock.EstimatedRemote;
+                }
+            }
+        }
+
+        private static void DisplayPersistenceInfo()
+        {
+            List<SPeer> peers = new List<SPeer>();
+            if (CoopClient.Instance.Persistence != null)
+            {
+                RailClientPeer peer = CoopClient.Instance.Persistence.Peer;
+                if (peer != null)
+                {
+                    SPeer peerInfo = new SPeer();
+                    peerInfo.Peer = peer;
+                    peerInfo.Type = SPeer.EType.ClientSide;
+                    peers.Add(peerInfo);
+                }
+            }
+
+            if (CoopServer.Instance.Persistence != null)
+            {
+                foreach (RailServerPeer peer in CoopServer.Instance.Persistence.ConnectedClients)
+                {
+                    SPeer peerInfo = new SPeer();
+                    peerInfo.Peer = peer;
+                    peerInfo.Type = SPeer.EType.ServerSide;
+                    peers.Add(peerInfo);
+                }
+            }
+
+            Imgui.Columns(5);
+            Imgui.Text("Type");
+            peers.ForEach(p => Imgui.Text(p.Type.ToString()));
+
+            Imgui.NextColumn();
+            Imgui.Text("Local tick");
+            peers.ForEach(p => Imgui.Text(p.Peer.LocalTick.ToString()));
+
+            Imgui.NextColumn();
+            Imgui.Text("Latest remote tick");
+            peers.ForEach(p => Imgui.Text(p.Peer.RemoteClock.LatestRemote.ToString()));
+
+            Imgui.NextColumn();
+            Imgui.Text("Estimated remote tick");
+            peers.ForEach(p => Imgui.Text(p.Peer.RemoteClock.EstimatedRemote.ToString()));
+
+            Imgui.NextColumn();
+            Imgui.Text("LatestRemote - EstimatedRemote");
+            Imgui.Separator();
+            peers.ForEach(p => Imgui.Text($"{p.Slack}"));
+
+            Imgui.Columns();
         }
 
         private static void DisplayMethodRegistry()
@@ -134,7 +220,7 @@ namespace Coop.Mod.DebugUtil
 
         private static void DisplayEntities()
         {
-            if (!Imgui.TreeNode("Persistence: Parties"))
+            if (!Imgui.TreeNode("Parties"))
             {
                 return;
             }
@@ -178,7 +264,11 @@ namespace Coop.Mod.DebugUtil
             Server server = CoopServer.Instance.Current;
             GameSession session = CoopClient.Instance.Session;
 
-            if (Imgui.TreeNode($"Client is {session.Connection.State}"))
+            if (session.Connection == null)
+            {
+                Imgui.Text("Coop not running.");
+            }
+            else if (Imgui.TreeNode($"Client is {session.Connection.State}"))
             {
                 Imgui.Columns(2);
                 Imgui.Text("Ping");
@@ -193,7 +283,7 @@ namespace Coop.Mod.DebugUtil
                 Imgui.TreePop();
             }
 
-            if (CoopServer.Instance == null)
+            if (server == null)
             {
                 Imgui.Text("No coop server running.");
             }
@@ -229,7 +319,7 @@ namespace Coop.Mod.DebugUtil
 
         private static void DisplayClientRpcInfo()
         {
-            if (!Imgui.TreeNode("Persistence: client synchronized method calls"))
+            if (!Imgui.TreeNode("Client synchronized method calls"))
             {
                 return;
             }

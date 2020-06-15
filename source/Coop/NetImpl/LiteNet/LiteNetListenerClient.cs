@@ -34,6 +34,7 @@ namespace Coop.NetImpl.LiteNet
             if (m_Session.Connection != null)
             {
                 m_Session.Disconnect(disconnectInfo.GetReason(false));
+                peer.Tag = null;
             }
         }
 
@@ -47,7 +48,7 @@ namespace Coop.NetImpl.LiteNet
                 throw new InvalidNetworkPackageException($"Received empty package from ${peer}.");
             }
 
-            peer.GetConnection().Receive(reader.GetRemainingBytesSegment());
+            peer.GetConnection()?.Receive(reader.GetRemainingBytesSegment());
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
