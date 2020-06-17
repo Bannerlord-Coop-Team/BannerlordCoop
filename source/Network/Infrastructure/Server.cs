@@ -116,11 +116,11 @@ namespace Network.Infrastructure
             Direct
         }
 
-        private readonly EType m_ServerType;
+        public EType ServerType { get; }
 
         public Server(EType eType)
         {
-            m_ServerType = eType;
+            ServerType = eType;
             Updateables = new UpdateableList();
             m_State = new StateMachine<EState, ETrigger>(EState.Inactive);
 
@@ -178,7 +178,7 @@ namespace Network.Infrastructure
 
         private void StartMainLoop()
         {
-            if (m_ServerType == EType.Threaded)
+            if (ServerType == EType.Threaded)
             {
                 m_Thread = new Thread(Run);
                 lock (m_StopRequestLock)

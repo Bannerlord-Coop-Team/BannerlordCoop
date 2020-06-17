@@ -5,28 +5,25 @@ namespace Common
 {
     public class UpdateableList
     {
-        private readonly object m_Lock = new object();
-        private readonly List<IUpdateable> m_Updateables;
-
-        public UpdateableList()
-        {
-            m_Updateables = new List<IUpdateable>();
-        }
+        private readonly List<IUpdateable> m_Updateables = new List<IUpdateable>();
 
         public void UpdateAll(TimeSpan frameTime)
         {
-            lock (m_Lock)
+            List<IUpdateable> iterationCopy;
+            lock (m_Updateables)
             {
-                foreach (IUpdateable updateable in m_Updateables)
-                {
-                    updateable.Update(frameTime);
-                }
+                iterationCopy = new List<IUpdateable>(m_Updateables);
+            }
+
+            foreach (IUpdateable updateable in iterationCopy)
+            {
+                updateable.Update(frameTime);
             }
         }
 
         public void Add(IUpdateable updateable)
         {
-            lock (m_Lock)
+            lock (m_Updateables)
             {
                 if (m_Updateables.Contains(updateable))
                 {
@@ -39,7 +36,7 @@ namespace Common
 
         public void Remove(IUpdateable updateable)
         {
-            lock (m_Lock)
+            lock (m_Updateables)
             {
                 m_Updateables.Remove(updateable);
             }
