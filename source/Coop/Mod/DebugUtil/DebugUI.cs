@@ -47,26 +47,6 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private class SPeer
-        {
-            public enum EType
-            {
-                ClientSide,
-                ServerSide
-            }
-
-            public RailPeer Peer;
-            public EType Type;
-
-            public int Slack
-            {
-                get
-                {
-                    return Peer.RemoteClock.LatestRemote - Peer.RemoteClock.EstimatedRemote;
-                }
-            }
-        }
-
         private static void DisplayPersistenceInfo()
         {
             List<SPeer> peers = new List<SPeer>();
@@ -291,6 +271,9 @@ namespace Coop.Mod.DebugUtil
                 $"Server is {server.State.ToString()} with {server.ActiveConnections.Count}/{server.ActiveConfig.MaxPlayerCount} players.")
             )
             {
+                double ticksPerFrame = server.AverageFrameTime.Ticks;
+                int tickRate = (int) (TimeSpan.TicksPerSecond / ticksPerFrame);
+                Imgui.Text($"Tickrate [Hz]: {tickRate}");
                 Imgui.Text(
                     $"LAN:   {server.ActiveConfig.LanAddress}:{server.ActiveConfig.LanPort}");
                 Imgui.Text(
@@ -377,6 +360,20 @@ namespace Coop.Mod.DebugUtil
         {
             Imgui.End();
             Imgui.EndMainThreadScope();
+        }
+
+        private class SPeer
+        {
+            public enum EType
+            {
+                ClientSide,
+                ServerSide
+            }
+
+            public RailPeer Peer;
+            public EType Type;
+
+            public int Slack => Peer.RemoteClock.LatestRemote - Peer.RemoteClock.EstimatedRemote;
         }
     }
 }

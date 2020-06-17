@@ -11,6 +11,7 @@ namespace Common
         private readonly Stopwatch m_Timer;
         private readonly Action<long> m_WaitUntilTick;
         public TimeSpan LastFrameTime;
+        private double m_AverageTicksPerFrame;
 
         public FrameLimiter(TimeSpan targetFrameTime)
         {
@@ -42,13 +43,16 @@ namespace Common
             m_Avg = new MovingAverage(32);
         }
 
+        public TimeSpan AverageFrameTime => TimeSpan.FromTicks((long) m_AverageTicksPerFrame);
+
         public void Throttle()
         {
             long elapsedTicks = m_Timer.Elapsed.Ticks;
-            double avgTicksPerFrame = m_Avg.Push(elapsedTicks);
-            if (avgTicksPerFrame < m_TargetTicksPerFrame)
+            m_AverageTicksPerFrame = m_Avg.Push(elapsedTicks);
+            if (m_AverageTicksPerFrame < m_TargetTicksPerFrame)
             {
-                m_WaitUntilTick(elapsedTicks + (m_TargetTicksPerFrame - (long) avgTicksPerFrame));
+                m_WaitUntilTick(
+                    elapsedTicks + (m_TargetTicksPerFrame - (long) m_AverageTicksPerFrame));
             }
 
             LastFrameTime = m_Timer.Elapsed;

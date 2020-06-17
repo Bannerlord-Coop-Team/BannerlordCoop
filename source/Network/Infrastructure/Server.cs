@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Common;
+using JetBrains.Annotations;
 using Network.Protocol;
 using NLog;
 using Stateless;
@@ -171,6 +172,9 @@ namespace Network.Infrastructure
         private bool m_IsStopRequest;
         private readonly object m_StopRequestLock = new object();
         private Thread m_Thread;
+        [CanBeNull] private FrameLimiter m_FrameLimiter;
+
+        public TimeSpan AverageFrameTime => m_FrameLimiter?.AverageFrameTime ?? TimeSpan.Zero;
 
         private void StartMainLoop()
         {
@@ -188,20 +192,22 @@ namespace Network.Infrastructure
 
         private void Run()
         {
-            FrameLimiter frameLimiter = new FrameLimiter(
+            m_FrameLimiter = new FrameLimiter(
                 ActiveConfig.TickRate > 0 ?
                     TimeSpan.FromMilliseconds(1000 / (double) ActiveConfig.TickRate) :
                     TimeSpan.Zero);
             bool bRunning = true;
             while (bRunning)
             {
-                Update(frameLimiter.LastFrameTime);
-                frameLimiter.Throttle();
+                Update(m_FrameLimiter.LastFrameTime);
+                m_FrameLimiter.Throttle();
                 lock (m_StopRequestLock)
                 {
                     bRunning = !m_IsStopRequest;
                 }
             }
+
+            m_FrameLimiter = null;
         }
 
         private void StopMainLoop()
