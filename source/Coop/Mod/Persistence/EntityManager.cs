@@ -57,7 +57,7 @@ namespace Coop.Mod.Persistence
                 MobilePartyEntityServer entity =
                     m_Room.AddNewEntity<MobilePartyEntityServer>(
                         e => e.State.PartyId = party.Party.Index);
-                Logger.Debug("Added new entity {} for party {}", entity, party);
+                Logger.Debug("Added new entity {}.", entity);
 
                 lock (m_Lock)
                 {
@@ -80,6 +80,11 @@ namespace Coop.Mod.Persistence
             // Parties
             foreach (MobileParty party in Campaign.Current.MobileParties)
             {
+                if (party.Party.Index == MobilePartyState.InvalidPartyId)
+                {
+                    throw new Exception("Invalid party id!");
+                }
+
                 MobilePartyEntityServer entity = room.AddNewEntity<MobilePartyEntityServer>(
                     e => e.State.PartyId = party.Party.Index);
                 m_Parties.Add(party, entity);
@@ -114,6 +119,11 @@ namespace Coop.Mod.Persistence
 
         private void OnPartyAdded(MobileParty party)
         {
+            if (party.Party.Index == MobilePartyState.InvalidPartyId)
+            {
+                throw new Exception("Invalid party id!");
+            }
+
             lock (m_Lock)
             {
                 if (m_Parties.ContainsKey(party))

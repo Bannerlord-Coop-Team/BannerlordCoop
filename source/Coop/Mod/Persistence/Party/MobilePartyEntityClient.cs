@@ -44,6 +44,11 @@ namespace Coop.Mod.Persistence.Party
 
         private void UpdateLocalMovement()
         {
+            if (State.PartyId == MobilePartyState.InvalidPartyId)
+            {
+                throw new Exception("Invalid party id!");
+            }
+
             MobileParty party = m_Environment.GetMobilePartyByIndex(State.PartyId);
             if (party == null) return;
             MovementData data = new MovementData
