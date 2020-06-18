@@ -16,13 +16,12 @@ namespace Coop.Mod.Patch
         [PatchInitializer]
         public static void Init()
         {
-            // TODO: Disabled because of https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/16
-            // CoopClient.Instance.OnPersistenceInitialized += persistence =>
-            //     persistence.RpcSyncHandlers.Register(Patch.Methods);
-            // foreach (MethodAccess method in Patch.Methods)
-            // {
-            //     method.Condition = Coop.DoSync;
-            // }
+            CoopClient.Instance.OnPersistenceInitialized += persistence =>
+                persistence.RpcSyncHandlers.Register(Patch.Methods);
+            foreach (MethodAccess method in Patch.Methods)
+            {
+                method.Condition = Coop.DoSync;
+            }
         }
     }
 }
