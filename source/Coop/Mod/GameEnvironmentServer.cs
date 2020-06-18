@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
+using NLog;
 using Sync;
 using TaleWorlds.CampaignSystem;
 
@@ -8,6 +9,8 @@ namespace Coop.Mod
 {
     public class GameEnvironmentServer : IEnvironmentServer
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         public FieldAccessGroup<MobileParty, MovementData> TargetPosition =>
             CampaignMapMovement.Movement;
 
@@ -15,7 +18,13 @@ namespace Coop.Mod
 
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)
         {
-            return MobileParty.All.SingleOrDefault(p => p.Party.Index == iPartyIndex);
+            MobileParty ret = null;
+            GameLoopRunner.RunOnMainThread(
+                () =>
+                {
+                    ret = MobileParty.All.SingleOrDefault(p => p.Party.Index == iPartyIndex);
+                });
+            return ret;
         }
 
         public Campaign GetCurrentCampaign()

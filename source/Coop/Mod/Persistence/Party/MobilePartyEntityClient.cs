@@ -46,32 +46,26 @@ namespace Coop.Mod.Persistence.Party
         {
             MobileParty party = m_Environment.GetMobilePartyByIndex(State.PartyId);
             if (party == null) return;
+            MovementData data = new MovementData
+            {
+                DefaultBehaviour = State.Movement.DefaultBehavior,
+                TargetPosition = State.Movement.Position,
+                TargetParty = State.Movement.TargetPartyIndex != MovementState.InvalidIndex ?
+                    MBObjectManager.Instance.GetObject(State.Movement.TargetPartyIndex) as
+                        MobileParty :
+                    null,
+                TargetSettlement = State.Movement.SettlementIndex != MovementState.InvalidIndex ?
+                    MBObjectManager.Instance.GetObject(
+                        State.Movement.SettlementIndex) as Settlement :
+                    null
+            };
             Logger.Trace(
-                "[{tick}] Received move entity {id} ('{party}') to '{position}'.",
+                "[{tick}] Received move entity {id} ({party}) to {position}.",
                 Room.Tick,
                 Id,
                 party,
-                State.Movement);
-            m_Environment.TargetPosition.SetTyped(
-                party,
-                new MovementData
-                {
-                    DefaultBehaviour = State.Movement.DefaultBehavior,
-                    TargetPosition = State.Movement.Position,
-                    TargetParty =
-                        State.Movement.TargetPartyIndex !=
-                        MovementState.InvalidIndex ?
-                            MBObjectManager.Instance.GetObject(
-                                    State.Movement.TargetPartyIndex) as
-                                MobileParty :
-                            null,
-                    TargetSettlement =
-                        State.Movement.SettlementIndex != MovementState.InvalidIndex ?
-                            MBObjectManager.Instance.GetObject(
-                                    State.Movement.SettlementIndex) as
-                                Settlement :
-                            null
-                });
+                data);
+            m_Environment.TargetPosition.SetTyped(party, data);
         }
 
         protected override void OnControllerChanged()

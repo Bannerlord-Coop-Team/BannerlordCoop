@@ -45,17 +45,24 @@ namespace Coop.Mod.Persistence
 
         private void AddPendingParties(Tick tick)
         {
+            List<MobileParty> toBeAdded;
             lock (m_Lock)
             {
-                foreach (MobileParty party in m_PartiesToAdd)
+                toBeAdded = new List<MobileParty>(m_PartiesToAdd);
+                m_PartiesToAdd.Clear();
+            }
+
+            foreach (MobileParty party in toBeAdded)
+            {
+                MobilePartyEntityServer entity =
+                    m_Room.AddNewEntity<MobilePartyEntityServer>(
+                        e => e.State.PartyId = party.Party.Index);
+                Logger.Debug("Added new entity {} for party {}", entity, party);
+
+                lock (m_Lock)
                 {
-                    MobilePartyEntityServer entity =
-                        m_Room.AddNewEntity<MobilePartyEntityServer>(
-                            e => e.State.PartyId = party.Party.Index);
                     m_Parties.Add(party, entity);
                 }
-
-                m_PartiesToAdd.Clear();
             }
         }
 
@@ -86,6 +93,7 @@ namespace Coop.Mod.Persistence
 
         private void OnPartyRemoved(MobileParty party)
         {
+            RailEntityServer entityToRemove;
             lock (m_Lock)
             {
                 if (!m_Parties.ContainsKey(party))
@@ -96,9 +104,12 @@ namespace Coop.Mod.Persistence
                     return;
                 }
 
-                m_Room.MarkForRemoval(m_Parties[party]);
+                entityToRemove = m_Parties[party];
                 m_Parties.Remove(party);
             }
+
+            m_Room.MarkForRemoval(entityToRemove);
+            Logger.Debug("Marked entity {} for removal.", entityToRemove, party);
         }
 
         private void OnPartyAdded(MobileParty party)

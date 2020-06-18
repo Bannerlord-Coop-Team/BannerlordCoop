@@ -46,7 +46,10 @@ namespace Coop.Mod.Persistence.Party
                 m_Instance = m_Environment.GetMobilePartyByIndex(State.PartyId);
                 if (m_Instance == null)
                 {
-                    throw new Exception($"Mobile party id {State.PartyId} not found.");
+                    Logger.Error(
+                        "Mobile party id {} not found in the local game state. Desync?",
+                        State.PartyId);
+                    return;
                 }
 
                 m_Environment.TargetPosition.SetHandler(m_Instance, GoToPosition);

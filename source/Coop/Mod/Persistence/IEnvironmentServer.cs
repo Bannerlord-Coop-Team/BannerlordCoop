@@ -1,4 +1,5 @@
-﻿using Sync;
+﻿using JetBrains.Annotations;
+using Sync;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence
@@ -7,7 +8,10 @@ namespace Coop.Mod.Persistence
     {
         FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
         bool CanChangeTimeControlMode { get; }
+
+        [CanBeNull]
         MobileParty GetMobilePartyByIndex(int iPartyIndex);
+
         Campaign GetCurrentCampaign();
     }
 }
