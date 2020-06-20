@@ -39,9 +39,9 @@ foreach ($file in $filesToCopy)
 }
 
 # copy to games mod folder
-if(Test-Path $config.modsDir)
+if(Test-Path (${BaseDir} + $config.modsDir))
 {
-    $ModDir = $config.modsDir + "\" + $config.name
+    $ModDir = ${BaseDir} + $config.modsDir + "\" + $config.name
     Remove-Item ${ModDir} -Recurse
     New-Item -Force -ItemType Directory -Path ${ModDir} | Out-Null
     Copy-item -Force -Recurse $DeployDir\* -Destination $ModDir\
