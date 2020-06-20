@@ -27,6 +27,7 @@ namespace Network.Infrastructure
             StateMachine<EConnectionState, ETrigger>.TriggerWithParameters<EDisconnectReason>
                 disconnectTrigger =
                     m_StateMachine.SetTriggerParameters<EDisconnectReason>(ETrigger.Disconnect);
+
             m_StateMachine.Configure(EConnectionState.Disconnecting)
                           .OnEntryFrom(disconnectTrigger, closeConnection)
                           .Permit(ETrigger.Disconnected, EConnectionState.Disconnected);
