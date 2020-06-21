@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Coop.Mod;
 using Coop.NetImpl.LiteNet;
 using Moq;
@@ -37,22 +38,22 @@ namespace Coop.Tests
                 m_Server.Object.ActiveConfig.LanPort);
         }
 
-        private void WaitForClientConnect()
+        private async Task WaitForClientConnect()
         {
             while (!m_Client.Connected)
             {
-                Thread.Sleep(m_FrameTime);
+                await Task.Delay(m_FrameTime);
                 m_Server.Object.Update(m_FrameTime);
                 m_Client.Update(m_FrameTime);
             }
         }
 
-        private void WaitForTimeout()
+        private async Task WaitForTimeout()
         {
             TimeSpan waitedFor = TimeSpan.Zero;
             while (waitedFor < m_DisconnectTimeout + m_FrameTime)
             {
-                Thread.Sleep(m_FrameTime);
+                await Task.Delay(m_FrameTime);
                 m_Server.Object.Update(m_FrameTime);
                 waitedFor += m_FrameTime;
             }
@@ -60,41 +61,42 @@ namespace Coop.Tests
             // Update the client
             while (m_Client.Connected)
             {
+                await Task.Delay(m_FrameTime);
                 m_Client.Update(m_DisconnectTimeout);
             }
         }
 
         [Fact(Timeout = 2000)]
-        public void ClientCanConnect()
+        public async Task ClientCanConnect()
         {
             Assert.False(m_Client.Connected);
             ConnectClient();
-            WaitForClientConnect();
+            await WaitForClientConnect();
             Assert.True(m_Client.Connected);
         }
 
         [Fact(Timeout = 2000)]
-        public void ClientReconnectsAfterTimeout()
+        public async Task ClientReconnectsAfterTimeout()
         {
             int iConnectionsCreated = 0;
             int iConnectionsDestroyed = 0;
             m_Client.Session.OnConnectionCreated += connection => { iConnectionsCreated++; };
             m_Client.Session.OnConnectionDestroyed += connection => { iConnectionsDestroyed++; };
             ConnectClient();
-            WaitForClientConnect();
+            await WaitForClientConnect();
             Assert.True(m_Client.Connected);
             Assert.Equal(1, iConnectionsCreated);
             Assert.Equal(0, iConnectionsDestroyed);
 
             // Wait for the timeout
-            WaitForTimeout();
+            await WaitForTimeout();
             Assert.False(m_Client.Connected);
             Assert.Equal(1, iConnectionsCreated);
             Assert.Equal(1, iConnectionsDestroyed);
             Assert.Null(m_Client.Session.Connection);
 
             // Wait for the reconnect
-            WaitForClientConnect();
+            await WaitForClientConnect();
             Assert.True(m_Client.Connected);
             Assert.Equal(2, iConnectionsCreated);
             Assert.Equal(1, iConnectionsDestroyed);
@@ -102,14 +104,14 @@ namespace Coop.Tests
         }
 
         [Fact(Timeout = 2000)]
-        public void ClientTimesOut()
+        public async Task ClientTimesOut()
         {
             ConnectClient();
-            WaitForClientConnect();
+            await WaitForClientConnect();
             Assert.True(m_Client.Connected);
 
             // Wait for the timeout
-            WaitForTimeout();
+            await  WaitForTimeout();
             Assert.False(m_Client.Connected);
         }
     }
