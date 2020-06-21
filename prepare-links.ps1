@@ -17,7 +17,7 @@ While ($processes.Count -eq 0)
 {
 	$processes = Get-Process -Name Bannerlord,Bannerlord.Native,Bannerlord_BE,TaleWorlds.MountAndBlade.Launcher -ErrorAction SilentlyContinue -FileVersionInfo
     If ($processes.Count -gt 0) {Break}
-    Write-Output "*** Run Mount & Blade: Bannerlod at now and then press any key here... ***"
+    Write-Output "*** Run Mount & Blade: Bannerlod now and then press any key here... ***"
     $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 }
 
@@ -31,7 +31,7 @@ $path = Split-Path -Path $path -Parent
 $key = 0
 While ($key -eq 0)
 {
-	Write-Output "Are this path correct for game Mount & Blade: Bannerlod?"
+	Write-Output "Is this path correct for game Mount & Blade: Bannerlod?"
 	Write-Output $path
 	Write-Output "y - yes, n - no [default = y]"
 	$key = $Host.UI.RawUI.ReadKey('IncludeKeyDown') | Select-Object -ExpandProperty VirtualKeyCode
