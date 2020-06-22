@@ -78,8 +78,10 @@ namespace Coop.Tests.Sync
 
             // Client1 ACK -> Server
             ExecuteSendsClients();
+            Assert.False(client0.State[id].Acknowledged);
             // Server ACK -> Client 0
-            ExecuteSendsClients();
+            ExecuteSendsServer();
+            Assert.True(client0.State[id].Acknowledged);
 
             // Object is present and equal in all stores
             Assert.Equal(message, client0.Data[id] as string);
