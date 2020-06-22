@@ -39,37 +39,23 @@ namespace Coop.Mod.Persistence.RPC
 
         public static Argument Create(object obj)
         {
-            if (obj == null)
+            switch (obj)
             {
-                return Argument.Null;
+                case null:
+                    return Argument.Null;
+                case MBGUID guid:
+                    return new Argument(guid);
+                case RailEntityBase entity:
+                    return new Argument(entity);
+                case EntityId entityId:
+                    return new Argument(entityId);
+                case MBObjectBase mbobj:
+                    return new Argument(mbobj.Id);
+                case int i:
+                    return new Argument(i);
+                default:
+                    throw new Exception($"Unknown argument type: {obj}.");
             }
-
-            if (obj is MBGUID guid)
-            {
-                return new Argument(guid);
-            }
-
-            if (obj is RailEntityBase entity)
-            {
-                return new Argument(entity);
-            }
-
-            if (obj is EntityId entityId)
-            {
-                return new Argument(entityId);
-            }
-
-            if (obj is MBObjectBase mbobj)
-            {
-                return new Argument(mbobj.Id);
-            }
-
-            if (obj is int i)
-            {
-                return new Argument(i);
-            }
-
-            throw new Exception($"Unknown argument type: {obj}.");
         }
     }
 }
