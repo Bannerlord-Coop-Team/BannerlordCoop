@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using Extensions.Data;
 using JetBrains.Annotations;
 using Network;
@@ -13,34 +10,37 @@ using NLog;
 
 namespace Sync.Store
 {
-    public struct ObjectId
+    public class RemoteObjectState
     {
-        public uint Value { get; }
-
-        public ObjectId(uint id)
+        public enum EOrigin
         {
-            Value = id;
+            Local,
+            Remote
         }
-    }
 
-    public class RemoteObject
-    {
-        public object Object { get; set; }
+        public RemoteObjectState(EOrigin eOrigin)
+        {
+            Origin = eOrigin;
+        }
+
+        public EOrigin Origin { get; }
         public bool Sent { get; set; }
         public bool Acknowledged { get; set; }
     }
 
     /// <summary>
-    ///     Stores arbitrary data that is synchronized to a remote instance of this class.
+    ///     Stores arbitrary data that is synchronized to a remote instance a store.
     ///     Attention: Data added to the store will not be automatically removed! It will be kept
     ///     until it is explicitly removed.
     /// </summary>
-    public class RemoteStore
+    public class RemoteStore : IStore
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly ConnectionBase m_Connection;
+        private readonly Dictionary<ObjectId, object> m_Data;
 
-        private readonly Dictionary<ObjectId, RemoteObject> m_Data;
+        private readonly Dictionary<ObjectId, RemoteObjectState> m_State =
+            new Dictionary<ObjectId, RemoteObjectState>();
 
         /// <summary>
         ///     Triggered when the remote instance confirmed the reception of a sent object.
@@ -48,9 +48,16 @@ namespace Sync.Store
         public Action<ObjectId, object> OnObjectAcknowledged;
 
         /// <summary>
-        ///     Triggered when the local instance received an object from the remote instance.
+        ///     Triggered when the local instance received an object from the remote instance and
+        ///     an acknowledge has been sent back.
         /// </summary>
         public Action<ObjectId, object> OnObjectReceived;
+
+        /// <summary>
+        ///     Triggered when the local instance deserialized an added object from the remote store.
+        ///     The return value determines if an ACK is sent back.
+        /// </summary>
+        public Func<ObjectId, byte[], object, bool> OnPacketAddDeserialized;
 
         /// <summary>
         ///     Creates a new store.
@@ -58,7 +65,7 @@ namespace Sync.Store
         /// <param name="data">data storage for all objects in this store.</param>
         /// <param name="connection">connection to be used to communicate with the remote store</param>
         public RemoteStore(
-            [NotNull] Dictionary<ObjectId, RemoteObject> data,
+            [NotNull] Dictionary<ObjectId, object> data,
             [NotNull] ConnectionBase connection)
         {
             m_Data = data;
@@ -66,7 +73,26 @@ namespace Sync.Store
             m_Connection.Dispatcher.RegisterPacketHandlers(this);
         }
 
-        public IReadOnlyDictionary<ObjectId, RemoteObject> Data => m_Data;
+        public IReadOnlyDictionary<ObjectId, RemoteObjectState> State => m_State;
+
+        public ObjectId Insert(object obj)
+        {
+            byte[] raw = StoreSerializer.Serialize(obj);
+            ObjectId id = new ObjectId(XXHash.XXH32(raw));
+            m_Data[id] = obj;
+            Logger.Trace("Insert {id}: {object}", id, obj);
+            SendAdd(id, raw);
+            return id;
+        }
+
+        public bool Remove(ObjectId id)
+        {
+            m_State.Remove(id);
+            Logger.Trace("Remove {id}: {object}", id, m_Data[id]);
+            return m_Data.Remove(id);
+        }
+
+        public IReadOnlyDictionary<ObjectId, object> Data => m_Data;
 
         ~RemoteStore()
         {
@@ -83,20 +109,54 @@ namespace Sync.Store
             // Receive the object
             byte[] raw = packet.Payload.ToArray();
             ObjectId id = new ObjectId(XXHash.XXH32(raw));
-            m_Data[id] = new RemoteObject
-            {
-                Object = Deserialize(raw),
-                Sent = false,
-                Acknowledged = true
-            };
+            m_State[id] = new RemoteObjectState(RemoteObjectState.EOrigin.Remote);
 
-            // Return ACK
+            // Add to store
+            if (m_Data.ContainsKey(id))
+            {
+                Logger.Warn(
+                    "{id}: {object} already stored. Objects should only be added once!",
+                    id,
+                    m_Data[id]);
+            }
+            else
+            {
+                m_Data[id] = StoreSerializer.Deserialize(raw);
+            }
+
+            // Call handlers
+            bool bDoSendAck = true;
+            if (OnPacketAddDeserialized != null)
+            {
+                bDoSendAck = OnPacketAddDeserialized.Invoke(id, raw, m_Data[id]);
+            }
+
+            if (bDoSendAck)
+            {
+                SendACK(id);
+                Logger.Trace("Received {id}: {object}", id, m_Data[id]);
+                OnObjectReceived?.Invoke(id, m_Data[id]);
+            }
+        }
+
+        public void SendACK(ObjectId id)
+        {
+            if (!m_State.ContainsKey(id))
+            {
+                throw new Exception($"Invalid internal state for {id}: Unknown.");
+            }
+
+            if (m_State[id].Origin == RemoteObjectState.EOrigin.Local)
+            {
+                throw new Exception(
+                    "Invalid internal state for {id}: A locally added object cannot be acknowledged.");
+            }
+
             ByteWriter writer = new ByteWriter();
             writer.Binary.Write(id.Value);
+            m_State[id].Acknowledged = true;
             m_Connection.Send(new Packet(EPacket.StoreAck, writer.ToArray()));
-
-            Logger.Trace("Received {}: {}", id, m_Data[id].Object);
-            OnObjectReceived?.Invoke(id, m_Data[id].Object);
+            Logger.Trace("Sent StoreAck {id}.", id);
         }
 
         [PacketHandler(EConnectionState.ClientAwaitingWorldData, EPacket.StoreAck)]
@@ -107,54 +167,26 @@ namespace Sync.Store
         private void ReceiveAck(Packet packet)
         {
             ObjectId id = new ObjectId(new ByteReader(packet.Payload).Binary.ReadUInt32());
-            if (!m_Data.ContainsKey(id))
+            if (!m_Data.ContainsKey(id) || !m_State.ContainsKey(id))
             {
                 throw new Exception($"Received ACK for unknown object {id}.");
             }
 
-            m_Data[id].Acknowledged = true;
-            Logger.Trace("Receivec ACK {}: {}", id, m_Data[id].Object);
-            OnObjectAcknowledged?.Invoke(id, m_Data[id].Object);
+            m_State[id].Acknowledged = true;
+            Logger.Trace("Received ACK {id}: {object}", id, m_Data[id]);
+            OnObjectAcknowledged?.Invoke(id, m_Data[id]);
         }
 
-        public ObjectId Insert(object obj)
+        public void SendAdd(ObjectId id, byte[] raw)
         {
-            byte[] raw = Serialize(obj);
-            ObjectId id = new ObjectId(XXHash.XXH32(raw));
             m_Connection.Send(new Packet(EPacket.StoreAdd, raw));
-            m_Data[id] = new RemoteObject
+            m_State[id] = new RemoteObjectState(RemoteObjectState.EOrigin.Local)
             {
-                Object = obj,
                 Acknowledged = false,
                 Sent = true
             };
-            Logger.Trace("Insert {}: {}", id, obj);
-            return id;
-        }
 
-        public bool Remove(ObjectId id)
-        {
-            if (!m_Data.ContainsKey(id))
-            {
-                throw new ArgumentException($"Unknown key {id}", nameof(id));
-            }
-
-            Logger.Trace("Remove {}: {}", id, m_Data[id]);
-            return m_Data.Remove(id);
-        }
-
-        private byte[] Serialize(object obj)
-        {
-            IFormatter formatter = new BinaryFormatter();
-            MemoryStream stream = new MemoryStream();
-            formatter.Serialize(stream, obj);
-            return stream.ToArray();
-        }
-
-        private object Deserialize(byte[] raw)
-        {
-            MemoryStream buffer = new MemoryStream(raw);
-            return new BinaryFormatter().Deserialize(buffer);
+            Logger.Trace("Sent StoreAdd {id}.", id);
         }
     }
 }

@@ -19,8 +19,6 @@ namespace Coop.Tests.Sync
 
         private void Init(int iNumberOfClients)
         {
-            Dictionary<ObjectId, RemoteObject> dataServer =
-                new Dictionary<ObjectId, RemoteObject>();
             for (int i = 0; i < iNumberOfClients; ++i)
             {
                 ConnectionTestImpl client = new ConnectionTestImpl
@@ -34,9 +32,8 @@ namespace Coop.Tests.Sync
 
                 client.NetworkImpl.OnSend += server.Receive;
                 server.NetworkImpl.OnSend += client.Receive;
-                m_StoresClient.Add(
-                    new RemoteStore(new Dictionary<ObjectId, RemoteObject>(), client));
-                m_StoresServer.Add(new RemoteStore(dataServer, server));
+                m_StoresClient.Add(new RemoteStore(new Dictionary<ObjectId, object>(), client));
+                m_StoresServer.Add(new RemoteStore(new Dictionary<ObjectId, object>(), server));
 
                 m_ConnectionsClient.Add(client);
                 m_ConnectionsServer.Add(server);
@@ -66,8 +63,8 @@ namespace Coop.Tests.Sync
             Assert.DoesNotContain(id, serverStore.Data);
             ExecuteSendsClients();
             Assert.Contains(id, serverStore.Data);
-            Assert.IsType<string>(serverStore.Data[id].Object);
-            Assert.Equal(message, serverStore.Data[id].Object as string);
+            Assert.IsType<string>(serverStore.Data[id]);
+            Assert.Equal(message, serverStore.Data[id] as string);
         }
 
         [Fact]
@@ -127,16 +124,18 @@ namespace Coop.Tests.Sync
 
             ObjectId id = clientStore.Insert(message);
             Assert.Contains(id, clientStore.Data);
-            Assert.True(clientStore.Data[id].Sent);
-            Assert.False(clientStore.Data[id].Acknowledged);
+            Assert.Equal(RemoteObjectState.EOrigin.Local, clientStore.State[id].Origin);
+            Assert.True(clientStore.State[id].Sent);
+            Assert.False(clientStore.State[id].Acknowledged);
             ExecuteSendsClients();
             Assert.Contains(id, serverStore.Data);
-            Assert.True(serverStore.Data[id].Acknowledged);
-            Assert.False(serverStore.Data[id].Sent);
+            Assert.Equal(RemoteObjectState.EOrigin.Remote, serverStore.State[id].Origin);
+            Assert.True(serverStore.State[id].Acknowledged);
+            Assert.False(serverStore.State[id].Sent);
             Assert.False(
-                clientStore.Data[id].Acknowledged); // Server sends have not been processed yet!
+                clientStore.State[id].Acknowledged); // Server sends have not been processed yet!
             ExecuteSendsServer();
-            Assert.True(clientStore.Data[id].Acknowledged);
+            Assert.True(clientStore.State[id].Acknowledged);
         }
     }
 }
