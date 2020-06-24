@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.Core;
 
-namespace MBMultiplayerCampaign.Serializers
+namespace Coop.Mod.Serializers
 {
     [Serializable]
     class EquipmentSerializer : ICustomSerializer

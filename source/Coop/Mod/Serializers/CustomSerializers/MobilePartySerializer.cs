@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace MBMultiplayerCampaign.Serializers
+namespace Coop.Mod.Serializers
 {
     [Serializable]
     public class MobilePartySerializer : CustomSerializer
@@ -20,11 +20,6 @@ namespace MBMultiplayerCampaign.Serializers
         {
             MobileParty clientParty = MBObjectManager.Instance.CreateObject<MobileParty>("");
             clientParty.SetAsMainParty();
-            throw new NotImplementedException();
-        }
-
-        public override ICustomSerializer Serialize(object obj)
-        {
             throw new NotImplementedException();
         }
     }

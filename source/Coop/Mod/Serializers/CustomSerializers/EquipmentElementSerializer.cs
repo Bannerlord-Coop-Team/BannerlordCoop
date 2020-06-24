@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace MBMultiplayerCampaign.Serializers
+namespace Coop.Mod.Serializers
 {
     [Serializable]
     class EquipmentElementSerializer : ICustomSerializer
@@ -14,7 +14,6 @@ namespace MBMultiplayerCampaign.Serializers
         string itemModifier;
         uint id;
 
-        public EquipmentElementSerializer() { }
         public EquipmentElementSerializer(EquipmentElement equipmentElement)
         {
             itemModifier = (equipmentElement.ItemModifier != null) ? equipmentElement.ItemModifier.ID : "";

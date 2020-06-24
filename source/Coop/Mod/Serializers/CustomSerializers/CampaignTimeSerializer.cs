@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using System.Reflection;
 
-namespace MBMultiplayerCampaign.Serializers
+namespace Coop.Mod.Serializers
 {
     [Serializable]
     public class CampaignTimeSerializer : ICustomSerializer
@@ -23,12 +23,7 @@ namespace MBMultiplayerCampaign.Serializers
                 .GetValue(campaignTime);
         }
 
-        public ICustomSerializer Serialize(object obj)
-        {
-            return new CampaignTimeSerializer((CampaignTime)obj);
-        }
-
-        object ICustomSerializer.Deserialize()
+        public object Deserialize()
         {
             ConstructorInfo ctorCampaignTime = typeof(CampaignTime).Assembly
                 .GetType("TaleWorlds.CampaignSystem.CampaignTime")

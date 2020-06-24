@@ -19,9 +19,18 @@ namespace Network.Infrastructure
          *
          * Possible transitions to:
          * - ClientAwaitingWorldData: The server accepted the request.
+         * - ClientCharacterCreation: Client is required to make character.
          * - Disconnecting: Request timeout or the server rejected the request.
          */
         ClientAtMainMenu,
+
+        /** [client side] Client is creating a character.
+         *
+         * Possible transitions to:
+         * - ClientAwaitingWorldData: The server accepted the request.
+         * - Disconnecting: Request timeout or the server rejected the request.
+         */
+        ClientCharacterCreation,
 
 
         /** [client side] Client is joining a server, e.g. downloading data.

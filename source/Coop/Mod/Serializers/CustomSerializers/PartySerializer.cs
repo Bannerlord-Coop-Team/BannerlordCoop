@@ -1,4 +1,4 @@
-﻿namespace MBMultiplayerCampaign.Serializers
+﻿namespace Coop.Mod.Serializers
 {
     internal class PartySerializer
     {

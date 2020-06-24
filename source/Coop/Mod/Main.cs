@@ -75,7 +75,7 @@ namespace Coop.Mod
             {
                 typeof(Module)
                     .GetField("_splashScreenPlayed", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .SetValue(TaleWorlds.MountAndBlade.Module.CurrentModule, true);
+                    .SetValue(Module.CurrentModule, true);
             }
 
             harmony.PatchAll();

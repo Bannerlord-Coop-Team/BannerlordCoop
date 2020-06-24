@@ -10,6 +10,11 @@ using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
 using RailgunNet.Logic;
+using StoryMode;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
+using System.Threading.Tasks;
 
 namespace Coop.Mod
 {
@@ -23,6 +28,7 @@ namespace Coop.Mod
 
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
         private int m_ReconnectAttempts = MaxReconnectAttempts;
+        private ClientCharacterCreatorManager gameManager;
 
         public CoopClient()
         {
@@ -31,7 +37,7 @@ namespace Coop.Mod
             m_NetManager = new LiteNetManagerClient(Session);
             GameState = new CoopGameState();
             Events = new CoopEvents();
-            Events.OnGameLoaded.AddNonSerializedListener(this, Init);
+            Init();
         }
 
         [CanBeNull] public PersistenceClient Persistence { get; private set; }
@@ -112,9 +118,43 @@ namespace Coop.Mod
 
             m_ReconnectAttempts = MaxReconnectAttempts;
             TryInitPersistence(con);
-            ClientGameManager.OnLoadFinishedEvent += con.sendGameLoaded;
-            con.OnClientLoaded += TryInitPersistence;
-            con.OnDisconnected += ConnectionClosed;
+
+            #region events
+            // Upward
+            Session.Connection.RequireCharacterCreation += CreateCharacter;
+            Session.Connection.OnCharacterCreated += CharacterCreated;
+
+            Session.Connection.OnClientLoaded += TryInitPersistence;
+            Session.Connection.OnDisconnected += ConnectionClosed;
+
+            // Downward
+            if(con.State == EConnectionState.ClientLoading)
+            {
+                ClientCharacterCreatorManager.OnLoadFinishedEvent += Session.Connection.sendGameLoaded;
+            }
+            #endregion
+
+        }
+
+        private void CreateCharacter(ConnectionClient con)
+        {
+            if (gameManager == null)
+            {
+                gameManager = new ClientCharacterCreatorManager();
+                MBGameManager.StartNewGame(gameManager);
+                ClientCharacterCreatorManager.OnLoadFinishedEvent += (object source, EventArgs e) =>
+                {
+                    StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, () =>
+                    {
+                        CharacterCreated(con);
+                    });
+                };
+            }
+        }
+
+        private void CharacterCreated(ConnectionClient con)
+        {
+            // Switch state
         }
 
         private void ConnectionClosed(EDisconnectReason eReason)

@@ -51,7 +51,7 @@ namespace Coop.Mod
                 GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
             }
 
-            MBGameManager.StartNewGame(new ClientGameManager(loadResult));
+            MBGameManager.StartNewGame(new ClientCharacterCreatorManager(loadResult));
         }
 
         public static LoadGameResult LoadSaveGameData(ISaveDriver driver)
