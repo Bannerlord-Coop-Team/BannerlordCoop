@@ -3,6 +3,7 @@ using RailgunNet;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using RailgunNet.Util;
+using System;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence.World
@@ -11,10 +12,10 @@ namespace Coop.Mod.Persistence.World
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public CampaignTimeControlMode RequestedTimeControlMode
+        public ValueTuple<CampaignTimeControlMode, bool> RequestedTimeControlMode
         {
-            get => (CampaignTimeControlMode) m_RequestedTimeControlMode;
-            set => m_RequestedTimeControlMode = (byte) value;
+            get => ((CampaignTimeControlMode)m_RequestedTimeControlMode, m_RequestedTimeControlModeLock == 1);
+            set => (m_RequestedTimeControlMode, m_RequestedTimeControlModeLock) = ((byte)value.Item1, value.Item2 ? (byte)1 : (byte)0);
         }
 
         [OnlyIn(Component.Server)]
@@ -26,7 +27,7 @@ namespace Coop.Mod.Persistence.World
                     "Time control change request from {sender} to {request}.",
                     sender,
                     RequestedTimeControlMode);
-                entity.RequestedTimeControlMode = RequestedTimeControlMode;
+                (entity.RequestedTimeControlMode, entity.RequestedTimeControlModeLock) = RequestedTimeControlMode;
             }
             else
             {
@@ -37,6 +38,7 @@ namespace Coop.Mod.Persistence.World
         #region synced data
         [EventData] public EntityId EntityId { get; set; }
         [EventData] private byte m_RequestedTimeControlMode { get; set; }
+        [EventData] private byte m_RequestedTimeControlModeLock { get; set; }
         #endregion
     }
 }

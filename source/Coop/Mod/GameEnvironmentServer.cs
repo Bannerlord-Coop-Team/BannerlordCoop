@@ -31,5 +31,15 @@ namespace Coop.Mod
         {
             return Campaign.Current;
         }
+
+        public void LockTimeControlStopped()
+        {
+            Campaign.Current.TimeControlMode = CampaignTimeControlMode.Stop;
+            Campaign.Current.SetTimeControlModeLock(true);
+        }
+        public void UnlockTimeControl()
+        {
+            Campaign.Current.SetTimeControlModeLock(false);
+        }
     }
 }
