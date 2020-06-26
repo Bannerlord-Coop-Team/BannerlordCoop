@@ -14,7 +14,7 @@ namespace Coop.Mod.Serializers
         //PartySerializer party;
         public MobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
         {
-            int i = NonSerializableObjects.Count;
+            
         }
         public override object Deserialize()
         {

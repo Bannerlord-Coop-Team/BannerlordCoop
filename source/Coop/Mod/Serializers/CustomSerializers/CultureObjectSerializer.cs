@@ -1,19 +1,22 @@
 ﻿using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Serializers
 {
     [Serializable]
     internal class CultureObjectSerializer : ICustomSerializer
     {
-        // TODO
+        private string cultureId;
         public CultureObjectSerializer(CultureObject culture)
         {
+            cultureId = culture.StringId;
         }
 
         public object Deserialize()
         {
-            throw new System.NotImplementedException();
+            return MBObjectManager.Instance.GetObject(new MBGUID(uint.Parse(cultureId));
         }
     }
 }

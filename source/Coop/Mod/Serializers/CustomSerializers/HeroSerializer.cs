@@ -83,6 +83,7 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)fieldInfo.GetValue(hero)));
                         break;
                     case "_partyBelongedTo":
+                        SNNSO.Add(fieldInfo, new MobilePartySerializer((MobileParty)fieldInfo.GetValue(hero)));
                         break;
                     case "<LastMeetingTimeWithPlayer>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)fieldInfo.GetValue(hero)));
@@ -100,7 +101,7 @@ namespace Coop.Mod.Serializers
                         MothersName = ((Hero)fieldInfo.GetValue(hero)).Name.ToString();
                         break;
                     case "ExSpouses":
-                        foreach (Hero exSpouse in ((MBReadOnlyList<Hero>)fieldInfo.GetValue(hero)))
+                        foreach (Hero exSpouse in (MBReadOnlyList<Hero>)fieldInfo.GetValue(hero))
                         {
                             ExSpouses.Add(exSpouse.Name.ToString());
                         }
