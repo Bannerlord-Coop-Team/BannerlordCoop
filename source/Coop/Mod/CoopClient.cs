@@ -9,6 +9,7 @@ using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
 using RailgunNet.Logic;
+using Sync.Store;
 
 namespace Coop.Mod
 {
@@ -21,6 +22,13 @@ namespace Coop.Mod
             new Lazy<CoopClient>(() => new CoopClient());
 
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
+
+        /// <summary>
+        ///     Internal data storage for <see cref="SyncedObjectStore" />.
+        /// </summary>
+        private readonly Dictionary<ObjectId, object> m_SyncedObjects =
+            new Dictionary<ObjectId, object>();
+
         private int m_ReconnectAttempts = MaxReconnectAttempts;
 
         public Action<PersistenceClient> OnPersistenceInitialized;
@@ -34,6 +42,12 @@ namespace Coop.Mod
             Events = new CoopEvents();
             Events.OnGameLoaded.AddNonSerializedListener(this, Init);
         }
+
+        /// <summary>
+        ///     Object store shared with the server if connected. Otherwise null.
+        /// </summary>
+        [CanBeNull]
+        public RemoteStore SyncedObjectStore { get; private set; }
 
         [CanBeNull] public PersistenceClient Persistence { get; private set; }
 
@@ -99,6 +113,7 @@ namespace Coop.Mod
 
             m_ReconnectAttempts = MaxReconnectAttempts;
             TryInitPersistence(con);
+            SyncedObjectStore = new RemoteStore(m_SyncedObjects, con);
             con.OnClientJoined += TryInitPersistence;
             con.OnDisconnected += ConnectionClosed;
         }
@@ -106,6 +121,7 @@ namespace Coop.Mod
         private void ConnectionClosed(EDisconnectReason eReason)
         {
             Persistence?.SetConnection(null);
+            SyncedObjectStore = null;
         }
 
         private void ConnectionDestroyed(EDisconnectReason eReason)

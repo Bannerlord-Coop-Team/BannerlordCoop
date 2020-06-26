@@ -30,6 +30,7 @@ namespace Network.Infrastructure
             ActiveConnections.All(con => con.State == EConnectionState.ServerPlaying);
 
         public event Action<ConnectionServer> OnClientConnected;
+        public event Action<ConnectionServer, EDisconnectReason> OnClientDisconnected;
 
         public void Start(ServerConfiguration config)
         {
@@ -94,6 +95,8 @@ namespace Network.Infrastructure
             {
                 Logger.Error("Unknown connection: {connection}.", con);
             }
+
+            OnClientDisconnected?.Invoke(con, eReason);
         }
 
         public virtual bool CanPlayerJoin()

@@ -5,6 +5,7 @@ using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
+using Sync.Store;
 
 namespace Coop.Mod
 {
@@ -23,6 +24,13 @@ namespace Coop.Mod
         {
         }
 
+        /// <summary>
+        ///     Object store shared with all connected clients. Set to an instance when the server
+        ///     is started, otherwise null.
+        /// </summary>
+        [CanBeNull]
+        public SharedRemoteStore SyncedObjectStore { get; private set; }
+
         [CanBeNull] public CoopServerRail Persistence { get; private set; }
 
         public static CoopServer Instance => m_Instance.Value;
@@ -36,10 +44,13 @@ namespace Coop.Mod
                 Server.EType eServerType = Server.EType.Threaded;
                 Current = new Server(eServerType);
 
+                SyncedObjectStore = new SharedRemoteStore();
                 m_GameEnvironmentServer = new GameEnvironmentServer();
                 Persistence = new CoopServerRail(Current, m_GameEnvironmentServer);
+
                 Current.Updateables.Add(Persistence);
                 Current.OnClientConnected += OnClientConnected;
+                Current.OnClientDisconnected += OnClientDisconnected;
 
                 if (eServerType == Server.EType.Direct)
                 {
@@ -61,6 +72,8 @@ namespace Coop.Mod
         public void ShutDownServer()
         {
             Current?.Stop();
+            Persistence = null;
+            SyncedObjectStore = null;
             m_NetManager?.Stop();
             m_NetManager = null;
             m_GameEnvironmentServer = null;
@@ -79,10 +92,18 @@ namespace Coop.Mod
 
         private void OnClientConnected(ConnectionServer connection)
         {
+            SyncedObjectStore.AddConnection(connection);
             connection.OnClientJoined += Persistence.ClientJoined;
             connection.OnDisconnected += Persistence.Disconnected;
             connection.OnServerSendingWorldData += m_GameEnvironmentServer.LockTimeControlStopped;
             connection.OnServerSendedWorldData += m_GameEnvironmentServer.UnlockTimeControl;
+        }
+
+        private void OnClientDisconnected(ConnectionServer connection, EDisconnectReason eReason)
+        {
+            connection.OnClientJoined -= Persistence.ClientJoined;
+            connection.OnDisconnected -= Persistence.Disconnected;
+            SyncedObjectStore?.RemoveConnection(connection);
         }
     }
 }
