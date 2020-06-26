@@ -14,6 +14,8 @@ namespace Network.Protocol
         Server_WorldData, // Contains the initial state of the game world.
 
         Sync,
+        StoreAdd, // Adds an object to the global object store
+        StoreAck, // Sent after receiving an object via StoreAdd
         KeepAlive,
         Persistence // Will be forwarded to the game state persistence layer.
     }
