@@ -77,9 +77,14 @@ namespace Coop.Mod
             Persistence?.Update(frameTime);
         }
 
-        public void Connect(IPAddress ip, int iPort)
+        public string Connect(IPAddress ip, int iPort)
         {
-            m_NetManager.Connect(ip, iPort);
+            return m_NetManager.Connect(ip, iPort);
+        }
+
+        public void Disconnect()
+        {
+            m_NetManager.Disconnect(EDisconnectReason.ClientLeft);
         }
 
         private void Init()

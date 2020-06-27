@@ -5,6 +5,7 @@ using Common;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RPC;
 using Network.Infrastructure;
+using NLog;
 using RailgunNet.Connection;
 using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
@@ -16,7 +17,8 @@ namespace Coop.Mod.DebugUtil
 {
     public class DebugUI : IUpdateable
     {
-        private readonly string m_WindowTitle = "";
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private readonly string m_WindowTitle = "Debug UI";
 
         public bool Visible { get; set; }
 
@@ -159,16 +161,22 @@ namespace Coop.Mod.DebugUtil
         {
             Imgui.BeginMainThreadScope();
             Imgui.Begin(m_WindowTitle);
-            Imgui.Text("DO NOT MOVE THIS WINDOW! It will crash the game.");
+            Imgui.Text("DO NOT MOVE THIS WINDOW IN MAIN MENU! It will crash the game.");
         }
 
         private void AddButtons()
         {
-            if (Imgui.SmallButton("Close"))
+            Imgui.NewLine();
+            string startServerResult = null;
+            string connectResult = null;
+
+            Imgui.SameLine(20);
+            if (Imgui.SmallButton("Close DebugUI"))
             {
                 Visible = false;
             }
 
+            Imgui.SameLine(130);
             if (Imgui.SmallButton("Toggle console"))
             {
                 DebugConsole.Toggle();
@@ -176,25 +184,46 @@ namespace Coop.Mod.DebugUtil
 
             if (CoopServer.Instance.Current == null)
             {
-                Imgui.SameLine(200);
+                Imgui.SameLine(250);
                 if (Imgui.SmallButton("Start Server"))
                 {
-                    CoopServer.Instance.StartServer();
-                    ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
-                    CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
+                    if ((startServerResult = CoopServer.Instance.StartServer()) == null)
+                    {
+                        ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
+                        connectResult = CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
+                    }
                 }
             }
 
             if (!CoopClient.Instance.Connected)
             {
-                Imgui.SameLine(400);
-                if (Imgui.SmallButton("Connect to local host"))
+                Imgui.SameLine(350);
+                if (Imgui.SmallButton("Connect to local"))
                 {
                     ServerConfiguration defaultConfiguration = new ServerConfiguration();
-                    CoopClient.Instance.Connect(
+                    connectResult = CoopClient.Instance.Connect(
                         defaultConfiguration.LanAddress,
                         defaultConfiguration.LanPort);
                 }
+            }
+
+            if (CoopClient.Instance.Connected)
+            {
+                Imgui.SameLine(300);
+                if (Imgui.SmallButton("Disconnect"))
+                {
+                    CoopClient.Instance.Disconnect();
+                }
+            }
+
+            if (startServerResult != null)
+            {
+                Logger.Warn(startServerResult);
+            }
+
+            if (connectResult != null)
+            {
+                Logger.Warn(connectResult);
             }
         }
 
