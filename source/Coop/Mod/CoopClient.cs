@@ -118,6 +118,7 @@ namespace Coop.Mod
 
             m_ReconnectAttempts = MaxReconnectAttempts;
             TryInitPersistence(con);
+            SyncedObjectStore = new RemoteStore(m_SyncedObjects, con);
             con.OnClientJoined += TryInitPersistence;
             con.OnDisconnected += ConnectionClosed;
         }
@@ -125,6 +126,7 @@ namespace Coop.Mod
         private void ConnectionClosed(EDisconnectReason eReason)
         {
             Persistence?.SetConnection(null);
+            SyncedObjectStore = null;
         }
 
         private void ConnectionDestroyed(EDisconnectReason eReason)
