@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Linq;
+using Coop.Mod.Persistence.World;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
@@ -16,6 +18,8 @@ namespace Coop.Mod
             new Lazy<CoopServer>(() => new CoopServer());
 
         private LiteNetManagerServer m_NetManager;
+
+        private GameEnvironmentServer m_GameEnvironmentServer;
 
         private CoopServer()
         {
@@ -49,7 +53,9 @@ namespace Coop.Mod
                 Current = new Server(eServerType);
 
                 SyncedObjectStore = new SharedRemoteStore();
-                Persistence = new CoopServerRail(Current, new GameEnvironmentServer());
+                m_GameEnvironmentServer = new GameEnvironmentServer();
+                Persistence = new CoopServerRail(Current, m_GameEnvironmentServer);
+
                 Current.Updateables.Add(Persistence);
                 Current.OnClientConnected += OnClientConnected;
                 Current.OnClientDisconnected += OnClientDisconnected;
@@ -80,6 +86,7 @@ namespace Coop.Mod
             SyncedObjectStore = null;
             m_NetManager?.Stop();
             m_NetManager = null;
+            m_GameEnvironmentServer = null;
             Current = null;
         }
 
@@ -98,6 +105,8 @@ namespace Coop.Mod
             SyncedObjectStore.AddConnection(connection);
             connection.OnClientJoined += Persistence.ClientJoined;
             connection.OnDisconnected += Persistence.Disconnected;
+            connection.OnServerSendingWorldData += m_GameEnvironmentServer.LockTimeControlStopped;
+            connection.OnServerSendedWorldData += m_GameEnvironmentServer.UnlockTimeControl;
         }
 
         private void OnClientDisconnected(ConnectionServer connection, EDisconnectReason eReason)

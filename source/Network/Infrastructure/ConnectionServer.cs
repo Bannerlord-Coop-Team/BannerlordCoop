@@ -59,6 +59,8 @@ namespace Network.Infrastructure
         public override EConnectionState State => m_StateMachine.State;
         public event Action<ConnectionServer> OnClientJoined;
         public event Action<ConnectionServer> OnDisconnected;
+        public event Action OnServerSendingWorldData;
+        public event Action OnServerSendedWorldData;
 
         ~ConnectionServer()
         {
@@ -160,7 +162,9 @@ namespace Network.Infrastructure
 
         private void SendInitialWorldData()
         {
+            OnServerSendingWorldData?.Invoke();
             Send(new Packet(EPacket.Server_WorldData, m_WorldData.SerializeInitialWorldState()));
+            OnServerSendedWorldData?.Invoke();
         }
 
         [PacketHandler(EConnectionState.ServerJoining, EPacket.Client_Joined)]
