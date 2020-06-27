@@ -44,18 +44,21 @@ namespace Coop.NetImpl.LiteNet
             Connect(m_Peer.EndPoint.Address, m_Peer.EndPoint.Port);
         }
 
-        public void Connect(IPAddress address, int iPort)
+        public string Connect(IPAddress address, int iPort)
         {
+            string result = null;
+
             IPEndPoint toConnectTo = new IPEndPoint(address, iPort);
             if (Connected)
             {
                 if (m_Peer.EndPoint.Equals(toConnectTo))
                 {
-                    Logger.Debug("Client is already connected to the endpoint. Ignoring request.");
-                    return;
+                    string msg = "Client is already connected to the endpoint. Ignoring request.";
+                    Logger.Debug(msg);
+                    return msg;
                 }
 
-                Logger.Debug("Switching servers.");
+                Logger.Debug(result = "Switching servers.");
                 Disconnect(EDisconnectReason.ClientJoinedAnotherServer);
             }
 
@@ -74,6 +77,8 @@ namespace Coop.NetImpl.LiteNet
                 throw new NetworkConnectionFailedException(
                     $"Could not connect to {address}:{iPort}.");
             }
+
+            return result;
         }
 
         public void Disconnect(EDisconnectReason eReason)

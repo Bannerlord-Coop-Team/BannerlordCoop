@@ -4,6 +4,7 @@ using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
 using Sync.Store;
+using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod
 {
@@ -33,8 +34,15 @@ namespace Coop.Mod
 
         public Server Current { get; private set; }
 
-        public void StartServer()
+        public string StartServer()
         {
+            if (Campaign.Current == null)
+            {
+                string msg = "Campaign is not loaded. Could not start server.";
+                Logger.Debug(msg);
+                return msg;
+            }
+
             if (Current == null)
             {
                 Server.EType eServerType = Server.EType.Threaded;
@@ -61,6 +69,8 @@ namespace Coop.Mod
                 m_NetManager.StartListening();
                 Logger.Debug("Setup network connection for server.");
             }
+
+            return null;
         }
 
         public void ShutDownServer()

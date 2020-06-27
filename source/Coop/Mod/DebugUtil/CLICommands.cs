@@ -37,10 +37,13 @@ namespace Coop.Mod.DebugUtil
         [CommandLineFunctionality.CommandLineArgumentFunction("start_local_server", sGroupName)]
         public static string StartServer(List<string> parameters)
         {
-            CoopServer.Instance.StartServer();
-            ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
-            CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
-            return CoopServer.Instance.ToString();
+            if (CoopServer.Instance.StartServer() == null)
+            {
+                ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
+                CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
+                return CoopServer.Instance.ToString();
+            }
+            return null;
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("connect_to", sGroupName)]
@@ -57,6 +60,13 @@ namespace Coop.Mod.DebugUtil
 
             CoopClient.Instance.Connect(ip, iPort);
             return "Client connection request sent.";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("disconnect", sGroupName)]
+        public static string Disconnect(List<string> parameters)
+        {
+            CoopClient.Instance.Disconnect();
+            return "Client disconnection request sent.";
         }
     }
 }
