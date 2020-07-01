@@ -22,6 +22,11 @@ namespace Sync.Store
         private readonly Dictionary<ConnectionBase, RemoteStore> m_Stores =
             new Dictionary<ConnectionBase, RemoteStore>();
 
+        /// <summary>
+        ///     Triggered when an object has been distributed to all clients.
+        /// </summary>
+        public Action<ObjectId> OnObjectDistributed;
+
         public ObjectId Insert(object obj)
         {
             byte[] raw = StoreSerializer.Serialize(obj);
@@ -29,6 +34,7 @@ namespace Sync.Store
             m_Data[id] = obj;
             Logger.Trace("Insert {id}: {object}", id, obj);
 
+            m_PendingAcks[id] = new PendingResponse(null, m_Stores.Values.ToList());
             foreach (RemoteStore store in m_Stores.Values)
             {
                 store.SendAdd(id, raw);
@@ -82,8 +88,9 @@ namespace Sync.Store
             pending.OnAckFrom(m_Stores[sender]);
             if (pending.AllDone())
             {
-                pending.Origin.SendACK(id);
+                pending.Origin?.SendACK(id);
                 m_PendingAcks.Remove(id);
+                OnObjectDistributed?.Invoke(id);
             }
         }
 
@@ -125,14 +132,14 @@ namespace Sync.Store
             private readonly List<RemoteStore> m_Pending;
 
             public PendingResponse(
-                [NotNull] RemoteStore origin,
+                [CanBeNull] RemoteStore origin,
                 [NotNull] List<RemoteStore> storesToWaitFor)
             {
                 Origin = origin;
                 m_Pending = storesToWaitFor;
             }
 
-            public RemoteStore Origin { get; }
+            [CanBeNull] public RemoteStore Origin { get; }
 
             public void OnAckFrom(RemoteStore store)
             {

@@ -107,6 +107,36 @@ namespace Coop.Tests.Sync
         }
 
         [Fact]
+        private void OnDistributedIsInvoked()
+        {
+            string message = "Hello World";
+            Init(2);
+
+            RemoteStore client0 = m_StoresClient[0];
+            RemoteStore client1 = m_StoresClient[1];
+
+            ObjectId id = client0.Insert(message);
+
+            ObjectId? handlerArgument = null;
+            m_StoreServer.OnObjectDistributed += objectId => { handlerArgument = objectId; };
+
+            // Client0 Add -> Server
+            ExecuteSendsClients();
+            Assert.False(handlerArgument.HasValue);
+
+            // Server Add -> Client1
+            ExecuteSendsServer();
+            Assert.False(handlerArgument.HasValue);
+
+            // Client1 ACK -> Server
+            ExecuteSendsClients();
+            Assert.True(handlerArgument.HasValue);
+
+            // Server ACK -> Client 0
+            ExecuteSendsServer();
+        }
+
+        [Fact]
         private void ServerAckIsDelayedWithMultipleClients()
         {
             string message = "Hello World";
