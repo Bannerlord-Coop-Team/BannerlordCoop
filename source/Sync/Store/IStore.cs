@@ -10,6 +10,11 @@ namespace Sync.Store
         {
             Value = id;
         }
+
+        public override string ToString()
+        {
+            return $"Object {Value}";
+        }
     }
 
     public interface IStore

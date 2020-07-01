@@ -1,8 +1,10 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
 using NLog;
 using Sync;
+using Sync.Store;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod
@@ -32,11 +34,16 @@ namespace Coop.Mod
             return Campaign.Current;
         }
 
+        public SharedRemoteStore Store =>
+            CoopServer.Instance.SyncedObjectStore ??
+            throw new InvalidOperationException("Client not initialized.");
+
         public void LockTimeControlStopped()
         {
             Campaign.Current.TimeControlMode = CampaignTimeControlMode.Stop;
             Campaign.Current.SetTimeControlModeLock(true);
         }
+
         public void UnlockTimeControl()
         {
             Campaign.Current.SetTimeControlModeLock(false);

@@ -3,6 +3,7 @@ using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
 using Sync;
+using Sync.Store;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod
@@ -14,8 +15,12 @@ namespace Coop.Mod
 
         public FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode =>
             TimeControl.TimeControlMode;
-        public FieldAccess<Campaign, bool> TimeControlModeLock =>
-            TimeControl.TimeControlModeLock;
+
+        public FieldAccess<Campaign, bool> TimeControlModeLock => TimeControl.TimeControlModeLock;
+
+        public RemoteStore Store =>
+            CoopClient.Instance.SyncedObjectStore ??
+            throw new InvalidOperationException("Client not initialized.");
 
         #region Game state access
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)
