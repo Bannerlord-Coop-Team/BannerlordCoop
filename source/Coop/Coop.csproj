@@ -267,6 +267,7 @@
     <Compile Include="Mod\Persistence\Registry.cs" />
     <Compile Include="Mod\Persistence\RPC\Argument.cs" />
     <Compile Include="Mod\Persistence\RPC\ArgumentFactory.cs" />
+    <Compile Include="Mod\Persistence\RPC\EventBroadcastingQueue.cs"/>
     <Compile Include="Mod\Persistence\RPC\MethodCall.cs" />
     <Compile Include="Mod\Persistence\RPC\MethodCallSerializer.cs" />
     <Compile Include="Mod\Persistence\RPC\ArgumentSerializer.cs" />

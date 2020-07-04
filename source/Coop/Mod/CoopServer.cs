@@ -1,6 +1,5 @@
 ﻿using System;
-using System.Linq;
-using Coop.Mod.Persistence.World;
+using Coop.Mod.Persistence;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
@@ -17,9 +16,9 @@ namespace Coop.Mod
         private static readonly Lazy<CoopServer> m_Instance =
             new Lazy<CoopServer>(() => new CoopServer());
 
-        private LiteNetManagerServer m_NetManager;
-
         private GameEnvironmentServer m_GameEnvironmentServer;
+
+        private LiteNetManagerServer m_NetManager;
 
         private CoopServer()
         {
@@ -54,7 +53,10 @@ namespace Coop.Mod
 
                 SyncedObjectStore = new SharedRemoteStore();
                 m_GameEnvironmentServer = new GameEnvironmentServer();
-                Persistence = new CoopServerRail(Current, m_GameEnvironmentServer);
+                Persistence = new CoopServerRail(
+                    Current,
+                    SyncedObjectStore,
+                    Registry.Server(m_GameEnvironmentServer));
 
                 Current.Updateables.Add(Persistence);
                 Current.OnClientConnected += OnClientConnected;

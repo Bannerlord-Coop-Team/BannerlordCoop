@@ -3,6 +3,7 @@ using JetBrains.Annotations;
 using Network.Protocol;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
+using Sync.Store;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.RPC
@@ -27,7 +28,8 @@ namespace Coop.Mod.Persistence.RPC
         Null,
         EntityReference,
         MBGUID,
-        Int
+        Int,
+        StoreObjectId
     }
 
     public struct Argument
@@ -42,6 +44,7 @@ namespace Coop.Mod.Persistence.RPC
         public MBGUID? MbGUID { get; }
 
         public int? Int { get; }
+        public ObjectId? StoreObjectId { get; }
 
         public Argument(int i) : this()
         {
@@ -70,6 +73,12 @@ namespace Coop.Mod.Persistence.RPC
             MbGUID = guid;
         }
 
+        public Argument(ObjectId id) : this()
+        {
+            EventType = EventArgType.StoreObjectId;
+            StoreObjectId = id;
+        }
+
         public override string ToString()
         {
             switch (EventType)
@@ -82,6 +91,8 @@ namespace Coop.Mod.Persistence.RPC
                     return $"MBGUID {MbGUID}";
                 case EventArgType.Int:
                     return Int.ToString();
+                case EventArgType.StoreObjectId:
+                    return $"{StoreObjectId.ToString()}";
                 default:
                     throw new ArgumentOutOfRangeException();
             }

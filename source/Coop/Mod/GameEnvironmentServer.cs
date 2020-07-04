@@ -2,6 +2,7 @@
 using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
+using Coop.Mod.Persistence.RPC;
 using NLog;
 using Sync;
 using Sync.Store;
@@ -17,6 +18,8 @@ namespace Coop.Mod
             CampaignMapMovement.Movement;
 
         public bool CanChangeTimeControlMode => CoopServer.Instance.Current.AreAllClientsPlaying;
+
+        public EventBroadcastingQueue EventQueue => CoopServer.Instance.Persistence?.EventQueue;
 
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)
         {
