@@ -13,10 +13,10 @@ using System.Collections;
 namespace Coop.Mod.Serializers
 {
     [Serializable]
-    class CharacterObjectSerializer : CustomSerializer
+    public class CharacterObjectSerializer : CustomSerializer
     {
         //XmlDocument document;
-        HeroSerializer heroSerializer;
+        PlayerHeroSerializer heroSerializer;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
@@ -25,7 +25,7 @@ namespace Coop.Mod.Serializers
 
         public CharacterObjectSerializer() { }
 
-        public CharacterObjectSerializer(CharacterObject characterObject, HeroSerializer hero) : base(characterObject)
+        public CharacterObjectSerializer(CharacterObject characterObject, PlayerHeroSerializer hero) : base(characterObject)
         {
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {

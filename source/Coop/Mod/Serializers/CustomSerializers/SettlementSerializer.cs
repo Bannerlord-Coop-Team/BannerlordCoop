@@ -9,12 +9,21 @@ namespace Coop.Mod.Serializers
         private string settlementId;
         public SettlementSerializer(Settlement settlement)
         {
-            settlementId = settlement.StringId;
+            if(settlement != null)
+            {
+                settlementId = settlement.StringId;
+            }
+            
         }
 
         public object Deserialize()
         {
-            return Settlement.Find(settlementId);
+            if(settlementId != null)
+            {
+                return Settlement.Find(settlementId);
+            }
+
+            return null;
         }
     }
 }

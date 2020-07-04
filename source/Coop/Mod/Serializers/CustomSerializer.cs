@@ -52,9 +52,23 @@ namespace Coop.Mod.Serializers
 
         public abstract object Deserialize();
 
+        protected virtual object Deserialize(object newObj)
+        {
+            foreach (FieldInfo field in SerializableObjects.Keys)
+            {
+                field.SetValue(newObj, SerializableObjects[field]);
+            }
+            return newObj;
+        }
+
         protected FieldInfo[] GetFields()
         {
             return ObjectType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        }
+
+        protected PropertyInfo[] GetProperties()
+        {
+            return ObjectType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         }
     }
 }

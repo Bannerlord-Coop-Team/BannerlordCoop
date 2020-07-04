@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using Coop.Mod.DebugUtil;
+using Coop.Mod.Serializers;
 using SandBox;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.SaveSystem.Load;
 
@@ -20,6 +22,8 @@ namespace Coop.Mod.Managers
         {
             base.OnLoadFinished();
             CLICommands.StartServer(new List<string>());
+            PlayerHeroSerializer heroSerializer = new PlayerHeroSerializer(Hero.MainHero);
+            Hero hero = (Hero)heroSerializer.Deserialize();
         }
     }
 }

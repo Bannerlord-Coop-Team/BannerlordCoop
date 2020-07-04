@@ -20,7 +20,7 @@ namespace Coop.Mod.Serializers
         public object Deserialize()
         {
             return new Hero.HeroLastSeenInformation
-            {
+            { 
                 LastSeenPlace = (Settlement)lastSeenPlace.Deserialize(),
                 LastSeenDate = (CampaignTime)lastSeenDate.Deserialize(),
                 IsNearbySettlement = isSettlementNearby,

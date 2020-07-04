@@ -37,7 +37,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\x64\Debug\</OutputPath>
+    <OutputPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Coop\bin\Win64_Shipping_Client\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <DebugType>full</DebugType>
@@ -295,19 +295,30 @@
     <Compile Include="Mod\Behaviour\GameLoadedBehaviour.cs" />
     <Compile Include="Mod\GameEnvironmentServer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\BannerSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\BasicTroopSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CampaignTimeSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CharacterObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ClanSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CultureObjectSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\DeterministicRandomSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\HeroDeveloperSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\HeroLastSeenInformationSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\HeroSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\ItemRosterSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\MobilePartiesAroundPositionListSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\NavigationPathSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\PartyBaseSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\PathFaceRecordSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\SettlementSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\TroopRosterSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterFeatsSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterPerksSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterSkillsSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterTraitsSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\EquipmentElementSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\EquipmentSerialzer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\HeroSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\PlayerHeroSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MobilePartySerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\PartySerializer.cs" />
     <Compile Include="Mod\Serializers\MBSerializer.cs" />
@@ -361,7 +372,8 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll</PostBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

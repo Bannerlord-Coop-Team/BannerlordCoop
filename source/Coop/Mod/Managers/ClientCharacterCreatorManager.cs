@@ -57,7 +57,7 @@ namespace Coop.Mod.Managers
                 // Pop game state
                 Game.Current.GameStateManager.PopState(0);
 
-                HeroSerializer hero = new HeroSerializer(ClientHero);
+                PlayerHeroSerializer hero = new PlayerHeroSerializer(ClientHero);
 
                 // TODO use HeroCreator.CreateNewHero
                 // TODO Populate using CharacterCreator

@@ -8,15 +8,15 @@ namespace Coop.Mod.Serializers
     [Serializable]
     internal class CultureObjectSerializer : ICustomSerializer
     {
-        private string cultureId;
+        MBGUID cultureId;
         public CultureObjectSerializer(CultureObject culture)
         {
-            cultureId = culture.StringId;
+            cultureId = culture.Id;
         }
 
         public object Deserialize()
         {
-            return MBObjectManager.Instance.GetObject(new MBGUID(uint.Parse(cultureId));
+            return MBObjectManager.Instance.GetObject(cultureId);
         }
     }
 }

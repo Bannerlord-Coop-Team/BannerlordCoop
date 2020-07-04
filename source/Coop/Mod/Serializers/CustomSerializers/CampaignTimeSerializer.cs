@@ -12,24 +12,32 @@ namespace Coop.Mod.Serializers
     public class CampaignTimeSerializer : ICustomSerializer
     {
         long numTicks;
-
+        bool numTicksExists;
         public CampaignTimeSerializer()
         {
         }
         public CampaignTimeSerializer(CampaignTime campaignTime)
         {
-            numTicks = (long)typeof(CampaignTime)
+            numTicksExists = campaignTime != null;
+            if (numTicksExists)
+            {
+                numTicks = (long)typeof(CampaignTime)
                 .GetField("_numTicks", BindingFlags.NonPublic | BindingFlags.Instance)
                 .GetValue(campaignTime);
+            }
         }
 
         public object Deserialize()
         {
-            ConstructorInfo ctorCampaignTime = typeof(CampaignTime).Assembly
-                .GetType("TaleWorlds.CampaignSystem.CampaignTime")
-                .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)[0];
+            if (numTicksExists)
+            {
+                ConstructorInfo ctorCampaignTime = typeof(CampaignTime).Assembly
+                    .GetType("TaleWorlds.CampaignSystem.CampaignTime")
+                    .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)[0];
 
-            return (CampaignTime)ctorCampaignTime.Invoke(new object[] { numTicks });
+                return (CampaignTime)ctorCampaignTime.Invoke(new object[] { numTicks });
+            }
+            return null;
         }
     }
 }
