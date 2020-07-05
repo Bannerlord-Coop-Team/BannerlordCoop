@@ -6,7 +6,7 @@ using Network;
 using Network.Infrastructure;
 using Network.Protocol;
 
-namespace Coop.Multiplayer.Network
+namespace Coop.NetImpl.LiteNet
 {
     public class LiteNetManagerServer : IUpdateable
     {
@@ -66,9 +66,7 @@ namespace Coop.Multiplayer.Network
             if (m_SinceLastKeepAlive > m_Config.KeepAliveInterval)
             {
                 m_Server.SendToAll(
-                    new Packet(
-                        EPacket.KeepAlive,
-                        new KeepAlive(++m_iKeepAliveID).Serialize()));
+                    new Packet(EPacket.KeepAlive, new KeepAlive(++m_iKeepAliveID).Serialize()));
                 m_SinceLastKeepAlive = TimeSpan.Zero;
             }
         }

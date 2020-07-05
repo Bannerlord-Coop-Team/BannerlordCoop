@@ -1,17 +1,20 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common;
+using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.UI;
+using Coop.Mod.Patch;
+
 using HarmonyLib;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
-using NoHarmony;
 using Sync;
+using TaleWorlds.Library;
 using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Core;
@@ -39,7 +42,7 @@ namespace Coop.Mod
 
         public Main()
         {
-            TaleWorlds.Library.Debug.DebugManager = Debugging.DebugManager;
+            Debug.DebugManager = Debugging.DebugManager;
             MBDebug.DisableLogging = false;
 
             Instance = this;
@@ -62,14 +65,22 @@ namespace Coop.Mod
             AddBehavior<GameLoadedBehaviour>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
-            IEnumerable<Type> patches =
+            IEnumerable<MethodInfo> patchInitializers =
                 from t in Assembly.GetExecutingAssembly().GetTypes()
-                where t.IsDefined(typeof(PatchAttribute))
-                select t;
-            foreach (Type patch in patches)
+                from m in t.GetMethods()
+                where m.IsDefined(typeof(PatchInitializerAttribute))
+                select m;
+            foreach (MethodInfo initializer in patchInitializers)
             {
-                FieldWatcher.ApplyFieldWatcherPatches(harmony, patch);
+                if (!initializer.IsStatic)
+                {
+                    throw new Exception("Invalid [PatchInitializer]. Has to be static.");
+                }
+
+                initializer.Invoke(null, null);
             }
+
+            harmony.PatchAll();
 
             if (DEBUG)
             {
@@ -150,7 +161,7 @@ namespace Coop.Mod
 
             // NLog
             Target.Register<MbLogTarget>("MbLog");
-            Common.Logging.Init(
+            Mod.Logging.Init(
                 new Target[]
                 {
                     new MbLogTarget
@@ -167,3 +178,4 @@ namespace Coop.Mod
         }
     }
 }
+

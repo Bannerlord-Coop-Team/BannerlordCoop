@@ -1,6 +1,9 @@
 # Bannerlord Coop
 Mod to enjoy the Mount & Blade II: Bannerlord campaign with other players.
 
+## Mod Discord
+https://discord.gg/ngC4RVb
+
 ## Current state
 Very early in development. There's is absolutely no gameplay so far. [Video created on commit d86c24c](https://youtu.be/Y_htoMXQGqU).
 
@@ -37,7 +40,7 @@ The game is now running a local coop server and is connected to it with a local 
 Only works in LAN, never tested it in WAN.
 
 ## Contributing
-If anyone is interested in contributing to this project, please feel free to open an issue and request additional documentation & information. Until then i'm treating this as a personal project and will not actively communicate any issues, TODOs or design decisions.
+If anyone is interested in contributing to this project, please feel free to open an issue and request additional documentation & information.
 
 ## Acknowledgments
 - Zetrith for [Multiplayer](https://github.com/Zetrith/Multiplayer).

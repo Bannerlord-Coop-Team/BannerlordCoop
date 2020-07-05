@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using Microsoft.VisualStudio.TestPlatform.ObjectModel.Client;
 using Moq;
 using Network.Infrastructure;
 using Network.Protocol;
 using Xunit;
-using Version = System.Version;
+using Version = Network.Protocol.Version;
 
-namespace Coop.Tests
+namespace Coop.Tests.Network
 {
     public class ConnectionServer_Test
     {
@@ -17,10 +16,10 @@ namespace Coop.Tests
         private readonly Mock<INetworkConnection> m_NetworkConnection =
             TestUtils.CreateMockConnection();
 
+        private readonly List<ArraySegment<byte>> m_SendRawParams = new List<ArraySegment<byte>>();
+
         private readonly Mock<ISaveData> m_WorldData = TestUtils.CreateMockSaveData();
         private ArraySegment<byte> m_PersistenceReceiveParam;
-
-        private readonly List<ArraySegment<byte>> m_SendRawParams = new List<ArraySegment<byte>>();
 
         public ConnectionServer_Test()
         {
@@ -52,7 +51,7 @@ namespace Coop.Tests
             // Send client hello
             ArraySegment<byte> clientHello = TestUtils.MakeRaw(
                 EPacket.Client_Hello,
-                new Client_Hello(Network.Protocol.Version.Number).Serialize());
+                new Client_Hello(Version.Number).Serialize());
             m_Connection.Receive(clientHello);
 
             // Expect server request client info

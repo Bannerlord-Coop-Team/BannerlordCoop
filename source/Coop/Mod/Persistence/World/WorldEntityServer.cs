@@ -18,14 +18,16 @@ namespace Coop.Mod.Persistence.World
         }
 
         [CanBeNull] public CampaignTimeControlMode? RequestedTimeControlMode { get; set; }
+        [CanBeNull] public bool? RequestedTimeControlModeLock { get; set; }
 
         protected override void UpdateAuthoritative()
         {
-            if (RequestedTimeControlMode.HasValue && m_Environment.CanChangeTimeControlMode)
+            if ((RequestedTimeControlMode.HasValue || RequestedTimeControlModeLock.HasValue) && m_Environment.CanChangeTimeControlMode)
             {
                 Logger.Trace("Changing time control to {request}.", RequestedTimeControlMode.Value);
-                State.TimeControlMode = RequestedTimeControlMode.Value;
+                State.TimeControlMode = (RequestedTimeControlMode.Value , RequestedTimeControlModeLock.Value);
                 RequestedTimeControlMode = null;
+                RequestedTimeControlModeLock = null;
             }
         }
 

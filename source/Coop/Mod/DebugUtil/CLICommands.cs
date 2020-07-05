@@ -39,15 +39,14 @@ namespace Coop.Mod.DebugUtil
         [CommandLineFunctionality.CommandLineArgumentFunction("start_local_server", sGroupName)]
         public static string StartServer(List<string> parameters)
         {
-            if (Main.DEBUG && !IsGameLoaded())
+            if (Main.DEBUG && CoopServer.Instance.StartServer() == null)
             {
                 CoopServer.Instance.StartGame(Main.LOAD_GAME);
+                ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
+                CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
+                return CoopServer.Instance.ToString();
             }
-            
-            CoopServer.Instance.StartServer();
-            ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
-            CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
-            return CoopServer.Instance.ToString();
+            return null;
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("connect_to", sGroupName)]
@@ -66,9 +65,11 @@ namespace Coop.Mod.DebugUtil
             return "Client connection request sent.";
         }
 
-        private static bool IsGameLoaded()
+        [CommandLineFunctionality.CommandLineArgumentFunction("disconnect", sGroupName)]
+        public static string Disconnect(List<string> parameters)
         {
-            return Campaign.Current != null;
+            CoopClient.Instance.Disconnect();
+            return "Client disconnection request sent.";
         }
     }
 }

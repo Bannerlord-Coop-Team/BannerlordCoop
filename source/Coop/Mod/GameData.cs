@@ -24,6 +24,11 @@ namespace Coop.Mod
 
         public bool Receive(ArraySegment<byte> rawData)
         {
+            if (rawData.Count == 0)
+            {
+                throw new Exception("Payload is empty.");
+            }
+
             ByteReader reader = new ByteReader(rawData);
             ECommand eData = (ECommand) reader.Binary.ReadInt32();
             switch (eData)

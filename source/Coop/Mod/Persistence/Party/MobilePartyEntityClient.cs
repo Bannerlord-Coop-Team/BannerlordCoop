@@ -44,34 +44,33 @@ namespace Coop.Mod.Persistence.Party
 
         private void UpdateLocalMovement()
         {
+            if (State.PartyId == MobilePartyState.InvalidPartyId)
+            {
+                throw new Exception("Invalid party id!");
+            }
+
             MobileParty party = m_Environment.GetMobilePartyByIndex(State.PartyId);
             if (party == null) return;
+            MovementData data = new MovementData
+            {
+                DefaultBehaviour = State.Movement.DefaultBehavior,
+                TargetPosition = State.Movement.Position,
+                TargetParty = State.Movement.TargetPartyIndex != MovementState.InvalidIndex ?
+                    MBObjectManager.Instance.GetObject(State.Movement.TargetPartyIndex) as
+                        MobileParty :
+                    null,
+                TargetSettlement = State.Movement.SettlementIndex != MovementState.InvalidIndex ?
+                    MBObjectManager.Instance.GetObject(
+                        State.Movement.SettlementIndex) as Settlement :
+                    null
+            };
             Logger.Trace(
-                "[{tick}] Received move entity {id} ('{party}') to '{position}'.",
+                "[{tick}] Received move entity {id} ({party}) to {position}.",
                 Room.Tick,
                 Id,
                 party,
-                State.Movement);
-            m_Environment.TargetPosition.SetTyped(
-                party,
-                new MovementData
-                {
-                    DefaultBehaviour = State.Movement.DefaultBehavior,
-                    TargetPosition = State.Movement.Position,
-                    TargetParty =
-                        State.Movement.TargetPartyIndex !=
-                        MovementState.InvalidIndex ?
-                            MBObjectManager.Instance.GetObject(
-                                    State.Movement.TargetPartyIndex) as
-                                MobileParty :
-                            null,
-                    TargetSettlement =
-                        State.Movement.SettlementIndex != MovementState.InvalidIndex ?
-                            MBObjectManager.Instance.GetObject(
-                                    State.Movement.SettlementIndex) as
-                                Settlement :
-                            null
-                });
+                data);
+            m_Environment.TargetPosition.SetTyped(party, data);
         }
 
         protected override void OnControllerChanged()
@@ -105,8 +104,8 @@ namespace Coop.Mod.Persistence.Party
                 {
                     throw new Exception($"Mobile party id {State.PartyId} not found.");
                 }
-                
-                m_Environment.TargetPosition.SetSyncHandler(m_Instance, GoToPosition);
+
+                m_Environment.TargetPosition.SetHandler(m_Instance, GoToPosition);
             }
         }
 
@@ -114,7 +113,7 @@ namespace Coop.Mod.Persistence.Party
         {
             if (m_Instance != null)
             {
-                m_Environment.TargetPosition.RemoveSyncHandler(m_Instance);
+                m_Environment.TargetPosition.RemoveHandler(m_Instance);
                 m_Instance = null;
             }
         }

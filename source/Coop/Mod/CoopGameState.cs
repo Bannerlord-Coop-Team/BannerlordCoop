@@ -13,6 +13,8 @@ namespace Coop.Mod
             m_PlayerParties = new HashSet<MobileParty>();
         }
 
+        public bool IsGameLoaded => Campaign.Current != null;
+
         public void AddPlayerControllerParty(MobileParty party)
         {
             if (party == null)

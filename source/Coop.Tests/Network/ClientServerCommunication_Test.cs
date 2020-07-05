@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using Common;
-using Coop.Multiplayer.Network;
+using Coop.NetImpl.LiteNet;
 using Moq;
 using Network.Infrastructure;
 using Network.Protocol;
 using Xunit;
 
-namespace Coop.Tests
+namespace Coop.Tests.Network
 {
     public class ClientServerCommunication_Test
     {
@@ -137,8 +137,7 @@ namespace Coop.Tests
             }
 
             // SendSync a sync package from client to server
-            expectedReceiveOrderOnServer.Add(
-                (EConnectionState.ServerPlaying, EPacket.Sync));
+            expectedReceiveOrderOnServer.Add((EConnectionState.ServerPlaying, EPacket.Sync));
             client.Session.Connection.Send(new Packet(EPacket.Sync, new byte[] { }));
             TestUtils.UpdateUntil(
                 () => iPacketsReceived == expectedReceiveOrderOnServer.Count,

@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
 using Sync;
@@ -8,11 +9,13 @@ namespace Coop.Mod
 {
     internal class GameEnvironmentClient : IEnvironmentClient
     {
-        public SyncFieldGroup<MobileParty, MovementData> TargetPosition =>
+        public FieldAccessGroup<MobileParty, MovementData> TargetPosition =>
             CampaignMapMovement.Movement;
 
-        public SyncField<Campaign, CampaignTimeControlMode> TimeControlMode =>
+        public FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode =>
             TimeControl.TimeControlMode;
+        public FieldAccess<Campaign, bool> TimeControlModeLock =>
+            TimeControl.TimeControlModeLock;
 
         #region Game state access
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)

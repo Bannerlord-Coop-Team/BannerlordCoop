@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Common;
+using JetBrains.Annotations;
 using Network.Protocol;
 using NLog;
 using Stateless;
@@ -26,9 +27,10 @@ namespace Network.Infrastructure
         public EState State => m_State.State;
 
         public bool AreAllClientsPlaying =>
-            m_ActiveConnections.All(con => con.State == EConnectionState.ServerPlaying);
+            ActiveConnections.All(con => con.State == EConnectionState.ServerPlaying);
 
         public event Action<ConnectionServer> OnClientConnected;
+        public event Action<ConnectionServer, EDisconnectReason> OnClientDisconnected;
 
         public void Start(ServerConfiguration config)
         {
@@ -51,7 +53,7 @@ namespace Network.Infrastructure
 
         public void SendToAll(Packet packet)
         {
-            foreach (ConnectionServer conn in m_ActiveConnections)
+            foreach (ConnectionServer conn in ActiveConnections)
             {
                 conn.Send(packet);
             }
@@ -61,15 +63,15 @@ namespace Network.Infrastructure
         {
             string sDump = string.Join(
                 Environment.NewLine,
-                $"Server is '{State.ToString()}' with '{m_ActiveConnections.Count}/{ActiveConfig.MaxPlayerCount}' players.",
+                $"Server is '{State.ToString()}' with '{ActiveConnections.Count}/{ActiveConfig.MaxPlayerCount}' players.",
                 $"LAN:   {ActiveConfig.LanAddress}:{ActiveConfig.LanPort}",
                 $"WAN:   {ActiveConfig.WanAddress}:{ActiveConfig.WanPort}");
 
-            if (m_ActiveConnections.Count > 0)
+            if (ActiveConnections.Count > 0)
             {
                 sDump += Environment.NewLine + "Connections to clients:";
                 sDump += Environment.NewLine + "Ping " + "State                         Network";
-                foreach (ConnectionServer conn in m_ActiveConnections)
+                foreach (ConnectionServer conn in ActiveConnections)
                 {
                     sDump += Environment.NewLine + $"{conn}";
                 }
@@ -80,7 +82,7 @@ namespace Network.Infrastructure
 
         public virtual void Connected(ConnectionServer con)
         {
-            m_ActiveConnections.Add(con);
+            ActiveConnections.Add(con);
             OnClientConnected?.Invoke(con);
             Logger.Info("Connection established: {connection}.", con);
         }
@@ -89,16 +91,17 @@ namespace Network.Infrastructure
         {
             Logger.Info("Connection closed: {connection}. {reason}.", con, eReason);
             con.Disconnect(eReason);
-            if (!m_ActiveConnections.Remove(con))
+            if (!ActiveConnections.Remove(con))
             {
                 Logger.Error("Unknown connection: {connection}.", con);
             }
+
+            OnClientDisconnected?.Invoke(con, eReason);
         }
 
         public virtual bool CanPlayerJoin()
         {
-            return State == EState.Running &&
-                   m_ActiveConnections.Count < ActiveConfig.MaxPlayerCount;
+            return State == EState.Running && ActiveConnections.Count < ActiveConfig.MaxPlayerCount;
         }
 
         #region internals
@@ -116,13 +119,12 @@ namespace Network.Infrastructure
             Direct
         }
 
-        private readonly EType m_ServerType;
+        public EType ServerType { get; }
 
         public Server(EType eType)
         {
-            m_ServerType = eType;
+            ServerType = eType;
             Updateables = new UpdateableList();
-            m_ActiveConnections = new List<ConnectionServer>();
             m_State = new StateMachine<EState, ETrigger>(EState.Inactive);
 
             m_State.Configure(EState.Inactive).Permit(ETrigger.Start, EState.Starting);
@@ -149,7 +151,7 @@ namespace Network.Infrastructure
             Stop();
         }
 
-        private readonly List<ConnectionServer> m_ActiveConnections;
+        public List<ConnectionServer> ActiveConnections { get; } = new List<ConnectionServer>();
 
         private void Load(ServerConfiguration config)
         {
@@ -160,12 +162,12 @@ namespace Network.Infrastructure
         private void ShutDown()
         {
             ActiveConfig = null;
-            foreach (ConnectionServer conn in m_ActiveConnections)
+            foreach (ConnectionServer conn in ActiveConnections)
             {
                 conn.Disconnect(EDisconnectReason.ServerShutDown);
             }
 
-            m_ActiveConnections.Clear();
+            ActiveConnections.Clear();
             m_State.Fire(ETrigger.Stopped);
         }
 
@@ -173,10 +175,13 @@ namespace Network.Infrastructure
         private bool m_IsStopRequest;
         private readonly object m_StopRequestLock = new object();
         private Thread m_Thread;
+        [CanBeNull] private FrameLimiter m_FrameLimiter;
+
+        public TimeSpan AverageFrameTime => m_FrameLimiter?.AverageFrameTime ?? TimeSpan.Zero;
 
         private void StartMainLoop()
         {
-            if (m_ServerType == EType.Threaded)
+            if (ServerType == EType.Threaded)
             {
                 m_Thread = new Thread(Run);
                 lock (m_StopRequestLock)
@@ -190,20 +195,22 @@ namespace Network.Infrastructure
 
         private void Run()
         {
-            FrameLimiter frameLimiter = new FrameLimiter(
+            m_FrameLimiter = new FrameLimiter(
                 ActiveConfig.TickRate > 0 ?
                     TimeSpan.FromMilliseconds(1000 / (double) ActiveConfig.TickRate) :
                     TimeSpan.Zero);
             bool bRunning = true;
             while (bRunning)
             {
-                Update(frameLimiter.LastFrameTime);
-                frameLimiter.Throttle();
+                Update(m_FrameLimiter.LastFrameTime);
+                m_FrameLimiter.Throttle();
                 lock (m_StopRequestLock)
                 {
                     bRunning = !m_IsStopRequest;
                 }
             }
+
+            m_FrameLimiter = null;
         }
 
         private void StopMainLoop()

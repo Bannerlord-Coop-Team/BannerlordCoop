@@ -537,4 +537,7 @@ MigrationBackup/
 
 # End of https://www.gitignore.io/api/csharp,powershell,dotnetcore,visualstudio,visualstudiocode
 deploy/**
+mb2/**
 source/.editorconfig
+# Rider IDE
+source/.idea

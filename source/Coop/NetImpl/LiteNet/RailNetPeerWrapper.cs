@@ -4,7 +4,7 @@ using Network.Infrastructure;
 using Network.Protocol;
 using RailgunNet.Connection.Traffic;
 
-namespace Coop.Multiplayer.Network
+namespace Coop.NetImpl.LiteNet
 {
     public class RailNetPeerWrapper : IRailNetPeer, IGameStatePersistence
     {

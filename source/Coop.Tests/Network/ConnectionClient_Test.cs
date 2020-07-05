@@ -3,9 +3,9 @@ using Moq;
 using Network.Infrastructure;
 using Network.Protocol;
 using Xunit;
-using Version = System.Version;
+using Version = Network.Protocol.Version;
 
-namespace Coop.Tests
+namespace Coop.Tests.Network
 {
     public class ConnectionClient_Test
     {
@@ -53,7 +53,7 @@ namespace Coop.Tests
                 Times.Once);
             ArraySegment<byte> expectedSentData = TestUtils.MakeRaw(
                 EPacket.Client_Hello,
-                new Client_Hello(Network.Protocol.Version.Number).Serialize());
+                new Client_Hello(Version.Number).Serialize());
             Assert.Equal(expectedSentData, m_SendRawParam);
             Assert.Equal(EConnectionState.ClientJoinRequesting, m_Connection.State);
 
@@ -111,7 +111,7 @@ namespace Coop.Tests
         }
 
         [Fact]
-        private void ReceiveForPersistenceIsRelayed()
+        private void ReceiveForPersistenceIsIntercepted()
         {
             // Bring connection to EConnectionState.ClientPlaying
             VerifyStateTransitionsUntilConnected(false);

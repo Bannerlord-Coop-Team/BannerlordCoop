@@ -1,5 +1,5 @@
 {
-    "modsDir" : "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Mount & Blade II Bannerlord\\Modules",
+    "modsDir" : "mb2\\Modules",
     "name" : "Coop",
     "version" : "v0.0.1"
 }

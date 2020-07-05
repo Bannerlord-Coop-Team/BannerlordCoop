@@ -10,7 +10,8 @@ namespace Coop.Mod.Persistence.Party
     public class MobilePartyState : RailState
     {
         private MovementState m_Movement = new MovementState();
-        [Immutable] public int PartyId { get; set; }
+        public static int InvalidPartyId = -1;
+        [Immutable] public int PartyId { get; set; } = InvalidPartyId;
 
         [Mutable]
         public MovementState Movement
@@ -72,8 +73,8 @@ namespace Coop.Mod.Persistence.Party
         {
             buffer.WriteByte((byte) state.DefaultBehavior);
             CoordinateCompressor.Write(buffer, state.Position);
-            buffer.WriteUInt(state.TargetPartyIndex.InternalValue);
-            buffer.WriteUInt(state.SettlementIndex.InternalValue);
+            buffer.WriteMBGUID(state.TargetPartyIndex);
+            buffer.WriteMBGUID(state.SettlementIndex);
         }
 
         [Decoder]
@@ -83,8 +84,8 @@ namespace Coop.Mod.Persistence.Party
             {
                 DefaultBehavior = (AiBehavior) buffer.ReadByte(),
                 Position = CoordinateCompressor.Read(buffer),
-                TargetPartyIndex = new MBGUID(buffer.ReadUInt()),
-                SettlementIndex = new MBGUID(buffer.ReadUInt())
+                TargetPartyIndex = buffer.ReadMBGUID(),
+                SettlementIndex = buffer.ReadMBGUID()
             };
         }
     }

@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
 
@@ -18,10 +21,15 @@ namespace Sync.Reflection
             MemberInfo memberInfo)
         {
             Type instanceType = memberInfo.DeclaringType;
+            if (instanceType == null)
+            {
+                throw new ArgumentNullException(nameof(memberInfo.DeclaringType));
+            }
+
             ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
 
             // `TDeclaring` might be a base class or interface of `instanceType`.
-            MemberExpression memberAccess = null;
+            MemberExpression memberAccess;
             if (instanceType == typeof(TDeclaring))
             {
                 memberAccess = Expression.MakeMemberAccess(arg0, memberInfo);
@@ -49,9 +57,14 @@ namespace Sync.Reflection
             MemberInfo memberInfo)
         {
             Type instanceType = memberInfo.DeclaringType;
+            if (instanceType == null)
+            {
+                throw new ArgumentNullException(nameof(memberInfo.DeclaringType));
+            }
+
             ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
 
-            MemberExpression memberAccess = null;
+            MemberExpression memberAccess;
             // `TDeclaring` might be a base class or interface of `instanceType`.
             if (instanceType == typeof(TDeclaring))
             {
@@ -85,7 +98,7 @@ namespace Sync.Reflection
             Type instanceType = method.DeclaringType;
             ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
 
-            MethodCallExpression exCall = null;
+            MethodCallExpression exCall;
             // `TDeclaring` might be a base class or interface of `instanceType`.
             if (instanceType == typeof(TDeclaring))
             {
@@ -110,22 +123,23 @@ namespace Sync.Reflection
         }
 
         /// <summary>
-        ///     Returns a member method call of the form `void Method(TDeclaring, object)`.
+        ///     Returns a member method call of the form `void Method(TDeclaring, TParam)`.
         /// </summary>
         /// <typeparam name="TDeclaring">Type of the instance containing the member.</typeparam>
+        /// <typeparam name="TParam">Type of the parameter for the call.</typeparam>
         /// <param name="method"></param>
         /// <returns></returns>
-        public static Action<TDeclaring, object> CreateCall<TDeclaring>(MethodInfo method)
+        public static Action<TDeclaring, TParam> CreateCall<TDeclaring, TParam>(MethodInfo method)
         {
             Type instanceType = method.DeclaringType;
             ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
-            ParameterExpression arg1 = Expression.Parameter(typeof(object), "arg1");
+            ParameterExpression arg1 = Expression.Parameter(typeof(TParam), "arg1");
 
             UnaryExpression exConvertToParam0 = Expression.Convert(
                 arg1,
                 method.GetParameters()[0].ParameterType);
 
-            MethodCallExpression exCall = null;
+            MethodCallExpression exCall;
             // `TDeclaring` might be a base class or interface of `instanceType`.
             if (instanceType == typeof(TDeclaring))
             {
@@ -145,8 +159,8 @@ namespace Sync.Reflection
                 exCall = Expression.Call(arg0Converted, method, exConvertToParam0);
             }
 
-            Expression<Action<TDeclaring, object>> lambda =
-                Expression.Lambda<Action<TDeclaring, object>>(exCall, arg0, arg1);
+            Expression<Action<TDeclaring, TParam>> lambda =
+                Expression.Lambda<Action<TDeclaring, TParam>>(exCall, arg0, arg1);
             return lambda.Compile();
         }
 
@@ -201,11 +215,101 @@ namespace Sync.Reflection
 
         public static Func<TValue> CreateGetter<TValue>(MemberInfo memberInfo, object instance)
         {
-            Type instanceType = memberInfo.DeclaringType;
             ConstantExpression exInstance = Expression.Constant(instance);
             MemberExpression exMemberAccess = Expression.MakeMemberAccess(exInstance, memberInfo);
             UnaryExpression body = Expression.Convert(exMemberAccess, typeof(TValue));
             return Expression.Lambda<Func<TValue>>(body).Compile();
+        }
+
+        public static Action<object, object[]> CreateStandInCaller(MethodInfo method)
+        {
+            ParameterInfo[] parameters = method.GetParameters();
+            ParameterExpression argInstance = Expression.Parameter(typeof(object), "instance");
+            UnaryExpression argInstanceConverted = Expression.Convert(
+                argInstance,
+                parameters[0].ParameterType);
+            ParameterExpression args = Expression.Parameter(typeof(object[]), "args");
+
+            // Unpack parameters
+            List<Expression> exArgs = new List<Expression>
+            {
+                argInstanceConverted
+            };
+            for (int i = 1; i < method.GetParameters().Length; ++i)
+            {
+                ParameterInfo param = method.GetParameters()[i];
+                BinaryExpression arrayElement = Expression.ArrayIndex(
+                    args,
+                    Expression.Constant(i - 1));
+                UnaryExpression arrayElementConverted =
+                    Expression.Convert(arrayElement, param.ParameterType);
+                exArgs.Add(arrayElementConverted);
+            }
+
+            // Standins are always static with the first argument being the instance.
+            MethodCallExpression exCall = Expression.Call(null, method, exArgs);
+
+            Expression<Action<object, object[]>> lambda =
+                Expression.Lambda<Action<object, object[]>>(exCall, argInstance, args);
+            return lambda.Compile();
+        }
+
+        public static Action<object[]> CreateStaticStandInCaller(MethodInfo method)
+        {
+            ParameterExpression args = Expression.Parameter(typeof(object[]), "args");
+
+            // Unpack parameters
+            List<Expression> exArgs = new List<Expression>();
+            for (int i = 0; i < method.GetParameters().Length; ++i)
+            {
+                ParameterInfo param = method.GetParameters()[i];
+                BinaryExpression arrayElement = Expression.ArrayIndex(args, Expression.Constant(i));
+                UnaryExpression arrayElementConverted =
+                    Expression.Convert(arrayElement, param.ParameterType);
+                exArgs.Add(arrayElementConverted);
+            }
+
+            // Standins are always static with the first argument being the instance.
+            MethodCallExpression exCall = Expression.Call(null, method, exArgs);
+
+            Expression<Action<object[]>> lambda = Expression.Lambda<Action<object[]>>(exCall, args);
+            return lambda.Compile();
+        }
+
+        public static DynamicMethod CreateStandIn(MethodAccess methodAccess)
+        {
+            List<Type> parameters = methodAccess.MemberInfo.GetParameters()
+                                                .Select(info => info.ParameterType)
+                                                .ToList();
+            if (!methodAccess.MemberInfo.IsStatic)
+            {
+                parameters.Insert(
+                    0,
+                    methodAccess.MemberInfo.DeclaringType); // First argument is the instance
+            }
+
+            DynamicMethod dyn = new DynamicMethod(
+                "Original",
+                MethodAttributes.Static | MethodAttributes.Public,
+                CallingConventions.Standard,
+                methodAccess.MemberInfo.ReturnType,
+                parameters.ToArray(),
+                methodAccess.MemberInfo.DeclaringType,
+                true);
+
+            // The standin as it is will never be called. But it still needs a body for the reverse patching.
+            ILGenerator il = dyn.GetILGenerator();
+            il.ThrowException(typeof(StandInNotPatchedException));
+
+            return dyn;
+        }
+    }
+
+    public class StandInNotPatchedException : Exception
+    {
+        public StandInNotPatchedException() : base(
+            "Dynamically generated stand in method was not patched by harmony.")
+        {
         }
     }
 }

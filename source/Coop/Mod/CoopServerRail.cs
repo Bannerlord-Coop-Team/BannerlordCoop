@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Common;
 using Coop.Mod.Persistence;
-using Coop.Multiplayer.Network;
+using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using RailgunNet.Connection.Server;
@@ -17,6 +17,10 @@ namespace Coop.Mod
             new Dictionary<ConnectionServer, RailNetPeerWrapper>();
 
         private readonly Server m_Server;
+        [NotNull] public RailServerRoom Room => m_Instance.Room;
+
+        [NotNull]
+        public IReadOnlyCollection<RailServerPeer> ConnectedClients => m_Instance.ConnectedClients;
 
         public CoopServerRail(Server server, IEnvironmentServer environment)
         {

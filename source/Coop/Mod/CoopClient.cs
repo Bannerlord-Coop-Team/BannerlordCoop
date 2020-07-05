@@ -1,20 +1,15 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using Common;
-using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
-using Coop.Multiplayer.Network;
+using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
 using RailgunNet.Logic;
-using StoryMode;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.MountAndBlade;
-using System.Threading.Tasks;
+using Sync.Store;
 
 namespace Coop.Mod
 {
@@ -27,8 +22,16 @@ namespace Coop.Mod
             new Lazy<CoopClient>(() => new CoopClient());
 
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
+
+        /// <summary>
+        ///     Internal data storage for <see cref="SyncedObjectStore" />.
+        /// </summary>
+        private readonly Dictionary<ObjectId, object> m_SyncedObjects =
+            new Dictionary<ObjectId, object>();
+
         private int m_ReconnectAttempts = MaxReconnectAttempts;
-        private ClientCharacterCreatorManager gameManager;
+
+        public Action<PersistenceClient> OnPersistenceInitialized;
 
         public CoopClient()
         {
@@ -37,8 +40,14 @@ namespace Coop.Mod
             m_NetManager = new LiteNetManagerClient(Session);
             GameState = new CoopGameState();
             Events = new CoopEvents();
-            Init();
+            Events.OnGameLoaded.AddNonSerializedListener(this, Init);
         }
+
+        /// <summary>
+        ///     Object store shared with the server if connected. Otherwise null.
+        /// </summary>
+        [CanBeNull]
+        public RemoteStore SyncedObjectStore { get; private set; }
 
         [CanBeNull] public PersistenceClient Persistence { get; private set; }
 
@@ -49,7 +58,7 @@ namespace Coop.Mod
         public CoopGameState GameState { get; }
         public CoopEvents Events { get; }
 
-        public bool ClientPlaying
+        public bool Connected
         {
             get
             {
@@ -58,22 +67,7 @@ namespace Coop.Mod
                     return false;
                 }
 
-                // TODO change to main menu state
                 return Session.Connection.State == EConnectionState.ClientPlaying;
-            }
-        }
-
-        public bool ClientRequestingWorldData
-        {
-            get
-            {
-                if (Session.Connection == null)
-                {
-                    return false;
-                }
-
-                // TODO change to main menu state
-                return Session.Connection.State == EConnectionState.ClientJoinRequesting;
             }
         }
 
@@ -83,9 +77,14 @@ namespace Coop.Mod
             Persistence?.Update(frameTime);
         }
 
-        public void Connect(IPAddress ip, int iPort)
+        public string Connect(IPAddress ip, int iPort)
         {
-            m_NetManager.Connect(ip, iPort);
+            return m_NetManager.Connect(ip, iPort);
+        }
+
+        public void Disconnect()
+        {
+            m_NetManager.Disconnect(EDisconnectReason.ClientLeft);
         }
 
         private void Init()
@@ -104,6 +103,7 @@ namespace Coop.Mod
             if (Persistence == null)
             {
                 Persistence = new PersistenceClient(new GameEnvironmentClient());
+                OnPersistenceInitialized?.Invoke(Persistence);
             }
 
             Persistence.SetConnection(con);
@@ -118,48 +118,15 @@ namespace Coop.Mod
 
             m_ReconnectAttempts = MaxReconnectAttempts;
             TryInitPersistence(con);
-
-            #region events
-            // Upward
-            Session.Connection.RequireCharacterCreation += CreateCharacter;
-            Session.Connection.OnCharacterCreated += CharacterCreated;
-
-            Session.Connection.OnClientLoaded += TryInitPersistence;
-            Session.Connection.OnDisconnected += ConnectionClosed;
-
-            // Downward
-            if(con.State == EConnectionState.ClientLoading)
-            {
-                ClientCharacterCreatorManager.OnLoadFinishedEvent += Session.Connection.sendGameLoaded;
-            }
-            #endregion
-
-        }
-
-        private void CreateCharacter(ConnectionClient con)
-        {
-            if (gameManager == null)
-            {
-                gameManager = new ClientCharacterCreatorManager();
-                MBGameManager.StartNewGame(gameManager);
-                ClientCharacterCreatorManager.OnLoadFinishedEvent += (object source, EventArgs e) =>
-                {
-                    StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, () =>
-                    {
-                        CharacterCreated(con);
-                    });
-                };
-            }
-        }
-
-        private void CharacterCreated(ConnectionClient con)
-        {
-            // Switch state
+            SyncedObjectStore = new RemoteStore(m_SyncedObjects, con);
+            con.OnClientJoined += TryInitPersistence;
+            con.OnDisconnected += ConnectionClosed;
         }
 
         private void ConnectionClosed(EDisconnectReason eReason)
         {
             Persistence?.SetConnection(null);
+            SyncedObjectStore = null;
         }
 
         private void ConnectionDestroyed(EDisconnectReason eReason)
@@ -211,3 +178,4 @@ namespace Coop.Mod
         }
     }
 }
+
