@@ -41,7 +41,7 @@ namespace Coop.Mod.Serializers
                 switch (fieldInfo.Name)
                 {
                     case "_characterObject":
-                        //SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value, this));
+                        SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value, this));
                         break;
                     case "<BattleEquipment>k__BackingField":
                         SNNSO.Add(fieldInfo, new EquipmentSerializer((Equipment)value));
@@ -77,7 +77,7 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_clan":
-                        //SNNSO.Add(fieldInfo, new ClanSerializer((Clan)value, this));
+                        SNNSO.Add(fieldInfo, new ClanSerializer((Clan)value, this));
                         break;
                     case "Culture":
                         // TODO Repoint (can use server obj)

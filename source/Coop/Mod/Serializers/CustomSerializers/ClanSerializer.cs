@@ -79,7 +79,15 @@ namespace Coop.Mod.Serializers
 
         public override object Deserialize()
         {
-            Clan newClan = new Clan();
+
+            Clan newClan = MBObjectManager.Instance.CreateObject<Clan>();
+
+            foreach(FieldInfo field in SNNSO.Keys)
+            {
+                field.SetValue(newClan, SNNSO[field].Deserialize());
+            }
+
+            newClan.GetType().GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(newClan, _leader.hero);
 
             return base.Deserialize(newClan);
         }

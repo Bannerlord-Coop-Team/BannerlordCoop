@@ -64,24 +64,13 @@ namespace Coop.Mod.Serializers
                 .GetField("_heroObject", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(characterObject, heroSerializer.hero);
 
-            // Objects natively serializable
-            foreach (FieldInfo fieldInfo in SerializableObjects.Keys)
-            {
-                fieldInfo.SetValue(characterObject, SerializableObjects[fieldInfo]);
-            }
-
             // Objects requiring a custom serializer
             foreach (FieldInfo fieldInfo in SNNSO.Keys)
             {
                 fieldInfo.SetValue(characterObject, SNNSO[fieldInfo].Deserialize());
             }
 
-            foreach (ICollection iterable in Collections)
-            {
-                int count = iterable.Count;
-            }
-
-            return characterObject;
+            return base.Deserialize(characterObject);
         }
     }
 }
