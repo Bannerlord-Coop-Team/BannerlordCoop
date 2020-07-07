@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Common;
+using Coop.Mod.DebugUtil;
 using Coop.Mod.Persistence;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
@@ -33,6 +34,7 @@ namespace Coop.Mod
 
         public void Update(TimeSpan frameTime)
         {
+            MoveTo.MoveToPlayback?.Invoke();
             m_Instance.Update();
         }
 

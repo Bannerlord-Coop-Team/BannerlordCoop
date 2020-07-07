@@ -241,6 +241,8 @@
     <Compile Include="Mod\DebugUtil\DebugManager.cs" />
     <Compile Include="Mod\Coop.cs" />
     <Compile Include="Mod\DebugUtil\DebugUI.cs" />
+    <Compile Include="Mod\DebugUtil\MoveTo.cs" />
+    <Compile Include="Mod\DebugUtil\MoveToEvent.cs" />
     <Compile Include="Mod\Exceptions.cs" />
     <Compile Include="Mod\GameEnvironmentClient.cs" />
     <Compile Include="Mod\GameLoopRunner.cs" />

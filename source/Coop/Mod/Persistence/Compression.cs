@@ -21,14 +21,14 @@ namespace Coop.Mod.Persistence
             }
 
             [Encoder]
-            public void Write(RailBitBuffer buffer, Vec2 coord)
+            public void WriteVec2(RailBitBuffer buffer, Vec2 coord)
             {
                 buffer.WriteFloat(m_Compressor, coord.X);
                 buffer.WriteFloat(m_Compressor, coord.Y);
             }
 
             [Decoder]
-            public Vec2 Read(RailBitBuffer buffer)
+            public Vec2 ReadVec2(RailBitBuffer buffer)
             {
                 return new Vec2(buffer.ReadFloat(m_Compressor), buffer.ReadFloat(m_Compressor));
             }

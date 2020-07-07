@@ -28,6 +28,7 @@ namespace Coop.Mod.Persistence
         private readonly RailServerRoom m_Room;
         private readonly RailServer m_Server;
         private RailServerPeer m_Arbiter;
+        public bool DisableWarn { get; set; } = false;
 
         public EntityManager(RailServer server)
         {
@@ -103,9 +104,10 @@ namespace Coop.Mod.Persistence
             {
                 if (!m_Parties.ContainsKey(party))
                 {
-                    Logger.Warn(
-                        "Inconsistent internal state: {party} was removed, but never added.",
-                        party);
+                    if (!DisableWarn)
+                        Logger.Warn(
+                            "Inconsistent internal state: {party} was removed, but never added.",
+                            party);
                     return;
                 }
 
@@ -128,9 +130,10 @@ namespace Coop.Mod.Persistence
             {
                 if (m_Parties.ContainsKey(party))
                 {
-                    Logger.Warn(
-                        "Inconsistent internal state: {party} was already registered.",
-                        party);
+                    if (!DisableWarn)
+                        Logger.Warn(
+                            "Inconsistent internal state: {party} was already registered.",
+                            party);
                     return;
                 }
 

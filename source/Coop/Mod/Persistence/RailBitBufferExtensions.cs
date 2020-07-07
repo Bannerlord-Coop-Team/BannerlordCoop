@@ -31,5 +31,17 @@ namespace Coop.Mod.Persistence
         {
             return new MBGUID(buffer.ReadUInt());
         }
+
+        [Encoder]
+        public static void WriteCampaignTime(this RailBitBuffer buffer, CampaignTime time)
+        {
+            buffer.WriteUInt64((ulong)time.ToMilliseconds);
+        }
+
+        [Decoder]
+        public static CampaignTime ReadCampaignTime(this RailBitBuffer buffer)
+        {
+            return CampaignTime.Milliseconds((long)buffer.ReadUInt64());
+        }
     }
 }

@@ -65,14 +65,14 @@ namespace Coop.Mod.Persistence.Party
 
     public static class MovementStateSerializer
     {
-        private static Compression.Coordinate2d CoordinateCompressor { get; } =
+        public static Compression.Coordinate2d CoordinateCompressor { get; } =
             new Compression.Coordinate2d();
 
         [Encoder]
         public static void WriteMovementState(this RailBitBuffer buffer, MovementState state)
         {
             buffer.WriteByte((byte) state.DefaultBehavior);
-            CoordinateCompressor.Write(buffer, state.Position);
+            CoordinateCompressor.WriteVec2(buffer, state.Position);
             buffer.WriteMBGUID(state.TargetPartyIndex);
             buffer.WriteMBGUID(state.SettlementIndex);
         }
@@ -83,7 +83,7 @@ namespace Coop.Mod.Persistence.Party
             return new MovementState
             {
                 DefaultBehavior = (AiBehavior) buffer.ReadByte(),
-                Position = CoordinateCompressor.Read(buffer),
+                Position = CoordinateCompressor.ReadVec2(buffer),
                 TargetPartyIndex = buffer.ReadMBGUID(),
                 SettlementIndex = buffer.ReadMBGUID()
             };
