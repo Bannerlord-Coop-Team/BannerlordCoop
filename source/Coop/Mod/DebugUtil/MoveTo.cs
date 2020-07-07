@@ -121,6 +121,9 @@ namespace Coop.Mod.DebugUtil
             state = MoveToState.Playback;
             MoveToPlayback += OnEventPlayback;
 
+            CoopServer.Instance.Persistence.EntityManager.WorldEntityServer.State.TimeControlMode =
+                (CampaignTimeControlMode.UnstoppablePlay, false);
+
             return $"Playback file '{filename}' started.";
         }
 
@@ -139,9 +142,12 @@ namespace Coop.Mod.DebugUtil
                     int count = RecordingEventList.Count / RailBitBuffer.MAX_LIST_COUNT;
                     for (int i = 0; i < count; i++)
                     {
-                        buffer.PackAll(RecordingEventList.GetRange(i * RailBitBuffer.MAX_LIST_COUNT, RailBitBuffer.MAX_LIST_COUNT), q => buffer.WriteMoveToEvent(q));
+                        buffer.PackAll(RecordingEventList.GetRange(i * RailBitBuffer.MAX_LIST_COUNT,
+                            RailBitBuffer.MAX_LIST_COUNT), q => buffer.WriteMoveToEvent(q));
                     }
-                    buffer.PackAll(RecordingEventList.GetRange(count * RailBitBuffer.MAX_LIST_COUNT, RecordingEventList.Count % RailBitBuffer.MAX_LIST_COUNT), q => buffer.WriteMoveToEvent(q));
+                    buffer.PackAll(RecordingEventList.GetRange(count * RailBitBuffer.MAX_LIST_COUNT,
+                        RecordingEventList.Count % RailBitBuffer.MAX_LIST_COUNT), q => buffer.WriteMoveToEvent(q));
+
                     byte[] data = new byte[buffer.ByteSize + 4];
                     Array.Resize(ref data, buffer.Store(data));
 
@@ -194,13 +200,16 @@ namespace Coop.Mod.DebugUtil
             var moveTo = PlaybackMainPartyList.FirstOrDefault(q => !q.passed && q.time <= now);
             if (moveTo != null)
             {
-                if (CoopServer.Instance.Persistence.Room.Entities.FirstOrDefault(q => q.Id == moveTo.entityId) is MobilePartyEntityServer entity)
+                if (CoopServer.Instance.Persistence.Room.Entities.
+                    FirstOrDefault(q => q.Id == moveTo.entityId) is MobilePartyEntityServer entity)
                     entity.State.Movement = new MovementState()
                     {
                         DefaultBehavior = moveTo.movement.DefaultBehaviour,
                         Position = moveTo.movement.TargetPosition,
-                        SettlementIndex = moveTo.movement.TargetSettlement != null ? moveTo.movement.TargetSettlement.Id : MovementState.InvalidIndex,
-                        TargetPartyIndex = moveTo.movement.TargetParty != null ? moveTo.movement.TargetParty.Id : MovementState.InvalidIndex
+                        SettlementIndex = moveTo.movement.TargetSettlement != null ?
+                            moveTo.movement.TargetSettlement.Id : MovementState.InvalidIndex,
+                        TargetPartyIndex = moveTo.movement.TargetParty != null ?
+                            moveTo.movement.TargetParty.Id : MovementState.InvalidIndex
                     };
 
                 moveTo.passed = true;
@@ -216,7 +225,6 @@ namespace Coop.Mod.DebugUtil
 
         private static void VerifyEvents()
         {
-            //TODO: verify events
             var difftime = new List<long?>();
 
             foreach (var play in PlaybackEventList)
@@ -237,6 +245,7 @@ namespace Coop.Mod.DebugUtil
 
             int l_minValue = (int)difftime.Min().Value;
             int l_maxValue = (int)difftime.Max().Value;
+
             int minValue = Math.Sign(l_minValue) * RailUtil.Log2((ulong)Math.Abs(l_minValue));
             int maxValue = Math.Sign(l_maxValue) * RailUtil.Log2((ulong)Math.Abs(l_maxValue)) + 1;
 

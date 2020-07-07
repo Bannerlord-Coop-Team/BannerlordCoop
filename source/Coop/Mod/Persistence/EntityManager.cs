@@ -28,6 +28,7 @@ namespace Coop.Mod.Persistence
         private readonly RailServerRoom m_Room;
         private readonly RailServer m_Server;
         private RailServerPeer m_Arbiter;
+        public WorldEntityServer WorldEntityServer { get; private set; }
         public bool DisableWarn { get; set; } = false;
 
         public EntityManager(RailServer server)
@@ -76,7 +77,7 @@ namespace Coop.Mod.Persistence
 
         private void InitRoom(RailServerRoom room)
         {
-            room.AddNewEntity<WorldEntityServer>();
+            WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
 
             // Parties
             foreach (MobileParty party in Campaign.Current.MobileParties)

@@ -1,7 +1,6 @@
 ﻿using Coop.Mod.Persistence;
 using RailgunNet.System.Encoding;
 using RailgunNet.System.Types;
-using System;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
@@ -20,7 +19,7 @@ namespace Coop.Mod.DebugUtil
         {
             return obj is MoveToEvent other &&
                 this.entityId == other.entityId &&
-                this.party?.Id == other.party.Id &&
+                this.party?.Id == other.party?.Id &&
                 this.movement.NearlyEquals(other.movement);
         }
 
