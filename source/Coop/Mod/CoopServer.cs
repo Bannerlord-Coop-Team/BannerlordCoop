@@ -82,6 +82,7 @@ namespace Coop.Mod
         public void ShutDownServer()
         {
             Current?.Stop();
+            Persistence?.CloseServerRail();
             Persistence = null;
             SyncedObjectStore = null;
             m_NetManager?.Stop();
