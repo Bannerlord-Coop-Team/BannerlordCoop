@@ -26,10 +26,6 @@ namespace Coop.Mod.Managers
 {
     public class ClientCharacterCreatorManager : StoryModeGameManager
     {
-        public ClientCharacterCreatorManager() : base() 
-        {
-            // CharacterCreationState.FinalizeCharacterCreation()
-        }
         public ClientCharacterCreatorManager(LoadResult saveGameData) : base(saveGameData) { }
 
         public delegate void OnLoadFinishedEventHandler(object source, EventArgs e);

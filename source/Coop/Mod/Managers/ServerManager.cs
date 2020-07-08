@@ -22,7 +22,6 @@ namespace Coop.Mod.Managers
         {
             base.OnLoadFinished();
             CLICommands.StartServer(new List<string>());
-            PlayerHeroSerializer phs = new PlayerHeroSerializer(Hero.MainHero);
             CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {
                 remoteStore.OnObjectReceived += (objId, obj) =>
                 {

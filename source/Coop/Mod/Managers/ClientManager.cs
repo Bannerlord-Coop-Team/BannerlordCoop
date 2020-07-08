@@ -37,21 +37,7 @@ namespace Coop.Mod.Managers
 
             OnLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
 
-            
-
-            //StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, GetCreatedCharacter);
-
-            if (Main.DEBUG)
-            {
-
-                // TODO use HeroCreator.CreateNewHero
-                // TODO Populate using CharacterCreator
-                // TODO Override 
-                // ChangePlayerCharacterAction.Apply(ClientHero);
-            }
-            //CharacterObject player = new CharacterObject();
-            
-            
+            // TODO recieve host party and instantiate it            
             //ClientParty = new MobileParty();
             //TextObject name = MobilePartyHelper.GeneratePartyName(player);
             //ClientParty.InitializeMobileParty(name, Game.Current.ObjectManager.GetObject<PartyTemplateObject>("main_hero_party_template"), new Vec2(685.3f, 410.9f), 0f, 0f, MobileParty.PartyTypeEnum.Default, -1);
