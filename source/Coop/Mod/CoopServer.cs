@@ -82,7 +82,7 @@ namespace Coop.Mod
 
         public void ShutDownServer()
         {
-            MoveTo.Stop();
+            Replay.Stop();
             Current?.Stop();
             Persistence = null;
             SyncedObjectStore = null;

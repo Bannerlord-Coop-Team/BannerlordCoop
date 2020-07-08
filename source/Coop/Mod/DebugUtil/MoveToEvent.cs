@@ -7,17 +7,17 @@ using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.DebugUtil
 {
-    public class MoveToEvent
+    public class ReplayEvent
     {
         public CampaignTime time;
         public EntityId entityId;
         public MobileParty party;
         public MovementData movement;
-        public bool passed = false;
+        public bool applied = false;
 
         public override bool Equals(object obj)
         {
-            return obj is MoveToEvent other &&
+            return obj is ReplayEvent other &&
                 this.entityId == other.entityId &&
                 this.party?.Id == other.party?.Id &&
                 this.movement.NearlyEquals(other.movement);
@@ -29,21 +29,21 @@ namespace Coop.Mod.DebugUtil
         }
     }
 
-    public static class MoveToEventSerializer
+    public static class ReplayEventSerializer
     {
         [Encoder]
-        public static void WriteMoveToEvent(this RailBitBuffer buffer, MoveToEvent moveTo)
+        public static void WriteReplayEvent(this RailBitBuffer buffer, ReplayEvent replay)
         {
-            buffer.WriteCampaignTime(moveTo.time);
-            buffer.WriteEntityId(moveTo.entityId);
-            buffer.WriteMBGUID(moveTo.party.Id);
-            buffer.WriteMovementData(moveTo.movement);
+            buffer.WriteCampaignTime(replay.time);
+            buffer.WriteEntityId(replay.entityId);
+            buffer.WriteMBGUID(replay.party.Id);
+            buffer.WriteMovementData(replay.movement);
         }
 
         [Decoder]
-        public static MoveToEvent ReadMoveToEvent(this RailBitBuffer buffer)
+        public static ReplayEvent ReadReplayEvent(this RailBitBuffer buffer)
         {
-            return new MoveToEvent
+            return new ReplayEvent
             {
                 time = buffer.ReadCampaignTime(),
                 entityId = buffer.ReadEntityId(),

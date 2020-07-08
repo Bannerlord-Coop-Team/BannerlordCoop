@@ -34,7 +34,7 @@ namespace Coop.Mod
 
         public void Update(TimeSpan frameTime)
         {
-            MoveTo.MoveToPlayback?.Invoke();
+            Replay.ReplayPlayback?.Invoke();
             m_Instance.Update();
         }
 

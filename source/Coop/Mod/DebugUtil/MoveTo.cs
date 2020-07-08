@@ -14,29 +14,29 @@ using Path = System.IO.Path;
 
 namespace Coop.Mod.DebugUtil
 {
-    public static class MoveTo
+    public static class Replay
     {
         private static readonly NLog.Logger Logger = LogManager.GetCurrentClassLogger();
 
         private const string logsDir = "logs";
-        private const string recordExt = ".moveto";
+        private const string recordExt = ".replay";
         private const string logFilename = "-verified.csv";
         private static string current;
         private static CampaignTime firstTick;
         private static CampaignTime lastTick;
 
-        private static MoveToState state { get; set; } = MoveToState.Stop;
-        private static List<MoveToEvent> RecordingEventList;
-        private static List<MoveToEvent> PlaybackEventList;
-        private static List<MoveToEvent> PlaybackMainPartyList;
+        private static ReplayState state { get; set; } = ReplayState.Stop;
+        private static List<ReplayEvent> RecordingEventList;
+        private static List<ReplayEvent> PlaybackEventList;
+        private static List<ReplayEvent> PlaybackMainPartyList;
 
-        public static Action<EntityId, MobileParty, MovementData> MoveToRecording { get; private set; }
-        public static Action MoveToPlayback { get; private set; }
+        public static Action<EntityId, MobileParty, MovementData> ReplayRecording { get; private set; }
+        public static Action ReplayPlayback { get; private set; }
 
         private static bool isValid(string fileName) => !string.IsNullOrEmpty(fileName) &&
               fileName.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
 
-        public enum MoveToState
+        public enum ReplayState
         {
             Stop,
             Recording,
@@ -45,7 +45,7 @@ namespace Coop.Mod.DebugUtil
 
         internal static string StartRecord(string filename)
         {
-            if (state == MoveToState.Playback)
+            if (state == ReplayState.Playback)
                 return "Could not start recording while playback.";
 
             if (CoopServer.Instance?.Persistence?.Room?.Tick.IsValid != true)
@@ -70,17 +70,17 @@ namespace Coop.Mod.DebugUtil
                 }
             }
 
-            RecordingEventList = new List<MoveToEvent>();
+            RecordingEventList = new List<ReplayEvent>();
             current = filename;
-            state = MoveToState.Recording;
-            MoveToRecording += OnEventRecording;
+            state = ReplayState.Recording;
+            ReplayRecording += OnEventRecording;
 
             return $"Recording '{filename}' started.";
         }
 
         internal static string Playback(string filename)
         {
-            if (state == MoveToState.Recording)
+            if (state == ReplayState.Recording)
                 return "Could not start playback while recording.";
 
             if (CoopServer.Instance?.Persistence?.Room?.Tick.IsValid != true)
@@ -98,10 +98,10 @@ namespace Coop.Mod.DebugUtil
 
             var buffer = new RailBitBuffer();
             buffer.Load(new ArraySegment<byte>(File.ReadAllBytes(path)));
-            PlaybackEventList = new List<MoveToEvent>();
+            PlaybackEventList = new List<ReplayEvent>();
             while (!buffer.IsFinished)
             {
-                PlaybackEventList.AddRange(buffer.UnpackAll(q => q.ReadMoveToEvent()));
+                PlaybackEventList.AddRange(buffer.UnpackAll(q => q.ReadReplayEvent()));
             }
 
             if (PlaybackEventList.Count == 0)
@@ -115,11 +115,11 @@ namespace Coop.Mod.DebugUtil
 
             PlaybackMainPartyList = PlaybackEventList.Where(q => q.party.IsPlayerControlled()).ToList();
 
-            RecordingEventList = new List<MoveToEvent>();
+            RecordingEventList = new List<ReplayEvent>();
             lastTick = PlaybackEventList.Last().time;
             current = filename;
-            state = MoveToState.Playback;
-            MoveToPlayback += OnEventPlayback;
+            state = ReplayState.Playback;
+            ReplayPlayback += OnEventPlayback;
 
             CoopServer.Instance.Persistence.EntityManager.WorldEntityServer.State.TimeControlMode =
                 (CampaignTimeControlMode.UnstoppablePlay, false);
@@ -131,22 +131,22 @@ namespace Coop.Mod.DebugUtil
         {
             switch (state)
             {
-                case MoveToState.Stop:
+                case ReplayState.Stop:
                     return "Nothing happend.";
 
-                case MoveToState.Recording:
-                    MoveToRecording -= OnEventRecording;
-                    state = MoveToState.Stop;
+                case ReplayState.Recording:
+                    ReplayRecording -= OnEventRecording;
+                    state = ReplayState.Stop;
 
                     var buffer = new RailBitBuffer();
                     int count = RecordingEventList.Count / RailBitBuffer.MAX_LIST_COUNT;
                     for (int i = 0; i < count; i++)
                     {
                         buffer.PackAll(RecordingEventList.GetRange(i * RailBitBuffer.MAX_LIST_COUNT,
-                            RailBitBuffer.MAX_LIST_COUNT), q => buffer.WriteMoveToEvent(q));
+                            RailBitBuffer.MAX_LIST_COUNT), q => buffer.WriteReplayEvent(q));
                     }
                     buffer.PackAll(RecordingEventList.GetRange(count * RailBitBuffer.MAX_LIST_COUNT,
-                        RecordingEventList.Count % RailBitBuffer.MAX_LIST_COUNT), q => buffer.WriteMoveToEvent(q));
+                        RecordingEventList.Count % RailBitBuffer.MAX_LIST_COUNT), q => buffer.WriteReplayEvent(q));
 
                     byte[] data = new byte[buffer.ByteSize + 4];
                     Array.Resize(ref data, buffer.Store(data));
@@ -157,10 +157,10 @@ namespace Coop.Mod.DebugUtil
                     RecordingEventList = null;
                     return $"Recording stopped and exported in file '{current}'.";
 
-                case MoveToState.Playback:
-                    MoveToPlayback -= OnEventPlayback;
-                    MoveToRecording -= OnEventRecording;
-                    state = MoveToState.Stop;
+                case ReplayState.Playback:
+                    ReplayPlayback -= OnEventPlayback;
+                    ReplayRecording -= OnEventRecording;
+                    state = ReplayState.Stop;
 
                     VerifyEvents();
 
@@ -176,7 +176,7 @@ namespace Coop.Mod.DebugUtil
 
         private static void OnEventRecording(EntityId entityId, MobileParty party, MovementData movement)
         {
-            RecordingEventList.Add(new MoveToEvent()
+            RecordingEventList.Add(new ReplayEvent()
             {
                 time = CampaignTime.Now,
                 entityId = entityId,
@@ -184,7 +184,7 @@ namespace Coop.Mod.DebugUtil
                 movement = movement
             });
             if (party.IsPlayerControlled())
-                Logger.Warn("[MOVETO] Yet one player's moving recorded.");
+                Logger.Info("[REPLAY] Yet one player's moving recorded.");
         }
 
         public static void OnEventPlayback()
@@ -193,33 +193,33 @@ namespace Coop.Mod.DebugUtil
 
             if (firstTick <= now)
             {
-                MoveToRecording += OnEventRecording;
+                ReplayRecording += OnEventRecording;
                 firstTick = CampaignTime.Never;
             }
 
-            var moveTo = PlaybackMainPartyList.FirstOrDefault(q => !q.passed && q.time <= now);
-            if (moveTo != null)
+            var replay = PlaybackMainPartyList.FirstOrDefault(q => !q.applied && q.time <= now);
+            if (replay != null)
             {
                 if (CoopServer.Instance.Persistence.Room.Entities.
-                    FirstOrDefault(q => q.Id == moveTo.entityId) is MobilePartyEntityServer entity)
+                    FirstOrDefault(q => q.Id == replay.entityId) is MobilePartyEntityServer entity)
                     entity.State.Movement = new MovementState()
                     {
-                        DefaultBehavior = moveTo.movement.DefaultBehaviour,
-                        Position = moveTo.movement.TargetPosition,
-                        SettlementIndex = moveTo.movement.TargetSettlement != null ?
-                            moveTo.movement.TargetSettlement.Id : MovementState.InvalidIndex,
-                        TargetPartyIndex = moveTo.movement.TargetParty != null ?
-                            moveTo.movement.TargetParty.Id : MovementState.InvalidIndex
+                        DefaultBehavior = replay.movement.DefaultBehaviour,
+                        Position = replay.movement.TargetPosition,
+                        SettlementIndex = replay.movement.TargetSettlement != null ?
+                            replay.movement.TargetSettlement.Id : MovementState.InvalidIndex,
+                        TargetPartyIndex = replay.movement.TargetParty != null ?
+                            replay.movement.TargetParty.Id : MovementState.InvalidIndex
                     };
 
-                moveTo.passed = true;
-                Logger.Warn("[MOVETO] Moving to new position.");
+                replay.applied = true;
+                Logger.Info("[REPLAY] Moving to new position.");
             }
 
             if (now >= lastTick)
             {
                 Stop(); // TODO: send message in debug console instead to send on game screen
-                Logger.Warn("[MOVETO] Playback has finished.");
+                Logger.Info("[REPLAY] Playback has finished.");
             }
         }
 
@@ -229,11 +229,11 @@ namespace Coop.Mod.DebugUtil
 
             foreach (var play in PlaybackEventList)
             {
-                var rec = RecordingEventList.FirstOrDefault(q => !q.passed && q.Equals(play));
+                var rec = RecordingEventList.FirstOrDefault(q => !q.applied && q.Equals(play));
                 if (rec != null)
                 {
                     difftime.Add((long)(rec.time - play.time).ToMilliseconds);
-                    rec.passed = true;
+                    rec.applied = true;
                 }
                 else
                     difftime.Add(null);
@@ -241,7 +241,7 @@ namespace Coop.Mod.DebugUtil
 
             var csv = difftime.Where(q => q != null).Select(q => new object[6] { q, 0, null, null, null, null }).ToList();
             var skipped = difftime.Count(q => q == null);
-            var new_events = RecordingEventList.Count(q => !q.passed);
+            var new_events = RecordingEventList.Count(q => !q.applied);
 
             int l_minValue = (int)difftime.Min().Value;
             int l_maxValue = (int)difftime.Max().Value;
@@ -273,11 +273,11 @@ namespace Coop.Mod.DebugUtil
             var path = Path.Combine(logsDir, current + logFilename);
             File.WriteAllText(path, report);
 
-            Logger.Warn($"[MOVETO] Verifying has finished and exported into '{path}'.");
+            Logger.Info($"[REPLAY] Verifying has finished and exported into '{path}'.");
             if (skipped > 0)
-                Logger.Warn($"[MOVETO] Skipped {skipped} movements.");
+                Logger.Info($"[REPLAY] Skipped {skipped} movements.");
             if (new_events > 0)
-                Logger.Warn($"[MOVETO] There is {new_events} new movements.");
+                Logger.Info($"[REPLAY] There is {new_events} new movements.");
         }
     }
 }

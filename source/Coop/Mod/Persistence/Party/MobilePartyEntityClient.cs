@@ -73,7 +73,7 @@ namespace Coop.Mod.Persistence.Party
                 data);
             m_Environment.TargetPosition.SetTyped(party, data);
 
-            MoveTo.MoveToRecording?.Invoke(Id, party, data);
+            Replay.ReplayRecording?.Invoke(Id, party, data);
         }
 
         protected override void OnControllerChanged()
