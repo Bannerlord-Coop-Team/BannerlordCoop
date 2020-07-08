@@ -28,6 +28,10 @@ namespace Coop.Mod.Managers
     {
         public ClientCharacterCreatorManager(LoadResult saveGameData) : base(saveGameData) { }
 
+        public ClientCharacterCreatorManager()
+        {
+        }
+
         public delegate void OnLoadFinishedEventHandler(object source, EventArgs e);
         public static event OnLoadFinishedEventHandler OnLoadFinishedEvent;
 

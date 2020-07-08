@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using Coop.Mod.Managers;
 using Coop.Mod.Persistence.World;
@@ -66,7 +67,7 @@ namespace Coop.Mod
                 Current.OnClientConnected += OnClientConnected;
                 Current.OnClientDisconnected += OnClientDisconnected;
 
-                if (eServerType == Server.EType.Direct)
+                if (eServerType == Server.EType.Threaded)
                 {
                     Main.Instance.Updateables.Add(Current);
                 }
@@ -98,11 +99,18 @@ namespace Coop.Mod
 
         public void StartGame(string saveName)
         {
-            // TODO: Relies on hardcoded save game file being present.
             if(Main.DEBUG)
             {
-                LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(saveName, Utilities.GetModulesNames());
-                MBGameManager.StartNewGame(CreateGameManager(saveGameData));
+                try
+                {
+                    LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(saveName, Utilities.GetModulesNames());
+                    MBGameManager.StartNewGame(CreateGameManager(saveGameData));
+                }
+                catch(IOException ex)
+                {
+                    Logger.Error("Save file not found: " + ex.Message);
+                }
+                
             }
         }
 

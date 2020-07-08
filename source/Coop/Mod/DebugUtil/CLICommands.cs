@@ -39,7 +39,7 @@ namespace Coop.Mod.DebugUtil
         [CommandLineFunctionality.CommandLineArgumentFunction("start_local_server", sGroupName)]
         public static string StartServer(List<string> parameters)
         {
-            if (Main.DEBUG && CoopServer.Instance.StartServer() == null)
+            if (CoopServer.Instance.StartServer() == null)
             {
                 ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
                 CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
