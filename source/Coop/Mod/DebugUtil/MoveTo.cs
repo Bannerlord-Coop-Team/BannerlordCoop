@@ -14,23 +14,65 @@ using Path = System.IO.Path;
 
 namespace Coop.Mod.DebugUtil
 {
+    /// <summary>
+    /// How it works:
+    /// <list type="bullet">
+    /// <item>load savefile in game</item>
+    /// <item>start server</item>
+    /// <item>open 'RGL Command line console'</item>
+    /// <item>(1) type 'coop.record 1'</item>
+    /// <item>do some movements on campaign map</item>
+    /// <item>type 'coop.stop'</item>
+    /// <item>stop server</item>
+    /// <item>load the same savefile in game</item>
+    /// <item>start server</item>
+    /// <item>open rgl-debug-console</item>
+    /// <item>(2) type 'coop.play 1'</item>
+    /// <item>setup normal speed (key '2')</item>
+    /// <item>main hero party will be moving exactly same as past</item>
+    /// <item>(3) wait while in log shown '[REPLAY] Verifying has finished ...'</item>
+    /// <item>view file <c>\mb2\bin\Win64_Shipping_Client\logs\1-verified.html</c> in browser or Excel</item>
+    /// </list>
+    /// Column names used in report:
+    /// <list type="bullet">
+    /// <item><term>timeDiff(ms)</term><description> it is the in-game time interval in ms between
+    /// related saved and replayed movement events</description></item>
+    /// <item><term>skipped</term><description> it is the number of saved movement which did not find
+    /// a related movement while playback</description></item>
+    /// <item><term>newEvents</term><description> it is the number of new movement happend while playback
+    /// which did not find a related in saved movements</description></item>
+    /// <item><term>cols</term><description> it is the statistical info about distribution of time intervals
+    /// calculated as <c>count(log2(time_diff), column)</c></description></item>
+    /// </list>
+    /// Constant shift in result data no matter.
+    /// It is important that the spread of values is minimal.
+    /// See <seealso>https://github.com/Bannerlord-Coop-Team/BannerlordCoop/pull/33</seealso>
+    /// </summary>
     public static class Replay
     {
         private static readonly NLog.Logger Logger = LogManager.GetCurrentClassLogger();
 
         private const string logsDir = "logs";
         private const string recordExt = ".replay";
-        private const string logFilename = "-verified.csv";
-        private static string current;
+        private const string logFilename = "-verified.html";
+        private const int averageEventsCountInColumn = 5;
+        private static string currentFilename;
+        // 
         private static CampaignTime firstTick;
         private static CampaignTime lastTick;
 
         private static ReplayState state { get; set; } = ReplayState.Stop;
         private static List<ReplayEvent> RecordingEventList;
         private static List<ReplayEvent> PlaybackEventList;
+        // list of main party movement which we play manually while playback
         private static List<ReplayEvent> PlaybackMainPartyList;
 
+        // point of recording movements; happen on client side
+        // TODO: maybe remove recording point onto server side?
         public static Action<EntityId, MobileParty, MovementData> ReplayRecording { get; private set; }
+
+        // point of playback recorded movements; happen on server side
+        // TODO: maybe remove playback point onto client side? or send events data to server through network?
         public static Action ReplayPlayback { get; private set; }
 
         private static bool isValid(string fileName) => !string.IsNullOrEmpty(fileName) &&
@@ -43,6 +85,12 @@ namespace Coop.Mod.DebugUtil
             Playback
         }
 
+        /// <summary>
+        /// Start recording movement and wait 'stop' command.
+        /// First step.
+        /// </summary>
+        /// <param name="filename">Filename without path and extension</param>
+        /// <returns></returns>
         internal static string StartRecord(string filename)
         {
             if (state == ReplayState.Playback)
@@ -71,13 +119,21 @@ namespace Coop.Mod.DebugUtil
             }
 
             RecordingEventList = new List<ReplayEvent>();
-            current = filename;
+
+            currentFilename = filename;
             state = ReplayState.Recording;
             ReplayRecording += OnEventRecording;
 
             return $"Recording '{filename}' started.";
         }
 
+        /// <summary>
+        /// Start replay movements of main party from file and wait 'stop' command.
+        /// At the same time it starting recording movement for further analize.
+        /// Second step.
+        /// </summary>
+        /// <param name="filename">Filename without path and extension</param>
+        /// <returns></returns>
         internal static string Playback(string filename)
         {
             if (state == ReplayState.Recording)
@@ -107,17 +163,18 @@ namespace Coop.Mod.DebugUtil
             if (PlaybackEventList.Count == 0)
                 return "Record is empty.";
 
-            var now = CampaignTime.Now;
             firstTick = PlaybackEventList.First().time;
+            lastTick = PlaybackEventList.Last().time;
+
+            var now = CampaignTime.Now;
             if (now > firstTick)
                 return $"Tick : {(long)now.ToMilliseconds} > {(long)firstTick.ToMilliseconds}\n" +
                     "Current campaign time is passed.";
 
             PlaybackMainPartyList = PlaybackEventList.Where(q => q.party.IsPlayerControlled()).ToList();
-
             RecordingEventList = new List<ReplayEvent>();
-            lastTick = PlaybackEventList.Last().time;
-            current = filename;
+
+            currentFilename = filename;
             state = ReplayState.Playback;
             ReplayPlayback += OnEventPlayback;
 
@@ -127,6 +184,11 @@ namespace Coop.Mod.DebugUtil
             return $"Playback file '{filename}' started.";
         }
 
+        /// <summary>
+        /// Stop recording and save it in file if it was recording state.
+        /// Stop playback and verify first recorded movements with second recorded movements.
+        /// </summary>
+        /// <returns></returns>
         internal static string Stop()
         {
             switch (state)
@@ -151,11 +213,11 @@ namespace Coop.Mod.DebugUtil
                     byte[] data = new byte[buffer.ByteSize + 4];
                     Array.Resize(ref data, buffer.Store(data));
 
-                    var path = Path.Combine(logsDir, current + recordExt);
+                    var path = Path.Combine(logsDir, currentFilename + recordExt);
                     File.WriteAllBytes(path, data);
 
                     RecordingEventList = null;
-                    return $"Recording stopped and exported in file '{current}'.";
+                    return $"Recording stopped and exported in file '{currentFilename}'.";
 
                 case ReplayState.Playback:
                     ReplayPlayback -= OnEventPlayback;
@@ -167,7 +229,7 @@ namespace Coop.Mod.DebugUtil
                     RecordingEventList = null;
                     PlaybackEventList = null;
                     PlaybackMainPartyList = null;
-                    return $"Playback file '{current}' stopped.";
+                    return $"Playback file '{currentFilename}' stopped.";
 
                 default:
                     return null;
@@ -216,68 +278,123 @@ namespace Coop.Mod.DebugUtil
                 Logger.Info("[REPLAY] Moving to new position.");
             }
 
-            if (now >= lastTick)
+            if (lastTick <= now)
             {
-                Stop(); // TODO: send message in debug console instead to send on game screen
+                Stop();
+                // TODO: send message in debug console instead to send on game screen
                 Logger.Info("[REPLAY] Playback has finished.");
             }
         }
 
+        /// <summary>
+        /// Verify difference in start time of similar movements in first recorded data (recording state)
+        /// and last recorded data (playback state).
+        /// Third step.
+        /// </summary>
         private static void VerifyEvents()
         {
-            var difftime = new List<long?>();
+            var diffTime = new List<long?>();
 
             foreach (var play in PlaybackEventList)
             {
                 var rec = RecordingEventList.FirstOrDefault(q => !q.applied && q.Equals(play));
                 if (rec != null)
                 {
-                    difftime.Add((long)(rec.time - play.time).ToMilliseconds);
+                    // rec.time - CampaignTime of movement recorded in playback state (second step)
+                    // play.time - CampaignTime of movement recorded in recording state (first step)
+                    diffTime.Add((long)(rec.time - play.time).ToMilliseconds);
                     rec.applied = true;
                 }
                 else
-                    difftime.Add(null);
+                    diffTime.Add(null);
             }
 
-            var csv = difftime.Where(q => q != null).Select(q => new object[6] { q, 0, null, null, null, null }).ToList();
-            var skipped = difftime.Count(q => q == null);
-            var new_events = RecordingEventList.Count(q => !q.applied);
+            var skipped = diffTime.Count(q => q == null);
+            var newEvents = RecordingEventList.Count(q => !q.applied);
+            if (skipped > 0)
+                Logger.Info($"[REPLAY] Skipped {skipped} movements.");
+            if (newEvents > 0)
+                Logger.Info($"[REPLAY] There is {newEvents} new movements.");
 
-            int l_minValue = (int)difftime.Min().Value;
-            int l_maxValue = (int)difftime.Max().Value;
+            var path = Path.Combine(logsDir, currentFilename + logFilename);
+            ExportToFile(path, diffTime, skipped, newEvents);
+
+            Logger.Info($"[REPLAY] Verifying has finished and exported into '{path}'.");
+        }
+
+        /// <summary>
+        /// Export verified data in html-report (compatible with Excel).
+        /// </summary>
+        /// <param name="path">path with filename and extension where report will be stored</param>
+        /// <param name="diffTime">data with difference in start time of movements (in milliseconds of in-game time)</param>
+        /// <param name="skipped">count of unknown movements in first recorded data (recording state)</param>
+        /// <param name="newEvents">count of unknown movements in second recorded data (playback state)</param>
+        private static void ExportToFile(string path, List<long?> diffTime, int skipped, int newEvents)
+        {
+            var table = diffTime.Where(q => q != null).Select(q => new object[6] { q, 0, null, null, null, null }).ToList();
+
+            int l_minValue = (int)diffTime.Min().Value;
+            int l_maxValue = (int)diffTime.Max().Value;
 
             int minValue = Math.Sign(l_minValue) * RailUtil.Log2((ulong)Math.Abs(l_minValue));
             int maxValue = Math.Sign(l_maxValue) * RailUtil.Log2((ulong)Math.Abs(l_maxValue)) + 1;
 
-            int colsCount = csv.Count / 5;
+            int colsCount = table.Count / averageEventsCountInColumn;
             int colWidth = (maxValue - minValue) / colsCount;
 
-            csv[0][2] = skipped;
-            csv[0][3] = new_events;
-            csv[0][4] = l_minValue;
-            csv[0][5] = l_maxValue;
+            table[0][2] = skipped;
+            table[0][3] = newEvents;
+            table[0][4] = l_minValue;
+            table[0][5] = l_maxValue;
 
-            foreach (var line in csv)
+            foreach (var line in table)
             {
                 long diff = ((long?)line[0]).Value;
                 int index = (Math.Sign(diff) * RailUtil.Log2((ulong)Math.Abs(diff)) - minValue) / colWidth;
-                csv[index][1] = (int)csv[index][1] + 1;
+                table[index][1] = (int)table[index][1] + 1;
             }
 
-            var report = $"time_diff(ms),cols,skipped,new_events,minValue,maxValue\r\n";
-            foreach (var line in csv)
+            var report =
+$@"<html xmlns:o='urn:schemas-microsoft-com:office:office'
+    xmlns:x='urn:schemas-microsoft-com:office:excel'
+    xmlns='http://www.w3.org/TR/REC-html40'>
+    <head>
+        <xml>
+            <x:ExcelWorkbook>
+                <x:ExcelWorksheets>
+                    <x:ExcelWorksheet>
+                        <x:Name>{firstTick}</x:Name>
+                        <x:WorksheetOptions>
+                            <x:Print>
+                                <x:Gridlines />
+                            </x:Print>
+                        </x:WorksheetOptions>
+                    </x:ExcelWorksheet>
+                </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+        </xml>
+    </head>                      
+    <body>
+        <table>
+            <tr>
+                <th>timeDiff(ms)</th>
+                <th>cols</th>
+                <th>skipped</th>
+                <th>newEvents</th>
+                <th>minValue</th>
+                <th>maxValue</th>
+            </tr>
+";
+
+            foreach (var line in table)
             {
-                report += $"{line[0]},{line[1]},{line[2]},{line[3]},{line[4]},{line[5]}\r\n";
+                report += $"<tr><td>{line[0]}</td><td>{line[1]}</td><td>{line[2]}</td><td>{line[3]}</td>" +
+                    $"<td>{line[4]}</td><td>{line[5]}</td>\r\n";
             }
 
-            var path = Path.Combine(logsDir, current + logFilename);
-            File.WriteAllText(path, report);
+            report += "</table></body></html>";
 
-            Logger.Info($"[REPLAY] Verifying has finished and exported into '{path}'.");
-            if (skipped > 0)
-                Logger.Info($"[REPLAY] Skipped {skipped} movements.");
-            if (new_events > 0)
-                Logger.Info($"[REPLAY] There is {new_events} new movements.");
+            File.WriteAllText(path, report);
         }
     }
 }

@@ -73,8 +73,8 @@ namespace Coop.Mod.DebugUtil
         public static string Help(List<string> parameters)
         {
             return "Coop commands:\n" +
-                "\tcoop.record <filename>\tStart record user actions and behavior events.\n" +
-                "\tcoop.play <filename>\tPlayback recorded user actions and verify behavior events.\n" +
+                "\tcoop.record <filename>\tStart record movements of all parties.\n" +
+                "\tcoop.play <filename>\tPlayback recorded movements of main hero party.\n" +
                 "\tcoop.stop\t\tStop record or playback.";
         }
 
@@ -100,23 +100,27 @@ namespace Coop.Mod.DebugUtil
             return Replay.Stop();
         }
 
-        [CommandLineFunctionality.CommandLineArgumentFunction("suppress_inconsistent_state_warnings", sGroupName)]
+        [CommandLineFunctionality.CommandLineArgumentFunction("disable_inconsistent_state_warnings", sGroupName)]
         public static string DisableWarn(List<string> parameters)
         {
-            var help = "Disable(1) or enable(0) to show warnings about inconsistent internal state from Coop.Mod.Persistence.EntityManager\n" +
+            var help = "Disable(1) or enable(0) to show warnings about inconsistent internal state\n" +
                     $"Usage:\n" +
-                    $" {sGroupName}.suppress_inconsistent_state_warnings 1";
+                    $"\t{sGroupName}.disable_inconsistent_state_warnings 1";
             if (parameters.Count < 1)
                 return help;
 
+            var entityManager = CoopServer.Instance?.Persistence?.EntityManager;
+            if (entityManager == null)
+                return "Server not started.";
+
             if (parameters[0] == "1")
             {
-                CoopServer.Instance.Persistence.EntityManager.SuppressInconsistentStateWarnings = true;
-                return "Inconsistent state warnings suppressed.";
+                entityManager.SuppressInconsistentStateWarnings = true;
+                return "Inconsistent state warnings disabled.";
             }
             else if (parameters[0] == "0")
             {
-                CoopServer.Instance.Persistence.EntityManager.SuppressInconsistentStateWarnings = false;
+                entityManager.SuppressInconsistentStateWarnings = false;
                 return "Inconsistent state warnings enabled.";
             }
 

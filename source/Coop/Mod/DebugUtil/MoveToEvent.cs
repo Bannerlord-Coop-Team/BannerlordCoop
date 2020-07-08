@@ -7,6 +7,10 @@ using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.DebugUtil
 {
+    /// <summary>
+    /// Used for store info about movements of parties on campaign map into file which will be used
+    /// for playback recorded time interval.
+    /// </summary>
     public class ReplayEvent
     {
         public CampaignTime time;
@@ -29,6 +33,9 @@ namespace Coop.Mod.DebugUtil
         }
     }
 
+    /// <summary>
+    /// Serializer for object ReplayEvent.
+    /// </summary>
     public static class ReplayEventSerializer
     {
         [Encoder]
