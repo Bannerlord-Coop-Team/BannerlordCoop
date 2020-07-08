@@ -13,11 +13,9 @@ namespace Coop.Mod.Serializers
     {
         long numTicks;
         bool numTicksExists;
-        public CampaignTimeSerializer()
-        {
-        }
         public CampaignTimeSerializer(CampaignTime campaignTime)
         {
+            // long cannot be null so a flag is needed for null campaign time
             numTicksExists = campaignTime != null;
             if (numTicksExists)
             {
@@ -29,6 +27,7 @@ namespace Coop.Mod.Serializers
 
         public object Deserialize()
         {
+            // only create object if it existed on serialize end
             if (numTicksExists)
             {
                 ConstructorInfo ctorCampaignTime = typeof(CampaignTime).Assembly

@@ -37,6 +37,8 @@ namespace Coop.Mod.Managers
 
             OnLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
 
+            
+
             //StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, GetCreatedCharacter);
 
             if (Main.DEBUG)
@@ -48,7 +50,8 @@ namespace Coop.Mod.Managers
                 // ChangePlayerCharacterAction.Apply(ClientHero);
             }
             //CharacterObject player = new CharacterObject();
-            //Hero clientHero = Hero.MainHero;
+            
+            
             //ClientParty = new MobileParty();
             //TextObject name = MobilePartyHelper.GeneratePartyName(player);
             //ClientParty.InitializeMobileParty(name, Game.Current.ObjectManager.GetObject<PartyTemplateObject>("main_hero_party_template"), new Vec2(685.3f, 410.9f), 0f, 0f, MobileParty.PartyTypeEnum.Default, -1);

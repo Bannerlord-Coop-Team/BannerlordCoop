@@ -41,7 +41,6 @@ namespace Coop.Mod.DebugUtil
         {
             if (Main.DEBUG && CoopServer.Instance.StartServer() == null)
             {
-                CoopServer.Instance.StartGame(Main.LOAD_GAME);
                 ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
                 CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
                 return CoopServer.Instance.ToString();

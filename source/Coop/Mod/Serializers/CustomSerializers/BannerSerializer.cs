@@ -1,7 +1,9 @@
-﻿using TaleWorlds.Core;
+﻿using System;
+using TaleWorlds.Core;
 
 namespace Coop.Mod.Serializers
 {
+    [Serializable]
     internal class BannerSerializer : ICustomSerializer
     {
         private string data;

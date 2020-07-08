@@ -11,6 +11,12 @@ using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Serializers
 {
+    /// <summary>
+    /// Property owner objects are serializable.
+    /// This class reuses existing serialization functionality.
+    /// </summary>
+    /// <typeparam name="T">Subclass of PropertyOwner</typeparam>
+    [Serializable]
     public class PropertyOwnerSerializer<T> : ICustomSerializer where T : MBObjectBase 
     {
         string data;

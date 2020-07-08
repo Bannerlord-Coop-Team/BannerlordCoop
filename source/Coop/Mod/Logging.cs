@@ -26,12 +26,12 @@ namespace Coop.Mod
                 IncludeSourceInfo = true
             };
 
-            config.AddRule(LogLevel.Info, LogLevel.Fatal, logFile);
+            config.AddRule(LogLevel.Trace, LogLevel.Fatal, logFile);
             // config.AddRule(LogLevel.Debug, LogLevel.Fatal, debugOutput);
             config.AddRule(LogLevel.Trace, LogLevel.Fatal, viewer);
             foreach (Target t in appSpecificTargets)
             {
-                config.AddRule(LogLevel.Info, LogLevel.Fatal, t);
+                config.AddRule(LogLevel.Trace, LogLevel.Fatal, t);
             }
 
             LogManager.Configuration = config;

@@ -1,41 +1,51 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Serializers
 {
     [Serializable]
     public class MobilePartySerializer : CustomSerializer
     {
+        /// <summary>
+        /// Used for circular reference
+        /// </summary>
         [NonSerialized]
         public MobileParty mobileParty;
+
+        /// <summary>
+        /// Used for circular reference
+        /// </summary>
+        [NonSerialized]
+        PlayerHeroSerializer hero;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+
         List<string> attachedPartiesNames = new List<string>();
         string name;
         
-        public MobilePartySerializer(MobileParty mobileParty, PlayerHeroSerializer hero) : base(mobileParty)
+        public MobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
         {
             name = mobileParty.Name.ToString();
 
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
+                // Get value from fieldInfo
                 object value = fieldInfo.GetValue(mobileParty);
 
+                // If value is null, no need to serialize
                 if (value == null)
                 {
                     continue;
                 }
 
+                // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
                     case "_currentSettlement":
@@ -46,9 +56,10 @@ namespace Coop.Mod.Serializers
                         break;
                     case "<Ai>k__BackingField":
                         // PartyAi
+                        // NOTE may not be needed due to player control
                         break;
                     case "<Party>k__BackingField":
-                        SNNSO.Add(fieldInfo, new PartyBaseSerializer((PartyBase)value, this , hero));
+                        SNNSO.Add(fieldInfo, new PartyBaseSerializer((PartyBase)value));
                         break;
                     case "_disorganizedUntilTime":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
@@ -91,25 +102,49 @@ namespace Coop.Mod.Serializers
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
                 }
             }
+
+            // TODO manage collections
+
+            // Remove non serializable objects before serialization
+            // They are marked as nonserializable in CustomSerializer but still tries to serialize???
+            NonSerializableCollections.Clear();
+            NonSerializableObjects.Clear();
         }
+
+        /// <summary>
+        /// For assigning PlayerHeroSerializer reference for deserialization
+        /// </summary>
+        /// <param name="hero">PlayerHeroSerializer used by partyBaseSerializer</param>
+        public void SetHeroReference(PlayerHeroSerializer hero)
+        {
+            this.hero = hero;
+        }
+
         public override object Deserialize()
         {
             MobileParty newMobileParty = MobileParty.Create(name);
 
-            foreach(FieldInfo fieldInfo in SerializableObjects.Keys)
+            // Circular referenced object needs assignment before deserialize
+            if (hero == null)
             {
-                fieldInfo.SetValue(newMobileParty, SerializableObjects[fieldInfo]);
+                throw new SerializationException("Must set hero reference before deserializing. Use SetHeroReference()");
             }
 
-            foreach(FieldInfo fieldInfo in SNNSO.Keys)
+            // Objects requiring a custom serializer
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
-                fieldInfo.SetValue(newMobileParty, SNNSO[fieldInfo]);
+                // Pass references to specified serializers
+                switch (entry.Value)
+                {
+                    case PartyBaseSerializer partyBaseSerializer:
+                        partyBaseSerializer.SetHeroReference(hero);
+                        partyBaseSerializer.SetMobilePartyReference(this);
+                        break;
+                }
+                entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
             }
 
-            MobileParty.All.FindIndex((party) => { return true; });
-            MobileParty clientParty = MBObjectManager.Instance.CreateObject<MobileParty>("");
-            clientParty.SetAsMainParty();
-            throw new NotImplementedException();
+            return base.Deserialize(newMobileParty);
         }
     }
 }

@@ -9,43 +9,56 @@ using System.Xml;
 using TaleWorlds.Core;
 using System.IO;
 using System.Collections;
+using TaleWorlds.ObjectSystem;
+using System.Runtime.Serialization;
 
 namespace Coop.Mod.Serializers
 {
     [Serializable]
     public class CharacterObjectSerializer : CustomSerializer
     {
-        //XmlDocument document;
-        PlayerHeroSerializer heroSerializer;
+        /// <summary>
+        /// Used for circular reference
+        /// </summary>
+        [NonSerialized]
+        private PlayerHeroSerializer heroObject;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        
 
-        public CharacterObjectSerializer() { }
-
-        public CharacterObjectSerializer(CharacterObject characterObject, PlayerHeroSerializer hero) : base(characterObject)
+        public CharacterObjectSerializer(CharacterObject characterObject) : base(characterObject)
         {
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
+                // Get value from fieldInfo
+                object value = fieldInfo.GetValue(characterObject);
+
+                // If value is null, no need to serialize
+                if (value == null)
+                {
+                    continue;
+                }
+
+                // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
                     case "_heroObject":
-                        heroSerializer = hero;
+                        // Assigned by SetHeroReference on deserialization
                         break;
 
                     case "_characterTraits":
-                        SNNSO.Add(fieldInfo, new CharacterTraitsSerializer((CharacterTraits)fieldInfo.GetValue(characterObject)));
+                        SNNSO.Add(fieldInfo, new CharacterTraitsSerializer((CharacterTraits)value));
                         break;
 
                     case "_characterFeats":
-                        SNNSO.Add(fieldInfo, new CharacterFeatsSerializer((CharacterFeats)fieldInfo.GetValue(characterObject)));
+                        SNNSO.Add(fieldInfo, new CharacterFeatsSerializer((CharacterFeats)value));
                         break;
 
                     case "_characterSkills":
-                        CharacterSkills characterSkills = (CharacterSkills)fieldInfo.GetValue(characterObject);
-                        SNNSO.Add(fieldInfo, new CharacterSkillsSerializer(characterSkills));
+                        SNNSO.Add(fieldInfo, new CharacterSkillsSerializer((CharacterSkills)value));
                         break;
 
                     default:
@@ -53,21 +66,43 @@ namespace Coop.Mod.Serializers
                     
                 }
             }
+
+            // TODO manage collections
+
+            // Remove non serializable objects before serialization
+            // They are marked as nonserializable in CustomSerializer but still tries to serialize???
+            NonSerializableCollections.Clear();
+            NonSerializableObjects.Clear();
+        }
+
+        /// <summary>
+        /// For assigning PlayerHeroSerializer reference for deserialization
+        /// </summary>
+        /// <param name="heroObject">PlayerHeroSerializer used by _heroObject</param>
+        public void SetHeroReference(PlayerHeroSerializer heroObject)
+        {
+            this.heroObject = heroObject;
         }
 
         public override object Deserialize()
         {
-            CharacterObject characterObject = new CharacterObject();
+            CharacterObject characterObject = MBObjectManager.Instance.CreateObject<CharacterObject>();
 
-            // Cross referenced objects
+            // Circular referenced object needs assignment before deserialize
+            if(heroObject == null)
+            {
+                throw new SerializationException("Must set hero reference before deserializing. Use SetHeroReference()");
+            }
+
+            // Circular referenced objects
             typeof(CharacterObject)
                 .GetField("_heroObject", BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(characterObject, heroSerializer.hero);
+                .SetValue(characterObject, heroObject.hero);
 
             // Objects requiring a custom serializer
-            foreach (FieldInfo fieldInfo in SNNSO.Keys)
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
-                fieldInfo.SetValue(characterObject, SNNSO[fieldInfo].Deserialize());
+                entry.Key.SetValue(characterObject, entry.Value.Deserialize());
             }
 
             return base.Deserialize(characterObject);

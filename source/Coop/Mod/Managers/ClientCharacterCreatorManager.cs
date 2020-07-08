@@ -32,8 +32,8 @@ namespace Coop.Mod.Managers
         }
         public ClientCharacterCreatorManager(LoadResult saveGameData) : base(saveGameData) { }
 
-        public delegate void OnOnLoadFinishedEventHandler(object source, EventArgs e);
-        public static event OnOnLoadFinishedEventHandler OnLoadFinishedEvent;
+        public delegate void OnLoadFinishedEventHandler(object source, EventArgs e);
+        public static event OnLoadFinishedEventHandler OnLoadFinishedEvent;
 
         public MobileParty ClientParty { get; private set; }
         public Hero ClientHero { get; private set; }
@@ -51,14 +51,13 @@ namespace Coop.Mod.Managers
             {
                 SkipCharacterCreation();
                 ClientHero = Hero.MainHero;
+                PlayerHeroSerializer serializablePlayerHero = new PlayerHeroSerializer(Hero.MainHero);
+                CoopClient.Instance.SyncedObjectStore.Insert(serializablePlayerHero);
                 // TODO find way to exit in character creation
                 // Pop tutorial state
                 Game.Current.GameStateManager.PopState(0);
                 // Pop game state
                 Game.Current.GameStateManager.PopState(0);
-
-                PlayerHeroSerializer hero = new PlayerHeroSerializer(ClientHero);
-
                 // TODO use HeroCreator.CreateNewHero
                 // TODO Populate using CharacterCreator
                 // TODO Override 

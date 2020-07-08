@@ -72,7 +72,7 @@ namespace Coop.Tests
             Assert.False(m_Client.ClientPlaying);
             ConnectClient();
             await WaitForClientConnect();
-            Assert.True(m_Client.Connected);
+            Assert.True(m_Client.ClientPlaying);
         }
 
         [Fact(Timeout = 2000)]
@@ -84,20 +84,20 @@ namespace Coop.Tests
             m_Client.Session.OnConnectionDestroyed += connection => { iConnectionsDestroyed++; };
             ConnectClient();
             await WaitForClientConnect();
-            Assert.True(m_Client.Connected);
+            Assert.True(m_Client.ClientPlaying);
             Assert.Equal(1, iConnectionsCreated);
             Assert.Equal(0, iConnectionsDestroyed);
 
             // Wait for the timeout
             await WaitForTimeout();
-            Assert.False(m_Client.Connected);
+            Assert.False(m_Client.ClientPlaying);
             Assert.Equal(1, iConnectionsCreated);
             Assert.Equal(1, iConnectionsDestroyed);
             Assert.Null(m_Client.Session.Connection);
 
             // Wait for the reconnect
             await WaitForClientConnect();
-            Assert.True(m_Client.Connected);
+            Assert.True(m_Client.ClientPlaying);
             Assert.Equal(2, iConnectionsCreated);
             Assert.Equal(1, iConnectionsDestroyed);
             Assert.NotNull(m_Client.Session.Connection);
@@ -108,11 +108,11 @@ namespace Coop.Tests
         {
             ConnectClient();
             await WaitForClientConnect();
-            Assert.True(m_Client.Connected);
+            Assert.True(m_Client.ClientPlaying);
 
             // Wait for the timeout
             await  WaitForTimeout();
-            Assert.False(m_Client.Connected);
+            Assert.False(m_Client.ClientPlaying);
         }
     }
 }

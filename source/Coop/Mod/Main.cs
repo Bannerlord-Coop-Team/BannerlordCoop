@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -6,14 +6,12 @@ using Common;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
-using Coop.Mod.UI;
 using Coop.Mod.Patch;
 
 using HarmonyLib;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
-using Sync;
 using TaleWorlds.Library;
 using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
@@ -21,12 +19,12 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine.Screens;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.MountAndBlade.View.Missions;
 
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
-using Coop.Mod.Patch;
 using Network.Infrastructure;
+using Coop.Mod.UI;
+using TaleWorlds.MountAndBlade.View.Missions;
 
 namespace Coop.Mod
 {

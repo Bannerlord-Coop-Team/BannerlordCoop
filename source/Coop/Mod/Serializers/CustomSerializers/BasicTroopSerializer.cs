@@ -1,20 +1,22 @@
-﻿using TaleWorlds.CampaignSystem;
+﻿using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Serializers
 {
+    [Serializable]
     internal class BasicTroopSerializer : ICustomSerializer
     {
-        MBGUID MBGUID;
+        MBGUIDSerializer id;
 
         public BasicTroopSerializer(CharacterObject value)
         {
-            MBGUID = value.Id;
+            id = new MBGUIDSerializer(value.Id);
         }
 
         public object Deserialize()
         {
-            return MBObjectManager.Instance.GetObject(MBGUID);
+            return MBObjectManager.Instance.GetObject((MBGUID)id.Deserialize());
         }
     }
 }

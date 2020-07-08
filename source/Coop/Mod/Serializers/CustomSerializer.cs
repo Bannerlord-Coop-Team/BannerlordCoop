@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -18,11 +19,11 @@ namespace Coop.Mod.Serializers
     {
         public Type ObjectType { get; private set; }
         public readonly Dictionary<FieldInfo, object> SerializableObjects = new Dictionary<FieldInfo, object>();
-        public readonly List<ICollection> Collections = new List<ICollection>();
+        public readonly Dictionary<FieldInfo, ICollection> Collections = new Dictionary<FieldInfo, ICollection>();
 
-        [NonSerialized]
+        [IgnoreDataMember]
         public readonly List<FieldInfo> NonSerializableObjects = new List<FieldInfo>();
-        [NonSerialized]
+        [IgnoreDataMember]
         public readonly List<ICollection> NonSerializableCollections = new List<ICollection>();
 
         protected CustomSerializer() { }
@@ -34,9 +35,20 @@ namespace Coop.Mod.Serializers
             {
                 if(!field.IsLiteral)
                 {
-                    if(field.FieldType is ICollection)
+                    // Is field collection
+                    if(field.FieldType.GetInterface(nameof(ICollection)) != null)
                     {
-                        Collections.Add((ICollection)field.GetValue(obj));
+                        // If collection is serializable add to Collections list
+                        if(IsCollectionSerializableRecursive(field.FieldType))
+                        {
+                            Collections.Add(field, (ICollection)field.GetValue(obj));
+                        }
+                        // otherwise, add to NonSerializableCollections list
+                        else
+                        {
+                            NonSerializableCollections.Add((ICollection)field.GetValue(obj));
+                        }
+                        
                     }
                     else if (field.FieldType.IsSerializable)
                     {
@@ -54,8 +66,17 @@ namespace Coop.Mod.Serializers
             }
         }
 
+        /// <summary>
+        /// Deserialized object
+        /// </summary>
+        /// <returns>New instantiated object</returns>
         public abstract object Deserialize();
 
+        /// <summary>
+        /// Assigns natively serializable fields
+        /// </summary>
+        /// <param name="newObj">Object to assign values</param>
+        /// <returns>Object</returns>
         protected virtual object Deserialize(object newObj)
         {
             foreach (FieldInfo field in SerializableObjects.Keys)
@@ -65,14 +86,46 @@ namespace Coop.Mod.Serializers
             return newObj;
         }
 
+        /// <summary>
+        /// Get all fields from type
+        /// </summary>
+        /// <returns>FieldInfo[]</returns>
         protected FieldInfo[] GetFields()
         {
             return ObjectType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         }
 
-        protected PropertyInfo[] GetProperties()
+        /// <summary>
+        /// Checks if collection has serializable elements
+        /// </summary>
+        /// <param name="type">Type from collection</param>
+        /// <returns>If collection is completely serializable</returns>
+        private bool IsCollectionSerializableRecursive(Type type)
         {
-            return ObjectType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            List<Type> elementTypes = new List<Type>(type.GetGenericArguments());
+
+            // Native arrays do not have generic arguments
+            if (elementTypes.Count == 0 && type.IsArray)
+            {
+                elementTypes.Add(type.GetElementType());
+            }
+
+            // Return true if list is empty, but never should be empty
+            // TODO add validate to result or change to false
+            bool result = true;
+            foreach(Type elementType in elementTypes)
+            {
+                if (elementType.GetInterface(nameof(ICollection)) != null)
+                {
+                    result &= IsCollectionSerializableRecursive(elementType);
+                }
+                else
+                {
+                    return elementType.IsSerializable;
+                }
+            }
+            return result;
         }
     }
 }

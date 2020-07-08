@@ -18,7 +18,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\x64\Debug\</OutputPath>
+    <OutputPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Coop\bin\Win64_Shipping_Client\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <DebugType>full</DebugType>
@@ -95,6 +95,22 @@
     <Reference Include="Steamworks.NET, Version=13.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\Steamworks.NET.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode.GauntletUI, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.View.dll</HintPath>
+    </Reference>
+    <Reference Include="StoryMode.ViewModelCollection, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -185,11 +201,19 @@
     <Reference Include="TaleWorlds.MountAndBlade.Diamond">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Diamond.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.GauntletUI, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.Helpers">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Helpers.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>E:\Steam Games\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
@@ -245,6 +269,9 @@
     <Compile Include="Mod\GameEnvironmentClient.cs" />
     <Compile Include="Mod\GameLoopRunner.cs" />
     <Compile Include="Mod\Logging.cs" />
+    <Compile Include="Mod\Managers\ClientCharacterCreatorManager.cs" />
+    <Compile Include="Mod\Managers\ClientManager.cs" />
+    <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
     <Compile Include="Mod\Patch\Debugging.cs" />
     <Compile Include="Mod\Patch\Exceptions.cs" />
@@ -291,6 +318,37 @@
     <Compile Include="Mod\GameEnvironmentServer.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Mod\Main.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\BannerSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\BasicTroopSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\CampaignTimeSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\CharacterObjectSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\ClanSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\CultureObjectSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\DeterministicRandomSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\EquipmentElementSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\EquipmentSerialzer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\HeroDeveloperSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\HeroLastSeenInformationSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\HeroSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\ItemRosterSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\MBGUIDSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\MobilePartiesAroundPositionListSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\MobilePartySerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\NavigationPathSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\PartyBaseSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\PathFaceRecordSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\PlayerHeroSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\SettlementSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\TroopRosterSerializer.cs" />
+    <Compile Include="Mod\Serializers\MBObjectSerializer.cs" />
+    <Compile Include="Mod\Serializers\PropertyOwnerSerializer.cs" />
+    <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterFeatsSerializer.cs" />
+    <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterPerksSerializer.cs" />
+    <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterSkillsSerializer.cs" />
+    <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterTraitsSerializer.cs" />
+    <Compile Include="Mod\UI\CharacterCreationUI\CharacterCreationUI.cs" />
+    <Compile Include="Mod\UI\LoadGameUI\CoopLoadUI.cs" />
     <Compile Include="NetImpl\LiteNet\Extensions.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerClient.cs" />
@@ -333,7 +391,8 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll</PostBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

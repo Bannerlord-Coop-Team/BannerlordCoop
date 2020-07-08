@@ -1,7 +1,9 @@
-﻿using TaleWorlds.CampaignSystem;
+﻿using System;
+using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Serializers
 {
+    [Serializable]
     internal class PathFaceRecordSerializer : ICustomSerializer
     {
         private int pathFaceIndex;

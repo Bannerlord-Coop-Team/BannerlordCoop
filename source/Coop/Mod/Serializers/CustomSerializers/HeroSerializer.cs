@@ -16,7 +16,7 @@ namespace Coop.Mod.Serializers
 
         public object Deserialize()
         {
-            return Hero.FindFirst((hero) => { return hero.Name.ToString() == name; });
+            return Hero.FindFirst((hero) => { return hero.Name?.ToString() == name; });
         }
     }
 }

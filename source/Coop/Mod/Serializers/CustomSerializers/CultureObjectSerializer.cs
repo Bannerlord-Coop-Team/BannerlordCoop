@@ -6,17 +6,8 @@ using TaleWorlds.ObjectSystem;
 namespace Coop.Mod.Serializers
 {
     [Serializable]
-    internal class CultureObjectSerializer : ICustomSerializer
+    internal class CultureObjectSerializer : MBObjectSerializer
     {
-        MBGUID cultureId;
-        public CultureObjectSerializer(CultureObject culture)
-        {
-            cultureId = culture.Id;
-        }
-
-        public object Deserialize()
-        {
-            return MBObjectManager.Instance.GetObject(cultureId);
-        }
+        public CultureObjectSerializer(CultureObject culture) : base(culture) { }
     }
 }

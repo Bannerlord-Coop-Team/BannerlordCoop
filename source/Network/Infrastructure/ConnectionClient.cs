@@ -88,6 +88,9 @@ namespace Network.Infrastructure
         }
 
         public override EConnectionState State => m_StateMachine.State;
+
+        public Action<ConnectionClient> OnClientJoined { get; set; }
+
         public event Action<ConnectionClient> OnClientLoaded;
         public event Action<EDisconnectReason> OnDisconnected;
         public event Action<ConnectionClient> OnCharacterCreated;

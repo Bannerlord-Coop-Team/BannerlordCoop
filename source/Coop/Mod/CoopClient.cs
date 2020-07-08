@@ -3,13 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using Common;
+using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
 using RailgunNet.Logic;
+using StoryMode;
 using Sync.Store;
+using TaleWorlds.MountAndBlade;
 
 namespace Coop.Mod
 {
@@ -31,7 +34,9 @@ namespace Coop.Mod
 
         private int m_ReconnectAttempts = MaxReconnectAttempts;
 
+        public Action<RemoteStore> RemoteStoreCreated;
         public Action<PersistenceClient> OnPersistenceInitialized;
+        private MBGameManager gameManager;
 
         public CoopClient()
         {
@@ -40,7 +45,7 @@ namespace Coop.Mod
             m_NetManager = new LiteNetManagerClient(Session);
             GameState = new CoopGameState();
             Events = new CoopEvents();
-            Events.OnGameLoaded.AddNonSerializedListener(this, Init);
+            Init();
         }
 
         /// <summary>
@@ -58,7 +63,7 @@ namespace Coop.Mod
         public CoopGameState GameState { get; }
         public CoopEvents Events { get; }
 
-        public bool Connected
+        public bool ClientPlaying
         {
             get
             {
@@ -68,6 +73,20 @@ namespace Coop.Mod
                 }
 
                 return Session.Connection.State == EConnectionState.ClientPlaying;
+            }
+        }
+
+        public bool ClientRequestingWorldData
+        {
+            get
+            {
+                if (Session.Connection == null)
+                {
+                    return false;
+                }
+
+                // TODO change to main menu state
+                return Session.Connection.State == EConnectionState.ClientJoinRequesting;
             }
         }
 
@@ -116,11 +135,44 @@ namespace Coop.Mod
                 throw new ArgumentNullException(nameof(con));
             }
 
-            m_ReconnectAttempts = MaxReconnectAttempts;
-            TryInitPersistence(con);
             SyncedObjectStore = new RemoteStore(m_SyncedObjects, con);
-            con.OnClientJoined += TryInitPersistence;
-            con.OnDisconnected += ConnectionClosed;
+            RemoteStoreCreated?.Invoke(SyncedObjectStore);
+
+            #region events
+            // Upward
+            Session.Connection.RequireCharacterCreation += CreateCharacter;
+            Session.Connection.OnCharacterCreated += CharacterCreated;
+
+            Session.Connection.OnClientLoaded += TryInitPersistence;
+            Session.Connection.OnDisconnected += ConnectionClosed;
+            #endregion
+
+            // Downward
+            if (con.State == EConnectionState.ClientLoading)
+            {
+                ClientCharacterCreatorManager.OnLoadFinishedEvent += Session.Connection.sendGameLoaded;
+            }
+        }
+
+        private void CreateCharacter(ConnectionClient con)
+        {
+            if (gameManager == null)
+            {
+                gameManager = new ClientCharacterCreatorManager();
+                MBGameManager.StartNewGame(gameManager);
+                ClientCharacterCreatorManager.OnLoadFinishedEvent += (object source, EventArgs e) =>
+                {
+                    StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, () =>
+                    {
+                        CharacterCreated(con);
+                    });
+                };
+            }
+        }
+
+        private void CharacterCreated(ConnectionClient con)
+        {
+            // Switch state
         }
 
         private void ConnectionClosed(EDisconnectReason eReason)

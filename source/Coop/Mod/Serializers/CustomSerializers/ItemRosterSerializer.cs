@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace Coop.Mod.Serializers
 {
@@ -14,45 +15,42 @@ namespace Coop.Mod.Serializers
 
         public ItemRosterSerializer(ItemRoster roster)
         {
-        
             foreach (ItemRosterElement item in roster)
             {
-                using (MemoryStream stream = new MemoryStream())
-                {
-                    using (BinaryWriter writer = new BinaryWriter(stream))
-                    {
-                        typeof(ItemRosterElement)
-                            .GetMethod("SerializeTo", BindingFlags.NonPublic | BindingFlags.Instance)
-                            .Invoke(item, new object[] { writer });
-                        data.Add(stream.ToArray());
-                    }
-                }
+                // TaleWorlds BinaryWriter
+                BinaryWriter writer = new BinaryWriter();
+                // Have to get method info different due to the method being an explicit interface implementation
+                MethodInfo serializeTo = typeof(ItemRosterElement)
+                    .GetInterfaceMap(typeof(ISerializableObject))
+                    .InterfaceMethods.First((methodInfo) => { return methodInfo.Name == "SerializeTo"; });
+                serializeTo.Invoke(item, new object[] { writer });
+                data.Add(writer.Data);
             }
-
         }
 
-            public object Deserialize()
+        public object Deserialize()
+        {
+            ItemRoster newRoster = new ItemRoster();
+
+            List<ItemRosterElement> items = new List<ItemRosterElement>();
+            foreach (byte[] element in data)
             {
-                ItemRoster newRoster = new ItemRoster();
-                MethodInfo addItem = typeof(ItemRoster).GetMethod("Add", BindingFlags.NonPublic | BindingFlags.Instance);
+                ItemRosterElement newItem = new ItemRosterElement();
+                // TaleWorlds BinaryReader
+                BinaryReader reader = new BinaryReader(element);
+                // Have to get method info different due to the method being an explicit interface implementation
+                MethodInfo deserializeFrom = typeof(ItemRosterElement)
+                    .GetInterfaceMap(typeof(ISerializableObject))
+                    .InterfaceMethods.First((methodInfo) => { return methodInfo.Name == "DeserializeFrom"; });
+                deserializeFrom.Invoke(newItem, new object[] { reader });
+                items.Add(newItem);
+            }
 
-                foreach (byte[] element in data)
-                {
-                    using (MemoryStream stream = new MemoryStream())
-                    {
-                        stream.Read(element, 0, element.Length);
-                        using (BinaryReader reader = new BinaryReader(stream))
-                        {
-                            ItemRosterElement newItem = new ItemRosterElement();
-                            typeof(ItemRosterElement)
-                            .GetMethod("DeserializeFrom", BindingFlags.NonPublic | BindingFlags.Instance)
-                            .Invoke(newItem, new object[] { reader });
-                            addItem.Invoke(newRoster, new object[] { newItem });
-                        }
-                    }
-                }
+            typeof(ItemRoster)
+                .GetField("_data", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(newRoster, items.ToArray());
 
-                return newRoster;
+            return newRoster;
             }
         }
 }
