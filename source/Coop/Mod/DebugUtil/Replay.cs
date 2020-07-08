@@ -236,6 +236,12 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
+        /// <summary>
+        /// Record party movement while first and second steps
+        /// </summary>
+        /// <param name="entityId"></param>
+        /// <param name="party"></param>
+        /// <param name="movement"></param>
         private static void OnEventRecording(EntityId entityId, MobileParty party, MovementData movement)
         {
             RecordingEventList.Add(new ReplayEvent()
@@ -249,15 +255,21 @@ namespace Coop.Mod.DebugUtil
                 Logger.Info("[REPLAY] Yet one player's moving recorded.");
         }
 
-        public static void OnEventPlayback()
+        /// <summary>
+        /// Replay main party movement
+        /// </summary>
+        private static void OnEventPlayback()
         {
             var now = CampaignTime.Now;
 
+            // start recording for second step
             if (firstTick <= now)
             {
                 ReplayRecording += OnEventRecording;
                 firstTick = CampaignTime.Never;
             }
+            else
+                return;
 
             var replay = PlaybackMainPartyList.FirstOrDefault(q => !q.applied && q.time <= now);
             if (replay != null)
@@ -278,6 +290,7 @@ namespace Coop.Mod.DebugUtil
                 Logger.Info("[REPLAY] Moving to new position.");
             }
 
+            // stop recording end playback when all recorded movements was replayed
             if (lastTick <= now)
             {
                 Stop();
