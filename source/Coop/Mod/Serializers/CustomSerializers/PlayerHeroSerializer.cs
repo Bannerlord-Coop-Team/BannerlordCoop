@@ -140,13 +140,13 @@ namespace Coop.Mod.Serializers
                 switch (entry.Value)
                 {
                     case CharacterObjectSerializer characterObjectSerializer:
-                        characterObjectSerializer.SetHeroReference(this);
+                        characterObjectSerializer.SetHeroReference(hero);
                         break;
                     case ClanSerializer clanSerializer:
-                        clanSerializer.SetHeroReference(this);
+                        clanSerializer.SetHeroReference(hero);
                         break;
                     case MobilePartySerializer mobilePartySerializer:
-                        mobilePartySerializer.SetHeroReference(this);
+                        mobilePartySerializer.SetHeroReference(hero);
                         break;
                 }
 

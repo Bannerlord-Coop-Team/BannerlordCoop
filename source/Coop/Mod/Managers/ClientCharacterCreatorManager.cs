@@ -52,12 +52,9 @@ namespace Coop.Mod.Managers
                 SkipCharacterCreation();
                 ClientHero = Hero.MainHero;
                 PlayerHeroSerializer serializablePlayerHero = new PlayerHeroSerializer(Hero.MainHero);
-                CoopClient.Instance.SyncedObjectStore.Insert(serializablePlayerHero);
+                //CoopClient.Instance.SyncedObjectStore.Insert(serializablePlayerHero);
                 // TODO find way to exit in character creation
-                // Pop tutorial state
-                Game.Current.GameStateManager.PopState(0);
-                // Pop game state
-                Game.Current.GameStateManager.PopState(0);
+                EndGame();
                 // TODO use HeroCreator.CreateNewHero
                 // TODO Populate using CharacterCreator
                 // TODO Override 

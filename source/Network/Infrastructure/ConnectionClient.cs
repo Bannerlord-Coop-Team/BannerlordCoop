@@ -2,7 +2,6 @@
 using Network.Protocol;
 using NLog;
 using Stateless;
-using StoryMode;
 using Version = Network.Protocol.Version;
 
 namespace Network.Infrastructure
@@ -51,17 +50,18 @@ namespace Network.Infrastructure
                               EConnectionState.ClientPlaying,
                               () => !m_WorldData.RequiresInitialWorldData);
 
+            // Character Creation
             m_StateMachine.Configure(EConnectionState.ClientCharacterCreation)
                           .OnEntry(characterCreation)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
                           .PermitIf(
                               ETrigger.CharacterCreated,
                               EConnectionState.ClientAwaitingWorldData,
-                              () => m_WorldData.RequiresCharacterCreation)
+                              () => m_WorldData.RequiresInitialWorldData)
                           .PermitIf(
-                              ETrigger.ServerAcceptedJoinRequest,
+                              ETrigger.CharacterCreated,
                               EConnectionState.ClientPlaying,
-                              () => !m_WorldData.RequiresCharacterCreation);
+                              () => !m_WorldData.RequiresInitialWorldData);
 
             // Client request world data
             m_StateMachine.Configure(EConnectionState.ClientAwaitingWorldData)
@@ -81,10 +81,17 @@ namespace Network.Infrastructure
 
             // Client playing (game loaded)
             m_StateMachine.Configure(EConnectionState.ClientPlaying)
-                          .OnEntry(onConnected)
+                          .OnEntry(clientLoaded)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting);
 
             Dispatcher.RegisterPacketHandlers(this);
+
+            m_StateMachine.OnTransitioned((stateMachine) =>
+            {
+                Logger.Debug($"Client switched from {stateMachine.Source} " + 
+                    $"to {stateMachine.Source} " +  
+                    $"with trigger {stateMachine.Trigger}.");
+            });
         }
 
         public override EConnectionState State => m_StateMachine.State;
@@ -180,6 +187,11 @@ namespace Network.Infrastructure
         {
             RequireCharacterCreation?.Invoke(this);
         }
+
+        public void CharacterCreationOver()
+        {
+            m_StateMachine.Fire(ETrigger.CharacterCreated);
+        }
         #endregion
 
         #region ClientAwaitingWorldData
@@ -240,7 +252,7 @@ namespace Network.Infrastructure
         #endregion
 
         #region ClientPlaying
-        private void onConnected()
+        private void clientLoaded()
         {
             Send(new Packet(EPacket.Client_Joined, new Client_Joined().Serialize()));
             OnClientLoaded?.Invoke(this);

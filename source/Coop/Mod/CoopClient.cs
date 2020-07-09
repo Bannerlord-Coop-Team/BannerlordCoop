@@ -12,7 +12,9 @@ using NLog;
 using RailgunNet.Logic;
 using StoryMode;
 using Sync.Store;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using Logger = NLog.Logger;
 
 namespace Coop.Mod
 {
@@ -86,7 +88,8 @@ namespace Coop.Mod
                 }
 
                 // TODO change to main menu state
-                return Session.Connection.State == EConnectionState.ClientJoinRequesting;
+                return Session.Connection.State == EConnectionState.ClientJoinRequesting || 
+                    Session.Connection.State == EConnectionState.ClientCharacterCreation;
             }
         }
 
@@ -150,7 +153,7 @@ namespace Coop.Mod
             // Downward
             if (con.State == EConnectionState.ClientLoading)
             {
-                ClientCharacterCreatorManager.OnLoadFinishedEvent += Session.Connection.sendGameLoaded;
+                ClientManager.OnLoadFinishedEvent += Session.Connection.sendGameLoaded;
             }
         }
 
@@ -164,7 +167,10 @@ namespace Coop.Mod
                 {
                     StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, () =>
                     {
-                        CharacterCreated(con);
+                        if(con.State == EConnectionState.ClientCharacterCreation)
+                        {
+                            CharacterCreated(con);
+                        }
                     });
                 };
             }
@@ -172,7 +178,8 @@ namespace Coop.Mod
 
         private void CharacterCreated(ConnectionClient con)
         {
-            // Switch state
+            con.CharacterCreationOver();
+            gameManager = null;
         }
 
         private void ConnectionClosed(EDisconnectReason eReason)

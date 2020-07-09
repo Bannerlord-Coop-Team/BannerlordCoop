@@ -21,7 +21,7 @@ namespace Coop.Mod.Serializers
         /// Used for circular reference
         /// </summary>
         [NonSerialized]
-        private PlayerHeroSerializer heroObject;
+        private Hero heroObject;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
@@ -79,7 +79,7 @@ namespace Coop.Mod.Serializers
         /// For assigning PlayerHeroSerializer reference for deserialization
         /// </summary>
         /// <param name="heroObject">PlayerHeroSerializer used by _heroObject</param>
-        public void SetHeroReference(PlayerHeroSerializer heroObject)
+        public void SetHeroReference(Hero heroObject)
         {
             this.heroObject = heroObject;
         }
@@ -97,7 +97,7 @@ namespace Coop.Mod.Serializers
             // Circular referenced objects
             typeof(CharacterObject)
                 .GetField("_heroObject", BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(characterObject, heroObject.hero);
+                .SetValue(characterObject, heroObject);
 
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)

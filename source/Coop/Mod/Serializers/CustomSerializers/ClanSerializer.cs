@@ -19,7 +19,7 @@ namespace Coop.Mod.Serializers
         /// Used for circular reference
         /// </summary>
         [NonSerialized]
-        PlayerHeroSerializer _leader;
+        Hero _leader;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
@@ -98,7 +98,7 @@ namespace Coop.Mod.Serializers
         /// For assigning PlayerHeroSerializer reference for deserialization
         /// </summary>
         /// <param name="leader">PlayerHeroSerializer used by _leader</param>
-        public void SetHeroReference(PlayerHeroSerializer leader)
+        public void SetHeroReference(Hero leader)
         {
             _leader = leader;
         }
@@ -115,7 +115,7 @@ namespace Coop.Mod.Serializers
             }
 
             // Circular referenced objects
-            newClan.GetType().GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(newClan, _leader.hero);
+            newClan.GetType().GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(newClan, _leader);
 
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)

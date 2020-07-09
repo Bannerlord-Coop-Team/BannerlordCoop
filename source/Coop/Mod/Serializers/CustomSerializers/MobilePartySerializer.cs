@@ -20,7 +20,7 @@ namespace Coop.Mod.Serializers
         /// Used for circular reference
         /// </summary>
         [NonSerialized]
-        PlayerHeroSerializer hero;
+        Hero hero;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
@@ -115,7 +115,7 @@ namespace Coop.Mod.Serializers
         /// For assigning PlayerHeroSerializer reference for deserialization
         /// </summary>
         /// <param name="hero">PlayerHeroSerializer used by partyBaseSerializer</param>
-        public void SetHeroReference(PlayerHeroSerializer hero)
+        public void SetHeroReference(Hero hero)
         {
             this.hero = hero;
         }
@@ -138,7 +138,7 @@ namespace Coop.Mod.Serializers
                 {
                     case PartyBaseSerializer partyBaseSerializer:
                         partyBaseSerializer.SetHeroReference(hero);
-                        partyBaseSerializer.SetMobilePartyReference(this);
+                        partyBaseSerializer.SetMobilePartyReference(newMobileParty);
                         break;
                 }
                 entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());

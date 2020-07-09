@@ -56,7 +56,7 @@ namespace Coop.Mod
 
             if (Current == null)
             {
-                Server.EType eServerType = Server.EType.Direct;
+                Server.EType eServerType = Server.EType.Threaded;
                 Current = new Server(eServerType);
 
                 SyncedObjectStore = new SharedRemoteStore();
@@ -67,7 +67,7 @@ namespace Coop.Mod
                 Current.OnClientConnected += OnClientConnected;
                 Current.OnClientDisconnected += OnClientDisconnected;
 
-                if (eServerType == Server.EType.Threaded)
+                if (eServerType == Server.EType.Direct)
                 {
                     Main.Instance.Updateables.Add(Current);
                 }

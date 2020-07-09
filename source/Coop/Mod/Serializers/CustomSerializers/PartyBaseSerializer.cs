@@ -11,12 +11,10 @@ namespace Coop.Mod.Serializers
     [Serializable]
     public class PartyBaseSerializer : CustomSerializer
     {
-        // TODO add setters and use in parent, see characterobjectserializer
         [NonSerialized]
-        MobilePartySerializer mobilePartySerializer;
-        // TODO add setters and use in parent, see characterobjectserializer
+        MobileParty mobileParty;
         [NonSerialized]
-        PlayerHeroSerializer heroSerializer;
+        Hero hero;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
@@ -67,40 +65,42 @@ namespace Coop.Mod.Serializers
                 }
             }
 
+            FieldInfo indexField = partyBase.GetType().GetField("_index", BindingFlags.Instance | BindingFlags.NonPublic);
+            SerializableObjects.Remove(indexField);
             NonSerializableCollections.Clear();
             NonSerializableObjects.Clear();
         }
 
-        public void SetHeroReference(PlayerHeroSerializer playerHeroSerializer)
+        public void SetHeroReference(Hero hero)
         {
-            heroSerializer = playerHeroSerializer;
+            this.hero = hero;
         }
 
-        public void SetMobilePartyReference(MobilePartySerializer mobilePartySerializer)
+        public void SetMobilePartyReference(MobileParty mobileParty)
         {
-            this.mobilePartySerializer = mobilePartySerializer;
+            this.mobileParty = mobileParty;
         }
 
         public override object Deserialize()
         {
-            if (heroSerializer == null)
+            if (hero == null)
             {
                 throw new SerializationException("Must set hero reference before deserializing. Use SetHeroReference()");
             }
-            else if(mobilePartySerializer == null)
+            else if(mobileParty == null)
             {
                 throw new SerializationException("Must set mobileParty reference before deserializing. Use SetMobilePartyReference()");
             }
 
-            PartyBase newPartyBase = new PartyBase(mobilePartySerializer.mobileParty);
+            PartyBase newPartyBase = new PartyBase(mobileParty);
 
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
                 entry.Key.SetValue(newPartyBase, entry.Value.Deserialize());
             }
 
-            newPartyBase.GetType().GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, heroSerializer.hero);
-            newPartyBase.GetType().GetField("<MobileParty>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, mobilePartySerializer.mobileParty);
+            newPartyBase.GetType().GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, hero);
+            newPartyBase.GetType().GetField("<MobileParty>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, mobileParty);
 
             return base.Deserialize(newPartyBase);
         }
