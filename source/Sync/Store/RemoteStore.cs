@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Extensions.Data;
 using JetBrains.Annotations;
 using Network;
 using Network.Infrastructure;
 using Network.Protocol;
 using NLog;
+using Standart.Hash.xxHash;
 
 namespace Sync.Store
 {
@@ -78,7 +78,7 @@ namespace Sync.Store
         public ObjectId Insert(object obj)
         {
             byte[] raw = StoreSerializer.Serialize(obj);
-            ObjectId id = new ObjectId(XXHash.XXH32(raw));
+            ObjectId id = new ObjectId(xxHash32.ComputeHash(raw, raw.Length));
             m_Data[id] = obj;
             Logger.Trace("Insert {id}: {object}", id, obj);
             SendAdd(id, raw);
@@ -108,7 +108,7 @@ namespace Sync.Store
         {
             // Receive the object
             byte[] raw = packet.Payload.ToArray();
-            ObjectId id = new ObjectId(XXHash.XXH32(raw));
+            ObjectId id = new ObjectId(xxHash32.ComputeHash(raw, raw.Length));
             m_State[id] = new RemoteObjectState(RemoteObjectState.EOrigin.Remote);
 
             // Add to store
