@@ -15,39 +15,17 @@ using Path = System.IO.Path;
 namespace Coop.Mod.DebugUtil
 {
     /// <summary>
-    /// How it works:
-    /// <list type="bullet">
-    /// <item>load savefile in game</item>
-    /// <item>start server</item>
-    /// <item>open 'RGL Command line console'</item>
-    /// <item>(1) type 'coop.record 1'</item>
-    /// <item>do some movements on campaign map</item>
-    /// <item>type 'coop.stop'</item>
-    /// <item>stop server</item>
-    /// <item>load the same savefile in game</item>
-    /// <item>start server</item>
-    /// <item>open rgl-debug-console</item>
-    /// <item>(2) type 'coop.play 1'</item>
-    /// <item>setup normal speed (key '2')</item>
-    /// <item>main hero party will be moving exactly same as past</item>
-    /// <item>(3) wait while in log shown '[REPLAY] Verifying has finished ...'</item>
-    /// <item>view file <c>\mb2\bin\Win64_Shipping_Client\logs\1-verified.html</c> in browser or Excel</item>
+    /// Module for search abnormal desynchronization between two identical movement sequences.
+    /// There are three steps:
+    /// <list type="table">
+    /// <item>(1) record movements</item>
+    /// <item>(2) playback movements</item>
+    /// <item>(3) verify sync of movements</item>
     /// </list>
-    /// Column names used in report:
-    /// <list type="bullet">
-    /// <item><term>timeDiff(ms)</term><description> it is the in-game time interval in ms between
-    /// related saved and replayed movement events</description></item>
-    /// <item><term>skipped</term><description> it is the number of saved movement which did not find
-    /// a related movement while playback</description></item>
-    /// <item><term>newEvents</term><description> it is the number of new movement happend while playback
-    /// which did not find a related in saved movements</description></item>
-    /// <item><term>cols</term><description> it is the statistical info about distribution of time intervals
-    /// calculated as <c>count(log2(time_diff), column)</c></description></item>
-    /// </list>
-    /// Constant shift in result data no matter.
-    /// It is important that the spread of values is minimal.
-    /// See <seealso>https://github.com/Bannerlord-Coop-Team/BannerlordCoop/pull/33</seealso>
     /// </summary>
+    /// <remarks>
+    /// See <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki">BannerlordCoop wiki</a>
+    /// </remarks>
     public static class Replay
     {
         private static readonly NLog.Logger Logger = LogManager.GetCurrentClassLogger();
