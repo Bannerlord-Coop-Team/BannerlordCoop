@@ -84,7 +84,6 @@ namespace Coop.Mod
         {
             Replay.Stop();
             Current?.Stop();
-            Persistence?.CloseServerRail();
             Persistence = null;
             SyncedObjectStore = null;
             m_NetManager?.Stop();

@@ -38,10 +38,9 @@ namespace Coop.Mod
             m_Instance.Update();
         }
 
-        public void CloseServerRail()
+        ~CoopServerRail()
         {
             m_Server.Updateables.Remove(this);
-            EntityManager.CloseRoom();
         }
 
         public void ClientJoined(ConnectionServer connection)

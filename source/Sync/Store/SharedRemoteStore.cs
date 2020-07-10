@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Extensions.Data;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
-using Standart.Hash.xxHash;
 
 namespace Sync.Store
 {
@@ -25,7 +25,7 @@ namespace Sync.Store
         public ObjectId Insert(object obj)
         {
             byte[] raw = StoreSerializer.Serialize(obj);
-            ObjectId id = new ObjectId(xxHash32.ComputeHash(raw, raw.Length));
+            ObjectId id = new ObjectId(XXHash.XXH32(raw));
             m_Data[id] = obj;
             Logger.Trace("Insert {id}: {object}", id, obj);
 
