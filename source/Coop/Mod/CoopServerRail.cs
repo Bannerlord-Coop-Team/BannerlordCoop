@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Common;
+using Coop.Mod.DebugUtil;
 using Coop.Mod.Persistence;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
@@ -33,13 +34,13 @@ namespace Coop.Mod
 
         public void Update(TimeSpan frameTime)
         {
+            Replay.ReplayPlayback?.Invoke();
             m_Instance.Update();
         }
 
-        public void CloseServerRail()
+        ~CoopServerRail()
         {
             m_Server.Updateables.Remove(this);
-            EntityManager.CloseRoom();
         }
 
         public void ClientJoined(ConnectionServer connection)

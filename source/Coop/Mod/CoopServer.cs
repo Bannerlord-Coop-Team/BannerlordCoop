@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using Coop.Mod.Managers;
+using Coop.Mod.DebugUtil;
 using Coop.Mod.Persistence.World;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
@@ -88,6 +89,7 @@ namespace Coop.Mod
 
         public void ShutDownServer()
         {
+            Replay.Stop();
             Current?.Stop();
             Persistence = null;
             SyncedObjectStore = null;

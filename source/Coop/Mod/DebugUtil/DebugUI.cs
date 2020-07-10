@@ -182,9 +182,9 @@ namespace Coop.Mod.DebugUtil
                 DebugConsole.Toggle();
             }
 
-            Imgui.SameLine(250);
             if (CoopServer.Instance.Current == null)
             {
+                Imgui.SameLine(250);
                 if (Imgui.SmallButton("Start Server"))
                 {
                     if ((startServerResult = CoopServer.Instance.StartServer()) == null)
@@ -194,17 +194,10 @@ namespace Coop.Mod.DebugUtil
                     }
                 }
             }
-            else
-            {
-                if (Imgui.SmallButton("Stop Server"))
-                {
-                    CoopServer.Instance.ShutDownServer();
-                }
-            }
 
-            Imgui.SameLine(350);
             if (!CoopClient.Instance.ClientPlaying)
             {
+                Imgui.SameLine(350);
                 if (Imgui.SmallButton("Connect to local"))
                 {
                     ServerConfiguration defaultConfiguration = new ServerConfiguration();
@@ -213,8 +206,10 @@ namespace Coop.Mod.DebugUtil
                         defaultConfiguration.LanPort);
                 }
             }
-            else
+
+            if (CoopClient.Instance.Connected)
             {
+                Imgui.SameLine(300);
                 if (Imgui.SmallButton("Disconnect"))
                 {
                     CoopClient.Instance.Disconnect();

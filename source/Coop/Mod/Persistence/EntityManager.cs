@@ -28,6 +28,8 @@ namespace Coop.Mod.Persistence
         private readonly RailServerRoom m_Room;
         private readonly RailServer m_Server;
         private RailServerPeer m_Arbiter;
+        public WorldEntityServer WorldEntityServer { get; private set; }
+        public bool SuppressInconsistentStateWarnings { get; set; } = false;
 
         public EntityManager(RailServer server)
         {
@@ -80,7 +82,7 @@ namespace Coop.Mod.Persistence
                 throw new Exception("Unable to initialize game entities: Unexpected state. No game loaded?");
             }
 
-            room.AddNewEntity<WorldEntityServer>();
+            WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
 
             // Parties
             foreach (MobileParty party in Campaign.Current.MobileParties)
@@ -101,15 +103,6 @@ namespace Coop.Mod.Persistence
             // Settlements
         }
 
-        public void CloseRoom()
-        {
-            foreach (var entity in m_Room.Entities)
-            {
-                m_Room.MarkForRemoval(entity);
-            }
-            m_Room.ServerUpdate();
-        }
-
         private void OnPartyRemoved(MobileParty party)
         {
             RailEntityServer entityToRemove;
@@ -117,9 +110,10 @@ namespace Coop.Mod.Persistence
             {
                 if (!m_Parties.ContainsKey(party))
                 {
-                    Logger.Warn(
-                        "Inconsistent internal state: {party} was removed, but never added.",
-                        party);
+                    if (!SuppressInconsistentStateWarnings)
+                        Logger.Warn(
+                            "Inconsistent internal state: {party} was removed, but never added.",
+                            party);
                     return;
                 }
 
@@ -142,9 +136,10 @@ namespace Coop.Mod.Persistence
             {
                 if (m_Parties.ContainsKey(party))
                 {
-                    Logger.Warn(
-                        "Inconsistent internal state: {party} was already registered.",
-                        party);
+                    if (!SuppressInconsistentStateWarnings)
+                        Logger.Warn(
+                            "Inconsistent internal state: {party} was already registered.",
+                            party);
                     return;
                 }
 
