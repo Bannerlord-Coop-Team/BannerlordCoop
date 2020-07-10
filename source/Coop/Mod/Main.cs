@@ -7,19 +7,34 @@ using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Patch;
+
 using HarmonyLib;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
+using TaleWorlds.Library;
 using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
-using TaleWorlds.Library;
+using TaleWorlds.Core;
+using TaleWorlds.Engine.Screens;
+using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
+
 using Logger = NLog.Logger;
+using Module = TaleWorlds.MountAndBlade.Module;
+using Network.Infrastructure;
+using Coop.Mod.UI;
+using TaleWorlds.MountAndBlade.View.Missions;
 
 namespace Coop.Mod
 {
     internal class Main : NoHarmonyLoader
     {
+
+        // Debug symbols
+        public static readonly bool DEBUG = true;
+        public static readonly string LOAD_GAME = "MP";
+        // -------------
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
@@ -64,6 +79,53 @@ namespace Coop.Mod
             }
 
             harmony.PatchAll();
+
+            if (DEBUG)
+            {
+                typeof(Module)
+                    .GetField("_splashScreenPlayed", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(Module.CurrentModule, true);
+            }
+
+            harmony.PatchAll();
+
+            Module.CurrentModule.AddInitialStateOption(new InitialStateOption("CoOp Campaign",
+            new TextObject("Co-op Campaign", null),
+            9990,
+            () =>
+            {
+                string[] array = Utilities.GetFullCommandLineString().Split(new char[]
+                {
+                    ' '
+                });
+
+                
+
+                if (DEBUG)
+                {
+                    foreach (string argument in array)
+                    {
+                        if (argument.ToLower() == "/server")
+                        {
+                            //TODO add name to args
+                            CoopServer.Instance.StartGame("MP");
+                        }
+                        else if (argument.ToLower() == "/client")
+                        {
+                            ServerConfiguration defaultConfiguration = new ServerConfiguration();
+                            CoopClient.Instance.Connect(defaultConfiguration.LanAddress, defaultConfiguration.LanPort);
+                        }
+                    }
+                }
+                else
+                {
+                    InformationManager.DisplayMessage(new InformationMessage("Hello World!"));
+                    ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopLoadScreen>(new object[] { }));
+                }
+            },
+            false));
+
+
         }
 
         protected override void OnSubModuleUnloaded()
@@ -114,3 +176,4 @@ namespace Coop.Mod
         }
     }
 }
+

@@ -1,4 +1,5 @@
 ﻿using Network.Infrastructure;
+using System;
 
 namespace Network.Protocol
 {
@@ -104,6 +105,36 @@ namespace Network.Protocol
         {
             // Empty
             return new Client_RequestWorldData();
+        }
+    }
+
+    public class Client_GameLoading
+    {
+        public byte[] Serialize()
+        {
+            // Empty
+            return new byte[0];
+        }
+
+        public static Client_GameLoading Deserialize(ByteReader reader)
+        {
+            // Empty
+            return new Client_GameLoading();
+        }
+    }
+
+    public class Client_GameLoaded
+    {
+        public byte[] Serialize()
+        {
+            // Empty
+            return new byte[0];
+        }
+
+        public static Client_GameLoaded Deserialize(ByteReader reader)
+        {
+            // Empty
+            return new Client_GameLoaded();
         }
     }
 

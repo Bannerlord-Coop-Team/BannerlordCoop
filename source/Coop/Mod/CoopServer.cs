@@ -1,5 +1,7 @@
-﻿using System;
+using System;
+using System.IO;
 using System.Linq;
+using Coop.Mod.Managers;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Persistence.World;
 using Coop.NetImpl.LiteNet;
@@ -8,6 +10,10 @@ using Network.Infrastructure;
 using NLog;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.Engine;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.SaveSystem.Load;
 
 namespace Coop.Mod
 {
@@ -38,6 +44,7 @@ namespace Coop.Mod
         public static CoopServer Instance => m_Instance.Value;
 
         public Server Current { get; private set; }
+        public ServerGameManager gameManager { get; private set; }
 
         public string StartServer()
         {
@@ -90,6 +97,49 @@ namespace Coop.Mod
             m_NetManager = null;
             m_GameEnvironmentServer = null;
             Current = null;
+        }
+
+        public void StartGame(string saveName)
+        {
+            if(Main.DEBUG)
+            {
+                try
+                {
+                    LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(saveName, Utilities.GetModulesNames());
+                    MBGameManager.StartNewGame(CreateGameManager(saveGameData));
+                }
+                catch(IOException ex)
+                {
+                    Logger.Error("Save file not found: " + ex.Message);
+                }
+                
+            }
+        }
+
+        public ServerGameManager CreateGameManager(LoadGameResult saveGameData = null)
+        {
+            if (saveGameData != null)
+            {
+                gameManager = CreateGameManager(saveGameData.LoadResult);
+            }
+            else
+            {
+                gameManager = new ServerGameManager();
+            }
+            return gameManager;
+        }
+
+        public ServerGameManager CreateGameManager(LoadResult loadResult = null)
+        {
+            if (loadResult != null)
+            {
+                gameManager = new ServerGameManager(loadResult);
+            }
+            else
+            {
+                gameManager = new ServerGameManager();
+            }
+            return gameManager;
         }
 
         public override string ToString()

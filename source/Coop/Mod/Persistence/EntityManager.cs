@@ -77,6 +77,11 @@ namespace Coop.Mod.Persistence
 
         private void InitRoom(RailServerRoom room)
         {
+            if (Campaign.Current == null)
+            {
+                throw new Exception("Unable to initialize game entities: Unexpected state. No game loaded?");
+            }
+
             WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
 
             // Parties
@@ -183,7 +188,7 @@ namespace Coop.Mod.Persistence
 
         private MobileParty GetPlayerParty(RailServerPeer peer)
         {
-            if (Coop.IsClient && Coop.IsServer)
+            if (Coop.IsClientPlaying || Coop.IsServer)
             {
                 return MobileParty.MainParty;
             }
