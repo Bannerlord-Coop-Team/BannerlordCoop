@@ -35,6 +35,8 @@ namespace Sync
             }
         }
 
+        public EMethodPatchFlag Flags { get; private set; } = EMethodPatchFlag.None;
+
         /// <summary>
         ///     If set, this function will be called before invoking any onBeforeCall handlers. If the
         ///     function evaluates to false, the onBeforeCall handlers will not be called.
@@ -45,6 +47,11 @@ namespace Sync
         public MethodId Id { get; }
 
         public MethodInfo MemberInfo { get; }
+
+        public void AddFlags(EMethodPatchFlag flag)
+        {
+            Flags |= flag;
+        }
 
         private void InitOriginal(DynamicMethod toPatch)
         {

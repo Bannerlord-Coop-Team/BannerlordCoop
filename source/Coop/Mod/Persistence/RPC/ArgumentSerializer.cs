@@ -1,9 +1,14 @@
 ﻿using System;
 using RailgunNet.System.Encoding;
 using RailgunNet.System.Types;
+using Sync.Store;
 
 namespace Coop.Mod.Persistence.RPC
 {
+    /// <summary>
+    ///     Serializer for <see cref="Argument" />. It's important to keep in mind, that the
+    ///     serialized payload may never exceed <see cref="RailgunNet.RailConfig.MAXSIZE_EVENT" />!
+    /// </summary>
     public static class ArgumentSerializer
     {
         private static int NumberOfBitsForArgType => GetNumberOfBitsForArgType();
@@ -32,6 +37,9 @@ namespace Coop.Mod.Persistence.RPC
                 case EventArgType.Int:
                     buffer.WriteInt(arg.Int.Value);
                     break;
+                case EventArgType.StoreObjectId:
+                    buffer.WriteUInt(arg.StoreObjectId.Value.Value);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -51,6 +59,8 @@ namespace Coop.Mod.Persistence.RPC
                     return Argument.Null;
                 case EventArgType.Int:
                     return new Argument(buffer.ReadInt());
+                case EventArgType.StoreObjectId:
+                    return new Argument(new ObjectId(buffer.ReadUInt()));
                 default:
                     throw new ArgumentOutOfRangeException();
             }

@@ -9,8 +9,23 @@ using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.RPC
 {
+    /// <summary>
+    ///     Factory to create the transfer wrapper for an argument in a RPC call.
+    /// </summary>
     public static class ArgumentFactory
     {
+        /// <summary>
+        ///     Resolves the transferred RPC argument to be used in the local function call.
+        /// </summary>
+        /// <param name="room">Rail room for the local client.</param>
+        /// <param name="store">Clients remote store instance.</param>
+        /// <param name="arg">Argument to be resolved.</param>
+        /// <returns>The unwrapped argument.</returns>
+        /// <exception cref="ArgumentException">
+        ///     If the argument references an object in the store,
+        ///     but the reference cannot be resolved.
+        /// </exception>
+        /// <exception cref="ArgumentOutOfRangeException">If the argument type is unknown.</exception>
         public static object Resolve(this RailClientRoom room, IStore store, Argument arg)
         {
             switch (arg.EventType)
@@ -37,7 +52,7 @@ namespace Coop.Mod.Persistence.RPC
                     if (!arg.StoreObjectId.HasValue ||
                         !store.Data.ContainsKey(arg.StoreObjectId.Value))
                     {
-                        throw new Exception($"Cannot resolve ${arg}.");
+                        throw new ArgumentException($"Cannot resolve ${arg}.");
                     }
 
                     return store.Data[arg.StoreObjectId.Value];
@@ -46,23 +61,31 @@ namespace Coop.Mod.Persistence.RPC
             }
         }
 
+        /// <summary>
+        ///     Resolves a list of transferred RPC arguments to be used in the local function call.
+        /// </summary>
+        /// <param name="room">Rail room for the local client.</param>
+        /// <param name="store">Clients remote store instance.</param>
+        /// <param name="args">Argument to be resolved.</param>
+        /// <returns>A list of the unwrapped arguments.</returns>
         public static object[] Resolve(this RailClientRoom room, IStore store, List<Argument> args)
         {
             return args.Select(arg => room.Resolve(store, arg)).ToArray();
         }
 
-        public static Argument Create(IStore store, object obj)
-        {
-            switch (obj)
-            {
-                case null:
-                    return Argument.Null;
-                default:
-                    return new Argument(store.Insert(obj));
-            }
-        }
-
-        public static Argument Create(object obj)
+        /// <summary>
+        ///     Creates a RPC transfer wrapper for a function call argument.
+        /// </summary>
+        /// <param name="store">Clients remote store instance.</param>
+        /// <param name="obj">The object to be wrapped.</param>
+        /// <param name="bTransferByValue">
+        ///     If true, the object will always be transferred by
+        ///     value. If the argument is too large to fit in an <see cref="RailEvent" />,
+        ///     the argument will be shared to all receivers using the <paramref name="store" />.
+        ///     If false, the argument may be, depending on the type, transferred by reference.
+        /// </param>
+        /// <returns>The wrapped argument.</returns>
+        public static Argument Create(IStore store, object obj, bool bTransferByValue)
         {
             switch (obj)
             {
@@ -74,12 +97,17 @@ namespace Coop.Mod.Persistence.RPC
                     return new Argument(entity);
                 case EntityId entityId:
                     return new Argument(entityId);
-                case MBObjectBase mbobj:
-                    return new Argument(mbobj.Id);
                 case int i:
                     return new Argument(i);
+                case MBObjectBase mbobj:
+                    if (bTransferByValue)
+                    {
+                        goto default;
+                    }
+
+                    return new Argument(mbobj.Id);
                 default:
-                    throw new Exception($"Unknown argument type: {obj}.");
+                    return new Argument(store.Insert(obj));
             }
         }
     }

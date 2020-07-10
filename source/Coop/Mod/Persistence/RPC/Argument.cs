@@ -1,6 +1,5 @@
 ﻿using System;
 using JetBrains.Annotations;
-using Network.Protocol;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using Sync.Store;
@@ -9,12 +8,13 @@ using TaleWorlds.ObjectSystem;
 namespace Coop.Mod.Persistence.RPC
 {
     /// <summary>
-    ///     Type of an argument used in a <see cref="EventMethodCall" />.
+    ///     Wrapper for an argument used in a <see cref="EventMethodCall" />.
     ///     ATTENTION: The persistence is intended to reliably transfer very small amount of data
     ///     that is to be applied at a synchronized point in time on all client. Maximum payload
     ///     data in a single event is tiny <see cref="RailgunNet.RailConfig.MAXSIZE_EVENT" />.
-    ///     Instead of sending data, only send a reference to it in the already synchronized
-    ///     game state. To transfer new game state use a <see cref="EPacket.Sync" /> message.
+    ///     Larger objects need be transferred using a <see cref="RemoteStore" /> and then referenced
+    ///     in a <see cref="EventArgType.StoreObjectId" />. The <see cref="ArgumentFactory.Create" />
+    ///     can take care of this.
     ///     To add a new argument type:
     ///     1. Add enum entry
     ///     2. Extended <see cref="Argument" /> to store the new type in some way

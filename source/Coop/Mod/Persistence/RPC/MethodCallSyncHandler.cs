@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Common;
@@ -6,12 +7,13 @@ using JetBrains.Annotations;
 using RailgunNet.Connection.Client;
 using RailgunNet.System.Types;
 using Sync;
+using Sync.Store;
 
 namespace Coop.Mod.Persistence.RPC
 {
     public class MethodCallSyncHandler
     {
-        private bool m_bIsRegistered;
+        private bool m_IsRegistered;
 
         public MethodCallSyncHandler([NotNull] MethodAccess methodAccess)
         {
@@ -21,6 +23,8 @@ namespace Coop.Mod.Persistence.RPC
 
         public Statistics Stats { get; } = new Statistics();
         public MethodAccess MethodAccess { get; }
+
+        private static RemoteStore Store => CoopClient.Instance.SyncedObjectStore;
 
         [Conditional("DEBUG")]
         private void Trace(MethodCall call, RailClientRoom room)
@@ -35,7 +39,7 @@ namespace Coop.Mod.Persistence.RPC
 
         private void Register()
         {
-            if (m_bIsRegistered)
+            if (m_IsRegistered)
             {
                 return;
             }
@@ -48,14 +52,14 @@ namespace Coop.Mod.Persistence.RPC
                         CoopClient.Instance.Persistence?.Room.RaiseEvent<EventMethodCall>(
                             evt =>
                             {
-                                // TODO: ArgumentFactory.Create with store!
                                 evt.Call = new MethodCall
                                 {
                                     Id = MethodAccess.Id,
-                                    Instance = ArgumentFactory.Create(instance),
-                                    Arguments =
-                                        objects.Select(o => ArgumentFactory.Create(o))
-                                               .ToList()
+                                    Instance = ArgumentFactory.Create(
+                                        Store,
+                                        instance,
+                                        false),
+                                    Arguments = ProduceArguments(objects)
                                 };
                                 Trace(evt.Call, CoopClient.Instance.Persistence.Room);
                             });
@@ -65,12 +69,20 @@ namespace Coop.Mod.Persistence.RPC
                         throw new ArgumentNullException(nameof(args), "Unexpected argument type.");
                     }
                 });
-            m_bIsRegistered = true;
+            m_IsRegistered = true;
+        }
+
+        private List<Argument> ProduceArguments(IEnumerable<object> objects)
+        {
+            bool bTransferByValue =
+                MethodAccess.Flags.HasFlag(EMethodPatchFlag.TransferArgumentsByValue);
+            return objects.Select(obj => ArgumentFactory.Create(Store, obj, bTransferByValue))
+                          .ToList();
         }
 
         private void Unregister()
         {
-            if (!m_bIsRegistered)
+            if (!m_IsRegistered)
             {
                 return;
             }
