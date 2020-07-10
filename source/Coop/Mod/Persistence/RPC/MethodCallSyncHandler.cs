@@ -48,6 +48,7 @@ namespace Coop.Mod.Persistence.RPC
                         CoopClient.Instance.Persistence?.Room.RaiseEvent<EventMethodCall>(
                             evt =>
                             {
+                                // TODO: ArgumentFactory.Create with store!
                                 evt.Call = new MethodCall
                                 {
                                     Id = MethodAccess.Id,

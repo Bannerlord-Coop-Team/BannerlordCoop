@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Common;
+using Coop.Mod.DebugUtil;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RPC;
 using Coop.NetImpl.LiteNet;
@@ -14,7 +15,9 @@ namespace Coop.Mod
 {
     public class CoopServerRail : IUpdateable
     {
-        private readonly RailServer m_Instance;
+        [NotNull] private readonly RailServer m_Instance;
+
+        [CanBeNull] public RailServerRoom Room => m_Instance.Room;
 
         private readonly Dictionary<ConnectionServer, RailNetPeerWrapper> m_RailConnections =
             new Dictionary<ConnectionServer, RailNetPeerWrapper>();
@@ -41,6 +44,7 @@ namespace Coop.Mod
 
         public void Update(TimeSpan frameTime)
         {
+            Replay.ReplayPlayback?.Invoke();
             m_Instance.Update();
             EventQueue.Update(frameTime);
         }
