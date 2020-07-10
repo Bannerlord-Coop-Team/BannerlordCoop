@@ -1,4 +1,5 @@
 ﻿using System;
+using Coop.Mod.DebugUtil;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
@@ -71,6 +72,8 @@ namespace Coop.Mod.Persistence.Party
                 party,
                 data);
             m_Environment.TargetPosition.SetTyped(party, data);
+
+            Replay.ReplayRecording?.Invoke(Id, party, data);
         }
 
         protected override void OnControllerChanged()

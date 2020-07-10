@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using Coop.Mod.DebugUtil;
 using Coop.Mod.Persistence.World;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
@@ -81,8 +82,8 @@ namespace Coop.Mod
 
         public void ShutDownServer()
         {
+            Replay.Stop();
             Current?.Stop();
-            Persistence?.CloseServerRail();
             Persistence = null;
             SyncedObjectStore = null;
             m_NetManager?.Stop();
