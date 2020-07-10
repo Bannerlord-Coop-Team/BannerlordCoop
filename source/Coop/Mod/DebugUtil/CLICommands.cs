@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Reflection;
+using HarmonyLib;
 using Network.Infrastructure;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.DebugUtil
@@ -31,7 +34,7 @@ namespace Coop.Mod.DebugUtil
                 Main.Instance.Updateables.Add(m_DebugUI);
             }
             m_DebugUI.Visible = true;
-            return "";
+            return "Done.";
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("start_local_server", sGroupName)]
@@ -43,7 +46,18 @@ namespace Coop.Mod.DebugUtil
                 CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
                 return CoopServer.Instance.ToString();
             }
-            return null;
+            return "Server started already.";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("stop_local_server", sGroupName)]
+        public static string StopServer(List<string> parameters)
+        {
+            if (CoopServer.Instance.Current != null)
+            {
+                CoopServer.Instance.ShutDownServer();
+                return "Done.";
+            }
+            return "Server not started.";
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("connect_to", sGroupName)]
@@ -65,8 +79,27 @@ namespace Coop.Mod.DebugUtil
         [CommandLineFunctionality.CommandLineArgumentFunction("disconnect", sGroupName)]
         public static string Disconnect(List<string> parameters)
         {
-            CoopClient.Instance.Disconnect();
-            return "Client disconnection request sent.";
+            if (CoopClient.Instance.Connected)
+            {
+                CoopClient.Instance.Disconnect();
+                return "Client disconnection request sent.";
+            }
+
+            return "Client not connected.";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("random_seed", sGroupName)]
+        public static string RandomSeed(List<string> parameters)
+        {
+            if (Game.Current != null)
+            {
+                FieldInfo fieldInfo = AccessTools.Field(typeof(Game), "_randomSeed");
+                var seed = fieldInfo.GetValue(Game.Current);
+
+                return $"Your random seed is '{seed}'.";
+            }
+
+            return "Your campaign game not started.";
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("help", sGroupName)]

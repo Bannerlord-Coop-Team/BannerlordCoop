@@ -98,6 +98,15 @@ namespace Coop.Mod.Persistence
             // Settlements
         }
 
+        public void CloseRoom()
+        {
+            foreach (var entity in m_Room.Entities)
+            {
+                m_Room.MarkForRemoval(entity);
+            }
+            m_Room.ServerUpdate();
+        }
+
         private void OnPartyRemoved(MobileParty party)
         {
             RailEntityServer entityToRemove;
