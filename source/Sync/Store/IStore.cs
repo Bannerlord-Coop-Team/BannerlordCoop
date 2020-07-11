@@ -13,7 +13,7 @@ namespace Sync.Store
 
         public override string ToString()
         {
-            return $"Object {Value}";
+            return $"Obj {Value}";
         }
     }
 

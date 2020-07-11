@@ -83,7 +83,7 @@ namespace Sync.Store
             byte[] raw = m_Serializer.Serialize(obj);
             ObjectId id = new ObjectId(XXHash.XXH32(raw));
             m_Data[id] = obj;
-            Logger.Trace("Insert {id}: {object}", id, obj);
+            Logger.Trace("[{id}] Insert: {object} [{type}]", id, obj, obj.GetType());
             SendAdd(id, raw);
             return id;
         }
@@ -91,7 +91,7 @@ namespace Sync.Store
         public bool Remove(ObjectId id)
         {
             m_State.Remove(id);
-            Logger.Trace("Remove {id}: {object}", id, m_Data[id]);
+            Logger.Trace("[{id}] Remove: {object} [{type}]", id, m_Data[id], m_Data[id].GetType());
             return m_Data.Remove(id);
         }
 
@@ -118,13 +118,19 @@ namespace Sync.Store
             if (m_Data.ContainsKey(id))
             {
                 Logger.Warn(
-                    "{id}: {object} already stored. Objects should only be added once!",
+                    "[{id}]: {object} [{type}] already stored. Objects should only be added once!",
                     id,
+                    m_Data[id],
                     m_Data[id]);
             }
             else
             {
                 m_Data[id] = m_Serializer.Deserialize(raw);
+                Logger.Trace(
+                    "[{id}] Received: {object} [{type}]",
+                    id,
+                    m_Data[id],
+                    m_Data[id].GetType());
             }
 
             // Call handlers
@@ -137,7 +143,6 @@ namespace Sync.Store
             if (bDoSendAck)
             {
                 SendACK(id);
-                Logger.Trace("Received {id}: {object}", id, m_Data[id]);
                 OnObjectReceived?.Invoke(id, m_Data[id]);
             }
         }
@@ -159,7 +164,7 @@ namespace Sync.Store
             writer.Binary.Write(id.Value);
             m_State[id].Acknowledged = true;
             m_Connection.Send(new Packet(EPacket.StoreAck, writer.ToArray()));
-            Logger.Trace("Sent StoreAck {id}.", id);
+            Logger.Trace("[{id}] Sent ACK", id);
         }
 
         [PacketHandler(EConnectionState.ClientAwaitingWorldData, EPacket.StoreAck)]
@@ -176,7 +181,11 @@ namespace Sync.Store
             }
 
             m_State[id].Acknowledged = true;
-            Logger.Trace("Received ACK {id}: {object}", id, m_Data[id]);
+            Logger.Trace(
+                "[{id}] Received ACK: {object} [{type}]",
+                id,
+                m_Data[id],
+                m_Data[id].GetType());
             OnObjectAcknowledged?.Invoke(id, m_Data[id]);
         }
 
@@ -189,7 +198,7 @@ namespace Sync.Store
                 Sent = true
             };
 
-            Logger.Trace("Sent StoreAdd {id}.", id);
+            Logger.Trace("[{id}] Sent StoreAdd", id);
         }
     }
 }

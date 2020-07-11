@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using NLog;
 using RailgunNet.Logic;
 using Sync.Store;
 using TaleWorlds.ObjectSystem;
@@ -13,6 +14,8 @@ namespace Coop.Mod.Persistence.RPC
     /// </summary>
     public static class ArgumentFactory
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         /// <summary>
         ///     Resolves the transferred RPC argument to be used in the local function call.
         /// </summary>
@@ -49,6 +52,11 @@ namespace Coop.Mod.Persistence.RPC
                     }
 
                     object resolvedObject = store.Data[arg.StoreObjectId.Value];
+                    Logger.Debug(
+                        "[{id}] Resolved store RPC arg: {object} [{type}]",
+                        arg.StoreObjectId.Value,
+                        resolvedObject,
+                        resolvedObject.GetType());
                     store.Remove(arg.StoreObjectId.Value);
                     return resolvedObject;
                 default:

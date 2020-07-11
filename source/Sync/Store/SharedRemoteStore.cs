@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Extensions.Data;
@@ -39,7 +39,7 @@ namespace Sync.Store
             byte[] raw = m_Serializer.Serialize(obj);
             ObjectId id = new ObjectId(XXHash.XXH32(raw));
             m_Data[id] = obj;
-            Logger.Trace("Insert {id}: {object}", id, obj);
+            Logger.Trace("[{id}] Insert: {object}", id, obj);
 
             m_PendingAcks[id] = new PendingResponse(null, m_Stores.Values.ToList());
             foreach (RemoteStore store in m_Stores.Values)
@@ -92,18 +92,18 @@ namespace Sync.Store
             if (!m_PendingAcks.ContainsKey(id))
             {
                 Logger.Warn(
-                    "Received ACK for {id} from {sender}, but the server was not expecting one.",
+                    "[{id}] Received ACK for from {sender}, but the server was not expecting one.",
                     id,
                     sender);
                 return;
             }
 
-            Logger.Trace("Received ACK for {id} from {sender}.", id, sender);
+            Logger.Trace("[{id}] Received ACK for from {sender}.", id, sender);
             PendingResponse pending = m_PendingAcks[id];
             pending.OnAckFrom(m_Stores[sender]);
             if (pending.AllDone())
             {
-                Logger.Trace("Received all necessary ACKS for {id}. Object distributed.", id);
+                Logger.Debug("[{id}] Received all necessary ACKs. Object distributed.", id);
                 pending.Origin?.SendACK(id);
                 m_PendingAcks.Remove(id);
                 OnObjectDistributed?.Invoke(id);
@@ -121,6 +121,7 @@ namespace Sync.Store
                 throw new Exception($"Unknown origin: {sender}.");
             }
 
+            Logger.Debug("[{id}] Client added: {object}.", id, obj);
             List<RemoteStore> otherStores =
                 m_Stores.Where(s => s.Key != sender).Select(p => p.Value).ToList();
             if (otherStores.Count == 0)
@@ -132,6 +133,7 @@ namespace Sync.Store
             m_PendingAcks[id] = new PendingResponse(m_Stores[sender], otherStores);
             foreach (RemoteStore store in otherStores)
             {
+                Logger.Trace("[{id}] Distributing to {store}.", id, store);
                 store.SendAdd(id, payload);
             }
 

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Coop.Mod.Serializers;
 using Network.Infrastructure;
 using Sync.Store;
 
@@ -12,7 +13,8 @@ namespace Coop.Tests.Sync
 
         public List<ConnectionTestImpl> ConnectionsServer { get; } = new List<ConnectionTestImpl>();
 
-        public SharedRemoteStore StoreServer { get; } = new SharedRemoteStore();
+        public SharedRemoteStore StoreServer { get; } =
+            new SharedRemoteStore(new SerializableFactory());
 
         public void Init(int iNumberOfClients)
         {
@@ -29,7 +31,11 @@ namespace Coop.Tests.Sync
 
                 client.NetworkImpl.OnSend += server.Receive;
                 server.NetworkImpl.OnSend += client.Receive;
-                StoresClient.Add(new RemoteStore(new Dictionary<ObjectId, object>(), client));
+                StoresClient.Add(
+                    new RemoteStore(
+                        new Dictionary<ObjectId, object>(),
+                        client,
+                        new SerializableFactory()));
                 StoreServer.AddConnection(server);
 
                 ConnectionsClient.Add(client);

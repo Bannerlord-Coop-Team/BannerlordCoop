@@ -49,7 +49,9 @@ namespace Coop.Mod.Persistence.RPC
                         if (timeSinceCreation > Timeout)
                         {
                             Logger.Error(
-                                "{event} has been pending for {timeSinceCreation}. Large object transfer still not completed. Abort event.");
+                                "{event} has been pending for {timeSinceCreation}. Large object transfer still not completed. Abort event.",
+                                call.RPC,
+                                timeSinceCreation);
                             call.RPC.Free();
                         }
                         else
@@ -129,6 +131,7 @@ namespace Coop.Mod.Persistence.RPC
             {
                 if (!IsReadyToBeSent()) return false;
                 Room.BroadcastEvent(RPC);
+                Logger.Trace("[{event}] Broadcast", RPC);
                 return true;
             }
         }
