@@ -23,6 +23,7 @@ namespace Coop.Mod.Persistence.RPC
     public enum EventArgType
     {
         Null,
+        MBObjectManager,
         MBObject,
         Int,
         StoreObjectId
@@ -33,6 +34,11 @@ namespace Coop.Mod.Persistence.RPC
         public static Argument Null = new Argument
         {
             EventType = EventArgType.Null
+        };
+
+        public static Argument MBObjectManager = new Argument
+        {
+            EventType = EventArgType.MBObjectManager
         };
 
         public EventArgType EventType { get; private set; }
@@ -65,6 +71,8 @@ namespace Coop.Mod.Persistence.RPC
             {
                 case EventArgType.Null:
                     return "null";
+                case EventArgType.MBObjectManager:
+                    return "MBObjectManager";
                 case EventArgType.MBObject:
                     return $"MBGUID {MbGUID}";
                 case EventArgType.Int:

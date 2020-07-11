@@ -30,6 +30,8 @@ namespace Coop.Mod.Persistence.RPC
             {
                 case EventArgType.Null:
                     return null;
+                case EventArgType.MBObjectManager:
+                    return MBObjectManager.Instance;
                 case EventArgType.MBObject:
                     return MBObjectManager.Instance.GetObject(arg.MbGUID.Value);
                 case EventArgType.Int:
@@ -87,6 +89,8 @@ namespace Coop.Mod.Persistence.RPC
             {
                 case null:
                     return Argument.Null;
+                case MBObjectManager mbObjectManager:
+                    return Argument.MBObjectManager;
                 case MBGUID guid:
                     return new Argument(guid);
                 case int i:

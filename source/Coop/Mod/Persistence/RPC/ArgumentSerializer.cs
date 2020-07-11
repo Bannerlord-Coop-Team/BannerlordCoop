@@ -30,6 +30,9 @@ namespace Coop.Mod.Persistence.RPC
                 case EventArgType.Null:
                     // Empty
                     break;
+                case EventArgType.MBObjectManager:
+                    // Empty
+                    break;
                 case EventArgType.Int:
                     buffer.WriteInt(arg.Int.Value);
                     break;
@@ -49,6 +52,8 @@ namespace Coop.Mod.Persistence.RPC
             {
                 case EventArgType.MBObject:
                     return new Argument(buffer.ReadMBGUID());
+                case EventArgType.MBObjectManager:
+                    return Argument.MBObjectManager;
                 case EventArgType.Null:
                     return Argument.Null;
                 case EventArgType.Int:
