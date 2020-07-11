@@ -1,10 +1,11 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using Common;
 using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
+using Coop.Mod.Serializers;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
@@ -12,9 +13,7 @@ using NLog;
 using RailgunNet.Logic;
 using StoryMode;
 using Sync.Store;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using Logger = NLog.Logger;
 
 namespace Coop.Mod
 {
@@ -34,11 +33,12 @@ namespace Coop.Mod
         private readonly Dictionary<ObjectId, object> m_SyncedObjects =
             new Dictionary<ObjectId, object>();
 
+        private MBGameManager gameManager;
+
         private int m_ReconnectAttempts = MaxReconnectAttempts;
+        public Action<PersistenceClient> OnPersistenceInitialized;
 
         public Action<RemoteStore> RemoteStoreCreated;
-        public Action<PersistenceClient> OnPersistenceInitialized;
-        private MBGameManager gameManager;
 
         public CoopClient()
         {
@@ -88,8 +88,8 @@ namespace Coop.Mod
                 }
 
                 // TODO change to main menu state
-                return Session.Connection.State == EConnectionState.ClientJoinRequesting || 
-                    Session.Connection.State == EConnectionState.ClientCharacterCreation;
+                return Session.Connection.State == EConnectionState.ClientJoinRequesting ||
+                       Session.Connection.State == EConnectionState.ClientCharacterCreation;
             }
         }
 
@@ -138,7 +138,7 @@ namespace Coop.Mod
                 throw new ArgumentNullException(nameof(con));
             }
 
-            SyncedObjectStore = new RemoteStore(m_SyncedObjects, con);
+            SyncedObjectStore = new RemoteStore(m_SyncedObjects, con, new SerializableFactory());
             RemoteStoreCreated?.Invoke(SyncedObjectStore);
 
             #region events
@@ -163,15 +163,18 @@ namespace Coop.Mod
             {
                 gameManager = new ClientCharacterCreatorManager();
                 MBGameManager.StartNewGame(gameManager);
-                ClientCharacterCreatorManager.OnLoadFinishedEvent += (object source, EventArgs e) =>
+                ClientCharacterCreatorManager.OnLoadFinishedEvent += (source, e) =>
                 {
-                    StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, () =>
-                    {
-                        if(con.State == EConnectionState.ClientCharacterCreation)
+                    StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(
+                        this,
+                        () =>
                         {
-                            CharacterCreated(con);
-                        }
-                    });
+                            if (con.State ==
+                                EConnectionState.ClientCharacterCreation)
+                            {
+                                CharacterCreated(con);
+                            }
+                        });
                 };
             }
         }
@@ -237,4 +240,3 @@ namespace Coop.Mod
         }
     }
 }
-

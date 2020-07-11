@@ -1,9 +1,9 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
-using Coop.Mod.Managers;
 using Coop.Mod.DebugUtil;
+using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
+using Coop.Mod.Serializers;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
@@ -60,7 +60,7 @@ namespace Coop.Mod
                 Server.EType eServerType = Server.EType.Threaded;
                 Current = new Server(eServerType);
 
-                SyncedObjectStore = new SharedRemoteStore();
+                SyncedObjectStore = new SharedRemoteStore(new SerializableFactory());
                 m_GameEnvironmentServer = new GameEnvironmentServer();
                 Persistence = new CoopServerRail(
                     Current,
@@ -104,18 +104,19 @@ namespace Coop.Mod
 
         public void StartGame(string saveName)
         {
-            if(Main.DEBUG)
+            if (Main.DEBUG)
             {
                 try
                 {
-                    LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(saveName, Utilities.GetModulesNames());
+                    LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(
+                        saveName,
+                        Utilities.GetModulesNames());
                     MBGameManager.StartNewGame(CreateGameManager(saveGameData));
                 }
-                catch(IOException ex)
+                catch (IOException ex)
                 {
                     Logger.Error("Save file not found: " + ex.Message);
                 }
-                
             }
         }
 
@@ -129,6 +130,7 @@ namespace Coop.Mod
             {
                 gameManager = new ServerGameManager();
             }
+
             return gameManager;
         }
 
@@ -142,6 +144,7 @@ namespace Coop.Mod
             {
                 gameManager = new ServerGameManager();
             }
+
             return gameManager;
         }
 

@@ -259,15 +259,15 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
-    <Compile Include="Mod\DebugUtil\CLICommands.cs" />
-    <Compile Include="Mod\DebugUtil\DebugConsole.cs" />
-    <Compile Include="Mod\DebugUtil\DebugManager.cs" />
-    <Compile Include="Mod\Coop.cs" />
-    <Compile Include="Mod\DebugUtil\DebugUI.cs" />
+    <Compile Include="Mod\Behaviour\InitServerBehaviour.cs"/>
+    <Compile Include="Mod\DebugUtil\CLICommands.cs"/>
+    <Compile Include="Mod\DebugUtil\DebugConsole.cs"/>
+    <Compile Include="Mod\DebugUtil\DebugManager.cs"/>
+    <Compile Include="Mod\Coop.cs"/>
+    <Compile Include="Mod\DebugUtil\DebugUI.cs"/>
     <Compile Include="Mod\DebugUtil\PartySpawnHelper.cs"/>
-    <Compile Include="Mod\DebugUtil\Replay.cs" />
-    <Compile Include="Mod\DebugUtil\ReplayEvent.cs" />
+    <Compile Include="Mod\DebugUtil\Replay.cs"/>
+    <Compile Include="Mod\DebugUtil\ReplayEvent.cs"/>
     <Compile Include="Mod\Exceptions.cs"/>
     <Compile Include="Mod\GameEnvironmentClient.cs"/>
     <Compile Include="Mod\GameLoopRunner.cs"/>
@@ -290,15 +290,15 @@
     <Compile Include="Mod\Persistence\IEnvironmentServer.cs"/>
     <Compile Include="Mod\Persistence\Party\EventPartyMoveTo.cs"/>
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityClient.cs"/>
-    <Compile Include="Mod\Persistence\Party\MobilePartyEntityServer.cs" />
-    <Compile Include="Mod\Persistence\Party\MobilePartyState.cs" />
-    <Compile Include="Mod\Persistence\MovementData.cs" />
-    <Compile Include="Mod\Persistence\PersistenceClient.cs" />
-    <Compile Include="Mod\Persistence\EntityManager.cs" />
-    <Compile Include="Mod\Persistence\RailBitBufferExtensions.cs" />
-    <Compile Include="Mod\Persistence\Registry.cs" />
-    <Compile Include="Mod\Persistence\RPC\Argument.cs" />
-    <Compile Include="Mod\Persistence\RPC\ArgumentFactory.cs" />
+    <Compile Include="Mod\Persistence\Party\MobilePartyEntityServer.cs"/>
+    <Compile Include="Mod\Persistence\Party\MobilePartyState.cs"/>
+    <Compile Include="Mod\Persistence\MovementData.cs"/>
+    <Compile Include="Mod\Persistence\PersistenceClient.cs"/>
+    <Compile Include="Mod\Persistence\EntityManager.cs"/>
+    <Compile Include="Mod\Persistence\RailBitBufferExtensions.cs"/>
+    <Compile Include="Mod\Persistence\Registry.cs"/>
+    <Compile Include="Mod\Persistence\RPC\Argument.cs"/>
+    <Compile Include="Mod\Persistence\RPC\ArgumentFactory.cs"/>
     <Compile Include="Mod\Persistence\RPC\EventBroadcastingQueue.cs"/>
     <Compile Include="Mod\Persistence\RPC\MethodCall.cs" />
     <Compile Include="Mod\Persistence\RPC\MethodCallSerializer.cs" />
@@ -353,6 +353,7 @@
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterPerksSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterSkillsSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterTraitsSerializer.cs" />
+    <Compile Include="Mod\Serializers\SerializableFactory.cs"/>
     <Compile Include="Mod\UI\CharacterCreationUI\CharacterCreationUI.cs" />
     <Compile Include="Mod\UI\LoadGameUI\CoopLoadUI.cs" />
     <Compile Include="NetImpl\LiteNet\Extensions.cs" />
@@ -397,7 +398,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll</PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted $(SolutionDir)..\deploy.ps1 -SolutionDir $(SolutionDir) -TargetDir $(TargetDir) -TargetFileName $(TargetFileName) -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll</PostBuildEvent>
   </PropertyGroup>
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

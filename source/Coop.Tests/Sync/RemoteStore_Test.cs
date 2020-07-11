@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Coop.Mod.Serializers;
 using Network.Infrastructure;
 using Sync.Store;
 using Xunit;
@@ -32,8 +33,16 @@ namespace Coop.Tests.Sync
 
                 client.NetworkImpl.OnSend += server.Receive;
                 server.NetworkImpl.OnSend += client.Receive;
-                m_StoresClient.Add(new RemoteStore(new Dictionary<ObjectId, object>(), client));
-                m_StoresServer.Add(new RemoteStore(new Dictionary<ObjectId, object>(), server));
+                m_StoresClient.Add(
+                    new RemoteStore(
+                        new Dictionary<ObjectId, object>(),
+                        client,
+                        new SerializableFactory()));
+                m_StoresServer.Add(
+                    new RemoteStore(
+                        new Dictionary<ObjectId, object>(),
+                        server,
+                        new SerializableFactory()));
 
                 m_ConnectionsClient.Add(client);
                 m_ConnectionsServer.Add(server);

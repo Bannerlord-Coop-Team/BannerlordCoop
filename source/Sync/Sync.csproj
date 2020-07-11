@@ -80,19 +80,20 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="EPatchBehaviour.cs" />
-    <Compile Include="MethodPatch.cs" />
+    <Compile Include="EPatchBehaviour.cs"/>
+    <Compile Include="MethodPatch.cs"/>
     <Compile Include="EMethodPatchFlag.cs"/>
-    <Compile Include="Store\IStore.cs" />
-    <Compile Include="Store\RemoteStore.cs" />
-    <Compile Include="Store\SharedRemoteStore.cs" />
-    <Compile Include="Store\StoreSerializer.cs" />
-    <Compile Include="ValueChangeRequest.cs" />
-    <Compile Include="FieldChangeBuffer.cs" />
-    <Compile Include="MethodId.cs" />
-    <Compile Include="MethodPatchFactory.cs" />
-    <Compile Include="MethodRegistry.cs" />
-    <Compile Include="PropertyPatch.cs" />
+    <Compile Include="Store\ISerializableFactory.cs"/>
+    <Compile Include="Store\IStore.cs"/>
+    <Compile Include="Store\RemoteStore.cs"/>
+    <Compile Include="Store\SharedRemoteStore.cs"/>
+    <Compile Include="Store\StoreSerializer.cs"/>
+    <Compile Include="ValueChangeRequest.cs"/>
+    <Compile Include="FieldChangeBuffer.cs"/>
+    <Compile Include="MethodId.cs"/>
+    <Compile Include="MethodPatchFactory.cs"/>
+    <Compile Include="MethodRegistry.cs"/>
+    <Compile Include="PropertyPatch.cs"/>
     <Compile Include="ValueAccess.cs" />
     <Compile Include="Tracker.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

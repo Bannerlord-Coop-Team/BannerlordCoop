@@ -38,6 +38,7 @@ namespace Sync.Store
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly ConnectionBase m_Connection;
         private readonly Dictionary<ObjectId, object> m_Data;
+        private readonly StoreSerializer m_Serializer;
 
         private readonly Dictionary<ObjectId, RemoteObjectState> m_State =
             new Dictionary<ObjectId, RemoteObjectState>();
@@ -66,8 +67,10 @@ namespace Sync.Store
         /// <param name="connection">connection to be used to communicate with the remote store</param>
         public RemoteStore(
             [NotNull] Dictionary<ObjectId, object> data,
-            [NotNull] ConnectionBase connection)
+            [NotNull] ConnectionBase connection,
+            [NotNull] ISerializableFactory serializableFactory)
         {
+            m_Serializer = new StoreSerializer(serializableFactory);
             m_Data = data;
             m_Connection = connection;
             m_Connection.Dispatcher.RegisterPacketHandlers(this);
@@ -77,7 +80,7 @@ namespace Sync.Store
 
         public ObjectId Insert(object obj)
         {
-            byte[] raw = StoreSerializer.Serialize(obj);
+            byte[] raw = m_Serializer.Serialize(obj);
             ObjectId id = new ObjectId(XXHash.XXH32(raw));
             m_Data[id] = obj;
             Logger.Trace("Insert {id}: {object}", id, obj);
@@ -121,7 +124,7 @@ namespace Sync.Store
             }
             else
             {
-                m_Data[id] = StoreSerializer.Deserialize(raw);
+                m_Data[id] = m_Serializer.Deserialize(raw);
             }
 
             // Call handlers

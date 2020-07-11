@@ -19,6 +19,8 @@ namespace Sync.Store
         private readonly Dictionary<ObjectId, PendingResponse> m_PendingAcks =
             new Dictionary<ObjectId, PendingResponse>();
 
+        private readonly StoreSerializer m_Serializer;
+
         private readonly Dictionary<ConnectionBase, RemoteStore> m_Stores =
             new Dictionary<ConnectionBase, RemoteStore>();
 
@@ -27,9 +29,14 @@ namespace Sync.Store
         /// </summary>
         public Action<ObjectId> OnObjectDistributed;
 
+        public SharedRemoteStore([NotNull] ISerializableFactory serializableFactory)
+        {
+            m_Serializer = new StoreSerializer(serializableFactory);
+        }
+
         public ObjectId Insert(object obj)
         {
-            byte[] raw = StoreSerializer.Serialize(obj);
+            byte[] raw = m_Serializer.Serialize(obj);
             ObjectId id = new ObjectId(XXHash.XXH32(raw));
             m_Data[id] = obj;
             Logger.Trace("Insert {id}: {object}", id, obj);
@@ -66,7 +73,7 @@ namespace Sync.Store
                     $"Cannot create two stores for the same connection {connection}.");
             }
 
-            RemoteStore store = new RemoteStore(m_Data, connection);
+            RemoteStore store = new RemoteStore(m_Data, connection, m_Serializer.Factory);
             store.OnPacketAddDeserialized += (id, payload, obj) =>
             {
                 return RemoteObjectAdded(connection, id, payload, obj);
@@ -82,12 +89,21 @@ namespace Sync.Store
                 throw new Exception($"Unknown origin: {sender}.");
             }
 
-            if (!m_PendingAcks.ContainsKey(id)) return;
+            if (!m_PendingAcks.ContainsKey(id))
+            {
+                Logger.Warn(
+                    "Received ACK for {id} from {sender}, but the server was not expecting one.",
+                    id,
+                    sender);
+                return;
+            }
 
+            Logger.Trace("Received ACK for {id} from {sender}.", id, sender);
             PendingResponse pending = m_PendingAcks[id];
             pending.OnAckFrom(m_Stores[sender]);
             if (pending.AllDone())
             {
+                Logger.Trace("Received all necessary ACKS for {id}. Object distributed.", id);
                 pending.Origin?.SendACK(id);
                 m_PendingAcks.Remove(id);
                 OnObjectDistributed?.Invoke(id);
