@@ -21,21 +21,26 @@ namespace Network.Infrastructure
             m_StateMachine =
                 new StateMachine<EConnectionState, ETrigger>(EConnectionState.Disconnected);
 
+            // Server wait for host client connect
             m_StateMachine.Configure(EConnectionState.Disconnected)
                           .Permit(ETrigger.WaitForClient, EConnectionState.ServerAwaitingClient);
 
+            // Disconnect trigger
             StateMachine<EConnectionState, ETrigger>.TriggerWithParameters<EDisconnectReason>
                 disconnectTrigger =
                     m_StateMachine.SetTriggerParameters<EDisconnectReason>(ETrigger.Disconnect);
 
+            // Disconnect
             m_StateMachine.Configure(EConnectionState.Disconnecting)
                           .OnEntryFrom(disconnectTrigger, closeConnection)
                           .Permit(ETrigger.Disconnected, EConnectionState.Disconnected);
 
+            // Server wait for client connect
             m_StateMachine.Configure(EConnectionState.ServerAwaitingClient)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
                           .Permit(ETrigger.ClientInfoVerified, EConnectionState.ServerJoining);
 
+            // Server client joining
             m_StateMachine.Configure(EConnectionState.ServerJoining)
                           .OnEntry(SendJoinRequestAccepted)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
@@ -44,11 +49,13 @@ namespace Network.Infrastructure
                               EConnectionState.ServerSendingWorldData)
                           .Permit(ETrigger.ClientJoined, EConnectionState.ServerPlaying);
 
+            // Send world data
             m_StateMachine.Configure(EConnectionState.ServerSendingWorldData)
                           .OnEntry(SendInitialWorldData)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
                           .Permit(ETrigger.ClientJoined, EConnectionState.ServerPlaying);
 
+            // Server playing
             m_StateMachine.Configure(EConnectionState.ServerPlaying)
                           .OnEntry(onConnected)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting);

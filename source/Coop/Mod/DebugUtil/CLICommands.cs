@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.Net;
 using Network.Infrastructure;
+using Network;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.DebugUtil

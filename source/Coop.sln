@@ -22,6 +22,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Network", "Network\Network.csproj", "{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientDebug", "ClientDebug\ClientDebug.csproj", "{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,14 @@ Global
 		{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}.Release|x64.ActiveCfg = Release|Any CPU
 		{B0FF5E24-4D98-4EC8-BBCE-6CDB85CB685D}.Release|x64.Build.0 = Release|Any CPU
+		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Debug|x64.Build.0 = Debug|Any CPU
+		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Release|x64.ActiveCfg = Release|Any CPU
+		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -14,10 +14,13 @@ namespace Coop.Mod
         InitialWorldState
     }
 
+    // TODO rename interface to more relevant name
     internal class GameData : ISaveData
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        public bool RequiresInitialWorldData => !CoopClient.Instance.GameState.IsGameLoaded;
+        public bool RequiresInitialWorldData => Coop.IsClientReqWorldData && !Coop.IsServer;
+        // TODO determine if client needs to create a character
+        public bool RequiresCharacterCreation => !Coop.IsServer;
 
         public bool Receive(ArraySegment<byte> rawData)
         {

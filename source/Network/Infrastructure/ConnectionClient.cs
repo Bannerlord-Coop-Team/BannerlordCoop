@@ -8,8 +8,8 @@ namespace Network.Infrastructure
 {
     public class ConnectionClient : ConnectionBase
     {
+        public static StateMachine<EConnectionState, ETrigger> m_StateMachine;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        private readonly StateMachine<EConnectionState, ETrigger> m_StateMachine;
         private readonly ISaveData m_WorldData;
 
         public ConnectionClient(
@@ -25,6 +25,7 @@ namespace Network.Infrastructure
             m_StateMachine.Configure(EConnectionState.Disconnected)
                           .Permit(ETrigger.TryJoinServer, EConnectionState.ClientJoinRequesting);
 
+            // Disconnect trigger
             StateMachine<EConnectionState, ETrigger>.TriggerWithParameters<EDisconnectReason>
                 disconnectTrigger =
                     m_StateMachine.SetTriggerParameters<EDisconnectReason>(ETrigger.Disconnect);
@@ -32,9 +33,14 @@ namespace Network.Infrastructure
                           .OnEntryFrom(disconnectTrigger, closeConnection)
                           .Permit(ETrigger.Disconnected, EConnectionState.Disconnected);
 
+            // Client join request
             m_StateMachine.Configure(EConnectionState.ClientJoinRequesting)
                           .OnEntry(sendClientHello)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
+                          .PermitIf(
+                              ETrigger.RequireClientCreation,
+                              EConnectionState.ClientCharacterCreation,
+                              () => m_WorldData.RequiresCharacterCreation)
                           .PermitIf(
                               ETrigger.ServerAcceptedJoinRequest,
                               EConnectionState.ClientAwaitingWorldData,
@@ -44,23 +50,58 @@ namespace Network.Infrastructure
                               EConnectionState.ClientPlaying,
                               () => !m_WorldData.RequiresInitialWorldData);
 
+            // Character Creation
+            m_StateMachine.Configure(EConnectionState.ClientCharacterCreation)
+                          .OnEntry(characterCreation)
+                          .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
+                          .PermitIf(
+                              ETrigger.CharacterCreated,
+                              EConnectionState.ClientAwaitingWorldData,
+                              () => m_WorldData.RequiresInitialWorldData)
+                          .PermitIf(
+                              ETrigger.CharacterCreated,
+                              EConnectionState.ClientPlaying,
+                              () => !m_WorldData.RequiresInitialWorldData);
+
+            // Client request world data
             m_StateMachine.Configure(EConnectionState.ClientAwaitingWorldData)
                           .OnEntry(sendClientRequestInitialWorldData)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
                           .Permit(
                               ETrigger.InitialWorldDataReceived,
+                              EConnectionState.ClientLoading);
+
+            // Client loading game
+            m_StateMachine.Configure(EConnectionState.ClientLoading)
+                          .OnEntry(sendGameLoading)
+                          .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
+                          .Permit(
+                              ETrigger.GameLoaded,
                               EConnectionState.ClientPlaying);
 
+            // Client playing (game loaded)
             m_StateMachine.Configure(EConnectionState.ClientPlaying)
-                          .OnEntry(onConnected)
+                          .OnEntry(clientLoaded)
                           .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting);
 
             Dispatcher.RegisterPacketHandlers(this);
+
+            m_StateMachine.OnTransitioned((stateMachine) =>
+            {
+                Logger.Debug($"Client switched from {stateMachine.Source} " + 
+                    $"to {stateMachine.Source} " +  
+                    $"with trigger {stateMachine.Trigger}.");
+            });
         }
 
         public override EConnectionState State => m_StateMachine.State;
-        public event Action<ConnectionClient> OnClientJoined;
+
+        public Action<ConnectionClient> OnClientJoined { get; set; }
+
+        public event Action<ConnectionClient> OnClientLoaded;
         public event Action<EDisconnectReason> OnDisconnected;
+        public event Action<ConnectionClient> OnCharacterCreated;
+        public event Action<ConnectionClient> RequireCharacterCreation;
 
         ~ConnectionClient()
         {
@@ -90,11 +131,14 @@ namespace Network.Infrastructure
             OnDisconnected?.Invoke(eReason);
         }
 
-        private enum ETrigger
+        public enum ETrigger
         {
             TryJoinServer,
             ServerAcceptedJoinRequest,
+            RequireClientCreation,
+            CharacterCreated,
             InitialWorldDataReceived,
+            GameLoaded,
             Disconnect,
             Disconnected
         }
@@ -106,7 +150,7 @@ namespace Network.Infrastructure
         }
 
         [PacketHandler(EConnectionState.ClientJoinRequesting, EPacket.Server_RequestClientInfo)]
-        private void receiveClientInfoRequest(Packet packet)
+        private void receiveClientInfoRequest(Packet packet)  
         {
             Server_RequestClientInfo payload =
                 Server_RequestClientInfo.Deserialize(new ByteReader(packet.Payload));
@@ -126,11 +170,31 @@ namespace Network.Infrastructure
         {
             Server_JoinRequestAccepted payload =
                 Server_JoinRequestAccepted.Deserialize(new ByteReader(packet.Payload));
-            m_StateMachine.Fire(ETrigger.ServerAcceptedJoinRequest);
+            if(m_WorldData.RequiresCharacterCreation)
+            {
+                m_StateMachine.Fire(ETrigger.RequireClientCreation);
+            }
+            else
+            {
+                m_StateMachine.Fire(ETrigger.ServerAcceptedJoinRequest);
+            }
+        }
+
+        #endregion
+
+        #region ClientCharacterCreation
+        private void characterCreation()
+        {
+            RequireCharacterCreation?.Invoke(this);
+        }
+
+        public void CharacterCreationOver()
+        {
+            m_StateMachine.Fire(ETrigger.CharacterCreated);
         }
         #endregion
 
-        #region ClientAwaitingWorldData & ClientPlaying
+        #region ClientAwaitingWorldData
         private void sendClientRequestInitialWorldData()
         {
             Send(
@@ -167,11 +231,31 @@ namespace Network.Infrastructure
                 Disconnect(EDisconnectReason.WorldDataTransferIssue);
             }
         }
+        #endregion
 
-        private void onConnected()
+        #region  ClientLoading
+        private void sendGameLoading()
+        {
+            Send(
+                new Packet(
+                    EPacket.Client_Joined,
+                    new Client_GameLoading().Serialize()));
+        }
+        public void sendGameLoaded(object source, EventArgs e)
+        {
+            Send(
+                new Packet(
+                    EPacket.Client_Joined,
+                    new Client_GameLoaded().Serialize()));
+            m_StateMachine.Fire(ETrigger.GameLoaded);
+        }
+        #endregion
+
+        #region ClientPlaying
+        private void clientLoaded()
         {
             Send(new Packet(EPacket.Client_Joined, new Client_Joined().Serialize()));
-            OnClientJoined?.Invoke(this);
+            OnClientLoaded?.Invoke(this);
         }
 
         [PacketHandler(EConnectionState.ClientPlaying, EPacket.Sync)]
