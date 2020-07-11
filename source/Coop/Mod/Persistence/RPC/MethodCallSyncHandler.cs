@@ -4,13 +4,20 @@ using System.Diagnostics;
 using System.Linq;
 using Common;
 using JetBrains.Annotations;
+using RailgunNet;
 using RailgunNet.Connection.Client;
 using RailgunNet.System.Types;
+using RailgunNet.Util;
 using Sync;
 using Sync.Store;
 
 namespace Coop.Mod.Persistence.RPC
 {
+    /// <summary>
+    ///     Registers a global call handler for a <see cref="MethodAccess" /> that sends an
+    ///     <see cref="EventMethodCall" /> to the server.
+    /// </summary>
+    [OnlyIn(Component.Client)]
     public class MethodCallSyncHandler
     {
         private bool m_IsRegistered;

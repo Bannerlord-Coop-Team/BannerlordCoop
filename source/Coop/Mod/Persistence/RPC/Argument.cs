@@ -23,7 +23,7 @@ namespace Coop.Mod.Persistence.RPC
     public enum EventArgType
     {
         Null,
-        MBGUID,
+        MBObject,
         Int,
         StoreObjectId
     }
@@ -49,7 +49,7 @@ namespace Coop.Mod.Persistence.RPC
 
         public Argument(MBGUID guid) : this()
         {
-            EventType = EventArgType.MBGUID;
+            EventType = EventArgType.MBObject;
             MbGUID = guid;
         }
 
@@ -65,7 +65,7 @@ namespace Coop.Mod.Persistence.RPC
             {
                 case EventArgType.Null:
                     return "null";
-                case EventArgType.MBGUID:
+                case EventArgType.MBObject:
                     return $"MBGUID {MbGUID}";
                 case EventArgType.Int:
                     return Int.ToString();

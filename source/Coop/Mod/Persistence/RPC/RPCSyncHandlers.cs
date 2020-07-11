@@ -3,6 +3,9 @@ using Sync;
 
 namespace Coop.Mod.Persistence.RPC
 {
+    /// <summary>
+    ///     Manages a collection of <see cref="MethodCallSyncHandler" />.
+    /// </summary>
     public class RPCSyncHandlers
     {
         private readonly List<MethodCallSyncHandler> m_Handlers = new List<MethodCallSyncHandler>();

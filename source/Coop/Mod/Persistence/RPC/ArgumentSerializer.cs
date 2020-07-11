@@ -24,7 +24,7 @@ namespace Coop.Mod.Persistence.RPC
             buffer.Write(NumberOfBitsForArgType, Convert.ToByte(arg.EventType));
             switch (arg.EventType)
             {
-                case EventArgType.MBGUID:
+                case EventArgType.MBObject:
                     buffer.WriteMBGUID(arg.MbGUID.Value);
                     break;
                 case EventArgType.Null:
@@ -47,7 +47,7 @@ namespace Coop.Mod.Persistence.RPC
             EventArgType eType = (EventArgType) buffer.Read(NumberOfBitsForArgType);
             switch (eType)
             {
-                case EventArgType.MBGUID:
+                case EventArgType.MBObject:
                     return new Argument(buffer.ReadMBGUID());
                 case EventArgType.Null:
                     return Argument.Null;

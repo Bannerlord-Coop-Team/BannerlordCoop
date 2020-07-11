@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using JetBrains.Annotations;
 using RailgunNet.Logic;
 using Sync.Store;
 using TaleWorlds.ObjectSystem;
@@ -29,7 +30,7 @@ namespace Coop.Mod.Persistence.RPC
             {
                 case EventArgType.Null:
                     return null;
-                case EventArgType.MBGUID:
+                case EventArgType.MBObject:
                     return MBObjectManager.Instance.GetObject(arg.MbGUID.Value);
                 case EventArgType.Int:
                     return arg.Int.Value;
@@ -77,7 +78,10 @@ namespace Coop.Mod.Persistence.RPC
         ///     If false, the argument may be, depending on the type, transferred by reference.
         /// </param>
         /// <returns>The wrapped argument.</returns>
-        public static Argument Create(IStore store, object obj, bool bTransferByValue)
+        public static Argument Create(
+            [NotNull] IStore store,
+            [CanBeNull] object obj,
+            bool bTransferByValue)
         {
             switch (obj)
             {

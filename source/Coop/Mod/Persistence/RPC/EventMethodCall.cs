@@ -9,6 +9,15 @@ using Sync;
 
 namespace Coop.Mod.Persistence.RPC
 {
+    /// <summary>
+    ///     RailEvent used to initiate remote procedure calls. The way this event is processed
+    ///     differs between client and server:
+    ///     - The server acts as a broadcasting relay station. Effectively receiving the event
+    ///     and forwarding it to all clients (INCLUDING the client that sent the event!).
+    ///     Note that the server will delay event execution until all arguments have been
+    ///     transferred to all clients.
+    ///     - Clients will resolve the call and arguments locally and execute it.
+    /// </summary>
     public class EventMethodCall : RailEvent
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -47,6 +56,7 @@ namespace Coop.Mod.Persistence.RPC
                 else if (room is RailClientRoom clientRoom)
                 {
                     Logger.Trace("SyncCall: {}", Call);
+                    // TODO: The call is not synchronized to a campaign time at this point. We probably want an execution queue of some sorts that executes the call at the right point in time.
                     method.CallOriginal(
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Instance),
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Arguments));
