@@ -60,6 +60,13 @@ namespace Sync
             EMethodPatchFlag eFlags = EMethodPatchFlag.None,
             EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
+            if (method.IsGenericMethod)
+            {
+                throw new ArgumentException(
+                    $"Unable to generate patch: provided method {method} is generic. Use a [HarmonyPatch] with TargetMethod instead.",
+                    nameof(method));
+            }
+
             if (method.DeclaringType != m_Declaring)
             {
                 throw new ArgumentException(
@@ -85,15 +92,14 @@ namespace Sync
             EMethodPatchFlag eFlags = EMethodPatchFlag.None,
             EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
-            MethodInfo method = AccessTools.Method(m_Declaring, sMethodName);
-            if (method == null)
+            foreach (MethodInfo info in m_Declaring.GetMethods())
             {
-                throw new ArgumentException(
-                    $"Method {m_Declaring}.{sMethodName} not found.",
-                    nameof(sMethodName));
+                if (info.Name == sMethodName)
+                {
+                    Intercept(info, eFlags, eBehaviour);
+                }
             }
 
-            PatchPrefix(method, eFlags, eBehaviour);
             return this;
         }
 
