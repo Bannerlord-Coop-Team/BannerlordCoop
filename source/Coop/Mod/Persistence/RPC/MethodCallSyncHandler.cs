@@ -9,7 +9,6 @@ using RailgunNet.Connection.Client;
 using RailgunNet.System.Types;
 using RailgunNet.Util;
 using Sync;
-using Sync.Store;
 
 namespace Coop.Mod.Persistence.RPC
 {
@@ -20,18 +19,20 @@ namespace Coop.Mod.Persistence.RPC
     [OnlyIn(Component.Client)]
     public class MethodCallSyncHandler
     {
+        [NotNull] private readonly IClientAccess m_ClientAccess;
         private bool m_IsRegistered;
 
-        public MethodCallSyncHandler([NotNull] MethodAccess methodAccess)
+        public MethodCallSyncHandler(
+            [NotNull] MethodAccess methodAccess,
+            [NotNull] IClientAccess access)
         {
             MethodAccess = methodAccess;
+            m_ClientAccess = access;
             Register();
         }
 
         public Statistics Stats { get; } = new Statistics();
         public MethodAccess MethodAccess { get; }
-
-        private static RemoteStore Store => CoopClient.Instance.SyncedObjectStore;
 
         [Conditional("DEBUG")]
         private void Trace(MethodCall call, RailClientRoom room)
@@ -56,20 +57,23 @@ namespace Coop.Mod.Persistence.RPC
                 {
                     if (args is object[] objects)
                     {
-                        CoopClient.Instance.Persistence?.Room.RaiseEvent<EventMethodCall>(
-                            evt =>
-                            {
-                                evt.Call = new MethodCall
-                                {
-                                    Id = MethodAccess.Id,
-                                    Instance = ArgumentFactory.Create(
-                                        Store,
-                                        instance,
-                                        false),
-                                    Arguments = ProduceArguments(objects)
-                                };
-                                Trace(evt.Call, CoopClient.Instance.Persistence.Room);
-                            });
+                        m_ClientAccess.GetRoom()
+                                      ?.RaiseEvent<EventMethodCall>(
+                                          evt =>
+                                          {
+                                              evt.Call = new MethodCall
+                                              {
+                                                  Id = MethodAccess.Id,
+                                                  Instance = ArgumentFactory.Create(
+                                                      m_ClientAccess.GetStore(),
+                                                      instance,
+                                                      false),
+                                                  Arguments = ProduceArguments(objects)
+                                              };
+                                              Trace(
+                                                  evt.Call,
+                                                  CoopClient.Instance.Persistence.Room);
+                                          });
                     }
                     else
                     {
@@ -83,7 +87,11 @@ namespace Coop.Mod.Persistence.RPC
         {
             bool bTransferByValue =
                 MethodAccess.Flags.HasFlag(EMethodPatchFlag.TransferArgumentsByValue);
-            return objects.Select(obj => ArgumentFactory.Create(Store, obj, bTransferByValue))
+            return objects.Select(
+                              obj => ArgumentFactory.Create(
+                                  m_ClientAccess.GetStore(),
+                                  obj,
+                                  bTransferByValue))
                           .ToList();
         }
 

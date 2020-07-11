@@ -31,7 +31,8 @@ namespace Sync
         }
 
         public MethodPatch InterceptAll(
-            BindingFlags filter,
+            BindingFlags filter =
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly,
             EMethodPatchFlag eFlags = EMethodPatchFlag.None,
             EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
@@ -96,6 +97,16 @@ namespace Sync
             return this;
         }
 
+        /// <summary>
+        ///     Do not use, generics cannot be reliably patched as of right now. See
+        ///     https://github.com/pardeike/Harmony/issues/320
+        /// </summary>
+        /// <param name="sMethodName"></param>
+        /// <param name="genericInstantiations"></param>
+        /// <param name="eFlags"></param>
+        /// <param name="eBehaviour"></param>
+        /// <returns></returns>
+        [Obsolete]
         public MethodPatch InterceptGeneric(
             string sMethodName,
             Type[] genericInstantiations,

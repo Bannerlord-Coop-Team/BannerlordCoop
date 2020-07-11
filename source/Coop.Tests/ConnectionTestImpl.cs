@@ -15,16 +15,13 @@ namespace Coop.Tests
 
     public class ConnectionTestImpl : ConnectionBase
     {
-        public ConnectionTestImpl() : base(
-            new InMemoryConnection(),
-            new GameStatePersistenceTestImpl())
+        public ConnectionTestImpl(
+            InMemoryConnection connection,
+            IGameStatePersistence gameStatePersistence) : base(connection, gameStatePersistence)
         {
         }
 
         public InMemoryConnection NetworkImpl => Network as InMemoryConnection;
-
-        public GameStatePersistenceTestImpl GameStatePersistenceImpl =>
-            GameStatePersistence as GameStatePersistenceTestImpl;
 
         public EConnectionState StateImpl { get; set; }
         public override EConnectionState State => StateImpl;

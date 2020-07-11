@@ -45,7 +45,10 @@ namespace Sync
 
                 HarmonyMethod patch = new HarmonyMethod(factoryMethod)
                 {
-                    priority = SyncPriority.MethodPatchGeneratedPrefix
+                    priority = SyncPriority.MethodPatchGeneratedPrefix,
+#if DEBUG
+                    debug = true
+#endif
                 };
                 Patcher.HarmonyInstance.Patch(access.MemberInfo, patch);
             }

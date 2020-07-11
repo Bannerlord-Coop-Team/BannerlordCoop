@@ -11,12 +11,11 @@ namespace Coop.Tests.Persistence.RPC
     {
         public ArgumentFactory_Test()
         {
-            m_TestStores.Init(2);
-            m_StoreClient0 = m_TestStores.StoresClient[0];
-            m_StoreClient1 = m_TestStores.StoresClient[1];
+            m_StoreClient0 = m_Environment.StoresClient[0];
+            m_StoreClient1 = m_Environment.StoresClient[1];
         }
 
-        private readonly TestStores m_TestStores = new TestStores();
+        private readonly TestEnvironment m_Environment = new TestEnvironment(2);
         private readonly RemoteStore m_StoreClient0;
         private readonly RemoteStore m_StoreClient1;
 
@@ -133,8 +132,8 @@ namespace Coop.Tests.Persistence.RPC
                 () => ArgumentFactory.Resolve(m_StoreClient1, argDeserialized));
 
             // Sync the store
-            m_TestStores.ExecuteSendsClients(); // Client0 -> Server
-            m_TestStores.ExecuteSendsServer(); // Server -> Client 1
+            m_Environment.ExecuteSendsClients(); // Client0 -> Server
+            m_Environment.ExecuteSendsServer(); // Server -> Client 1
 
             // Now client 1 can resolve the argument
             object resolvedClient1 = ArgumentFactory.Resolve(m_StoreClient1, argDeserialized);

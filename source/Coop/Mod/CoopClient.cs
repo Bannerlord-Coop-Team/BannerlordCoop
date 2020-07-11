@@ -5,11 +5,13 @@ using System.Net;
 using Common;
 using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
+using Coop.Mod.Persistence.RPC;
 using Coop.Mod.Serializers;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
+using RailgunNet.Connection.Client;
 using RailgunNet.Logic;
 using StoryMode;
 using Sync.Store;
@@ -17,7 +19,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Coop.Mod
 {
-    public class CoopClient : IUpdateable
+    public class CoopClient : IUpdateable, IClientAccess
     {
         private const int MaxReconnectAttempts = 2;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -91,6 +93,16 @@ namespace Coop.Mod
                 return Session.Connection.State == EConnectionState.ClientJoinRequesting ||
                        Session.Connection.State == EConnectionState.ClientCharacterCreation;
             }
+        }
+
+        public RemoteStore GetStore()
+        {
+            return SyncedObjectStore;
+        }
+
+        public RailClientRoom GetRoom()
+        {
+            return Persistence?.Room;
         }
 
         public void Update(TimeSpan frameTime)
