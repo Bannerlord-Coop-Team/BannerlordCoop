@@ -78,6 +78,38 @@ namespace Coop.Tests.Persistence.RPC
             Assert.Equal(i, resolved);
         }
 
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1000)]
+        [InlineData(-1000)]
+        [InlineData(float.MinValue)]
+        [InlineData(float.MaxValue)]
+        [InlineData(float.NegativeInfinity)]
+        [InlineData(float.PositiveInfinity)]
+        private void FloatCanBeSerialized(float fValue)
+        {
+            // Create
+            Argument arg = ArgumentFactory.Create(m_StoreClient0, fValue, false);
+            Assert.Empty(m_StoreClient0.Data);
+            Assert.Equal(
+                EventArgType.Float,
+                arg.EventType); // Regardless of byValue because its a value type!
+            Assert.True(arg.Float.HasValue);
+
+            // Serialize
+            buffer.EncodeEventArg(arg);
+
+            // Deserialize
+            Argument argDeserialized = buffer.DecodeEventArg();
+            Assert.Equal(arg, argDeserialized);
+
+            // Resolve
+            object resolved = ArgumentFactory.Resolve(m_StoreClient0, argDeserialized);
+            Assert.NotNull(resolved);
+            Assert.IsType<float>(resolved);
+            Assert.Equal(fValue, resolved);
+        }
+
         [Fact]
         private void ObjectIsRemovedFromStoreAfterResolve()
         {

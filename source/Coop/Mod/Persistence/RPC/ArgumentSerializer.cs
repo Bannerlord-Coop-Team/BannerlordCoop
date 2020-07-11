@@ -36,6 +36,10 @@ namespace Coop.Mod.Persistence.RPC
                 case EventArgType.Int:
                     buffer.WriteInt(arg.Int.Value);
                     break;
+                case EventArgType.Float:
+                    buffer.WriteUInt(
+                        BitConverter.ToUInt32(BitConverter.GetBytes(arg.Float.Value), 0));
+                    break;
                 case EventArgType.StoreObjectId:
                     buffer.WriteUInt(arg.StoreObjectId.Value.Value);
                     break;
@@ -58,6 +62,10 @@ namespace Coop.Mod.Persistence.RPC
                     return Argument.Null;
                 case EventArgType.Int:
                     return new Argument(buffer.ReadInt());
+                case EventArgType.Float:
+                    uint ui = buffer.ReadUInt();
+                    float f = BitConverter.ToSingle(BitConverter.GetBytes(ui), 0);
+                    return new Argument(f);
                 case EventArgType.StoreObjectId:
                     return new Argument(new ObjectId(buffer.ReadUInt()));
                 default:

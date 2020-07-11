@@ -26,6 +26,7 @@ namespace Coop.Mod.Persistence.RPC
         MBObjectManager,
         MBObject,
         Int,
+        Float,
         StoreObjectId
     }
 
@@ -45,12 +46,19 @@ namespace Coop.Mod.Persistence.RPC
         public MBGUID? MbGUID { get; }
 
         public int? Int { get; }
+        public float? Float { get; }
         public ObjectId? StoreObjectId { get; }
 
         public Argument(int i) : this()
         {
             EventType = EventArgType.Int;
             Int = i;
+        }
+
+        public Argument(float f) : this()
+        {
+            EventType = EventArgType.Float;
+            Float = f;
         }
 
         public Argument(MBGUID guid) : this()
@@ -77,6 +85,8 @@ namespace Coop.Mod.Persistence.RPC
                     return $"MBGUID {MbGUID}";
                 case EventArgType.Int:
                     return Int.ToString();
+                case EventArgType.Float:
+                    return Float.ToString();
                 case EventArgType.StoreObjectId:
                     return $"{StoreObjectId.ToString()}";
                 default:

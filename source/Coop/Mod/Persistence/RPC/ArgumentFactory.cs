@@ -39,6 +39,8 @@ namespace Coop.Mod.Persistence.RPC
                     return MBObjectManager.Instance.GetObject(arg.MbGUID.Value);
                 case EventArgType.Int:
                     return arg.Int.Value;
+                case EventArgType.Float:
+                    return arg.Float.Value;
                 case EventArgType.StoreObjectId:
                     if (store == null)
                     {
@@ -103,6 +105,8 @@ namespace Coop.Mod.Persistence.RPC
                     return new Argument(guid);
                 case int i:
                     return new Argument(i);
+                case float f:
+                    return new Argument(f);
                 case MBObjectBase mbobj:
                     if (bTransferByValue)
                     {
