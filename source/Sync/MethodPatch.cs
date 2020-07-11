@@ -60,13 +60,6 @@ namespace Sync
             EMethodPatchFlag eFlags = EMethodPatchFlag.None,
             EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
-            if (method.IsGenericMethod)
-            {
-                throw new ArgumentException(
-                    $"Unable to generate patch: provided method {method} is generic. Use a [HarmonyPatch] with TargetMethod instead.",
-                    nameof(method));
-            }
-
             if (method.DeclaringType != m_Declaring)
             {
                 throw new ArgumentException(
@@ -103,9 +96,57 @@ namespace Sync
             return this;
         }
 
+        public MethodPatch InterceptGeneric(
+            string sMethodName,
+            Type[] genericInstantiations,
+            EMethodPatchFlag eFlags = EMethodPatchFlag.None,
+            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
+        {
+            foreach (MethodInfo info in m_Declaring.GetMethods())
+            {
+                if (info.IsGenericMethod && info.Name == sMethodName)
+                {
+                    foreach (Type genericArg in genericInstantiations)
+                    {
+                        Intercept(info.MakeGenericMethod(genericArg), eFlags, eBehaviour);
+                    }
+                }
+            }
+
+            return this;
+        }
+
         public bool TryGetMethod(string sMethodName, out MethodAccess methodAccess)
         {
-            return TryGetMethod(AccessTools.Method(m_Declaring, sMethodName), out methodAccess);
+            MethodInfo method = AccessTools.Method(m_Declaring, sMethodName);
+            if (method.IsGenericMethod)
+            {
+                throw new ArgumentException(
+                    $"Unable to generate patch: provided method {method} is generic. Use a [HarmonyPatch] with TargetMethod instead.",
+                    nameof(method));
+            }
+
+            return TryGetMethod(method, out methodAccess);
+        }
+
+        public bool TryGetMethod(
+            string sMethodName,
+            Type[] genericArguments,
+            out MethodAccess methodAccess)
+        {
+            MethodInfo method = AccessTools.Method(
+                m_Declaring,
+                sMethodName,
+                null,
+                genericArguments);
+            if (method.IsGenericMethod)
+            {
+                throw new ArgumentException(
+                    $"Unable to generate patch: provided method {method} is generic. Use a [HarmonyPatch] with TargetMethod instead.",
+                    nameof(method));
+            }
+
+            return TryGetMethod(method, out methodAccess);
         }
 
         public bool TryGetMethod(MethodInfo methodInfo, out MethodAccess methodAccess)
