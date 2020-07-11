@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Extensions.Data;
@@ -127,6 +127,7 @@ namespace Sync.Store
             if (otherStores.Count == 0)
             {
                 // Nothing more to do. Let the store send the ACK.
+                OnObjectDistributed?.Invoke(id);
                 return true;
             }
 
