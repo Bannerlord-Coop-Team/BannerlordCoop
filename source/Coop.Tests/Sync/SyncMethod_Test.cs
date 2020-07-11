@@ -40,10 +40,12 @@ namespace Coop.Tests.Sync
             public static readonly MethodPatch Patch = new MethodPatch(typeof(A))
                                                        .Intercept(
                                                            nameof(A.SyncedMethod),
+                                                           EMethodPatchFlag.None,
                                                            EPatchBehaviour
                                                                .CallOriginalBaseOnDispatcherReturn)
                                                        .Intercept(
                                                            nameof(A.StaticSyncedMethod),
+                                                           EMethodPatchFlag.None,
                                                            EPatchBehaviour
                                                                .CallOriginalBaseOnDispatcherReturn);
         }

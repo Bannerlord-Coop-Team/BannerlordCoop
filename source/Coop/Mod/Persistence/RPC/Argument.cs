@@ -1,7 +1,4 @@
 ﻿using System;
-using JetBrains.Annotations;
-using RailgunNet.Logic;
-using RailgunNet.System.Types;
 using Sync.Store;
 using TaleWorlds.ObjectSystem;
 
@@ -26,7 +23,6 @@ namespace Coop.Mod.Persistence.RPC
     public enum EventArgType
     {
         Null,
-        EntityReference,
         MBGUID,
         Int,
         StoreObjectId
@@ -40,7 +36,6 @@ namespace Coop.Mod.Persistence.RPC
         };
 
         public EventArgType EventType { get; private set; }
-        public EntityId? RailId { get; }
         public MBGUID? MbGUID { get; }
 
         public int? Int { get; }
@@ -50,21 +45,6 @@ namespace Coop.Mod.Persistence.RPC
         {
             EventType = EventArgType.Int;
             Int = i;
-        }
-
-        public Argument([NotNull] RailEntityBase entity) : this(entity.Id)
-        {
-        }
-
-        public Argument(EntityId id) : this()
-        {
-            if (id == EntityId.INVALID)
-            {
-                throw new Exception("Invalid entity. Cannot reference it in an event argument.");
-            }
-
-            EventType = EventArgType.EntityReference;
-            RailId = id;
         }
 
         public Argument(MBGUID guid) : this()
@@ -85,8 +65,6 @@ namespace Coop.Mod.Persistence.RPC
             {
                 case EventArgType.Null:
                     return "null";
-                case EventArgType.EntityReference:
-                    return RailId.ToString();
                 case EventArgType.MBGUID:
                     return $"MBGUID {MbGUID}";
                 case EventArgType.Int:

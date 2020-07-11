@@ -1,6 +1,5 @@
 ﻿using System;
 using RailgunNet.System.Encoding;
-using RailgunNet.System.Types;
 using Sync.Store;
 
 namespace Coop.Mod.Persistence.RPC
@@ -25,9 +24,6 @@ namespace Coop.Mod.Persistence.RPC
             buffer.Write(NumberOfBitsForArgType, Convert.ToByte(arg.EventType));
             switch (arg.EventType)
             {
-                case EventArgType.EntityReference:
-                    buffer.WriteEntityId(arg.RailId.Value);
-                    break;
                 case EventArgType.MBGUID:
                     buffer.WriteMBGUID(arg.MbGUID.Value);
                     break;
@@ -51,8 +47,6 @@ namespace Coop.Mod.Persistence.RPC
             EventArgType eType = (EventArgType) buffer.Read(NumberOfBitsForArgType);
             switch (eType)
             {
-                case EventArgType.EntityReference:
-                    return new Argument(buffer.ReadEntityId());
                 case EventArgType.MBGUID:
                     return new Argument(buffer.ReadMBGUID());
                 case EventArgType.Null:

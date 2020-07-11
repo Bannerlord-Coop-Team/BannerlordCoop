@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using RailgunNet.Connection.Client;
 using RailgunNet.Logic;
-using RailgunNet.System.Types;
 using Sync.Store;
 using TaleWorlds.ObjectSystem;
 
@@ -17,7 +15,6 @@ namespace Coop.Mod.Persistence.RPC
         /// <summary>
         ///     Resolves the transferred RPC argument to be used in the local function call.
         /// </summary>
-        /// <param name="room">Rail room for the local client.</param>
         /// <param name="store">Clients remote store instance.</param>
         /// <param name="arg">Argument to be resolved.</param>
         /// <returns>The unwrapped argument.</returns>
@@ -26,18 +23,11 @@ namespace Coop.Mod.Persistence.RPC
         ///     but the reference cannot be resolved.
         /// </exception>
         /// <exception cref="ArgumentOutOfRangeException">If the argument type is unknown.</exception>
-        public static object Resolve(this RailClientRoom room, IStore store, Argument arg)
+        public static object Resolve(IStore store, Argument arg)
         {
             switch (arg.EventType)
             {
                 case EventArgType.Null:
-                    return null;
-                case EventArgType.EntityReference:
-                    if (room.TryGet(arg.RailId.Value, out RailEntityClient entity))
-                    {
-                        return entity;
-                    }
-
                     return null;
                 case EventArgType.MBGUID:
                     return MBObjectManager.Instance.GetObject(arg.MbGUID.Value);
@@ -55,7 +45,9 @@ namespace Coop.Mod.Persistence.RPC
                         throw new ArgumentException($"Cannot resolve ${arg}.");
                     }
 
-                    return store.Data[arg.StoreObjectId.Value];
+                    object resolvedObject = store.Data[arg.StoreObjectId.Value];
+                    store.Remove(arg.StoreObjectId.Value);
+                    return resolvedObject;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -68,9 +60,9 @@ namespace Coop.Mod.Persistence.RPC
         /// <param name="store">Clients remote store instance.</param>
         /// <param name="args">Argument to be resolved.</param>
         /// <returns>A list of the unwrapped arguments.</returns>
-        public static object[] Resolve(this RailClientRoom room, IStore store, List<Argument> args)
+        public static object[] Resolve(IStore store, List<Argument> args)
         {
-            return args.Select(arg => room.Resolve(store, arg)).ToArray();
+            return args.Select(arg => Resolve(store, arg)).ToArray();
         }
 
         /// <summary>
@@ -93,10 +85,6 @@ namespace Coop.Mod.Persistence.RPC
                     return Argument.Null;
                 case MBGUID guid:
                     return new Argument(guid);
-                case RailEntityBase entity:
-                    return new Argument(entity);
-                case EntityId entityId:
-                    return new Argument(entityId);
                 case int i:
                     return new Argument(i);
                 case MBObjectBase mbobj:

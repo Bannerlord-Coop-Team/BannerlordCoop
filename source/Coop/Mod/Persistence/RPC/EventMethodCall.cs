@@ -48,8 +48,8 @@ namespace Coop.Mod.Persistence.RPC
                 {
                     Logger.Trace("SyncCall: {}", Call);
                     method.CallOriginal(
-                        clientRoom.Resolve(m_EnvironmentClient.Store, Call.Instance),
-                        clientRoom.Resolve(m_EnvironmentClient.Store, Call.Arguments));
+                        ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Instance),
+                        ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Arguments));
                     Free();
                 }
             }
