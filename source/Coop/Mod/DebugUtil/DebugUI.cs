@@ -207,7 +207,7 @@ namespace Coop.Mod.DebugUtil
                 }
             }
 
-            if (CoopClient.Instance.Connected)
+            if (CoopClient.Instance.ClientPlaying)
             {
                 Imgui.SameLine(300);
                 if (Imgui.SmallButton("Disconnect"))
