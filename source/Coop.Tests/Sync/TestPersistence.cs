@@ -34,13 +34,12 @@ namespace Coop.Tests.Sync
         {
             RailClient client = new RailClient(registryClient);
             Rooms.Add(client.StartRoom());
-            client.SetPeer(connectionClientSide);
             Clients.Add(client);
-
             Server.AddClient(connectionServerSide, "");
+            client.SetPeer(connectionClientSide);
         }
 
-        public void UpdateClient()
+        public void UpdateClients()
         {
             foreach (RailClient client in Clients)
             {

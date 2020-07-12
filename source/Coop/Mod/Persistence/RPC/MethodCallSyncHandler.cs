@@ -70,9 +70,7 @@ namespace Coop.Mod.Persistence.RPC
                                                       false),
                                                   Arguments = ProduceArguments(objects)
                                               };
-                                              Trace(
-                                                  evt.Call,
-                                                  CoopClient.Instance.Persistence.Room);
+                                              Trace(evt.Call, m_ClientAccess.GetRoom());
                                           });
                     }
                     else

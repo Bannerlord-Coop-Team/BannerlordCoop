@@ -50,7 +50,7 @@ namespace Coop.Tests.Sync
                 };
 
                 IGameStatePersistence persistenceServer = bSetupPersistence ?
-                    new RailNetPeerWrapper(con.client) :
+                    new RailNetPeerWrapper(con.server) :
                     (IGameStatePersistence) new GameStatePersistenceTestImpl();
                 ConnectionTestImpl server = new ConnectionTestImpl(con.server, persistenceServer)
                 {

@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RPC;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using RailgunNet.Connection.Client;
 using RailgunNet.Factory;
+using RailgunNet.Logic;
+using Sync;
 using Sync.Store;
 
 namespace Coop.Tests.Sync
@@ -29,6 +32,8 @@ namespace Coop.Tests.Sync
             Connections = new TestConnections(ConnectionsRaw, true);
             Stores = new TestStores(Connections);
 
+            // Railgun
+            RailSynchronizedFactory.Detect(Assembly.GetAssembly(typeof(RailBitBufferExtensions)));
             RailRegistry registryServer =
                 serverRegistryCreator(new TestEnvironmentServer(StoreServer));
             Persistence = new TestPersistence(registryServer);
@@ -44,14 +49,23 @@ namespace Coop.Tests.Sync
                     clientRegistryCreator(new TestEnvironmentClient(store));
                 Persistence.AddClient(registryClient, client, server);
             }
+
+            // Let railgun do its initialization routine
+            for (int i = 0; i < 5; ++i)
+            {
+                Persistence.UpdateServer();
+                ExecuteSendsServer();
+                Persistence.UpdateClients();
+                ExecuteSendsClients();
+            }
         }
 
-        [NotNull] public TestConnectionsRaw ConnectionsRaw { get; }
-        [NotNull] public TestConnections Connections { get; }
+        [NotNull] public TestConnectionsRaw ConnectionsRaw { get; private set; }
+        [NotNull] public TestConnections Connections { get; private set; }
 
-        [NotNull] public TestStores Stores { get; }
+        [NotNull] public TestStores Stores { get; private set; }
 
-        [CanBeNull] public TestPersistence Persistence { get; }
+        [CanBeNull] public TestPersistence Persistence { get; private set; }
 
         public List<RemoteStore> StoresClient => Stores.StoresClient;
 
@@ -75,6 +89,15 @@ namespace Coop.Tests.Sync
         public void ExecuteSendsServer()
         {
             ConnectionsRaw.ExecuteSendsServer();
+        }
+
+        public void Destroy()
+        {
+            Persistence = null;
+            Stores = null;
+            Connections = null;
+            ConnectionsRaw = null;
+            MethodPatchFactory.UnpatchAll();
         }
 
         public IClientAccess GetClientAccess(int iClientId)

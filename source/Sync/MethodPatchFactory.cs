@@ -239,6 +239,15 @@ namespace Sync
             return dyn;
         }
 
+        public static void UnpatchAll()
+        {
+            lock (Patcher.HarmonyLock)
+            {
+                Patcher.HarmonyInstance.UnpatchAll();
+                Prefixes.Clear();
+            }
+        }
+
         private struct SMethodParameter
         {
             [CanBeNull] public ParameterInfo Info;

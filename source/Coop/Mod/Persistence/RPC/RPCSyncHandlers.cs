@@ -8,9 +8,7 @@ namespace Coop.Mod.Persistence.RPC
     /// </summary>
     public class RPCSyncHandlers
     {
-        private readonly List<MethodCallSyncHandler> m_Handlers = new List<MethodCallSyncHandler>();
-
-        public IReadOnlyList<MethodCallSyncHandler> Handlers => m_Handlers;
+        public List<MethodCallSyncHandler> Handlers { get; } = new List<MethodCallSyncHandler>();
 
         public void Register(IEnumerable<MethodAccess> patches, IClientAccess access)
         {
@@ -22,7 +20,7 @@ namespace Coop.Mod.Persistence.RPC
 
         public void Register(MethodAccess method, IClientAccess access)
         {
-            m_Handlers.Add(new MethodCallSyncHandler(method, access));
+            Handlers.Add(new MethodCallSyncHandler(method, access));
         }
     }
 }
