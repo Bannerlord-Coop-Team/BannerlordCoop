@@ -5,6 +5,8 @@ using Xunit;
 
 namespace Coop.Tests.Sync
 {
+    [Collection(
+        "UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class MethodPatcherGeneric_Test
     {
         private class Foo

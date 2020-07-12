@@ -2,7 +2,7 @@
 
 namespace Sync.Store
 {
-    public struct ObjectId
+    public readonly struct ObjectId
     {
         public uint Value { get; }
 

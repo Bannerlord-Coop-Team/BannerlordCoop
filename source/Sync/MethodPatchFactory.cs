@@ -124,16 +124,7 @@ namespace Sync
             for (int i = 0; i < parameters.Count; ++i)
             {
                 SMethodParameter parameter = parameters[i];
-                ParameterAttributes attr;
-                if (parameter.Info != null)
-                {
-                    attr = parameter.Info.Attributes;
-                }
-                else
-                {
-                    // Injected parameter
-                    attr = ParameterAttributes.In;
-                }
+                ParameterAttributes attr = parameter.Info?.Attributes ?? ParameterAttributes.In;
 
                 int iArgIndex = i + 1; // +1 because 0 is the return value
                 dyn.DefineParameter(iArgIndex, attr, parameter.Name);

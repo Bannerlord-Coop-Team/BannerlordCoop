@@ -13,10 +13,11 @@ using Xunit;
 
 namespace Coop.Tests.Persistence.RPC
 {
-    [Collection("Sequential")]
-    public class EventMethodCall_Test : IDisposable
+    [Collection(
+        "UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
+    public class RPC_Test : IDisposable
     {
-        public EventMethodCall_Test()
+        public RPC_Test()
         {
             // Init patch
             MethodPatch Patch = new MethodPatch(typeof(Foo)).Intercept(nameof(Foo.SyncedMethod));
@@ -61,6 +62,7 @@ namespace Coop.Tests.Persistence.RPC
         [NotNull] private MethodCallSyncHandler SyncHandler { get; }
 
         private const int ClientId0 = 0;
+        private const int ClientId1 = 1;
 
         [Fact]
         private void CallingPatchedMethodInvokesSyncHandler()
@@ -120,6 +122,113 @@ namespace Coop.Tests.Persistence.RPC
         }
 
         [Fact]
+        private void EventIsReceivedByServer()
+        {
+            RailClient client0 = Persistence.Clients[ClientId0];
+            InMemoryConnection conClient0 =
+                m_Environment.ConnectionsRaw.ConnectionsClient[ClientId0];
+
+            // Call method
+            string sMessage = "Hello World";
+            Foo.SyncedMethod(sMessage);
+            client0.Update();
+
+            // Verify server side state before receiving the event
+            Assert.Equal(0, m_Environment.EventQueue.Count);
+            Assert.Empty(m_Environment.StoreServer.Data);
+
+            // Receive
+            conClient0.ExecuteSends();
+            Assert.Equal(1, m_Environment.EventQueue.Count);
+            Assert.Single(m_Environment.StoreServer.Data);
+
+            // Verify the argument was received by the server
+            MethodCallSyncHandler.Statistics.Trace trace = SyncHandler.Stats.History.Peek();
+            ObjectId messageId = trace.Call.Arguments[0].StoreObjectId.Value;
+            Assert.True(m_Environment.StoreServer.Data.ContainsKey(messageId));
+        }
+
+        [Fact]
+        private void ServerRelaysStoreAdd()
+        {
+            RailClient client0 = Persistence.Clients[ClientId0];
+            RailClient client1 = Persistence.Clients[ClientId1];
+            InMemoryConnection conClient0ToServer =
+                m_Environment.ConnectionsRaw.ConnectionsClient[ClientId0];
+            InMemoryConnection conServerToClient0 =
+                m_Environment.ConnectionsRaw.ConnectionsServer[ClientId0];
+            InMemoryConnection conClient1ToServer =
+                m_Environment.ConnectionsRaw.ConnectionsClient[ClientId1];
+            InMemoryConnection conServerToClient1 =
+                m_Environment.ConnectionsRaw.ConnectionsServer[ClientId1];
+
+            // Call method and send event to server
+            string sMessage = "Hello World";
+            Foo.SyncedMethod(sMessage);
+            client0.Update();
+            conClient0ToServer.ExecuteSends();
+            MethodCallSyncHandler.Statistics.Trace trace = SyncHandler.Stats.History.Peek();
+            ObjectId messageId = trace.Call.Arguments[0].StoreObjectId.Value;
+
+            // The server relayed the StoreAdd to client 1
+            Assert.Single(conServerToClient1.SendBuffer);
+            byte[] payloadAdd = conServerToClient1.SendBuffer[0];
+            EPacket eTypeAdd = PacketReader.DecodePacketType(payloadAdd[0]);
+            Assert.Equal(EPacket.StoreAdd, eTypeAdd);
+            Assert.Empty(conServerToClient0.SendBuffer); // But nothing back to client 0
+
+            // Let the client 1 receive the StoreAdd. Client 1 returns an ACK
+            conServerToClient1.ExecuteSends();
+            Assert.Single(conClient1ToServer.SendBuffer);
+            byte[] payloadAck = conClient1ToServer.SendBuffer[0];
+            EPacket eTypeAck = PacketReader.DecodePacketType(payloadAck[0]);
+            Assert.Equal(EPacket.StoreAck, eTypeAck);
+
+            // Receive the ACK on the server. The server will then ACK back to client 0
+            Assert.Empty(conServerToClient0.SendBuffer);
+            conClient1ToServer.ExecuteSends();
+            Assert.Single(conServerToClient0.SendBuffer);
+        }
+
+        [Fact]
+        private void ServerWaitsUntilAllArgumentsAreDistributed()
+        {
+            RailClient client0 = Persistence.Clients[ClientId0];
+            RailClient client1 = Persistence.Clients[ClientId1];
+            InMemoryConnection conClient0ToServer =
+                m_Environment.ConnectionsRaw.ConnectionsClient[ClientId0];
+            InMemoryConnection conServerToClient0 =
+                m_Environment.ConnectionsRaw.ConnectionsServer[ClientId0];
+            InMemoryConnection conClient1ToServer =
+                m_Environment.ConnectionsRaw.ConnectionsClient[ClientId1];
+            InMemoryConnection conServerToClient1 =
+                m_Environment.ConnectionsRaw.ConnectionsServer[ClientId1];
+
+            // Call method and send event to server
+            string sMessage = "Hello World";
+            Foo.SyncedMethod(sMessage);
+            client0.Update();
+            conClient0ToServer.ExecuteSends();
+            Assert.Equal(1, m_Environment.EventQueue.Count);
+
+            // Updating the event queue will not broadcast anything because the argument was not yet acknowledged by client 1
+            m_Environment.EventQueue.Update(TimeSpan.Zero);
+            Assert.Equal(1, m_Environment.EventQueue.Count);
+            Assert.Single(conServerToClient1.SendBuffer); // StoreAdd to client 1
+            Assert.Empty(conServerToClient0.SendBuffer);
+
+            // Let the client 1 receive the StoreAdd & return ACK to server
+            conServerToClient1.ExecuteSends();
+            Assert.Single(conClient1ToServer.SendBuffer);
+            conClient1ToServer.ExecuteSends();
+
+            // Event can now be broadcast
+            Assert.Equal(1, m_Environment.EventQueue.Count);
+            m_Environment.EventQueue.Update(TimeSpan.Zero);
+            Assert.Equal(0, m_Environment.EventQueue.Count);
+        }
+
+        [Fact]
         private void SyncHandlersGeneratesEvent()
         {
             // Call method
@@ -132,7 +241,6 @@ namespace Coop.Tests.Persistence.RPC
 
             // Verify the SyncHandler was called at all
             Assert.Single(SyncHandler.Stats.History);
-            MethodCallSyncHandler.Statistics.Trace trace = SyncHandler.Stats.History.Peek();
 
             // There should be an outgoing event in the clients queue. We should be able to observe the event being sent on the next update.
             RailClient client0 = Persistence.Clients[ClientId0];

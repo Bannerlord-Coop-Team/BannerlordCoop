@@ -6,6 +6,8 @@ using Xunit;
 
 namespace Coop.Tests.Persistence.RPC
 {
+    [Collection(
+        "UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class MBObjectManager_Create_Test
     {
         private static readonly MethodPatch Patch =

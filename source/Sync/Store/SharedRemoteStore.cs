@@ -75,9 +75,7 @@ namespace Sync.Store
 
             RemoteStore store = new RemoteStore(m_Data, connection, m_Serializer.Factory);
             store.OnPacketAddDeserialized += (id, payload, obj) =>
-            {
-                return RemoteObjectAdded(connection, id, payload, obj);
-            };
+                RemoteObjectAdded(connection, id, payload, obj);
             store.OnObjectAcknowledged += (id, obj) => { ObjectAcknowledged(connection, id); };
             m_Stores.Add(connection, store);
         }

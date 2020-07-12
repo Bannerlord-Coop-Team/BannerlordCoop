@@ -34,8 +34,9 @@ namespace Coop.Tests.Sync
 
             // Railgun
             RailSynchronizedFactory.Detect(Assembly.GetAssembly(typeof(RailBitBufferExtensions)));
-            RailRegistry registryServer =
-                serverRegistryCreator(new TestEnvironmentServer(StoreServer));
+            TestEnvironmentServer serverEnvironment = new TestEnvironmentServer(StoreServer);
+            EventQueue = serverEnvironment.EventQueue;
+            RailRegistry registryServer = serverRegistryCreator(serverEnvironment);
             Persistence = new TestPersistence(registryServer);
 
             foreach (((RailNetPeerWrapper First, RailNetPeerWrapper Second) First, RemoteStore
@@ -59,6 +60,8 @@ namespace Coop.Tests.Sync
                 ExecuteSendsClients();
             }
         }
+
+        public EventBroadcastingQueue EventQueue { get; }
 
         [NotNull] public TestConnectionsRaw ConnectionsRaw { get; private set; }
         [NotNull] public TestConnections Connections { get; private set; }

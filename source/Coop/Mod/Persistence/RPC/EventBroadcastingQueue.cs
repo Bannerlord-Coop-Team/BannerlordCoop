@@ -36,6 +36,17 @@ namespace Coop.Mod.Persistence.RPC
             m_Store.OnObjectDistributed += OnObjectDistributed;
         }
 
+        public int Count
+        {
+            get
+            {
+                lock (m_Queue)
+                {
+                    return m_Queue.Count;
+                }
+            }
+        }
+
         public void Update(TimeSpan frameTime)
         {
             int numberOfBroadcastEvents = 0;
