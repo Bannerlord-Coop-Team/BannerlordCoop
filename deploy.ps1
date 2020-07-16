@@ -47,7 +47,6 @@ foreach ($file in $filesToCopy)
 if(Test-Path (${BaseDir} + $config.modsDir))
 {
     $ModDir = ${BaseDir} + $config.modsDir + "\" + $config.name
-    Write-Output ${ModDir}
     Remove-Item ${ModDir} -Recurse -ErrorAction Ignore
     New-Item -Force -ItemType Directory -Path ${ModDir} | Out-Null
     Copy-item -Force -Recurse $DeployDir\* -Destination $ModDir\
