@@ -14,9 +14,22 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem.Load;
+using Network.Protocol;
+using Network;
+using System.Collections.Generic;
+using Stateless;
 
 namespace Coop.Mod
 {
+    class GameServerPacketHandlerAttribute : PacketHandlerAttribute
+    {
+        public GameServerPacketHandlerAttribute(ECoopServerState state, EPacket eType)
+        {
+            State = state;
+            Type = eType;
+        }
+    }
+
     public class CoopServer
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -27,6 +40,9 @@ namespace Coop.Mod
         private LiteNetManagerServer m_NetManager;
 
         private GameEnvironmentServer m_GameEnvironmentServer;
+        public static bool AreAllClientsPlaying =>
+            m_CoopServerSMs.All(clientSM => clientSM.Key.State.Equals(ECoopServerState.Playing));
+        private static readonly Dictionary<ConnectionServer, CoopServerSM> m_CoopServerSMs = new Dictionary<ConnectionServer, CoopServerSM>();
 
         private CoopServer()
         {
@@ -45,6 +61,11 @@ namespace Coop.Mod
 
         public Server Current { get; private set; }
         public ServerGameManager gameManager { get; private set; }
+
+        #region Events
+        public event Action OnServerSendingWorldData;
+        public event Action OnServerSentWorldData;
+        #endregion
 
         public string StartServer()
         {
@@ -154,18 +175,57 @@ namespace Coop.Mod
 
         private void OnClientConnected(ConnectionServer connection)
         {
+            CoopServerSM coopServerSM = new CoopServerSM();
+            m_CoopServerSMs.Add(connection, coopServerSM);
+
+            #region State Machine Callbacks
+            coopServerSM.SendingWorldDataState.OnEntryFrom(coopServerSM.SendWorldDataTrigger, SendInitialWorldData);
+            #endregion
+
             SyncedObjectStore.AddConnection(connection);
             connection.OnClientJoined += Persistence.ClientJoined;
             connection.OnDisconnected += Persistence.Disconnected;
-            connection.OnServerSendingWorldData += m_GameEnvironmentServer.LockTimeControlStopped;
-            connection.OnServerSendedWorldData += m_GameEnvironmentServer.UnlockTimeControl;
+            OnServerSendingWorldData += m_GameEnvironmentServer.LockTimeControlStopped;
+            OnServerSentWorldData += m_GameEnvironmentServer.UnlockTimeControl;
+
+            connection.Dispatcher.RegisterPacketHandler(ReceiveClientRequestWorldData);
+            connection.Dispatcher.RegisterPacketHandler(ReceiveClientDeclineWorldData);
         }
 
         private void OnClientDisconnected(ConnectionServer connection, EDisconnectReason eReason)
         {
+            m_CoopServerSMs.Remove(connection);
+
             connection.OnClientJoined -= Persistence.ClientJoined;
             connection.OnDisconnected -= Persistence.Disconnected;
             SyncedObjectStore?.RemoveConnection(connection);
+        }
+
+        // TODO make packets contain expected state.
+        [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.Client_RequestWorldData)]
+        private void ReceiveClientRequestWorldData(ConnectionBase connection, Packet packet)
+        {
+            Client_RequestWorldData info =
+                Client_RequestWorldData.Deserialize(new ByteReader(packet.Payload));
+            Logger.Info("Client requested world data.");
+            m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(
+                    new StateMachine<ECoopServerState, ECoopServerTrigger>.TriggerWithParameters<
+                        ConnectionServer>(ECoopServerTrigger.RequiresWorldData),
+                    (ConnectionServer)connection);
+        }
+
+        // TODO make packets contain expected state.
+        [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_DeclineWorldData)]
+        private void ReceiveClientDeclineWorldData(ConnectionBase connection, Packet packet)
+        {
+            m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.DeclineWorldData);
+        }
+
+        private void SendInitialWorldData(ConnectionServer connection)
+        {
+            OnServerSendingWorldData?.Invoke();
+            connection.SendWorldData();
+            OnServerSentWorldData?.Invoke();
         }
     }
 }

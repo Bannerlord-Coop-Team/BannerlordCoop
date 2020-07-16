@@ -14,7 +14,7 @@ namespace Coop.Mod
         public FieldAccessGroup<MobileParty, MovementData> TargetPosition =>
             CampaignMapMovement.Movement;
 
-        public bool CanChangeTimeControlMode => CoopServer.Instance.Current.AreAllClientsPlaying;
+        public bool CanChangeTimeControlMode => CoopServer.AreAllClientsPlaying;
 
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)
         {

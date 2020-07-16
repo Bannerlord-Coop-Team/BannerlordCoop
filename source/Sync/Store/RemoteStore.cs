@@ -70,7 +70,8 @@ namespace Sync.Store
         {
             m_Data = data;
             m_Connection = connection;
-            m_Connection.Dispatcher.RegisterPacketHandlers(this);
+            m_Connection.Dispatcher.RegisterPacketHandler(ReceiveAdd);
+            m_Connection.Dispatcher.RegisterPacketHandler(ReceiveAck);
         }
 
         public IReadOnlyDictionary<ObjectId, RemoteObjectState> State => m_State;
@@ -99,12 +100,9 @@ namespace Sync.Store
             m_Connection.Dispatcher.UnregisterPacketHandlers(this);
         }
 
-        [PacketHandler(EConnectionState.ClientAwaitingWorldData, EPacket.StoreAdd)]
-        [PacketHandler(EConnectionState.ClientPlaying, EPacket.StoreAdd)]
-        [PacketHandler(EConnectionState.ServerJoining, EPacket.StoreAdd)]
-        [PacketHandler(EConnectionState.ServerSendingWorldData, EPacket.StoreAdd)]
-        [PacketHandler(EConnectionState.ServerPlaying, EPacket.StoreAdd)]
-        private void ReceiveAdd(Packet packet)
+        [ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.StoreAdd)]
+        [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.StoreAdd)]
+        private void ReceiveAdd(ConnectionBase connection, Packet packet)
         {
             // Receive the object
             byte[] raw = packet.Payload.ToArray();
@@ -159,12 +157,9 @@ namespace Sync.Store
             Logger.Trace("Sent StoreAck {id}.", id);
         }
 
-        [PacketHandler(EConnectionState.ClientAwaitingWorldData, EPacket.StoreAck)]
-        [PacketHandler(EConnectionState.ClientPlaying, EPacket.StoreAck)]
-        [PacketHandler(EConnectionState.ServerJoining, EPacket.StoreAck)]
-        [PacketHandler(EConnectionState.ServerSendingWorldData, EPacket.StoreAck)]
-        [PacketHandler(EConnectionState.ServerPlaying, EPacket.StoreAck)]
-        private void ReceiveAck(Packet packet)
+        [ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.StoreAdd)]
+        [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.StoreAdd)]
+        private void ReceiveAck(ConnectionBase connection, Packet packet)
         {
             ObjectId id = new ObjectId(new ByteReader(packet.Payload).Binary.ReadUInt32());
             if (!m_Data.ContainsKey(id) || !m_State.ContainsKey(id))

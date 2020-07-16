@@ -40,7 +40,6 @@ namespace Coop.NetImpl.LiteNet
             LiteNetConnection network = new LiteNetConnection(peer);
             RailNetPeerWrapper persistence = new RailNetPeerWrapper(network);
             ConnectionServer con = new ConnectionServer(network, persistence, m_WorldData);
-            con.PrepareForClientConnection();
             peer.Tag = con;
             m_Server.Connected(con);
         }

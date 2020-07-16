@@ -8,16 +8,27 @@ using Coop.Mod.Persistence;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
+using Network.Protocol;
 using NLog;
 using RailgunNet.Logic;
 using StoryMode;
 using Sync.Store;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Logger = NLog.Logger;
 
 namespace Coop.Mod
 {
+    class GameClientPacketHandlerAttribute : PacketHandlerAttribute
+    {
+        public GameClientPacketHandlerAttribute(ECoopClientState state, EPacket eType)
+        {
+            State = state;
+            Type = eType;
+        }
+    }
+
     public class CoopClient : IUpdateable
     {
         private const int MaxReconnectAttempts = 2;
@@ -25,6 +36,7 @@ namespace Coop.Mod
 
         private static readonly Lazy<CoopClient> m_Instance =
             new Lazy<CoopClient>(() => new CoopClient());
+        private readonly CoopClientSM m_CoopClientSM;
 
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
 
@@ -47,6 +59,17 @@ namespace Coop.Mod
             m_NetManager = new LiteNetManagerClient(Session);
             GameState = new CoopGameState();
             Events = new CoopEvents();
+            m_CoopClientSM = new CoopClientSM();
+            
+            #region State Machine Callbacks
+            m_CoopClientSM.CharacterCreationState.OnEntry(CreateCharacter);
+            m_CoopClientSM.ReceivingWorldDataState.OnEntry(SendClientRequestInitialWorldData);
+            m_CoopClientSM.LoadingState.OnEntry(SendGameLoading);
+            m_CoopClientSM.PlayingState.OnEntry(SendGameLoaded);
+            #endregion
+
+            
+
             Init();
         }
 
@@ -65,6 +88,10 @@ namespace Coop.Mod
         public CoopGameState GameState { get; }
         public CoopEvents Events { get; }
 
+        #region Events
+        public event Action OnClientLoaded;
+        #endregion
+
         public bool ClientPlaying
         {
             get
@@ -74,7 +101,7 @@ namespace Coop.Mod
                     return false;
                 }
 
-                return Session.Connection.State == EConnectionState.ClientPlaying;
+                return Session.Connection.State.Equals(ECoopClientState.Playing);
             }
         }
 
@@ -88,8 +115,7 @@ namespace Coop.Mod
                 }
 
                 // TODO change to main menu state
-                return Session.Connection.State == EConnectionState.ClientJoinRequesting || 
-                    Session.Connection.State == EConnectionState.ClientCharacterCreation;
+                return Session.Connection.State.Equals(ECoopClientState.ReceivingWorldData);
             }
         }
 
@@ -118,9 +144,10 @@ namespace Coop.Mod
             }
         }
 
-        private void TryInitPersistence(ConnectionClient con)
+        private void TryInitPersistence()
         {
-            if (con == null || con.State != EConnectionState.ClientPlaying) return;
+            ConnectionClient con = Session.Connection;
+            if (con == null || !con.State.Equals(ECoopClientState.Playing)) return;
 
             if (Persistence == null)
             {
@@ -137,27 +164,32 @@ namespace Coop.Mod
             {
                 throw new ArgumentNullException(nameof(con));
             }
+            
+            if (Coop.IsServer)
+            {
+                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
+            }
+            else
+            {
+                // TODO get if character exists on server
+                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.RequiresCharacterCreation);
+            }
+            
 
             SyncedObjectStore = new RemoteStore(m_SyncedObjects, con);
             RemoteStoreCreated?.Invoke(SyncedObjectStore);
 
             #region events
-            // Upward
-            Session.Connection.RequireCharacterCreation += CreateCharacter;
-            Session.Connection.OnCharacterCreated += CharacterCreated;
-
-            Session.Connection.OnClientLoaded += TryInitPersistence;
+            OnClientLoaded += TryInitPersistence;
             Session.Connection.OnDisconnected += ConnectionClosed;
             #endregion
 
-            // Downward
-            if (con.State == EConnectionState.ClientLoading)
-            {
-                ClientManager.OnLoadFinishedEvent += Session.Connection.sendGameLoaded;
-            }
+            // Handler Registration
+            Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
+            Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
         }
 
-        private void CreateCharacter(ConnectionClient con)
+        private void CreateCharacter()
         {
             if (gameManager == null)
             {
@@ -167,19 +199,13 @@ namespace Coop.Mod
                 {
                     StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, () =>
                     {
-                        if(con.State == EConnectionState.ClientCharacterCreation)
+                        if(m_CoopClientSM.StateMachine.State.Equals(ECoopClientState.CharacterCreation))
                         {
-                            CharacterCreated(con);
+                            CharacterCreationOver();
                         }
                     });
                 };
             }
-        }
-
-        private void CharacterCreated(ConnectionClient con)
-        {
-            con.CharacterCreationOver();
-            gameManager = null;
         }
 
         private void ConnectionClosed(EDisconnectReason eReason)
@@ -211,6 +237,106 @@ namespace Coop.Mod
                 m_NetManager.Reconnect();
             }
         }
+
+        #region ClientCharacterCreation
+
+        public void CharacterCreationOver()
+        {
+            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterCreated);
+        }
+        #endregion
+
+        #region ClientAwaitingWorldData
+        private void SendClientRequestInitialWorldData()
+        {
+            if(Coop.IsServer)
+            {
+                Session.Connection.Send(
+                new Packet(
+                    EPacket.Client_DeclineWorldData,
+                    new Client_DeclineWorldData().Serialize()));
+                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
+            }
+            else
+            {
+                Session.Connection.Send(
+                new Packet(
+                    EPacket.Client_RequestWorldData,
+                    new Client_RequestWorldData().Serialize()));
+            }
+            
+        }
+
+        [GameClientPacketHandler(ECoopClientState.ReceivingWorldData, EPacket.Server_WorldData)]
+        private void ReceiveInitialWorldData(ConnectionBase connection, Packet packet)
+        {
+            bool bSuccess = false;
+            try
+            {
+                bSuccess = Session.World.Receive(packet.Payload);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(
+                    e,
+                    "World data received from server could not be parsed . Disconnect {client}.",
+                    this);
+            }
+
+            if (bSuccess)
+            {
+                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
+                gameManager = new ClientManager(((GameData)Session.World).LoadResult);
+            }
+            else
+            {
+                Logger.Error(
+                    "World data received from server could not be parsed. Disconnect {client}.",
+                    this);
+                Session.Connection.Disconnect(EDisconnectReason.WorldDataTransferIssue);
+            }
+        }
+        #endregion
+
+        #region  ClientLoading
+        private void SendGameLoading()
+        {
+            Session.Connection.Send(
+                new Packet(
+                    EPacket.Client_Joined,
+                    new Client_GameLoading().Serialize()));
+        }
+        #endregion
+
+        #region ClientPlaying
+        public void SendGameLoaded()
+        {
+            Session.Connection.Send(
+                new Packet(
+                    EPacket.Client_Joined,
+                    new Client_GameLoaded().Serialize()));
+            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded);
+            Session.Connection.Send(new Packet(EPacket.Client_Joined, new Client_Joined().Serialize()));
+            if (m_CoopClientSM.StateMachine.State.Equals(ECoopClientState.Playing))
+            {
+                OnClientLoaded?.Invoke();
+            }
+        }
+
+
+        [GameClientPacketHandler(ECoopClientState.Playing, EPacket.Sync)]
+        private void ReceiveSyncPacket(ConnectionBase connection, Packet packet)
+        {
+            try
+            {
+                Session.World.Receive(packet.Payload);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Sync data received from server could not be parsed. Ignored.");
+            }
+        }
+        #endregion
 
         public override string ToString()
         {

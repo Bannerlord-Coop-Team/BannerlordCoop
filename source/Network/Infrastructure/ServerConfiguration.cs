@@ -9,9 +9,9 @@ namespace Network.Infrastructure
         public int LanPort { get; set; } = 4201;
         public IPAddress WanAddress { get; set; } = null;
         public int WanPort { get; set; } = 4200;
-        public TimeSpan KeepAliveInterval { get; set; } = TimeSpan.FromSeconds(5);
+        public TimeSpan KeepAliveInterval { get; set; } = TimeSpan.FromSeconds(500);
         public TimeSpan LanDiscoveryInterval { get; } = TimeSpan.FromSeconds(2);
-        public TimeSpan DisconnectTimeout { get; set; } = TimeSpan.FromSeconds(15);
+        public TimeSpan DisconnectTimeout { get; set; } = TimeSpan.FromSeconds(500);
         public uint MaxPlayerCount { get; set; } = 8;
         public uint TickRate { get; set; } = 120; // in [Hz]. 0 for no limit.
     }

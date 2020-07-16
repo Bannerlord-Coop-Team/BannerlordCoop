@@ -7,6 +7,7 @@ using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using RailgunNet.Connection.Server;
+using Steamworks;
 
 namespace Coop.Mod
 {
@@ -47,7 +48,7 @@ namespace Coop.Mod
         {
             RailNetPeerWrapper peer = connection.GameStatePersistence as RailNetPeerWrapper;
             m_RailConnections.Add(connection, peer);
-            m_Instance.AddClient(peer, ""); // TODO: Name
+            m_Instance.AddClient(peer, SteamFriends.GetPersonaName());
         }
 
         public void Disconnected(ConnectionServer connection)

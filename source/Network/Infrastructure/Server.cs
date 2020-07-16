@@ -12,42 +12,31 @@ namespace Network.Infrastructure
 {
     public class Server : IUpdateable
     {
-        public enum EState
-        {
-            Inactive,
-            Starting,
-            Running,
-            Stopping
-        }
-
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         public readonly UpdateableList Updateables;
         public ServerConfiguration ActiveConfig;
-        public EState State => m_State.State;
-
-        public bool AreAllClientsPlaying =>
-            ActiveConnections.All(con => con.State == EConnectionState.ServerPlaying);
+        public Enum State => m_ServerSM.StateMachine.State;
 
         public event Action<ConnectionServer> OnClientConnected;
         public event Action<ConnectionServer, EDisconnectReason> OnClientDisconnected;
 
         public void Start(ServerConfiguration config)
         {
-            if (m_State.IsInState(EState.Inactive))
+            if (m_ServerSM.StateMachine.IsInState(EServerState.Inactive))
             {
-                m_State.Fire(
-                    new StateMachine<EState, ETrigger>.TriggerWithParameters<ServerConfiguration>(
-                        ETrigger.Start),
+                m_ServerSM.StateMachine.Fire(
+                    new StateMachine<EServerState, EServerTrigger>.TriggerWithParameters<ServerConfiguration>(
+                        EServerTrigger.Start),
                     config);
             }
         }
 
         public void Stop()
         {
-            if (State != EState.Inactive)
+            if (!State.Equals(EServerState.Inactive))
             {
-                m_State.Fire(ETrigger.Stop);
+                m_ServerSM.StateMachine.Fire(EServerTrigger.Stop);
             }
         }
 
@@ -101,17 +90,11 @@ namespace Network.Infrastructure
 
         public virtual bool CanPlayerJoin()
         {
-            return State == EState.Running && ActiveConnections.Count < ActiveConfig.MaxPlayerCount;
+            return State.Equals(EServerState.Running) && ActiveConnections.Count < ActiveConfig.MaxPlayerCount;
         }
 
         #region internals
-        private enum ETrigger
-        {
-            Start,
-            Initialized,
-            Stop,
-            Stopped
-        }
+       
 
         public enum EType
         {
@@ -125,25 +108,17 @@ namespace Network.Infrastructure
         {
             ServerType = eType;
             Updateables = new UpdateableList();
-            m_State = new StateMachine<EState, ETrigger>(EState.Inactive);
+            m_ServerSM = new ServerSM();
 
-            m_State.Configure(EState.Inactive).Permit(ETrigger.Start, EState.Starting);
+            #region State Machine Configuration
+            m_ServerSM.StartingState.OnEntryFrom(m_ServerSM.StartTrigger, Load);
 
-            StateMachine<EState, ETrigger>.TriggerWithParameters<ServerConfiguration> startTrigger =
-                m_State.SetTriggerParameters<ServerConfiguration>(ETrigger.Start);
-            m_State.Configure(EState.Starting)
-                   .OnEntryFrom(startTrigger, Load)
-                   .Permit(ETrigger.Initialized, EState.Running)
-                   .Permit(ETrigger.Stop, EState.Stopping);
+            m_ServerSM.RunningState
+                .OnEntryFrom(EServerTrigger.Initialized, StartMainLoop)
+                .OnExit(StopMainLoop);
 
-            m_State.Configure(EState.Running)
-                   .OnEntryFrom(ETrigger.Initialized, StartMainLoop)
-                   .OnExit(StopMainLoop)
-                   .Permit(ETrigger.Stop, EState.Stopping);
-
-            m_State.Configure(EState.Stopping)
-                   .OnEntry(ShutDown)
-                   .Permit(ETrigger.Stopped, EState.Inactive);
+            m_ServerSM.StoppingState.OnEntry(ShutDown);
+            #endregion
         }
 
         ~Server()
@@ -156,7 +131,7 @@ namespace Network.Infrastructure
         private void Load(ServerConfiguration config)
         {
             ActiveConfig = config;
-            m_State.Fire(ETrigger.Initialized);
+            m_ServerSM.StateMachine.Fire(EServerTrigger.Initialized);
         }
 
         private void ShutDown()
@@ -168,10 +143,10 @@ namespace Network.Infrastructure
             }
 
             ActiveConnections.Clear();
-            m_State.Fire(ETrigger.Stopped);
+            m_ServerSM.StateMachine.Fire(EServerTrigger.Stopped);
         }
 
-        private readonly StateMachine<EState, ETrigger> m_State;
+        private readonly ServerSM m_ServerSM;
         private bool m_IsStopRequest;
         private readonly object m_StopRequestLock = new object();
         private Thread m_Thread;
