@@ -18,11 +18,11 @@ namespace Network.Protocol
 
         public event EventHandler<PacketEventArgs> OnDispatch;
 
-        public void RegisterPacketHandler(Action<ConnectionBase, Packet> handler) 
+        public void RegisterPacketHandler(Action<ConnectionBase, Packet> handler)
         {
             object owner = handler.Target;
 
-            RegisterStateMachine(owner); 
+            RegisterStateMachine(owner);
 
             if (!Attribute.IsDefined(handler.Method, typeof(PacketHandlerAttribute)))
             {
@@ -49,6 +49,7 @@ namespace Network.Protocol
                     m_PacketHandlers.Add(spPair, list);
                 }
             }
+        }
 
         /// <summary>
         /// Registers <see cref="CoopStateMachine"/> to reference state
