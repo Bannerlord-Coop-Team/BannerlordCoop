@@ -22,22 +22,7 @@ namespace Network.Protocol
         {
             object owner = handler.Target;
 
-            // Register state machines
-            foreach(FieldInfo field in owner.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
-            {
-                if (StateMachines.ContainsKey(owner))
-                {
-                    // Exit loop if state machine is already registered
-                    break;
-                }
-
-                if (field.FieldType.IsSubclassOf(typeof(CoopStateMachine)))
-                {
-                    CoopStateMachine stateMachine = (CoopStateMachine)field.GetValue(owner);
-                    StateMachines.Add(owner, stateMachine);
-                    break;
-                }
-            }
+            RegisterStateMachine(owner); 
 
             if (!Attribute.IsDefined(handler.Method, typeof(PacketHandlerAttribute)))
             {
@@ -64,6 +49,33 @@ namespace Network.Protocol
                     m_PacketHandlers.Add(spPair, list);
                 }
             }
+
+        /// <summary>
+        /// Registers <see cref="CoopStateMachine"/> to reference state
+        /// </summary>
+        /// <param name="owner">Object containing a <see cref="CoopStateMachine"/> type</param>
+        /// <returns>If StateMachine is registered</returns>
+        private bool RegisterStateMachine(object owner)
+        {
+            // Register state machines
+            if (StateMachines.ContainsKey(owner))
+            {
+                // Return registered if state machine is already registered
+                return true;
+            }
+
+            foreach (FieldInfo field in owner.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                
+
+                if (field.FieldType.IsSubclassOf(typeof(CoopStateMachine)))
+                {
+                    CoopStateMachine stateMachine = (CoopStateMachine)field.GetValue(owner);
+                    StateMachines.Add(owner, stateMachine);
+                    return true;
+                }
+            }
+            return false;
         }
 
         public void UnregisterPacketHandler(Action<ConnectionBase, Packet> handler)
