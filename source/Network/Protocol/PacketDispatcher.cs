@@ -14,15 +14,13 @@ namespace Network.Protocol
         private readonly Dictionary<StatePacketPair, List<OwnerHandlerPair>>
             m_PacketHandlers =
                 new Dictionary<StatePacketPair, List<OwnerHandlerPair>>();
-        private readonly Dictionary<object, CoopStateMachine> StateMachines = new Dictionary<object, CoopStateMachine>();
+        private readonly Dictionary<object, List<CoopStateMachine>> StateMachines = new Dictionary<object, List<CoopStateMachine>>();
 
         public event EventHandler<PacketEventArgs> OnDispatch;
 
         public void RegisterPacketHandler(Action<ConnectionBase, Packet> handler)
         {
             object owner = handler.Target;
-
-            RegisterStateMachine(owner);
 
             if (!Attribute.IsDefined(handler.Method, typeof(PacketHandlerAttribute)))
             {
@@ -54,29 +52,18 @@ namespace Network.Protocol
         /// <summary>
         /// Registers <see cref="CoopStateMachine"/> to reference state
         /// </summary>
-        /// <param name="owner">Object containing a <see cref="CoopStateMachine"/> type</param>
-        /// <returns>If StateMachine is registered</returns>
-        private bool RegisterStateMachine(object owner)
+        /// <param name="owner">Assign owner</param>
+        /// <param name="stateMachine">State machine to register</param>
+        public void RegisterStateMachine(object owner, CoopStateMachine stateMachine)
         {
-            // Register state machines
-            if (StateMachines.ContainsKey(owner))
+            if (StateMachines.ContainsKey(owner) && !StateMachines[owner].Contains(stateMachine))
             {
-                // Return registered if state machine is already registered
-                return true;
+                StateMachines[owner].Add(stateMachine);
             }
-
-            foreach (FieldInfo field in owner.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
+            else
             {
-                
-
-                if (field.FieldType.IsSubclassOf(typeof(CoopStateMachine)))
-                {
-                    CoopStateMachine stateMachine = (CoopStateMachine)field.GetValue(owner);
-                    StateMachines.Add(owner, stateMachine);
-                    return true;
-                }
+                StateMachines.Add(owner, new List<CoopStateMachine>() { stateMachine });
             }
-            return false;
         }
 
         public void UnregisterPacketHandler(Action<ConnectionBase, Packet> handler)
@@ -99,14 +86,18 @@ namespace Network.Protocol
         public void Dispatch(ConnectionBase connection, Packet packet)
         {
             OnDispatch?.Invoke(this, new PacketEventArgs(packet));
-            foreach(CoopStateMachine stateMachine in StateMachines.Values)
+            Dictionary<object, List<CoopStateMachine>> stateMachinesCopy = new Dictionary<object, List<CoopStateMachine>>(StateMachines);
+            foreach (List<CoopStateMachine> stateMachines in stateMachinesCopy.Values)
             {
-                StatePacketPair key = new StatePacketPair(stateMachine.State, packet.Type);
-                if (m_PacketHandlers.ContainsKey(key))
+                foreach (CoopStateMachine stateMachine in stateMachines)
                 {
-                    foreach (OwnerHandlerPair pair in m_PacketHandlers[key])
+                    StatePacketPair key = new StatePacketPair(stateMachine.State, packet.Type);
+                    if (m_PacketHandlers.ContainsKey(key))
                     {
-                        pair.Handler.Invoke(connection, packet);
+                        foreach (OwnerHandlerPair pair in m_PacketHandlers[key])
+                        {
+                            pair.Handler.Invoke(connection, packet);
+                        }
                     }
                 }
             }
@@ -136,7 +127,30 @@ namespace Network.Protocol
             this.ePacket = ePacket;
         }
 
-        
+        public static bool operator ==(StatePacketPair lhs, StatePacketPair rhs)
+        {
+            return lhs.Equals(rhs);
+        }
+
+        public static bool operator !=(StatePacketPair lhs, StatePacketPair rhs)
+        {
+            return !(lhs.Equals(rhs));
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is StatePacketPair pair &&
+                   EqualityComparer<Enum>.Default.Equals(State, pair.State) &&
+                   ePacket == pair.ePacket;
+        }
+
+        public override int GetHashCode()
+        {
+            int hashCode = -488946146;
+            hashCode = hashCode * -1521134295 + EqualityComparer<Enum>.Default.GetHashCode(State);
+            hashCode = hashCode * -1521134295 + ePacket.GetHashCode();
+            return hashCode;
+        }
     }
 
     internal class OwnerHandlerPair

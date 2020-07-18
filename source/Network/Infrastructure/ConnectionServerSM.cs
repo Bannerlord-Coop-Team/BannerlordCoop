@@ -54,6 +54,7 @@ namespace Network.Infrastructure
             CloseTrigger = StateMachine.SetTriggerParameters<EDisconnectReason>(EServerConnectionTrigger.Close);
 
             TerminatedState = StateMachine.Configure(EServerConnectionState.Terminated);
+            TerminatedState.PermitReentry(EServerConnectionTrigger.Close);
 
             AwaitingClientState = StateMachine.Configure(EServerConnectionState.AwaitingClient);
             AwaitingClientState.Permit(EServerConnectionTrigger.Close, EServerConnectionState.Terminated);

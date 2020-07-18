@@ -41,6 +41,8 @@ namespace Network.Infrastructure
             Dispatcher.RegisterPacketHandler(ReceiveClientJoined);
             Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
             Dispatcher.RegisterPacketHandler(ReceiveClientKeepAlive);
+
+            Dispatcher.RegisterStateMachine(this, m_ServerSM);
         }
 
         public override Enum State => m_ServerSM.StateMachine.State;

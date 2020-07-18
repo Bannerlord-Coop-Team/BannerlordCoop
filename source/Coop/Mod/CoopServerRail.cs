@@ -48,7 +48,7 @@ namespace Coop.Mod
         {
             RailNetPeerWrapper peer = connection.GameStatePersistence as RailNetPeerWrapper;
             m_RailConnections.Add(connection, peer);
-            m_Instance.AddClient(peer, SteamFriends.GetPersonaName());
+            m_Instance.AddClient(peer, "Unknown");
         }
 
         public void Disconnected(ConnectionServer connection)

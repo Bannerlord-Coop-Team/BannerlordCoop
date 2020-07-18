@@ -68,7 +68,6 @@ namespace Coop.Mod
             m_CoopClientSM.PlayingState.OnEntry(SendGameLoaded);
             #endregion
 
-            
 
             Init();
         }
@@ -164,7 +163,12 @@ namespace Coop.Mod
             {
                 throw new ArgumentNullException(nameof(con));
             }
-            
+
+            Session.Connection.OnConnected += ConnectionEstablished;
+        }
+
+        private void ConnectionEstablished(ConnectionClient con)
+        {
             if (Coop.IsServer)
             {
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
@@ -174,7 +178,7 @@ namespace Coop.Mod
                 // TODO get if character exists on server
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.RequiresCharacterCreation);
             }
-            
+
 
             SyncedObjectStore = new RemoteStore(m_SyncedObjects, con);
             RemoteStoreCreated?.Invoke(SyncedObjectStore);
@@ -187,6 +191,8 @@ namespace Coop.Mod
             // Handler Registration
             Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
             Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
+
+            Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
         }
 
         private void CreateCharacter()
@@ -287,6 +293,7 @@ namespace Coop.Mod
             {
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
                 gameManager = new ClientManager(((GameData)Session.World).LoadResult);
+                MBGameManager.StartNewGame(gameManager);
             }
             else
             {

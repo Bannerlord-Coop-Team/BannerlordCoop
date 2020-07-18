@@ -18,6 +18,7 @@ using Network.Protocol;
 using Network;
 using System.Collections.Generic;
 using Stateless;
+using Common;
 
 namespace Coop.Mod
 {
@@ -42,7 +43,7 @@ namespace Coop.Mod
         private GameEnvironmentServer m_GameEnvironmentServer;
         public static bool AreAllClientsPlaying =>
             m_CoopServerSMs.All(clientSM => clientSM.Key.State.Equals(ECoopServerState.Playing));
-        private static readonly Dictionary<ConnectionServer, CoopServerSM> m_CoopServerSMs = new Dictionary<ConnectionServer, CoopServerSM>();
+        private static readonly Dictionary<ConnectionServer, CoopStateMachine> m_CoopServerSMs = new Dictionary<ConnectionServer, CoopStateMachine>();
 
         private CoopServer()
         {
@@ -112,12 +113,15 @@ namespace Coop.Mod
         {
             Replay.Stop();
             Current?.Stop();
+            m_NetManager?.Stop();
+
             Persistence = null;
             SyncedObjectStore = null;
-            m_NetManager?.Stop();
             m_NetManager = null;
             m_GameEnvironmentServer = null;
             Current = null;
+
+            m_CoopServerSMs.Clear();
         }
 
         public void StartGame(string saveName)
@@ -190,6 +194,8 @@ namespace Coop.Mod
 
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientRequestWorldData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientDeclineWorldData);
+
+            connection.Dispatcher.RegisterStateMachine(connection, coopServerSM);
         }
 
         private void OnClientDisconnected(ConnectionServer connection, EDisconnectReason eReason)
@@ -201,24 +207,22 @@ namespace Coop.Mod
             SyncedObjectStore?.RemoveConnection(connection);
         }
 
-        // TODO make packets contain expected state.
-        [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.Client_RequestWorldData)]
+        [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestWorldData)]
         private void ReceiveClientRequestWorldData(ConnectionBase connection, Packet packet)
         {
             Client_RequestWorldData info =
                 Client_RequestWorldData.Deserialize(new ByteReader(packet.Payload));
             Logger.Info("Client requested world data.");
-            m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(
+            ((CoopServerSM)m_CoopServerSMs[(ConnectionServer)connection]).StateMachine.Fire(
                     new StateMachine<ECoopServerState, ECoopServerTrigger>.TriggerWithParameters<
                         ConnectionServer>(ECoopServerTrigger.RequiresWorldData),
                     (ConnectionServer)connection);
         }
 
-        // TODO make packets contain expected state.
         [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_DeclineWorldData)]
         private void ReceiveClientDeclineWorldData(ConnectionBase connection, Packet packet)
         {
-            m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.DeclineWorldData);
+            ((CoopServerSM)m_CoopServerSMs[(ConnectionServer)connection]).StateMachine.Fire(ECoopServerTrigger.DeclineWorldData);
         }
 
         private void SendInitialWorldData(ConnectionServer connection)

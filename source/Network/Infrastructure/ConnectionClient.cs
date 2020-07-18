@@ -17,7 +17,9 @@ namespace Network.Infrastructure
 
     public class ConnectionClient : ConnectionBase
     {
-        private readonly ConnectionClientSM m_ClientSM;               
+        private readonly ConnectionClientSM m_ClientSM;
+
+        public event Action<ConnectionClient> OnConnected;
 
         public ConnectionClient(
             INetworkConnection network,
@@ -37,6 +39,8 @@ namespace Network.Infrastructure
             Dispatcher.RegisterPacketHandler(receiveClientInfoRequest);
             Dispatcher.RegisterPacketHandler(receiveJoinRequestAccepted);
             Dispatcher.RegisterPacketHandler(receiveServerKeepAlive);
+
+            Dispatcher.RegisterStateMachine(this, m_ClientSM);
         }
 
         public override Enum State => m_ClientSM.StateMachine.State;
@@ -59,9 +63,9 @@ namespace Network.Infrastructure
         {
             if (!m_ClientSM.StateMachine.IsInState(EClientConnectionState.Disconnected))
             {
-                m_ClientSM.StateMachine.Fire(
-                    m_ClientSM.DisconnectTrigger,
-                    eReason);
+                //m_ClientSM.StateMachine.Fire(
+                //    m_ClientSM.DisconnectTrigger,
+                //    eReason);
             }
         }
 
@@ -100,6 +104,8 @@ namespace Network.Infrastructure
             Server_JoinRequestAccepted payload =
                 Server_JoinRequestAccepted.Deserialize(new ByteReader(packet.Payload));
             m_ClientSM.StateMachine.Fire(EClientConnectionTrigger.ServerAcceptedJoinRequest);
+
+            OnConnected?.Invoke(this);
         }
 
         #endregion
