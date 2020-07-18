@@ -263,8 +263,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
-    <Compile Include="Mod\CoopClientSM.cs" />
-    <Compile Include="Mod\CoopServerSM.cs" />
     <Compile Include="Mod\DebugUtil\CLICommands.cs" />
     <Compile Include="Mod\DebugUtil\DebugConsole.cs" />
     <Compile Include="Mod\DebugUtil\DebugManager.cs" />
