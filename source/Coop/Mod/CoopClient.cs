@@ -175,18 +175,15 @@ namespace Coop.Mod
             {
                 gameManager = new ClientCharacterCreatorManager();
                 MBGameManager.StartNewGame(gameManager);
-                ClientCharacterCreatorManager.OnLoadFinishedEvent += (source, e) =>
+                ClientCharacterCreatorManager.OnLoadFinishedEvent += (object source, EventArgs e) =>
                 {
-                    StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(
-                        this,
-                        () =>
+                    StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, () =>
+                    {
+                        if (con.State == EConnectionState.ClientCharacterCreation)
                         {
-                            if (con.State ==
-                                EConnectionState.ClientCharacterCreation)
-                            {
-                                CharacterCreated(con);
-                            }
-                        });
+                            CharacterCreated(con);
+                        }
+                    });
                 };
             }
         }
