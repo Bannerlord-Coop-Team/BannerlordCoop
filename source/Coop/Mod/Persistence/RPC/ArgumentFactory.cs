@@ -108,12 +108,10 @@ namespace Coop.Mod.Persistence.RPC
                 case float f:
                     return new Argument(f);
                 case MBObjectBase mbobj:
-                    if (bTransferByValue)
-                    {
-                        goto default;
-                    }
+                    return bTransferByValue ?
+                        new Argument(store.Insert(obj)) :
+                        new Argument(mbobj.Id);
 
-                    return new Argument(mbobj.Id);
                 default:
                     return new Argument(store.Insert(obj));
             }
