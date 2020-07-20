@@ -5,11 +5,14 @@ using System.Net;
 using Common;
 using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
+using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Serializers;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using Network.Protocol;
 using NLog;
+using RailgunNet.Connection.Client;
 using RailgunNet.Logic;
 using StoryMode;
 using Sync.Store;
@@ -88,10 +91,6 @@ namespace Coop.Mod
         public CoopGameState GameState { get; }
         public CoopEvents Events { get; }
 
-        #region Events
-        public event Action OnClientLoaded;
-        #endregion
-
         public bool ClientPlaying
         {
             get
@@ -157,7 +156,7 @@ namespace Coop.Mod
         private void TryInitPersistence()
         {
             ConnectionClient con = Session.Connection;
-            if (con == null || !con.State.Equals(ECoopClientState.Playing)) return;
+            if (con == null || !m_CoopClientSM.State.Equals(ECoopClientState.Playing)) return;
 
             if (Persistence == null)
             {
@@ -180,30 +179,31 @@ namespace Coop.Mod
 
         private void ConnectionEstablished(ConnectionClient con)
         {
-            if (Coop.IsServer)
+            if (m_CoopClientSM.State.Equals(ECoopClientState.MainManu))
             {
-                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
+                if (Coop.IsServer)
+                {
+                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
+                }
+                else
+                {
+                    // TODO get if character exists on server
+                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.RequiresCharacterCreation);
+                }
+
+                SyncedObjectStore = new RemoteStore(m_SyncedObjects, con, new SerializableFactory());
+                RemoteStoreCreated?.Invoke(SyncedObjectStore);
+
+                #region events
+                Session.Connection.OnDisconnected += ConnectionClosed;
+                #endregion
+
+                // Handler Registration
+                Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
+                Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
+
+                Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
             }
-            else
-            {
-                // TODO get if character exists on server
-                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.RequiresCharacterCreation);
-            }
-
-
-            SyncedObjectStore = new RemoteStore(m_SyncedObjects, con);
-            RemoteStoreCreated?.Invoke(SyncedObjectStore);
-
-            #region events
-            OnClientLoaded += TryInitPersistence;
-            Session.Connection.OnDisconnected += ConnectionClosed;
-            #endregion
-
-            // Handler Registration
-            Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
-            Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
-
-            Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
         }
 
         private void CreateCharacter()
@@ -273,6 +273,7 @@ namespace Coop.Mod
                     EPacket.Client_DeclineWorldData,
                     new Client_DeclineWorldData().Serialize()));
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
+                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded);
             }
             else
             {
@@ -305,6 +306,9 @@ namespace Coop.Mod
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
                 gameManager = new ClientManager(((GameData)Session.World).LoadResult);
                 MBGameManager.StartNewGame(gameManager);
+                ClientManager.OnLoadFinishedEvent += (source, e) => { 
+                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded); 
+                };
             }
             else
             {
@@ -319,10 +323,11 @@ namespace Coop.Mod
         #region  ClientLoading
         private void SendGameLoading()
         {
-            Session.Connection.Send(
-                new Packet(
-                    EPacket.Client_Joined,
-                    new Client_GameLoading().Serialize()));
+            // TODO add loading and loaded messages
+            //Session.Connection.Send(
+            //    new Packet(
+            //        EPacket.Client_Joined,
+            //        new Client_GameLoading().Serialize()));
         }
         #endregion
 
@@ -332,13 +337,8 @@ namespace Coop.Mod
             Session.Connection.Send(
                 new Packet(
                     EPacket.Client_Joined,
-                    new Client_GameLoaded().Serialize()));
-            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded);
-            Session.Connection.Send(new Packet(EPacket.Client_Joined, new Client_Joined().Serialize()));
-            if (m_CoopClientSM.StateMachine.State.Equals(ECoopClientState.Playing))
-            {
-                OnClientLoaded?.Invoke();
-            }
+                    new Client_Joined().Serialize()));
+            TryInitPersistence();
         }
 
 
