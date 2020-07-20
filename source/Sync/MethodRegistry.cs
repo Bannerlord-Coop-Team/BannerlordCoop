@@ -6,7 +6,7 @@ namespace Sync
 {
     public static class MethodRegistry
     {
-        private static readonly object m_Lock = new object();
+        private static readonly object Lock = new object();
 
         private static readonly Dictionary<MethodAccess, MethodId> MethodIds =
             new Dictionary<MethodAccess, MethodId>();
@@ -19,7 +19,7 @@ namespace Sync
 
         public static MethodId Register([NotNull] MethodAccess methodAccess)
         {
-            lock (m_Lock)
+            lock (Lock)
             {
                 if (MethodIds.ContainsKey(methodAccess))
                 {

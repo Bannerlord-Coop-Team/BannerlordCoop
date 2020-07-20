@@ -38,6 +38,7 @@ namespace Sync.Store
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly ConnectionBase m_Connection;
         private readonly Dictionary<ObjectId, object> m_Data;
+        private readonly StoreSerializer m_Serializer;
 
         private readonly Dictionary<ObjectId, RemoteObjectState> m_State =
             new Dictionary<ObjectId, RemoteObjectState>();
@@ -66,8 +67,10 @@ namespace Sync.Store
         /// <param name="connection">connection to be used to communicate with the remote store</param>
         public RemoteStore(
             [NotNull] Dictionary<ObjectId, object> data,
-            [NotNull] ConnectionBase connection)
+            [NotNull] ConnectionBase connection,
+            [NotNull] ISerializableFactory serializableFactory)
         {
+            m_Serializer = new StoreSerializer(serializableFactory);
             m_Data = data;
             m_Connection = connection;
             m_Connection.Dispatcher.RegisterPacketHandlers(this);
@@ -77,10 +80,10 @@ namespace Sync.Store
 
         public ObjectId Insert(object obj)
         {
-            byte[] raw = StoreSerializer.Serialize(obj);
+            byte[] raw = m_Serializer.Serialize(obj);
             ObjectId id = new ObjectId(XXHash.XXH32(raw));
             m_Data[id] = obj;
-            Logger.Trace("Insert {id}: {object}", id, obj);
+            Logger.Trace("[{id}] Insert: {object} [{type}]", id, obj, obj.GetType());
             SendAdd(id, raw);
             return id;
         }
@@ -88,7 +91,7 @@ namespace Sync.Store
         public bool Remove(ObjectId id)
         {
             m_State.Remove(id);
-            Logger.Trace("Remove {id}: {object}", id, m_Data[id]);
+            Logger.Trace("[{id}] Remove: {object} [{type}]", id, m_Data[id], m_Data[id].GetType());
             return m_Data.Remove(id);
         }
 
@@ -115,13 +118,19 @@ namespace Sync.Store
             if (m_Data.ContainsKey(id))
             {
                 Logger.Warn(
-                    "{id}: {object} already stored. Objects should only be added once!",
+                    "[{id}]: {object} [{type}] already stored. Objects should only be added once!",
                     id,
+                    m_Data[id],
                     m_Data[id]);
             }
             else
             {
-                m_Data[id] = StoreSerializer.Deserialize(raw);
+                m_Data[id] = m_Serializer.Deserialize(raw);
+                Logger.Trace(
+                    "[{id}] Received: {object} [{type}]",
+                    id,
+                    m_Data[id],
+                    m_Data[id].GetType());
             }
 
             // Call handlers
@@ -134,7 +143,6 @@ namespace Sync.Store
             if (bDoSendAck)
             {
                 SendACK(id);
-                Logger.Trace("Received {id}: {object}", id, m_Data[id]);
                 OnObjectReceived?.Invoke(id, m_Data[id]);
             }
         }
@@ -156,7 +164,7 @@ namespace Sync.Store
             writer.Binary.Write(id.Value);
             m_State[id].Acknowledged = true;
             m_Connection.Send(new Packet(EPacket.StoreAck, writer.ToArray()));
-            Logger.Trace("Sent StoreAck {id}.", id);
+            Logger.Trace("[{id}] Sent ACK", id);
         }
 
         [PacketHandler(EConnectionState.ClientAwaitingWorldData, EPacket.StoreAck)]
@@ -173,7 +181,11 @@ namespace Sync.Store
             }
 
             m_State[id].Acknowledged = true;
-            Logger.Trace("Received ACK {id}: {object}", id, m_Data[id]);
+            Logger.Trace(
+                "[{id}] Received ACK: {object} [{type}]",
+                id,
+                m_Data[id],
+                m_Data[id].GetType());
             OnObjectAcknowledged?.Invoke(id, m_Data[id]);
         }
 
@@ -186,7 +198,7 @@ namespace Sync.Store
                 Sent = true
             };
 
-            Logger.Trace("Sent StoreAdd {id}.", id);
+            Logger.Trace("[{id}] Sent StoreAdd", id);
         }
     }
 }

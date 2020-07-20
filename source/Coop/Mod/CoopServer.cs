@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.IO;
-using System.Linq;
-using Coop.Mod.Managers;
 using Coop.Mod.DebugUtil;
-using Coop.Mod.Persistence.World;
+using Coop.Mod.Managers;
+using Coop.Mod.Persistence;
+using Coop.Mod.Serializers;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
@@ -24,9 +24,9 @@ namespace Coop.Mod
         private static readonly Lazy<CoopServer> m_Instance =
             new Lazy<CoopServer>(() => new CoopServer());
 
-        private LiteNetManagerServer m_NetManager;
-
         private GameEnvironmentServer m_GameEnvironmentServer;
+
+        private LiteNetManagerServer m_NetManager;
 
         private CoopServer()
         {
@@ -57,12 +57,18 @@ namespace Coop.Mod
 
             if (Current == null)
             {
+                ServerConfiguration config = new ServerConfiguration();
+
                 Server.EType eServerType = Server.EType.Threaded;
                 Current = new Server(eServerType);
 
-                SyncedObjectStore = new SharedRemoteStore();
+                SyncedObjectStore = new SharedRemoteStore(new SerializableFactory());
                 m_GameEnvironmentServer = new GameEnvironmentServer();
-                Persistence = new CoopServerRail(Current, m_GameEnvironmentServer);
+                Persistence = new CoopServerRail(
+                    Current,
+                    SyncedObjectStore,
+                    Registry.Server(m_GameEnvironmentServer),
+                    config.EventBroadcastTimeout);
 
                 Current.Updateables.Add(Persistence);
                 Current.OnClientConnected += OnClientConnected;
@@ -73,7 +79,7 @@ namespace Coop.Mod
                     Main.Instance.Updateables.Add(Current);
                 }
 
-                Current.Start(new ServerConfiguration());
+                Current.Start(config);
                 Logger.Debug("Created server.");
             }
 
@@ -101,18 +107,19 @@ namespace Coop.Mod
 
         public void StartGame(string saveName)
         {
-            if(Main.DEBUG)
+            if (Main.DEBUG)
             {
                 try
                 {
-                    LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(saveName, Utilities.GetModulesNames());
+                    LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(
+                        saveName,
+                        Utilities.GetModulesNames());
                     MBGameManager.StartNewGame(CreateGameManager(saveGameData));
                 }
-                catch(IOException ex)
+                catch (IOException ex)
                 {
                     Logger.Error("Save file not found: " + ex.Message);
                 }
-                
             }
         }
 
@@ -126,6 +133,7 @@ namespace Coop.Mod
             {
                 gameManager = new ServerGameManager();
             }
+
             return gameManager;
         }
 
@@ -139,6 +147,7 @@ namespace Coop.Mod
             {
                 gameManager = new ServerGameManager();
             }
+
             return gameManager;
         }
 
