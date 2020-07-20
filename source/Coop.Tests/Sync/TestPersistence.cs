@@ -81,7 +81,7 @@ namespace Coop.Tests.Sync
         public TestEnvironmentServer(SharedRemoteStore store)
         {
             Store = store;
-            EventQueue = new EventBroadcastingQueue(Store);
+            EventQueue = new EventBroadcastingQueue(Store, TimeSpan.FromSeconds(5));
         }
 
         public FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }

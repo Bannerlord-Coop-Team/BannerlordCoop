@@ -57,6 +57,8 @@ namespace Coop.Mod
 
             if (Current == null)
             {
+                ServerConfiguration config = new ServerConfiguration();
+
                 Server.EType eServerType = Server.EType.Threaded;
                 Current = new Server(eServerType);
 
@@ -65,7 +67,8 @@ namespace Coop.Mod
                 Persistence = new CoopServerRail(
                     Current,
                     SyncedObjectStore,
-                    Registry.Server(m_GameEnvironmentServer));
+                    Registry.Server(m_GameEnvironmentServer),
+                    config.EventBroadcastTimeout);
 
                 Current.Updateables.Add(Persistence);
                 Current.OnClientConnected += OnClientConnected;
@@ -76,7 +79,7 @@ namespace Coop.Mod
                     Main.Instance.Updateables.Add(Current);
                 }
 
-                Current.Start(new ServerConfiguration());
+                Current.Start(config);
                 Logger.Debug("Created server.");
             }
 

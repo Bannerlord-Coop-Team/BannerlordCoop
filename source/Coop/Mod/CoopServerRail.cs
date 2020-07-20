@@ -17,8 +17,6 @@ namespace Coop.Mod
     {
         [NotNull] private readonly RailServer m_Instance;
 
-        [CanBeNull] public RailServerRoom Room => m_Instance.Room;
-
         private readonly Dictionary<ConnectionServer, RailNetPeerWrapper> m_RailConnections =
             new Dictionary<ConnectionServer, RailNetPeerWrapper>();
 
@@ -27,13 +25,16 @@ namespace Coop.Mod
         public CoopServerRail(
             [NotNull] Server server,
             [NotNull] SharedRemoteStore store,
-            [NotNull] RailRegistry registry)
+            [NotNull] RailRegistry registry,
+            TimeSpan eventTimeout)
         {
             m_Server = server;
-            EventQueue = new EventBroadcastingQueue(store);
+            EventQueue = new EventBroadcastingQueue(store, eventTimeout);
             m_Instance = new RailServer(registry);
             EntityManager = new EntityManager(m_Instance);
         }
+
+        [CanBeNull] public RailServerRoom Room => m_Instance.Room;
 
         [NotNull]
         public IReadOnlyCollection<RailServerPeer> ConnectedClients => m_Instance.ConnectedClients;

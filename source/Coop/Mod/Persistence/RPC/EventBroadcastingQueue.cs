@@ -18,7 +18,12 @@ namespace Coop.Mod.Persistence.RPC
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
+        /// <summary>
+        ///     Defines the maximum number of events that can be added to the queue. Smaller in
+        ///     DEBUG to identify situations where events are starving in the queue. Might need
+        ///     to be adjusted depending on how much is done using events.
+        /// </summary>
+        private static readonly int MaximumQueueSize = Main.DEBUG ? 128 : 8192;
 
         private readonly OrderedHashSet<ObjectId> m_DistributedObjects =
             new OrderedHashSet<ObjectId>();
@@ -27,11 +32,18 @@ namespace Coop.Mod.Persistence.RPC
 
         [NotNull] private readonly SharedRemoteStore m_Store;
 
+        private readonly TimeSpan m_Timeout;
+
         /// <summary>
         /// </summary>
         /// <param name="store">Store to be used for large object transfer.</param>
-        public EventBroadcastingQueue([NotNull] SharedRemoteStore store)
+        /// <param name="eventTimeout">
+        ///     Maximum amount of time a single event may spend in the queue. After
+        ///     which it is dropped.
+        /// </param>
+        public EventBroadcastingQueue([NotNull] SharedRemoteStore store, TimeSpan eventTimeout)
         {
+            m_Timeout = eventTimeout;
             m_Store = store;
             m_Store.OnObjectDistributed += OnObjectDistributed;
         }
@@ -57,7 +69,7 @@ namespace Coop.Mod.Persistence.RPC
                     if (!call.TryBroadcast())
                     {
                         TimeSpan timeSinceCreation = DateTime.Now - call.CreatedAt;
-                        if (timeSinceCreation > Timeout)
+                        if (timeSinceCreation > m_Timeout)
                         {
                             Logger.Error(
                                 "{event} has been pending for {timeSinceCreation}. Large object transfer still not completed. Abort event.",
@@ -92,6 +104,27 @@ namespace Coop.Mod.Persistence.RPC
             {
                 Call call = new Call(room, rpc);
                 call.ObjectsToBeDistributed.RemoveAll(id => m_DistributedObjects.Contains(id));
+
+                if (m_Queue.Count >= MaximumQueueSize)
+                {
+                    Logger.Error("Event queue is full!");
+                    if (Main.DEBUG)
+                    {
+                        // Events seem to starve in the queue. This indicates an underlying issue.
+                        // Do one of the following:
+                        // 1. Did you change anything that increases the number of generated events
+                        //    in a single frame?
+                        //    yes -> Increase MaximumQueueSize accordingly.
+                        // 2. Did you introduce an event with very large payloads that is blocking
+                        //    the queue while other events are occuring?
+                        //    yes -> Maybe the game should be be paused while we that event is
+                        //           transferred? Remember that the queue is always executed in
+                        //           sequence to guarantee a consistent state.
+                        // 3. Open a bug.
+                        throw new IndexOutOfRangeException();
+                    }
+                }
+
                 m_Queue.Add(call);
             }
         }
