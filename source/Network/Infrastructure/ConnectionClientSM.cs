@@ -7,44 +7,41 @@ using System.Collections.Generic;
 namespace Network.Infrastructure
 {
     using StateConfiguration = StateMachine<EClientConnectionState, EClientConnectionTrigger>.StateConfiguration;
-    public enum EClientConnectionTrigger
-    {
-        TryJoinServer,
-        ServerAcceptedJoinRequest,
-        Disconnect,
-    }
-
     public enum EClientConnectionState
     {
-        /** [client side] Client is trying to establish a connection to a server.
-         *
-         * Possible transitions to:
-         * - ClientJoining: The server accepted the request.
-         * - Disconnecting: Request timeout or the server rejected the request.
-         */
-        ///<summary>
-        /// [client side] Client is trying to establish a connection to a server.
-        /// Possible transitions to:
+        /// <summary>
+        /// Client is trying to establish a connection to a server.
         /// </summary>
         JoinRequesting,
 
-        /** [client side] Client is trying to establish a connection to a server.
-         *
-         * Possible transitions to:
-         * - ClientJoining: The server accepted the request.
-         * - Disconnecting: Request timeout or the server rejected the request.
-         */
+        /// <summary>
+        /// A connection with the server has been established.
+        /// </summary>
         Connected,
 
-        /** Connection is being closed.
-         *
-         * Possible transitions to:
-         * - Disconnected:  Connection was closed.
-         */
+        /// <summary>
+        /// Connection has been closed.
+        /// </summary>
         Disconnected
     }
 
-    
+    public enum EClientConnectionTrigger
+    {
+        /// <summary>
+        /// A request to join server has been sent.
+        /// </summary>
+        TryJoinServer,
+
+        /// <summary>
+        /// Server has accepted join request
+        /// </summary>
+        ServerAcceptedJoinRequest,
+
+        /// <summary>
+        /// Connection has been closed.
+        /// </summary>
+        Disconnect,
+    }
 
     public class ConnectionClientSM : CoopStateMachine<EClientConnectionState, EClientConnectionTrigger>
     {

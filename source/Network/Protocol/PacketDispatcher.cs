@@ -146,9 +146,8 @@ namespace Network.Protocol
 
         public override int GetHashCode()
         {
-            int hashCode = -488946146;
-            hashCode = hashCode * -1521134295 + EqualityComparer<Enum>.Default.GetHashCode(State);
-            hashCode = hashCode * -1521134295 + ePacket.GetHashCode();
+            int hashCode = EqualityComparer<Enum>.Default.GetHashCode(State);
+            hashCode += ePacket.GetHashCode();
             return hashCode;
         }
     }
@@ -172,9 +171,8 @@ namespace Network.Protocol
 
         public override int GetHashCode()
         {
-            int hashCode = 1730637479;
-            hashCode = hashCode * -1521134295 + EqualityComparer<object>.Default.GetHashCode(Owner);
-            hashCode = hashCode * -1521134295 + EqualityComparer<Action<ConnectionBase, Packet>>.Default.GetHashCode(Handler);
+            int hashCode = EqualityComparer<object>.Default.GetHashCode(Owner);
+            hashCode += EqualityComparer<Action<ConnectionBase, Packet>>.Default.GetHashCode(Handler);
             return hashCode;
         }
 

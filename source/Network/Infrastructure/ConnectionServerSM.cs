@@ -7,13 +7,6 @@ using System.Collections.Generic;
 namespace Network.Infrastructure
 {
     using StateConfiguration = StateMachine<EServerConnectionState, EServerConnectionTrigger>.StateConfiguration;
-    public enum EServerConnectionTrigger
-    {
-        Close,
-        ClientInfoVerified,
-        ClientReady,
-    }
-
     public enum EServerConnectionState
     {
         /// <summary>
@@ -27,7 +20,7 @@ namespace Network.Infrastructure
         ClientJoining,
 
         /// <summary>
-        /// Client is ready.
+        /// Client is ready for state transfer and synchronization.
         /// </summary>
         Ready,
 
@@ -37,7 +30,23 @@ namespace Network.Infrastructure
         Terminated,
     }
 
+    public enum EServerConnectionTrigger
+    {
+        /// <summary>
+        /// Close connection with client.
+        /// </summary>
+        Close,
 
+        /// <summary>
+        /// Client info is valid.
+        /// </summary>
+        ClientInfoVerified,
+
+        /// <summary>
+        /// Client is ready for state transfer and synchronization.
+        /// </summary>
+        ClientReady,
+    }
 
     public class ConnectionServerSM : CoopStateMachine<EServerConnectionState, EServerConnectionTrigger>
     {

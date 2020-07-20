@@ -11,10 +11,29 @@ namespace Coop.Mod
     using StateConfiguration = StateMachine<ECoopClientState, ECoopClientTrigger>.StateConfiguration;
     enum ECoopClientState
     {
+        /// <summary>
+        /// Client is at main menu.
+        /// </summary>
         MainManu,
+
+        /// <summary>
+        /// Client is creating character.
+        /// </summary>
         CharacterCreation,
+
+        /// <summary>
+        /// Client is receiving world data.
+        /// </summary>
         ReceivingWorldData,
+
+        /// <summary>
+        /// Client is loading.
+        /// </summary>
         Loading,
+
+        /// <summary>
+        /// Client is playing
+        /// </summary>
         Playing,
     }
     enum ECoopClientTrigger
@@ -29,8 +48,19 @@ namespace Coop.Mod
         /// </summary>
         CharacterExists,
 
+        /// <summary>
+        /// A new character has been created.
+        /// </summary>
         CharacterCreated,
+
+        /// <summary>
+        /// World data has been received.
+        /// </summary>
         WorldDataReceived,
+
+        /// <summary>
+        /// The game has been loaded for the client.
+        /// </summary>
         GameLoaded,
     }
     internal class CoopClientSM : CoopStateMachine<ECoopClientState, ECoopClientTrigger>

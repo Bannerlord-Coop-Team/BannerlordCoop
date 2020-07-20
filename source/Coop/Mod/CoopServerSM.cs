@@ -6,14 +6,36 @@ namespace Coop.Mod
 {
     using StateConfiguration = StateMachine<ECoopServerState, ECoopServerTrigger>.StateConfiguration;
     enum ECoopServerState {
+        /// <summary>
+        /// A client is awaiting world data.
+        /// </summary>
         Preparing,
+
+        /// <summary>
+        /// A client is receiving world data.
+        /// </summary>
         SendingWorldData,
+
+        /// <summary>
+        /// A client is playing.
+        /// </summary>
         Playing,
     }
 
     enum ECoopServerTrigger {
+        /// <summary>
+        /// A client has requested world data.
+        /// </summary>
         RequiresWorldData,
+
+        /// <summary>
+        /// A client does not need world data.
+        /// </summary>
         DeclineWorldData,
+
+        /// <summary>
+        /// A client has recieved world data.
+        /// </summary>
         WorldDataRecieved,
     }
 

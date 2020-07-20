@@ -43,7 +43,7 @@ namespace Coop.Mod
         private GameEnvironmentServer m_GameEnvironmentServer;
         public static bool AreAllClientsPlaying =>
             m_CoopServerSMs.All(clientSM => clientSM.Key.State.Equals(ECoopServerState.Playing));
-        private static readonly Dictionary<ConnectionServer, CoopStateMachine> m_CoopServerSMs = new Dictionary<ConnectionServer, CoopStateMachine>();
+        private static readonly Dictionary<ConnectionServer, CoopServerSM> m_CoopServerSMs = new Dictionary<ConnectionServer, CoopServerSM>();
 
         private CoopServer()
         {
@@ -210,19 +210,21 @@ namespace Coop.Mod
         [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestWorldData)]
         private void ReceiveClientRequestWorldData(ConnectionBase connection, Packet packet)
         {
+            ConnectionServer connectionServer = (ConnectionServer)connection;
             Client_RequestWorldData info =
                 Client_RequestWorldData.Deserialize(new ByteReader(packet.Payload));
             Logger.Info("Client requested world data.");
-            ((CoopServerSM)m_CoopServerSMs[(ConnectionServer)connection]).StateMachine.Fire(
+
+            m_CoopServerSMs[connectionServer].StateMachine.Fire(
                     new StateMachine<ECoopServerState, ECoopServerTrigger>.TriggerWithParameters<
                         ConnectionServer>(ECoopServerTrigger.RequiresWorldData),
-                    (ConnectionServer)connection);
+                    connectionServer);
         }
 
         [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_DeclineWorldData)]
         private void ReceiveClientDeclineWorldData(ConnectionBase connection, Packet packet)
         {
-            ((CoopServerSM)m_CoopServerSMs[(ConnectionServer)connection]).StateMachine.Fire(ECoopServerTrigger.DeclineWorldData);
+            m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.DeclineWorldData);
         }
 
         private void SendInitialWorldData(ConnectionServer connection)

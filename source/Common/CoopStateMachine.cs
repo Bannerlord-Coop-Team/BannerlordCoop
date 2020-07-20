@@ -21,7 +21,7 @@ namespace Common
             {
                 State = stateMachine.Destination;
                 Logger.Debug($"{GetType().Name} switched from {stateMachine.Source} " +
-                    $"to {stateMachine.Source} " +
+                    $"to {stateMachine.Destination} " +
                     $"with trigger {stateMachine.Trigger}.");
             });
         }
