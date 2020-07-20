@@ -31,12 +31,14 @@ namespace Sync
         }
 
         public MethodPatch InterceptAll(
-            BindingFlags flags,
+            BindingFlags filter =
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly,
+            EMethodPatchFlag eFlags = EMethodPatchFlag.None,
             EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
-            foreach (MethodInfo method in m_Declaring.GetMethods(flags))
+            foreach (MethodInfo method in m_Declaring.GetMethods(filter))
             {
-                Intercept(method, eBehaviour);
+                Intercept(method, eFlags, eBehaviour);
             }
 
             return this;
@@ -47,6 +49,7 @@ namespace Sync
         ///     <see cref="MethodAccess.InvokeOnBeforeCallHandler" />.
         /// </summary>
         /// <param name="method">Method to track.</param>
+        /// <param name="eFlags">Flags for the generated interceptor.</param>
         /// <param name="eBehaviour"></param>
         /// <returns>this</returns>
         /// <exception cref="ArgumentException">
@@ -55,6 +58,7 @@ namespace Sync
         /// </exception>
         public MethodPatch Intercept(
             MethodInfo method,
+            EMethodPatchFlag eFlags = EMethodPatchFlag.None,
             EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
             if (method.DeclaringType != m_Declaring)
@@ -64,7 +68,7 @@ namespace Sync
                     nameof(method));
             }
 
-            PatchPrefix(method, eBehaviour);
+            PatchPrefix(method, eFlags, eBehaviour);
             return this;
         }
 
@@ -73,28 +77,87 @@ namespace Sync
         ///     <see cref="MethodAccess.InvokeOnBeforeCallHandler" />.
         /// </summary>
         /// <param name="sMethodName">Name of the method</param>
+        /// <param name="eFlags">Flags for the generated interceptor.</param>
         /// <param name="eBehaviour"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException">If no method with that name exists.</exception>
         public MethodPatch Intercept(
             string sMethodName,
+            EMethodPatchFlag eFlags = EMethodPatchFlag.None,
             EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
-            MethodInfo method = AccessTools.Method(m_Declaring, sMethodName);
-            if (method == null)
+            foreach (MethodInfo info in m_Declaring.GetMethods())
             {
-                throw new ArgumentException(
-                    $"Method {m_Declaring}.{sMethodName} not found.",
-                    nameof(sMethodName));
+                if (info.Name == sMethodName)
+                {
+                    Intercept(info, eFlags, eBehaviour);
+                }
             }
 
-            PatchPrefix(method, eBehaviour);
+            return this;
+        }
+
+        /// <summary>
+        ///     Do not use, generics cannot be reliably patched as of right now. See
+        ///     https://github.com/pardeike/Harmony/issues/320
+        /// </summary>
+        /// <param name="sMethodName"></param>
+        /// <param name="genericInstantiations"></param>
+        /// <param name="eFlags"></param>
+        /// <param name="eBehaviour"></param>
+        /// <returns></returns>
+        [Obsolete]
+        public MethodPatch InterceptGeneric(
+            string sMethodName,
+            Type[] genericInstantiations,
+            EMethodPatchFlag eFlags = EMethodPatchFlag.None,
+            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
+        {
+            foreach (MethodInfo info in m_Declaring.GetMethods())
+            {
+                if (info.IsGenericMethod && info.Name == sMethodName)
+                {
+                    foreach (Type genericArg in genericInstantiations)
+                    {
+                        Intercept(info.MakeGenericMethod(genericArg), eFlags, eBehaviour);
+                    }
+                }
+            }
+
             return this;
         }
 
         public bool TryGetMethod(string sMethodName, out MethodAccess methodAccess)
         {
-            return TryGetMethod(AccessTools.Method(m_Declaring, sMethodName), out methodAccess);
+            MethodInfo method = AccessTools.Method(m_Declaring, sMethodName);
+            if (method.IsGenericMethod)
+            {
+                throw new ArgumentException(
+                    $"Unable to generate patch: provided method {method} is generic. Use a [HarmonyPatch] with TargetMethod instead.",
+                    nameof(method));
+            }
+
+            return TryGetMethod(method, out methodAccess);
+        }
+
+        public bool TryGetMethod(
+            string sMethodName,
+            Type[] genericArguments,
+            out MethodAccess methodAccess)
+        {
+            MethodInfo method = AccessTools.Method(
+                m_Declaring,
+                sMethodName,
+                null,
+                genericArguments);
+            if (method.IsGenericMethod)
+            {
+                throw new ArgumentException(
+                    $"Unable to generate patch: provided method {method} is generic. Use a [HarmonyPatch] with TargetMethod instead.",
+                    nameof(method));
+            }
+
+            return TryGetMethod(method, out methodAccess);
         }
 
         public bool TryGetMethod(MethodInfo methodInfo, out MethodAccess methodAccess)
@@ -103,12 +166,17 @@ namespace Sync
             return methodAccess != null;
         }
 
-        private void PatchPrefix(MethodInfo original, EPatchBehaviour eBehaviour)
+        private void PatchPrefix(
+            MethodInfo original,
+            EMethodPatchFlag eFlags,
+            EPatchBehaviour eBehaviour)
         {
             MethodInfo dispatcher = AccessTools.Method(
                 typeof(MethodPatch),
                 nameof(DispatchPrefixExecution));
-            m_Access.Add(MethodPatchFactory.AddPrefix(original, dispatcher, eBehaviour));
+            MethodAccess access = MethodPatchFactory.AddPrefix(original, dispatcher, eBehaviour);
+            access.AddFlags(eFlags);
+            m_Access.Add(access);
         }
 
         private static bool DispatchPrefixExecution(

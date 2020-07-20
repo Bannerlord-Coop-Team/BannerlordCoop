@@ -1,13 +1,5 @@
 [submodule "source/RailgunNet"]
 	path = source/RailgunNet
-	url = git@github.com:araex/RailgunNet.git
-[submodule "source/LiteNetLib"]
-	path = source/LiteNetLib
-	url = git@github.com:RevenantX/LiteNetLib.git
-	
-	
-[submodule "source/RailgunNet"]
-	path = source/RailgunNet
 	url = https://github.com/araex/RailgunNet.git
 [submodule "source/LiteNetLib"]
 	path = source/LiteNetLib

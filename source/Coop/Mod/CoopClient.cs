@@ -1,4 +1,4 @@
-﻿﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -29,7 +29,7 @@ namespace Coop.Mod
         }
     }
 
-    public class CoopClient : IUpdateable
+    public class CoopClient : IUpdateable, IClientAccess
     {
         private const int MaxReconnectAttempts = 2;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -46,11 +46,12 @@ namespace Coop.Mod
         private readonly Dictionary<ObjectId, object> m_SyncedObjects =
             new Dictionary<ObjectId, object>();
 
+        private MBGameManager gameManager;
+
         private int m_ReconnectAttempts = MaxReconnectAttempts;
+        public Action<PersistenceClient> OnPersistenceInitialized;
 
         public Action<RemoteStore> RemoteStoreCreated;
-        public Action<PersistenceClient> OnPersistenceInitialized;
-        private MBGameManager gameManager;
 
         public CoopClient()
         {
@@ -116,6 +117,16 @@ namespace Coop.Mod
                 // TODO change to main menu state
                 return Session.Connection.State.Equals(ECoopClientState.ReceivingWorldData);
             }
+        }
+
+        public RemoteStore GetStore()
+        {
+            return SyncedObjectStore;
+        }
+
+        public RailClientRoom GetRoom()
+        {
+            return Persistence?.Room;
         }
 
         public void Update(TimeSpan frameTime)
@@ -370,4 +381,3 @@ namespace Coop.Mod
         }
     }
 }
-

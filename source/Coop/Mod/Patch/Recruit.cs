@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using Sync;
+﻿using Sync;
 using TaleWorlds.CampaignSystem.Actions;
 
 namespace Coop.Mod.Patch
@@ -10,14 +9,13 @@ namespace Coop.Mod.Patch
     public static class Recruit
     {
         private static readonly MethodPatch Patch =
-            new MethodPatch(typeof(RecruitAction)).InterceptAll(
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            new MethodPatch(typeof(RecruitAction)).InterceptAll();
 
         [PatchInitializer]
         public static void Init()
         {
             CoopClient.Instance.OnPersistenceInitialized += persistence =>
-                persistence.RpcSyncHandlers.Register(Patch.Methods);
+                persistence.RpcSyncHandlers.Register(Patch.Methods, CoopClient.Instance);
             foreach (MethodAccess method in Patch.Methods)
             {
                 method.Condition = Coop.DoSync;

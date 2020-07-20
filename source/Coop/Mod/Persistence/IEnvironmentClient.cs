@@ -1,5 +1,6 @@
-﻿using Sync;
-using System;
+﻿using JetBrains.Annotations;
+using Sync;
+using Sync.Store;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence
@@ -9,6 +10,8 @@ namespace Coop.Mod.Persistence
         FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
         FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; }
         FieldAccess<Campaign, bool> TimeControlModeLock { get; }
+
+        [NotNull] RemoteStore Store { get; }
 
         #region Game state access
         MobileParty GetMobilePartyByIndex(int iPartyIndex);

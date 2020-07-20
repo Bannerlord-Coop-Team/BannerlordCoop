@@ -2,13 +2,18 @@
 
 namespace Sync.Store
 {
-    public struct ObjectId
+    public readonly struct ObjectId
     {
         public uint Value { get; }
 
         public ObjectId(uint id)
         {
             Value = id;
+        }
+
+        public override string ToString()
+        {
+            return $"Obj {Value}";
         }
     }
 

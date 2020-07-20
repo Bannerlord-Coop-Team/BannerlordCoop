@@ -28,7 +28,7 @@ namespace Coop.Mod
 
             config.AddRule(LogLevel.Debug, LogLevel.Fatal, logFile);
             // config.AddRule(LogLevel.Debug, LogLevel.Fatal, debugOutput);
-            config.AddRule(LogLevel.Info, LogLevel.Fatal, viewer);
+            config.AddRule(LogLevel.Trace, LogLevel.Fatal, viewer);
             foreach (Target t in appSpecificTargets)
             {
                 config.AddRule(LogLevel.Info, LogLevel.Fatal, t);

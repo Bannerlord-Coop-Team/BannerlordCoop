@@ -6,7 +6,7 @@ namespace Coop.Tests
 {
     public class InMemoryConnection : INetworkConnection
     {
-        private readonly List<byte[]> sendBuffer = new List<byte[]>();
+        public List<byte[]> SendBuffer { get; } = new List<byte[]>();
 
         public int FragmentLength => 100;
 
@@ -21,15 +21,15 @@ namespace Coop.Tests
 
         public void SendRaw(ArraySegment<byte> raw, EDeliveryMethod _)
         {
-            sendBuffer.Add(raw.ToArray());
+            SendBuffer.Add(raw.ToArray());
         }
 
         public event Action<ArraySegment<byte>> OnSend;
 
         public void ExecuteSends()
         {
-            sendBuffer.ForEach(buffer => OnSend?.Invoke(buffer));
-            sendBuffer.Clear();
+            SendBuffer.ForEach(buffer => OnSend?.Invoke(buffer));
+            SendBuffer.Clear();
         }
     }
 }

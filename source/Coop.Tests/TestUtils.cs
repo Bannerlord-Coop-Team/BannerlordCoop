@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using Common;
 using HarmonyLib;
@@ -174,6 +175,14 @@ namespace Coop.Tests
             writer.Binary.Write(PacketWriter.EncodePacketType(EPacket.Persistence));
             writer.Binary.Write(payload);
             return writer.ToArray();
+        }
+
+        public static long GetSerializedSize(object o)
+        {
+            Stream s = new MemoryStream();
+            BinaryFormatter formatter = new BinaryFormatter();
+            formatter.Serialize(s, o);
+            return s.Length;
         }
 
         public class UpdateThread

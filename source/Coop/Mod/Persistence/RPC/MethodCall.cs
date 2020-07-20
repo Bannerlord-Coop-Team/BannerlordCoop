@@ -1,16 +1,19 @@
 ﻿using System.Collections.Generic;
-using RailgunNet.System.Types;
 using Sync;
 
 namespace Coop.Mod.Persistence.RPC
 {
+    /// <summary>
+    ///     Represents a serializable call to a method including all invocation arguments. Method
+    ///     pointer, instance and arguments have to resolved before execution. In order to resolve
+    ///     a method call refer to <see cref="MethodRegistry" /> and <see cref="ArgumentFactory" />.
+    /// </summary>
     public class MethodCall
     {
         public List<Argument> Arguments = new List<Argument>();
 
         public MethodId Id = MethodId.Invalid;
         public Argument Instance = Argument.Null; // Instance to call the method on.
-        public static EntityId StaticContext => EntityId.INVALID;
 
         public override string ToString()
         {

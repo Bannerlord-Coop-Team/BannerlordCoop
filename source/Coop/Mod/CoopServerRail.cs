@@ -3,33 +3,43 @@ using System.Collections.Generic;
 using Common;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Persistence;
+using Coop.Mod.Persistence.RPC;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using RailgunNet.Connection.Server;
-using Steamworks;
+using RailgunNet.Factory;
+using Sync.Store;
 
 namespace Coop.Mod
 {
     public class CoopServerRail : IUpdateable
     {
-        private readonly RailServer m_Instance;
+        [NotNull] private readonly RailServer m_Instance;
 
         private readonly Dictionary<ConnectionServer, RailNetPeerWrapper> m_RailConnections =
             new Dictionary<ConnectionServer, RailNetPeerWrapper>();
 
-        private readonly Server m_Server;
-        [NotNull] public RailServerRoom Room => m_Instance.Room;
+        [NotNull] private readonly Server m_Server;
+
+        public CoopServerRail(
+            [NotNull] Server server,
+            [NotNull] SharedRemoteStore store,
+            [NotNull] RailRegistry registry,
+            TimeSpan eventTimeout)
+        {
+            m_Server = server;
+            EventQueue = new EventBroadcastingQueue(store, eventTimeout);
+            m_Instance = new RailServer(registry);
+            EntityManager = new EntityManager(m_Instance);
+        }
+
+        [CanBeNull] public RailServerRoom Room => m_Instance.Room;
 
         [NotNull]
         public IReadOnlyCollection<RailServerPeer> ConnectedClients => m_Instance.ConnectedClients;
 
-        public CoopServerRail(Server server, IEnvironmentServer environment)
-        {
-            m_Server = server;
-            m_Instance = new RailServer(Registry.Server(environment));
-            EntityManager = new EntityManager(m_Instance);
-        }
+        public EventBroadcastingQueue EventQueue { get; }
 
         [NotNull] public EntityManager EntityManager { get; }
 
@@ -37,6 +47,7 @@ namespace Coop.Mod
         {
             Replay.ReplayPlayback?.Invoke();
             m_Instance.Update();
+            EventQueue.Update(frameTime);
         }
 
         ~CoopServerRail()

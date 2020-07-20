@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using Coop.Mod.Persistence;
 using Network.Infrastructure;
-using Network;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.DebugUtil
@@ -12,6 +11,9 @@ namespace Coop.Mod.DebugUtil
     public static class CLICommands
     {
         private const string sGroupName = "coop";
+        private const string sTestGroupName = "test";
+
+        private static DebugUI m_DebugUI;
 
         [CommandLineFunctionality.CommandLineArgumentFunction("info", sGroupName)]
         public static string DumpInfo(List<string> parameters)
@@ -23,8 +25,6 @@ namespace Coop.Mod.DebugUtil
             return sMessage;
         }
 
-        private static DebugUI m_DebugUI;
-
         [CommandLineFunctionality.CommandLineArgumentFunction("show_debug_ui", sGroupName)]
         public static string ShowDebugUi(List<string> parameters)
         {
@@ -33,6 +33,7 @@ namespace Coop.Mod.DebugUtil
                 m_DebugUI = new DebugUI();
                 Main.Instance.Updateables.Add(m_DebugUI);
             }
+
             m_DebugUI.Visible = true;
             return "";
         }
@@ -46,6 +47,7 @@ namespace Coop.Mod.DebugUtil
                 CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
                 return CoopServer.Instance.ToString();
             }
+
             return null;
         }
 
@@ -76,16 +78,19 @@ namespace Coop.Mod.DebugUtil
         public static string Help(List<string> parameters)
         {
             return "Coop commands:\n" +
-                "\tcoop.record <filename>\tStart record movements of all parties.\n" +
-                "\tcoop.play <filename>\tPlayback recorded movements of main hero party.\n" +
-                "\tcoop.stop\t\tStop record or playback.";
+                   "\tcoop.record <filename>\tStart record movements of all parties.\n" +
+                   "\tcoop.play <filename>\tPlayback recorded movements of main hero party.\n" +
+                   "\tcoop.stop\t\tStop record or playback.";
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("record", sGroupName)]
         public static string Record(List<string> parameters)
         {
             if (parameters.Count < 1)
+            {
                 return Help(null);
+            }
+
             return Replay.StartRecord(parameters[0]);
         }
 
@@ -93,7 +98,10 @@ namespace Coop.Mod.DebugUtil
         public static string Play(List<string> parameters)
         {
             if (parameters.Count < 1)
+            {
                 return Help(null);
+            }
+
             return Replay.Playback(parameters[0]);
         }
 
@@ -103,31 +111,46 @@ namespace Coop.Mod.DebugUtil
             return Replay.Stop();
         }
 
-        [CommandLineFunctionality.CommandLineArgumentFunction("disable_inconsistent_state_warnings", sGroupName)]
+        [CommandLineFunctionality.CommandLineArgumentFunction(
+            "disable_inconsistent_state_warnings",
+            sGroupName)]
         public static string DisableWarn(List<string> parameters)
         {
-            var help = "Disable(1) or enable(0) to show warnings about inconsistent internal state\n" +
-                    $"Usage:\n" +
-                    $"\t{sGroupName}.disable_inconsistent_state_warnings 1";
+            string help =
+                "Disable(1) or enable(0) to show warnings about inconsistent internal state\n" +
+                "Usage:\n" +
+                $"\t{sGroupName}.disable_inconsistent_state_warnings 1";
             if (parameters.Count < 1)
+            {
                 return help;
+            }
 
-            var entityManager = CoopServer.Instance?.Persistence?.EntityManager;
+            EntityManager entityManager = CoopServer.Instance?.Persistence?.EntityManager;
             if (entityManager == null)
+            {
                 return "Server not started.";
+            }
 
             if (parameters[0] == "1")
             {
                 entityManager.SuppressInconsistentStateWarnings = true;
                 return "Inconsistent state warnings disabled.";
             }
-            else if (parameters[0] == "0")
+
+            if (parameters[0] == "0")
             {
                 entityManager.SuppressInconsistentStateWarnings = false;
                 return "Inconsistent state warnings enabled.";
             }
 
             return help;
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("spawn_party", sTestGroupName)]
+        public static string Spawn(List<string> parameters)
+        {
+            MobileParty party = PartySpawnHelper.SpawnTestersNear(Campaign.Current.MainParty);
+            return $"Spawned {party}.";
         }
     }
 }

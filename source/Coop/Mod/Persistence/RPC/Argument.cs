@@ -1,19 +1,17 @@
 ﻿using System;
-using JetBrains.Annotations;
-using Network.Protocol;
-using RailgunNet.Logic;
-using RailgunNet.System.Types;
+using Sync.Store;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.RPC
 {
     /// <summary>
-    ///     Type of an argument used in a <see cref="EventMethodCall" />.
+    ///     Wrapper for an argument used in a <see cref="EventMethodCall" />.
     ///     ATTENTION: The persistence is intended to reliably transfer very small amount of data
     ///     that is to be applied at a synchronized point in time on all client. Maximum payload
     ///     data in a single event is tiny <see cref="RailgunNet.RailConfig.MAXSIZE_EVENT" />.
-    ///     Instead of sending data, only send a reference to it in the already synchronized
-    ///     game state. To transfer new game state use a <see cref="EPacket.Sync" /> message.
+    ///     Larger objects need be transferred using a <see cref="RemoteStore" /> and then referenced
+    ///     in a <see cref="EventArgType.StoreObjectId" />. The <see cref="ArgumentFactory.Create" />
+    ///     can take care of this.
     ///     To add a new argument type:
     ///     1. Add enum entry
     ///     2. Extended <see cref="Argument" /> to store the new type in some way
@@ -25,9 +23,11 @@ namespace Coop.Mod.Persistence.RPC
     public enum EventArgType
     {
         Null,
-        EntityReference,
-        MBGUID,
-        Int
+        MBObjectManager,
+        MBObject,
+        Int,
+        Float,
+        StoreObjectId
     }
 
     public struct Argument
@@ -37,11 +37,17 @@ namespace Coop.Mod.Persistence.RPC
             EventType = EventArgType.Null
         };
 
+        public static Argument MBObjectManager = new Argument
+        {
+            EventType = EventArgType.MBObjectManager
+        };
+
         public EventArgType EventType { get; private set; }
-        public EntityId? RailId { get; }
         public MBGUID? MbGUID { get; }
 
         public int? Int { get; }
+        public float? Float { get; }
+        public ObjectId? StoreObjectId { get; }
 
         public Argument(int i) : this()
         {
@@ -49,25 +55,22 @@ namespace Coop.Mod.Persistence.RPC
             Int = i;
         }
 
-        public Argument([NotNull] RailEntityBase entity) : this(entity.Id)
+        public Argument(float f) : this()
         {
-        }
-
-        public Argument(EntityId id) : this()
-        {
-            if (id == EntityId.INVALID)
-            {
-                throw new Exception("Invalid entity. Cannot reference it in an event argument.");
-            }
-
-            EventType = EventArgType.EntityReference;
-            RailId = id;
+            EventType = EventArgType.Float;
+            Float = f;
         }
 
         public Argument(MBGUID guid) : this()
         {
-            EventType = EventArgType.MBGUID;
+            EventType = EventArgType.MBObject;
             MbGUID = guid;
+        }
+
+        public Argument(ObjectId id) : this()
+        {
+            EventType = EventArgType.StoreObjectId;
+            StoreObjectId = id;
         }
 
         public override string ToString()
@@ -76,12 +79,16 @@ namespace Coop.Mod.Persistence.RPC
             {
                 case EventArgType.Null:
                     return "null";
-                case EventArgType.EntityReference:
-                    return RailId.ToString();
-                case EventArgType.MBGUID:
+                case EventArgType.MBObjectManager:
+                    return "MBObjectManager";
+                case EventArgType.MBObject:
                     return $"MBGUID {MbGUID}";
                 case EventArgType.Int:
                     return Int.ToString();
+                case EventArgType.Float:
+                    return Float.ToString();
+                case EventArgType.StoreObjectId:
+                    return $"{StoreObjectId.ToString()}";
                 default:
                     throw new ArgumentOutOfRangeException();
             }

@@ -33,6 +33,7 @@ namespace Sync
         {
             m_SetterPatch.Intercept(
                 AccessTools.PropertySetter(m_Declaring, property.Name),
+                EMethodPatchFlag.None,
                 m_Behaviour);
             return this;
         }
@@ -41,6 +42,7 @@ namespace Sync
         {
             m_SetterPatch.Intercept(
                 AccessTools.PropertySetter(m_Declaring, sProperty),
+                EMethodPatchFlag.None,
                 m_Behaviour);
             return this;
         }
@@ -49,6 +51,7 @@ namespace Sync
         {
             m_SetterPatch.Intercept(
                 AccessTools.PropertyGetter(m_Declaring, property.Name),
+                EMethodPatchFlag.None,
                 m_Behaviour);
             return this;
         }
@@ -57,6 +60,7 @@ namespace Sync
         {
             m_SetterPatch.Intercept(
                 AccessTools.PropertyGetter(m_Declaring, sProperty),
+                EMethodPatchFlag.None,
                 m_Behaviour);
             return this;
         }
