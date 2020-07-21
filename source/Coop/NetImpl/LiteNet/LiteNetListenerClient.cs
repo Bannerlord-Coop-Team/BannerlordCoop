@@ -23,8 +23,7 @@ namespace Coop.NetImpl.LiteNet
             RailNetPeerWrapper persistence = new RailNetPeerWrapper(network);
             ConnectionClient connection = new ConnectionClient(
                 network,
-                persistence,
-                m_Session.World);
+                persistence);
             m_Session.ConnectionCreated(connection);
             peer.Tag = connection;
         }

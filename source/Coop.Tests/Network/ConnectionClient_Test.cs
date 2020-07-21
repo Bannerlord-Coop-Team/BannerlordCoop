@@ -44,7 +44,7 @@ namespace Coop.Tests.Network
             m_WorldData.Setup(d => d.RequiresInitialWorldData).Returns(bExchangeWorldData);
 
             // Init
-            Assert.Equal(EConnectionState.Disconnected, m_Connection.State);
+            Assert.Equal(EClientConnectionState.Disconnected, m_Connection.State);
             m_Connection.Connect();
 
             // Expect client hello
@@ -55,14 +55,13 @@ namespace Coop.Tests.Network
                 EPacket.Client_Hello,
                 new Client_Hello(Version.Number).Serialize());
             Assert.Equal(expectedSentData, m_SendRawParam);
-            Assert.Equal(EConnectionState.ClientJoinRequesting, m_Connection.State);
 
             // Ack client hello
             ArraySegment<byte> response = TestUtils.MakeRaw(
                 EPacket.Server_RequestClientInfo,
                 new Server_RequestClientInfo().Serialize());
             m_Connection.Receive(response);
-            Assert.Equal(EConnectionState.ClientJoinRequesting, m_Connection.State);
+            Assert.Equal(EClientConnectionState.JoinRequesting, m_Connection.State);
 
             // Expect client info
             expectedSentData = TestUtils.MakeRaw(

@@ -8,6 +8,7 @@ namespace Network.Protocol
         Client_Hello, // Introduces the client to the server.
         Client_Info, // Contains ClientInfo.
         Client_RequestWorldData, // Client wants to be sent a save game of the current state.
+        Client_DeclineWorldData, // Client does not need world data
         Client_Joined, // Sent once the client has loaded the initial world state.
 
         Server_RequestClientInfo, // Instructs the client to send its ClientInfo.
@@ -94,6 +95,21 @@ namespace Network.Protocol
     }
 
     public class Client_RequestWorldData
+    {
+        public byte[] Serialize()
+        {
+            // Empty
+            return new byte[0];
+        }
+
+        public static Client_RequestWorldData Deserialize(ByteReader reader)
+        {
+            // Empty
+            return new Client_RequestWorldData();
+        }
+    }
+
+    public class Client_DeclineWorldData
     {
         public byte[] Serialize()
         {

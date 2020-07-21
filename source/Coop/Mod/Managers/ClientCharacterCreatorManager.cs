@@ -45,42 +45,14 @@ namespace Coop.Mod.Managers
 
             OnLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
 
-            //StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, GetCreatedCharacter);
-
             if (Main.DEBUG)
             {
                 SkipCharacterCreation();
                 ClientHero = Hero.MainHero;
                 PlayerHeroSerializer serializablePlayerHero = new PlayerHeroSerializer(Hero.MainHero);
-                //CoopClient.Instance.SyncedObjectStore.Insert(serializablePlayerHero);
-                // TODO find way to exit in character creation
+                CoopClient.Instance.SyncedObjectStore.Insert(serializablePlayerHero);
                 EndGame();
-                // TODO use HeroCreator.CreateNewHero
-                // TODO Populate using CharacterCreator
-                // TODO Override 
-                // ChangePlayerCharacterAction.Apply(ClientHero);
             }
-            //CharacterObject player = new CharacterObject();
-            //Hero clientHero = Hero.MainHero;
-            //ClientParty = new MobileParty();
-            //TextObject name = MobilePartyHelper.GeneratePartyName(player);
-            //ClientParty.InitializeMobileParty(name, Game.Current.ObjectManager.GetObject<PartyTemplateObject>("main_hero_party_template"), new Vec2(685.3f, 410.9f), 0f, 0f, MobileParty.PartyTypeEnum.Default, -1);
-            //ClientParty.ItemRoster.AddToCounts(DefaultItems.Grain, 1, true);
-            //ClientParty.Party.Owner = clientHero;
-            //ClientParty.SetAsMainParty();
-            //Campaign.Current.CameraFollowParty = ClientParty.Party;
-        }
-
-        
-
-        public new void OnTick(float dt)
-        {
-            FieldInfo entityFieldInfo = typeof(GameManagerBase).GetField("_entitySystem", BindingFlags.Instance | BindingFlags.NonPublic);
-            if(entityFieldInfo.GetValue(this) == null)
-            {
-                entityFieldInfo.SetValue(this, new EntitySystem<GameManagerComponent>());
-            }
-            base.OnTick(dt);
         }
 
         private void SkipCharacterCreation()

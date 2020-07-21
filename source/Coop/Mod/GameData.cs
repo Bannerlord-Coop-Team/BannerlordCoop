@@ -6,6 +6,7 @@ using NLog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Load;
 
 namespace Coop.Mod
 {
@@ -21,6 +22,8 @@ namespace Coop.Mod
         public bool RequiresInitialWorldData => Coop.IsClientReqWorldData && !Coop.IsServer;
         // TODO determine if client needs to create a character
         public bool RequiresCharacterCreation => !Coop.IsServer;
+
+        public LoadResult LoadResult { get; private set; }
 
         public bool Receive(ArraySegment<byte> rawData)
         {
@@ -92,7 +95,7 @@ namespace Coop.Mod
                 Logger.Error(loadResult.ToFriendlyString());
             }
 
-            GameLoopRunner.RunOnMainThread(() => SaveLoad.LoadGame(loadResult.LoadResult));
+            GameLoopRunner.RunOnMainThread(() => { LoadResult = loadResult.LoadResult; });
             return true;
         }
 

@@ -1,110 +1,11 @@
 ﻿using System;
 using System.IO;
+using Common;
 using JetBrains.Annotations;
 using Network.Protocol;
 
 namespace Network.Infrastructure
 {
-    public enum EConnectionState
-    {
-        /** [client side] Client is trying to establish a connection to a server.
-         *
-         * Possible transitions to:
-         * - ClientJoining: The server accepted the request.
-         * - Disconnecting: Request timeout or the server rejected the request.
-         */
-        ClientJoinRequesting,
-
-        /** [client side] Client is waiting at the main menu.
-         *
-         * Possible transitions to:
-         * - ClientAwaitingWorldData: The server accepted the request.
-         * - ClientCharacterCreation: Client is required to make character.
-         * - Disconnecting: Request timeout or the server rejected the request.
-         */
-        ClientAtMainMenu,
-
-        /** [client side] Client is creating a character.
-         *
-         * Possible transitions to:
-         * - ClientAwaitingWorldData: The server accepted the request.
-         * - Disconnecting: Request timeout or the server rejected the request.
-         */
-        ClientCharacterCreation,
-
-
-        /** [client side] Client is joining a server, e.g. downloading data.
-         *
-         * Possible transitions to
-         * - ClientLoading:   Client is loading the requested world data.
-         * - Disconnecting:   Timeout.
-         */
-        ClientAwaitingWorldData,
-
-        /** [client side] Client is loading the requested world data.
-         *
-         * Possible transitions to:
-         * - Disconnecting:  Timeout or disconnect request (either server or client side).
-         */
-        ClientLoading,
-
-        /** [client side] Client is playing on the server.
-         *
-         * Possible transitions to:
-         * - Disconnecting:  Timeout or disconnect request (either server or client side).
-         */
-        ClientPlaying,
-
-        /** [server side] Server is awaiting a join request from a client.
-         *
-         * Possible transitions to:
-         * - ServerJoining: Join request from client received & approved.
-         * - Disconnecting:  Timeout or request denied.
-         */
-        ServerAwaitingClient,
-
-        /**
-         * [server side] Server is waiting for the client to either request data or
-         * ack the join.
-         * 
-         * Possible transitions to:
-         * - ServerSendingWorldData: Client wants to be sent a save game.
-         * - ServerPlaying: Client confirmed that it joined the server.
-         * - Disconnecting:  Timeout or request denied.
-         */
-        ServerJoining,
-
-        /** [server side] Client is joining the server.
-         *
-         * Possible transitions to:
-         * - ServerPlaying: Join request from client received & approved.
-         * - Disconnecting:    Timeout or request denied.
-         */
-        ServerSendingWorldData,
-
-        /** [server side] Client is playing on the server.
-         *
-         * Possible transitions to:
-         * - Disconnecting:  Timeout or disconnect request (either server or client side).
-         */
-        ServerPlaying,
-
-        /** Connection is being closed.
-         *
-         * Possible transitions to:
-         * - Disconnected:  Connection was closed.
-         */
-        Disconnecting,
-
-        /** Connection is inactive.
-         *
-         * Possible transitions to:
-         * - ClientJoinRequesting:  [client side] Client wants to establish a connection to a server.
-         * - ServerAwaitingClient:  [server side] Client wants to establish a connection to a server.
-         */
-        Disconnected
-    }
-
     /// <summary>
     ///     A connection represents state and logic for data exchange between a client and a server.
     ///     - State management & transitions are to be implemented by inherting classes.
@@ -133,7 +34,7 @@ namespace Network.Infrastructure
 
         public void Send(Packet packet)
         {
-            if (State != EConnectionState.Disconnected)
+            if (!State.Equals(EClientConnectionState.Disconnected))
             {
                 if (packet.Length > Network.MaxPackageLength)
                 {
@@ -151,7 +52,7 @@ namespace Network.Infrastructure
 
         public void SendFragmented(Packet packet)
         {
-            if (State != EConnectionState.Disconnected)
+            if (!State.Equals(EClientConnectionState.Disconnected))
             {
                 if (packet.Length > Network.MaxPackageLength)
                 {
@@ -174,7 +75,7 @@ namespace Network.Infrastructure
 
         public void Receive(ArraySegment<byte> buffer)
         {
-            if (State == EConnectionState.Disconnected) return;
+            if (State.Equals(EClientConnectionState.Disconnected)) return;
 
             EPacket eType = PacketReader.DecodePacketType(buffer.Array[buffer.Offset]);
             if (eType == EPacket.Persistence)
@@ -192,7 +93,7 @@ namespace Network.Infrastructure
                 if (packet != null)
                 {
                     m_PackageReader = null;
-                    Dispatcher.Dispatch(State, packet);
+                    Dispatcher.Dispatch(this, packet);
                 }
             }
         }
@@ -200,7 +101,7 @@ namespace Network.Infrastructure
 
         #region State & transitions
         public INetworkConnection Network { get; }
-        public abstract EConnectionState State { get; }
+        public abstract Enum State { get; }
         public int Latency = 0;
 
         /// <summary>

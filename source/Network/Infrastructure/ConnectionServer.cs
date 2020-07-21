@@ -6,10 +6,18 @@ using Version = Network.Protocol.Version;
 
 namespace Network.Infrastructure
 {
+    public class ConnectionServerPacketHandlerAttribute : PacketHandlerAttribute
+    {
+        public ConnectionServerPacketHandlerAttribute(EServerConnectionState state, EPacket eType)
+        {
+            State = state;
+            Type = eType;
+        }
+    }
     public class ConnectionServer : ConnectionBase
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        private readonly StateMachine<EConnectionState, ETrigger> m_StateMachine;
+        private readonly ConnectionServerSM m_ServerSM;
         private readonly ISaveData m_WorldData;
 
         public ConnectionServer(
@@ -18,74 +26,45 @@ namespace Network.Infrastructure
             ISaveData worldData) : base(network, persistence)
         {
             m_WorldData = worldData;
-            m_StateMachine =
-                new StateMachine<EConnectionState, ETrigger>(EConnectionState.Disconnected);
+            m_ServerSM = new ConnectionServerSM();
 
-            // Server wait for host client connect
-            m_StateMachine.Configure(EConnectionState.Disconnected)
-                          .Permit(ETrigger.WaitForClient, EConnectionState.ServerAwaitingClient);
+            #region State Machine Callbacks
+            m_ServerSM.TerminatedState.OnEntryFrom(m_ServerSM.CloseTrigger, closeConnection);
 
-            // Disconnect trigger
-            StateMachine<EConnectionState, ETrigger>.TriggerWithParameters<EDisconnectReason>
-                disconnectTrigger =
-                    m_StateMachine.SetTriggerParameters<EDisconnectReason>(ETrigger.Disconnect);
+            m_ServerSM.ClientJoiningState.OnEntry(SendJoinRequestAccepted);
 
-            // Disconnect
-            m_StateMachine.Configure(EConnectionState.Disconnecting)
-                          .OnEntryFrom(disconnectTrigger, closeConnection)
-                          .Permit(ETrigger.Disconnected, EConnectionState.Disconnected);
+            m_ServerSM.ReadyState.OnEntry(onConnected);
+            #endregion
 
-            // Server wait for client connect
-            m_StateMachine.Configure(EConnectionState.ServerAwaitingClient)
-                          .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
-                          .Permit(ETrigger.ClientInfoVerified, EConnectionState.ServerJoining);
+            Dispatcher.RegisterPacketHandler(ReceiveClientHello);
+            Dispatcher.RegisterPacketHandler(ReceiveClientInfo);
+            Dispatcher.RegisterPacketHandler(ReceiveClientJoined);
+            Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
+            Dispatcher.RegisterPacketHandler(ReceiveClientKeepAlive);
 
-            // Server client joining
-            m_StateMachine.Configure(EConnectionState.ServerJoining)
-                          .OnEntry(SendJoinRequestAccepted)
-                          .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
-                          .Permit(
-                              ETrigger.ClientRequestedWorldData,
-                              EConnectionState.ServerSendingWorldData)
-                          .Permit(ETrigger.ClientJoined, EConnectionState.ServerPlaying);
-
-            // Send world data
-            m_StateMachine.Configure(EConnectionState.ServerSendingWorldData)
-                          .OnEntry(SendInitialWorldData)
-                          .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting)
-                          .Permit(ETrigger.ClientJoined, EConnectionState.ServerPlaying);
-
-            // Server playing
-            m_StateMachine.Configure(EConnectionState.ServerPlaying)
-                          .OnEntry(onConnected)
-                          .Permit(ETrigger.Disconnect, EConnectionState.Disconnecting);
-
-            Dispatcher.RegisterPacketHandlers(this);
+            Dispatcher.RegisterStateMachine(this, m_ServerSM);
         }
 
-        public override EConnectionState State => m_StateMachine.State;
+        public override Enum State => m_ServerSM.StateMachine.State;
         public event Action<ConnectionServer> OnClientJoined;
         public event Action<ConnectionServer> OnDisconnected;
-        public event Action OnServerSendingWorldData;
-        public event Action OnServerSendedWorldData;
 
         ~ConnectionServer()
         {
             Dispatcher.UnregisterPacketHandlers(this);
         }
-
-        public void PrepareForClientConnection()
+        public void SendWorldData()
         {
-            m_StateMachine.Fire(ETrigger.WaitForClient);
+            Send(new Packet(EPacket.Server_WorldData, m_WorldData.SerializeInitialWorldState()));
         }
 
         public override void Disconnect(EDisconnectReason eReason)
         {
-            if (!m_StateMachine.IsInState(EConnectionState.Disconnected))
+            if (!m_ServerSM.StateMachine.IsInState(EServerConnectionState.Terminated))
             {
-                m_StateMachine.Fire(
-                    new StateMachine<EConnectionState, ETrigger>.TriggerWithParameters<
-                        EDisconnectReason>(ETrigger.Disconnect),
+                m_ServerSM.StateMachine.Fire(
+                    new StateMachine<EServerConnectionState, EServerConnectionTrigger>.TriggerWithParameters<
+                        EDisconnectReason>(EServerConnectionTrigger.Close),
                     eReason);
             }
         }
@@ -94,7 +73,7 @@ namespace Network.Infrastructure
         {
             OnDisconnected?.Invoke(this);
             Network.Close(eReason);
-            m_StateMachine.Fire(ETrigger.Disconnected);
+            m_ServerSM.StateMachine.Fire(EServerConnectionTrigger.Close);
         }
 
         private void onConnected()
@@ -102,19 +81,9 @@ namespace Network.Infrastructure
             OnClientJoined?.Invoke(this);
         }
 
-        private enum ETrigger
-        {
-            WaitForClient,
-            ClientInfoVerified,
-            ClientRequestedWorldData,
-            ClientJoined,
-            Disconnect,
-            Disconnected
-        }
-
         #region ServerAwaitingClient
-        [PacketHandler(EConnectionState.ServerAwaitingClient, EPacket.Client_Hello)]
-        private void ReceiveClientHello(Packet packet)
+        [ConnectionServerPacketHandler(EServerConnectionState.AwaitingClient, EPacket.Client_Hello)]
+        private void ReceiveClientHello(ConnectionBase connection, Packet packet)
         {
             Client_Hello payload = Client_Hello.Deserialize(new ByteReader(packet.Payload));
             if (payload.m_Version == Version.Number)
@@ -140,12 +109,12 @@ namespace Network.Infrastructure
                     new Server_RequestClientInfo().Serialize()));
         }
 
-        [PacketHandler(EConnectionState.ServerAwaitingClient, EPacket.Client_Info)]
-        private void ReceiveClientInfo(Packet packet)
+        [ConnectionServerPacketHandler(EServerConnectionState.AwaitingClient, EPacket.Client_Info)]
+        private void ReceiveClientInfo(ConnectionBase connection, Packet packet)
         {
             Client_Info info = Client_Info.Deserialize(new ByteReader(packet.Payload));
             Logger.Info("Received client join request from {playerName}.", info.m_Player.Name);
-            m_StateMachine.Fire(ETrigger.ClientInfoVerified);
+            m_ServerSM.StateMachine.Fire(EServerConnectionTrigger.ClientInfoVerified);
         }
         #endregion
 
@@ -158,32 +127,15 @@ namespace Network.Infrastructure
                     new Server_JoinRequestAccepted().Serialize()));
         }
 
-        [PacketHandler(EConnectionState.ServerJoining, EPacket.Client_RequestWorldData)]
-        private void ReceiveClientRequestWorldData(Packet packet)
-        {
-            Client_RequestWorldData info =
-                Client_RequestWorldData.Deserialize(new ByteReader(packet.Payload));
-            Logger.Info("Client requested world data.");
-            m_StateMachine.Fire(ETrigger.ClientRequestedWorldData);
-        }
-
-        private void SendInitialWorldData()
-        {
-            OnServerSendingWorldData?.Invoke();
-            Send(new Packet(EPacket.Server_WorldData, m_WorldData.SerializeInitialWorldState()));
-            OnServerSendedWorldData?.Invoke();
-        }
-
-        [PacketHandler(EConnectionState.ServerJoining, EPacket.Client_Joined)]
-        [PacketHandler(EConnectionState.ServerSendingWorldData, EPacket.Client_Joined)]
-        private void receiveClientJoined(Packet packet)
+        [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.Client_Joined)]
+        private void ReceiveClientJoined(ConnectionBase connection, Packet packet)
         {
             Client_Joined payload = Client_Joined.Deserialize(new ByteReader(packet.Payload));
-            m_StateMachine.Fire(ETrigger.ClientJoined);
+            m_ServerSM.StateMachine.Fire(EServerConnectionTrigger.ClientReady);
         }
 
-        [PacketHandler(EConnectionState.ServerPlaying, EPacket.Sync)]
-        private void receiveSyncPacket(Packet packet)
+        [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.Sync)]
+        private void ReceiveSyncPacket(ConnectionBase connection, Packet packet)
         {
             try
             {
@@ -198,9 +150,8 @@ namespace Network.Infrastructure
             }
         }
 
-        [PacketHandler(EConnectionState.ServerSendingWorldData, EPacket.KeepAlive)]
-        [PacketHandler(EConnectionState.ServerPlaying, EPacket.KeepAlive)]
-        private void receiveClientKeepAlive(Packet packet)
+        [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.KeepAlive)]
+        private void ReceiveClientKeepAlive(ConnectionBase connection, Packet packet)
         {
             KeepAlive payload = KeepAlive.Deserialize(new ByteReader(packet.Payload));
         }
