@@ -399,7 +399,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\"  -TargetDir "$(TargetDir)\" -TargetFileName "$(TargetFileName) " -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll</PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\"  -TargetDir "$(TargetDir)\" -TargetFileName "$(TargetFileName) " -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll</PostBuildEvent>
   </PropertyGroup>
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

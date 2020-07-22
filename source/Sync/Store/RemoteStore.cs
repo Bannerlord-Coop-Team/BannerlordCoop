@@ -165,8 +165,8 @@ namespace Sync.Store
             Logger.Trace("[{id}] Sent ACK", id);
         }
 
-        [ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.StoreAdd)]
-        [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.StoreAdd)]
+        [ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.StoreAck)]
+        [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.StoreAck)]
         private void ReceiveAck(ConnectionBase connection, Packet packet)
         {
             ObjectId id = new ObjectId(new ByteReader(packet.Payload).Binary.ReadUInt32());
