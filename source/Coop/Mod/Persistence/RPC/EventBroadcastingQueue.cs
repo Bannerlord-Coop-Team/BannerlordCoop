@@ -23,7 +23,7 @@ namespace Coop.Mod.Persistence.RPC
         ///     DEBUG to identify situations where events are starving in the queue. Might need
         ///     to be adjusted depending on how much is done using events.
         /// </summary>
-        private static readonly int MaximumQueueSize = Main.DEBUG ? 128 : 8192;
+        public static readonly int MaximumQueueSize = Main.DEBUG ? 128 : 8192;
 
         private readonly OrderedHashSet<ObjectId> m_DistributedObjects =
             new OrderedHashSet<ObjectId>();

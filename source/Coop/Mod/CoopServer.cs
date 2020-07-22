@@ -40,6 +40,7 @@ namespace Coop.Mod
             new Lazy<CoopServer>(() => new CoopServer());
 
         private GameEnvironmentServer m_GameEnvironmentServer;
+        public IEnvironmentServer Environment => m_GameEnvironmentServer;
         public static bool AreAllClientsPlaying =>
             m_CoopServerSMs.All(clientSM => clientSM.Key.State.Equals(ECoopServerState.Playing));
         private static readonly Dictionary<ConnectionServer, CoopServerSM> m_CoopServerSMs = new Dictionary<ConnectionServer, CoopServerSM>();
