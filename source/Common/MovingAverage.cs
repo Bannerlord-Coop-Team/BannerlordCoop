@@ -1,18 +1,46 @@
-﻿namespace Common
+﻿using System.Linq;
+
+namespace Common
 {
     public class MovingAverage
     {
-        private readonly int m_iSize;
+        public int Size { get; }
 
         private readonly long[] m_Values;
         private int m_iBack;
         private int m_iCount;
         private int m_iFront;
 
-        public MovingAverage(int iSize)
+        private long? m_Min;
+        private long? m_Max;
+
+        public long Min
         {
-            m_iSize = iSize;
-            m_Values = new long[iSize];
+            get
+            {
+                if (!m_Min.HasValue)
+                {
+                    m_Min = m_Values.Min();
+                }
+                return m_Min.Value;
+            }
+        }
+        public long Max
+        {
+            get
+            {
+                if (!m_Max.HasValue)
+                {
+                    m_Max = m_Values.Max();
+                }
+                return m_Max.Value;
+            }
+        }
+
+        public MovingAverage(int size)
+        {
+            Size = size;
+            m_Values = new long[size];
             m_iCount = 0;
             m_iFront = 0;
             m_iBack = 0;
@@ -23,9 +51,9 @@
 
         public double Push(long value)
         {
-            if (m_iCount == m_iSize)
+            if (m_iCount == Size)
             {
-                Average = (Average * m_iSize - m_Values[m_iBack] + value) / m_iSize;
+                Average = (Average * Size - m_Values[m_iBack] + value) / Size;
                 m_Values[m_iBack] = value;
                 m_iFront = NextIndex(m_iFront);
                 m_iBack = NextIndex(m_iBack);
@@ -37,12 +65,15 @@
                 m_iBack = NextIndex(m_iBack);
             }
 
+            m_Min = null;
+            m_Max = null;
+            
             return Average;
         }
 
         private int NextIndex(int index)
         {
-            return (index + 1) % m_iSize;
+            return (index + 1) % Size;
         }
     }
 }
