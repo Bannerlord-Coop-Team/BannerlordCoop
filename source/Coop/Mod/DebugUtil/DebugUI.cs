@@ -333,6 +333,8 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
+        private static readonly MovingAverage m_AverageEventsInQueue = new MovingAverage(60);
+
         private static void DisplayClientRpcInfo()
         {
             if (!Imgui.TreeNode("Client synchronized method calls"))
@@ -347,6 +349,17 @@ namespace Coop.Mod.DebugUtil
             else
             {
                 RPCSyncHandlers manager = CoopClient.Instance?.Persistence?.RpcSyncHandlers;
+
+                EventBroadcastingQueue queue = CoopServer.Instance.Environment?.EventQueue;
+                if (queue != null)
+                {
+                    int currentQueueSize = queue.Count;
+                    double avgSize = m_AverageEventsInQueue.Push(currentQueueSize);
+                    Imgui.Text(
+                        $"Event queue {queue.Count}/{EventBroadcastingQueue.MaximumQueueSize}.");
+                    Imgui.Text(
+                        $"    min {m_AverageEventsInQueue.Min} / avg {Math.Round(m_AverageEventsInQueue.Average)} / max {m_AverageEventsInQueue.Max}.");
+                }
 
                 foreach (MethodCallSyncHandler handler in manager.Handlers)
                 {

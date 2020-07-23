@@ -43,6 +43,7 @@ namespace Coop.Mod
         public bool AreAllClientsPlaying =>
             m_CoopServerSMs.All(clientSM => clientSM.Key.State.Equals(EServerConnectionState.Ready));
         private readonly Dictionary<ConnectionServer, CoopServerSM> m_CoopServerSMs = new Dictionary<ConnectionServer, CoopServerSM>();
+        public IEnvironmentServer Environment => m_GameEnvironmentServer;
 
         private LiteNetManagerServer m_NetManager;
 
