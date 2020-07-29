@@ -37,15 +37,6 @@ namespace Coop.Tests.Network
         }
 
         [Fact]
-        public void DuplicateRegistrationFails()
-        {
-            EventHandlerNonStatic eventHandler = new EventHandlerNonStatic();
-            m_Dispatcher.RegisterPacketHandler(eventHandler.NonStaticHandler);
-            Assert.Throws<DuplicatePacketHandlerRegistration>(
-                () => m_Dispatcher.RegisterPacketHandler(eventHandler.NonStaticHandler));
-        }
-
-        [Fact]
         public void HandlerRegister()
         {
             bool wasCalled = false;

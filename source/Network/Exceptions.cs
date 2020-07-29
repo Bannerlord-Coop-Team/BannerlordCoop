@@ -50,11 +50,4 @@ namespace Network
         {
         }
     }
-
-    public class DuplicatePacketHandlerRegistration : Exception
-    {
-        public DuplicatePacketHandlerRegistration(string msg) : base(msg)
-        {
-        }
-    }
 }
