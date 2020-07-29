@@ -64,8 +64,9 @@ namespace Coop.NetImpl.LiteNet
 
             m_NetManager = new NetManager(new LiteNetListenerClient(m_Session))
             {
-                ReconnectDelay = 500,
-                MaxConnectAttempts = 20
+                ReconnectDelay = 2000,
+                MaxConnectAttempts = 20,
+                DisconnectTimeout = (int) TimeSpan.FromSeconds(60).TotalMilliseconds
             };
 
             if (m_NetManager.Start())

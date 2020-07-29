@@ -5,18 +5,17 @@ namespace Coop.Mod
     public static class Coop
     {
         public static bool IsServer => CoopServer.Instance.Current != null;
-        public static bool IsClientPlaying => CoopClient.Instance.ClientPlaying;
-        public static bool IsClientReqWorldData => CoopClient.Instance.ClientRequestingWorldData;
+        public static bool IsClientConnected => CoopClient.Instance.ClientConnected;
 
         /// <summary>
         ///     The arbiter is the game instance with authority over all clients.
         /// </summary>
         public static bool IsArbiter =>
-            IsServer && IsClientPlaying; // The server currently runs in the hosts game session.
+            IsServer && IsClientConnected; // The server currently runs in the hosts game session.
 
         public static bool DoSync()
         {
-            return IsClientPlaying || IsServer;
+            return IsClientConnected || IsServer;
         }
 
         /// <summary>

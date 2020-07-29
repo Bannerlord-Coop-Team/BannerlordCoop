@@ -91,7 +91,7 @@ namespace Coop.Mod
         public CoopGameState GameState { get; }
         public CoopEvents Events { get; }
 
-        public bool ClientPlaying
+        public bool ClientConnected
         {
             get
             {
@@ -100,21 +100,7 @@ namespace Coop.Mod
                     return false;
                 }
 
-                return Session.Connection.State.Equals(ECoopClientState.Playing);
-            }
-        }
-
-        public bool ClientRequestingWorldData
-        {
-            get
-            {
-                if (Session.Connection == null)
-                {
-                    return false;
-                }
-
-                // TODO change to main menu state
-                return Session.Connection.State.Equals(ECoopClientState.ReceivingWorldData);
+                return Session.Connection.State.Equals(EClientConnectionState.Connected);
             }
         }
 

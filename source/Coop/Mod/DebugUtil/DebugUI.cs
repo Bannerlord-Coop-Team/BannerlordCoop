@@ -195,7 +195,7 @@ namespace Coop.Mod.DebugUtil
                 }
             }
 
-            if (!CoopClient.Instance.ClientPlaying)
+            if (!CoopClient.Instance.ClientConnected)
             {
                 Imgui.SameLine(350);
                 if (Imgui.SmallButton("Connect to local"))
@@ -207,7 +207,7 @@ namespace Coop.Mod.DebugUtil
                 }
             }
 
-            if (CoopClient.Instance.ClientPlaying)
+            if (CoopClient.Instance.ClientConnected)
             {
                 Imgui.SameLine(300);
                 if (Imgui.SmallButton("Disconnect"))

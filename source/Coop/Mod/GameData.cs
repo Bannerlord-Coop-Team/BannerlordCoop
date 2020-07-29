@@ -19,7 +19,6 @@ namespace Coop.Mod
     internal class GameData : ISaveData
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        public bool RequiresInitialWorldData => Coop.IsClientReqWorldData && !Coop.IsServer;
         // TODO determine if client needs to create a character
         public bool RequiresCharacterCreation => !Coop.IsServer;
 

@@ -37,8 +37,6 @@ namespace Coop.Tests.Network
         [InlineData(true)]
         private void ClientSendOrder(bool bExchangeWorldData)
         {
-            m_WorldData.Setup(d => d.RequiresInitialWorldData).Returns(bExchangeWorldData);
-
             List<(Enum, EPacket)> expectedReceiveOrderOnServer =
                 new List<(Enum, EPacket)>();
             expectedReceiveOrderOnServer.Add(
