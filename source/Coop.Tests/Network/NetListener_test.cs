@@ -59,8 +59,8 @@ namespace Coop.Tests.Network
                 Listener = new LiteNetListenerClient(Session);
                 Manager = new NetManager(Listener);
                 Manager.Start();
-                Manager.ReconnectDelay = 10;
-                Manager.MaxConnectAttempts = 1;
+                Manager.ReconnectDelay = 25;
+                Manager.MaxConnectAttempts = 10;
             }
 
             public bool Connected
