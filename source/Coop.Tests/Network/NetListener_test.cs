@@ -11,6 +11,8 @@ using Xunit;
 
 namespace Coop.Tests.Network
 {
+    [Collection("Uses LiteNet")]
+    [CollectionDefinition("Uses LiteNet", DisableParallelization = true)]
     public class NetListener_test
     {
         public NetListener_test()

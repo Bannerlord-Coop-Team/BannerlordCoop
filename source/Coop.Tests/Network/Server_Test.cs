@@ -7,6 +7,10 @@ using Xunit;
 
 namespace Coop.Tests.Network
 {
+    // Since the server runs in a thread these tests should not be run in parallel with other tests.
+    // They might interfere with the benchmarking results.
+    [Collection("Server_Test")]
+    [CollectionDefinition("Server_Test", DisableParallelization = true)] 
     public class Server_Test
     {
         public Server_Test()
@@ -53,7 +57,7 @@ namespace Coop.Tests.Network
         private readonly TimingModule m_Module;
         private readonly ServerConfiguration m_Config;
 
-        [Theory]
+        [Theory (Skip = "Takes too long to be run in regular runs. Also doesn't test much, it's a benchmark.")]
         [InlineData(5)]
         [InlineData(10)]
         [InlineData(60)]
