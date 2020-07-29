@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace Coop.Mod
 {
     using StateConfiguration = StateMachine<ECoopClientState, ECoopClientTrigger>.StateConfiguration;
-    enum ECoopClientState
+    public enum ECoopClientState
     {
         /// <summary>
         /// Client is at main menu.

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace Network.Infrastructure
 {
     using StateConfiguration = StateMachine<EServerState, EServerTrigger>.StateConfiguration;
-    enum EServerState
+    public enum EServerState
     {
         Inactive,
         Starting,

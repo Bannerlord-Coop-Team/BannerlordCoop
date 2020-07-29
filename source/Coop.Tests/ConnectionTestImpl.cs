@@ -1,4 +1,6 @@
 ﻿using System;
+using Common;
+using JetBrains.Annotations;
 using Network.Infrastructure;
 
 namespace Coop.Tests
@@ -13,18 +15,80 @@ namespace Coop.Tests
         }
     }
 
-    public class ConnectionTestImpl : ConnectionBase
+    public class ClientTestSM : CoopStateMachine<EClientConnectionState, EClientConnectionTrigger>
     {
-        public ConnectionTestImpl(
-            InMemoryConnection connection,
-            IGameStatePersistence gameStatePersistence) : base(connection, gameStatePersistence)
+        public ClientTestSM(EClientConnectionState StartingState) : base(StartingState)
         {
         }
 
-        public InMemoryConnection NetworkImpl => Network as InMemoryConnection;
+        public void SetState(Enum state)
+        {
+            if (state.GetType() != typeof(EClientConnectionState))
+            {
+                throw new ArgumentException("wrong enum type");
+            }
 
-        public override Enum State => StateImpl;
-        public Enum StateImpl;
+            State = state;
+        }
+    }
+
+    public class ServerTestSM : CoopStateMachine<EServerConnectionState, EServerConnectionTrigger>
+    {
+        public ServerTestSM(EServerConnectionState StartingState) : base(StartingState)
+        {
+        }
+
+        public void SetState(Enum state)
+        {
+            if (state.GetType() != typeof(EServerConnectionState))
+            {
+                throw new ArgumentException("wrong enum type");
+            }
+
+            State = state;
+        }
+    }
+
+    public class ConnectionTestImpl : ConnectionBase
+    {
+        public enum EType
+        {
+            Client,
+            Server
+        }
+
+        [CanBeNull] private readonly ClientTestSM m_ClientSM;
+        [CanBeNull] private readonly ServerTestSM m_ServerSM;
+
+        public ConnectionTestImpl(
+            EType eType,
+            InMemoryConnection connection,
+            IGameStatePersistence gameStatePersistence) : base(connection, gameStatePersistence)
+        {
+            switch (eType)
+            {
+                case EType.Client:
+                    m_ClientSM = new ClientTestSM(EClientConnectionState.JoinRequesting);
+                    Dispatcher.RegisterStateMachine(this, m_ClientSM);
+                    break;
+                case EType.Server:
+                    m_ServerSM = new ServerTestSM(EServerConnectionState.AwaitingClient);
+                    Dispatcher.RegisterStateMachine(this, m_ServerSM);
+                    break;
+            }
+        }
+
+        public InMemoryConnection NetworkImpl => Network as InMemoryConnection;
+        public override Enum State => m_ClientSM != null ? m_ClientSM.State : m_ServerSM.State;
+
+        public Enum StateImpl
+        {
+            set
+            {
+                m_ClientSM?.SetState(value);
+                m_ServerSM?.SetState(value);
+            }
+        }
 
         public override void Disconnect(EDisconnectReason eReason)
         {
