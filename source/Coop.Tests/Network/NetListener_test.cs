@@ -229,10 +229,11 @@ namespace Coop.Tests.Network
                 Client client = new Client(m_iServerPort);
                 client.ConnectToServer();
                 clients.Add(client);
+                PollUntil(() => client.Connected, clients);
             }
 
             // Wait until all clients are connected to the server
-            PollUntil(() => clients.All(client => client.Connected), clients);
+            
             Assert.Equal(iNumberOfClients, m_ServerSideConnected.Count);
             Assert.Equal(iNumberOfClients, m_NetManagerServer.ConnectedPeerList.Count);
         }

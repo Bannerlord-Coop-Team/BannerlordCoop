@@ -23,8 +23,8 @@ namespace Coop.Tests
 
         public InMemoryConnection NetworkImpl => Network as InMemoryConnection;
 
-        public EConnectionState StateImpl { get; set; }
-        public override EConnectionState State => StateImpl;
+        public override Enum State => StateImpl;
+        public Enum StateImpl;
 
         public override void Disconnect(EDisconnectReason eReason)
         {
