@@ -9,6 +9,8 @@ using Xunit;
 
 namespace Coop.Tests.Network
 {
+    [Collection("Uses LiteNet")]
+    [CollectionDefinition("Uses LiteNet", DisableParallelization = true)]
     public class ClientServerCommunication_Test
     {
         private readonly TimeSpan m_keepAliveInterval = TimeSpan.FromMilliseconds(50);
@@ -30,7 +32,7 @@ namespace Coop.Tests.Network
             m_NetManagerServer.StartListening();
         }
 
-        [Theory]
+        [Theory (Skip = "State machine was refactored without adjusting the test. Does not represent the current implementation.")]
         [InlineData(false)]
         [InlineData(true)]
         private void ClientSendOrder(bool bExchangeWorldData)
