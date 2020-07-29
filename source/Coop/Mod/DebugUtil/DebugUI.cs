@@ -182,7 +182,7 @@ namespace Coop.Mod.DebugUtil
                 DebugConsole.Toggle();
             }
 
-            if (CoopServer.Instance.Current == null)
+            if (CoopServer.Instance.Current == null && !CoopClient.Instance.ClientConnected)
             {
                 Imgui.SameLine(250);
                 if (Imgui.SmallButton("Start Server"))
