@@ -63,8 +63,7 @@ namespace Network.Infrastructure
             if (!m_ServerSM.StateMachine.IsInState(EServerConnectionState.Terminated))
             {
                 m_ServerSM.StateMachine.Fire(
-                    new StateMachine<EServerConnectionState, EServerConnectionTrigger>.TriggerWithParameters<
-                        EDisconnectReason>(EServerConnectionTrigger.Close),
+                    m_ServerSM.CloseTrigger,
                     eReason);
             }
         }
@@ -73,7 +72,6 @@ namespace Network.Infrastructure
         {
             OnDisconnected?.Invoke(this);
             Network.Close(eReason);
-            m_ServerSM.StateMachine.Fire(EServerConnectionTrigger.Close);
         }
 
         private void onConnected()

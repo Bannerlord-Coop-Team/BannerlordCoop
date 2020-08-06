@@ -2,6 +2,7 @@
 using Moq;
 using Network.Infrastructure;
 using Network.Protocol;
+using Coop;
 using Xunit;
 using Version = Network.Protocol.Version;
 
@@ -22,8 +23,7 @@ namespace Coop.Tests.Network
                                  (ArraySegment<byte> arg) => m_PersistenceReceiveParam = arg);
             m_Connection = new ConnectionClient(
                 m_NetworkConnection.Object,
-                m_GamePersistence.Object,
-                m_WorldData.Object);
+                m_GamePersistence.Object);
         }
 
         private readonly Mock<INetworkConnection> m_NetworkConnection =
@@ -36,12 +36,10 @@ namespace Coop.Tests.Network
 
         private ArraySegment<byte> m_SendRawParam;
 
-        [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        private void VerifyStateTransitionsUntilConnected(bool bExchangeWorldData)
+        [Fact]
+        private void VerifyStateTransitionsUntilConnected()
         {
-            m_WorldData.Setup(d => d.RequiresInitialWorldData).Returns(bExchangeWorldData);
+            //m_WorldData.Setup(d => d.RequiresInitialWorldData).Returns(bExchangeWorldData);
 
             // Init
             Assert.Equal(EClientConnectionState.Disconnected, m_Connection.State);
@@ -68,79 +66,13 @@ namespace Coop.Tests.Network
                 EPacket.Client_Info,
                 new Client_Info(new Player("Unknown")).Serialize());
             Assert.Equal(expectedSentData, m_SendRawParam);
-            Assert.Equal(EConnectionState.ClientJoinRequesting, m_Connection.State);
 
-            // Ack client info
-            response = TestUtils.MakeRaw(
+            // Server accepts join request
+            ArraySegment<byte> joinRequestAccepted = TestUtils.MakeRaw(
                 EPacket.Server_JoinRequestAccepted,
                 new Server_JoinRequestAccepted().Serialize());
-            m_Connection.Receive(response);
-
-            if (bExchangeWorldData)
-            {
-                expectedSentData = TestUtils.MakeRaw(
-                    EPacket.Client_RequestWorldData,
-                    new Client_RequestWorldData().Serialize());
-                Assert.Equal(expectedSentData, m_SendRawParam);
-                Assert.Equal(EConnectionState.ClientAwaitingWorldData, m_Connection.State);
-
-                // Send world data to client
-                response = TestUtils.MakeRaw(
-                    EPacket.Server_WorldData,
-                    m_WorldData.Object.SerializeInitialWorldState());
-                m_Connection.Receive(response);
-                Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
-            }
-
-            // Expect client joined
-            expectedSentData = TestUtils.MakeRaw(
-                EPacket.Client_Joined,
-                new Client_Joined().Serialize());
-            Assert.Equal(expectedSentData, m_SendRawParam);
-            Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
-
-            // Send keep alive
-            ArraySegment<byte> keepAliveFromServer = TestUtils.MakeKeepAlive(42);
-            m_Connection.Receive(keepAliveFromServer);
-            Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
-
-            // Expect client keep alive response
-            expectedSentData = keepAliveFromServer;
-            Assert.Equal(expectedSentData, m_SendRawParam);
-        }
-
-        [Fact]
-        private void ReceiveForPersistenceIsIntercepted()
-        {
-            // Bring connection to EConnectionState.ClientPlaying
-            VerifyStateTransitionsUntilConnected(false);
-            Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
-
-            // Persistence has not received anything yet
-            Assert.Null(m_PersistenceReceiveParam.Array);
-
-            // Generate a payload
-            ArraySegment<byte> persistencePayload = TestUtils.MakePersistencePayload(50);
-
-            // Receive
-            m_Connection.Receive(persistencePayload);
-
-            // Verify
-            Assert.Equal(persistencePayload, m_PersistenceReceiveParam);
-            Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
-
-            // Interweave a keep alive
-            ArraySegment<byte> keepAliveFromServer = TestUtils.MakeKeepAlive(42);
-            m_Connection.Receive(keepAliveFromServer);
-            Assert.Equal(keepAliveFromServer, m_SendRawParam); // Client ack
-
-            // Send another persistence packet
-            m_PersistenceReceiveParam = new ArraySegment<byte>();
-            m_Connection.Receive(persistencePayload);
-
-            // Verify
-            Assert.Equal(persistencePayload, m_PersistenceReceiveParam);
-            Assert.Equal(EConnectionState.ClientPlaying, m_Connection.State);
+            m_Connection.Receive(joinRequestAccepted);
+            Assert.True(m_Connection.State.Equals(EClientConnectionState.Connected));
         }
     }
 }

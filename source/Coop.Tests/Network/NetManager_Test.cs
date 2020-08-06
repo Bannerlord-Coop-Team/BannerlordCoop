@@ -7,6 +7,8 @@ using Xunit;
 
 namespace Coop.Tests.Network
 {
+    [Collection("Uses LiteNet")]
+    [CollectionDefinition("Uses LiteNet", DisableParallelization = true)]
     public class NetManager_Test
     {
         public NetManager_Test()

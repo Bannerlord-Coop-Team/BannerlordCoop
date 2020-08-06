@@ -15,9 +15,9 @@ namespace Coop.Tests.Network
             m_GamePersistence = new Mock<IGameStatePersistence>();
             m_GamePersistence.Setup(per => per.Receive(It.IsAny<ArraySegment<byte>>()))
                              .Callback((ArraySegment<byte> arg) => m_ReceiveParam = arg);
-            m_Connection = new Mock<ConnectionBase>(
-                m_NetworkConnection.Object,
-                m_GamePersistence.Object).Object;
+            m_Mock = new Mock<ConnectionBase>(m_NetworkConnection.Object, m_GamePersistence.Object);
+            m_Mock.SetupGet(c => c.State).Returns(EClientConnectionState.Connected);
+            m_Connection = m_Mock.Object;
         }
 
         private readonly Mock<INetworkConnection> m_NetworkConnection =
@@ -25,6 +25,7 @@ namespace Coop.Tests.Network
 
         private readonly Mock<IGameStatePersistence> m_GamePersistence;
         private readonly ConnectionBase m_Connection;
+        private readonly Mock<ConnectionBase> m_Mock;
         private ArraySegment<byte> m_ReceiveParam;
 
         [Theory]

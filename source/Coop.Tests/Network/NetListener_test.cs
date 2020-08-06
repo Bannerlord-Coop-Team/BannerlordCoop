@@ -11,6 +11,8 @@ using Xunit;
 
 namespace Coop.Tests.Network
 {
+    [Collection("Uses LiteNet")]
+    [CollectionDefinition("Uses LiteNet", DisableParallelization = true)]
     public class NetListener_test
     {
         public NetListener_test()
@@ -59,8 +61,8 @@ namespace Coop.Tests.Network
                 Listener = new LiteNetListenerClient(Session);
                 Manager = new NetManager(Listener);
                 Manager.Start();
-                Manager.ReconnectDelay = 10;
-                Manager.MaxConnectAttempts = 1;
+                Manager.ReconnectDelay = 25;
+                Manager.MaxConnectAttempts = 10;
             }
 
             public bool Connected
@@ -229,10 +231,11 @@ namespace Coop.Tests.Network
                 Client client = new Client(m_iServerPort);
                 client.ConnectToServer();
                 clients.Add(client);
+                PollUntil(() => client.Connected, clients);
             }
 
             // Wait until all clients are connected to the server
-            PollUntil(() => clients.All(client => client.Connected), clients);
+            
             Assert.Equal(iNumberOfClients, m_ServerSideConnected.Count);
             Assert.Equal(iNumberOfClients, m_NetManagerServer.ConnectedPeerList.Count);
         }

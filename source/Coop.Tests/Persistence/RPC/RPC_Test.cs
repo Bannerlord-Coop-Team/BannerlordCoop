@@ -7,6 +7,7 @@ using Coop.Tests.Sync;
 using JetBrains.Annotations;
 using Network;
 using Network.Protocol;
+using RailgunNet;
 using RailgunNet.Connection.Client;
 using Sync;
 using Sync.Store;
@@ -369,6 +370,15 @@ namespace Coop.Tests.Persistence.RPC
             client0.Update();
             Assert.Single(conClient0ToServer.SendBuffer);
             Assert.Equal(keepAliveSize, conClient0ToServer.SendBuffer[0].Length);
+        }
+
+        [Fact]
+        private void IsCorrectRailgunConfig()
+        {
+            // These tests were written with the assumption that the send rate is 1 on both client & server.
+            // If this test fails do not even bother debugging the others, they will fail!
+            Assert.Equal(1, RailConfig.SERVER_SEND_RATE);
+            Assert.Equal(1, RailConfig.CLIENT_SEND_RATE);
         }
 
         [Fact]

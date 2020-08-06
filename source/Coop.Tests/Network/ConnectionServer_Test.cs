@@ -38,15 +38,11 @@ namespace Coop.Tests.Network
                 m_WorldData.Object);
         }
 
-        [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        private void VerifyStateTransitionsUntilConnected(bool bWithWorldDataExchange)
+        [Fact]
+        private void VerifyStateTransitionsUntilConnected()
         {
             // Init
-            Assert.Equal(EConnectionState.Disconnected, m_Connection.State);
-            m_Connection.PrepareForClientConnection();
-            Assert.Equal(EConnectionState.ServerAwaitingClient, m_Connection.State);
+            Assert.Equal(EServerConnectionState.AwaitingClient, m_Connection.State);
 
             // Send client hello
             ArraySegment<byte> clientHello = TestUtils.MakeRaw(
@@ -59,41 +55,25 @@ namespace Coop.Tests.Network
                 EPacket.Server_RequestClientInfo,
                 new Server_RequestClientInfo().Serialize());
             Assert.Equal(response, m_SendRawParams[^1]);
-            Assert.Equal(EConnectionState.ServerAwaitingClient, m_Connection.State);
+            Assert.Equal(EServerConnectionState.AwaitingClient, m_Connection.State);
 
             // Respond with client info
             ArraySegment<byte> clientInfo = TestUtils.MakeRaw(
                 EPacket.Client_Info,
                 new Client_Info(new Player("Unknown")).Serialize());
             m_Connection.Receive(clientInfo);
+            Assert.Equal(EServerConnectionState.ClientJoining, m_Connection.State);
 
             ArraySegment<byte> joinRequestAccepted = TestUtils.MakeRaw(
                 EPacket.Server_JoinRequestAccepted,
                 new Server_JoinRequestAccepted().Serialize());
             Assert.Equal(joinRequestAccepted, m_SendRawParams[^1]);
-            Assert.Equal(EConnectionState.ServerJoining, m_Connection.State);
 
-            if (bWithWorldDataExchange)
-            {
-                // Request world data
-                ArraySegment<byte> worldDataRequest = TestUtils.MakeRaw(
-                    EPacket.Client_RequestWorldData,
-                    new Client_RequestWorldData().Serialize());
-                m_Connection.Receive(worldDataRequest);
-
-                ArraySegment<byte> worldData = TestUtils.MakeRaw(
-                    EPacket.Server_WorldData,
-                    m_WorldData.Object.SerializeInitialWorldState());
-                Assert.Equal(worldData, m_SendRawParams[^1]);
-                Assert.Equal(EConnectionState.ServerSendingWorldData, m_Connection.State);
-            }
-
-            // client joined
-            ArraySegment<byte> joined = TestUtils.MakeRaw(
+            ArraySegment<byte> clientJoined = TestUtils.MakeRaw(
                 EPacket.Client_Joined,
                 new Client_Joined().Serialize());
-            m_Connection.Receive(joined);
-            Assert.Equal(EConnectionState.ServerPlaying, m_Connection.State);
+            m_Connection.Receive(clientJoined);
+            Assert.Equal(EServerConnectionState.Ready, m_Connection.State);
         }
     }
 }

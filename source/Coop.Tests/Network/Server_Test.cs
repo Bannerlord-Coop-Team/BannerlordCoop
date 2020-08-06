@@ -7,6 +7,10 @@ using Xunit;
 
 namespace Coop.Tests.Network
 {
+    // Since the server runs in a thread these tests should not be run in parallel with other tests.
+    // They might interfere with the benchmarking results.
+    [Collection("Server_Test")]
+    [CollectionDefinition("Server_Test", DisableParallelization = true)] 
     public class Server_Test
     {
         public Server_Test()
@@ -53,7 +57,7 @@ namespace Coop.Tests.Network
         private readonly TimingModule m_Module;
         private readonly ServerConfiguration m_Config;
 
-        [Theory]
+        [Theory (Skip = "Takes too long to be run in regular runs. Also doesn't test much, it's a benchmark.")]
         [InlineData(5)]
         [InlineData(10)]
         [InlineData(60)]
@@ -66,12 +70,13 @@ namespace Coop.Tests.Network
             TimeSpan sleepTime = TimeSpan.FromMilliseconds(1000);
             TimeSpan expectedTickTime = TimeSpan.FromMilliseconds(1000 / (double) uiTickRate);
 
-            Assert.True(m_Server.State == Server.EState.Inactive);
+            Assert.True(m_Server.State.Equals(EServerState.Inactive));
             m_Server.Start(m_Config);
 
             Thread.Sleep(sleepTime);
+            Assert.True(m_Server.State.Equals(EServerState.Running));
             m_Server.Stop();
-            Assert.True(m_Server.State == Server.EState.Inactive);
+            Assert.True(m_Server.State.Equals(EServerState.Inactive));
             double diff = Math.Abs(m_Module.AverageTicksPerFrame.Average - expectedTickTime.Ticks);
             Assert.True(diff < .7 * expectedTickTime.Ticks);
         }
@@ -80,18 +85,18 @@ namespace Coop.Tests.Network
         public void StartAndStop()
         {
             // start server
-            Assert.True(m_Server.State == Server.EState.Inactive);
+            Assert.True(m_Server.State.Equals(EServerState.Inactive));
             m_Server.Start(m_Config);
-            Assert.Equal(Server.EState.Running, m_Server.State);
+            Assert.True(m_Server.State.Equals(EServerState.Running));
 
             // wait for first sim tick
             m_Module.OnTick.WaitOne();
-            Assert.Equal(Server.EState.Running, m_Server.State);
+            Assert.True(m_Server.State.Equals(EServerState.Running));
             Assert.True(m_Module.iCounter > 0);
 
             // stop server
             m_Server.Stop();
-            Assert.True(m_Server.State == Server.EState.Inactive);
+            Assert.True(m_Server.State.Equals(EServerState.Inactive));
             int iCounterAfterStop = m_Module.iCounter;
             m_Module.OnTick.WaitOne(5);
             Assert.Equal(iCounterAfterStop, m_Module.iCounter);

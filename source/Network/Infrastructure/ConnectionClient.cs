@@ -63,16 +63,15 @@ namespace Network.Infrastructure
         {
             if (!m_ClientSM.StateMachine.IsInState(EClientConnectionState.Disconnected))
             {
-                //m_ClientSM.StateMachine.Fire(
-                //    m_ClientSM.DisconnectTrigger,
-                //    eReason);
+                m_ClientSM.StateMachine.Fire(
+                    m_ClientSM.DisconnectTrigger,
+                    eReason);
             }
         }
 
         private void closeConnection(EDisconnectReason eReason)
         {
             Network.Close(eReason);
-            m_ClientSM.StateMachine.Fire(EClientConnectionTrigger.Disconnect);
             OnDisconnected?.Invoke(eReason);
         }
 
