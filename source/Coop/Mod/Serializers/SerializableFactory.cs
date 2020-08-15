@@ -1,10 +1,5 @@
 ﻿﻿using Sync.Store;
 using TaleWorlds.CampaignSystem;
-using Sync.Store;
-using System;
-using System.Runtime.Remoting;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
@@ -20,8 +15,6 @@ namespace Coop.Mod.Serializers
         {
             switch (obj)
             {
-                case TroopRoster troop:
-                    return new TroopRosterSerializer(troop);
                 case Banner banner:
                     return new BannerSerializer(banner);
                 case CampaignTime campaignTime:
