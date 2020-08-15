@@ -347,6 +347,7 @@
     <Compile Include="Mod\Serializers\CustomSerializers\PathFaceRecordSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\PlayerHeroSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\SettlementSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\TraitObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\TroopRosterSerializer.cs" />
     <Compile Include="Mod\Serializers\MBObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializer.cs" />
