@@ -19,9 +19,7 @@ namespace Coop.Mod.Serializers
             numTicksExists = campaignTime != null;
             if (numTicksExists)
             {
-                numTicks = (long)typeof(CampaignTime)
-                .GetField("_numTicks", BindingFlags.NonPublic | BindingFlags.Instance)
-                .GetValue(campaignTime);
+                numTicks = campaignTime.GetNumTicks();
             }
         }
 

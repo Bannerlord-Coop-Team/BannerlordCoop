@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
@@ -22,6 +23,8 @@ namespace Coop.Mod.Persistence.World
 
         protected override void UpdateAuthoritative()
         {
+            State.CampaignTimeTicks = CampaignTime.Now.GetNumTicks();
+            
             if (!RequestedTimeControlMode.HasValue && !RequestedTimeControlModeLock.HasValue)
             {
                 // No pending requests

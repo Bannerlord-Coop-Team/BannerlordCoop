@@ -1,11 +1,12 @@
 ﻿using System;
+using HarmonyLib;
 using NLog;
 using Sync;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Patch
 {
-    public static class MapTimeTracker
+    public static class TimeSynchronization
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         
@@ -16,7 +17,7 @@ namespace Coop.Mod.Patch
         
         // Patched method: internal void MapTimeTracker.Tick(float seconds)
         private static readonly MethodPatch Patch =
-            new MethodPatch(typeof(MapTimeTracker)).Intercept("Tick");
+            new MethodPatch(typeof(CampaignTime).Assembly.GetType("TaleWorlds.CampaignSystem.MapTimeTracker", true)).Intercept("Tick");
 
         [PatchInitializer]
         public static void Init()
@@ -54,11 +55,10 @@ namespace Coop.Mod.Patch
                 }
 
                 float fOriginalArg = (float) args[0];
-                float SecondsFromAuthoritativeState = GetAuthoritativeTime.Invoke().RemainingSecondsFromNow;
-                float fDiff = SecondsFromAuthoritativeState - fOriginalArg;
+                float secondsBehindServer = GetAuthoritativeTime.Invoke().RemainingSecondsFromNow;
+                float fDiff = secondsBehindServer - fOriginalArg;
                 Logger.Trace("Time correction: {diff}.", fDiff);
-                
-                args[0] = SecondsFromAuthoritativeState;
+                args[0] = Math.Min(secondsBehindServer, 0f);
                 access.CallOriginal(instance, args);
             };
         }
