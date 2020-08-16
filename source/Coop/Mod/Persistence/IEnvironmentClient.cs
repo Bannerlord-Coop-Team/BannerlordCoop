@@ -10,6 +10,7 @@ namespace Coop.Mod.Persistence
         FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
         FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; }
         FieldAccess<Campaign, bool> TimeControlModeLock { get; }
+        CampaignTime AuthoritativeTime { get; set; }
 
         [NotNull] RemoteStore Store { get; }
 

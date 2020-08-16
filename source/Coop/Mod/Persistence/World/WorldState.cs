@@ -13,9 +13,12 @@ namespace Coop.Mod.Persistence.World
             set => (m_TimeControlMode, m_TimeControlModeLock) = ((byte)value.Item1, value.Item2 ? (byte)1: (byte)0);
         }
 
+        public long CampaignTimeTicks => m_CampaignTimeTicks;
+
         #region synced data
         [Mutable] private byte m_TimeControlMode { get; set; }
         [Mutable] private byte m_TimeControlModeLock { get; set; }
+        [Mutable] private long m_CampaignTimeTicks { get; set; }
         #endregion
 
 #pragma warning disable 67
@@ -23,7 +26,7 @@ namespace Coop.Mod.Persistence.World
 #pragma warning restore 67
         public override string ToString()
         {
-            return $"{TimeControlMode}";
+            return $"{CampaignTimeTicks} :: {TimeControlMode}";
         }
     }
 }
