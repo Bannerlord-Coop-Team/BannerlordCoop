@@ -20,13 +20,13 @@ namespace Coop.Mod
 
         public GameEnvironmentClient()
         {
-            Patch.MapTimeTracker.GetAuthoritativeTime += () => AuthoritativeTime;
+            Patch.TimeSynchronization.GetAuthoritativeTime += () => AuthoritativeTime;
         }
 
         public CampaignTime AuthoritativeTime {
             get;
             set;
-        } = CampaignTime.Never;
+        } = CampaignTime.Zero;
 
         public RemoteStore Store =>
             CoopClient.Instance.SyncedObjectStore ??

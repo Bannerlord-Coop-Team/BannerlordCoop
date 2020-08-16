@@ -12,6 +12,14 @@ namespace Sync
     /// </summary>
     public class MethodPatch
     {
+        private const BindingFlags All = BindingFlags.Instance | 
+                                         BindingFlags.Static | 
+                                         BindingFlags.Public | 
+                                         BindingFlags.NonPublic | 
+                                         BindingFlags.GetField | 
+                                         BindingFlags.SetField | 
+                                         BindingFlags.GetProperty | 
+                                         BindingFlags.SetProperty;
         private readonly List<MethodAccess> m_Access = new List<MethodAccess>();
         private readonly Type m_Declaring;
 
@@ -31,12 +39,12 @@ namespace Sync
         }
 
         public MethodPatch InterceptAll(
-            BindingFlags filter =
+            BindingFlags eBindingFlags =
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly,
             EMethodPatchFlag eFlags = EMethodPatchFlag.None,
             EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
         {
-            foreach (MethodInfo method in m_Declaring.GetMethods(filter))
+            foreach (MethodInfo method in m_Declaring.GetMethods(eBindingFlags))
             {
                 Intercept(method, eFlags, eBehaviour);
             }
@@ -84,9 +92,10 @@ namespace Sync
         public MethodPatch Intercept(
             string sMethodName,
             EMethodPatchFlag eFlags = EMethodPatchFlag.None,
-            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
+            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal,
+            BindingFlags eBindingFlags = All)
         {
-            foreach (MethodInfo info in m_Declaring.GetMethods())
+            foreach (MethodInfo info in m_Declaring.GetMethods(eBindingFlags))
             {
                 if (info.Name == sMethodName)
                 {
@@ -111,9 +120,10 @@ namespace Sync
             string sMethodName,
             Type[] genericInstantiations,
             EMethodPatchFlag eFlags = EMethodPatchFlag.None,
-            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
+            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal,
+            BindingFlags eBindingFlags = All)
         {
-            foreach (MethodInfo info in m_Declaring.GetMethods())
+            foreach (MethodInfo info in m_Declaring.GetMethods(eBindingFlags))
             {
                 if (info.IsGenericMethod && info.Name == sMethodName)
                 {

@@ -13,7 +13,11 @@ namespace Coop.Mod.Persistence.World
             set => (m_TimeControlMode, m_TimeControlModeLock) = ((byte)value.Item1, value.Item2 ? (byte)1: (byte)0);
         }
 
-        public long CampaignTimeTicks => m_CampaignTimeTicks;
+        public long CampaignTimeTicks
+        {
+            get => m_CampaignTimeTicks;
+            set => m_CampaignTimeTicks = value;
+        }
 
         #region synced data
         [Mutable] private byte m_TimeControlMode { get; set; }
