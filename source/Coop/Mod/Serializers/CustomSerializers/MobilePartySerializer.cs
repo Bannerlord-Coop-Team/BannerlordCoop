@@ -99,6 +99,9 @@ namespace Coop.Mod.Serializers
                             attachedPartiesNames.Add(attachedParty.Name.ToString());
                         }
                         break;
+                    case "_actualClan":
+                        SNNSO.Add(fieldInfo, new ClanSerializer((Clan)value));
+                        break;
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
                 }
