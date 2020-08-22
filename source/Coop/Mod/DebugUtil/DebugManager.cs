@@ -33,6 +33,28 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
+        public void SilentAssert(
+            bool condition,
+            string message = "",
+            bool getDump = false,
+            [CallerFilePath] string callerFile = "",
+            [CallerMemberName] string callerMethod = "",
+            [CallerLineNumber] int callerLine = 0)
+        {
+            if (!condition)
+            {
+                Logger.Debug(
+                    "Assert failure in {file}::{method}::{line}: {message}",
+                    callerFile,
+                    callerMethod,
+                    callerLine);
+                if (Debugger.IsAttached)
+                {
+                    Debugger.Break();
+                }
+            }
+        }
+
         public void BeginTelemetryScope(TelemetryLevelMask levelMask, string scopeName)
         {
         }
