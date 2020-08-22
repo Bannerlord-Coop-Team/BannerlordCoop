@@ -26,7 +26,7 @@ namespace Coop.Mod
         public CampaignTime AuthoritativeTime {
             get;
             set;
-        } = CampaignTime.Zero;
+        } = CampaignTime.Never;
 
         public RemoteStore Store =>
             CoopClient.Instance.SyncedObjectStore ??

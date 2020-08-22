@@ -33,6 +33,8 @@ namespace Coop.Mod.Persistence.World
 
             if (!m_Environment.CanChangeTimeControlMode)
             {
+                RequestedTimeControlMode = null;
+                RequestedTimeControlModeLock = null;
                 Logger.Trace("Time control request ignored: Cannot change time control mode right now.");
                 return;
             }

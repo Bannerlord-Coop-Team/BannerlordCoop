@@ -95,6 +95,15 @@ namespace Coop.Mod
             return m_GetNumTicks.Invoke(time);
         }
 
+        public static CampaignTime CreateCampaignTime(long numTicks)
+        {
+            ConstructorInfo ctorCampaignTime = typeof(CampaignTime).Assembly
+                                                                   .GetType("TaleWorlds.CampaignSystem.CampaignTime")
+                                                                   .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)[0];
+
+            return (CampaignTime)ctorCampaignTime.Invoke(new object[] { numTicks });
+        }
+
         private static Func<CampaignTime, long> m_GetNumTicks = InvokableFactory.CreateGetter<CampaignTime, long>(
             typeof(CampaignTime).GetField("_numTicks", 
                 BindingFlags.NonPublic | BindingFlags.Instance));

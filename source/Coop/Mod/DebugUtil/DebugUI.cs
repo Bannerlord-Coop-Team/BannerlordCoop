@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using Common;
+using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RPC;
 using Network.Infrastructure;
@@ -279,15 +280,19 @@ namespace Coop.Mod.DebugUtil
             }
             else if (Imgui.TreeNode($"Client is {session.Connection.State}"))
             {
-                Imgui.Columns(2);
+                Imgui.Columns(3);
                 Imgui.Text("Ping");
                 Imgui.Text($"{session.Connection.Latency}");
 
                 Imgui.NextColumn();
                 Imgui.Text("Network");
-                Imgui.Separator();
                 Imgui.Text(session.Connection.Network.ToString());
 
+                Imgui.NextColumn();
+                Imgui.Text("Delay [campaign seconds]");
+                Imgui.Text($"min {TimeSynchronization.Delay.Min} / avg {Math.Round(TimeSynchronization.Delay.Average)} / max {TimeSynchronization.Delay.Max}");
+                Imgui.Separator();
+                
                 Imgui.Columns();
                 Imgui.TreePop();
             }

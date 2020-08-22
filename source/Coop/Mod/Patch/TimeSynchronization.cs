@@ -1,6 +1,8 @@
 ﻿using System;
+using Common;
 using HarmonyLib;
 using NLog;
+using RailgunNet.System.Types;
 using Sync;
 using TaleWorlds.CampaignSystem;
 
@@ -8,6 +10,11 @@ namespace Coop.Mod.Patch
 {
     public static class TimeSynchronization
     {
+        /// <summary>
+        /// Average offset to the hosts campaign time that had to be compensated. Measured in CampaignTime seconds.
+        /// </summary>
+        public static MovingAverage Delay { get; set; } = new MovingAverage(200);
+
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         
         /// <summary>
@@ -17,7 +24,8 @@ namespace Coop.Mod.Patch
         
         // Patched method: internal void MapTimeTracker.Tick(float seconds)
         private static readonly MethodPatch Patch =
-            new MethodPatch(typeof(CampaignTime).Assembly.GetType("TaleWorlds.CampaignSystem.MapTimeTracker", true)).Intercept("Tick");
+            new MethodPatch(typeof(CampaignTime).Assembly.GetType("TaleWorlds.CampaignSystem.MapTimeTracker", true))
+                .Intercept("Tick", EMethodPatchFlag.None, EPatchBehaviour.NeverCallOriginal);
 
         [PatchInitializer]
         public static void Init()
@@ -27,8 +35,7 @@ namespace Coop.Mod.Patch
                 throw new Exception("Patching failed. Was MapTimeTracker.Tick(float seconds) in the game DLLs changed?");
             }
             
-            // Only relevant for slave clients. The host is the authority for the campaign time.
-            access.Condition = o => Coop.IsClientConnected && !Coop.IsArbiter; 
+            access.Condition = o => Coop.IsClientConnected; 
             access.SetGlobalHandler(CreateTickHandler(access));
         }
 
@@ -48,17 +55,27 @@ namespace Coop.Mod.Patch
                         "Unexpected function signature, expected MapTimeTracker.Tick(float seconds). Patch needs to be adjusted.");
                 }
                 
+                if (Coop.IsArbiter)
+                {
+                    // The host is the authority for the campaign time. Go ahead.
+                    access.CallOriginal(instance, args);
+                    return;
+                }
+                
                 // Take the predicted server side campaign time
                 if (GetAuthoritativeTime == null)
                 {
                     throw new Exception("Invalid state. Please set GetAuthoritativeTime during initialization.");
                 }
 
-                float fOriginalArg = (float) args[0];
-                float secondsBehindServer = GetAuthoritativeTime.Invoke().RemainingSecondsFromNow;
-                float fDiff = secondsBehindServer - fOriginalArg;
-                Logger.Trace("Time correction: {diff}.", fDiff);
-                args[0] = Math.Min(secondsBehindServer, 0f);
+                CampaignTime serverTime = GetAuthoritativeTime.Invoke();
+                if (serverTime != CampaignTime.Never)
+                {
+                    // Correct local time
+                    float secondsBehindServer = serverTime.RemainingSecondsFromNow;
+                    Delay.Push((int) Math.Round(secondsBehindServer));
+                    args[0] = Math.Max(secondsBehindServer, 0f);
+                }
                 access.CallOriginal(instance, args);
             };
         }

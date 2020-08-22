@@ -221,13 +221,13 @@ namespace Sync.Reflection
             return Expression.Lambda<Func<TValue>>(body).Compile();
         }
         
-        public static Func<TValue, TDeclaring> CreateGetter<TValue, TDeclaring>(MemberInfo memberInfo)
+        public static Func<TDeclaring, TValue> CreateGetter<TDeclaring, TValue>(MemberInfo memberInfo)
         {
             Type instanceType = memberInfo.DeclaringType;
             ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
             MemberExpression exMemberAccess = Expression.MakeMemberAccess(arg0, memberInfo);
             UnaryExpression body = Expression.Convert(exMemberAccess, typeof(TValue));
-            return Expression.Lambda<Func<TValue, TDeclaring>>(body).Compile();
+            return Expression.Lambda<Func<TDeclaring, TValue>>(body, arg0).Compile();
         }
 
         public static Action<object, object[]> CreateStandInCaller(MethodInfo method)
