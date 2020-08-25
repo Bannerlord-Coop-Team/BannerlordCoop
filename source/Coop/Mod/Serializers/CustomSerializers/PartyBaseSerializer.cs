@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SandBox.View.Map;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -81,7 +82,7 @@ namespace Coop.Mod.Serializers
             this.mobileParty = mobileParty;
         }
 
-        public override object Deserialize()
+        public object Deserialize(PartyBase newPartyBase)
         {
             if (hero == null)
             {
@@ -92,17 +93,24 @@ namespace Coop.Mod.Serializers
                 throw new SerializationException("Must set mobileParty reference before deserializing. Use SetMobilePartyReference()");
             }
 
-            PartyBase newPartyBase = new PartyBase(mobileParty);
-
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
                 entry.Key.SetValue(newPartyBase, entry.Value.Deserialize());
             }
 
+            newPartyBase.AddElementToMemberRoster(hero.CharacterObject, 1);
             newPartyBase.GetType().GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, hero);
             newPartyBase.GetType().GetField("<MobileParty>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, mobileParty);
 
+            IPartyVisual newVisual = Campaign.Current.VisualCreator.PartyVisualCreator.CreatePartyVisual();
+            newPartyBase.GetType().GetField("_visual", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, newVisual);
+
             return base.Deserialize(newPartyBase);
+        }
+
+        public override object Deserialize()
+        {
+            throw new NotImplementedException();
         }
     }
 }

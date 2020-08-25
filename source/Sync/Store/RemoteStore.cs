@@ -105,6 +105,7 @@ namespace Sync.Store
 
         [ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.StoreAdd)]
         [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.StoreAdd)]
+        [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.StoreAdd)]
         private void ReceiveAdd(ConnectionBase connection, Packet packet)
         {
             // Receive the object
@@ -167,6 +168,7 @@ namespace Sync.Store
 
         [ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.StoreAck)]
         [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.StoreAck)]
+        [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.StoreAck)]
         private void ReceiveAck(ConnectionBase connection, Packet packet)
         {
             ObjectId id = new ObjectId(new ByteReader(packet.Payload).Binary.ReadUInt32());

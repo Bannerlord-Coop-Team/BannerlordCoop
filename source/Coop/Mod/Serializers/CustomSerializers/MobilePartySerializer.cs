@@ -139,9 +139,12 @@ namespace Coop.Mod.Serializers
                     case PartyBaseSerializer partyBaseSerializer:
                         partyBaseSerializer.SetHeroReference(hero);
                         partyBaseSerializer.SetMobilePartyReference(newMobileParty);
+                        entry.Key.SetValue(newMobileParty, partyBaseSerializer.Deserialize(newMobileParty.Party));
+                        break;
+                    default:
+                        entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
                         break;
                 }
-                entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
             }
 
             return base.Deserialize(newMobileParty);

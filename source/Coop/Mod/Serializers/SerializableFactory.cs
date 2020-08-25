@@ -36,7 +36,15 @@ namespace Coop.Mod.Serializers
                 case Hero.HeroLastSeenInformation heroLastSeenInfo:
                     return new HeroLastSeenInformationSerializer(heroLastSeenInfo);
                 case Hero hero:
-                    return new HeroSerializer(hero);
+                    if(hero.StringId == "main_hero")
+                    {
+                        return new PlayerHeroSerializer(hero);
+                    }
+                    else
+                    {
+                        return new HeroSerializer(hero);
+                    }
+                    
                 case ItemRoster itemRoster:
                     return new ItemRosterSerializer(itemRoster);
                 case MBGUID mbguid:

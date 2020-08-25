@@ -39,23 +39,23 @@ namespace Coop.Mod.Serializers
                 .GetField("<VersionNo>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(newRoster, versionNumber);
 
-            List<TroopRosterElement> troops = new List<TroopRosterElement>();
-            foreach (byte[] element in data)
-            {
-                TroopRosterElement newTroop = new TroopRosterElement();
-                // TaleWorlds BinaryReader
-                BinaryReader reader = new BinaryReader(element);
-                // Have to get method info different due to the method being an explicit interface implementation
-                MethodInfo deserializeFrom = typeof(TroopRosterElement)
-                    .GetInterfaceMap(typeof(ISerializableObject))
-                    .InterfaceMethods.First((methodInfo) => { return methodInfo.Name == "DeserializeFrom"; });
-                deserializeFrom.Invoke(newTroop, new object[] { reader });
-                troops.Add(newTroop);
-            }
+            //List<TroopRosterElement> troops = new List<TroopRosterElement>();
+            //foreach (byte[] element in data)
+            //{
+            //    TroopRosterElement newTroop = new TroopRosterElement();
+            //    // TaleWorlds BinaryReader
+            //    BinaryReader reader = new BinaryReader(element);
+            //    // Have to get method info different due to the method being an explicit interface implementation
+            //    MethodInfo deserializeFrom = typeof(TroopRosterElement)
+            //        .GetInterfaceMap(typeof(ISerializableObject))
+            //        .InterfaceMethods.First((methodInfo) => { return methodInfo.Name == "DeserializeFrom"; });
+            //    deserializeFrom.Invoke(newTroop, new object[] { reader });
+            //    troops.Add(newTroop);
+            //}
 
-            typeof(TroopRoster)
-                .GetField("data", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newRoster, troops.ToArray());
+            //typeof(TroopRoster)
+            //    .GetField("data", BindingFlags.NonPublic | BindingFlags.Instance)
+            //    .SetValue(newRoster, troops.ToArray());
 
             return newRoster;
         }

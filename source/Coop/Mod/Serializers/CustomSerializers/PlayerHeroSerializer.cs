@@ -164,7 +164,25 @@ namespace Coop.Mod.Serializers
                 .GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(hero, lExSpouses);
 
-            return base.Deserialize(hero);
+            
+
+            ConstructorInfo ctor = typeof(HeroDeveloper).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance,
+                                    null, new Type[] { typeof(Hero) }, null);
+
+            HeroDeveloper newDeveloper = (HeroDeveloper)ctor.Invoke(new object[] { hero });
+            hero.GetType()
+                .GetField("_heroDeveloper", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(hero, newDeveloper);
+
+            base.Deserialize(hero);
+
+            List<PartyBase> ownedParties = (List<PartyBase>)hero.GetType()
+                .GetField("_ownedParties", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(hero);
+
+            ownedParties.Add(hero.PartyBelongedTo.Party);
+
+            return hero;
         }
     }
 }

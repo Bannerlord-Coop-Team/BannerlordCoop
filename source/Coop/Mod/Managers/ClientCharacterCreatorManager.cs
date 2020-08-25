@@ -21,9 +21,21 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Helpers;
+using Sync.Store;
 
 namespace Coop.Mod.Managers
 {
+    public class HeroEventArgs : EventArgs
+    {
+
+        public ObjectId HeroId { get; private set; }
+        public string PartyName { get; private set; }
+        public HeroEventArgs(string PartyName, ObjectId HeroId)
+        {
+            this.PartyName = PartyName;
+            this.HeroId = HeroId;
+        }
+    }
     public class ClientCharacterCreatorManager : StoryModeGameManager
     {
         public ClientCharacterCreatorManager(LoadResult saveGameData) : base(saveGameData) { }
@@ -33,26 +45,30 @@ namespace Coop.Mod.Managers
         }
 
         public delegate void OnLoadFinishedEventHandler(object source, EventArgs e);
-        public static event OnLoadFinishedEventHandler OnLoadFinishedEvent;
+        public static event OnLoadFinishedEventHandler OnCharacterCreationLoadFinishedEvent;
+        public static event OnLoadFinishedEventHandler OnGameLoadFinishedEvent;
 
         public MobileParty ClientParty { get; private set; }
         public Hero ClientHero { get; private set; }
         public CharacterObject ClientCharacterObject { get; private set; }
+        
 
         public override void OnLoadFinished()
         {
             base.OnLoadFinished();
 
-            OnLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
+            OnCharacterCreationLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
 
             if (Main.DEBUG)
             {
                 SkipCharacterCreation();
-                ClientHero = Hero.MainHero;
-                PlayerHeroSerializer serializablePlayerHero = new PlayerHeroSerializer(Hero.MainHero);
-                CoopClient.Instance.SyncedObjectStore.Insert(serializablePlayerHero);
-                EndGame();
             }
+
+            OnGameLoadFinishedEvent?.Invoke(this, new HeroEventArgs(
+                MobileParty.MainParty.Name.ToString(),
+                CoopClient.Instance.SyncedObjectStore.Insert(Hero.MainHero)
+            ));
+            EndGame();
         }
 
         private void SkipCharacterCreation()
