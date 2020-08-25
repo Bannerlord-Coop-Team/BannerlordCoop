@@ -1,14 +1,6 @@
-﻿using HarmonyLib;
-using System;
-using System.CodeDom;
+﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -100,6 +92,9 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
                         break;
                     case "<HomeSettlement>k__BackingField":
+                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        break;
+                    case "_homeSettlement":
                         SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
                         break;
                     case "_father":

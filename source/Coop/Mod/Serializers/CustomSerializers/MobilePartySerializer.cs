@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace Coop.Mod.Serializers
 {
@@ -98,6 +99,9 @@ namespace Coop.Mod.Serializers
                             attachedPartiesNames.Add(attachedParty.Name.ToString());
                         }
                         break;
+                    case "_actualClan":
+                        SNNSO.Add(fieldInfo, new ClanSerializer((Clan)value));
+                        break;
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
                 }
@@ -122,7 +126,10 @@ namespace Coop.Mod.Serializers
 
         public override object Deserialize()
         {
-            MobileParty newMobileParty = MobileParty.Create(name);
+            MobileParty newMobileParty = new MobileParty
+            {
+                Name = new TextObject(name)
+            };
 
             // Circular referenced object needs assignment before deserialize
             if (hero == null)
