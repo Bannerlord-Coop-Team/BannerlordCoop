@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Coop.Mod.Patch;
+using Sync.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.SaveSystem;
@@ -87,5 +89,23 @@ namespace Coop.Mod
         {
             Utils.SetPrivateField(typeof(InMemDriver), "_data", driver, buffer);
         }
+
+        public static long GetNumTicks(this CampaignTime time)
+        {
+            return m_GetNumTicks.Invoke(time);
+        }
+
+        public static CampaignTime CreateCampaignTime(long numTicks)
+        {
+            ConstructorInfo ctorCampaignTime = typeof(CampaignTime).Assembly
+                                                                   .GetType("TaleWorlds.CampaignSystem.CampaignTime")
+                                                                   .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)[0];
+
+            return (CampaignTime)ctorCampaignTime.Invoke(new object[] { numTicks });
+        }
+
+        private static Func<CampaignTime, long> m_GetNumTicks = InvokableFactory.CreateGetter<CampaignTime, long>(
+            typeof(CampaignTime).GetField("_numTicks", 
+                BindingFlags.NonPublic | BindingFlags.Instance));
     }
 }

@@ -126,10 +126,7 @@ namespace Coop.Mod.Serializers
 
         public override object Deserialize()
         {
-            MobileParty newMobileParty = new MobileParty
-            {
-                Name = new TextObject(name)
-            };
+            MobileParty newMobileParty = MobileParty.Create(name);
 
             // Circular referenced object needs assignment before deserialize
             if (hero == null)

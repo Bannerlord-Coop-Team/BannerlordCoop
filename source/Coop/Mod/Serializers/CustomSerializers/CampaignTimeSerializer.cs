@@ -19,9 +19,7 @@ namespace Coop.Mod.Serializers
             numTicksExists = campaignTime != null;
             if (numTicksExists)
             {
-                numTicks = (long)typeof(CampaignTime)
-                .GetField("_numTicks", BindingFlags.NonPublic | BindingFlags.Instance)
-                .GetValue(campaignTime);
+                numTicks = campaignTime.GetNumTicks();
             }
         }
 
@@ -30,11 +28,7 @@ namespace Coop.Mod.Serializers
             // only create object if it existed on serialize end
             if (numTicksExists)
             {
-                ConstructorInfo ctorCampaignTime = typeof(CampaignTime).Assembly
-                    .GetType("TaleWorlds.CampaignSystem.CampaignTime")
-                    .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)[0];
-
-                return (CampaignTime)ctorCampaignTime.Invoke(new object[] { numTicks });
+                return Extensions.CreateCampaignTime(numTicks);
             }
             return null;
         }
