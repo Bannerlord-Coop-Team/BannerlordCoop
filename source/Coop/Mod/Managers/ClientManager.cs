@@ -7,6 +7,7 @@ using TaleWorlds.Core;
 using TaleWorlds.SaveSystem.Load;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Actions;
+using System.Threading.Tasks;
 
 namespace Coop.Mod.Managers
 {
@@ -21,25 +22,19 @@ namespace Coop.Mod.Managers
         public override void OnLoadFinished()
         {
             base.OnLoadFinished();
-            foreach(MobileParty party in MobileParty.All)
+            Parallel.ForEach(MobileParty.All, (party) =>
             {
-                if (party.StringId == "player_party1")
+                if (party.Name.ToString() == m_PartyName)
                 {
-                    string name = party.Name.ToString();
-                    if (name == m_PartyName)
-                    {
-                        clientPlayer = party.LeaderHero;
-                        ChangePlayerCharacterAction.Apply(clientPlayer);
-                        Settlement settlement = Settlement.Find("tutorial_training_field");
-                        Campaign.Current.HandleSettlementEncounter(MobileParty.MainParty, settlement);
-                        PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(LocationComplex.Current.GetLocationWithId("training_field"), null, null, null);
-                        clientPlayer.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(clientPlayer);
-                    }
+                    clientPlayer = party.LeaderHero;
+                    ChangePlayerCharacterAction.Apply(clientPlayer);
+                    Settlement settlement = Settlement.Find("tutorial_training_field");
+                    Campaign.Current.HandleSettlementEncounter(MobileParty.MainParty, settlement);
+                    PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(LocationComplex.Current.GetLocationWithId("training_field"), null, null, null);
+                    clientPlayer.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(clientPlayer);
                 }
-            }
+            });
             OnLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
-            
-            //parties.Single().SetAsMainParty();
         } 
 
         
