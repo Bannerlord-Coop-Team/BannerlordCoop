@@ -63,6 +63,8 @@ namespace Coop.Tests.Sync
         public FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
         public FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; }
         public FieldAccess<Campaign, bool> TimeControlModeLock { get; }
+        
+        public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Zero;
         public RemoteStore Store { get; }
 
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)

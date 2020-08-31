@@ -38,7 +38,7 @@ namespace Coop.NetImpl.LiteNet
         public override string ToString()
         {
             return
-                $"{base.ToString()}-{m_Peer.EndPoint.ToFriendlyString()}-{m_Peer.ConnectionState}";
+                $"LiteNet : {m_Peer.ConnectionState} : {m_Peer.EndPoint.ToFriendlyString()}";
         }
     }
 }
