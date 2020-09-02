@@ -22,18 +22,31 @@ namespace Coop.Mod.Managers
         public override void OnLoadFinished()
         {
             base.OnLoadFinished();
-            Parallel.ForEach(MobileParty.All, (party) =>
+
+            MobileParty playerParty = MobileParty.All.AsParallel().SingleOrDefault(party => party.Name.ToString() == m_PartyName);
+
+            if(playerParty != null)
             {
-                if (party.Name.ToString() == m_PartyName)
-                {
-                    clientPlayer = party.LeaderHero;
-                    ChangePlayerCharacterAction.Apply(clientPlayer);
-                    Settlement settlement = Settlement.Find("tutorial_training_field");
-                    Campaign.Current.HandleSettlementEncounter(MobileParty.MainParty, settlement);
-                    PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(LocationComplex.Current.GetLocationWithId("training_field"), null, null, null);
-                    clientPlayer.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(clientPlayer);
-                }
-            });
+                clientPlayer = playerParty.LeaderHero;
+
+                // Switch current player party from host to client party
+                ChangePlayerCharacterAction.Apply(clientPlayer);
+
+                // Start player at training field
+                Settlement settlement = Settlement.Find("tutorial_training_field");
+                Campaign.Current.HandleSettlementEncounter(MobileParty.MainParty, settlement);
+                PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(LocationComplex.Current.GetLocationWithId("training_field"), null, null, null);
+
+                // Update health due to member starting as injured
+                clientPlayer.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(clientPlayer);
+            }
+            else
+            {
+                throw new Exception("Transferred player party could not be found");
+            }
+
+            
+
             OnLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
         } 
 
