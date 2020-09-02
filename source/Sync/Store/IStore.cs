@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using JetBrains.Annotations;
+using System.Collections.Generic;
 
 namespace Sync.Store
 {
@@ -15,6 +16,9 @@ namespace Sync.Store
         {
             return $"Obj {Value}";
         }
+
+        public static bool operator ==(ObjectId lhs, ObjectId rhs) => lhs.Value == rhs.Value;
+        public static bool operator !=(ObjectId lhs, ObjectId rhs) => lhs.Value != rhs.Value;
     }
 
     public interface IStore

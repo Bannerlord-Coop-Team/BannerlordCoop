@@ -1,51 +1,54 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Permissions;
-using System.Text;
-using System.Threading.Tasks;
-using Coop.Mod.Serializers;
 using SandBox;
-using StoryMode;
-using StoryMode.CharacterCreationSystem;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.Engine.Screens;
-using TaleWorlds.MountAndBlade;
-using TaleWorlds.ObjectSystem;
 using TaleWorlds.SaveSystem.Load;
 using System.Reflection;
-using NetworkMessages.FromClient;
-using Module = TaleWorlds.MountAndBlade.Module;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.Library;
-using TaleWorlds.Localization;
-using Helpers;
+using System.Threading.Tasks;
 
 namespace Coop.Mod.Managers
 {
     public class ClientManager : CampaignGameManager
     {
-        public ClientManager(LoadResult saveGameData) : base(saveGameData) { }
+        readonly string m_PartyName;
+        Hero clientPlayer;
+        public ClientManager(LoadResult saveGameData, string partyName) : base(saveGameData) { m_PartyName = partyName; }
 
         public delegate void OnOnLoadFinishedEventHandler(object source, EventArgs e);
         public static event OnOnLoadFinishedEventHandler OnLoadFinishedEvent;
-
         public override void OnLoadFinished()
         {
             base.OnLoadFinished();
 
-            OnLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
+            MobileParty playerParty = MobileParty.All.AsParallel().SingleOrDefault(party => party.Name.ToString() == m_PartyName);
 
-            // TODO recieve host party and instantiate it            
-            //ClientParty = new MobileParty();
-            //TextObject name = MobilePartyHelper.GeneratePartyName(player);
-            //ClientParty.InitializeMobileParty(name, Game.Current.ObjectManager.GetObject<PartyTemplateObject>("main_hero_party_template"), new Vec2(685.3f, 410.9f), 0f, 0f, MobileParty.PartyTypeEnum.Default, -1);
-            //ClientParty.ItemRoster.AddToCounts(DefaultItems.Grain, 1, true);
-            //ClientParty.Party.Owner = clientHero;
-            //ClientParty.SetAsMainParty();
-            //Campaign.Current.CameraFollowParty = ClientParty.Party;
-        }
+            if(playerParty != null)
+            {
+                clientPlayer = playerParty.LeaderHero;
+
+                // Switch current player party from host to client party
+                ChangePlayerCharacterAction.Apply(clientPlayer);
+
+                // Start player at training field
+                Settlement settlement = Settlement.Find("tutorial_training_field");
+                Campaign.Current.HandleSettlementEncounter(MobileParty.MainParty, settlement);
+                PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(LocationComplex.Current.GetLocationWithId("training_field"), null, null, null);
+
+                // Update health due to member starting as injured
+                clientPlayer.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(clientPlayer);
+            }
+            else
+            {
+                throw new Exception("Transferred player party could not be found");
+            }
+
+            
+
+            OnLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
+        } 
 
         
 

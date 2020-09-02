@@ -35,13 +35,9 @@ namespace Coop.Mod.Managers
                     if (obj is PlayerHeroSerializer serializedPlayerHero)
                     {
                         Hero hero = (Hero)serializedPlayerHero.Deserialize();
-                        remoteStore.Remove(objId);
                     }
                 };
             };
-            
-            //PlayerHeroSerializer heroSerializer = new PlayerHeroSerializer(Hero.MainHero);
-            //Hero hero = (Hero)heroSerializer.Deserialize();
         }
     }
 }

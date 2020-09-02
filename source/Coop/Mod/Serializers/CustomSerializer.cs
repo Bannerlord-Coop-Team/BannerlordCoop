@@ -21,9 +21,9 @@ namespace Coop.Mod.Serializers
         public readonly Dictionary<FieldInfo, object> SerializableObjects = new Dictionary<FieldInfo, object>();
         public readonly Dictionary<FieldInfo, ICollection> Collections = new Dictionary<FieldInfo, ICollection>();
 
-        [IgnoreDataMember]
+        [NonSerialized]
         public readonly List<FieldInfo> NonSerializableObjects = new List<FieldInfo>();
-        [IgnoreDataMember]
+        [NonSerialized]
         public readonly List<ICollection> NonSerializableCollections = new List<ICollection>();
 
         protected CustomSerializer() { }
@@ -31,7 +31,8 @@ namespace Coop.Mod.Serializers
         protected CustomSerializer(object obj)
         {
             ObjectType = obj.GetType();
-            foreach (FieldInfo field in GetFields())
+            FieldInfo[] fields = GetFields();
+            foreach (FieldInfo field in fields)
             {
                 if(!field.IsLiteral)
                 {

@@ -3,7 +3,6 @@ using SandBox.View;
 using SandBox.ViewModelCollection.SaveLoad;
 using TaleWorlds.Engine.Screens;
 using TaleWorlds.Engine.GauntletUI;
-using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade.View.Missions;
 using System;
@@ -12,8 +11,7 @@ using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.Engine;
 using TaleWorlds.Localization;
 using System.Linq;
-using System.Collections.Generic;
-using Coop.Mod.DebugUtil;
+using TaleWorlds.SaveSystem;
 
 namespace Coop.Mod.UI
 {

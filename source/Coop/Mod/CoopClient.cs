@@ -16,6 +16,7 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Logic;
 using StoryMode;
 using Sync.Store;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -52,6 +53,8 @@ namespace Coop.Mod
         private MBGameManager gameManager;
 
         private int m_ReconnectAttempts = MaxReconnectAttempts;
+        private string m_PartyName;
+        private ObjectId m_HeroId;
         public Action<PersistenceClient> OnPersistenceInitialized;
 
         public Action<RemoteStore> RemoteStoreCreated;
@@ -198,15 +201,21 @@ namespace Coop.Mod
             {
                 gameManager = new ClientCharacterCreatorManager();
                 MBGameManager.StartNewGame(gameManager);
-                ClientCharacterCreatorManager.OnLoadFinishedEvent += (object source, EventArgs e) =>
+
+                ClientCharacterCreatorManager.OnGameLoadFinishedEvent += (object source, EventArgs e) =>
                 {
-                    StoryModeEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, () =>
+                    if(e is HeroEventArgs args)
                     {
-                        if(m_CoopClientSM.StateMachine.State.Equals(ECoopClientState.CharacterCreation))
-                        {
-                            CharacterCreationOver();
-                        }
-                    });
+                        m_PartyName = args.PartyName;
+                        m_HeroId = args.HeroId;
+
+                        CharacterCreationOver();
+                    }
+                    else
+                    {
+                        throw new Exception("EventArgs not of type HeroEventArgs");
+                    }
+                    
                 };
             }
         }
@@ -245,7 +254,13 @@ namespace Coop.Mod
 
         public void CharacterCreationOver()
         {
-            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterCreated);
+            GetStore().OnObjectAcknowledged += (id, obj) =>
+            {
+                if (id == m_HeroId)
+                {
+                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterCreated);
+                }
+            };
         }
         #endregion
 
@@ -290,7 +305,7 @@ namespace Coop.Mod
             if (bSuccess)
             {
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
-                gameManager = new ClientManager(((GameData)Session.World).LoadResult);
+                gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_PartyName);
                 MBGameManager.StartNewGame(gameManager);
                 ClientManager.OnLoadFinishedEvent += (source, e) => { 
                     m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded); 
