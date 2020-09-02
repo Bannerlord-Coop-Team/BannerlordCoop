@@ -18,6 +18,16 @@ namespace Coop.Mod
 
         public FieldAccess<Campaign, bool> TimeControlModeLock => TimeControl.TimeControlModeLock;
 
+        public GameEnvironmentClient()
+        {
+            Patch.TimeSynchronization.GetAuthoritativeTime += () => AuthoritativeTime;
+        }
+
+        public CampaignTime AuthoritativeTime {
+            get;
+            set;
+        } = CampaignTime.Never;
+
         public RemoteStore Store =>
             CoopClient.Instance.SyncedObjectStore ??
             throw new InvalidOperationException("Client not initialized.");

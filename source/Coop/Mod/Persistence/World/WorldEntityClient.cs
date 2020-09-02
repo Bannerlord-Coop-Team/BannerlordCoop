@@ -84,6 +84,10 @@ namespace Coop.Mod.Persistence.World
                     m_Environment.GetCurrentCampaign(),
                     State.TimeControlMode.Item2);
             }
+            else if (e.PropertyName == nameof(State.CampaignTimeTicks))
+            {
+                m_Environment.AuthoritativeTime = Extensions.CreateCampaignTime(State.CampaignTimeTicks);
+            }
         }
 
         protected override void OnRemoved()
