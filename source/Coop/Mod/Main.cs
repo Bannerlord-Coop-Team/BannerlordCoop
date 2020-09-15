@@ -77,6 +77,7 @@ namespace Coop.Mod
                 initializer.Invoke(null, null);
             }
 
+            // Skip startup splash screen
             if (DEBUG)
             {
                 typeof(Module).GetField(
@@ -85,6 +86,7 @@ namespace Coop.Mod
                               .SetValue(Module.CurrentModule, true);
             }
 
+            // Apply all patches via harmony
             harmony.PatchAll();
 
             Module.CurrentModule.AddInitialStateOption(

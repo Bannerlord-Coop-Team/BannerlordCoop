@@ -36,9 +36,12 @@ namespace Coop.Mod
         /// <summary>
         /// A client has recieved world data.
         /// </summary>
-        WorldDataRecieved,
+        ClientLoaded,
     }
 
+    /// <summary>
+    /// Defines state machine used by CoopServer
+    /// </summary>
     class CoopServerSM : CoopStateMachine<ECoopServerState, ECoopServerTrigger>
     {
         public readonly StateConfiguration PreparingState;
@@ -60,7 +63,7 @@ namespace Coop.Mod
             SendWorldDataTrigger = StateMachine.SetTriggerParameters<ConnectionServer>(ECoopServerTrigger.RequiresWorldData);
 
             SendingWorldDataState = StateMachine.Configure(ECoopServerState.SendingWorldData);
-            SendingWorldDataState.Permit(ECoopServerTrigger.WorldDataRecieved, ECoopServerState.Playing);
+            SendingWorldDataState.Permit(ECoopServerTrigger.ClientLoaded, ECoopServerState.Playing);
 
             // Server playing
             PlayingState = StateMachine.Configure(ECoopServerState.Playing);

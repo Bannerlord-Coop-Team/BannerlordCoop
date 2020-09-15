@@ -292,7 +292,7 @@
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityClient.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityServer.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyState.cs" />
-    <Compile Include="Mod\Persistence\MovementData.cs" />
+    <Compile Include="Mod\Persistence\Party\MovementData.cs" />
     <Compile Include="Mod\Persistence\PersistenceClient.cs" />
     <Compile Include="Mod\Persistence\EntityManager.cs" />
     <Compile Include="Mod\Persistence\RailBitBufferExtensions.cs" />

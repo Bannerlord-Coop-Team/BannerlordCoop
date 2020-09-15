@@ -6,6 +6,7 @@ namespace Coop.Mod
     {
         public static bool IsServer => CoopServer.Instance.Current != null;
         public static bool IsClientConnected => CoopClient.Instance.ClientConnected;
+        public static bool IsClientPlaying => CoopClient.Instance.ClientPlaying;
 
         /// <summary>
         ///     The arbiter is the game instance with authority over all clients.

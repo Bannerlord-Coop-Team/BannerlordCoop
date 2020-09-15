@@ -42,7 +42,7 @@ namespace Coop.Tests.Network
             expectedReceiveOrderOnServer.Add(
                 (EServerConnectionState.AwaitingClient, EPacket.Client_Hello));
             expectedReceiveOrderOnServer.Add(
-                (EServerConnectionState.ClientJoining, EPacket.Client_Joined));
+                (EServerConnectionState.ClientJoining, EPacket.Client_Loaded));
             expectedReceiveOrderOnServer.Add(
                 (EServerConnectionState.Ready, EPacket.Client_Info));
 

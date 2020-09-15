@@ -18,11 +18,15 @@ namespace Coop.Mod.Managers
         public ClientManager(LoadResult saveGameData, string partyName) : base(saveGameData) { m_PartyName = partyName; }
 
         public delegate void OnOnLoadFinishedEventHandler(object source, EventArgs e);
-        public static event OnOnLoadFinishedEventHandler OnLoadFinishedEvent;
+        public static event OnOnLoadFinishedEventHandler OnPreLoadFinishedEvent;
+        public static event OnOnLoadFinishedEventHandler OnPostLoadFinishedEvent;
         public override void OnLoadFinished()
         {
+            OnPreLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
             base.OnLoadFinished();
+            OnPostLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
 
+            // Find actual unique way to differentiate parties
             MobileParty playerParty = MobileParty.All.AsParallel().SingleOrDefault(party => party.Name.ToString() == m_PartyName);
 
             if(playerParty != null)
@@ -36,18 +40,11 @@ namespace Coop.Mod.Managers
                 Settlement settlement = Settlement.Find("tutorial_training_field");
                 Campaign.Current.HandleSettlementEncounter(MobileParty.MainParty, settlement);
                 PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(LocationComplex.Current.GetLocationWithId("training_field"), null, null, null);
-
-                // Update health due to member starting as injured
-                clientPlayer.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(clientPlayer);
             }
             else
             {
                 throw new Exception("Transferred player party could not be found");
             }
-
-            
-
-            OnLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
         } 
 
         

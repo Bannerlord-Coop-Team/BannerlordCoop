@@ -107,6 +107,14 @@ namespace Coop.Mod
             }
         }
 
+        public bool ClientPlaying
+        {
+            get
+            {
+                return m_CoopClientSM.State.Equals(ECoopClientState.Playing);
+            }
+        }
+
         public RemoteStore GetStore()
         {
             return SyncedObjectStore;
@@ -307,7 +315,10 @@ namespace Coop.Mod
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
                 gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_PartyName);
                 MBGameManager.StartNewGame(gameManager);
-                ClientManager.OnLoadFinishedEvent += (source, e) => { 
+                ClientManager.OnPreLoadFinishedEvent += (source, e) => {
+                    CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, SendPlayerPartyChanged);
+                };
+                ClientManager.OnPostLoadFinishedEvent += (source, e) => {
                     m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded); 
                 };
             }
@@ -337,9 +348,17 @@ namespace Coop.Mod
         {
             Session.Connection.Send(
                 new Packet(
-                    EPacket.Client_Joined,
+                    EPacket.Client_Loaded,
                     new Client_Joined().Serialize()));
             TryInitPersistence();
+        }
+
+        private void SendPlayerPartyChanged(Hero hero, MobileParty party)
+        {
+            Session.Connection.Send(
+                new Packet(
+                    EPacket.Client_PartyChanged,
+                    new MBGUIDSerializer(party.Id).Serialize()));
         }
 
 

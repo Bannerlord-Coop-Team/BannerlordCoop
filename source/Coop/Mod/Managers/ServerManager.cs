@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+﻿using System.Reflection;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Serializers;
 using Network.Infrastructure;
@@ -35,7 +35,11 @@ namespace Coop.Mod.Managers
                     if (obj is PlayerHeroSerializer serializedPlayerHero)
                     {
                         Hero hero = (Hero)serializedPlayerHero.Deserialize();
+
+                        // Update health due to member starting as injured
+                        hero.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(hero);
                     }
+
                 };
             };
         }
