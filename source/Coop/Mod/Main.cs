@@ -90,7 +90,7 @@ namespace Coop.Mod
             Module.CurrentModule.AddInitialStateOption(
                 new InitialStateOption(
                     "CoOp Campaign",
-                    new TextObject("Co-op Campaign"),
+                    new TextObject("Host Co-op Campaign"),
                     9990,
                     () =>
                     {
@@ -125,6 +125,15 @@ namespace Coop.Mod
                         }
                     },
                     false));
+
+            Module.CurrentModule.AddInitialStateOption(new InitialStateOption(
+              "Join Coop Game",
+              new TextObject("Join Co-op Campaign"),
+              9991,
+              JoinWindow,
+              false
+            ));
+
         }
 
         protected override void OnSubModuleUnloaded()
@@ -172,6 +181,23 @@ namespace Coop.Mod
         {
             Exception ex = (Exception) e.ExceptionObject;
             Logger.Fatal(ex, "Unhandled exception");
+        }
+
+
+        internal static bool DisableIntroVideo = true;
+
+        internal static bool EnableTalkToOtherLordsInAnArmy = true;
+
+        internal static bool RecordFirstChanceExceptions = true;
+
+        internal static bool DontGroupThirdPartyMenuOptions = true;
+
+        internal static bool QuartermasterIsClanWide = true;
+
+
+        internal void JoinWindow()
+        {
+            ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopConnectionUI>());
         }
     }
 }

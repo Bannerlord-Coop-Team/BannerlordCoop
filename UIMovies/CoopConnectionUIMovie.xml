@@ -1,0 +1,93 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent">
+      <Children>
+        <Standard.Background/>
+
+        <Standard.TopPanel Parameter.Title="@MovieTextHeader"/>
+
+        <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-300"
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
+          <Children>
+            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
+                        SuggestedHeight="64" VerticalAlignment="Center" HorizontalAlignment="Right"
+                        Brush="Clan.TabControl.Text" Text="@IpText" PositionXOffset="-20"/>
+
+            <EditableTextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
+                                SuggestedHeight="64" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="32"
+                                Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                Text="@Ip" IsVisible="true" PositionXOffset="-80"/>
+          </Children>
+        </ListPanel>
+
+        <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-100"
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
+          <Children>
+            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
+                        SuggestedHeight="64" VerticalAlignment="Center" HorizontalAlignment="Right"
+                        Brush="Clan.TabControl.Text" Text="@PortText" PositionXOffset="-20"/>
+
+            <EditableTextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
+                                SuggestedHeight="64" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="32"
+                                Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                Text="@Port" IsVisible="true" PositionXOffset="-80" />
+          </Children>
+        </ListPanel>
+
+        <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="100"
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
+          <Children>
+            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
+                        SuggestedHeight="64" VerticalAlignment="Center" HorizontalAlignment="Right"
+                        Brush="Clan.TabControl.Text" Text="@PasswordText" PositionXOffset="-20"/>
+
+            <EditableTextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
+                                SuggestedHeight="64" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="32"
+                                Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                Text="@Password" IsVisible="true" PositionXOffset="-80"/>
+          </Children>
+        </ListPanel>
+
+        <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="300"
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
+          <Children>
+            <Standard.Button HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="20"
+                      Command.Click="ActionConnect" Parameter.Text="@JoinButtonText" PositionXOffset="-20"/>
+            <Standard.Button HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="20"
+                      Command.Click="ActionCancel" Parameter.Text="@CancelButtonText" PositionXOffset="20"/>
+          </Children>
+        </ListPanel>
+
+        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
+                        SuggestedHeight="64" VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                        Brush="ScoreboardPanels_2" Text="@CommunityText" PositionYOffset="-90" PositionXOffset="-6"/>
+
+        <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="60"
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
+          <Children>
+            <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                      Command.Click="ActionGithub" Parameter.Text="@GithubButtonText" PositionXOffset="-20"/>
+          </Children>
+        </ListPanel>
+        
+        <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="10"
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
+          <Children>
+            <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                      Command.Click="ActionDiscord" Parameter.Text="@DiscordButtonText" PositionXOffset="-20"/>
+          </Children>
+        </ListPanel>
+
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

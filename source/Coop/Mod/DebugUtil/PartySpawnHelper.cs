@@ -14,12 +14,12 @@ namespace Coop.Mod.DebugUtil
             MobileParty party =
                 MBObjectManager.Instance.CreateObject<MobileParty>(
                     "coop_mod_testers_" + TesterCount);
-            TroopRoster roster = new TroopRoster();
+            TroopRoster roster = new TroopRoster(null);
             CharacterObject obj =
                 Campaign.Current.ObjectManager.GetObject<CharacterObject>(
                     "tutorial_placeholder_volunteer");
             roster.AddToCounts(obj, 5 - roster.TotalManCount);
-            TroopRoster prisonerRoster = new TroopRoster();
+            TroopRoster prisonerRoster = new TroopRoster(null);
             party.InitializeMobileParty(
                 new TextObject("testers"),
                 roster,
