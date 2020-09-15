@@ -33,7 +33,7 @@ namespace Coop.Mod.Serializers
 
         public object Deserialize()
         {
-            TroopRoster newRoster = new TroopRoster(null);
+            TroopRoster newRoster = TroopRoster.CreateDummyTroopRoster();
 
             typeof(TroopRoster)
                 .GetField("<VersionNo>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)
