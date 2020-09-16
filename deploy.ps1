@@ -17,6 +17,7 @@ $BaseDir        = "${SolutionDir}..\"
 $DeployDir      = "${BaseDir}deploy\"
 $ConfigPath     = "${BaseDir}config.json"
 $TemplateDir    = "${BaseDir}template"
+$UIMovieDir    = "${BaseDir}UIMovies"
 
 # create output directory structure
 $DeployBinDir = "$DeployDir\bin\Win64_Shipping_Client"
@@ -36,6 +37,7 @@ $subModuleContent = $subModuleContent.replace('${name}', $config.name)
 $subModuleContent = $subModuleContent.replace('${version}', $config.version)
 $subModuleContent | Out-File -FilePath $DeployDir\SubModule.xml
 
+
 # copy mod dll
 $filesToCopy = @(${TargetFileName}) + ${Libs}
 foreach ($file in $filesToCopy) 
@@ -52,3 +54,8 @@ if(Test-Path (${BaseDir} + $config.modsDir))
     Copy-item -Force -Recurse $DeployDir\* -Destination $ModDir\
     
 }
+
+# write Movie Prefabs
+$MovieModDir = ${BaseDir} + $config.modsDir + "\" + $config.name + "\GUI\Prefabs"
+New-Item -Force -ItemType Directory -Path ${MovieModDir} | Out-Null
+Copy-Item -Force ${UIMovieDir}\* -Recurse -Destination ${MovieModDir}\

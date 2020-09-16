@@ -357,6 +357,8 @@
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterTraitsSerializer.cs" />
     <Compile Include="Mod\Serializers\SerializableFactory.cs" />
     <Compile Include="Mod\UI\CharacterCreationUI\CharacterCreationUI.cs" />
+    <Compile Include="Mod\UI\CoopConnectMenuVM.cs" />
+    <Compile Include="Mod\UI\CoopConnectionUI.cs" />
     <Compile Include="Mod\UI\LoadGameUI\CoopLoadUI.cs" />
     <Compile Include="NetImpl\LiteNet\Extensions.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerClient.cs" />
