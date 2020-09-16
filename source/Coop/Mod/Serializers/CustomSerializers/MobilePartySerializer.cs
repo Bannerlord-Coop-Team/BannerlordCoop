@@ -146,6 +146,9 @@ namespace Coop.Mod.Serializers
                         partyBaseSerializer.SetMobilePartyReference(newMobileParty);
                         entry.Key.SetValue(newMobileParty, partyBaseSerializer.Deserialize(newMobileParty.Party));
                         break;
+                    case ClanSerializer clanSerializer:
+                        clanSerializer.SetHeroReference(hero);
+                        break;
                     default:
                         entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
                         break;
