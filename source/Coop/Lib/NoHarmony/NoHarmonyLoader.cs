@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using Medallion.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 using TaleWorlds.Core;
@@ -74,21 +75,24 @@ namespace Coop.Lib.NoHarmony
         protected override void OnSubModuleLoad()
         {
             base.OnSubModuleLoad();
-            NoHarmonyInit();
-            if (UseConfFile)
+            SystemDistributedLock myLock = new SystemDistributedLock("HarmonyGlobalMutex");
+            using (myLock.Acquire())
             {
-                LoadConf();
-            }
+                NoHarmonyInit();
+                if (UseConfFile)
+                {
+                    LoadConf();
+                }
 
-            Log(LogLvl.Info, "NoHarmony initilized successfully.");
-            NoHarmonyLoad();
-            Log(
-                LogLvl.Info,
-                "Pending tasks : " +
-                ModelDelegates.Count +
-                " models, " +
-                BehaviorDelegates.Count +
-                " behaviors.");
+                Log(LogLvl.Info, "NoHarmony initialized successfully.");
+                NoHarmonyLoad();
+                Log(LogLvl.Info,
+                    "Pending tasks : " +
+                    ModelDelegates.Count +
+                    " models, " +
+                    BehaviorDelegates.Count +
+                    " behaviors.");
+            }
         }
 
         /// <summary>
