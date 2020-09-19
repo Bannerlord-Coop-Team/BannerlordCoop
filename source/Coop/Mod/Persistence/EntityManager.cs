@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Permissions;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.World;
 using NLog;
@@ -23,6 +24,9 @@ namespace Coop.Mod.Persistence
 
         private readonly Dictionary<MobileParty, RailEntityServer> m_Parties =
             new Dictionary<MobileParty, RailEntityServer>();
+
+        private readonly Dictionary<RailServerPeer, MobileParty> m_ControlledParties =
+            new Dictionary<RailServerPeer, MobileParty>();
 
         private readonly List<MobileParty> m_PartiesToAdd = new List<MobileParty>();
         private readonly RailServerRoom m_Room;
@@ -147,6 +151,25 @@ namespace Coop.Mod.Persistence
             }
         }
 
+        public void AddParty(MobileParty party)
+        {
+            MobilePartyEntityServer entity =
+                    m_Room.AddNewEntity<MobilePartyEntityServer>(
+                        e => e.State.PartyId = party.Party.Index);
+            Logger.Debug("Added new entity {}.", entity);
+
+            lock (m_Lock)
+            {
+                m_Parties.Add(party, entity);
+            }
+        }
+
+        public void GrantPartyControl(MobileParty party, RailServerPeer peer)
+        {
+            peer.GrantControl(m_Parties[party]);
+            m_ControlledParties.Add(peer, party);
+        }
+
         private void OnClientAdded(RailServerPeer peer)
         {
             if (IsArbiter(peer))
@@ -165,7 +188,7 @@ namespace Coop.Mod.Persistence
                 if (m_Parties[party].Controller == null)
                 {
                     // TODO: Currently only the hosting player gets to control the main party. In a future version, every player gets their own party.
-                    peer.GrantControl(m_Parties[party]);
+                    GrantPartyControl(party, peer);
                     Logger.Info("{party} control granted to {peer}.", party, peer);
                 }
             }
@@ -192,7 +215,6 @@ namespace Coop.Mod.Persistence
             {
                 return MobileParty.MainParty;
             }
-
             return null;
         }
 

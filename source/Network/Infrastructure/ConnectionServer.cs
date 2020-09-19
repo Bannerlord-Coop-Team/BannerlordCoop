@@ -125,7 +125,7 @@ namespace Network.Infrastructure
                     new Server_JoinRequestAccepted().Serialize()));
         }
 
-        [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.Client_Joined)]
+        [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.Client_Loaded)]
         private void ReceiveClientJoined(ConnectionBase connection, Packet packet)
         {
             Client_Joined payload = Client_Joined.Deserialize(new ByteReader(packet.Payload));

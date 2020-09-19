@@ -20,6 +20,9 @@ using System.Collections.Generic;
 using Stateless;
 using Common;
 using System.Linq;
+using TaleWorlds.ObjectSystem;
+using Coop.Mod.Persistence.Party;
+using RailgunNet.Logic;
 
 namespace Coop.Mod
 {
@@ -198,14 +201,20 @@ namespace Coop.Mod
             #endregion
 
             SyncedObjectStore.AddConnection(connection);
+
+            // Event Registration
             connection.OnClientJoined += Persistence.ClientJoined;
             connection.OnDisconnected += Persistence.Disconnected;
             OnServerSendingWorldData += m_GameEnvironmentServer.LockTimeControlStopped;
             OnServerSentWorldData += m_GameEnvironmentServer.UnlockTimeControl;
 
+            // Packet Handler Registration
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientRequestWorldData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientDeclineWorldData);
+            connection.Dispatcher.RegisterPacketHandler(ReceiveClientLoaded);
+            connection.Dispatcher.RegisterPacketHandler(ReceiveClientPlayerPartyChanged);
 
+            // State Machine Registration
             connection.Dispatcher.RegisterStateMachine(connection, coopServerSM);
         }
 
@@ -236,6 +245,26 @@ namespace Coop.Mod
         private void ReceiveClientDeclineWorldData(ConnectionBase connection, Packet packet)
         {
             m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.DeclineWorldData);
+        }
+
+        [GameServerPacketHandler(ECoopServerState.SendingWorldData, EPacket.Client_Loaded)]
+        private void ReceiveClientLoaded(ConnectionBase connection, Packet packet)
+        {
+            m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.ClientLoaded);
+        }
+
+        [GameServerPacketHandler(ECoopServerState.Playing, EPacket.Client_PartyChanged)]
+        private void ReceiveClientPlayerPartyChanged(ConnectionBase connection, Packet packet)
+        {
+            MBGUID guid = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
+            MobileParty party = (MobileParty)MBObjectManager.Instance.GetObject(guid);
+
+            party.Party.UpdateVisibilityAndInspected(false);
+
+            // Add party to persistance since manual creation of party is not handled
+            Persistence.EntityManager.AddParty(party);
+
+            Persistence.EntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
         }
 
         private void SendInitialWorldData(ConnectionServer connection)

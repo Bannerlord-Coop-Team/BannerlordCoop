@@ -73,6 +73,10 @@ namespace Coop.Mod.Persistence.Party
                 data);
             m_Environment.TargetPosition.SetTyped(party, data);
 
+            typeof(MobileParty)
+                .GetField("_defaultBehaviorNeedsUpdate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .SetValue(party, true);
+
             Replay.ReplayRecording?.Invoke(Id, party, data);
         }
 

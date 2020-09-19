@@ -63,6 +63,10 @@ namespace Coop.Mod
         /// </summary>
         GameLoaded,
     }
+
+    /// <summary>
+    /// Defines state machine used by CoopClient
+    /// </summary>
     internal class CoopClientSM : CoopStateMachine<ECoopClientState, ECoopClientTrigger>
     {
         public readonly StateConfiguration MainMenuState;
@@ -72,19 +76,24 @@ namespace Coop.Mod
         public readonly StateConfiguration PlayingState;
         public CoopClientSM() : base(ECoopClientState.MainManu)
         {
+            // Client at Main Menu
             MainMenuState = StateMachine.Configure(ECoopClientState.MainManu);
             MainMenuState.Permit(ECoopClientTrigger.RequiresCharacterCreation, ECoopClientState.CharacterCreation);
             MainMenuState.Permit(ECoopClientTrigger.CharacterExists, ECoopClientState.ReceivingWorldData);
 
+            // Client creating character
             CharacterCreationState = StateMachine.Configure(ECoopClientState.CharacterCreation);
             CharacterCreationState.Permit(ECoopClientTrigger.CharacterCreated, ECoopClientState.ReceivingWorldData);
 
+            // Client receiving world data
             ReceivingWorldDataState = StateMachine.Configure(ECoopClientState.ReceivingWorldData);
             ReceivingWorldDataState.Permit(ECoopClientTrigger.WorldDataReceived, ECoopClientState.Loading);
 
+            // Client loading
             LoadingState = StateMachine.Configure(ECoopClientState.Loading);
             LoadingState.Permit(ECoopClientTrigger.GameLoaded, ECoopClientState.Playing);
 
+            // Client playing
             PlayingState = StateMachine.Configure(ECoopClientState.Playing);
         }
     }

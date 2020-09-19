@@ -70,7 +70,7 @@ namespace Coop.Tests.Network
             Assert.Equal(joinRequestAccepted, m_SendRawParams[^1]);
 
             ArraySegment<byte> clientJoined = TestUtils.MakeRaw(
-                EPacket.Client_Joined,
+                EPacket.Client_Loaded,
                 new Client_Joined().Serialize());
             m_Connection.Receive(clientJoined);
             Assert.Equal(EServerConnectionState.Ready, m_Connection.State);

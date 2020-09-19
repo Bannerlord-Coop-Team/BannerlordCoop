@@ -10,7 +10,7 @@ namespace Coop.Mod.Persistence.Party
     public class MobilePartyState : RailState
     {
         private MovementState m_Movement = new MovementState();
-        public static int InvalidPartyId = -1;
+        public readonly static int InvalidPartyId = -1;
         [Immutable] public int PartyId { get; set; } = InvalidPartyId;
 
         [Mutable]

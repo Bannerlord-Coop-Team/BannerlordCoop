@@ -9,7 +9,8 @@ namespace Network.Protocol
         Client_Info, // Contains ClientInfo.
         Client_RequestWorldData, // Client wants to be sent a save game of the current state.
         Client_DeclineWorldData, // Client does not need world data
-        Client_Joined, // Sent once the client has loaded the initial world state.
+        Client_Loaded, // Sent once the client has loaded the initial world state.
+        Client_PartyChanged, // When the player party is switched
 
         Server_RequestClientInfo, // Instructs the client to send its ClientInfo.
         Server_JoinRequestAccepted, // Client is allowed to join the server.
