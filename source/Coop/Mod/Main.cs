@@ -153,7 +153,7 @@ namespace Coop.Mod
             }
 
             base.OnApplicationTick(dt);
-            if (Input.DebugInput.IsControlDown() && Input.DebugInput.IsKeyDown(InputKey.Tilde))
+            if (Input.IsKeyDown(InputKey.LeftControl) && Input.IsKeyDown(InputKey.Tilde))
             {
                 CLICommands.ShowDebugUi(new List<string>());
                 // DebugConsole.Toggle();
