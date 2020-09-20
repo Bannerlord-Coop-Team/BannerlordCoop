@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
@@ -10,6 +11,14 @@ namespace Coop.Mod
 {
     internal class GameEnvironmentClient : IEnvironmentClient
     {
+        public GameEnvironmentClient()
+        {
+            TimeSynchronization.GetAuthoritativeTime += () => AuthoritativeTime;
+        }
+
+        public HashSet<MobileParty> PlayerControlledMobileParties { get; } =
+            new HashSet<MobileParty>();
+
         public FieldAccessGroup<MobileParty, MovementData> TargetPosition =>
             CampaignMapMovement.Movement;
 
@@ -18,15 +27,21 @@ namespace Coop.Mod
 
         public FieldAccess<Campaign, bool> TimeControlModeLock => TimeControl.TimeControlModeLock;
 
-        public GameEnvironmentClient()
+        public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;
+
+        public void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled)
         {
-            Patch.TimeSynchronization.GetAuthoritativeTime += () => AuthoritativeTime;
+            if (isPlayerControlled)
+            {
+                PlayerControlledMobileParties.Add(GetMobilePartyByIndex(iPartyIndex));
+            }
+            else
+            {
+                PlayerControlledMobileParties.Remove(GetMobilePartyByIndex(iPartyIndex));
+            }
         }
 
-        public CampaignTime AuthoritativeTime {
-            get;
-            set;
-        } = CampaignTime.Never;
+        public IEnumerable<MobileParty> PlayerControlledParties => PlayerControlledMobileParties;
 
         public RemoteStore Store =>
             CoopClient.Instance.SyncedObjectStore ??

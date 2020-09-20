@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using Coop.Mod.DebugUtil;
 using JetBrains.Annotations;
 using NLog;
@@ -73,9 +74,10 @@ namespace Coop.Mod.Persistence.Party
                 data);
             m_Environment.TargetPosition.SetTyped(party, data);
 
-            typeof(MobileParty)
-                .GetField("_defaultBehaviorNeedsUpdate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-                .SetValue(party, true);
+            typeof(MobileParty).GetField(
+                                   "_defaultBehaviorNeedsUpdate",
+                                   BindingFlags.Instance | BindingFlags.NonPublic)
+                               .SetValue(party, true);
 
             Replay.ReplayRecording?.Invoke(Id, party, data);
         }
@@ -92,13 +94,20 @@ namespace Coop.Mod.Persistence.Party
             }
         }
 
+        private void OnPlayerControlledChanged()
+        {
+            m_Environment.SetIsPlayerControlled(State.PartyId, State.IsPlayerControlled);
+        }
+
         protected override void OnAdded()
         {
             State.OnMovementChanged += UpdateLocalMovement;
+            State.OnPlayerControlledChanged += OnPlayerControlledChanged;
         }
 
         protected override void OnRemoved()
         {
+            State.OnPlayerControlledChanged -= OnPlayerControlledChanged;
             State.OnMovementChanged -= UpdateLocalMovement;
         }
 

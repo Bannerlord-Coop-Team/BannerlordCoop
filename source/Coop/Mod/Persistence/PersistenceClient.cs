@@ -12,17 +12,18 @@ namespace Coop.Mod.Persistence
 {
     public class PersistenceClient : IUpdateable
     {
-        private readonly IEnvironmentClient m_Environment;
         [NotNull] private readonly RailClient m_RailClient;
-        [CanBeNull] public RailClientPeer Peer => m_RailClient.ServerPeer;
 
         public PersistenceClient(IEnvironmentClient environment)
         {
-            m_Environment = environment;
-            m_RailClient = new RailClient(Registry.Client(environment));
+            Environment = environment;
+            m_RailClient = new RailClient(Registry.Client(Environment));
             Room = m_RailClient.StartRoom();
             RpcSyncHandlers = new RPCSyncHandlers();
         }
+
+        public IEnvironmentClient Environment { get; }
+        [CanBeNull] public RailClientPeer Peer => m_RailClient.ServerPeer;
 
         [NotNull] public RPCSyncHandlers RpcSyncHandlers { get; }
 
