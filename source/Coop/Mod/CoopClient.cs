@@ -53,7 +53,7 @@ namespace Coop.Mod
         private MBGameManager gameManager;
 
         private int m_ReconnectAttempts = MaxReconnectAttempts;
-        private string m_PartyName;
+        private Hero m_Hero;
         private ObjectId m_HeroId;
         public Action<PersistenceClient> OnPersistenceInitialized;
 
@@ -214,7 +214,6 @@ namespace Coop.Mod
                 {
                     if(e is HeroEventArgs args)
                     {
-                        m_PartyName = args.PartyName;
                         m_HeroId = args.HeroId;
 
                         CharacterCreationOver();
@@ -267,6 +266,10 @@ namespace Coop.Mod
                 if (id == m_HeroId)
                 {
                     m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterCreated);
+                    if (obj is Hero hero)
+                    {
+                        m_Hero = hero;
+                    }
                 }
             };
         }
@@ -313,7 +316,7 @@ namespace Coop.Mod
             if (bSuccess)
             {
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
-                gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_PartyName);
+                gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_Hero);
                 MBGameManager.StartNewGame(gameManager);
                 ClientManager.OnPreLoadFinishedEvent += (source, e) => {
                     CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, SendPlayerPartyChanged);
