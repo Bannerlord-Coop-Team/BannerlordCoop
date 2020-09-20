@@ -25,7 +25,7 @@ namespace Coop.Mod.Persistence.World
                 throw new ArgumentException(nameof(value));
             }
 
-            bool modelock = this.m_Environment.GetCurrentCampaign().TimeControlModeLock;
+            bool modelock = m_Environment.GetCurrentCampaign().TimeControlModeLock;
 
             Logger.Trace(
                 "[{tick}] Request time control mode '{mode}'.",
@@ -46,7 +46,7 @@ namespace Coop.Mod.Persistence.World
                 throw new ArgumentException(nameof(value));
             }
 
-            CampaignTimeControlMode mode = this.m_Environment.GetCurrentCampaign().TimeControlMode;
+            CampaignTimeControlMode mode = m_Environment.GetCurrentCampaign().TimeControlMode;
 
             Logger.Trace(
                 "[{tick}] Request time control mode '{mode}'.",
@@ -69,24 +69,32 @@ namespace Coop.Mod.Persistence.World
 
         private void State_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(State.TimeControlMode))
+            switch (e.PropertyName)
             {
-                Logger.Trace(
-                    "[{tick}] Received time controle mode change to '{mode}'.",
-                    Room.Tick,
-                    State.TimeControlMode);
+                case nameof(State.TimeControl):
+                    Logger.Trace(
+                        "[{tick}] Received time control mode change to '{mode}'.",
+                        Room.Tick,
+                        State.TimeControl);
 
-                m_Environment.TimeControlMode.SetTyped(
-                    m_Environment.GetCurrentCampaign(),
-                    State.TimeControlMode.Item1);
+                    m_Environment.TimeControlMode.SetTyped(
+                        m_Environment.GetCurrentCampaign(),
+                        State.TimeControl);
+                    break;
+                case nameof(State.TimeControlLock):
+                    Logger.Trace(
+                        "[{tick}] Received time control lock change to '{lock}'.",
+                        Room.Tick,
+                        State.TimeControlLock);
 
-                m_Environment.TimeControlModeLock.SetTyped(
-                    m_Environment.GetCurrentCampaign(),
-                    State.TimeControlMode.Item2);
-            }
-            else if (e.PropertyName == nameof(State.CampaignTimeTicks))
-            {
-                m_Environment.AuthoritativeTime = Extensions.CreateCampaignTime(State.CampaignTimeTicks);
+                    m_Environment.TimeControlModeLock.SetTyped(
+                        m_Environment.GetCurrentCampaign(),
+                        State.TimeControlLock);
+                    break;
+                case nameof(State.CampaignTimeTicks):
+                    m_Environment.AuthoritativeTime =
+                        Extensions.CreateCampaignTime(State.CampaignTimeTicks);
+                    break;
             }
         }
 

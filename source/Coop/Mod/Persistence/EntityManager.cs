@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Permissions;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.World;
 using NLog;
@@ -25,15 +24,10 @@ namespace Coop.Mod.Persistence
         private readonly Dictionary<MobileParty, RailEntityServer> m_Parties =
             new Dictionary<MobileParty, RailEntityServer>();
 
-        private readonly Dictionary<RailServerPeer, MobileParty> m_ControlledParties =
-            new Dictionary<RailServerPeer, MobileParty>();
-
         private readonly List<MobileParty> m_PartiesToAdd = new List<MobileParty>();
         private readonly RailServerRoom m_Room;
         private readonly RailServer m_Server;
         private RailServerPeer m_Arbiter;
-        public WorldEntityServer WorldEntityServer { get; private set; }
-        public bool SuppressInconsistentStateWarnings { get; set; } = false;
 
         public EntityManager(RailServer server)
         {
@@ -46,6 +40,12 @@ namespace Coop.Mod.Persistence
             m_Server.ClientAdded += OnClientAdded;
             m_Server.ClientRemoved += OnClientRemoved;
         }
+
+        public Dictionary<RailServerPeer, MobileParty> PlayerControllerParties { get; } =
+            new Dictionary<RailServerPeer, MobileParty>();
+
+        public WorldEntityServer WorldEntityServer { get; private set; }
+        public bool SuppressInconsistentStateWarnings { get; set; } = false;
 
         public IReadOnlyCollection<RailEntityServer> Parties => m_Parties.Values;
 
@@ -83,7 +83,8 @@ namespace Coop.Mod.Persistence
         {
             if (Campaign.Current == null)
             {
-                throw new Exception("Unable to initialize game entities: Unexpected state. No game loaded?");
+                throw new Exception(
+                    "Unable to initialize game entities: Unexpected state. No game loaded?");
             }
 
             WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
@@ -115,9 +116,12 @@ namespace Coop.Mod.Persistence
                 if (!m_Parties.ContainsKey(party))
                 {
                     if (!SuppressInconsistentStateWarnings)
+                    {
                         Logger.Warn(
                             "Inconsistent internal state: {party} was removed, but never added.",
                             party);
+                    }
+
                     return;
                 }
 
@@ -141,9 +145,12 @@ namespace Coop.Mod.Persistence
                 if (m_Parties.ContainsKey(party))
                 {
                     if (!SuppressInconsistentStateWarnings)
+                    {
                         Logger.Warn(
                             "Inconsistent internal state: {party} was already registered.",
                             party);
+                    }
+
                     return;
                 }
 
@@ -154,8 +161,8 @@ namespace Coop.Mod.Persistence
         public void AddParty(MobileParty party)
         {
             MobilePartyEntityServer entity =
-                    m_Room.AddNewEntity<MobilePartyEntityServer>(
-                        e => e.State.PartyId = party.Party.Index);
+                m_Room.AddNewEntity<MobilePartyEntityServer>(
+                    e => e.State.PartyId = party.Party.Index);
             Logger.Debug("Added new entity {}.", entity);
 
             lock (m_Lock)
@@ -167,7 +174,7 @@ namespace Coop.Mod.Persistence
         public void GrantPartyControl(MobileParty party, RailServerPeer peer)
         {
             peer.GrantControl(m_Parties[party]);
-            m_ControlledParties.Add(peer, party);
+            PlayerControllerParties.Add(peer, party);
         }
 
         private void OnClientAdded(RailServerPeer peer)
@@ -215,6 +222,7 @@ namespace Coop.Mod.Persistence
             {
                 return MobileParty.MainParty;
             }
+
             return null;
         }
 

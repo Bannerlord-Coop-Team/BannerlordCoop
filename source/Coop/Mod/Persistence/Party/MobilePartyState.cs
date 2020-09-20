@@ -9,9 +9,24 @@ namespace Coop.Mod.Persistence.Party
 {
     public class MobilePartyState : RailState
     {
+        public static readonly int InvalidPartyId = -1;
+        private bool m_IsPlayerControlled;
         private MovementState m_Movement = new MovementState();
-        public readonly static int InvalidPartyId = -1;
         [Immutable] public int PartyId { get; set; } = InvalidPartyId;
+
+        [Mutable]
+        public bool IsPlayerControlled
+        {
+            get => m_IsPlayerControlled;
+            set
+            {
+                if (m_IsPlayerControlled != value)
+                {
+                    m_IsPlayerControlled = value;
+                    OnPlayerControlledChanged?.Invoke();
+                }
+            }
+        }
 
         [Mutable]
         public MovementState Movement
@@ -28,6 +43,7 @@ namespace Coop.Mod.Persistence.Party
         }
 
         public event Action OnMovementChanged;
+        public event Action OnPlayerControlledChanged;
     }
 
     public class MovementState

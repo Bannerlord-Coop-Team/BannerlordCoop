@@ -63,8 +63,15 @@ namespace Coop.Tests.Sync
         public FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
         public FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; }
         public FieldAccess<Campaign, bool> TimeControlModeLock { get; }
-        
+
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Zero;
+
+        public void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled)
+        {
+            throw new NotImplementedException();
+        }
+
+        public IEnumerable<MobileParty> PlayerControlledParties { get; }
         public RemoteStore Store { get; }
 
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)
