@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SandBox.View.Map;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -159,7 +160,6 @@ namespace Coop.Mod.Serializers
                 .GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(hero, lExSpouses);
 
-            
 
             ConstructorInfo ctor = typeof(HeroDeveloper).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance,
                                     null, new Type[] { typeof(Hero) }, null);
@@ -176,6 +176,13 @@ namespace Coop.Mod.Serializers
                 .GetValue(hero);
 
             ownedParties.Add(hero.PartyBelongedTo.Party);
+
+            // Update health due to member starting as injured
+            hero.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(hero);
+
+            // Invoke party visual onstartup to initialize properly
+            typeof(PartyVisual).GetMethod("TaleWorlds.CampaignSystem.IPartyVisual.OnStartup", BindingFlags.Instance | BindingFlags.NonPublic)
+            .Invoke(hero.PartyBelongedTo.Party.Visuals, new object[] { hero.PartyBelongedTo.Party });
 
             return hero;
         }

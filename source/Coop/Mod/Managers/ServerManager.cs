@@ -3,6 +3,7 @@ using Coop.Mod.DebugUtil;
 using Coop.Mod.Serializers;
 using Network.Infrastructure;
 using SandBox;
+using SandBox.View.Map;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -35,9 +36,6 @@ namespace Coop.Mod.Managers
                     if (obj is PlayerHeroSerializer serializedPlayerHero)
                     {
                         Hero hero = (Hero)serializedPlayerHero.Deserialize();
-
-                        // Update health due to member starting as injured
-                        hero.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(hero);
                     }
 
                 };
