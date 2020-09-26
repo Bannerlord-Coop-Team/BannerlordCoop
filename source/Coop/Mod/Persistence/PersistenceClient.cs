@@ -12,7 +12,9 @@ namespace Coop.Mod.Persistence
 {
     /// <summary>
     ///     Manages the <see cref="FieldChangeBuffer" />, that is it calls the responsible handlers
-    ///     for all requested changes once per <see cref="Update" />.
+    ///     for all requested changes once per <see cref="Update" />. As the server is currently
+    ///     running in the host client, this class is also responsible for triggering the serverside
+    ///     field updates!
     /// </summary>
     public class PersistenceClient : IUpdateable
     {
