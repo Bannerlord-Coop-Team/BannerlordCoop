@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Coop.Mod.Persistence;
+using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.RPC;
 using Coop.NetImpl.LiteNet;
 using RailgunNet.Connection.Client;
@@ -99,11 +100,6 @@ namespace Coop.Tests.Sync
         public EventBroadcastingQueue EventQueue { get; }
 
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Campaign GetCurrentCampaign()
         {
             throw new NotImplementedException();
         }

@@ -6,6 +6,9 @@ using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence.World
 {
+    /// <summary>
+    ///     Singular instance representing global world state.
+    /// </summary>
     public class WorldEntityServer : RailEntityServer<WorldState>
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -17,9 +20,19 @@ namespace Coop.Mod.Persistence.World
             m_Environment = environment ?? throw new ArgumentNullException(nameof(environment));
         }
 
+        /// <summary>
+        ///     Written when the server received change requests. Null when the server processed the requests.
+        /// </summary>
         [CanBeNull] public CampaignTimeControlMode? RequestedTimeControlMode { get; set; }
+        
+        /// <summary>
+        ///     Written when the server received change requests. Null when the server processed the requests.
+        /// </summary>
         [CanBeNull] public bool? RequestedTimeControlModeLock { get; set; }
 
+        /// <summary>
+        ///     Updates the authoritative world state
+        /// </summary>
         protected override void UpdateAuthoritative()
         {
             State.CampaignTimeTicks = CampaignTime.Now.GetNumTicks();

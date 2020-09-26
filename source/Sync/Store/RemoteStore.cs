@@ -29,7 +29,7 @@ namespace Sync.Store
     }
 
     /// <summary>
-    ///     Stores arbitrary data that is synchronized to a remote instance a store.
+    ///     Stores arbitrary data that is synchronized to a remote instance of a store.
     ///     Attention: Data added to the store will not be automatically removed! It will be kept
     ///     until it is explicitly removed.
     /// </summary>

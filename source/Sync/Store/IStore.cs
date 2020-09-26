@@ -5,6 +5,21 @@ namespace Sync.Store
 {
     public readonly struct ObjectId
     {
+        public bool Equals(ObjectId other)
+        {
+            return Value == other.Value;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is ObjectId other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return (int) Value;
+        }
+
         public uint Value { get; }
 
         public ObjectId(uint id)

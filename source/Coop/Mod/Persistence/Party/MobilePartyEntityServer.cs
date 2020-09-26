@@ -6,6 +6,10 @@ using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence.Party
 {
+    /// <summary>
+    ///     Railgun: Mobile party implementation for the server. One instance for each mobile party
+    ///     that is registered in the Railgun room.
+    /// </summary>
     public class MobilePartyEntityServer : RailEntityServer<MobilePartyState>
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -17,6 +21,9 @@ namespace Coop.Mod.Persistence.Party
             m_Environment = environment;
         }
 
+        /// <summary>
+        ///     Called when the controller of this party changes.
+        /// </summary>
         protected override void OnControllerChanged()
         {
             if (Controller == null)
@@ -29,16 +36,27 @@ namespace Coop.Mod.Persistence.Party
             }
         }
 
+        /// <summary>
+        ///     Called when this party is added to the Railgun room.
+        /// </summary>
         protected override void OnAdded()
         {
             Register();
         }
 
+        /// <summary>
+        ///     Called when this party is removed from the Railgun room.
+        /// </summary>
         protected override void OnRemoved()
         {
             Unregister();
         }
 
+        /// <summary>
+        ///     Registers handlers to intercept issued movement commands to this party and apply them
+        ///     the authoritative state.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
         private void Register()
         {
             if (m_Instance == null && Controller == null)
@@ -53,10 +71,13 @@ namespace Coop.Mod.Persistence.Party
                     return;
                 }
 
-                m_Environment.TargetPosition.SetHandler(m_Instance, GoToPosition);
+                m_Environment.TargetPosition.SetHandler(m_Instance, SetMovement);
             }
         }
 
+        /// <summary>
+        ///     Unregisters all handlers.
+        /// </summary>
         private void Unregister()
         {
             if (m_Instance != null)
@@ -66,7 +87,12 @@ namespace Coop.Mod.Persistence.Party
             }
         }
 
-        private void GoToPosition(object val)
+        /// <summary>
+        ///     Handler to apply a movement command to the authoritative state.
+        /// </summary>
+        /// <param name="val">MovementData</param>
+        /// <exception cref="ArgumentException"></exception>
+        private void SetMovement(object val)
         {
             MovementData data = val as MovementData;
             if (data == null)

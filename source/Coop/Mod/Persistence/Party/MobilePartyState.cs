@@ -7,13 +7,24 @@ using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.Party
 {
+    /// <summary>
+    ///     State for a mobile party entity.
+    /// </summary>
     public class MobilePartyState : RailState
     {
         public static readonly int InvalidPartyId = -1;
         private bool m_IsPlayerControlled;
         private MovementState m_Movement = new MovementState();
-        [Immutable] public int PartyId { get; set; } = InvalidPartyId;
 
+        /// <summary>
+        ///     Party ID as found in <see cref="TaleWorlds.CampaignSystem.MobileParty.Party.Index" />.
+        /// </summary>
+        [Immutable]
+        public int PartyId { get; set; } = InvalidPartyId;
+
+        /// <summary>
+        ///     Is the party controlled by any player?
+        /// </summary>
         [Mutable]
         public bool IsPlayerControlled
         {
@@ -28,6 +39,9 @@ namespace Coop.Mod.Persistence.Party
             }
         }
 
+        /// <summary>
+        ///     Movement data for the party.
+        /// </summary>
         [Mutable]
         public MovementState Movement
         {
@@ -46,6 +60,9 @@ namespace Coop.Mod.Persistence.Party
         public event Action OnPlayerControlledChanged;
     }
 
+    /// <summary>
+    ///     Contains all data relevant to a movement command in serializable format.
+    /// </summary>
     public class MovementState
     {
         public static MBGUID InvalidIndex = new MBGUID(0xDEADBEEF);
@@ -79,6 +96,9 @@ namespace Coop.Mod.Persistence.Party
         }
     }
 
+    /// <summary>
+    ///     Railgun encoder & decoder for the movement data.
+    /// </summary>
     public static class MovementStateSerializer
     {
         public static Compression.Coordinate2d CoordinateCompressor { get; } =

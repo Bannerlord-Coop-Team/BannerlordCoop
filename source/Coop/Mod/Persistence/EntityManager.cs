@@ -12,7 +12,7 @@ using TaleWorlds.CampaignSystem;
 namespace Coop.Mod.Persistence
 {
     /// <summary>
-    ///     Makes sure that each game entity the requires synchronization has a corresponding
+    ///     Makes sure that each game entity that requires synchronization has a corresponding
     ///     entity in the persistence framework.
     /// </summary>
     public class EntityManager
@@ -27,7 +27,6 @@ namespace Coop.Mod.Persistence
         private readonly List<MobileParty> m_PartiesToAdd = new List<MobileParty>();
         private readonly RailServerRoom m_Room;
         private readonly RailServer m_Server;
-        private RailServerPeer m_Arbiter;
 
         public EntityManager(RailServer server)
         {
@@ -181,7 +180,6 @@ namespace Coop.Mod.Persistence
         {
             if (IsArbiter(peer))
             {
-                m_Arbiter = peer;
             }
 
             MobileParty party = GetPlayerParty(peer);

@@ -10,6 +10,10 @@ using Sync;
 
 namespace Coop.Mod.Persistence
 {
+    /// <summary>
+    ///     Manages the <see cref="FieldChangeBuffer" />, that is it calls the responsible handlers
+    ///     for all requested changes once per <see cref="Update" />.
+    /// </summary>
     public class PersistenceClient : IUpdateable
     {
         [NotNull] private readonly RailClient m_RailClient;
