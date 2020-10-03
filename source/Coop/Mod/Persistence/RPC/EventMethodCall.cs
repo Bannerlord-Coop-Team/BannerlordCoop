@@ -60,6 +60,7 @@ namespace Coop.Mod.Persistence.RPC
                     method.CallOriginal(
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Instance),
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Arguments));
+                    PendingRequests.Instance.Remove(Call);
                 }
             }
             else

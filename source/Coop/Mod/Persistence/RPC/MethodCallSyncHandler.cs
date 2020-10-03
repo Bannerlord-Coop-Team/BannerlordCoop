@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using Common;
 using JetBrains.Annotations;
+using NLog;
 using RailgunNet;
 using RailgunNet.Connection.Client;
 using RailgunNet.System.Types;
@@ -19,6 +20,8 @@ namespace Coop.Mod.Persistence.RPC
     [OnlyIn(Component.Client)]
     public class MethodCallSyncHandler
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        
         [NotNull] private readonly IClientAccess m_ClientAccess;
         private bool m_IsRegistered;
 
@@ -57,21 +60,31 @@ namespace Coop.Mod.Persistence.RPC
                 {
                     if (args is object[] objects)
                     {
-                        m_ClientAccess.GetRoom()
-                                      ?.RaiseEvent<EventMethodCall>(
-                                          evt =>
-                                          {
-                                              evt.Call = new MethodCall
+                        bool bDebounce =
+                            MethodAccess.Flags.HasFlag(EMethodPatchFlag.DebounceCalls);
+                        MethodCall call = new MethodCall(
+                            MethodAccess.Id,
+                            ArgumentFactory.Create(
+                                m_ClientAccess.GetStore(),
+                                instance,
+                                false),
+                            ProduceArguments(objects));
+
+                        if (bDebounce && PendingRequests.Instance.IsPending(call))
+                        {
+                            Logger.Debug("Debounced RPC {}", call);
+                        }
+                        else
+                        {
+                            PendingRequests.Instance.Add(call);
+                            m_ClientAccess.GetRoom()
+                                          ?.RaiseEvent<EventMethodCall>(
+                                              evt =>
                                               {
-                                                  Id = MethodAccess.Id,
-                                                  Instance = ArgumentFactory.Create(
-                                                      m_ClientAccess.GetStore(),
-                                                      instance,
-                                                      false),
-                                                  Arguments = ProduceArguments(objects)
-                                              };
-                                              Trace(evt.Call, m_ClientAccess.GetRoom());
-                                          });
+                                                  evt.Call = call;
+                                                  Trace(evt.Call, m_ClientAccess.GetRoom());
+                                              });
+                        }
                     }
                     else
                     {

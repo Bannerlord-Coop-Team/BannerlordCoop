@@ -23,7 +23,7 @@ namespace Coop.Mod.Persistence.RPC
         ///     DEBUG to identify situations where events are starving in the queue. Might need
         ///     to be adjusted depending on how much is done using events.
         /// </summary>
-        public static readonly int MaximumQueueSize = Main.DEBUG ? 128 : 8192;
+        public static readonly int MaximumQueueSize = Main.DEBUG ? 512 : 8192;
 
         private readonly OrderedHashSet<ObjectId> m_DistributedObjects =
             new OrderedHashSet<ObjectId>();
@@ -174,8 +174,8 @@ namespace Coop.Mod.Persistence.RPC
             public bool TryBroadcast()
             {
                 if (!IsReadyToBeSent()) return false;
+                Logger.Trace("Broadcast: {event}", RPC.Call);
                 Room.BroadcastEvent(RPC);
-                Logger.Trace("[{event}] Broadcast", RPC);
                 return true;
             }
         }

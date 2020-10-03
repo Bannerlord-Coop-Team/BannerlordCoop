@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using NLog;
 using RailgunNet;
 using RailgunNet.System.Encoding;
@@ -16,6 +17,7 @@ namespace Coop.Mod.Persistence.RPC
         [Encoder]
         public static void WriteMethodCall(this RailBitBuffer buffer, MethodCall pack)
         {
+            int bufferSizeBefore = buffer.ByteSize;
             buffer.WriteInt(pack.Id.InternalValue);
             buffer.EncodeEventArg(pack.Instance);
             buffer.WriteInt(pack.Arguments.Count);
@@ -24,7 +26,8 @@ namespace Coop.Mod.Persistence.RPC
                 buffer.EncodeEventArg(arg);
             }
 
-            if (buffer.ByteSize > RailConfig.MAXSIZE_EVENT)
+            int eventByteSize = buffer.ByteSize - bufferSizeBefore;
+            if (eventByteSize > RailConfig.MAXSIZE_EVENT)
             {
                 // Railgun will not be able to pack the event into a frame. This means the RPC will
                 // never be synchronized. This is a fundamental issue which cannot be ignored!
@@ -48,16 +51,16 @@ namespace Coop.Mod.Persistence.RPC
         [Decoder]
         public static MethodCall ReadMethodCall(this RailBitBuffer buffer)
         {
-            MethodCall pack = new MethodCall();
-            pack.Id = new MethodId(buffer.ReadInt());
-            pack.Instance = buffer.DecodeEventArg();
+            MethodId id = new MethodId(buffer.ReadInt());
+            Argument instance = buffer.DecodeEventArg();
             int iNumberOfArguments = buffer.ReadInt();
+            List<Argument> args = new List<Argument>();
             for (int i = 0; i < iNumberOfArguments; ++i)
             {
-                pack.Arguments.Add(buffer.DecodeEventArg());
+                args.Add(buffer.DecodeEventArg());
             }
-
-            return pack;
+            
+            return new MethodCall(id, instance, args);
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 
 namespace Common
 {
@@ -36,6 +37,9 @@ namespace Common
                 return m_Max.Value;
             }
         }
+        
+        public long AllTimeMin { get; private set; } = Int64.MaxValue;
+        public long AllTimeMax { get; private set; } = Int64.MinValue;
 
         public MovingAverage(int size)
         {
@@ -67,6 +71,9 @@ namespace Common
 
             m_Min = null;
             m_Max = null;
+            
+            AllTimeMin = Math.Min(AllTimeMin, value);
+            AllTimeMax = Math.Max(AllTimeMax, value);
             
             return Average;
         }

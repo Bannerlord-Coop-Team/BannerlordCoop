@@ -5,6 +5,7 @@ using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
 using Sync.Store;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.RPC
@@ -61,6 +62,8 @@ namespace Coop.Mod.Persistence.RPC
                         resolvedObject.GetType());
                     store.Remove(arg.StoreObjectId.Value);
                     return resolvedObject;
+                case EventArgType.CurrentCampaign:
+                    return Campaign.Current;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -111,7 +114,13 @@ namespace Coop.Mod.Persistence.RPC
                     return bTransferByValue ?
                         new Argument(store.Insert(obj)) :
                         new Argument(mbobj.Id);
-
+                case Campaign campaign:
+                    if (campaign == Campaign.Current)
+                    {
+                        return Argument.CurrentCampaign;
+                    }
+                    // New campaign? Send by value
+                    return new Argument(store.Insert(obj));
                 default:
                     return new Argument(store.Insert(obj));
             }

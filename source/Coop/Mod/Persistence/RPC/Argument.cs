@@ -1,5 +1,6 @@
 ﻿using System;
 using Sync.Store;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.RPC
@@ -19,6 +20,7 @@ namespace Coop.Mod.Persistence.RPC
     ///     4. Implement <see cref="ArgumentFactory.Create" />
     ///     5. Implement encoder & decoder in <see cref="ArgumentSerializer" />
     ///     6. Add case for the new type in <see cref="Argument.ToString" />
+    ///     7. Add new argument type to hash <see cref="Argument.GetHashCode" />
     /// </summary>
     public enum EventArgType
     {
@@ -27,22 +29,27 @@ namespace Coop.Mod.Persistence.RPC
         MBObject,
         Int,
         Float,
-        StoreObjectId
+        StoreObjectId,
+        CurrentCampaign
     }
 
-    public struct Argument
+    /// <summary>
+    ///     Type union for arguments to a RPC.
+    /// </summary>
+    public readonly struct Argument
     {
-        public static Argument Null = new Argument
-        {
-            EventType = EventArgType.Null
-        };
+        public static Argument Null = new Argument(EventArgType.Null);
 
-        public static Argument MBObjectManager = new Argument
-        {
-            EventType = EventArgType.MBObjectManager
-        };
+        public static Argument CurrentCampaign = new Argument(EventArgType.CurrentCampaign);
 
-        public EventArgType EventType { get; private set; }
+        public static Argument MBObjectManager = new Argument(EventArgType.MBObjectManager);
+
+        private Argument(EventArgType eType) : this()
+        {
+            EventType = eType;
+        }
+
+        public EventArgType EventType { get; }
         public MBGUID? MbGUID { get; }
 
         public int? Int { get; }
@@ -73,6 +80,42 @@ namespace Coop.Mod.Persistence.RPC
             StoreObjectId = id;
         }
 
+        public override int GetHashCode()
+        {
+            int hash = (int) EventType;
+            int? argHash = null;
+            switch (EventType)
+            {
+                case EventArgType.Null:
+                    break;
+                case EventArgType.MBObjectManager:
+                    break;
+                case EventArgType.MBObject:
+                    argHash = MbGUID.Value.GetHashCode();
+                    break;
+                case EventArgType.Int:
+                    argHash = Int.Value.GetHashCode();
+                    break;
+                case EventArgType.Float:
+                    argHash = Float.Value.GetHashCode();
+                    break;
+                case EventArgType.StoreObjectId:
+                    argHash = StoreObjectId.Value.GetHashCode();
+                    break;
+                case EventArgType.CurrentCampaign:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+
+            if (argHash.HasValue)
+            {
+                hash = (hash * 397) ^ argHash.Value;
+            }
+            
+            return hash;
+        }
+
         public override string ToString()
         {
             switch (EventType)
@@ -82,16 +125,27 @@ namespace Coop.Mod.Persistence.RPC
                 case EventArgType.MBObjectManager:
                     return "MBObjectManager";
                 case EventArgType.MBObject:
-                    return $"MBGUID {MbGUID}";
+                    object obj = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject(MbGUID.Value);
+                    if (obj is MobileParty party)
+                    {
+                        return String.Format(
+                            "\"{0, 4}:{1}\"",
+                            party.Party.Index,
+                            party.Party.Name.ToString());
+                    }
+                    return $"\"{obj}\"";
                 case EventArgType.Int:
                     return Int.ToString();
                 case EventArgType.Float:
                     return Float.ToString();
                 case EventArgType.StoreObjectId:
                     return $"{StoreObjectId.ToString()}";
+                case EventArgType.CurrentCampaign:
+                    return "Campaign.Current";
                 default:
                     throw new ArgumentOutOfRangeException();
             }
         }
+        
     }
 }
