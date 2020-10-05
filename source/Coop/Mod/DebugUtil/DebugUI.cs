@@ -363,7 +363,9 @@ namespace Coop.Mod.DebugUtil
                     Imgui.Text(
                         $"Event queue {queue.Count}/{EventBroadcastingQueue.MaximumQueueSize}.");
                     Imgui.Text(
-                        $"    min {m_AverageEventsInQueue.Min} / avg {Math.Round(m_AverageEventsInQueue.Average)} / max {m_AverageEventsInQueue.Max}.");
+                        $"    min {m_AverageEventsInQueue.AllTimeMin} / avg {Math.Round(m_AverageEventsInQueue.Average)} / max {m_AverageEventsInQueue.AllTimeMax}.");
+                    Imgui.Text(
+                        $"Pending RPC: {PendingRequests.Instance.PendingRequestCount()}");
                 }
 
                 foreach (MethodCallSyncHandler handler in manager.Handlers)

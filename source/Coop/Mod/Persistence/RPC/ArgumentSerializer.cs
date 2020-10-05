@@ -43,6 +43,9 @@ namespace Coop.Mod.Persistence.RPC
                 case EventArgType.StoreObjectId:
                     buffer.WriteUInt(arg.StoreObjectId.Value.Value);
                     break;
+                case EventArgType.CurrentCampaign:
+                    // Empty
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -68,6 +71,8 @@ namespace Coop.Mod.Persistence.RPC
                     return new Argument(f);
                 case EventArgType.StoreObjectId:
                     return new Argument(new ObjectId(buffer.ReadUInt()));
+                case EventArgType.CurrentCampaign:
+                    return Argument.CurrentCampaign;
                 default:
                     throw new ArgumentOutOfRangeException();
             }

@@ -73,7 +73,8 @@ namespace Coop.Mod
                 {
                     throw new Exception("Invalid [PatchInitializer]. Has to be static.");
                 }
-
+                
+                Logger.Info("Init patch {}", initializer.DeclaringType);
                 initializer.Invoke(null, null);
             }
 
