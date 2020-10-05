@@ -4,6 +4,9 @@ using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence.World
 {
+    /// <summary>
+    ///     Global world state.
+    /// </summary>
     public class WorldState : RailState, INotifyPropertyChanged
     {
 #pragma warning disable 67

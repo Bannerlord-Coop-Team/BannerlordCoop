@@ -3,6 +3,9 @@ using TaleWorlds.Library;
 
 namespace Coop.Mod.Persistence
 {
+    /// <summary>
+    ///     Comparison methods for data that is being exchanged.
+    /// </summary>
     public class Compare
     {
         public const float COORDINATE_PRECISION = 0.001f;

@@ -6,8 +6,14 @@ using TaleWorlds.Library;
 
 namespace Coop.Mod.Persistence
 {
+    /// <summary>
+    ///     Provides Railgun data compression for TaleWorld classes
+    /// </summary>
     public class Compression
     {
+        /// <summary>
+        ///     Map size is limited, we do not need the full float range.
+        /// </summary>
         public class Coordinate2d
         {
             private readonly RailFloatCompressor m_Compressor;

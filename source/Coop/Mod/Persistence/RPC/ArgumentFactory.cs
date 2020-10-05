@@ -72,7 +72,6 @@ namespace Coop.Mod.Persistence.RPC
         /// <summary>
         ///     Resolves a list of transferred RPC arguments to be used in the local function call.
         /// </summary>
-        /// <param name="room">Rail room for the local client.</param>
         /// <param name="store">Clients remote store instance.</param>
         /// <param name="args">Argument to be resolved.</param>
         /// <returns>A list of the unwrapped arguments.</returns>
@@ -102,7 +101,7 @@ namespace Coop.Mod.Persistence.RPC
             {
                 case null:
                     return Argument.Null;
-                case MBObjectManager mbObjectManager:
+                case MBObjectManager _:
                     return Argument.MBObjectManager;
                 case MBGUID guid:
                     return new Argument(guid);
@@ -110,7 +109,7 @@ namespace Coop.Mod.Persistence.RPC
                     return new Argument(i);
                 case float f:
                     return new Argument(f);
-                case MBObjectBase mbobj:
+                case MBObjectBase mbObject:
                     return bTransferByValue ?
                         new Argument(store.Insert(obj)) :
                         new Argument(mbobj.Id);

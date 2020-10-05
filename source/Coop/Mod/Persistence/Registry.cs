@@ -6,6 +6,9 @@ using RailgunNet.Factory;
 
 namespace Coop.Mod.Persistence
 {
+    /// <summary>
+    ///     Factory methods to create the Railgun registry for client & server.
+    /// </summary>
     public static class Registry
     {
         public static RailRegistry Server(IEnvironmentServer environment)

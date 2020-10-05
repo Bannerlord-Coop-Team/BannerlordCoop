@@ -4,6 +4,9 @@ using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence
 {
+    /// <summary>
+    ///     Extensions for Railgun to encode & decode TaleWorlds classes.
+    /// </summary>
     public static class RailBitBufferExtensions
     {
         [Encoder]
@@ -35,13 +38,13 @@ namespace Coop.Mod.Persistence
         [Encoder]
         public static void WriteCampaignTime(this RailBitBuffer buffer, CampaignTime time)
         {
-            buffer.WriteUInt64((ulong)time.ToMilliseconds);
+            buffer.WriteUInt64((ulong) time.ToMilliseconds);
         }
 
         [Decoder]
         public static CampaignTime ReadCampaignTime(this RailBitBuffer buffer)
         {
-            return CampaignTime.Milliseconds((long)buffer.ReadUInt64());
+            return CampaignTime.Milliseconds((long) buffer.ReadUInt64());
         }
     }
 }

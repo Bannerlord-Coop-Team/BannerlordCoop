@@ -1,4 +1,5 @@
 ﻿using Coop.Mod.Persistence;
+using Coop.Mod.Persistence.Party;
 using Sync;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
