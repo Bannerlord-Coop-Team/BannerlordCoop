@@ -1,7 +1,7 @@
 ﻿using Coop.Mod.Persistence;
 using RailgunNet.System.Encoding;
 using RailgunNet.System.Types;
-using System.Text;
+using Coop.Mod.Persistence.Party;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 

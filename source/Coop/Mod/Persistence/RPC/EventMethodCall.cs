@@ -53,7 +53,7 @@ namespace Coop.Mod.Persistence.RPC
                     Logger.Trace("[{eventId}] Broadcast SyncCall: {call}", EventId, Call);
                     m_EnvironmentServer.EventQueue.Add(serverRoom, this);
                 }
-                else if (room is RailClientRoom clientRoom)
+                else if (room is RailClientRoom)
                 {
                     Logger.Trace("[{eventId}] SyncCall: {call}", EventId, Call);
                     // TODO: The call is not synchronized to a campaign time at this point. We probably want an execution queue of some sorts that executes the call at the right point in time.

@@ -7,6 +7,9 @@ using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence.World
 {
+    /// <summary>
+    ///     Singular instance representing global world state.
+    /// </summary>
     public class WorldEntityClient : RailEntityClient<WorldState>
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -18,6 +21,12 @@ namespace Coop.Mod.Persistence.World
             m_Environment = environment ?? throw new ArgumentNullException(nameof(environment));
         }
 
+        /// <summary>
+        ///     Called to request a change to the time control mode on the server.
+        /// </summary>
+        /// <param name="instance"></param>
+        /// <param name="value"></param>
+        /// <exception cref="ArgumentException"></exception>
         private void RequestTimeControlChange(object instance, object value)
         {
             if (!(value is CampaignTimeControlMode mode))
@@ -39,6 +48,12 @@ namespace Coop.Mod.Persistence.World
                 });
         }
 
+        /// <summary>
+        ///     Called to request a change to the time control lock on the server.
+        /// </summary>
+        /// <param name="instance"></param>
+        /// <param name="value"></param>
+        /// <exception cref="ArgumentException"></exception>
         private void RequestTimeControlLockChange(object instance, object value)
         {
             if (!(value is bool modelock))
@@ -60,6 +75,9 @@ namespace Coop.Mod.Persistence.World
                 });
         }
 
+        /// <summary>
+        ///     Called when the world entity was added to the Railgun room.
+        /// </summary>
         protected override void OnAdded()
         {
             m_Environment.TimeControlMode.SetGlobalHandler(RequestTimeControlChange);
@@ -67,6 +85,11 @@ namespace Coop.Mod.Persistence.World
             State.PropertyChanged += State_PropertyChanged;
         }
 
+        /// <summary>
+        ///     Handler when any property in the world state object was changed.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void State_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             switch (e.PropertyName)
@@ -98,6 +121,9 @@ namespace Coop.Mod.Persistence.World
             }
         }
 
+        /// <summary>
+        ///     Called when the world entity was removed from the Railgun room.
+        /// </summary>
         protected override void OnRemoved()
         {
             m_Environment.TargetPosition.RemoveGlobalHandler();

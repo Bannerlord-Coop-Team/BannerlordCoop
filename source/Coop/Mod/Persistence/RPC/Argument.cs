@@ -30,6 +30,9 @@ namespace Coop.Mod.Persistence.RPC
         StoreObjectId
     }
 
+    /// <summary>
+    ///     Type union for arguments to a RPC.
+    /// </summary>
     public struct Argument
     {
         public static Argument Null = new Argument

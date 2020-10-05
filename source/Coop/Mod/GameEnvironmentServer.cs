@@ -2,6 +2,7 @@
 using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
+using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.RPC;
 using NLog;
 using Sync;
@@ -30,11 +31,6 @@ namespace Coop.Mod
                     ret = MobileParty.All.SingleOrDefault(p => p.Party.Index == iPartyIndex);
                 });
             return ret;
-        }
-
-        public Campaign GetCurrentCampaign()
-        {
-            return Campaign.Current;
         }
 
         public SharedRemoteStore Store =>

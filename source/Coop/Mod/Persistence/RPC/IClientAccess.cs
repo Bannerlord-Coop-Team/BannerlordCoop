@@ -4,6 +4,9 @@ using Sync.Store;
 
 namespace Coop.Mod.Persistence.RPC
 {
+    /// <summary>
+    ///     Interface to access a clients persistence state. 
+    /// </summary>
     public interface IClientAccess
     {
         [CanBeNull]

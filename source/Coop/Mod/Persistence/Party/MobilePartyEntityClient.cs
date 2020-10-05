@@ -9,6 +9,10 @@ using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.Party
 {
+    /// <summary>
+    ///     Railgun: Mobile party implementation for clients. One instance for each mobile party
+    ///     that is registered in the Railgun room.
+    /// </summary>
     public class MobilePartyEntityClient : RailEntityClient<MobilePartyState>
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -21,7 +25,12 @@ namespace Coop.Mod.Persistence.Party
             m_Environment = environment;
         }
 
-        private void GoToPosition(object val)
+        /// <summary>
+        ///     Handler to issue a move command for this party to the server.
+        /// </summary>
+        /// <param name="val">MovementData</param>
+        /// <exception cref="ArgumentException"></exception>
+        private void SendMoveRequest(object val)
         {
             MovementData data = val as MovementData;
             if (data == null)
@@ -44,6 +53,10 @@ namespace Coop.Mod.Persistence.Party
                 });
         }
 
+        /// <summary>
+        ///     Handler to apply a received move command for this party.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
         private void UpdateLocalMovement()
         {
             if (State.PartyId == MobilePartyState.InvalidPartyId)
@@ -82,10 +95,14 @@ namespace Coop.Mod.Persistence.Party
             Replay.ReplayRecording?.Invoke(Id, party, data);
         }
 
+        /// <summary>
+        ///     Called when the controller of this party changes.
+        /// </summary>
         protected override void OnControllerChanged()
         {
             if (Controller != null)
             {
+                // We control the party now.
                 Register();
             }
             else
@@ -94,23 +111,38 @@ namespace Coop.Mod.Persistence.Party
             }
         }
 
+        /// <summary>
+        ///     Handler to be called when the control of this party changes to or from any player.
+        /// </summary>
         private void OnPlayerControlledChanged()
         {
             m_Environment.SetIsPlayerControlled(State.PartyId, State.IsPlayerControlled);
         }
 
+        /// <summary>
+        ///     Called when this party is added to the Railgun room.
+        /// </summary>
         protected override void OnAdded()
         {
             State.OnMovementChanged += UpdateLocalMovement;
             State.OnPlayerControlledChanged += OnPlayerControlledChanged;
         }
 
+        /// <summary>
+        ///     Called when this party is removed from the Railgun room.
+        /// </summary>
         protected override void OnRemoved()
         {
             State.OnPlayerControlledChanged -= OnPlayerControlledChanged;
             State.OnMovementChanged -= UpdateLocalMovement;
         }
 
+        /// <summary>
+        ///     Registers handlers to intercept issued movement commands to this party and send
+        ///     them to the server. Should only be called for parties that are controlled by
+        ///     this client.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
         private void Register()
         {
             if (m_Instance == null && Controller != null)
@@ -121,10 +153,13 @@ namespace Coop.Mod.Persistence.Party
                     throw new Exception($"Mobile party id {State.PartyId} not found.");
                 }
 
-                m_Environment.TargetPosition.SetHandler(m_Instance, GoToPosition);
+                m_Environment.TargetPosition.SetHandler(m_Instance, SendMoveRequest);
             }
         }
 
+        /// <summary>
+        ///     Unregisters all handlers.
+        /// </summary>
         private void Unregister()
         {
             if (m_Instance != null)
