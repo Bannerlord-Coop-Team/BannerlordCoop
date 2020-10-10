@@ -16,7 +16,7 @@ namespace Coop.Mod.Serializers
 
         public EquipmentElementSerializer(EquipmentElement equipmentElement)
         {
-            itemModifier = (equipmentElement.ItemModifier != null) ? equipmentElement.ItemModifier.ID : "";
+            itemModifier = (equipmentElement.ItemModifier != null) ? equipmentElement.ItemModifier.Name.ToString() : "";
             ItemObject item = equipmentElement.Item;
             id = (item != null) ? item.Id.InternalValue : 0U;
         }
