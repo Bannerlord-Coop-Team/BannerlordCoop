@@ -59,6 +59,11 @@ namespace Coop.Mod.DebugUtil
         {
         }
 
+        public void ShowMessageBox(string lpText, string lpCaption, uint uType)
+        {
+            Logger.Debug("{caption}: {message}", lpCaption, lpText);
+        }
+
         public void DisplayDebugMessage(string message)
         {
             Logger.Debug("{message}", message);
