@@ -112,7 +112,7 @@ namespace Coop.Mod.Persistence.RPC
                 case MBObjectBase mbObject:
                     return bTransferByValue ?
                         new Argument(store.Insert(obj)) :
-                        new Argument(mbobj.Id);
+                        new Argument(mbObject.Id);
                 case Campaign campaign:
                     if (campaign == Campaign.Current)
                     {
