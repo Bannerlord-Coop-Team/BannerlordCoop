@@ -26,7 +26,7 @@ namespace Coop.Mod.Persistence.Party
                     "[{tick}] Ack move entity {id} to {position}.",
                     room.Tick,
                     EntityId,
-                    Movement);
+                    Movement.ToString());
                 entity.State.Movement = Movement;
             }
             else

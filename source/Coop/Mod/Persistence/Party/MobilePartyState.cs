@@ -94,6 +94,12 @@ namespace Coop.Mod.Persistence.Party
             // TODO: What's supposed to happen here? The Equals override is necessary because of the coordinates comparision.
             return base.GetHashCode();
         }
+
+        public override string ToString()
+        {
+            return
+                $"Party: {TargetPartyIndex}, Settlement: {SettlementIndex}, Behaviour: {DefaultBehavior}, Position {Position}";
+        }
     }
 
     /// <summary>
