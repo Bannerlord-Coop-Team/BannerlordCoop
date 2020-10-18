@@ -381,7 +381,7 @@
     <Compile Include="NetImpl\LiteNet\LiteNetConnection.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerServer.cs" />
     <Compile Include="NetImpl\LiteNet\RailNetPeerWrapper.cs" />
-    <Compile Include="NetImpl\Platform.cs" />
+    <Compile Include="NetImpl\PlatformAPI.cs" />
     <Compile Include="NetImpl\Steam\NetworkSteam.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
