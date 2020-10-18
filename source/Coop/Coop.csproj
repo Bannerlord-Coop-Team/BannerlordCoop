@@ -67,6 +67,13 @@
     <Reference Include="DistributedLock, Version=1.5.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\DistributedLock.1.5.0\lib\net45\DistributedLock.dll</HintPath>
     </Reference>
+    <Reference Include="EOSSDK-CSharp, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\EOSSDK-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="GalaxyCSharp">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\GalaxyCSharp.dll</HintPath>
+    </Reference>
     <Reference Include="Mono.Reflection, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756, processorArchitecture=MSIL">
       <HintPath>..\packages\Mono.Reflection.2.0.0\lib\net40\Mono.Reflection.dll</HintPath>
     </Reference>
@@ -235,6 +242,9 @@
     </Reference>
     <Reference Include="TaleWorlds.PlatformService.Epic">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Epic.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.PlatformService.GOG">
+      <HintPath>..\..\..\..\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.GOG.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.PlatformService.Steam">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Steam.dll</HintPath>
