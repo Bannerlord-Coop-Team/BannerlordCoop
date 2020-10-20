@@ -20,8 +20,11 @@ namespace Coop.NetImpl
         private IPlatformServices platformServices;
         private static readonly NLog.Logger Logger = LogManager.GetCurrentClassLogger();
 
-        //Public to make testing easier (inject mocks). Since the services are retrieved during runtime (other than in unit tests),
-        //use PlatformAPI() to make a PlatformAPI with the retrieved services from the current platform.
+        /*
+         * This constructor should basically only be used for testing. 
+        * Since the services are retrieved during runtime from TaleWorlds' PlatformService (other than in unit tests),
+        * use PlatformAPI() to make a PlatformAPI with the retrieved services from the current platform.
+        */
         public PlatformAPI(IFriendListService friendListService, IPlatformServices platformServices)
         {
             this.friendListService = friendListService;
@@ -38,7 +41,8 @@ namespace Coop.NetImpl
         public string GetPlayerName()
         {
             PlayerId playerId = GetPlayerID();
-            return friendListService.GetUserName(playerId).Result;
+            string playerName = playerId.Equals(PlayerId.Empty) ? "Player" : friendListService.GetUserName(playerId).Result;
+            return playerName;
         }
 
         //TaleWorlds' IPlatformServices interface doesn't have a way to get the current user's name other than
@@ -47,11 +51,10 @@ namespace Coop.NetImpl
         //so this method is needed to convert the User ID to the PlayerId depending on the platform.
         public PlayerId GetPlayerID()
         {
-            //TODO: Add references to GOG and Epic APIs and implement the GOG and Epic PlayerID retrieval
             string currentPlatformName = friendListService.GetServiceName();
-            PlayerId playerId = new PlayerId();
+            PlayerId playerId = PlayerId.Empty;
 
-            string userIdString = GetUserID();
+            string userIdString = platformServices.UserId;
 
             switch (currentPlatformName)
             {
@@ -60,26 +63,37 @@ namespace Coop.NetImpl
                     CSteamID steamId = new CSteamID(userIdUlong);
                     playerId = SteamPlayerIdExtensions.ToPlayerId(steamId);
                     break;
-                case "GOG":
-                    userIdUlong = Convert.ToUInt64(userIdString);
-                    GalaxyID galaxyId = new GalaxyID(userIdUlong);
-                    playerId = TaleWorlds.PlatformService.GOG.SteamPlayerIdExtensions.ToPlayerId(galaxyId);
-                    break;
-                case "Epic":
-                    EpicAccountId epicId = EpicAccountId.FromString(userIdString);
+                //TODO: uncomment this once we can get GalaxyCSharpGlue.dll referenced properly
+                //case "GOG":
+                //    userIdUlong = Convert.ToUInt64(userIdString);
+                //    GalaxyID galaxyId = new GalaxyID(userIdUlong);
+                //    playerId = TaleWorlds.PlatformService.GOG.SteamPlayerIdExtensions.ToPlayerId(galaxyId);
+                //    break;
+                //TODO: uncomment this once we can get EOSSDK.dll referenced properly
+                //case "Epic":
+                //    EpicAccountId epicId = EpicAccountId.FromString(userIdString);
 
-                    //I just copy pasted the implementation TaleWorlds.PlatformService.Epic.EpicPlatformService because the method EpicAccountIdToPlayerId is private
-                    //EpicAccountIdToPlayerId(epicId)
-                    StringBuilder stringBuilder = new StringBuilder(64);
-                    int capacity = stringBuilder.Capacity;
-                    epicId.ToString(stringBuilder, ref capacity);
-                    playerId = new PlayerId(3, stringBuilder.ToString());
+                //    //I just copy pasted the implementation TaleWorlds.PlatformService.Epic.EpicPlatformService because the method EpicAccountIdToPlayerId is private
+                //    //EpicAccountIdToPlayerId(epicId)
+                //    StringBuilder stringBuilder = new StringBuilder(64);
+                //    int capacity = stringBuilder.Capacity;
+                //    epicId.ToString(stringBuilder, ref capacity);
+                //    playerId = new PlayerId(3, stringBuilder.ToString());
+                //    break;
+                default:
+                    Logger.Warn("Attempted to retrieve player ID for unsupported platform.");
                     break;
             }
 
             return playerId;
         }
 
+        /*
+         * Returns the platform-specific User ID. For example, if the user is playing through Steam,
+         * this should be the steamID64 of the user, e.g. 76561198092541763. See https://developer.valvesoftware.com/wiki/SteamID
+         * NOTE: This is not a PlayerId. GetPlayerID() returns a PlayerId object that 
+         * many of the methods in TaleWorlds' PlatformServices use. 
+         */
         public string GetUserID()
         {
             return platformServices.UserId;

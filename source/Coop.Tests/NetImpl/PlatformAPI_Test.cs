@@ -23,17 +23,17 @@ namespace Coop.Tests.NetImpl
             m_PlatformAPI = new PlatformAPI(friendListService.Object, platformServices.Object);
         }
 
-        //TODO: This is failing because of a missing reference to GalaxyCSharpGlue, but I'm having issues adding it
-        //reason: "please make sure that the file is accessible and that it is a valid assembly or com component"
-        [Fact]
-        public void GetPlayerID_ForGOG_ReturnsValidPlayerID()
-        {
-            friendListService.Setup(fls => fls.GetServiceName()).Returns("GOG");
-            platformServices.SetupGet(ps => ps.UserId).Returns("46987673193854369");
-            PlayerId playerId = m_PlatformAPI.GetPlayerID();
+        //TODO: This can't be tested because of a missing reference to GalaxyCSharpGlue.dll. Can uncomment once that reference is added
+        //[Fact]
+        //public void GetPlayerID_ForGOG_ReturnsValidPlayerID()
+        //{
+        //    friendListService.Setup(fls => fls.GetServiceName()).Returns("GOG");
+        //    platformServices.SetupGet(ps => ps.UserId).Returns("46987673193854369");
+        //    PlayerId playerId = m_PlatformAPI.GetPlayerID();
 
-            Assert.True(playerId.IsValid);
-        }
+        //    Assert.True(playerId.IsValid);
+        //}
+
 
         [Fact]
         public void GetPlayerID_ForSteam_ReturnsValidPlayerID()
@@ -44,6 +44,17 @@ namespace Coop.Tests.NetImpl
 
             Assert.True(playerId.IsValid);
         }
+
+        //TODO: This can't be tested because of a missing reference to EOSSDK.dll. Can uncomment once that reference is added
+        //[Fact]
+        //public void GetPlayerID_ForEpic_ReturnsValidPlayerID()
+        //{
+        //    friendListService.Setup(fls => fls.GetServiceName()).Returns("Epic");
+        //    platformServices.SetupGet(ps => ps.UserId).Returns("9668a87b73484b889f4902ca89365f1f");
+        //    PlayerId playerId = m_PlatformAPI.GetPlayerID();
+
+        //    Assert.True(playerId.IsValid);
+        //}
 
         [Fact]
         public void GetUserID_ReturnsNonEmptyAndNonNull()
