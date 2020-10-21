@@ -34,14 +34,39 @@ namespace Coop.NetImpl
         public PlatformAPI()
         {
             platformServices = PlatformServices.Instance;
-            platformServices.Initialize(new IFriendListService[0]);
-            friendListService = platformServices.GetFriendListServices()[0];
+            if(platformServices == null)
+            {
+                string errorMessage = "PlatformAPI: Failed to retrieve instance of PlatformServices.";
+                Logger.Error(errorMessage);
+                throw new ArgumentNullException("platformServices", errorMessage);
+            }
+
+            bool platformInitialized = platformServices.Initialize(new IFriendListService[0]);
+
+            if(!platformInitialized)
+            {
+                string errorMessage = "PlatformAPI: Failed to initialize platformServices.";
+                Logger.Error(errorMessage);
+                throw new Exception(errorMessage);
+            }
+
+            IFriendListService[] friendListServices = platformServices.GetFriendListServices();
+            
+            if(friendListServices == null || friendListServices.Length == 0)
+            {
+                string errorMessage = "PlatformAPI: Failed to retrieve friend list services from PlatformServices.";
+                Logger.Error(errorMessage);
+                throw new Exception(errorMessage);
+            }
+
+            friendListService = friendListServices[0];
         }
 
         public string GetPlayerName()
         {
             PlayerId playerId = GetPlayerID();
             string playerName = playerId.Equals(PlayerId.Empty) ? "Player" : friendListService.GetUserName(playerId).Result;
+
             return playerName;
         }
 
