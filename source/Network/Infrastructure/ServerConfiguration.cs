@@ -4,9 +4,18 @@ namespace Network.Infrastructure
 {
     public class ServerConfiguration
     {
-        public NetworkConfiguration NetworkConfiguration { get; set; } = new NetworkConfiguration();
+        public ServerConfiguration()
+        {
+            // Initialize the UpdateTime to be roughly once per server tick.
+            NetworkConfiguration = new NetworkConfiguration()
+            {
+                UpdateTime = TimeSpan.FromMilliseconds(1000 / (float) TickRate)
+            };
+        }
         public uint MaxPlayerCount { get; set; } = 8;
         public uint TickRate { get; set; } = 120; // in [Hz]. 0 for no limit.
+        
+        public NetworkConfiguration NetworkConfiguration { get; set; }
         
         /// <summary>
         ///     Defines the maximum amount of time after which an event will be dropped if it was not yet

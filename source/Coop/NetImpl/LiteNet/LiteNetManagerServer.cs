@@ -73,10 +73,9 @@ namespace Coop.NetImpl.LiteNet
 
         private NetManager CreateNetManager(ISaveData worldData)
         {
-            return new NetManager(new LiteNetListenerServer(m_Server, worldData))
-            {
-                DisconnectTimeout = (int) m_Config.NetworkConfiguration.DisconnectTimeout.TotalMilliseconds
-            };
+            return NetManagerFactory.Create(
+                new LiteNetListenerServer(m_Server, worldData),
+                m_Config.NetworkConfiguration);
         }
 
         public void StartListening()

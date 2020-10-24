@@ -147,7 +147,7 @@ namespace Coop.Tests.Network
             public Client(ISaveData worldData)
             {
                 Session = new GameSession(worldData);
-                Manager = new LiteNetManagerClient(Session);
+                Manager = new LiteNetManagerClient(Session, new ClientConfiguration());
             }
         }
     }

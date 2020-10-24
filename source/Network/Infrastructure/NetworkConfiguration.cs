@@ -11,6 +11,9 @@ namespace Network.Infrastructure
         public int WanPort { get; set; } = 4200;
         public TimeSpan KeepAliveInterval { get; set; } = TimeSpan.FromSeconds(1);
         public TimeSpan LanDiscoveryInterval { get; } = TimeSpan.FromSeconds(2);
-        public TimeSpan DisconnectTimeout { get; set; } = TimeSpan.FromSeconds(5);
+        public TimeSpan DisconnectTimeout { get; set; } = TimeSpan.FromSeconds(60);
+        public TimeSpan ReconnectDelay { get; set; } = TimeSpan.FromSeconds(2);
+        
+        public TimeSpan UpdateTime { get; set; } = TimeSpan.FromMilliseconds(15);
     }
 }

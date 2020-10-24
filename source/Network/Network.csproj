@@ -77,6 +77,7 @@
   <ItemGroup>
     <Compile Include="ByteReader.cs" />
     <Compile Include="ByteWriter.cs" />
+    <Compile Include="Infrastructure\ClientConfiguration.cs" />
     <Compile Include="Infrastructure\ConnectionClient.cs" />
     <Compile Include="Infrastructure\ConnectionClientSM.cs" />
     <Compile Include="Infrastructure\ConnectionServer.cs" />

@@ -29,7 +29,7 @@ namespace Coop.Tests.Network
             public Client()
             {
                 Session = new GameSession(Mock.Of<ISaveData>());
-                Manager = new LiteNetManagerClient(Session);
+                Manager = new LiteNetManagerClient(Session, new ClientConfiguration());
             }
         }
 

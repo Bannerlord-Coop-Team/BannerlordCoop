@@ -29,7 +29,7 @@ namespace Coop.Tests
         private readonly LiteNetManagerServer m_NetManagerServer;
         private readonly Mock<Server> m_Server;
         private readonly Mock<ISaveData> m_WorldData = TestUtils.CreateMockSaveData();
-        private readonly CoopClient m_Client = new CoopClient();
+        private readonly CoopClient m_Client = new CoopClient(new ClientConfiguration());
         private readonly TimeSpan m_FrameTime = TimeSpan.FromMilliseconds(15);
         private readonly TimeSpan m_DisconnectTimeout = TimeSpan.FromMilliseconds(100);
 

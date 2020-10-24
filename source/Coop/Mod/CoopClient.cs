@@ -39,7 +39,7 @@ namespace Coop.Mod
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private static readonly Lazy<CoopClient> m_Instance =
-            new Lazy<CoopClient>(() => new CoopClient());
+            new Lazy<CoopClient>(() => new CoopClient(new ClientConfiguration()));
         private readonly CoopClientSM m_CoopClientSM;
 
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
@@ -59,11 +59,11 @@ namespace Coop.Mod
 
         public Action<RemoteStore> RemoteStoreCreated;
 
-        public CoopClient()
+        public CoopClient(ClientConfiguration config)
         {
             Session = new GameSession(new GameData());
             Session.OnConnectionDestroyed += ConnectionDestroyed;
-            m_NetManager = new LiteNetManagerClient(Session);
+            m_NetManager = new LiteNetManagerClient(Session, config);
             GameState = new CoopGameState();
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
