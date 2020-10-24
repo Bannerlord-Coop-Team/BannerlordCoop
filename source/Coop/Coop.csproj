@@ -374,6 +374,7 @@
     <Compile Include="Mod\UI\CoopConnectMenuVM.cs" />
     <Compile Include="Mod\UI\CoopConnectionUI.cs" />
     <Compile Include="Mod\UI\LoadGameUI\CoopLoadUI.cs" />
+    <Compile Include="NetImpl\LiteNet\DiscoveryThread.cs" />
     <Compile Include="NetImpl\LiteNet\Extensions.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerClient.cs" />

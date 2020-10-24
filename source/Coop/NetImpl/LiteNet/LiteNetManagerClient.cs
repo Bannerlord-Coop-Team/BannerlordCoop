@@ -68,7 +68,7 @@ namespace Coop.NetImpl.LiteNet
             m_NetManager = NetManagerFactory.Create(
                 new LiteNetListenerClient(m_Session),
                 m_Configuration.NetworkConfiguration);
-
+            m_NetManager.BroadcastReceiveEnabled = true;
             if (m_NetManager.Start())
             {
                 m_Peer = m_NetManager.Connect(address.ToString(), iPort, "");

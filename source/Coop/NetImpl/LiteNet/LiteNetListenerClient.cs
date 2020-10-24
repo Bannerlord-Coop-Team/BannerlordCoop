@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Net.Sockets;
 using LiteNetLib;
 using Network;
@@ -67,11 +68,24 @@ namespace Coop.NetImpl.LiteNet
             NetPacketReader reader,
             UnconnectedMessageType messageType)
         {
-            Logger.Warn(
-                "OnNetworkReceiveUnconnected({remoteEndPoint}, {reader}, {messageType}).",
-                remoteEndPoint,
-                reader,
-                messageType);
+            if (messageType == UnconnectedMessageType.Broadcast)
+            {
+                ArraySegment<byte> buffer = reader.GetRemainingBytesSegment();
+                bool isDiscoveryPacket = Network.Protocol.Discovery.TryDeserialize(new ByteReader(buffer));
+                if (isDiscoveryPacket)
+                {
+                    Logger.Info("Server discovered: {peer}", remoteEndPoint);
+                    // TODO: Maybe connect to it if we are not already connected?
+                }
+            }
+            else
+            {
+                Logger.Debug(
+                    "Unknown broadcast: OnNetworkReceiveUnconnected({remoteEndPoint}, {reader}, {messageType}).",
+                    remoteEndPoint,
+                    reader,
+                    messageType);
+            }
         }
 
         public void OnConnectionRequest(ConnectionRequest request)

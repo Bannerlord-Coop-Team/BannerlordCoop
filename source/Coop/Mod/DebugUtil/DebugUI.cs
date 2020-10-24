@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using Common;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RPC;
+using Coop.NetImpl.LiteNet;
+using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
 using RailgunNet.Connection;
@@ -12,6 +15,7 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using Sync;
+using TaleWorlds.Core;
 using TaleWorlds.Engine;
 
 namespace Coop.Mod.DebugUtil
@@ -29,6 +33,7 @@ namespace Coop.Mod.DebugUtil
             {
                 Begin();
                 AddButtons();
+                DisplayDiscovery();
                 DisplayConnectionInfo();
                 DisplayMethodRegistry();
                 DisplayPersistenceMenu();
@@ -260,6 +265,33 @@ namespace Coop.Mod.DebugUtil
 
                 Imgui.Columns();
             }
+
+            Imgui.TreePop();
+        }
+
+        [CanBeNull] private static DiscoveryThread m_discoveryThread = null;
+        private static void DisplayDiscovery()
+        {
+            if (!Imgui.TreeNode("LAN server discovery"))
+            {
+                m_discoveryThread = null;
+                return;
+            }
+
+            if (m_discoveryThread == null)
+            {
+                m_discoveryThread = new DiscoveryThread(new NetworkConfiguration());
+            }
+
+            List<IPEndPoint> servers = m_discoveryThread.ServerList;
+            if (!servers.IsEmpty())
+            {
+                foreach (IPEndPoint ipEndPoint in servers)
+                {
+                    Imgui.Text($"{ipEndPoint}");
+                }
+            }
+            Imgui.Text("Scanning...");
 
             Imgui.TreePop();
         }

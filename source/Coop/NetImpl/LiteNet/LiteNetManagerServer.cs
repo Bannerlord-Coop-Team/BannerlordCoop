@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Text;
 using Common;
 using LiteNetLib;
 using Network;
@@ -58,8 +59,7 @@ namespace Coop.NetImpl.LiteNet
 
             if (m_lanManager != null && m_SinceLastDiscovery > m_Config.NetworkConfiguration.LanDiscoveryInterval)
             {
-                // TODO: LiteNetLib removed SendDiscoveryRequest in 0.9. Replacement?
-                // m_lanManager.SendDiscoveryRequest(Encoding.UTF8.GetBytes(Globals.LanDiscoveryString), Globals.LanDiscoveryPort);
+                m_lanManager.SendBroadcast(Network.Protocol.Discovery.GetPayload(), m_Config.NetworkConfiguration.LanDiscoveryPort);
                 m_SinceLastDiscovery = TimeSpan.Zero;
             }
 

@@ -92,6 +92,7 @@
     <Compile Include="Infrastructure\NetworkConfiguration.cs" />
     <Compile Include="Infrastructure\ServerSM.cs" />
     <Compile Include="MemoryStreamSegment.cs" />
+    <Compile Include="Protocol\Discovery.cs" />
     <Compile Include="Protocol\Packet.cs" />
     <Compile Include="Protocol\PacketDispatcher.cs" />
     <Compile Include="Protocol\PacketHandler.cs" />
@@ -105,6 +106,10 @@
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
       <Name>Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj">
+      <Project>{d8f65198-a926-4c46-9599-2d5d4349486f}</Project>
+      <Name>LiteNetLib</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
