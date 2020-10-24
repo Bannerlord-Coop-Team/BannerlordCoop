@@ -83,7 +83,6 @@
     <Compile Include="Infrastructure\ConnectionServer.cs" />
     <Compile Include="Infrastructure\ConnectionServerSM.cs" />
     <Compile Include="Infrastructure\GameSession.cs" />
-    <Compile Include="Infrastructure\Globals.cs" />
     <Compile Include="Infrastructure\ConnectionBase.cs" />
     <Compile Include="Exceptions.cs" />
     <Compile Include="Infrastructure\IGameStatePersistence.cs" />
