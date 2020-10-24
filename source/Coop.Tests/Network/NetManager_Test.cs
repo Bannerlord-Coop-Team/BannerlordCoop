@@ -37,7 +37,7 @@ namespace Coop.Tests.Network
         private void ClientCanConnect()
         {
             Client client = new Client();
-            client.Manager.Connect(m_Server.ActiveConfig.LanAddress, m_Server.ActiveConfig.LanPort);
+            client.Manager.Connect(m_Server.ActiveConfig.NetworkConfiguration.LanAddress, m_Server.ActiveConfig.NetworkConfiguration.LanPort);
             TestUtils.UpdateUntil(
                 () => client.Session.Connection != null,
                 new List<IUpdateable>
@@ -50,7 +50,7 @@ namespace Coop.Tests.Network
         private void ClientCanDisconnect()
         {
             Client client = new Client();
-            client.Manager.Connect(m_Server.ActiveConfig.LanAddress, m_Server.ActiveConfig.LanPort);
+            client.Manager.Connect(m_Server.ActiveConfig.NetworkConfiguration.LanAddress, m_Server.ActiveConfig.NetworkConfiguration.LanPort);
             TestUtils.UpdateUntil(
                 () => client.Session.Connection != null,
                 new List<IUpdateable>

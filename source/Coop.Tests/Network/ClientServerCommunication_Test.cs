@@ -22,7 +22,7 @@ namespace Coop.Tests.Network
         {
             TestUtils.SetupLogger();
             ServerConfiguration config = TestUtils.GetTestingConfig();
-            config.KeepAliveInterval = m_keepAliveInterval;
+            config.NetworkConfiguration.KeepAliveInterval = m_keepAliveInterval;
             m_Server = new Mock<Server>(Server.EType.Threaded)
             {
                 CallBase = true
@@ -78,8 +78,8 @@ namespace Coop.Tests.Network
             // Setup client
             Client client = new Client(m_WorldData.Object);
             client.Manager.Connect(
-                m_Server.Object.ActiveConfig.LanAddress,
-                m_Server.Object.ActiveConfig.LanPort);
+                m_Server.Object.ActiveConfig.NetworkConfiguration.LanAddress,
+                m_Server.Object.ActiveConfig.NetworkConfiguration.LanPort);
 
             // Wait until the client is connected
             TestUtils.UpdateUntil(

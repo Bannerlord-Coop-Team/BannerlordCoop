@@ -16,7 +16,7 @@ namespace Coop.Tests
         public CoopClient_Test()
         {
             ServerConfiguration config = TestUtils.GetTestingConfig();
-            config.DisconnectTimeout = m_DisconnectTimeout;
+            config.NetworkConfiguration.DisconnectTimeout = m_DisconnectTimeout;
             m_Server = new Mock<Server>(Server.EType.Threaded)
             {
                 CallBase = true
@@ -36,8 +36,8 @@ namespace Coop.Tests
         private void ConnectClient()
         {
             m_Client.Connect(
-                m_Server.Object.ActiveConfig.LanAddress,
-                m_Server.Object.ActiveConfig.LanPort);
+                m_Server.Object.ActiveConfig.NetworkConfiguration.LanAddress,
+                m_Server.Object.ActiveConfig.NetworkConfiguration.LanPort);
         }
 
         private async Task WaitForClientConnect()

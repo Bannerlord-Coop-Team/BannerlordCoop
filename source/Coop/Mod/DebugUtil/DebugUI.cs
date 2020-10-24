@@ -191,7 +191,7 @@ namespace Coop.Mod.DebugUtil
                     if ((startServerResult = CoopServer.Instance.StartServer()) == null)
                     {
                         ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
-                        connectResult = CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
+                        connectResult = CoopClient.Instance.Connect(config.NetworkConfiguration.LanAddress, config.NetworkConfiguration.LanPort);
                     }
                 }
             }
@@ -203,8 +203,8 @@ namespace Coop.Mod.DebugUtil
                 {
                     ServerConfiguration defaultConfiguration = new ServerConfiguration();
                     connectResult = CoopClient.Instance.Connect(
-                        defaultConfiguration.LanAddress,
-                        defaultConfiguration.LanPort);
+                        defaultConfiguration.NetworkConfiguration.LanAddress,
+                        defaultConfiguration.NetworkConfiguration.LanPort);
                 }
             }
 
@@ -313,9 +313,9 @@ namespace Coop.Mod.DebugUtil
                 }
 
                 Imgui.Text(
-                    $"LAN:   {server.ActiveConfig.LanAddress}:{server.ActiveConfig.LanPort}");
+                    $"LAN:   {server.ActiveConfig.NetworkConfiguration.LanAddress}:{server.ActiveConfig.NetworkConfiguration.LanPort}");
                 Imgui.Text(
-                    $"WAN:   {server.ActiveConfig.WanAddress}:{server.ActiveConfig.WanPort}");
+                    $"WAN:   {server.ActiveConfig.NetworkConfiguration.WanAddress}:{server.ActiveConfig.NetworkConfiguration.WanPort}");
                 Imgui.Text("");
 
                 Imgui.Columns(3);

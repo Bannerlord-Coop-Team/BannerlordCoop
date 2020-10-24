@@ -23,9 +23,9 @@ namespace Coop.Mod.UI
         public string PortText => "Port:";
         public string PasswordText => "Password:";
 
-        public string connectIP = new ServerConfiguration().LanAddress.ToString();
+        public string connectIP = new ServerConfiguration().NetworkConfiguration.LanAddress.ToString();
 
-        public string connectPort = new ServerConfiguration().LanPort.ToString();
+        public string connectPort = new ServerConfiguration().NetworkConfiguration.LanPort.ToString();
 
         public string connectPassword = "";
 

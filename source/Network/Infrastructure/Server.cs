@@ -53,8 +53,8 @@ namespace Network.Infrastructure
             string sDump = string.Join(
                 Environment.NewLine,
                 $"Server is '{State.ToString()}' with '{ActiveConnections.Count}/{ActiveConfig.MaxPlayerCount}' players.",
-                $"LAN:   {ActiveConfig.LanAddress}:{ActiveConfig.LanPort}",
-                $"WAN:   {ActiveConfig.WanAddress}:{ActiveConfig.WanPort}");
+                $"LAN:   {ActiveConfig.NetworkConfiguration.LanAddress}:{ActiveConfig.NetworkConfiguration.LanPort}",
+                $"WAN:   {ActiveConfig.NetworkConfiguration.WanAddress}:{ActiveConfig.NetworkConfiguration.WanPort}");
 
             if (ActiveConnections.Count > 0)
             {
