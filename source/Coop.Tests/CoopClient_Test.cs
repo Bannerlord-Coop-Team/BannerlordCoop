@@ -16,7 +16,7 @@ namespace Coop.Tests
         public CoopClient_Test()
         {
             ServerConfiguration config = TestUtils.GetTestingConfig();
-            config.DisconnectTimeout = m_DisconnectTimeout;
+            config.NetworkConfiguration.DisconnectTimeout = m_DisconnectTimeout;
             m_Server = new Mock<Server>(Server.EType.Threaded)
             {
                 CallBase = true
@@ -29,15 +29,15 @@ namespace Coop.Tests
         private readonly LiteNetManagerServer m_NetManagerServer;
         private readonly Mock<Server> m_Server;
         private readonly Mock<ISaveData> m_WorldData = TestUtils.CreateMockSaveData();
-        private readonly CoopClient m_Client = new CoopClient();
+        private readonly CoopClient m_Client = new CoopClient(new ClientConfiguration());
         private readonly TimeSpan m_FrameTime = TimeSpan.FromMilliseconds(15);
         private readonly TimeSpan m_DisconnectTimeout = TimeSpan.FromMilliseconds(100);
 
         private void ConnectClient()
         {
             m_Client.Connect(
-                m_Server.Object.ActiveConfig.LanAddress,
-                m_Server.Object.ActiveConfig.LanPort);
+                m_Server.Object.ActiveConfig.NetworkConfiguration.LanAddress,
+                m_Server.Object.ActiveConfig.NetworkConfiguration.LanPort);
         }
 
         private async Task WaitForClientConnect()

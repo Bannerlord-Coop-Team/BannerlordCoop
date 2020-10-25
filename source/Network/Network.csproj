@@ -77,20 +77,22 @@
   <ItemGroup>
     <Compile Include="ByteReader.cs" />
     <Compile Include="ByteWriter.cs" />
+    <Compile Include="Infrastructure\ClientConfiguration.cs" />
     <Compile Include="Infrastructure\ConnectionClient.cs" />
     <Compile Include="Infrastructure\ConnectionClientSM.cs" />
     <Compile Include="Infrastructure\ConnectionServer.cs" />
     <Compile Include="Infrastructure\ConnectionServerSM.cs" />
     <Compile Include="Infrastructure\GameSession.cs" />
-    <Compile Include="Infrastructure\Globals.cs" />
     <Compile Include="Infrastructure\ConnectionBase.cs" />
     <Compile Include="Exceptions.cs" />
     <Compile Include="Infrastructure\IGameStatePersistence.cs" />
     <Compile Include="Infrastructure\INetwork.cs" />
     <Compile Include="Infrastructure\INetworkConnection.cs" />
     <Compile Include="Infrastructure\ISaveData.cs" />
+    <Compile Include="Infrastructure\NetworkConfiguration.cs" />
     <Compile Include="Infrastructure\ServerSM.cs" />
     <Compile Include="MemoryStreamSegment.cs" />
+    <Compile Include="Protocol\Discovery.cs" />
     <Compile Include="Protocol\Packet.cs" />
     <Compile Include="Protocol\PacketDispatcher.cs" />
     <Compile Include="Protocol\PacketHandler.cs" />
@@ -104,6 +106,10 @@
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
       <Name>Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj">
+      <Project>{d8f65198-a926-4c46-9599-2d5d4349486f}</Project>
+      <Name>LiteNetLib</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

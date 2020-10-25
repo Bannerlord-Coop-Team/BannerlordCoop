@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net;
 using Common;
+using JetBrains.Annotations;
 using LiteNetLib;
 using Network;
 using Network.Infrastructure;
@@ -10,14 +11,16 @@ namespace Coop.NetImpl.LiteNet
 {
     public class LiteNetManagerClient : IUpdateable
     {
+        private readonly ClientConfiguration m_Configuration;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly GameSession m_Session;
         private NetManager m_NetManager;
         private NetPeer m_Peer;
 
-        public LiteNetManagerClient(GameSession session)
+        public LiteNetManagerClient([NotNull] GameSession session, [NotNull] ClientConfiguration config)
         {
             m_Session = session ?? throw new ArgumentNullException(nameof(session));
+            m_Configuration = config ?? throw new ArgumentNullException(nameof(config));
         }
 
         public bool Connected =>
@@ -62,13 +65,10 @@ namespace Coop.NetImpl.LiteNet
                 Disconnect(EDisconnectReason.ClientJoinedAnotherServer);
             }
 
-            m_NetManager = new NetManager(new LiteNetListenerClient(m_Session))
-            {
-                ReconnectDelay = 2000,
-                MaxConnectAttempts = 20,
-                DisconnectTimeout = (int) TimeSpan.FromSeconds(60).TotalMilliseconds
-            };
-
+            m_NetManager = NetManagerFactory.Create(
+                new LiteNetListenerClient(m_Session),
+                m_Configuration.NetworkConfiguration);
+            m_NetManager.BroadcastReceiveEnabled = true;
             if (m_NetManager.Start())
             {
                 m_Peer = m_NetManager.Connect(address.ToString(), iPort, "");

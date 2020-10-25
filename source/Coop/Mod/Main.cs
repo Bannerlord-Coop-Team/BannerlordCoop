@@ -113,8 +113,8 @@ namespace Coop.Mod
                                     ServerConfiguration defaultConfiguration =
                                         new ServerConfiguration();
                                     CoopClient.Instance.Connect(
-                                        defaultConfiguration.LanAddress,
-                                        defaultConfiguration.LanPort);
+                                        defaultConfiguration.NetworkConfiguration.LanAddress,
+                                        defaultConfiguration.NetworkConfiguration.LanPort);
                                 }
                             }
                         }

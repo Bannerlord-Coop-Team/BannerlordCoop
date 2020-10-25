@@ -27,7 +27,7 @@ namespace Coop.Mod.Managers
             if (CoopServer.Instance.StartServer() == null)
             {
                 ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
-                CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
+                CoopClient.Instance.Connect(config.NetworkConfiguration.LanAddress, config.NetworkConfiguration.LanPort);
             }
 
             CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {

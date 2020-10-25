@@ -374,12 +374,14 @@
     <Compile Include="Mod\UI\CoopConnectMenuVM.cs" />
     <Compile Include="Mod\UI\CoopConnectionUI.cs" />
     <Compile Include="Mod\UI\LoadGameUI\CoopLoadUI.cs" />
+    <Compile Include="NetImpl\LiteNet\DiscoveryThread.cs" />
     <Compile Include="NetImpl\LiteNet\Extensions.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerServer.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetConnection.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerServer.cs" />
+    <Compile Include="NetImpl\LiteNet\NetManagerFactory.cs" />
     <Compile Include="NetImpl\LiteNet\RailNetPeerWrapper.cs" />
     <Compile Include="NetImpl\PlatformAPI.cs" />
     <Compile Include="NetImpl\Steam\NetworkSteam.cs" />
