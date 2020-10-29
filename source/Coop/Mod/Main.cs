@@ -5,7 +5,9 @@ using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
+using Coop.Mod.BIT;
 using Coop.Mod.DebugUtil;
+using Coop.Mod.Managers;
 using Coop.Mod.Patch;
 using Coop.Mod.UI;
 using HarmonyLib;
@@ -30,6 +32,8 @@ namespace Coop.Mod
     {
         // Debug symbols
         public static readonly bool DEBUG = true;
+        // Test Symbols
+        public static readonly bool BIT_ENABLED = true;
 
         public static readonly string LOAD_GAME = "MP";
 
@@ -85,6 +89,11 @@ namespace Coop.Mod
                                   "_splashScreenPlayed",
                                   BindingFlags.Instance | BindingFlags.NonPublic)
                               .SetValue(Module.CurrentModule, true);
+            }
+
+            if (BIT_ENABLED)
+            {
+                BITSuite suite = BITSuite.Instance;
             }
 
             // Apply all patches via harmony
