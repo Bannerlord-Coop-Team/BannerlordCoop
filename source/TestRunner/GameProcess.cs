@@ -23,7 +23,7 @@ namespace TestRunner
     {
 
         Configuration config = ConfigurationManager.OpenExeConfiguration(Application.ExecutablePath);
-        string GamePath = ConfigurationManager.OpenExeConfiguration(Application.ExecutablePath).AppSettings.Settings?["GamePath"].Value;
+        string GamePath = ConfigurationManager.OpenExeConfiguration(Application.ExecutablePath).AppSettings.Settings["GamePath"]?.Value;
         readonly Process process;
 
         [DllImport("User32.dll")]
@@ -159,7 +159,7 @@ namespace TestRunner
                 }
             } catch(UnauthorizedAccessException)
             {
-                Console.WriteLine($"Unable to access {targetDirectory}");
+                
             }
             return null;
 
