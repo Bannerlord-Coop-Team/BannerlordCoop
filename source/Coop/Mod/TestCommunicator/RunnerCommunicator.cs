@@ -40,12 +40,15 @@ namespace Coop.Mod.BIT
             ReceiveLoopTask = Task.Run(() => ReceiveLoop(ReceiveLoopCTS.Token));
         }
 
-        public void SendData(string message)
+        public bool SendData(string message)
         {
+            if(message == string.Empty) { return false; }
+
             byte[] asciiData = Encoding.ASCII.GetBytes(message);
             ArraySegment<byte> array = new ArraySegment<byte>(asciiData);
             Task.Run(async () => await ws.SendAsync(array, WebSocketMessageType.Text, true, new CancellationToken())).Wait();
             OnDataSent?.Invoke(message);
+            return true;
         }
 
         #region Private
@@ -65,7 +68,9 @@ namespace Coop.Mod.BIT
 
                 if (result.EndOfMessage)
                 {
+                    message = message.Trim(new char[] { '\0' });
                     OnDataReceived?.Invoke(message);
+                    message = string.Empty;
                 }
             }
         }

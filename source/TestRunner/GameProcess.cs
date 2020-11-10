@@ -51,12 +51,18 @@ namespace TestRunner
 
             process = Process.Start(pInfo);
 
+            while (process.MainWindowTitle == string.Empty) { }
             if (process.MainWindowTitle == "Safe Mode")
             {
                 SetForegroundWindow(process.MainWindowHandle);
                 SendKeys.SendWait("{TAB}");
                 SendKeys.SendWait("{ENTER}");
             }
+        }
+
+        public void Kill()
+        {
+            process.Kill();
         }
 
         private void FindGamePath()

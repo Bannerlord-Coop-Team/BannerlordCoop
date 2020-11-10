@@ -1,7 +1,6 @@
 ﻿using System.Reflection;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Serializers;
-using Coop.Mod.Missions;
 using Network.Infrastructure;
 using SandBox;
 using SandBox.View.Map;

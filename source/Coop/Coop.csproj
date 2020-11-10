@@ -273,11 +273,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
-    <Compile Include="Mod\BIT\BITSuite.cs" />
-    <Compile Include="Mod\BIT\ClientBIT.cs" />
-    <Compile Include="Mod\BIT\EnvironmentStatus.cs" />
-    <Compile Include="Mod\BIT\HostBIT.cs" />
-    <Compile Include="Mod\BIT\RunnerCommunicator.cs" />
     <Compile Include="Mod\CoopClientSM.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />
     <Compile Include="Mod\DebugUtil\CLICommands.cs" />
@@ -297,7 +292,6 @@
     <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\Managers\TestMPManger.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
-    <Compile Include="Mod\Missions\BattleMission.cs" />
     <Compile Include="Mod\Patch\TimeSynchronization.cs" />
     <Compile Include="Mod\Patch\Debugging.cs" />
     <Compile Include="Mod\Patch\Exceptions.cs" />
@@ -377,6 +371,12 @@
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterSkillsSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterTraitsSerializer.cs" />
     <Compile Include="Mod\Serializers\SerializableFactory.cs" />
+    <Compile Include="Mod\TestCommunicator\BITSuite.cs" />
+    <Compile Include="Mod\TestCommunicator\ClientBIT.cs" />
+    <Compile Include="Mod\TestCommunicator\EnvironmentStatus.cs" />
+    <Compile Include="Mod\TestCommunicator\HostBIT.cs" />
+    <Compile Include="Mod\TestCommunicator\Protocol\StatusProtocol.cs" />
+    <Compile Include="Mod\TestCommunicator\RunnerCommunicator.cs" />
     <Compile Include="Mod\UI\CharacterCreationUI\CharacterCreationUI.cs" />
     <Compile Include="Mod\UI\CoopConnectMenuVM.cs" />
     <Compile Include="Mod\UI\CoopConnectionUI.cs" />

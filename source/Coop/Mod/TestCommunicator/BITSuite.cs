@@ -13,13 +13,26 @@ namespace Coop.Mod.BIT
         public BITSuite()
         {
             communicator.SendData("Hello");
+            communicator.OnDataReceived += Communicator_OnDataReceived;
         }
+
+        private void Communicator_OnDataReceived(string obj)
+        {
+            switch (obj)
+            {
+                case "State":
+                    if(TaleWorlds.Core.GameStateManager.Current?.ActiveState != null)
+                        communicator.SendData(TaleWorlds.Core.GameStateManager.Current.ActiveState.ToString());
+                    break;
+            }
+        }
+
+
 
         #region Private
         private static readonly Lazy<BITSuite> lazy = new Lazy<BITSuite>(() => new BITSuite());
         private static RunnerCommunicator communicator = new RunnerCommunicator();
         #endregion
-
 
     }
 }
