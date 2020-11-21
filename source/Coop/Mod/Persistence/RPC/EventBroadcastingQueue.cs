@@ -98,15 +98,17 @@ namespace Coop.Mod.Persistence.RPC
         /// </summary>
         /// <param name="room">Room to send the event to.</param>
         /// <param name="rpc"></param>
-        public void Add(RailServerRoom room, EventMethodCall rpc)
+        public bool Add(RailServerRoom room, EventMethodCall rpc)
         {
             lock (m_Queue)
             {
                 Call call = new Call(room, rpc);
                 call.ObjectsToBeDistributed.RemoveAll(id => m_DistributedObjects.Contains(id));
 
+                bool isFull = false;
                 if (m_Queue.Count >= MaximumQueueSize)
                 {
+                    isFull = true;
                     Logger.Error("Event queue is full!");
                     if (Main.DEBUG)
                     {
@@ -123,9 +125,11 @@ namespace Coop.Mod.Persistence.RPC
                         // 3. Open a bug.
                         throw new IndexOutOfRangeException();
                     }
+
                 }
 
                 m_Queue.Add(call);
+                return isFull;
             }
         }
 
