@@ -60,6 +60,10 @@
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
+  <PropertyGroup>
+	<!-- Default path to tools.dll -->
+	<BannerlordPath Condition="'$(BannerlordPath)'==''">..\..\mb2</BannerlordPath>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony, Version=2.0.1.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Lib.Harmony.2.0.1\lib\net472\0Harmony.dll</HintPath>
@@ -67,12 +71,19 @@
     <Reference Include="DistributedLock, Version=1.5.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\DistributedLock.1.5.0\lib\net45\DistributedLock.dll</HintPath>
     </Reference>
+    <Reference Include="EOSSDK-CSharp, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\EOSSDK-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="GalaxyCSharp">
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\GalaxyCSharp.dll</HintPath>
+    </Reference>
     <Reference Include="Mono.Reflection, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756, processorArchitecture=MSIL">
       <HintPath>..\packages\Mono.Reflection.2.0.0\lib\net40\Mono.Reflection.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
       <HintPath>..\packages\NLog.4.7.2\lib\net45\NLog.dll</HintPath>
@@ -81,39 +92,39 @@
       <HintPath>..\packages\PropertyChanged.Fody.3.2.8\lib\net40\PropertyChanged.dll</HintPath>
     </Reference>
     <Reference Include="SandBox">
-      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
+      <HintPath>$(BannerlordPath)\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>
     <Reference Include="SandBox.GauntletUI">
-      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
+      <HintPath>$(BannerlordPath)\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
     </Reference>
     <Reference Include="SandBox.View">
-      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
+      <HintPath>$(BannerlordPath)\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
     </Reference>
     <Reference Include="SandBox.ViewModelCollection">
-      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
+      <HintPath>$(BannerlordPath)\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="Stateless, Version=4.0.0.0, Culture=neutral, PublicKeyToken=93038f0927583c9a, processorArchitecture=MSIL">
       <HintPath>..\packages\Stateless.5.1.2\lib\net472\Stateless.dll</HintPath>
     </Reference>
     <Reference Include="Steamworks.NET, Version=13.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\Steamworks.NET.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\Steamworks.NET.dll</HintPath>
     </Reference>
     <Reference Include="StoryMode, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.dll</HintPath>
+      <HintPath>$(BannerlordPath)\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.dll</HintPath>
     </Reference>
     <Reference Include="StoryMode.GauntletUI, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.GauntletUI.dll</HintPath>
+      <HintPath>$(BannerlordPath)\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.GauntletUI.dll</HintPath>
     </Reference>
     <Reference Include="StoryMode.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.View.dll</HintPath>
+      <HintPath>$(BannerlordPath)\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.View.dll</HintPath>
     </Reference>
     <Reference Include="StoryMode.ViewModelCollection, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.ViewModelCollection.dll</HintPath>
+      <HintPath>$(BannerlordPath)\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -129,136 +140,141 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
+
+	
     <Reference Include="TaleWorlds.BattlEye.Client">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.BattlEye.Client.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.BattlEye.Client.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.CampaignSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Core">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Core.ViewModelCollection">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.ViewModelCollection.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Core.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Diamond">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Diamond.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Diamond.AccessProvider.Epic">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Epic.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Epic.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Diamond.AccessProvider.Steam">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Steam.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Steam.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Diamond.AccessProvider.Test">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Test.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Test.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.DotNet">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.DotNet.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.DotNet.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.DotNet.AutoGenerated">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.DotNet.AutoGenerated.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.DotNet.AutoGenerated.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Engine">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Engine.AutoGenerated">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.AutoGenerated.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Engine.AutoGenerated.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Engine.GauntletUI">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.GauntletUI">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.GauntletUI.Data">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.Data.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.Data.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.GauntletUI.ExtraWidgets">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.ExtraWidgets.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.ExtraWidgets.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.GauntletUI.PrefabSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.PrefabSystem.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.PrefabSystem.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.GauntletUI.TooltipExtensions">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.TooltipExtensions.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.TooltipExtensions.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.InputSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Library">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Localization">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.AutoGenerated">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.AutoGenerated.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.AutoGenerated.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.Diamond">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Diamond.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Diamond.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.GauntletUI, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.dll</HintPath>
+      <HintPath>$(BannerlordPath)\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.Helpers">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Helpers.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Helpers.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
+      <HintPath>$(BannerlordPath)\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.NavigationSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.NavigationSystem.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.NavigationSystem.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Network">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Network.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Network.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.ObjectSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.PlatformService">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.PlatformService.Epic">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Epic.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Epic.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.PlatformService.GOG">
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.GOG.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.PlatformService.Steam">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Steam.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Steam.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.PlayerServices">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlayerServices.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.PlayerServices.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.PSAI">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PSAI.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.PSAI.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.SaveSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Starter.DotNetCore">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Starter.DotNetCore.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Starter.DotNetCore.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Starter.Library">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Starter.Library.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.Starter.Library.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.TwoDimension">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.TwoDimension.Standalone">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.Standalone.dll</HintPath>
+      <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.Standalone.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -388,6 +404,10 @@
       <Project>{d8f65198-a926-4c46-9599-2d5d4349486f}</Project>
       <Name>LiteNetLib</Name>
     </ProjectReference>
+    <ProjectReference Include="..\ModTestingUtils\ModTestingUtils.csproj">
+      <Project>{68cefb0c-37f7-4f86-8e8d-1d3baf1e7277}</Project>
+      <Name>ModTestingUtils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Network\Network.csproj">
       <Project>{b0ff5e24-4d98-4ec8-bbce-6cdb85cb685d}</Project>
       <Name>Network</Name>
@@ -406,7 +426,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\"  -TargetDir "$(TargetDir)\" -TargetFileName "$(TargetFileName) " -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll</PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\"  -TargetDir "$(TargetDir)\" -TargetFileName "$(TargetFileName) " -Libs ModTestingUtils.dll,Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll</PostBuildEvent>
   </PropertyGroup>
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
