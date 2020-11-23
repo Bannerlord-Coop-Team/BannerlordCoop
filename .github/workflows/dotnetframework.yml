@@ -27,4 +27,4 @@ jobs:
       run: nuget restore source/Coop.sln
  
     - name: Build and Publish Web App
-      run: msbuild source/Coop.sln /p:Configuration=Release /p:DeployOnBuild=true /p:PublishProfile=FolderProfile
+      run: msbuild source/Coop.sln /p:Configuration=Release /p:PublishProfile=FolderProfile /p:SolutionDir="%cd%source/Coop/"
