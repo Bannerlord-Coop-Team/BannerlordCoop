@@ -26,9 +26,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientDebug", "ClientDebug\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestRunner", "TestRunner\TestRunner.csproj", "{CB7A9AB1-7AE9-4673-BB44-1CE955143D44}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BannerlordSystemTestingFramework", "BannerlordSystemTestingFramework\BannerlordSystemTestingFramework.csproj", "{510EAA3B-CF7D-46F9-87AA-5CB89A4E3A01}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BannerlordSystemTestingLibrary", "BannerlordSystemTestingFramework\BannerlordSystemTestingLibrary.csproj", "{510EAA3B-CF7D-46F9-87AA-5CB89A4E3A01}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "System Testing", "System Testing", "{7312E696-47B9-48A1-8D8B-DA353FCE9404}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemTests", "SystemTests\SystemTests.csproj", "{E55067A7-A9FE-4F80-81E1-85AFB5FDD149}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModTestingUtils", "ModTestingUtils\ModTestingUtils.csproj", "{0F8E5D6A-22C5-468F-9D41-8BA499913E24}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -113,6 +117,22 @@ Global
 		{510EAA3B-CF7D-46F9-87AA-5CB89A4E3A01}.Release|Any CPU.Build.0 = Release|Any CPU
 		{510EAA3B-CF7D-46F9-87AA-5CB89A4E3A01}.Release|x64.ActiveCfg = Release|Any CPU
 		{510EAA3B-CF7D-46F9-87AA-5CB89A4E3A01}.Release|x64.Build.0 = Release|Any CPU
+		{E55067A7-A9FE-4F80-81E1-85AFB5FDD149}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E55067A7-A9FE-4F80-81E1-85AFB5FDD149}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E55067A7-A9FE-4F80-81E1-85AFB5FDD149}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E55067A7-A9FE-4F80-81E1-85AFB5FDD149}.Debug|x64.Build.0 = Debug|Any CPU
+		{E55067A7-A9FE-4F80-81E1-85AFB5FDD149}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E55067A7-A9FE-4F80-81E1-85AFB5FDD149}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E55067A7-A9FE-4F80-81E1-85AFB5FDD149}.Release|x64.ActiveCfg = Release|Any CPU
+		{E55067A7-A9FE-4F80-81E1-85AFB5FDD149}.Release|x64.Build.0 = Release|Any CPU
+		{0F8E5D6A-22C5-468F-9D41-8BA499913E24}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F8E5D6A-22C5-468F-9D41-8BA499913E24}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F8E5D6A-22C5-468F-9D41-8BA499913E24}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0F8E5D6A-22C5-468F-9D41-8BA499913E24}.Debug|x64.Build.0 = Debug|Any CPU
+		{0F8E5D6A-22C5-468F-9D41-8BA499913E24}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F8E5D6A-22C5-468F-9D41-8BA499913E24}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F8E5D6A-22C5-468F-9D41-8BA499913E24}.Release|x64.ActiveCfg = Release|Any CPU
+		{0F8E5D6A-22C5-468F-9D41-8BA499913E24}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -120,6 +140,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{CB7A9AB1-7AE9-4673-BB44-1CE955143D44} = {7312E696-47B9-48A1-8D8B-DA353FCE9404}
 		{510EAA3B-CF7D-46F9-87AA-5CB89A4E3A01} = {7312E696-47B9-48A1-8D8B-DA353FCE9404}
+		{E55067A7-A9FE-4F80-81E1-85AFB5FDD149} = {7312E696-47B9-48A1-8D8B-DA353FCE9404}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7650262F-F60B-4456-97C4-A191D7CB6203}

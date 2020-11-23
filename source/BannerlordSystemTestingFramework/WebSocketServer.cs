@@ -1,6 +1,6 @@
 ﻿using SuperWebSocket;
 
-namespace TestRunner
+namespace BannerlordSystemTestingLibrary
 {
     class WebSocketServer
     {

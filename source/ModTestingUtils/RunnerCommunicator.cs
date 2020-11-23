@@ -5,39 +5,39 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.BIT
+namespace ModTestingUtils
 {
-    public enum E_BIT_Requests
-    {
-        IsHost,
-        HostState,
-        ConnectedGames,
-    }
     class RunnerCommunicator
     {
+        public event Action<string> OnMessageReceived;
+        public event Action<string> OnMessageSent;
 
-        public static readonly Dictionary<Enum, string> BITCommands = new Dictionary<Enum, string>() 
-        {
-            { E_BIT_Requests.IsHost, "Is Host"},
-            { E_BIT_Requests.HostState, "Host State"},
-            { E_BIT_Requests.ConnectedGames, "Connected Games"},
-        };
-
-        public event Action<string> OnDataReceived;
-        public event Action<string> OnDataSent;
+        public bool Connected = false;
 
         public RunnerCommunicator()
         {
-            Task.Run(async () =>
+            Task<bool> connectTask = Task<bool>.Run(async () =>
             {
                 // Cancle connect after 5 seconds
                 CancellationTokenSource cts = new CancellationTokenSource();
                 cts.CancelAfter(TimeSpan.FromSeconds(5));
+                try
+                {
+                    await ws.ConnectAsync(new Uri("ws://localhost:8080"), cts.Token);
+                }
+                catch (WebSocketException) {
+                    return false;
+                }
+                return true;
+            });
 
-                await ws.ConnectAsync(new Uri("ws://localhost:8080"), cts.Token);
-            }).Wait();
+            connectTask.Wait();
 
-            ReceiveLoopTask = Task.Run(() => ReceiveLoop(ReceiveLoopCTS.Token));
+            if(connectTask.Result)
+            {
+                Connected = true;
+                ReceiveLoopTask = Task.Run(() => ReceiveLoop(ReceiveLoopCTS.Token));
+            }
         }
 
         public bool SendData(string message)
@@ -47,7 +47,7 @@ namespace Coop.Mod.BIT
             byte[] asciiData = Encoding.ASCII.GetBytes(message);
             ArraySegment<byte> array = new ArraySegment<byte>(asciiData);
             Task.Run(async () => await ws.SendAsync(array, WebSocketMessageType.Text, true, new CancellationToken())).Wait();
-            OnDataSent?.Invoke(message);
+            OnMessageSent?.Invoke(message);
             return true;
         }
 
@@ -57,6 +57,7 @@ namespace Coop.Mod.BIT
         private CancellationTokenSource ReceiveLoopCTS = new CancellationTokenSource();
         private async void ReceiveLoop(CancellationToken cancellationToken)
         {
+            // TODO add disconnect handling
             string message = string.Empty;
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -69,7 +70,7 @@ namespace Coop.Mod.BIT
                 if (result.EndOfMessage)
                 {
                     message = message.Trim(new char[] { '\0' });
-                    OnDataReceived?.Invoke(message);
+                    OnMessageReceived?.Invoke(message);
                     message = string.Empty;
                 }
             }

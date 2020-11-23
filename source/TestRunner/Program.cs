@@ -11,16 +11,17 @@ using System.Windows.Forms;
 
 namespace TestRunner
 {
-    class Program
+    static class TestRunner
     {
         [DllImport("Kernel32")]
         private static extern bool SetConsoleCtrlHandler(EventHandler handler, bool add);
         private delegate bool EventHandler(CtrlType sig);
         static EventHandler _handler;
 
-        private readonly Dictionary<WebSocketSession, string> sessionId = new Dictionary<WebSocketSession, string>();
+        private static readonly Dictionary<WebSocketSession, string> sessionId = new Dictionary<WebSocketSession, string>();
         private static GameProcess hostProcess;
         private static GameProcess clientProcess;
+
         static void Main(string[] args)
         {
             WebSocketServer.Instance.NewSessionConnected += WsServer_NewSessionConnected;
@@ -32,19 +33,10 @@ namespace TestRunner
             _handler += new EventHandler(Handler);
             SetConsoleCtrlHandler(_handler, true);
 
-            //hostProcess = new GameProcess(GameType.Host);
-            //clientProcess = new GameProcess(GameType.Client);
+            hostProcess = new GameProcess(GameType.Host);
+            clientProcess = new GameProcess(GameType.Client);
 
             Console.WriteLine("Server is running.");
-
-            while (true)
-            {
-                foreach(WebSocketSession session in WebSocketServer.Instance.GetAllSessions())
-                {
-                    session.Send("State");
-                }
-                Thread.Sleep(1000);
-            }
             
             Console.ReadKey();
         }

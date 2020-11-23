@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BannerlordSystemTestingFramework
+namespace BannerlordSystemTestingLibrary
 {
     [System.AttributeUsage(AttributeTargets.Enum, Inherited = false, AllowMultiple = true)]
     public class SystemTestingProtocolAttribute : Attribute { }

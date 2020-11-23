@@ -5,12 +5,11 @@ using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
-using Coop.Mod.BIT;
 using Coop.Mod.DebugUtil;
-using Coop.Mod.Managers;
 using Coop.Mod.Patch;
 using Coop.Mod.UI;
 using HarmonyLib;
+using ModTestingUtils;
 using Network.Infrastructure;
 using NLog;
 using NLog.Layouts;
@@ -33,7 +32,7 @@ namespace Coop.Mod
         // Debug symbols
         public static readonly bool DEBUG = true;
         // Test Symbols
-        public static readonly bool BIT_ENABLED = true;
+        public static readonly bool TESTING_ENABLED = true;
 
         public static readonly string LOAD_GAME = "MP";
 
@@ -65,7 +64,7 @@ namespace Coop.Mod
             AddBehavior<InitServerBehaviour>();
             AddBehavior<GameLoadedBehaviour>();
 
-            Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
+            Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
             IEnumerable<MethodInfo> patchInitializers =
                 from t in Assembly.GetExecutingAssembly().GetTypes()
                 from m in t.GetMethods()
@@ -91,9 +90,9 @@ namespace Coop.Mod
                               .SetValue(Module.CurrentModule, true);
             }
 
-            if (BIT_ENABLED)
+            if (TESTING_ENABLED)
             {
-                BITSuite suite = BITSuite.Instance;
+                TestingUtils suite = TestingUtils.Instance;
             }
 
             // Apply all patches via harmony
