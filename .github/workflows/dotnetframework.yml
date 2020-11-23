@@ -16,12 +16,9 @@ jobs:
     steps:
     - uses: actions/checkout@v1
       name: Checkout Code
-
-    - name: Setup NuGet
-      uses: NuGet/setup-nuget@v1.0.2
       
     - name: Restore NuGet Package
-      run: nuget restore source/Coop.sln
+      run: nuget.exe restore source/Coop.sln
  
     - name: Build and Publish Web App
       run: msbuild.exe source/Coop.sln /p:Configuration=Release /p:PublishProfile=FolderProfile /p:SolutionDir="%cd%source/Coop/"
