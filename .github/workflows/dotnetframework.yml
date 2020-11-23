@@ -16,6 +16,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
       name: Checkout Code
+      with:
+        submodules: recursive
       
     - name: Restore NuGet Package
       run: nuget.exe restore source/Coop.sln
