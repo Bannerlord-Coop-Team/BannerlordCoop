@@ -291,9 +291,8 @@
     <Compile Include="Mod\Managers\ClientManager.cs" />
     <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
-    <Compile Include="Mod\Patch\MapSpeedModifier\OnTerrainClick\MapSpeedOnTerrainClickOverrider.cs" />
+    <Compile Include="Mod\Patch\MapSpeedModifier\OnMapSpeedChange\SetTimePatch.cs" />
     <Compile Include="Mod\Patch\MapSpeedModifier\MapSpeedResolver.cs" />
-    <Compile Include="Mod\Patch\MapSpeedModifier\OnTerrainClick\MapSpeedOnTerrainClickSaver.cs" />
     <Compile Include="Mod\Patch\MapSpeedModifier\OnMapSpeedChange\TimeControlOverrider.cs" />
     <Compile Include="Mod\Patch\TimeSynchronization.cs" />
     <Compile Include="Mod\Patch\Debugging.cs" />
