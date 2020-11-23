@@ -22,5 +22,5 @@ jobs:
     - name: Restore NuGet Package
       run: nuget.exe restore source/Coop.sln
  
-    - name: Build and Publish Web App
-      run: msbuild.exe source/Coop.sln /p:Configuration=Release /p:PublishProfile=FolderProfile /p:SolutionDir="%cd%source/Coop/"
+    - name: Build Mod
+      run: msbuild source/Coop.sln /p:Configuration=Release /p:PublishProfile=FolderProfile /p:SolutionDir="%cd%source/Coop/"
