@@ -34,5 +34,12 @@ namespace Network
             m_Stream.Position -= 1;
             return val;
         }
+        
+        public int PeekInt32()
+        {
+            int i = Binary.ReadInt32();
+            m_Stream.Position -= 4;
+            return i;
+        }
     }
 }

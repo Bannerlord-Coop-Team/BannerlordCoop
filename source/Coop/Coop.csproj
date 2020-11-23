@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props" Condition="Exists('..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -252,6 +252,9 @@
     <Reference Include="TaleWorlds.PlatformService.GOG">
       <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.GOG.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.PlatformService.GOG">
+      <HintPath>..\..\..\..\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.GOG.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.PlatformService.Steam">
       <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Steam.dll</HintPath>
     </Reference>
@@ -297,6 +300,10 @@
     <Compile Include="Mod\Managers\ClientManager.cs" />
     <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
+    <Compile Include="Mod\Patch\MapSpeedModifier\OnTerrainClick\MapSpeedOnTerrainClickOverrider.cs" />
+    <Compile Include="Mod\Patch\MapSpeedModifier\MapSpeedResolver.cs" />
+    <Compile Include="Mod\Patch\MapSpeedModifier\OnTerrainClick\MapSpeedOnTerrainClickSaver.cs" />
+    <Compile Include="Mod\Patch\MapSpeedModifier\OnMapSpeedChange\TimeControlOverrider.cs" />
     <Compile Include="Mod\Patch\TimeSynchronization.cs" />
     <Compile Include="Mod\Patch\Debugging.cs" />
     <Compile Include="Mod\Patch\Exceptions.cs" />
@@ -380,14 +387,16 @@
     <Compile Include="Mod\UI\CoopConnectMenuVM.cs" />
     <Compile Include="Mod\UI\CoopConnectionUI.cs" />
     <Compile Include="Mod\UI\LoadGameUI\CoopLoadUI.cs" />
+    <Compile Include="NetImpl\LiteNet\DiscoveryThread.cs" />
     <Compile Include="NetImpl\LiteNet\Extensions.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerServer.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetConnection.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerServer.cs" />
+    <Compile Include="NetImpl\LiteNet\NetManagerFactory.cs" />
     <Compile Include="NetImpl\LiteNet\RailNetPeerWrapper.cs" />
-    <Compile Include="NetImpl\Platform.cs" />
+    <Compile Include="NetImpl\PlatformAPI.cs" />
     <Compile Include="NetImpl\Steam\NetworkSteam.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -424,6 +433,7 @@
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>powershell -ExecutionPolicy Unrestricted -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\"  -TargetDir "$(TargetDir)\" -TargetFileName "$(TargetFileName) " -Libs ModTestingUtils.dll,Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll</PostBuildEvent>

@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using Common;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RPC;
+using Coop.NetImpl.LiteNet;
+using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
 using RailgunNet.Connection;
@@ -12,6 +15,7 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using Sync;
+using TaleWorlds.Core;
 using TaleWorlds.Engine;
 
 namespace Coop.Mod.DebugUtil
@@ -29,6 +33,7 @@ namespace Coop.Mod.DebugUtil
             {
                 Begin();
                 AddButtons();
+                DisplayDiscovery();
                 DisplayConnectionInfo();
                 DisplayMethodRegistry();
                 DisplayPersistenceMenu();
@@ -191,7 +196,7 @@ namespace Coop.Mod.DebugUtil
                     if ((startServerResult = CoopServer.Instance.StartServer()) == null)
                     {
                         ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
-                        connectResult = CoopClient.Instance.Connect(config.LanAddress, config.LanPort);
+                        connectResult = CoopClient.Instance.Connect(config.NetworkConfiguration.LanAddress, config.NetworkConfiguration.LanPort);
                     }
                 }
             }
@@ -203,8 +208,8 @@ namespace Coop.Mod.DebugUtil
                 {
                     ServerConfiguration defaultConfiguration = new ServerConfiguration();
                     connectResult = CoopClient.Instance.Connect(
-                        defaultConfiguration.LanAddress,
-                        defaultConfiguration.LanPort);
+                        defaultConfiguration.NetworkConfiguration.LanAddress,
+                        defaultConfiguration.NetworkConfiguration.LanPort);
                 }
             }
 
@@ -264,6 +269,33 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
+        [CanBeNull] private static DiscoveryThread m_discoveryThread = null;
+        private static void DisplayDiscovery()
+        {
+            if (!Imgui.TreeNode("LAN server discovery"))
+            {
+                m_discoveryThread = null;
+                return;
+            }
+
+            if (m_discoveryThread == null)
+            {
+                m_discoveryThread = new DiscoveryThread(new NetworkConfiguration());
+            }
+
+            List<IPEndPoint> servers = m_discoveryThread.ServerList;
+            if (!servers.IsEmpty())
+            {
+                foreach (IPEndPoint ipEndPoint in servers)
+                {
+                    Imgui.Text($"{ipEndPoint}");
+                }
+            }
+            Imgui.Text("Scanning...");
+
+            Imgui.TreePop();
+        }
+
         private static void DisplayConnectionInfo()
         {
             if (!Imgui.TreeNode("Connectioninfo"))
@@ -313,9 +345,9 @@ namespace Coop.Mod.DebugUtil
                 }
 
                 Imgui.Text(
-                    $"LAN:   {server.ActiveConfig.LanAddress}:{server.ActiveConfig.LanPort}");
+                    $"LAN:   {server.ActiveConfig.NetworkConfiguration.LanAddress}:{server.ActiveConfig.NetworkConfiguration.LanPort}");
                 Imgui.Text(
-                    $"WAN:   {server.ActiveConfig.WanAddress}:{server.ActiveConfig.WanPort}");
+                    $"WAN:   {server.ActiveConfig.NetworkConfiguration.WanAddress}:{server.ActiveConfig.NetworkConfiguration.WanPort}");
                 Imgui.Text("");
 
                 Imgui.Columns(3);

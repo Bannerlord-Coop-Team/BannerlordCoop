@@ -1,7 +1,6 @@
 ﻿using System;
 using Network.Protocol;
 using NLog;
-using Stateless;
 using Version = Network.Protocol.Version;
 
 namespace Network.Infrastructure

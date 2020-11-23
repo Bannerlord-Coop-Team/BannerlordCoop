@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using Common;
 using JetBrains.Annotations;
 using Network.Protocol;
 
@@ -106,7 +105,8 @@ namespace Network.Infrastructure
 
         /// <summary>
         ///     Closes the connection.
-        ///     Postcondition: <see cref="State" /> is equal to <see cref="EConnectionState.Disconnected" />.
+        ///     Post condition: <see cref="State" /> is equal to <see cref="EClientConnectionState.Disconnected"/>
+        ///     or <see cref="EServerConnectionState.Terminated"/>.
         /// </summary>
         /// <param name="eReason">Reason that caused the disconnect.</param>
         public abstract void Disconnect(EDisconnectReason eReason);

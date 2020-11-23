@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Text;
 using Common;
 using LiteNetLib;
 using Network;
@@ -27,19 +28,19 @@ namespace Coop.NetImpl.LiteNet
             }
 
             m_Config = server.ActiveConfig;
-            if (m_Config.WanAddress == null && m_Config.LanAddress == null)
+            if (m_Config.NetworkConfiguration.WanAddress == null && m_Config.NetworkConfiguration.LanAddress == null)
             {
                 throw new InvalidServerConfiguration(
                     $"Invalid server configuration {m_Server}. Unable to attach NetAdapter.");
             }
 
             m_Server = server;
-            if (m_Config.WanAddress != null)
+            if (m_Config.NetworkConfiguration.WanAddress != null)
             {
                 m_wanManager = CreateNetManager(worldData);
             }
 
-            if (m_Config.LanAddress != null)
+            if (m_Config.NetworkConfiguration.LanAddress != null)
             {
                 m_lanManager = CreateNetManager(worldData);
             }
@@ -56,14 +57,13 @@ namespace Coop.NetImpl.LiteNet
             m_lanManager?.PollEvents();
             m_wanManager?.PollEvents();
 
-            if (m_lanManager != null && m_SinceLastDiscovery > m_Config.LanDiscoveryInterval)
+            if (m_lanManager != null && m_SinceLastDiscovery > m_Config.NetworkConfiguration.LanDiscoveryInterval)
             {
-                // TODO: LiteNetLib removed SendDiscoveryRequest in 0.9. Replacement?
-                // m_lanManager.SendDiscoveryRequest(Encoding.UTF8.GetBytes(Globals.LanDiscoveryString), Globals.LanDiscoveryPort);
+                m_lanManager.SendBroadcast(Network.Protocol.Discovery.GetPayload(), m_Config.NetworkConfiguration.LanDiscoveryPort);
                 m_SinceLastDiscovery = TimeSpan.Zero;
             }
 
-            if (m_SinceLastKeepAlive > m_Config.KeepAliveInterval)
+            if (m_SinceLastKeepAlive > m_Config.NetworkConfiguration.KeepAliveInterval)
             {
                 m_Server.SendToAll(
                     new Packet(EPacket.KeepAlive, new KeepAlive(++m_iKeepAliveID).Serialize()));
@@ -73,16 +73,15 @@ namespace Coop.NetImpl.LiteNet
 
         private NetManager CreateNetManager(ISaveData worldData)
         {
-            return new NetManager(new LiteNetListenerServer(m_Server, worldData))
-            {
-                DisconnectTimeout = (int) m_Config.DisconnectTimeout.TotalMilliseconds
-            };
+            return NetManagerFactory.Create(
+                new LiteNetListenerServer(m_Server, worldData),
+                m_Config.NetworkConfiguration);
         }
 
         public void StartListening()
         {
-            m_wanManager?.Start(m_Config.WanAddress, IPAddress.IPv6Any, m_Config.WanPort);
-            m_lanManager?.Start(m_Config.LanAddress, IPAddress.IPv6Any, m_Config.LanPort);
+            m_wanManager?.Start(m_Config.NetworkConfiguration.WanAddress, IPAddress.IPv6Any, m_Config.NetworkConfiguration.WanPort);
+            m_lanManager?.Start(m_Config.NetworkConfiguration.LanAddress, IPAddress.IPv6Any, m_Config.NetworkConfiguration.LanPort);
             m_Server.Updateables.Add(this);
         }
 

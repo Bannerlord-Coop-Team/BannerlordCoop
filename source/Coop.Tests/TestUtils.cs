@@ -71,7 +71,10 @@ namespace Coop.Tests
         {
             return new ServerConfiguration
             {
-                LanPort = GetPort(),
+                NetworkConfiguration = new NetworkConfiguration
+                {
+                    LanPort = GetPort()
+                },
                 MaxPlayerCount = 4,
                 TickRate = 0
             };
