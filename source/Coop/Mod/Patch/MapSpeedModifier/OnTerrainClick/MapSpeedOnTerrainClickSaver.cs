@@ -17,8 +17,9 @@ namespace Coop.Mod.Patch.MapSpeedModifier.OnTerrainClick
     ///     This class prefixes private method <c>MapScreen::HandleLeftMouseButtonClick</c> to save 
     ///     current <c>TimeControlMode</c>.
     /// </remarks>
-    [HarmonyPatch(typeof(MapScreen))]
-    [HarmonyPatch("HandleLeftMouseButtonClick")]
+    // DISABLED
+    //[HarmonyPatch(typeof(MapScreen))]
+    //[HarmonyPatch("HandleLeftMouseButtonClick")]
     class MapSpeedOnTerrainClickSaver
     {
 

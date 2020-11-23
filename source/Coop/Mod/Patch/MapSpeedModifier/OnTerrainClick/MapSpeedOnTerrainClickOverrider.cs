@@ -17,8 +17,9 @@ namespace Coop.Mod.Patch.MapSpeedModifier.OnTerrainClick
     ///     This class prefixes private method <c>MapScreen::OnTerrainClick</c> to replace current <c>TimeControlMode</c> 
     ///     as <c>MapSpeedResolver::Resolve</c> sees fit.
     /// </remarks>
-    [HarmonyPatch(typeof(MapScreen))]
-    [HarmonyPatch("OnTerrainClick")]
+    //DISABLED
+    //[HarmonyPatch(typeof(MapScreen))]
+    //[HarmonyPatch("OnTerrainClick")]
     class MapSpeedOnTerrainClickOverrider
     {
         static void Prefix()

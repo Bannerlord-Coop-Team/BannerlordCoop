@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using Sync;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Patch.MapSpeedModifier.OnMapSpeedChange
@@ -20,15 +21,38 @@ namespace Coop.Mod.Patch.MapSpeedModifier.OnMapSpeedChange
     [HarmonyPatch(nameof(Campaign.TimeControlMode), MethodType.Setter)]
     class TimeControlOverrider
     {
-        static void Prefix(ref CampaignTimeControlMode value)
+        /// <summary>
+        /// Grants access to the private field <c>TaleWorlds.CampaignSystem.Campaign._timeControlMode</c> to override the setter logic.
+        /// </summary>
+        private static readonly FieldAccess _timeControlMode = new FieldAccess<CampaignTimeControlMode, CampaignTimeControlMode>(typeof(Campaign)
+                        .GetField("_timeControlMode", AccessTools.all));
+
+        /// <summary>
+        /// Overrides the <c>TaleWorlds.CampaignSystem.Campaign.TimeControlMode</c> setter logic
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns>Always false to skip original method call</returns>
+        static bool Prefix(ref CampaignTimeControlMode value)
         {
+            if (ShouldSetTimeControl(value))
+            {
+                _timeControlMode.Set(Campaign.Current, MapSpeedResolver.Resolve(value, true));
 
-            var newSpeed = MapSpeedResolver.Resolve(value, true);
+                SetTimePatch.CanChangeSpeedControl = false;
+            }
 
-            value = newSpeed;
-
+            return false;
         }
 
+        /// <summary>
+        /// Method to know if the TimeControlMode should be changed.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns>true if the TimeControlMode should be changed, false otherwise.</returns>
+        private static bool ShouldSetTimeControl(CampaignTimeControlMode value)
+        {
+            return SetTimePatch.CanChangeSpeedControl && !Campaign.Current.TimeControlModeLock && value != Campaign.Current.TimeControlMode;
+        }
     }
 
 }
