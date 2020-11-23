@@ -18,6 +18,12 @@ jobs:
       name: Checkout Code
       with:
         submodules: recursive
+        
+    - name: Setup MSBuild Path
+      uses: warrenbuckley/Setup-MSBuild@v1
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1.0.2
       
     - name: Restore NuGet Package
       run: nuget.exe restore source/Coop.sln
