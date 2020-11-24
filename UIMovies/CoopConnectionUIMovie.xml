@@ -58,10 +58,10 @@
                    HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="300"
                    LayoutImp.LayoutMethod="HorizontalLeftToRight">
           <Children>
-            <Standard.Button HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="20"
-                      Command.Click="ActionConnect" Parameter.Text="@JoinButtonText" PositionXOffset="-20"/>
-            <Standard.Button HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="20"
-                      Command.Click="ActionCancel" Parameter.Text="@CancelButtonText" PositionXOffset="20"/>
+            <Standard.Button Brush="Standard.BackButton" HorizontalAlignment="Center" VerticalAlignment="Center" SuggestedWidth="128"
+                      MarginTop="20" Command.Click="ActionCancel" PositionXOffset="-20" SuggestedHeight="64"/>
+	    <Standard.Button HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="20" SuggestedWidth="128"
+                      Command.Click="ActionConnect" Parameter.Text="@JoinButtonText" PositionXOffset="20"/>
           </Children>
         </ListPanel>
 
