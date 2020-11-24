@@ -51,8 +51,7 @@ namespace Coop.Mod.Persistence.RPC
                 if (room is RailServerRoom serverRoom)
                 {
                     Logger.Trace("[{eventId}] Broadcast SyncCall: {call}", EventId, Call);
-                    if(!m_EnvironmentServer.EventQueue.Add(serverRoom, this))
-                        m_EnvironmentServer.TimeControlStop();
+                    m_EnvironmentServer.EventQueue.Add(serverRoom, this);
                 }
                 else if (room is RailClientRoom)
                 {

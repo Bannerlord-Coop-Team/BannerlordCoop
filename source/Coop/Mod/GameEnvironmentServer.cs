@@ -37,11 +37,6 @@ namespace Coop.Mod
             CoopServer.Instance.SyncedObjectStore ??
             throw new InvalidOperationException("Client not initialized.");
 
-        public void TimeControlStop()
-        {
-            Campaign.Current.TimeControlMode = CampaignTimeControlMode.Stop;
-        }
-
         public void LockTimeControlStopped()
         {
             Campaign.Current.TimeControlMode = CampaignTimeControlMode.Stop;

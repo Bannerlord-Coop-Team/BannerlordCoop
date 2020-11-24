@@ -43,8 +43,13 @@ namespace Coop.Mod.Persistence
         MobileParty GetMobilePartyByIndex(int iPartyIndex);
 
         /// <summary>
-        ///     Stops time for the campaign.
+        ///     Stops time and locks time control.
         /// </summary>
-        void TimeControlStop();
+        void LockTimeControlStopped();
+
+        /// <summary>
+        ///     Unlocks time control.
+        /// </summary>
+        void UnlockTimeControl();
     }
 }

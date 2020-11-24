@@ -25,6 +25,8 @@ namespace Coop.Mod.Persistence.RPC
         /// </summary>
         public static readonly int MaximumQueueSize = Main.DEBUG ? 512 : 8192;
 
+        public bool m_WasFull = false;
+
         private readonly OrderedHashSet<ObjectId> m_DistributedObjects =
             new OrderedHashSet<ObjectId>();
 
@@ -33,6 +35,8 @@ namespace Coop.Mod.Persistence.RPC
         [NotNull] private readonly SharedRemoteStore m_Store;
 
         private readonly TimeSpan m_Timeout;
+
+        private IEnvironmentServer m_EnvironmentServer => CoopServer.Instance.Environment;
 
         /// <summary>
         /// </summary>
@@ -88,6 +92,11 @@ namespace Coop.Mod.Persistence.RPC
                 }
 
                 m_Queue.RemoveRange(0, numberOfBroadcastEvents);
+                if(m_WasFull && m_Queue.Count - numberOfBroadcastEvents == 0)
+                {
+                    m_WasFull = false;
+                    m_EnvironmentServer.UnlockTimeControl();
+                }
             }
         }
 
@@ -98,17 +107,15 @@ namespace Coop.Mod.Persistence.RPC
         /// </summary>
         /// <param name="room">Room to send the event to.</param>
         /// <param name="rpc"></param>
-        public bool Add(RailServerRoom room, EventMethodCall rpc)
+        public void Add(RailServerRoom room, EventMethodCall rpc)
         {
             lock (m_Queue)
             {
                 Call call = new Call(room, rpc);
                 call.ObjectsToBeDistributed.RemoveAll(id => m_DistributedObjects.Contains(id));
 
-                bool isFull = false;
                 if (m_Queue.Count >= MaximumQueueSize)
                 {
-                    isFull = true;
                     Logger.Error("Event queue is full!");
                     if (Main.DEBUG)
                     {
@@ -127,11 +134,16 @@ namespace Coop.Mod.Persistence.RPC
                     }
 
                 }
-
                 m_Queue.Add(call);
-                return isFull;
+                if (m_Queue.Count >= MaximumQueueSize)
+                {
+                    Logger.Debug("Event queue full, the game is paused to catch up.");
+                    m_WasFull = true;
+                    m_EnvironmentServer.LockTimeControlStopped();
+                }
             }
         }
+
 
         private void OnObjectDistributed(ObjectId id)
         {
