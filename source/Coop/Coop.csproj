@@ -292,6 +292,9 @@
     <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\Managers\TestMPManger.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
+    <Compile Include="Mod\Patch\MapSpeedModifier\OnMapSpeedChange\SetTimePatch.cs" />
+    <Compile Include="Mod\Patch\MapSpeedModifier\MapSpeedResolver.cs" />
+    <Compile Include="Mod\Patch\MapSpeedModifier\OnMapSpeedChange\TimeControlOverrider.cs" />
     <Compile Include="Mod\Patch\TimeSynchronization.cs" />
     <Compile Include="Mod\Patch\Debugging.cs" />
     <Compile Include="Mod\Patch\Exceptions.cs" />
@@ -423,6 +426,7 @@
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>powershell -ExecutionPolicy Unrestricted -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\"  -TargetDir "$(TargetDir)\" -TargetFileName "$(TargetFileName) " -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll</PostBuildEvent>
