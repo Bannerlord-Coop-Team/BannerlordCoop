@@ -141,8 +141,13 @@ namespace Coop.Mod
 
         protected override void OnSubModuleUnloaded()
         {
-            CoopServer.Instance.ShutDownServer();
             base.OnSubModuleUnloaded();
+        }
+
+        public override void OnGameEnd(Game game)
+        {
+            base.OnGameEnd(game);
+            CoopServer.Instance.ShutDownServer();
         }
 
         protected override void OnApplicationTick(float dt)
