@@ -1,4 +1,5 @@
-﻿using SuperWebSocket;
+﻿using BannerlordSystemTestingLibrary;
+using SuperWebSocket;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -18,23 +19,39 @@ namespace TestRunner
         private delegate bool EventHandler(CtrlType sig);
         static EventHandler _handler;
 
-        private static readonly Dictionary<WebSocketSession, string> sessionId = new Dictionary<WebSocketSession, string>();
-        private static GameProcess hostProcess;
-        private static GameProcess clientProcess;
+        static GameInstance host = new GameInstance("/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
+        static GameInstance client = new GameInstance("/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
+        //static GameInstance client2 = new GameInstance("/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
+
+        static List<GameInstance> instances = new List<GameInstance>
+            {
+                //host,
+                //client,
+            };
+
+        static TestEnvironment environment;
 
         static void Main(string[] args)
         {
-            WebSocketServer.Instance.NewSessionConnected += WsServer_NewSessionConnected;
-            WebSocketServer.Instance.NewMessageReceived += WsServer_NewMessageReceived;
-            WebSocketServer.Instance.NewDataReceived += WsServer_NewDataReceived;
-            WebSocketServer.Instance.SessionClosed += WsServer_SessionClosed;
+            environment = new TestEnvironment(instances);
+
+            //Console.WriteLine("PID " + host.PID.ToString());
 
             // Some biolerplate to react to close window event
             _handler += new EventHandler(Handler);
             SetConsoleCtrlHandler(_handler, true);
 
-            hostProcess = new GameProcess(GameType.Host);
-            clientProcess = new GameProcess(GameType.Client);
+            //host.Attach().Wait();
+
+            //Console.WriteLine("Attached.");
+
+            //host.SendCommand("StartGame");
+
+            environment.OnRegistrationFinished += (instance) =>
+            {
+                instance.SendCommand("StartGame");
+            };
+
 
             Console.WriteLine("Server is running.");
             
@@ -65,8 +82,10 @@ namespace TestRunner
                 case CtrlType.CTRL_LOGOFF_EVENT:
                 case CtrlType.CTRL_SHUTDOWN_EVENT:
                 case CtrlType.CTRL_CLOSE_EVENT:
-                    hostProcess.Kill();
-                    clientProcess.Kill();
+                    foreach(GameInstance instance in instances)
+                    {
+                        instance.Stop();
+                    }
                     return true;
                 default:
                     return false;

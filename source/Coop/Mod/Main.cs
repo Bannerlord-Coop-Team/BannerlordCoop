@@ -9,7 +9,7 @@ using Coop.Mod.DebugUtil;
 using Coop.Mod.Patch;
 using Coop.Mod.UI;
 using HarmonyLib;
-using ModTestingUtils;
+using ModTestingFramework;
 using Network.Infrastructure;
 using NLog;
 using NLog.Layouts;
@@ -92,7 +92,9 @@ namespace Coop.Mod
 
             if (TESTING_ENABLED)
             {
-                TestingUtils suite = TestingUtils.Instance;
+                TestingFramework suite = TestingFramework.Instance;
+
+                suite.SendMessage(Module.CurrentModule.GetInitialStateOptions().ToString());
             }
 
             // Apply all patches via harmony
@@ -128,8 +130,6 @@ namespace Coop.Mod
                         }
                         else
                         {
-                            InformationManager.DisplayMessage(
-                                new InformationMessage("Hello World!"));
                             ScreenManager.PushScreen(
                                 ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
                                     new object[] { }));

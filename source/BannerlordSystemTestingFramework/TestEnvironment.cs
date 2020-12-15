@@ -1,30 +1,32 @@
 ﻿using HarmonyLib;
-using SuperSocket.SocketBase;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Text;
 
 namespace BannerlordSystemTestingLibrary
 {
-    public class TestEnvironment : IDisposable
+    public class TestEnvironment
     {
+        public static readonly Encoding encoding = Encoding.UTF8;
         readonly List<GameInstance> instances = new List<GameInstance>();
+        readonly ProtocolRegistry protocolRegistry = new ProtocolRegistry();
+        readonly int PORT = 8998;
+
+        // TODO find better way to notify completed registration
+        public event Action<GameInstance> OnRegistrationFinished;
 
         TestEnvironment()
         {
-            WebSocketServer.Instance.NewSessionConnected += WsServer_NewSessionConnected;
-            WebSocketServer.Instance.NewMessageReceived += WsServer_NewMessageReceived;
-            WebSocketServer.Instance.NewDataReceived += WsServer_NewDataReceived;
-            WebSocketServer.Instance.SessionClosed += WsServer_SessionClosed;
+            SocketServer.Instance.StringEncoder = encoding;
+            SocketServer.Instance.DelimiterDataReceived += Instance_DelimiterDataReceived;
+            SocketServer.Instance.ClientConnected += Instance_ClientConnected;
+            SocketServer.Instance.ClientDisconnected += Instance_ClientDisconnected;
+            SocketServer.Instance.Start(PORT);
         }
 
-        
-
-        public TestEnvironment(GameInstance instance) : this()
-        {
-            instances.Add(instance);
-            instance.Start();
-        }
+        public TestEnvironment(GameInstance instance) : this(new List<GameInstance>() { instance }) { }
 
         public TestEnvironment(List<GameInstance> instances) : this()
         {
@@ -33,36 +35,72 @@ namespace BannerlordSystemTestingLibrary
                 this.instances.Add(instance);
                 instance.Start();
             }
-            
-        }
-        public void Dispose()
-        {
-            foreach(GameInstance instance in instances)
-            {
-                instance.Dispose();
-            }
         }
 
         #region Private
-        private void WsServer_SessionClosed(SuperWebSocket.WebSocketSession session, CloseReason value)
+        private void Instance_ClientDisconnected(object sender, System.Net.Sockets.TcpClient e)
         {
-            Trace.WriteLine("Session Closed");
+            Trace.WriteLine($"Client disconnected: {e.Client.RemoteEndPoint}");
         }
 
-        private void WsServer_NewDataReceived(SuperWebSocket.WebSocketSession session, byte[] value)
+        private void Instance_ClientConnected(object sender, System.Net.Sockets.TcpClient e)
         {
-            throw new NotImplementedException();
+            Trace.WriteLine($"New Connection from: {e.Client.RemoteEndPoint}");
         }
 
-        private void WsServer_NewMessageReceived(SuperWebSocket.WebSocketSession session, string value)
+        private void Instance_DelimiterDataReceived(object sender, SimpleTCP.Message e)
         {
-            Trace.WriteLine(value);
+            if (e.MessageString.StartsWith("REGISTER "))
+            {
+                ParseRegister(e);
+            }
+            else if (e.MessageString.StartsWith("REGISTRATION_COMPLETE")) 
+            {
+                GameInstance instance = instances.Find((i) =>
+                    i.PIDMsg.TcpClient.Client.RemoteEndPoint == e.TcpClient.Client.RemoteEndPoint);
+                OnRegistrationFinished?.Invoke(instance);
+            }
+            else if (e.MessageString.StartsWith("PID "))
+            {
+                ParsePID(e);
+            }
+            else
+            {
+                Trace.WriteLine(e.MessageString);
+            }
         }
 
-        private void WsServer_NewSessionConnected(SuperWebSocket.WebSocketSession session)
+        #region parsers
+        private void ParseRegister(SimpleTCP.Message e)
         {
-            Trace.WriteLine("Session Connected");
+            try
+            {
+                protocolRegistry.ParseAndRegisterCommand(e);
+                e.ReplyLine($"REGISTERED {e.MessageString.Remove(0, "REGISTER ".Length)}");
+            }
+            catch (ProtocolRegisterException ex)
+            {
+                e.ReplyLine($"REGISTER_FAILED {ex.Message}");
+            }
         }
-        #endregion
+
+        private void ParsePID(SimpleTCP.Message e)
+        {
+            string PID = e.MessageString.Remove(0, "PID ".Length);
+            GameInstance gameInstance;
+            if (instances.Where((instance) => instance.PID.ToString() == PID).Count() == 1)
+            {
+                gameInstance = instances.Where((instance) => instance.PID.ToString() == PID).Single();
+            }
+            else
+            {
+                Process gameProcess = Process.GetProcessById(int.Parse(PID));
+                gameInstance = new GameInstance(gameProcess);
+                instances.Add(gameInstance);
+            }
+            gameInstance.PIDMsg = e;
+        }
+        #endregion // Parsers
+        #endregion // Private
     }
 }

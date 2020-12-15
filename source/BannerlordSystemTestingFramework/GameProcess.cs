@@ -18,6 +18,8 @@ namespace BannerlordSystemTestingLibrary
         Process process;
         readonly ProcessStartInfo pInfo = new ProcessStartInfo();
 
+        public bool Running { get; private set; }
+
         [DllImport("User32.dll")]
         static extern int SetForegroundWindow(IntPtr point);
         public GameProcess(string args)
@@ -33,9 +35,17 @@ namespace BannerlordSystemTestingLibrary
             pInfo.Arguments = args;
         }
 
+        public GameProcess(Process p)
+        {
+            process = p;
+            Running = !process.HasExited;
+        }
+
         public void Start()
         {
+            Running = true;
             process = Process.Start(pInfo);
+            process.Exited += (sender, e) => { Running = false; };
 
             if (process.MainWindowTitle == "Safe Mode")
             {
@@ -47,10 +57,22 @@ namespace BannerlordSystemTestingLibrary
             Trace.WriteLine(process.MainWindowTitle);
         }
 
+        public int GetPID()
+        {
+            return process.Id;
+        }
+
+        public void Close()
+        {
+            process.CloseMainWindow();
+        }
+
         public void Kill()
         {
             process.Kill();
         }
+
+        #region private
 
         private void FindGamePath()
         {
@@ -111,6 +133,7 @@ namespace BannerlordSystemTestingLibrary
         {
             process.Kill();
         }
+        #endregion
     }
 
 

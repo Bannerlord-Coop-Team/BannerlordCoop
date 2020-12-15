@@ -18,9 +18,17 @@ namespace SystemTests
         [TestInitialize]
         public void Setup()
         {
-            List<GameInstance> instances = new List<GameInstance>();
-            instances.Add(host);
-            instances.Add(client);
+            //List<GameInstance> instances = new List<GameInstance>
+            //{
+            //    host,
+            //    client
+            //};
+
+            List<GameInstance> instances = new List<GameInstance>
+            {
+                host
+            };
+
 
             environment = new TestEnvironment(instances);
         }
@@ -28,7 +36,9 @@ namespace SystemTests
         [TestMethod]
         public void TestMethod1()
         {
-            Thread.Sleep(10);
+            while(host.Running) {
+                Thread.Sleep(TimeSpan.FromSeconds(1));
+            }
         }
     }
 }
