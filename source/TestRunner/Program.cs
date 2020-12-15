@@ -49,7 +49,7 @@ namespace TestRunner
 
             environment.OnRegistrationFinished += (instance) =>
             {
-                instance.SendCommand("StartGame");
+                instance.SendCommand("ExitGame");
             };
 
 

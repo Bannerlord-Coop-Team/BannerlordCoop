@@ -3,6 +3,7 @@ using SimpleTCP;
 using System;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 
 namespace ModTestingFramework
 {
@@ -44,7 +45,27 @@ namespace ModTestingFramework
             string[] splitArray = formattedMsg.Split(' ');
             string[] args = splitArray.Skip(1).ToArray();
             string command = splitArray.First();
-            CommandRegistry.commands[command].Invoke(null, args);
+
+            if (!CommandRegistry.commands.ContainsKey(command)) 
+            {
+                throw new Exception("Command does not exist in command registry.");
+            }
+
+            MethodInfo methodInfo = CommandRegistry.commands[command];
+
+            if(methodInfo.GetParameters().Length == 0)
+            {
+                methodInfo.Invoke(null, null);
+            }
+            else if(methodInfo.GetParameters().Length == 1 &&
+                methodInfo.GetParameters()[0].ParameterType == typeof(string[]))
+            {
+                methodInfo.Invoke(null, new object[] { args });
+            }
+            else
+            {
+                throw new Exception($"{methodInfo.Name} does not meet generic requirements.");
+            }
         }
 
         #region Private

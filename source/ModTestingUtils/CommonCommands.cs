@@ -10,5 +10,10 @@ namespace ModTestingFramework
         {
             throw new NotImplementedException();
         }
+
+        public static void ExitGame(string[] args)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
