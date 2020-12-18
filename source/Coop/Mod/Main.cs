@@ -93,8 +93,6 @@ namespace Coop.Mod
             if (TESTING_ENABLED)
             {
                 TestingFramework suite = TestingFramework.Instance;
-
-                suite.SendMessage(Module.CurrentModule.GetInitialStateOptions().ToString());
             }
 
             // Apply all patches via harmony

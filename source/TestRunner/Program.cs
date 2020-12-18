@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -35,21 +36,30 @@ namespace TestRunner
         {
             environment = new TestEnvironment(instances);
 
-            //Console.WriteLine("PID " + host.PID.ToString());
-
             // Some biolerplate to react to close window event
             _handler += new EventHandler(Handler);
             SetConsoleCtrlHandler(_handler, true);
-
-            //host.Attach().Wait();
-
-            //Console.WriteLine("Attached.");
-
-            //host.SendCommand("StartGame");
+            
 
             environment.OnRegistrationFinished += (instance) =>
             {
-                instance.SendCommand("ExitGame");
+                instance.OnGameStateChanged += (state) => {
+                    if (state == GameStates.MainMenuReadyState)
+                    {
+                        instance.SendCommand("ExitGame");
+                    }
+                    else if (state == GameStates.CharacterCreationState)
+                    {
+                        instance.SendCommand("CreateRandomCharacter");
+                    }
+                    else if (!typeof(GameStates)
+                    .GetFields(BindingFlags.Public | BindingFlags.Static)
+                    .Where(f => f.FieldType == typeof(string))
+                     .ToDictionary(f => f.Name,
+                            f => (string)f.GetValue(null)).Values.Contains(state)) {
+                        throw new Exception($"{state} not in GameStates");
+                    };
+                };
             };
 
 

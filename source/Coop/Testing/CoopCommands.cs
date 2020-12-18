@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BannerlordSystemTestingLibrary
+namespace Coop.Testing
 {
-    class ProtocolManager
+    class CoopCommands
     {
     }
 }
