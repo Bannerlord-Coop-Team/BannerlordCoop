@@ -7,6 +7,7 @@ using BannerlordSystemTestingLibrary.Utils;
 using System.Reflection;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace SystemTests
 {
@@ -14,7 +15,8 @@ namespace SystemTests
     public class UnitTest1
     {
         GameInstance host = new GameInstance("/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
-        //GameInstance client = new GameInstance("/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
+        GameInstance client = new GameInstance("/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
+        GameInstance client2 = new GameInstance("/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
 
         TestEnvironment environment;
 
@@ -24,13 +26,14 @@ namespace SystemTests
             List<GameInstance> instances = new List<GameInstance>
             {
                 host,
-                //client
+                client,
+                client2
             };
 
             environment = new TestEnvironment(instances);
         }
 
-        [TestMethod]
+            [TestMethod]
         public void TestMethod1()
         {
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();

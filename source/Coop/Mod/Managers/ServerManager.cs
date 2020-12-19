@@ -39,10 +39,6 @@ namespace Coop.Mod.Managers
                 CoopClient.Instance.Connect(config.NetworkConfiguration.LanAddress, config.NetworkConfiguration.LanPort);
             }
 
-            Settlement settlement = Settlement.Find("tutorial_training_field");
-            Campaign.Current.HandleSettlementEncounter(MobileParty.MainParty, settlement);
-            //BattleMission.StartBattle();
-
             CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {
                 remoteStore.OnObjectReceived += (objId, obj) =>
                 {
