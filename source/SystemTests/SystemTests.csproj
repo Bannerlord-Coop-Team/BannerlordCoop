@@ -64,7 +64,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BannerlordSystemTestingFramework\BannerlordSystemTestingLibrary.csproj">
+    <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingLibrary\BannerlordSystemTestingLibrary.csproj">
       <Project>{510eaa3b-cf7d-46f9-87aa-5cb89a4e3a01}</Project>
       <Name>BannerlordSystemTestingLibrary</Name>
       <EmbedInteropTypes>False</EmbedInteropTypes>

@@ -46,11 +46,7 @@ namespace TestRunner
                 instance.OnGameStateChanged += (state) => {
                     if (state == GameStates.MainMenuReadyState)
                     {
-                        instance.SendCommand("ExitGame");
-                    }
-                    else if (state == GameStates.CharacterCreationState)
-                    {
-                        instance.SendCommand("CreateRandomCharacter");
+                        instance.SendCommand("StartCoop");
                     }
                     else if (!typeof(GameStates)
                     .GetFields(BindingFlags.Public | BindingFlags.Static)
@@ -59,6 +55,11 @@ namespace TestRunner
                             f => (string)f.GetValue(null)).Values.Contains(state)) {
                         throw new Exception($"{state} not in GameStates");
                     };
+                };
+
+                instance.OnCommandResponse += (response) =>
+                {
+                    Console.WriteLine(response);
                 };
             };
 

@@ -4,6 +4,9 @@ using BannerlordSystemTestingLibrary;
 using System.Collections.Generic;
 using System.Threading;
 using BannerlordSystemTestingLibrary.Utils;
+using System.Reflection;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace SystemTests
 {
@@ -11,24 +14,18 @@ namespace SystemTests
     public class UnitTest1
     {
         GameInstance host = new GameInstance("/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
-        GameInstance client = new GameInstance("/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
+        //GameInstance client = new GameInstance("/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
 
         TestEnvironment environment;
 
         [TestInitialize]
         public void Setup()
         {
-            //List<GameInstance> instances = new List<GameInstance>
-            //{
-            //    host,
-            //    client
-            //};
-
             List<GameInstance> instances = new List<GameInstance>
             {
-                host
+                host,
+                //client
             };
-
 
             environment = new TestEnvironment(instances);
         }
@@ -36,9 +33,35 @@ namespace SystemTests
         [TestMethod]
         public void TestMethod1()
         {
-            while(host.Running) {
-                Thread.Sleep(TimeSpan.FromSeconds(1));
-            }
+            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+            environment.OnRegistrationFinished += (instance) =>
+            {
+                instance.OnGameStateChanged += (state) => {
+                    if (state == GameStates.MainMenuReadyState)
+                    {
+                        instance.SendCommand("StartCoop");
+                    }
+                    else if(state == GameStates.UnspecifiedDedicatedServerState)
+                    {
+                        tcs.SetResult(true);
+                    }
+                    else if (!typeof(GameStates)
+                    .GetFields(BindingFlags.Public | BindingFlags.Static)
+                    .Where(f => f.FieldType == typeof(string))
+                     .ToDictionary(f => f.Name,
+                            f => (string)f.GetValue(null)).Values.Contains(state))
+                    {
+                        throw new Exception($"{state} not in GameStates");
+                    };
+                };
+
+                instance.OnCommandResponse += (response) =>
+                {
+                    Console.WriteLine(response);
+                };
+            };
+
+            tcs.Task.Wait();
         }
     }
 }
