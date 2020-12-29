@@ -1,15 +1,10 @@
-﻿using System.Reflection;
-using Coop.Mod.DebugUtil;
-using Coop.Mod.Serializers;
+﻿using Coop.Mod.Serializers;
 using Network.Infrastructure;
 using SandBox;
-using SandBox.View.Map;
-using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem.Load;
-using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop.Mod.Managers
 {
@@ -38,6 +33,8 @@ namespace Coop.Mod.Managers
                 ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
                 CoopClient.Instance.Connect(config.NetworkConfiguration.LanAddress, config.NetworkConfiguration.LanPort);
             }
+
+            MobileParty.MainParty.RemoveParty();
 
             CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {
                 remoteStore.OnObjectReceived += (objId, obj) =>

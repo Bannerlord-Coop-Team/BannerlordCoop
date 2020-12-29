@@ -102,9 +102,15 @@ namespace Coop.Mod.Persistence
             }
 
             CampaignEvents.OnPartyDisbandedEvent.AddNonSerializedListener(this, OnPartyRemoved);
+            CampaignEvents.OnPartyRemovedEvent.AddNonSerializedListener(this, OnPartyRemoved);
             CampaignEvents.OnLordPartySpawnedEvent.AddNonSerializedListener(this, OnPartyAdded);
 
             // Settlements
+        }
+
+        private void OnPartyRemoved(PartyBase partyBase)
+        {
+            OnPartyRemoved(partyBase.MobileParty);
         }
 
         private void OnPartyRemoved(MobileParty party)
@@ -189,8 +195,7 @@ namespace Coop.Mod.Persistence
                 {
                     Logger.Warn("Player party not found.");
                 }
-
-                if (m_Parties[party].Controller == null)
+                else if (m_Parties[party].Controller == null)
                 {
                     // TODO: Currently only the hosting player gets to control the main party. In a future version, every player gets their own party.
                     GrantPartyControl(party, peer);
