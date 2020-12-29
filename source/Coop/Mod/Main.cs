@@ -14,7 +14,6 @@ using Network.Infrastructure;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
-using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Engine.Screens;
 using TaleWorlds.InputSystem;
