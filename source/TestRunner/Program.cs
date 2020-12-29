@@ -13,6 +13,9 @@ using System.Windows.Forms;
 
 namespace TestRunner
 {
+    /// <summary>
+    /// Runner that works similar to running a test but as an application
+    /// </summary>
     static class TestRunner
     {
         [DllImport("Kernel32")]
