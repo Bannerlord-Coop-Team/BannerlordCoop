@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using SandBox;
 using TaleWorlds.CampaignSystem;
@@ -7,9 +6,7 @@ using TaleWorlds.Core;
 using TaleWorlds.SaveSystem.Load;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Actions;
-using System.Threading.Tasks;
 using JetBrains.Annotations;
-using TaleWorlds.MountAndBlade;
 
 namespace Coop.Mod.Managers
 {
