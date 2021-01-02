@@ -66,7 +66,7 @@ namespace Coop.Mod
         public static CoopServer Instance => m_Instance.Value;
 
         public Server Current { get; private set; }
-        public DedicatedServerGameManager gameManager { get; private set; }
+        public ServerGameManager gameManager { get; private set; }
 
         #region Events
         public event Action OnServerSendingWorldData;
@@ -153,7 +153,7 @@ namespace Coop.Mod
             }
         }
 
-        public DedicatedServerGameManager CreateGameManager(LoadGameResult saveGameData = null)
+        public ServerGameManager CreateGameManager(LoadGameResult saveGameData = null)
         {
             if (saveGameData != null)
             {
@@ -161,21 +161,21 @@ namespace Coop.Mod
             }
             else
             {
-                gameManager = new DedicatedServerGameManager();
+                gameManager = new ServerGameManager();
             }
 
             return gameManager;
         }
 
-        public DedicatedServerGameManager CreateGameManager(LoadResult loadResult = null)
+        public ServerGameManager CreateGameManager(LoadResult loadResult = null)
         {
             if (loadResult != null)
             {
-                gameManager = new DedicatedServerGameManager(loadResult);
+                gameManager = new ServerGameManager(loadResult);
             }
             else
             {
-                gameManager = new DedicatedServerGameManager();
+                gameManager = new ServerGameManager();
             }
 
             return gameManager;
