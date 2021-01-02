@@ -34,8 +34,6 @@ namespace Coop.Mod.Managers
                 CoopClient.Instance.Connect(config.NetworkConfiguration.LanAddress, config.NetworkConfiguration.LanPort);
             }
 
-            MobileParty.MainParty.RemoveParty();
-
             CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {
                 remoteStore.OnObjectReceived += (objId, obj) =>
                 {

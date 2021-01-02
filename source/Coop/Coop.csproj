@@ -289,6 +289,7 @@
     <Compile Include="Mod\Logging.cs" />
     <Compile Include="Mod\Managers\ClientCharacterCreatorManager.cs" />
     <Compile Include="Mod\Managers\ClientManager.cs" />
+    <Compile Include="Mod\Managers\DedicatedServerManager.cs" />
     <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\Managers\TestMPManger.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
