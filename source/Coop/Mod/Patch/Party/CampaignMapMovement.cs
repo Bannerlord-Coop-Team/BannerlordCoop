@@ -13,7 +13,8 @@ namespace Coop.Mod.Patch
                 .InterceptSetter(nameof(MobileParty.DefaultBehavior))
                 .InterceptSetter(nameof(MobileParty.TargetSettlement))
                 .InterceptSetter(nameof(MobileParty.TargetParty))
-                .InterceptSetter(nameof(MobileParty.TargetPosition));
+                .InterceptSetter(nameof(MobileParty.TargetPosition))
+                .InterceptSetter(nameof(MobileParty.Position2D));
 
         public static FieldAccessGroup<MobileParty, MovementData> Movement { get; } =
             new FieldAccessGroup<MobileParty, MovementData>()
@@ -21,6 +22,7 @@ namespace Coop.Mod.Patch
                 .AddField<Settlement>("_targetSettlement")
                 .AddField<MobileParty>("_targetParty")
                 .AddField<Vec2>("_targetPosition")
+                .AddField<Vec2>("_position2D")
                 .AddField<int>("_numberOfFleeingsAtLastTravel");
 
         [PatchInitializer]
