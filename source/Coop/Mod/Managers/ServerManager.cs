@@ -8,6 +8,9 @@ using TaleWorlds.SaveSystem.Load;
 
 namespace Coop.Mod.Managers
 {
+    /// <summary>
+    /// Dedicated server game manager.
+    /// </summary>
     public class ServerGameManager : CampaignGameManager
     {
         public ServerGameManager() : base() { }
@@ -34,6 +37,7 @@ namespace Coop.Mod.Managers
                 CoopClient.Instance.Connect(config.NetworkConfiguration.LanAddress, config.NetworkConfiguration.LanPort);
             }
 
+            // Removes main party on server.
             MobileParty.MainParty.RemoveParty();
 
             CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {
@@ -41,6 +45,7 @@ namespace Coop.Mod.Managers
                 {
                     if (obj is PlayerHeroSerializer serializedPlayerHero)
                     {
+                        // Hero received from client after character creation
                         Hero hero = (Hero)serializedPlayerHero.Deserialize();
                     }
                 };
