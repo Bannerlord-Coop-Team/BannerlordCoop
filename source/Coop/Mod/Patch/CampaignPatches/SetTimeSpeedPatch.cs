@@ -6,7 +6,7 @@ namespace Coop.Mod.Patch.CampaignPatches
 
     /// <summary>
     ///     <para>
-    ///         Creates a flag when <c>Campaign::SetTimeSpeed</c> gets called.
+    ///         Creates a flag when <see cref="TaleWorlds.CampaignSystem.Campaign.SetTimeSpeed"/> is called.
     ///     </para>
     ///     <para>
     ///         More about it on <see href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/113">issue #113</see>
@@ -14,11 +14,11 @@ namespace Coop.Mod.Patch.CampaignPatches
     ///     </para>
     /// </summary>
     /// <remarks>
-    ///     This class prefixes <c>Campaign::SetTimeSpeed</c> to add a flag to know
+    ///     This class prefixes <see cref="TaleWorlds.CampaignSystem.Campaign.SetTimeSpeed"/> to add a flag and know
     ///     when the user have changed the map speed.
     /// </remarks>
     [HarmonyPatch(typeof(Campaign), nameof(Campaign.SetTimeSpeed))]
-    static class SetTimePatch
+    static class SetTimeSpeedPatch
     {
 
         [HarmonyPrefix]
