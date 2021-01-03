@@ -93,6 +93,20 @@ namespace Coop.Mod.Persistence.Party
                    TargetSettlement?.Id == other.TargetSettlement?.Id;
         }
 
+        public override bool Equals(Object obj)
+        {
+            if (!(obj is MovementData))
+            {
+                return false;
+            }
+
+            MovementData other = (MovementData)obj;
+            return DefaultBehaviour.Equals(other.DefaultBehaviour) &&
+                   TargetPosition.Equals(other.TargetPosition) &&
+                   TargetParty?.Id == other.TargetParty?.Id &&
+                   TargetSettlement?.Id == other.TargetSettlement?.Id;
+        }
+
         private enum Field
         {
             DefaultBehavior = 0,

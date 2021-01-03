@@ -100,10 +100,10 @@ namespace Sync
                 ValueAccess field = data.Access;
 
                 object newValue = data.Access.Get(data.Target);
-                bool changed = !Equals(newValue, data.Value);
+                bool changed = !newValue.Equals(data.Value);
 
                 Dictionary<object, ValueChangeRequest> fieldBuffer = BufferedChanges.Assert(field);
-                if (fieldBuffer.TryGetValue(data.Target, out ValueChangeRequest cached))
+                /*if (fieldBuffer.TryGetValue(data.Target, out ValueChangeRequest cached))
                 {
                     if (changed && cached.RequestProcessed)
                     {
@@ -113,7 +113,7 @@ namespace Sync
                     cached.RequestedValue = newValue;
                     field.Set(data.Target, cached.LatestActualValue);
                     continue;
-                }
+                }*/
 
                 if (!changed) continue;
 
