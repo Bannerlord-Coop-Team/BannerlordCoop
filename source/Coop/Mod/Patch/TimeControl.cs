@@ -31,14 +31,16 @@ namespace Coop.Mod.Patch
                 AccessTools.Property(typeof(Campaign), nameof(Campaign.TimeControlModeLock))
                            .GetBackingField());
 
+        public static bool CanSyncTimeControlMode = false;
+
         [PatchInitializer]
         public static void Init()
         {
-            FieldChangeBuffer.Intercept(TimeControlMode, TimeControlPatch.Setters, Coop.DoSync);
+            FieldChangeBuffer.Intercept(TimeControlMode, TimeControlPatch.Setters, DoSyncTimeControl);
             FieldChangeBuffer.Intercept(
                 TimeControlModeLock,
                 TimeControlLockPatch.Setters,
-                Coop.DoSync);
+                DoSyncTimeControl);
 
             MethodAccess mainPartyWaitingSetter = IsMainPartyWaitingPatch.Setters.First();
             mainPartyWaitingSetter.Condition = o => Coop.DoSync();
@@ -61,7 +63,12 @@ namespace Coop.Mod.Patch
 
             IsMainPartyWaitingPatch
                 .Setters.First()
-                .CallOriginal(instance, new object[] {isEveryMainPartyWaiting});
+                .CallOriginal(instance, new object[] { isEveryMainPartyWaiting });
+        }
+
+        public static bool DoSyncTimeControl()
+        {
+            return Coop.DoSync() && CanSyncTimeControlMode;
         }
     }
 }
