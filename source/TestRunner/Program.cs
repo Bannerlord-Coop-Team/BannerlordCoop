@@ -25,12 +25,11 @@ namespace TestRunner
 
         static GameInstance host = new GameInstance("/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
         static GameInstance client = new GameInstance("/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
-        //static GameInstance client2 = new GameInstance("/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
 
         static List<GameInstance> instances = new List<GameInstance>
             {
-                //host,
-                //client,
+                host,
+                client,
             };
 
         static TestEnvironment environment;
@@ -44,6 +43,7 @@ namespace TestRunner
             SetConsoleCtrlHandler(_handler, true);
             
 
+            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
             environment.OnRegistrationFinished += (instance) =>
             {
                 instance.OnGameStateChanged += (state) => {
@@ -51,6 +51,11 @@ namespace TestRunner
                     {
                         instance.SendCommand("StartCoop");
                     }
+                    else if(state == GameStates.UnspecifiedDedicatedServerState)
+                    {
+                        tcs.SetResult(true);
+                    }
+                    
                     else if (!typeof(GameStates)
                     .GetFields(BindingFlags.Public | BindingFlags.Static)
                     .Where(f => f.FieldType == typeof(string))
