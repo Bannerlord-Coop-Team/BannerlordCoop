@@ -85,14 +85,6 @@ namespace Coop.Mod.Persistence.Party
             return Values.GetEnumerator();
         }
 
-        public bool NearlyEquals(MovementData other)
-        {
-            return DefaultBehaviour == other.DefaultBehaviour &&
-                   TargetPosition.NearlyEquals(other.TargetPosition) &&
-                   TargetParty?.Id == other.TargetParty?.Id &&
-                   TargetSettlement?.Id == other.TargetSettlement?.Id;
-        }
-
         public override bool Equals(Object obj)
         {
             if (!(obj is MovementData))
@@ -101,8 +93,8 @@ namespace Coop.Mod.Persistence.Party
             }
 
             MovementData other = (MovementData)obj;
-            return DefaultBehaviour.Equals(other.DefaultBehaviour) &&
-                   TargetPosition.Equals(other.TargetPosition) &&
+            return DefaultBehaviour == other.DefaultBehaviour &&
+                   TargetPosition.NearlyEquals(other.TargetPosition, Compare.COORDINATE_PRECISION) &&
                    TargetParty?.Id == other.TargetParty?.Id &&
                    TargetSettlement?.Id == other.TargetSettlement?.Id;
         }
