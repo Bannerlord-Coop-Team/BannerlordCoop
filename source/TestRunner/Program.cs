@@ -110,26 +110,6 @@ namespace TestRunner
                     return false;
             }
         }
-
-        private static void WsServer_SessionClosed(WebSocketSession session, SuperSocket.SocketBase.CloseReason value)
-        {
-            Console.WriteLine("Session Closed");
-        }
-
-        private static void WsServer_NewDataReceived(WebSocketSession session, byte[] value)
-        {
-            throw new NotImplementedException();
-        }
-
-        private static void WsServer_NewMessageReceived(WebSocketSession session, string value)
-        {
-            Console.WriteLine(value);
-        }
-
-        private static void WsServer_NewSessionConnected(WebSocketSession session)
-        {
-            Console.WriteLine("Session Connected");
-        }
         #endregion
     }
 }
