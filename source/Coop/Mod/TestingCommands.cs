@@ -8,7 +8,7 @@ namespace Coop.Mod
     {
         public static void StartCoop()
         {
-            TaleWorlds.MountAndBlade.Module.CurrentModule.ExecuteInitialStateOptionWithId("CoOp Campaign");
+            TaleWorlds.MountAndBlade.Module.CurrentModule.ExecuteInitialStateOptionWithId(Main.CoopCampaign.Id);
         }
     }
 }
