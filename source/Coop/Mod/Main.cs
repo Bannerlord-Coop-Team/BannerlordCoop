@@ -7,6 +7,7 @@ using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Patch;
+using Coop.Mod.Patch.World;
 using Coop.Mod.UI;
 using HarmonyLib;
 using ModTestingFramework;
@@ -33,6 +34,8 @@ namespace Coop.Mod
         public static readonly bool DEBUG = true;
         // Test Symbols
         public static readonly bool TESTING_ENABLED = true;
+        public static TestingFramework Suite;
+
 
         public static readonly string LOAD_GAME = "MP";
 
@@ -92,7 +95,7 @@ namespace Coop.Mod
 
             if (TESTING_ENABLED)
             {
-                TestingFramework suite = TestingFramework.Instance;
+                Suite = TestingFramework.Instance;
             }
 
             // Apply all patches via harmony

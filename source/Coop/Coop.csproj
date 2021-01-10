@@ -301,6 +301,7 @@
     <Compile Include="Mod\Patch\Party\PartiesSellLootCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesSellPrisonerCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\RecruitmentCampaignBehavior.cs" />
+    <Compile Include="Mod\Patch\World\SaveManager.cs" />
     <Compile Include="Mod\Patch\World\TimeSynchronization.cs" />
     <Compile Include="Mod\Patch\Debugging.cs" />
     <Compile Include="Mod\Patch\Exceptions.cs" />
