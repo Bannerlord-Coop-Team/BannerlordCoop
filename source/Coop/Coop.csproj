@@ -389,12 +389,17 @@
     <Compile Include="NetImpl\PlatformAPI.cs" />
     <Compile Include="NetImpl\Steam\NetworkSteam.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Mod\TestingCommands.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingFramework\BannerlordSystemTestingFramework.csproj">
+      <Project>{68cefb0c-37f7-4f86-8e8d-1d3baf1e7277}</Project>
+      <Name>BannerlordSystemTestingFramework</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
       <Name>Common</Name>
@@ -422,7 +427,7 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\"  -TargetDir "$(TargetDir)\" -TargetFileName "$(TargetFileName) " -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll</PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\"  -TargetDir "$(TargetDir)\" -TargetFileName "$(TargetFileName) " -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll</PostBuildEvent>
   </PropertyGroup>
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

@@ -9,11 +9,11 @@ using Coop.Mod.DebugUtil;
 using Coop.Mod.Patch;
 using Coop.Mod.UI;
 using HarmonyLib;
+using ModTestingFramework;
 using Network.Infrastructure;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
-using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Engine.Screens;
 using TaleWorlds.InputSystem;
@@ -30,12 +30,62 @@ namespace Coop.Mod
     {
         // Debug symbols
         public static readonly bool DEBUG = true;
+        // Test Symbols
+        public static readonly bool TESTING_ENABLED = true;
 
         public static readonly string LOAD_GAME = "MP";
 
         // -------------
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
+
+        #region MainMenuButtons
+        public static InitialStateOption CoopCampaign = 
+            new InitialStateOption(
+                "CoOp Campaign",
+                new TextObject("Host Co-op Campaign"),
+                9990,
+                () =>
+                {
+                    string[] array = Utilities.GetFullCommandLineString().Split(' ');
+
+                    if (DEBUG)
+                    {
+                        foreach (string argument in array)
+                        {
+                            if (argument.ToLower() == "/server")
+                            {
+                                //TODO add name to args
+                                CoopServer.Instance.StartGame("MP");
+                            }
+                            else if (argument.ToLower() == "/client")
+                            {
+                                ServerConfiguration defaultConfiguration =
+                                    new ServerConfiguration();
+                                CoopClient.Instance.Connect(
+                                    defaultConfiguration.NetworkConfiguration.LanAddress,
+                                    defaultConfiguration.NetworkConfiguration.LanPort);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        ScreenManager.PushScreen(
+                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                                new object[] { }));
+                    }
+                },
+                false);
+
+        public static InitialStateOption JoinCoopGame =
+            new InitialStateOption(
+              "Join Coop Game",
+              new TextObject("Join Co-op Campaign"),
+              9991,
+              JoinWindow,
+              false
+            );
+        #endregion
 
         public Main()
         {
@@ -61,7 +111,7 @@ namespace Coop.Mod
             AddBehavior<InitServerBehaviour>();
             AddBehavior<GameLoadedBehaviour>();
 
-            Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord");
+            Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
             IEnumerable<MethodInfo> patchInitializers =
                 from t in Assembly.GetExecutingAssembly().GetTypes()
                 from m in t.GetMethods()
@@ -87,10 +137,16 @@ namespace Coop.Mod
                               .SetValue(Module.CurrentModule, true);
             }
 
+            if (TESTING_ENABLED)
+            {
+                TestingFramework suite = TestingFramework.Instance;
+            }
+
             // Apply all patches via harmony
             harmony.PatchAll();
 
-            Module.CurrentModule.AddInitialStateOption(
+            #region ButtonAssignment
+            CoopCampaign =
                 new InitialStateOption(
                     "CoOp Campaign",
                     new TextObject("Host Co-op Campaign"),
@@ -120,23 +176,26 @@ namespace Coop.Mod
                         }
                         else
                         {
-                            InformationManager.DisplayMessage(
-                                new InformationMessage("Hello World!"));
                             ScreenManager.PushScreen(
                                 ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
                                     new object[] { }));
                         }
                     },
-                    false));
+                    false);
 
-            Module.CurrentModule.AddInitialStateOption(new InitialStateOption(
-              "Join Coop Game",
-              new TextObject("Join Co-op Campaign"),
-              9991,
-              JoinWindow,
-              false
-            ));
+            JoinCoopGame =
+                new InitialStateOption(
+                  "Join Coop Game",
+                  new TextObject("Join Co-op Campaign"),
+                  9991,
+                  JoinWindow,
+                  false
+                );
 
+            Module.CurrentModule.AddInitialStateOption(CoopCampaign);
+
+            Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
+            #endregion
         }
 
         protected override void OnSubModuleUnloaded()
@@ -203,7 +262,7 @@ namespace Coop.Mod
         internal static bool QuartermasterIsClanWide = true;
 
 
-        internal void JoinWindow()
+        internal static void JoinWindow()
         {
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopConnectionUI>());
         }

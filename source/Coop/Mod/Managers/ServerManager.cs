@@ -7,7 +7,9 @@ using SandBox.View.Map;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem.Load;
+using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop.Mod.Managers
 {
@@ -21,8 +23,15 @@ namespace Coop.Mod.Managers
             // TODO save all heros
         }
 
+        public override void OnAfterCampaignStart(Game game)
+        {
+            NetworkMain.InitializeAsDedicatedServer();
+            base.OnAfterCampaignStart(game);
+        }
+
         public override void OnLoadFinished()
         {
+            NetworkMain.InitializeAsDedicatedServer();
             base.OnLoadFinished();
             if (CoopServer.Instance.StartServer() == null)
             {
@@ -37,7 +46,6 @@ namespace Coop.Mod.Managers
                     {
                         Hero hero = (Hero)serializedPlayerHero.Deserialize();
                     }
-
                 };
             };
         }
