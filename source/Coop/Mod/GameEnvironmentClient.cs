@@ -32,13 +32,20 @@ namespace Coop.Mod
 
         public void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled)
         {
+            MobileParty party = GetMobilePartyByIndex(iPartyIndex);
+
+            if(party == null)
+            {
+                return;
+            }
+
             if (isPlayerControlled)
             {
-                PlayerControlledMobileParties.Add(GetMobilePartyByIndex(iPartyIndex));
+                PlayerControlledMobileParties.Add(party);
             }
             else
             {
-                PlayerControlledMobileParties.Remove(GetMobilePartyByIndex(iPartyIndex));
+                PlayerControlledMobileParties.Remove(party);
             }
         }
 

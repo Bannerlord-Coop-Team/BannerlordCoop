@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Coop.Mod.Patch.Party;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.World;
 using NLog;
@@ -8,6 +9,7 @@ using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 
 namespace Coop.Mod.Persistence
 {
@@ -102,9 +104,16 @@ namespace Coop.Mod.Persistence
             }
 
             CampaignEvents.OnPartyDisbandedEvent.AddNonSerializedListener(this, OnPartyRemoved);
+            CampaignEvents.OnPartyRemovedEvent.AddNonSerializedListener(this, OnPartyRemoved);
             CampaignEvents.OnLordPartySpawnedEvent.AddNonSerializedListener(this, OnPartyAdded);
+            BanditsCampaignBehaviorPatch.OnBanditAdded += (sender, e) => OnPartyAdded(e);
 
             // Settlements
+        }
+
+        private void OnPartyRemoved(PartyBase partyBase)
+        {
+            OnPartyRemoved(partyBase.MobileParty);
         }
 
         private void OnPartyRemoved(MobileParty party)
@@ -189,8 +198,7 @@ namespace Coop.Mod.Persistence
                 {
                     Logger.Warn("Player party not found.");
                 }
-
-                if (m_Parties[party].Controller == null)
+                else if (m_Parties[party].Controller == null)
                 {
                     // TODO: Currently only the hosting player gets to control the main party. In a future version, every player gets their own party.
                     GrantPartyControl(party, peer);

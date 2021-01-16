@@ -1,18 +1,16 @@
-﻿using System.Reflection;
-using Coop.Mod.DebugUtil;
-using Coop.Mod.Serializers;
+﻿using Coop.Mod.Serializers;
 using Network.Infrastructure;
 using SandBox;
-using SandBox.View.Map;
-using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem.Load;
-using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop.Mod.Managers
 {
+    /// <summary>
+    /// Dedicated server game manager.
+    /// </summary>
     public class ServerGameManager : CampaignGameManager
     {
         public ServerGameManager() : base() { }
@@ -39,11 +37,15 @@ namespace Coop.Mod.Managers
                 CoopClient.Instance.Connect(config.NetworkConfiguration.LanAddress, config.NetworkConfiguration.LanPort);
             }
 
+            // Removes main party on server.
+            MobileParty.MainParty.RemoveParty();
+
             CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {
                 remoteStore.OnObjectReceived += (objId, obj) =>
                 {
                     if (obj is PlayerHeroSerializer serializedPlayerHero)
                     {
+                        // Hero received from client after character creation
                         Hero hero = (Hero)serializedPlayerHero.Deserialize();
                     }
                 };
