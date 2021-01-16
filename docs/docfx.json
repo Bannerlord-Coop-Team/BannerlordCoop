@@ -10,6 +10,7 @@
       ],
       "dest": "obj/api",
       "shouldSkipMarkup": true,
+	  "disableDefaultFilter": true,
       "properties": {
           "TargetFramework": "TargetFramework=net47"
       }
