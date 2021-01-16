@@ -1,0 +1,361 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Class ClientCharacterCreationReviewStageVM
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Class ClientCharacterCreationReviewStageVM
+   ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM">
+  
+  
+  <h1 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageVM" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM" class="text-break">Class ClientCharacterCreationReviewStageVM
+  </h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><span class="xref">TaleWorlds.Library.ViewModel</span></div>
+    <div class="level2"><span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM</span></div>
+    <div class="level3"><span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM</span></div>
+    <div class="level4"><span class="xref">ClientCharacterCreationReviewStageVM</span></div>
+  </div>
+  <div classs="implements">
+    <h5>Implements</h5>
+    <div><span class="xref">TaleWorlds.Library.IViewModel</span></div>
+    <div><span class="xref">System.ComponentModel.INotifyPropertyChanged</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnNextStage()</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnPreviousStage()</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.CanAdvanceToNextStage()</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.Name</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.NameTextQuestion</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.ReviewList</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.GainedPropertiesController</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM._characterCreation</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM._affirmativeAction</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM._negativeAction</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM._affirmativeActionText</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM._negativeActionText</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM.ExecuteGoToIndex(System.Int32)</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM.CanAdvance</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM.NextStageText</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM.PreviousStageText</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM.Title</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM.Description</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM.SelectionText</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM.TotalStageCount</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM.FurthestIndex</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM.CurrentStageIndex</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationStageBaseVM.AnyItemSelected</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.UIDebugMode</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.SetField&lt;T&gt;(T, T, System.String)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.OnPropertyChanged(System.String)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.OnPropertyChangedWithValue(System.Object, System.String)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath, System.Boolean)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.GetPropertyValue(System.String, TaleWorlds.Library.PropertyTypeFeeder)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.GetPropertyValue(System.String)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.GetPropertyType(System.String)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.SetPropertyValue(System.String, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.OnFinalize()</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.ExecuteCommand(System.String, System.Object[])</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.RefreshValues()</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.Properties</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.PropertyChanged</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.PropertyChangedWithValue</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ToString()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetHashCode()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetType()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.MemberwiseClone()</span>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="Coop.Client.UI.CharacterCreation.html">Coop.Client.UI.CharacterCreation</a></h6>
+  <h6><strong>Assembly</strong>: Coop.dll</h6>
+  <h5 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageVM_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">class ClientCharacterCreationReviewStageVM : CharacterCreationReviewStageVM, IViewModel, INotifyPropertyChanged</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageVM__ctor_StoryMode_CharacterCreationSystem_CharacterCreation_System_Action_TaleWorlds_Localization_TextObject_System_Action_TaleWorlds_Localization_TextObject_System_Int32_System_Int32_System_Int32_System_Action_System_Int32__.md&amp;value=---%0Auid%3A%20Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.%23ctor(StoryMode.CharacterCreationSystem.CharacterCreation%2CSystem.Action%2CTaleWorlds.Localization.TextObject%2CSystem.Action%2CTaleWorlds.Localization.TextObject%2CSystem.Int32%2CSystem.Int32%2CSystem.Int32%2CSystem.Action%7BSystem.Int32%7D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs/#L15">View Source</a>
+  </span>
+  <a id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageVM__ctor_" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.#ctor*"></a>
+  <h4 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageVM__ctor_StoryMode_CharacterCreationSystem_CharacterCreation_System_Action_TaleWorlds_Localization_TextObject_System_Action_TaleWorlds_Localization_TextObject_System_Int32_System_Int32_System_Int32_System_Action_System_Int32__" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.#ctor(StoryMode.CharacterCreationSystem.CharacterCreation,System.Action,TaleWorlds.Localization.TextObject,System.Action,TaleWorlds.Localization.TextObject,System.Int32,System.Int32,System.Int32,System.Action{System.Int32})">ClientCharacterCreationReviewStageVM(CharacterCreation, Action, TextObject, Action, TextObject, Int32, Int32, Int32, Action&lt;Int32&gt;)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClientCharacterCreationReviewStageVM(CharacterCreation characterCreation, Action affirmativeAction, TextObject affirmativeActionText, Action negativeAction, TextObject negativeActionText, int currentStageIndex, int totalStagesCount, int furthestIndex, Action&lt;int&gt; goToIndex)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">StoryMode.CharacterCreationSystem.CharacterCreation</span></td>
+        <td><span class="parametername">characterCreation</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Action</span></td>
+        <td><span class="parametername">affirmativeAction</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Localization.TextObject</span></td>
+        <td><span class="parametername">affirmativeActionText</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Action</span></td>
+        <td><span class="parametername">negativeAction</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Localization.TextObject</span></td>
+        <td><span class="parametername">negativeActionText</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><span class="parametername">currentStageIndex</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><span class="parametername">totalStagesCount</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><span class="parametername">furthestIndex</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Action</span>&lt;<span class="xref">System.Int32</span>&gt;</td>
+        <td><span class="parametername">goToIndex</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <span class="xref">TaleWorlds.Library.IViewModel</span>
+  </div>
+  <div>
+      <span class="xref">System.ComponentModel.INotifyPropertyChanged</span>
+  </div>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageVM.md&amp;value=---%0Auid%3A%20Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs/#L13" class="contribution-link">View Source</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,185 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Namespace Sync
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Namespace Sync
+   ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="Sync">
+  
+  <h1 id="Sync" data-uid="Sync" class="text-break">Namespace Sync
+  </h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">Classes
+  </h3>
+      <h4><a class="xref" href="Sync.FieldAccess.html">FieldAccess</a></h4>
+      <section>
+Type-erased interface to access an arbitrary field.
+</section>
+      <h4><a class="xref" href="Sync.FieldAccess-2.html">FieldAccess&lt;TDeclaring, TFieldType&gt;</a></h4>
+      <section>
+Typed interface to access an arbitrary field.
+</section>
+      <h4><a class="xref" href="Sync.FieldAccessGroup-2.html">FieldAccessGroup&lt;TDeclaring, TValueObject&gt;</a></h4>
+      <section>
+A collection of <a class="xref" href="Sync.FieldAccess.html">FieldAccess</a> that are declared in the same class. All fields of
+the group are manipulated as a single unit. The value of each individual field is stored in an
+<code data-dev-comment-type="typeparamref" class="typeparamref">TValueObject</code> instance.
+</section>
+      <h4><a class="xref" href="Sync.FieldChangeBuffer.html">FieldChangeBuffer</a></h4>
+      <section>
+Buffer for pending changes to a value. The changes are detected by creating a snapshot
+of the value in a prefix to the trigger function and restoring that snapshot in a
+postfix to the trigger function.
+The buffer <a class="xref" href="Sync.FieldChangeBuffer.html#Sync_FieldChangeBuffer_BufferedChanges">BufferedChanges</a> will never be cleared internally. The game
+loop is responsible to process the buffered changes and apply or discard them.
+</section>
+      <h4><a class="xref" href="Sync.MethodAccess.html">MethodAccess</a></h4>
+      <section>
+Type erased invocation wrapper for patched methods. On creation, a snapshot of the IL
+representation of the method is stored internally. The snapshot includes all patches
+to the function already applied. The snapshot can be called using <a class="xref" href="Sync.MethodAccess.html#Sync_MethodAccess_CallOriginal_System_Object_System_Object___">CallOriginal(Object, Object[])</a>.
+</section>
+      <h4><a class="xref" href="Sync.MethodPatch.html">MethodPatch</a></h4>
+      <section>
+Patch generator for method calls.
+</section>
+      <h4><a class="xref" href="Sync.MethodPatchFactory.html">MethodPatchFactory</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Sync.MethodRegistry.html">MethodRegistry</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Sync.Patcher.html">Patcher</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Sync.PropertyPatch.html">PropertyPatch</a></h4>
+      <section>
+Patch generator for properties.
+</section>
+      <h4><a class="xref" href="Sync.SyncPriority.html">SyncPriority</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Sync.Tracker.html">Tracker</a></h4>
+      <section>
+Base class for class wrappers that notify when specific instances of the wrapped class
+change internal state.
+</section>
+      <h4><a class="xref" href="Sync.ValueAccess.html">ValueAccess</a></h4>
+      <section>
+Type-erased interface for setting and getting a value from an instance.
+</section>
+      <h4><a class="xref" href="Sync.ValueChangeRequest.html">ValueChangeRequest</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Sync.ValueData.html">ValueData</a></h4>
+      <section></section>
+    <h3 id="structs">Structs
+  </h3>
+      <h4><a class="xref" href="Sync.MethodId.html">MethodId</a></h4>
+      <section></section>
+    <h3 id="enums">Enums
+  </h3>
+      <h4><a class="xref" href="Sync.EMethodPatchFlag.html">EMethodPatchFlag</a></h4>
+      <section>
+Flags indicating the desired behaviour of a generated patch for a method.
+</section>
+      <h4><a class="xref" href="Sync.EPatchBehaviour.html">EPatchBehaviour</a></h4>
+      <section></section>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

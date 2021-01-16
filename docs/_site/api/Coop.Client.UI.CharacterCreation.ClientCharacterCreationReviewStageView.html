@@ -1,0 +1,390 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Class ClientCharacterCreationReviewStageView
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Class ClientCharacterCreationReviewStageView
+   ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView">
+  
+  
+  <h1 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView" class="text-break">Class ClientCharacterCreationReviewStageView
+  </h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase</span></div>
+    <div class="level2"><span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView</span></div>
+    <div class="level3"><span class="xref">ClientCharacterCreationReviewStageView</span></div>
+  </div>
+  <div classs="implements">
+    <h5>Implements</h5>
+    <div><span class="xref">StoryMode.CharacterCreationSystem.ICharacterCreationStageListener</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView._affirmativeActionText</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView._negativeActionText</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.Tick(System.Single)</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.OnFinalize()</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.CharacterLayer</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase._affirmativeAction</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase._negativeAction</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase._refreshAction</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase._getTotalStageCountAction</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase._getCurrentStageIndexAction</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase._getFurthestIndexAction</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase._goToIndexAction</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase.OnRefresh()</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase.StoryMode.CharacterCreationSystem.ICharacterCreationStageListener.OnStageFinalize()</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase.GoToIndex(System.Int32)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ToString()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetHashCode()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetType()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.MemberwiseClone()</span>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="Coop.Client.UI.CharacterCreation.html">Coop.Client.UI.CharacterCreation</a></h6>
+  <h6><strong>Assembly</strong>: Coop.dll</h6>
+  <h5 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[GameStateScreen(typeof(ClientCharacterCreationState))]
+public class ClientCharacterCreationReviewStageView : CharacterCreationReviewStageView, ICharacterCreationStageListener</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView__ctor_StoryMode_CharacterCreationSystem_CharacterCreation_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Localization_TextObject_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Localization_TextObject_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageWithInt_.md&amp;value=---%0Auid%3A%20Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.%23ctor(StoryMode.CharacterCreationSystem.CharacterCreation%2CTaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage%2CTaleWorlds.Localization.TextObject%2CTaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage%2CTaleWorlds.Localization.TextObject%2CTaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage%2CTaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt%2CTaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt%2CTaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt%2CTaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageWithInt)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs/#L44">View Source</a>
+  </span>
+  <a id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView__ctor_" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.#ctor*"></a>
+  <h4 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView__ctor_StoryMode_CharacterCreationSystem_CharacterCreation_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Localization_TextObject_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Localization_TextObject_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageWithInt_" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.#ctor(StoryMode.CharacterCreationSystem.CharacterCreation,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage,TaleWorlds.Localization.TextObject,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage,TaleWorlds.Localization.TextObject,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageWithInt)">ClientCharacterCreationReviewStageView(CharacterCreation, ControlCharacterCreationStage, TextObject, ControlCharacterCreationStage, TextObject, ControlCharacterCreationStage, ControlCharacterCreationStageReturnInt, ControlCharacterCreationStageReturnInt, ControlCharacterCreationStageReturnInt, ControlCharacterCreationStageWithInt)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClientCharacterCreationReviewStageView(CharacterCreation characterCreation, ControlCharacterCreationStage affirmativeAction, TextObject affirmativeActionText, ControlCharacterCreationStage negativeAction, TextObject negativeActionText, ControlCharacterCreationStage onRefresh, ControlCharacterCreationStageReturnInt getCurrentStageIndexAction, ControlCharacterCreationStageReturnInt getTotalStageCountAction, ControlCharacterCreationStageReturnInt getFurthestIndexAction, ControlCharacterCreationStageWithInt goToIndexAction)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">StoryMode.CharacterCreationSystem.CharacterCreation</span></td>
+        <td><span class="parametername">characterCreation</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage</span></td>
+        <td><span class="parametername">affirmativeAction</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Localization.TextObject</span></td>
+        <td><span class="parametername">affirmativeActionText</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage</span></td>
+        <td><span class="parametername">negativeAction</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Localization.TextObject</span></td>
+        <td><span class="parametername">negativeActionText</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage</span></td>
+        <td><span class="parametername">onRefresh</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt</span></td>
+        <td><span class="parametername">getCurrentStageIndexAction</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt</span></td>
+        <td><span class="parametername">getTotalStageCountAction</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt</span></td>
+        <td><span class="parametername">getFurthestIndexAction</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageWithInt</span></td>
+        <td><span class="parametername">goToIndexAction</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_GetLayers.md&amp;value=---%0Auid%3A%20Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.GetLayers%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs/#L66">View Source</a>
+  </span>
+  <a id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_GetLayers_" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.GetLayers*"></a>
+  <h4 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_GetLayers" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.GetLayers">GetLayers()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override IEnumerable&lt;ScreenLayer&gt; GetLayers()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.IEnumerable</span>&lt;<span class="xref">TaleWorlds.Engine.Screens.ScreenLayer</span>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.GetLayers()</span></div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_GetVirtualStageCount.md&amp;value=---%0Auid%3A%20Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.GetVirtualStageCount%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs/#L71">View Source</a>
+  </span>
+  <a id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_GetVirtualStageCount_" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.GetVirtualStageCount*"></a>
+  <h4 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_GetVirtualStageCount" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.GetVirtualStageCount">GetVirtualStageCount()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override int GetVirtualStageCount()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.GetVirtualStageCount()</span></div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_NextStage.md&amp;value=---%0Auid%3A%20Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.NextStage%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs/#L76">View Source</a>
+  </span>
+  <a id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_NextStage_" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.NextStage*"></a>
+  <h4 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_NextStage" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.NextStage">NextStage()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override void NextStage()</code></pre>
+  </div>
+  <h5 class="overrides">Overrides</h5>
+  <div><span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.NextStage()</span></div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_PreviousStage.md&amp;value=---%0Auid%3A%20Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.PreviousStage%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs/#L81">View Source</a>
+  </span>
+  <a id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_PreviousStage_" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.PreviousStage*"></a>
+  <h4 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView_PreviousStage" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.PreviousStage">PreviousStage()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override void PreviousStage()</code></pre>
+  </div>
+  <h5 class="overrides">Overrides</h5>
+  <div><span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.PreviousStage()</span></div>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <span class="xref">StoryMode.CharacterCreationSystem.ICharacterCreationStageListener</span>
+  </div>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView.md&amp;value=---%0Auid%3A%20Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs/#L41" class="contribution-link">View Source</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

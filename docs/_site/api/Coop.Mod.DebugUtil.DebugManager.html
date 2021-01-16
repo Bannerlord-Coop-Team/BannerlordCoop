@@ -1,0 +1,950 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Class DebugManager
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Class DebugManager
+   ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="Coop.Mod.DebugUtil.DebugManager">
+  
+  
+  <h1 id="Coop_Mod_DebugUtil_DebugManager" data-uid="Coop.Mod.DebugUtil.DebugManager" class="text-break">Class DebugManager
+  </h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><span class="xref">DebugManager</span></div>
+  </div>
+  <div classs="implements">
+    <h5>Implements</h5>
+    <div><span class="xref">TaleWorlds.Library.IDebugManager</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <span class="xref">System.Object.ToString()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetHashCode()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetType()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.MemberwiseClone()</span>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="Coop.Mod.DebugUtil.html">Coop.Mod.DebugUtil</a></h6>
+  <h6><strong>Assembly</strong>: Coop.dll</h6>
+  <h5 id="Coop_Mod_DebugUtil_DebugManager_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class DebugManager : IDebugManager</code></pre>
+  </div>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_Logger.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.Logger%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L13">View Source</a>
+  </span>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_Logger" data-uid="Coop.Mod.DebugUtil.DebugManager.Logger">Logger</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static readonly Logger Logger</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">NLog.Logger</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_Assert_System_Boolean_System_String_System_String_System_String_System_Int32_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.Assert(System.Boolean%2CSystem.String%2CSystem.String%2CSystem.String%2CSystem.Int32)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L15">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_Assert_" data-uid="Coop.Mod.DebugUtil.DebugManager.Assert*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_Assert_System_Boolean_System_String_System_String_System_String_System_Int32_" data-uid="Coop.Mod.DebugUtil.DebugManager.Assert(System.Boolean,System.String,System.String,System.String,System.Int32)">Assert(Boolean, String, String, String, Int32)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Assert(bool condition, string message, string CallerFile = &quot;&quot;, string CallerMethod = &quot;&quot;, int CallerLine = 0)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="parametername">condition</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">message</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">CallerFile</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">CallerMethod</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><span class="parametername">CallerLine</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_BeginTelemetryScope_TaleWorlds_Library_TelemetryLevelMask_System_String_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.BeginTelemetryScope(TaleWorlds.Library.TelemetryLevelMask%2CSystem.String)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L58">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_BeginTelemetryScope_" data-uid="Coop.Mod.DebugUtil.DebugManager.BeginTelemetryScope*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_BeginTelemetryScope_TaleWorlds_Library_TelemetryLevelMask_System_String_" data-uid="Coop.Mod.DebugUtil.DebugManager.BeginTelemetryScope(TaleWorlds.Library.TelemetryLevelMask,System.String)">BeginTelemetryScope(TelemetryLevelMask, String)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void BeginTelemetryScope(TelemetryLevelMask levelMask, string scopeName)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.Library.TelemetryLevelMask</span></td>
+        <td><span class="parametername">levelMask</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">scopeName</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_DisplayDebugMessage_System_String_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.DisplayDebugMessage(System.String)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L67">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_DisplayDebugMessage_" data-uid="Coop.Mod.DebugUtil.DebugManager.DisplayDebugMessage*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_DisplayDebugMessage_System_String_" data-uid="Coop.Mod.DebugUtil.DebugManager.DisplayDebugMessage(System.String)">DisplayDebugMessage(String)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void DisplayDebugMessage(string message)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">message</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_EndTelemetryScope.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.EndTelemetryScope%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L72">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_EndTelemetryScope_" data-uid="Coop.Mod.DebugUtil.DebugManager.EndTelemetryScope*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_EndTelemetryScope" data-uid="Coop.Mod.DebugUtil.DebugManager.EndTelemetryScope">EndTelemetryScope()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void EndTelemetryScope()</code></pre>
+  </div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_GetDebugVector.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.GetDebugVector%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L76">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_GetDebugVector_" data-uid="Coop.Mod.DebugUtil.DebugManager.GetDebugVector*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_GetDebugVector" data-uid="Coop.Mod.DebugUtil.DebugManager.GetDebugVector">GetDebugVector()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Vec3 GetDebugVector()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.Library.Vec3</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_Print_System_String_System_Int32_TaleWorlds_Library_Debug_DebugColor_System_UInt64_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.Print(System.String%2CSystem.Int32%2CTaleWorlds.Library.Debug.DebugColor%2CSystem.UInt64)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L81">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_Print_" data-uid="Coop.Mod.DebugUtil.DebugManager.Print*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_Print_System_String_System_Int32_TaleWorlds_Library_Debug_DebugColor_System_UInt64_" data-uid="Coop.Mod.DebugUtil.DebugManager.Print(System.String,System.Int32,TaleWorlds.Library.Debug.DebugColor,System.UInt64)">Print(String, Int32, Debug.DebugColor, UInt64)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Print(string message, int logLevel = 0, Debug.DebugColor color = Debug.DebugColor.White, ulong debugFilter = 17592186044416UL)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">message</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><span class="parametername">logLevel</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Library.Debug.DebugColor</span></td>
+        <td><span class="parametername">color</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.UInt64</span></td>
+        <td><span class="parametername">debugFilter</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_PrintError_System_String_System_String_System_UInt64_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.PrintError(System.String%2CSystem.String%2CSystem.UInt64)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L91">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_PrintError_" data-uid="Coop.Mod.DebugUtil.DebugManager.PrintError*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_PrintError_System_String_System_String_System_UInt64_" data-uid="Coop.Mod.DebugUtil.DebugManager.PrintError(System.String,System.String,System.UInt64)">PrintError(String, String, UInt64)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void PrintError(string error, string stackTrace, ulong debugFilter = 17592186044416UL)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">error</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">stackTrace</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.UInt64</span></td>
+        <td><span class="parametername">debugFilter</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_PrintWarning_System_String_System_UInt64_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.PrintWarning(System.String%2CSystem.UInt64)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L96">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_PrintWarning_" data-uid="Coop.Mod.DebugUtil.DebugManager.PrintWarning*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_PrintWarning_System_String_System_UInt64_" data-uid="Coop.Mod.DebugUtil.DebugManager.PrintWarning(System.String,System.UInt64)">PrintWarning(String, UInt64)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void PrintWarning(string warning, ulong debugFilter = 17592186044416UL)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">warning</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.UInt64</span></td>
+        <td><span class="parametername">debugFilter</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_RenderDebugFrame_TaleWorlds_Library_MatrixFrame_System_Single_System_Single_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.RenderDebugFrame(TaleWorlds.Library.MatrixFrame%2CSystem.Single%2CSystem.Single)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L101">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_RenderDebugFrame_" data-uid="Coop.Mod.DebugUtil.DebugManager.RenderDebugFrame*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_RenderDebugFrame_TaleWorlds_Library_MatrixFrame_System_Single_System_Single_" data-uid="Coop.Mod.DebugUtil.DebugManager.RenderDebugFrame(TaleWorlds.Library.MatrixFrame,System.Single,System.Single)">RenderDebugFrame(MatrixFrame, Single, Single)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RenderDebugFrame(MatrixFrame frame, float lineLength, float time = 0F)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.Library.MatrixFrame</span></td>
+        <td><span class="parametername">frame</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Single</span></td>
+        <td><span class="parametername">lineLength</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Single</span></td>
+        <td><span class="parametername">time</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_RenderDebugLine_TaleWorlds_Library_Vec3_TaleWorlds_Library_Vec3_System_UInt32_System_Boolean_System_Single_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.RenderDebugLine(TaleWorlds.Library.Vec3%2CTaleWorlds.Library.Vec3%2CSystem.UInt32%2CSystem.Boolean%2CSystem.Single)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L105">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_RenderDebugLine_" data-uid="Coop.Mod.DebugUtil.DebugManager.RenderDebugLine*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_RenderDebugLine_TaleWorlds_Library_Vec3_TaleWorlds_Library_Vec3_System_UInt32_System_Boolean_System_Single_" data-uid="Coop.Mod.DebugUtil.DebugManager.RenderDebugLine(TaleWorlds.Library.Vec3,TaleWorlds.Library.Vec3,System.UInt32,System.Boolean,System.Single)">RenderDebugLine(Vec3, Vec3, UInt32, Boolean, Single)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RenderDebugLine(Vec3 position, Vec3 direction, uint color = 4294967295U, bool depthCheck = false, float time = 0F)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.Library.Vec3</span></td>
+        <td><span class="parametername">position</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Library.Vec3</span></td>
+        <td><span class="parametername">direction</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td><span class="parametername">color</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="parametername">depthCheck</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Single</span></td>
+        <td><span class="parametername">time</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_RenderDebugSphere_TaleWorlds_Library_Vec3_System_Single_System_UInt32_System_Boolean_System_Single_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.RenderDebugSphere(TaleWorlds.Library.Vec3%2CSystem.Single%2CSystem.UInt32%2CSystem.Boolean%2CSystem.Single)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L114">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_RenderDebugSphere_" data-uid="Coop.Mod.DebugUtil.DebugManager.RenderDebugSphere*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_RenderDebugSphere_TaleWorlds_Library_Vec3_System_Single_System_UInt32_System_Boolean_System_Single_" data-uid="Coop.Mod.DebugUtil.DebugManager.RenderDebugSphere(TaleWorlds.Library.Vec3,System.Single,System.UInt32,System.Boolean,System.Single)">RenderDebugSphere(Vec3, Single, UInt32, Boolean, Single)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RenderDebugSphere(Vec3 position, float radius, uint color = 4294967295U, bool depthCheck = false, float time = 0F)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.Library.Vec3</span></td>
+        <td><span class="parametername">position</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Single</span></td>
+        <td><span class="parametername">radius</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td><span class="parametername">color</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="parametername">depthCheck</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Single</span></td>
+        <td><span class="parametername">time</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_RenderDebugText_System_Single_System_Single_System_String_System_UInt32_System_Single_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.RenderDebugText(System.Single%2CSystem.Single%2CSystem.String%2CSystem.UInt32%2CSystem.Single)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L123">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_RenderDebugText_" data-uid="Coop.Mod.DebugUtil.DebugManager.RenderDebugText*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_RenderDebugText_System_Single_System_Single_System_String_System_UInt32_System_Single_" data-uid="Coop.Mod.DebugUtil.DebugManager.RenderDebugText(System.Single,System.Single,System.String,System.UInt32,System.Single)">RenderDebugText(Single, Single, String, UInt32, Single)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RenderDebugText(float screenX, float screenY, string text, uint color = 4294967295U, float time = 0F)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Single</span></td>
+        <td><span class="parametername">screenX</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Single</span></td>
+        <td><span class="parametername">screenY</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">text</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td><span class="parametername">color</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Single</span></td>
+        <td><span class="parametername">time</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_SetCrashReportCustomStack_System_String_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.SetCrashReportCustomStack(System.String)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L132">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_SetCrashReportCustomStack_" data-uid="Coop.Mod.DebugUtil.DebugManager.SetCrashReportCustomStack*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_SetCrashReportCustomStack_System_String_" data-uid="Coop.Mod.DebugUtil.DebugManager.SetCrashReportCustomStack(System.String)">SetCrashReportCustomStack(String)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SetCrashReportCustomStack(string customStack)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">customStack</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_SetCrashReportCustomString_System_String_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.SetCrashReportCustomString(System.String)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L136">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_SetCrashReportCustomString_" data-uid="Coop.Mod.DebugUtil.DebugManager.SetCrashReportCustomString*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_SetCrashReportCustomString_System_String_" data-uid="Coop.Mod.DebugUtil.DebugManager.SetCrashReportCustomString(System.String)">SetCrashReportCustomString(String)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SetCrashReportCustomString(string customString)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">customString</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_ShowMessageBox_System_String_System_String_System_UInt32_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.ShowMessageBox(System.String%2CSystem.String%2CSystem.UInt32)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L62">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_ShowMessageBox_" data-uid="Coop.Mod.DebugUtil.DebugManager.ShowMessageBox*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_ShowMessageBox_System_String_System_String_System_UInt32_" data-uid="Coop.Mod.DebugUtil.DebugManager.ShowMessageBox(System.String,System.String,System.UInt32)">ShowMessageBox(String, String, UInt32)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ShowMessageBox(string lpText, string lpCaption, uint uType)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">lpText</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">lpCaption</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.UInt32</span></td>
+        <td><span class="parametername">uType</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_ShowWarning_System_String_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.ShowWarning(System.String)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L140">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_ShowWarning_" data-uid="Coop.Mod.DebugUtil.DebugManager.ShowWarning*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_ShowWarning_System_String_" data-uid="Coop.Mod.DebugUtil.DebugManager.ShowWarning(System.String)">ShowWarning(String)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ShowWarning(string message)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">message</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_SilentAssert_System_Boolean_System_String_System_Boolean_System_String_System_String_System_Int32_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.SilentAssert(System.Boolean%2CSystem.String%2CSystem.Boolean%2CSystem.String%2CSystem.String%2CSystem.Int32)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L36">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_SilentAssert_" data-uid="Coop.Mod.DebugUtil.DebugManager.SilentAssert*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_SilentAssert_System_Boolean_System_String_System_Boolean_System_String_System_String_System_Int32_" data-uid="Coop.Mod.DebugUtil.DebugManager.SilentAssert(System.Boolean,System.String,System.Boolean,System.String,System.String,System.Int32)">SilentAssert(Boolean, String, Boolean, String, String, Int32)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SilentAssert(bool condition, string message = &quot;&quot;, bool getDump = false, string callerFile = &quot;&quot;, string callerMethod = &quot;&quot;, int callerLine = 0)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="parametername">condition</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">message</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="parametername">getDump</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">callerFile</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">callerMethod</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><span class="parametername">callerLine</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_WatchVariable_System_String_System_Object_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.WatchVariable(System.String%2CSystem.Object)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L145">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_WatchVariable_" data-uid="Coop.Mod.DebugUtil.DebugManager.WatchVariable*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_WatchVariable_System_String_System_Object_" data-uid="Coop.Mod.DebugUtil.DebugManager.WatchVariable(System.String,System.Object)">WatchVariable(String, Object)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void WatchVariable(string name, object value)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">name</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span></td>
+        <td><span class="parametername">value</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager_WriteDebugLineOnScreen_System_String_.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager.WriteDebugLineOnScreen(System.String)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L149">View Source</a>
+  </span>
+  <a id="Coop_Mod_DebugUtil_DebugManager_WriteDebugLineOnScreen_" data-uid="Coop.Mod.DebugUtil.DebugManager.WriteDebugLineOnScreen*"></a>
+  <h4 id="Coop_Mod_DebugUtil_DebugManager_WriteDebugLineOnScreen_System_String_" data-uid="Coop.Mod.DebugUtil.DebugManager.WriteDebugLineOnScreen(System.String)">WriteDebugLineOnScreen(String)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void WriteDebugLineOnScreen(string message)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td><span class="parametername">message</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <span class="xref">TaleWorlds.Library.IDebugManager</span>
+  </div>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_DebugUtil_DebugManager.md&amp;value=---%0Auid%3A%20Coop.Mod.DebugUtil.DebugManager%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/DebugUtil/DebugManager.cs/#L11" class="contribution-link">View Source</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

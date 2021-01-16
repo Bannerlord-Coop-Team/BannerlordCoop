@@ -1,0 +1,159 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Input: Party movement on campaign map </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Input: Party movement on campaign map ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="favicon.ico">
+    <link rel="stylesheet" href="styles/docfx.vendor.css">
+    <link rel="stylesheet" href="styles/docfx.css">
+    <link rel="stylesheet" href="styles/main.css">
+    <meta property="docfx:navrel" content="toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="index.html">
+                <img id="logo" class="svg" src="logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        <div class="article row grid">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h2 id="input-party-movement-on-campaign-map">Input: Party movement on campaign map</h2>
+
+<p>Main entry point: <code>SandBox.View.Map.MapScreen HandleLeftMouseButtonClick</code>
+<code>MobileParty.Position2D</code> - Teleports party directly to position
+<code>MapState.ProcessTravel</code> - Sends party to position. Already contains some defunct multiplayer logic.</p>
+<h2 id="sync">Sync</h2>
+<p>First managed code tick is received in <code>TaleWorlds.DotNet.Managed.ApplicationTick</code> which delegates to <code>IManagedComponent.OnApplicationTick</code> and eventuelly ends up in <code>Module.CurrentModule.OnApplicationTick</code> (base game module).</p>
+<p>Campaign ticks are generated in <code>CampaignEvents.SignalPeriodicEvents</code> with <code>Campaign.Current.CampaignStartTime.ElapsedHoursUntilNow</code> (=&gt; delta to <code>Campaign.Current.MapTimeTracker</code>) as a base timer. Updated in <code>Campaign.TickMapTime</code>. Base Tick is tied to <code>MapState.OnMapModeTick</code> which is invoked from a <code>MapState.OnTick</code> (inherited from <code>GameState</code>).</p>
+<h2 id="saving--loading">Saving &amp; Loading</h2>
+<p><code>MBSaveLoad</code>
+<code>SaveManager</code>
+<code>InMemDriver</code></p>
+<h2 id="randomness">Randomness</h2>
+<p>TaleWorld.Core.MBRandom</p>
+<h2 id="time-control">Time control</h2>
+<p>Campaign.SetTimeSpeed
+Campaign.TimeControlMode
+Campaign.SetTimeControlModeLock</p>
+<h2 id="mbsubmodulebase-initialization">MBSubModuleBase initialization</h2>
+<h3 id="order">Order</h3>
+<pre><code>                 OnSubModuleLoad
+LoadGame                +              new campaign
++---------------------+ | +-----------------------+
+|                       v                         |
+|            +----+OnGameStart+-----+             |
+|            |                      |             |
+|            |                      |             |
+|            v                      v             |
+|      OnGameLoaded          OnCampaignStart      |
+|            +                      +             |
+|            +----------+-----------+             |
+|                       v                         |
+|          OnGameInitializationFinished           |
+|                       +                         |
+|                       |                         |
+|                       v                         |
+|                   DoLoading+------+             |
+|                                   |             |
+|                       +           |             |
+|                       |           v             |
+|                       |     OnGameCreated       |
+|                       |                         |
++-----------------------+-------------------------+
+</code></pre><h4 id="parameters">Parameters</h4>
+<h4 id="game">Game</h4>
+<p>In singleplayer, the first parameter seems to always be <code>game.GameType is TaleWorlds.CampaignSystem.Campaign</code>. </p>
+<h4 id="initializerobject">initializerObject</h4>
+<p><code>OnGameStart</code>, <code>OnGameLoaded</code>, <code>OnCampaignStart</code> and <code>OngameCreated</code> receive a second <code>object</code> parameter. In singleplayer this is a <code>TaleWorlds.CampaignSystem.CampaignGameStarter</code>, otherwise a <code>TaleWorlds.MountAndBlase.BaseGameStarter</code>. Especially in campaign, this seems to be to be a significant entry point to adding content to the game.</p>
+<h3 id="oddities">Oddities</h3>
+<ul>
+<li>Modules cannot be added after <code>OnGameStart</code>. They can still be accessed afterwards, but won&#39;t have any effect.</li>
+<li><code>CampaignGameStarter</code> is invalidated and mostly moved to the <code>Campaign</code> right before <code>OnGameInitializationFinished</code>. <code>Campaign</code> does not store any of the behaviours befor that, do not access!
+## Persistence
+### Behaviours
+#### IDataStore
+Serialize &amp; deserialize <code>CampaignBehaviorBase</code> data. Implemented in <code>TaleWorld.CampaignSystem.CampaignBehaviorDataStore.BehaviorSaveData</code>.</li>
+</ul>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/docs/Research.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="styles/docfx.js"></script>
+    <script type="text/javascript" src="styles/main.js"></script>
+  </body>
+</html>

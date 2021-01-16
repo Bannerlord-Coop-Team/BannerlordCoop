@@ -1,0 +1,469 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Class SelectedGameVM
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Class SelectedGameVM
+   ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="Coop.Mod.UI.SelectedGameVM">
+  
+  
+  <h1 id="Coop_Mod_UI_SelectedGameVM" data-uid="Coop.Mod.UI.SelectedGameVM" class="text-break">Class SelectedGameVM
+  </h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><span class="xref">TaleWorlds.Library.ViewModel</span></div>
+    <div class="level2"><span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM</span></div>
+    <div class="level3"><span class="xref">SelectedGameVM</span></div>
+  </div>
+  <div classs="implements">
+    <h5>Implements</h5>
+    <div><span class="xref">TaleWorlds.Library.IViewModel</span></div>
+    <div><span class="xref">System.ComponentModel.INotifyPropertyChanged</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.RefreshValues()</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.Save</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.RequiresInquiryOnLoad</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.SavedGameProperties</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.LoadedModulesInSave</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.SaveVersion</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.DeleteText</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.IsSelected</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.SaveLoadText</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.OverrideSaveText</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.NameText</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.GameTimeText</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.CharacterNameText</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.CharacterVisual</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.ClanBanner</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.RealTimeText1</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.RealTimeText2</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.LevelText</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM.DateTimeHint</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.UIDebugMode</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.SetField&lt;T&gt;(T, T, System.String)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.OnPropertyChanged(System.String)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.OnPropertyChangedWithValue(System.Object, System.String)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath, System.Boolean)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.GetPropertyValue(System.String, TaleWorlds.Library.PropertyTypeFeeder)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.GetPropertyValue(System.String)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.GetPropertyType(System.String)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.SetPropertyValue(System.String, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.OnFinalize()</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.ExecuteCommand(System.String, System.Object[])</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.Properties</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.PropertyChanged</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.Library.ViewModel.PropertyChangedWithValue</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ToString()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetHashCode()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetType()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.MemberwiseClone()</span>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="Coop.Mod.UI.html">Coop.Mod.UI</a></h6>
+  <h6><strong>Assembly</strong>: Coop.dll</h6>
+  <h5 id="Coop_Mod_UI_SelectedGameVM_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">class SelectedGameVM : SavedGameVM, IViewModel, INotifyPropertyChanged</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_SelectedGameVM__ctor_TaleWorlds_SaveSystem_SaveGameFileInfo_System_Boolean_System_Action_SandBox_ViewModelCollection_SaveLoad_SavedGameVM__System_Action_SandBox_ViewModelCollection_SaveLoad_SavedGameVM__System_Action_System_Action_.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.SelectedGameVM.%23ctor(TaleWorlds.SaveSystem.SaveGameFileInfo%2CSystem.Boolean%2CSystem.Action%7BSandBox.ViewModelCollection.SaveLoad.SavedGameVM%7D%2CSystem.Action%7BSandBox.ViewModelCollection.SaveLoad.SavedGameVM%7D%2CSystem.Action%2CSystem.Action)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L22">View Source</a>
+  </span>
+  <a id="Coop_Mod_UI_SelectedGameVM__ctor_" data-uid="Coop.Mod.UI.SelectedGameVM.#ctor*"></a>
+  <h4 id="Coop_Mod_UI_SelectedGameVM__ctor_TaleWorlds_SaveSystem_SaveGameFileInfo_System_Boolean_System_Action_SandBox_ViewModelCollection_SaveLoad_SavedGameVM__System_Action_SandBox_ViewModelCollection_SaveLoad_SavedGameVM__System_Action_System_Action_" data-uid="Coop.Mod.UI.SelectedGameVM.#ctor(TaleWorlds.SaveSystem.SaveGameFileInfo,System.Boolean,System.Action{SandBox.ViewModelCollection.SaveLoad.SavedGameVM},System.Action{SandBox.ViewModelCollection.SaveLoad.SavedGameVM},System.Action,System.Action)">SelectedGameVM(SaveGameFileInfo, Boolean, Action&lt;SavedGameVM&gt;, Action&lt;SavedGameVM&gt;, Action, Action)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public SelectedGameVM(SaveGameFileInfo save, bool isSaving, Action&lt;SavedGameVM&gt; onDelete, Action&lt;SavedGameVM&gt; onSelection, Action onCancelLoadSave, Action onDone)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.SaveSystem.SaveGameFileInfo</span></td>
+        <td><span class="parametername">save</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><span class="parametername">isSaving</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Action</span>&lt;<span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM</span>&gt;</td>
+        <td><span class="parametername">onDelete</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Action</span>&lt;<span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM</span>&gt;</td>
+        <td><span class="parametername">onSelection</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Action</span></td>
+        <td><span class="parametername">onCancelLoadSave</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Action</span></td>
+        <td><span class="parametername">onDone</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_SelectedGameVM__onDelete.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.SelectedGameVM._onDelete%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L20">View Source</a>
+  </span>
+  <h4 id="Coop_Mod_UI_SelectedGameVM__onDelete" data-uid="Coop.Mod.UI.SelectedGameVM._onDelete">_onDelete</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly Action&lt;SavedGameVM&gt; _onDelete</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Action</span>&lt;<span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM</span>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_SelectedGameVM__onSelection.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.SelectedGameVM._onSelection%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L21">View Source</a>
+  </span>
+  <h4 id="Coop_Mod_UI_SelectedGameVM__onSelection" data-uid="Coop.Mod.UI.SelectedGameVM._onSelection">_onSelection</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly Action&lt;SavedGameVM&gt; _onSelection</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Action</span>&lt;<span class="xref">SandBox.ViewModelCollection.SaveLoad.SavedGameVM</span>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_SelectedGameVM_ExecuteDelete.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.SelectedGameVM.ExecuteDelete%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L29">View Source</a>
+  </span>
+  <a id="Coop_Mod_UI_SelectedGameVM_ExecuteDelete_" data-uid="Coop.Mod.UI.SelectedGameVM.ExecuteDelete*"></a>
+  <h4 id="Coop_Mod_UI_SelectedGameVM_ExecuteDelete" data-uid="Coop.Mod.UI.SelectedGameVM.ExecuteDelete">ExecuteDelete()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void ExecuteDelete()</code></pre>
+  </div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_SelectedGameVM_ExecuteSaveLoad.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.SelectedGameVM.ExecuteSaveLoad%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L39">View Source</a>
+  </span>
+  <a id="Coop_Mod_UI_SelectedGameVM_ExecuteSaveLoad_" data-uid="Coop.Mod.UI.SelectedGameVM.ExecuteSaveLoad*"></a>
+  <h4 id="Coop_Mod_UI_SelectedGameVM_ExecuteSaveLoad" data-uid="Coop.Mod.UI.SelectedGameVM.ExecuteSaveLoad">ExecuteSaveLoad()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ExecuteSaveLoad()</code></pre>
+  </div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_SelectedGameVM_ExecuteSelection.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.SelectedGameVM.ExecuteSelection%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L34">View Source</a>
+  </span>
+  <a id="Coop_Mod_UI_SelectedGameVM_ExecuteSelection_" data-uid="Coop.Mod.UI.SelectedGameVM.ExecuteSelection*"></a>
+  <h4 id="Coop_Mod_UI_SelectedGameVM_ExecuteSelection" data-uid="Coop.Mod.UI.SelectedGameVM.ExecuteSelection">ExecuteSelection()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void ExecuteSelection()</code></pre>
+  </div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_SelectedGameVM_StartGame_TaleWorlds_SaveSystem_Load_LoadResult_.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.SelectedGameVM.StartGame(TaleWorlds.SaveSystem.Load.LoadResult)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L56">View Source</a>
+  </span>
+  <a id="Coop_Mod_UI_SelectedGameVM_StartGame_" data-uid="Coop.Mod.UI.SelectedGameVM.StartGame*"></a>
+  <h4 id="Coop_Mod_UI_SelectedGameVM_StartGame_TaleWorlds_SaveSystem_Load_LoadResult_" data-uid="Coop.Mod.UI.SelectedGameVM.StartGame(TaleWorlds.SaveSystem.Load.LoadResult)">StartGame(LoadResult)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void StartGame(LoadResult loadResult)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.SaveSystem.Load.LoadResult</span></td>
+        <td><span class="parametername">loadResult</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <span class="xref">TaleWorlds.Library.IViewModel</span>
+  </div>
+  <div>
+      <span class="xref">System.ComponentModel.INotifyPropertyChanged</span>
+  </div>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_SelectedGameVM.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.SelectedGameVM%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L18" class="contribution-link">View Source</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

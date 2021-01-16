@@ -1,0 +1,184 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Namespace Coop.Mod.Persistence.RPC
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Namespace Coop.Mod.Persistence.RPC
+   ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="Coop.Mod.Persistence.RPC">
+  
+  <h1 id="Coop_Mod_Persistence_RPC" data-uid="Coop.Mod.Persistence.RPC" class="text-break">Namespace Coop.Mod.Persistence.RPC
+  </h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">Classes
+  </h3>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.ArgumentFactory.html">ArgumentFactory</a></h4>
+      <section>
+Factory to create the transfer wrapper for an argument in a RPC call.
+</section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.ArgumentSerializer.html">ArgumentSerializer</a></h4>
+      <section>
+Serializer for <a class="xref" href="Coop.Mod.Persistence.RPC.Argument.html">Argument</a>. It&apos;s important to keep in mind, that the
+serialized payload may never exceed <see cref="!:RailgunNet.RailConfig.MAXSIZE_EVENT"></see>!
+</section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.EventBroadcastingQueue.html">EventBroadcastingQueue</a></h4>
+      <section>
+Queue to broadcast events. Sends all events in order and makes sure, that all event
+arguments can be resolved on the clients. This includes waiting for any pending
+large object transfers.
+</section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Call.html">EventBroadcastingQueue.Call</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.EventMethodCall.html">EventMethodCall</a></h4>
+      <section>
+RailEvent used to initiate remote procedure calls. The way this event is processed
+differs between client and server:
+- The server acts as a broadcasting relay station. Effectively receiving the event
+and forwarding it to all clients (INCLUDING the client that sent the event!).
+Note that the server will delay event execution until all arguments have been
+transferred to all clients.
+- Clients will resolve the call and arguments locally and execute it.
+</section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSerializer.html">MethodCallSerializer</a></h4>
+      <section>
+Railgun encoders and decoders for the remote procedure calls.
+</section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.html">MethodCallSyncHandler</a></h4>
+      <section>
+Registers a global call handler for a <a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.html#Coop_Mod_Persistence_RPC_MethodCallSyncHandler_MethodAccess">MethodAccess</a> that sends an
+<a class="xref" href="Coop.Mod.Persistence.RPC.EventMethodCall.html">EventMethodCall</a> to the server.
+</section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.html">MethodCallSyncHandler.Statistics</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.PendingRequests.html">PendingRequests</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.RPCSyncHandlers.html">RPCSyncHandlers</a></h4>
+      <section>
+Manages a collection of <a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.html">MethodCallSyncHandler</a>.
+</section>
+    <h3 id="structs">Structs
+  </h3>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.Argument.html">Argument</a></h4>
+      <section>
+Type union for arguments to a RPC.
+</section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.MethodCall.html">MethodCall</a></h4>
+      <section>
+Represents a serializable call to a method including all invocation arguments. Method
+pointer, instance and arguments have to resolved before execution. In order to resolve
+a method call refer to <a class="xref" href="Sync.MethodRegistry.html">MethodRegistry</a> and <a class="xref" href="Coop.Mod.Persistence.RPC.ArgumentFactory.html">ArgumentFactory</a>.
+</section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.Trace.html">MethodCallSyncHandler.Statistics.Trace</a></h4>
+      <section></section>
+    <h3 id="interfaces">Interfaces
+  </h3>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.IClientAccess.html">IClientAccess</a></h4>
+      <section>
+Interface to access a clients persistence state. 
+</section>
+    <h3 id="enums">Enums
+  </h3>
+      <h4><a class="xref" href="Coop.Mod.Persistence.RPC.EventArgType.html">EventArgType</a></h4>
+      <section></section>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In This Article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>
