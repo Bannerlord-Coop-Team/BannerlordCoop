@@ -32,5 +32,14 @@ namespace Coop.Mod.Patch.World
                 }                
             }
         }
+
+        //public static void LoadPlayers()
+        //{
+        //    string pattern = BasePath.Name + "Modules/Coop/" + Campaign.Current.UniqueGameId + 
+        //    string path = BasePath.Name + "Modules/Coop/" + Campaign.Current.UniqueGameId +
+        //        DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss");
+
+        //    DateTime.FromFileTime()
+        //}
     }
 }
