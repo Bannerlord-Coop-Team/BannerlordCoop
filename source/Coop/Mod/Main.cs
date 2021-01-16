@@ -43,6 +43,54 @@ namespace Coop.Mod
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
+        #region MainMenuButtons
+        public static InitialStateOption CoopCampaign = 
+            new InitialStateOption(
+                "CoOp Campaign",
+                new TextObject("Host Co-op Campaign"),
+                9990,
+                () =>
+                {
+                    string[] array = Utilities.GetFullCommandLineString().Split(' ');
+
+                    if (DEBUG)
+                    {
+                        foreach (string argument in array)
+                        {
+                            if (argument.ToLower() == "/server")
+                            {
+                                //TODO add name to args
+                                CoopServer.Instance.StartGame("MP");
+                            }
+                            else if (argument.ToLower() == "/client")
+                            {
+                                ServerConfiguration defaultConfiguration =
+                                    new ServerConfiguration();
+                                CoopClient.Instance.Connect(
+                                    defaultConfiguration.NetworkConfiguration.LanAddress,
+                                    defaultConfiguration.NetworkConfiguration.LanPort);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        ScreenManager.PushScreen(
+                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                                new object[] { }));
+                    }
+                },
+                false);
+
+        public static InitialStateOption JoinCoopGame =
+            new InitialStateOption(
+              "Join Coop Game",
+              new TextObject("Join Co-op Campaign"),
+              9991,
+              JoinWindow,
+              false
+            );
+        #endregion
+
         public Main()
         {
             Debug.DebugManager = Debugging.DebugManager;
@@ -101,7 +149,8 @@ namespace Coop.Mod
             // Apply all patches via harmony
             harmony.PatchAll();
 
-            Module.CurrentModule.AddInitialStateOption(
+            #region ButtonAssignment
+            CoopCampaign =
                 new InitialStateOption(
                     "CoOp Campaign",
                     new TextObject("Host Co-op Campaign"),
@@ -136,22 +185,32 @@ namespace Coop.Mod
                                     new object[] { }));
                         }
                     },
-                    false));
+                    false);
 
-            Module.CurrentModule.AddInitialStateOption(new InitialStateOption(
-              "Join Coop Game",
-              new TextObject("Join Co-op Campaign"),
-              9991,
-              JoinWindow,
-              false
-            ));
+            JoinCoopGame =
+                new InitialStateOption(
+                  "Join Coop Game",
+                  new TextObject("Join Co-op Campaign"),
+                  9991,
+                  JoinWindow,
+                  false
+                );
 
+            Module.CurrentModule.AddInitialStateOption(CoopCampaign);
+
+            Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
+            #endregion
         }
 
         protected override void OnSubModuleUnloaded()
         {
-            CoopServer.Instance.ShutDownServer();
             base.OnSubModuleUnloaded();
+        }
+
+        public override void OnGameEnd(Game game)
+        {
+            base.OnGameEnd(game);
+            CoopServer.Instance.ShutDownServer();
         }
 
         protected override void OnApplicationTick(float dt)
@@ -207,7 +266,7 @@ namespace Coop.Mod
         internal static bool QuartermasterIsClanWide = true;
 
 
-        internal void JoinWindow()
+        internal static void JoinWindow()
         {
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopConnectionUI>());
         }

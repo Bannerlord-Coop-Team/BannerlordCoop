@@ -290,11 +290,7 @@
     <Compile Include="Mod\Managers\ClientCharacterCreatorManager.cs" />
     <Compile Include="Mod\Managers\ClientManager.cs" />
     <Compile Include="Mod\Managers\ServerManager.cs" />
-    <Compile Include="Mod\Managers\TestMPManger.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
-    <Compile Include="Mod\Patch\MapSpeedModifier\OnMapSpeedChange\SetTimePatch.cs" />
-    <Compile Include="Mod\Patch\MapSpeedModifier\MapSpeedResolver.cs" />
-    <Compile Include="Mod\Patch\MapSpeedModifier\OnMapSpeedChange\TimeControlOverrider.cs" />
     <Compile Include="Mod\Patch\Party\BanditsCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyFoodCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyHorseCampaignBehavior.cs" />
@@ -303,6 +299,9 @@
     <Compile Include="Mod\Patch\Party\RecruitmentCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\World\SaveManager.cs" />
     <Compile Include="Mod\Patch\World\TimeSynchronization.cs" />
+    <Compile Include="Mod\Patch\CampaignPatches\SetTimeSpeedPatch.cs" />
+    <Compile Include="Mod\Patch\CampaignPatches\TimeControlModePatch.cs" />
+    <Compile Include="Mod\Patch\MobilePartyPatches\ComputeIsWaitingPatch.cs" />
     <Compile Include="Mod\Patch\Debugging.cs" />
     <Compile Include="Mod\Patch\Exceptions.cs" />
     <Compile Include="Mod\Patch\PatchInitializerAttribute.cs" />
@@ -404,6 +403,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingFramework\BannerlordSystemTestingFramework.csproj">
+      <Project>{68cefb0c-37f7-4f86-8e8d-1d3baf1e7277}</Project>
+      <Name>BannerlordSystemTestingFramework</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
       <Name>Common</Name>
@@ -411,10 +414,6 @@
     <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj">
       <Project>{d8f65198-a926-4c46-9599-2d5d4349486f}</Project>
       <Name>LiteNetLib</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingFramework\BannerlordSystemTestingFramework.csproj">
-      <Project>{68CEFB0C-37F7-4F86-8E8D-1D3BAF1E7277}</Project>
-      <Name>ModTestingFramework</Name>
     </ProjectReference>
     <ProjectReference Include="..\Network\Network.csproj">
       <Project>{b0ff5e24-4d98-4ec8-bbce-6cdb85cb685d}</Project>

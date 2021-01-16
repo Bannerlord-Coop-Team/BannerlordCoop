@@ -13,6 +13,9 @@ using System.Windows.Forms;
 
 namespace TestRunner
 {
+    /// <summary>
+    /// Runner that works similar to running a test but as an application
+    /// </summary>
     static class TestRunner
     {
         [DllImport("Kernel32")]
@@ -22,12 +25,11 @@ namespace TestRunner
 
         static GameInstance host = new GameInstance("/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
         static GameInstance client = new GameInstance("/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
-        //static GameInstance client2 = new GameInstance("/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
 
         static List<GameInstance> instances = new List<GameInstance>
             {
-                //host,
-                //client,
+                host,
+                client,
             };
 
         static TestEnvironment environment;
@@ -41,6 +43,7 @@ namespace TestRunner
             SetConsoleCtrlHandler(_handler, true);
             
 
+            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
             environment.OnRegistrationFinished += (instance) =>
             {
                 instance.OnGameStateChanged += (state) => {
@@ -48,6 +51,11 @@ namespace TestRunner
                     {
                         instance.SendCommand("StartCoop");
                     }
+                    else if(state == GameStates.UnspecifiedDedicatedServerState)
+                    {
+                        tcs.SetResult(true);
+                    }
+                    
                     else if (!typeof(GameStates)
                     .GetFields(BindingFlags.Public | BindingFlags.Static)
                     .Where(f => f.FieldType == typeof(string))
@@ -101,26 +109,6 @@ namespace TestRunner
                 default:
                     return false;
             }
-        }
-
-        private static void WsServer_SessionClosed(WebSocketSession session, SuperSocket.SocketBase.CloseReason value)
-        {
-            Console.WriteLine("Session Closed");
-        }
-
-        private static void WsServer_NewDataReceived(WebSocketSession session, byte[] value)
-        {
-            throw new NotImplementedException();
-        }
-
-        private static void WsServer_NewMessageReceived(WebSocketSession session, string value)
-        {
-            Console.WriteLine(value);
-        }
-
-        private static void WsServer_NewSessionConnected(WebSocketSession session)
-        {
-            Console.WriteLine("Session Connected");
         }
         #endregion
     }
