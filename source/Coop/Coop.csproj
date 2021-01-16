@@ -303,7 +303,6 @@
     <Compile Include="Mod\Patch\MobilePartyPatches\ComputeIsWaitingPatch.cs" />
     <Compile Include="Mod\Patch\Debugging.cs" />
     <Compile Include="Mod\Patch\Exceptions.cs" />
-    <Compile Include="Mod\Patch\PatchInitializerAttribute.cs" />
     <Compile Include="Mod\Patch\World\TimeControl.cs" />
     <Compile Include="Mod\Patch\Utils.cs" />
     <Compile Include="Mod\Persistence\Compare.cs" />
@@ -409,6 +408,10 @@
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
       <Name>Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\CoopFramework\CoopFramework.csproj">
+      <Project>{55b13456-9f7f-4724-9cf5-ae12aa3ce81b}</Project>
+      <Name>CoopFramework</Name>
     </ProjectReference>
     <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj">
       <Project>{d8f65198-a926-4c46-9599-2d5d4349486f}</Project>

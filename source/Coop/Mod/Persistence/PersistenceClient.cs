@@ -35,11 +35,13 @@ namespace Coop.Mod.Persistence
 
         [NotNull] public RailClientRoom Room { get; }
 
+        [NotNull] public FieldChangeBuffer ChangeBuffer { get; } = new FieldChangeBuffer();
+
         public void Update(TimeSpan frameTime)
         {
             List<object> toRemove = new List<object>();
             foreach (KeyValuePair<ValueAccess, Dictionary<object, ValueChangeRequest>> buffer in
-                FieldChangeBuffer.BufferedChanges)
+                ChangeBuffer.BufferedChanges)
             {
                 ValueAccess access = buffer.Key;
                 foreach (KeyValuePair<object, ValueChangeRequest> instanceBuffer in buffer.Value)

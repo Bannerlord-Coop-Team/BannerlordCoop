@@ -8,6 +8,7 @@ using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Patch;
 using Coop.Mod.UI;
+using CoopFramework;
 using HarmonyLib;
 using ModTestingFramework;
 using Network.Infrastructure;

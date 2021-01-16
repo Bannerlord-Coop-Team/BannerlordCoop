@@ -12,32 +12,32 @@ namespace Sync
     ///     The buffer <see cref="BufferedChanges" /> will never be cleared internally. The game
     ///     loop is responsible to process the buffered changes and apply or discard them.
     /// </summary>
-    public static class FieldChangeBuffer
+    public class FieldChangeBuffer
     {
-        private static readonly Stack<ValueData> ActiveFields = new Stack<ValueData>();
+        private readonly Stack<ValueData> ActiveFields = new Stack<ValueData>();
 
-        private static readonly HarmonyMethod PatchPrefix = new HarmonyMethod(
+        private readonly HarmonyMethod PatchPrefix = new HarmonyMethod(
             AccessTools.Method(typeof(FieldChangeBuffer), nameof(PushActiveFields)))
         {
             priority = SyncPriority.FieldWatcherPre
         };
 
-        private static readonly HarmonyMethod PatchPostfix = new HarmonyMethod(
+        private readonly HarmonyMethod PatchPostfix = new HarmonyMethod(
             AccessTools.Method(typeof(FieldChangeBuffer), nameof(PopActiveFields)))
         {
             priority = SyncPriority.FieldWatcherPost
         };
 
-        public static Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>
+        public Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>
             BufferedChanges { get; } =
             new Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>();
 
-        private static void PushActiveFields()
+        private void PushActiveFields()
         {
             ActiveFields.Push(null);
         }
 
-        private static void OnBeforeExpectedChange(this ValueAccess access, object target)
+        private void OnBeforeExpectedChange(ValueAccess access, object target)
         {
             object value;
             if (BufferedChanges.ContainsKey(access) &&
@@ -65,7 +65,7 @@ namespace Sync
         ///     buffer instead
         /// </param>
         /// <param name="condition">The buffer is only active if the condition evaluates to true</param>
-        public static void Intercept(
+        public void Intercept(
             ValueAccess value,
             IEnumerable<MethodAccess> triggers,
             Func<bool> condition)
@@ -80,14 +80,14 @@ namespace Sync
                         {
                             if (condition())
                             {
-                                value.OnBeforeExpectedChange(instance);
+                                OnBeforeExpectedChange(value, instance);
                             }
                         });
                 }
             }
         }
 
-        private static void PopActiveFields()
+        private void PopActiveFields()
         {
             while (ActiveFields.Count > 0)
             {

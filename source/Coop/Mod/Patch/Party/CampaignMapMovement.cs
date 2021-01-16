@@ -1,5 +1,6 @@
 ﻿using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
+using CoopFramework;
 using Sync;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
@@ -24,9 +25,9 @@ namespace Coop.Mod.Patch
                 .AddField<int>("_numberOfFleeingsAtLastTravel");
 
         [PatchInitializer]
-        public static void Init()
+        public static void Init(ISynchronization sync)
         {
-            FieldChangeBuffer.Intercept(Movement, MobilePartyPatch.Setters, Coop.DoSync);
+            sync.RegisterSyncedField(Movement, MobilePartyPatch.Setters, Coop.DoSync);
         }
     }
 }

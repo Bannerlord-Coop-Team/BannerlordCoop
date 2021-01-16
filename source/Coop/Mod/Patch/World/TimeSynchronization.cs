@@ -1,5 +1,6 @@
 ﻿using System;
 using Common;
+using CoopFramework;
 using HarmonyLib;
 using NLog;
 using RailgunNet.System.Types;

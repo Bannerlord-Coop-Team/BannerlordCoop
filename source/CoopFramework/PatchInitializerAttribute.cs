@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Coop.Mod.Patch
+namespace CoopFramework
 {
     /// <summary>
     ///     Marks a static method to be called once during initialization of all patches.

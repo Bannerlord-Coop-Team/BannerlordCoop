@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using Coop.Mod.Persistence;
+using CoopFramework;
 using HarmonyLib;
 using Mono.Reflection;
 using Sync;
@@ -34,10 +35,10 @@ namespace Coop.Mod.Patch
         public static bool CanSyncTimeControlMode = false;
 
         [PatchInitializer]
-        public static void Init()
+        public static void Init(ISynchronization sync)
         {
-            FieldChangeBuffer.Intercept(TimeControlMode, TimeControlPatch.Setters, DoSyncTimeControl);
-            FieldChangeBuffer.Intercept(
+            sync.RegisterSyncedField(TimeControlMode, TimeControlPatch.Setters, DoSyncTimeControl);
+            sync.RegisterSyncedField(
                 TimeControlModeLock,
                 TimeControlLockPatch.Setters,
                 DoSyncTimeControl);
