@@ -67,7 +67,6 @@
     <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingLibrary\BannerlordSystemTestingLibrary.csproj">
       <Project>{510eaa3b-cf7d-46f9-87aa-5cb89a4e3a01}</Project>
       <Name>BannerlordSystemTestingLibrary</Name>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
