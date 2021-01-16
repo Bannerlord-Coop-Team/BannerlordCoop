@@ -23,9 +23,8 @@ namespace Coop.Mod.Managers
         [CanBeNull] Hero m_PlayerInCampaign;
         public ClientManager(LoadResult saveGameData, Hero playerAsSerialized) : base(saveGameData) { m_PlayerAsSerialized = playerAsSerialized; }
 
-        public delegate void OnOnLoadFinishedEventHandler(object source, EventArgs e);
-        public static event OnOnLoadFinishedEventHandler OnPreLoadFinishedEvent;
-        public static event OnOnLoadFinishedEventHandler OnPostLoadFinishedEvent;
+        public static event EventHandler OnPreLoadFinishedEvent;
+        public static event EventHandler OnPostLoadFinishedEvent;
         public override void OnLoadFinished()
         {
             OnPreLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
