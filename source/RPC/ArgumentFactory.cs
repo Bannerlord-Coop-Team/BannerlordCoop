@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
 using NLog;
-using RailgunNet.Logic;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Persistence.RPC
+namespace RPC
 {
     /// <summary>
     ///     Factory to create the transfer wrapper for an argument in a RPC call.
@@ -77,7 +76,7 @@ namespace Coop.Mod.Persistence.RPC
         /// <returns>A list of the unwrapped arguments.</returns>
         public static object[] Resolve(IStore store, List<Argument> args)
         {
-            return args.Select(arg => Resolve(store, arg)).ToArray();
+            return args.Select(arg => Resolve(store, (Argument) arg)).ToArray();
         }
 
         /// <summary>
@@ -87,7 +86,7 @@ namespace Coop.Mod.Persistence.RPC
         /// <param name="obj">The object to be wrapped.</param>
         /// <param name="bTransferByValue">
         ///     If true, the object will always be transferred by
-        ///     value. If the argument is too large to fit in an <see cref="RailEvent" />,
+        ///     value. If the argument is too large to fit in an <see cref="RailgunNet.Logic.RailEvent" />,
         ///     the argument will be shared to all receivers using the <paramref name="store" />.
         ///     If false, the argument may be, depending on the type, transferred by reference.
         /// </param>

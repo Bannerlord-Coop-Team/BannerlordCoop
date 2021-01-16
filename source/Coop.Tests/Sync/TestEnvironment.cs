@@ -9,6 +9,7 @@ using JetBrains.Annotations;
 using RailgunNet.Connection.Client;
 using RailgunNet.Factory;
 using RailgunNet.Logic;
+using RPC;
 using Sync;
 using Sync.Store;
 

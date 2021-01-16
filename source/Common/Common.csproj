@@ -70,9 +70,10 @@
     <Compile Include="CoopStateMachine.cs" />
     <Compile Include="DropoutStack.cs" />
     <Compile Include="FrameLimiter.cs" />
+    <Compile Include="Globals.cs" />
     <Compile Include="IUpdatable.cs" />
     <Compile Include="MovingAverage.cs" />
-    <Compile Include="OrderedHashSet.cs"/>
+    <Compile Include="OrderedHashSet.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UpdateableList.cs" />
   </ItemGroup>

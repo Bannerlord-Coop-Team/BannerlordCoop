@@ -39,6 +39,7 @@
     <ProjectReference Include="..\CoopFramework\CoopFramework.csproj" />
     <ProjectReference Include="..\Coop\Coop.csproj" />
     <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj" />
+    <ProjectReference Include="..\RPC\RPC.csproj" />
   </ItemGroup>
 
   <ItemGroup>

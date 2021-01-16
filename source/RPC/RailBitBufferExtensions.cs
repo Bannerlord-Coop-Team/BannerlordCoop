@@ -2,7 +2,7 @@
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Persistence
+namespace RPC
 {
     /// <summary>
     ///     Extensions for Railgun to encode & decode TaleWorlds classes.

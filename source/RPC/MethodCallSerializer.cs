@@ -5,7 +5,7 @@ using RailgunNet;
 using RailgunNet.System.Encoding;
 using Sync;
 
-namespace Coop.Mod.Persistence.RPC
+namespace RPC
 {
     /// <summary>
     ///     Railgun encoders and decoders for the remote procedure calls.
@@ -19,11 +19,11 @@ namespace Coop.Mod.Persistence.RPC
         {
             int bufferSizeBefore = buffer.ByteSize;
             buffer.WriteInt(pack.Id.InternalValue);
-            buffer.EncodeEventArg(pack.Instance);
+            ArgumentSerializer.EncodeEventArg(buffer, pack.Instance);
             buffer.WriteInt(pack.Arguments.Count);
             foreach (Argument arg in pack.Arguments)
             {
-                buffer.EncodeEventArg(arg);
+                ArgumentSerializer.EncodeEventArg(buffer, arg);
             }
 
             int eventByteSize = buffer.ByteSize - bufferSizeBefore;
@@ -52,12 +52,12 @@ namespace Coop.Mod.Persistence.RPC
         public static MethodCall ReadMethodCall(this RailBitBuffer buffer)
         {
             MethodId id = new MethodId(buffer.ReadInt());
-            Argument instance = buffer.DecodeEventArg();
+            Argument instance = ArgumentSerializer.DecodeEventArg(buffer);
             int iNumberOfArguments = buffer.ReadInt();
             List<Argument> args = new List<Argument>();
             for (int i = 0; i < iNumberOfArguments; ++i)
             {
-                args.Add(buffer.DecodeEventArg());
+                args.Add(ArgumentSerializer.DecodeEventArg(buffer));
             }
             
             return new MethodCall(id, instance, args);

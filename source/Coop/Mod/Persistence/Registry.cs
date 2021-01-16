@@ -3,6 +3,7 @@ using Coop.Mod.Persistence.RPC;
 using Coop.Mod.Persistence.World;
 using RailgunNet;
 using RailgunNet.Factory;
+using RPC;
 
 namespace Coop.Mod.Persistence
 {

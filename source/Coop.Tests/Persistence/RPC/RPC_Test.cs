@@ -9,6 +9,7 @@ using Network;
 using Network.Protocol;
 using RailgunNet;
 using RailgunNet.Connection.Client;
+using RPC;
 using Sync;
 using Sync.Store;
 using Xunit;

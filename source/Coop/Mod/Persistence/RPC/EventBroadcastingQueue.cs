@@ -23,7 +23,7 @@ namespace Coop.Mod.Persistence.RPC
         ///     DEBUG to identify situations where events are starving in the queue. Might need
         ///     to be adjusted depending on how much is done using events.
         /// </summary>
-        public static readonly int MaximumQueueSize = Main.DEBUG ? 512 : 8192;
+        public static readonly int MaximumQueueSize = Common.Globals.DEBUG ? 512 : 8192;
 
         private readonly OrderedHashSet<ObjectId> m_DistributedObjects =
             new OrderedHashSet<ObjectId>();
@@ -108,7 +108,7 @@ namespace Coop.Mod.Persistence.RPC
                 if (m_Queue.Count >= MaximumQueueSize)
                 {
                     Logger.Error("Event queue is full!");
-                    if (Main.DEBUG)
+                    if (Common.Globals.DEBUG)
                     {
                         // Events seem to starve in the queue. This indicates an underlying issue.
                         // Do one of the following:
@@ -149,9 +149,8 @@ namespace Coop.Mod.Persistence.RPC
                 Room = room;
                 RPC = rpc;
 
-                ObjectsToBeDistributed = RPC.Call.Arguments.Where(arg => arg.StoreObjectId.HasValue)
-                                            .Select(arg => arg.StoreObjectId.Value)
-                                            .ToList();
+                ObjectsToBeDistributed = Enumerable.ToList<ObjectId>(RPC.Call.Arguments.Where(arg => arg.StoreObjectId.HasValue)
+                                                .Select(arg => arg.StoreObjectId.Value));
             }
 
             [NotNull] public RailServerRoom Room { get; }

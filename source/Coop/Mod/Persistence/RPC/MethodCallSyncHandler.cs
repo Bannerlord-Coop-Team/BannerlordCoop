@@ -9,13 +9,14 @@ using RailgunNet;
 using RailgunNet.Connection.Client;
 using RailgunNet.System.Types;
 using RailgunNet.Util;
+using RPC;
 using Sync;
 
 namespace Coop.Mod.Persistence.RPC
 {
     /// <summary>
     ///     Registers a global call handler for a <see cref="MethodAccess" /> that sends an
-    ///     <see cref="EventMethodCall" /> to the server.
+    ///     <see cref="RPC.EventMethodCall" /> to the server.
     /// </summary>
     [OnlyIn(Component.Client)]
     public class MethodCallSyncHandler

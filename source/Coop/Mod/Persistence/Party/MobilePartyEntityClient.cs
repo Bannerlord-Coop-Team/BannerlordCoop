@@ -4,6 +4,7 @@ using Coop.Mod.DebugUtil;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
+using RPC;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 

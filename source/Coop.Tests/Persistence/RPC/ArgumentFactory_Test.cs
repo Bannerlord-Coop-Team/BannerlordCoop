@@ -2,6 +2,7 @@
 using Coop.Mod.Persistence.RPC;
 using Coop.Tests.Sync;
 using RailgunNet.System.Encoding;
+using RPC;
 using Sync.Store;
 using Xunit;
 

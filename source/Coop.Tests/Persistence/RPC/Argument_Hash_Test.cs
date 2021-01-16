@@ -1,5 +1,6 @@
 ﻿using System;
 using Coop.Mod.Persistence.RPC;
+using RPC;
 using Sync.Store;
 using TaleWorlds.ObjectSystem;
 using Xunit;

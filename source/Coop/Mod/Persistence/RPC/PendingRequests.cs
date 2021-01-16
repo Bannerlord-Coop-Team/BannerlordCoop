@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using RPC;
 
 namespace Coop.Mod.Persistence.RPC
 {

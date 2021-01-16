@@ -1,13 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Sync;
 
-namespace Coop.Mod.Persistence.RPC
+namespace RPC
 {
     /// <summary>
     ///     Represents a serializable call to a method including all invocation arguments. Method
     ///     pointer, instance and arguments have to resolved before execution. In order to resolve
-    ///     a method call refer to <see cref="MethodRegistry" /> and <see cref="ArgumentFactory" />.
+    ///     a method call refer to <see cref="Sync.MethodRegistry" /> and <see cref="ArgumentFactory" />.
     /// </summary>
     public readonly struct MethodCall
     {

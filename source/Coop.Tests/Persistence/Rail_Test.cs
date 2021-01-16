@@ -1,6 +1,5 @@
 ﻿using System.Linq;
 using System.Reflection;
-using Coop.Mod.Persistence;
 using Coop.NetImpl.LiteNet;
 using Moq;
 using RailgunNet;
@@ -8,6 +7,7 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Factory;
 using RailgunNet.Logic;
+using RPC;
 using TaleWorlds.CampaignSystem;
 using Xunit;
 

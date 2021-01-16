@@ -5,7 +5,7 @@ using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 
-namespace Coop.Mod.Persistence
+namespace RPC
 {
     /// <summary>
     ///     Provides an abstraction layer between the persistence and the game for the server.

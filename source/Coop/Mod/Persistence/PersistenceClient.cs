@@ -6,6 +6,7 @@ using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using RailgunNet.Connection.Client;
+using RPC;
 using Sync;
 
 namespace Coop.Mod.Persistence

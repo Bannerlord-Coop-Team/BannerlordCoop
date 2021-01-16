@@ -7,6 +7,7 @@ using Coop.NetImpl.LiteNet;
 using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Factory;
+using RPC;
 using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;

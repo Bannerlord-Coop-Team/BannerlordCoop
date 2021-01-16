@@ -30,8 +30,6 @@ namespace Coop.Mod
 {
     internal class Main : NoHarmonyLoader
     {
-        // Debug symbols
-        public static readonly bool DEBUG = true;
         // Test Symbols
         public static readonly bool TESTING_ENABLED = true;
 
@@ -51,7 +49,7 @@ namespace Coop.Mod
                 {
                     string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
-                    if (DEBUG)
+                    if (Globals.DEBUG)
                     {
                         foreach (string argument in array)
                         {
@@ -131,7 +129,7 @@ namespace Coop.Mod
             }
 
             // Skip startup splash screen
-            if (DEBUG)
+            if (Globals.DEBUG)
             {
                 typeof(Module).GetField(
                                   "_splashScreenPlayed",
@@ -157,7 +155,7 @@ namespace Coop.Mod
                     {
                         string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
-                        if (DEBUG)
+                        if (Globals.DEBUG)
                         {
                             foreach (string argument in array)
                             {

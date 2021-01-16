@@ -3,10 +3,10 @@ using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Persistence.RPC
+namespace RPC
 {
     /// <summary>
-    ///     Wrapper for an argument used in a <see cref="EventMethodCall" />.
+    ///     Wrapper for an argument used in a <see cref="Coop.Mod.Persistence.RPC.EventMethodCall" />.
     ///     ATTENTION: The persistence is intended to reliably transfer very small amount of data
     ///     that is to be applied at a synchronized point in time on all client. Maximum payload
     ///     data in a single event is tiny <see cref="RailgunNet.RailConfig.MAXSIZE_EVENT" />.

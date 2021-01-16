@@ -2,7 +2,7 @@
 using RailgunNet.System.Encoding;
 using Sync.Store;
 
-namespace Coop.Mod.Persistence.RPC
+namespace RPC
 {
     /// <summary>
     ///     Serializer for <see cref="Argument" />. It's important to keep in mind, that the

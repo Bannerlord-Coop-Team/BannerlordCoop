@@ -5,7 +5,9 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using RailgunNet.Util;
+using RPC;
 using Sync;
+using MethodCall = RPC.MethodCall;
 
 namespace Coop.Mod.Persistence.RPC
 {

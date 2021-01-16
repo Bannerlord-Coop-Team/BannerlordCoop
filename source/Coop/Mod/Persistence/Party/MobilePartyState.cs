@@ -1,6 +1,7 @@
 ﻿using System;
 using RailgunNet.Logic;
 using RailgunNet.System.Encoding;
+using RPC;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;

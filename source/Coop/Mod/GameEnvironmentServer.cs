@@ -5,6 +5,7 @@ using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.RPC;
 using NLog;
+using RPC;
 using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;

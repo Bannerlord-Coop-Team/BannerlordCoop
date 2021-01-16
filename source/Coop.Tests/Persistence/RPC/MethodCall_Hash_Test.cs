@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Coop.Mod.Persistence.RPC;
+using RPC;
 using Sync;
 using Sync.Store;
 using TaleWorlds.ObjectSystem;

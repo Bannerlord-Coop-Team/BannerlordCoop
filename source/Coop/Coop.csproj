@@ -316,16 +316,10 @@
     <Compile Include="Mod\Persistence\Party\MovementData.cs" />
     <Compile Include="Mod\Persistence\PersistenceClient.cs" />
     <Compile Include="Mod\Persistence\EntityManager.cs" />
-    <Compile Include="Mod\Persistence\RailBitBufferExtensions.cs" />
     <Compile Include="Mod\Persistence\Registry.cs" />
-    <Compile Include="Mod\Persistence\RPC\Argument.cs" />
-    <Compile Include="Mod\Persistence\RPC\ArgumentFactory.cs" />
     <Compile Include="Mod\Persistence\RPC\EventBroadcastingQueue.cs" />
-    <Compile Include="Mod\Persistence\RPC\IClientAccess.cs" />
-    <Compile Include="Mod\Persistence\RPC\MethodCall.cs" />
-    <Compile Include="Mod\Persistence\RPC\MethodCallSerializer.cs" />
-    <Compile Include="Mod\Persistence\RPC\ArgumentSerializer.cs" />
     <Compile Include="Mod\Persistence\RPC\EventMethodCall.cs" />
+    <Compile Include="Mod\Persistence\RPC\IClientAccess.cs" />
     <Compile Include="Mod\Persistence\RPC\MethodCallSyncHandler.cs" />
     <Compile Include="Mod\Persistence\RPC\PendingRequests.cs" />
     <Compile Include="Mod\Persistence\RPC\RPCSyncHandlers.cs" />
@@ -424,6 +418,10 @@
     <ProjectReference Include="..\RailgunNet\RailgunNet\RailgunNet.csproj">
       <Project>{d8389325-85ae-4a1d-9b8e-e4742349a531}</Project>
       <Name>RailgunNet</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\RPC\RPC.csproj">
+      <Project>{d6e8252c-8ede-4e01-9a61-6fb92b50fb6f}</Project>
+      <Name>RPC</Name>
     </ProjectReference>
     <ProjectReference Include="..\Sync\Sync.csproj">
       <Project>{79b189c9-b667-4997-a361-ab9c7c014184}</Project>

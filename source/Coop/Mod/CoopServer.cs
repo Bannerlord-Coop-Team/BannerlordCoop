@@ -23,6 +23,7 @@ using System.Linq;
 using TaleWorlds.ObjectSystem;
 using Coop.Mod.Persistence.Party;
 using RailgunNet.Logic;
+using RPC;
 
 namespace Coop.Mod
 {
@@ -137,7 +138,7 @@ namespace Coop.Mod
 
         public void StartGame(string saveName)
         {
-            if (Main.DEBUG)
+            if (Globals.DEBUG)
             {
                 try
                 {

@@ -2,6 +2,7 @@
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
+using RPC;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence.World
