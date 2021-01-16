@@ -95,6 +95,28 @@ namespace Network.Protocol
         }
     }
 
+    public class Client_Request_Party
+    {
+        public readonly string m_ClientId;
+
+        public Client_Request_Party(string clientId)
+        {
+            m_ClientId = clientId;
+        }
+
+        public byte[] Serialize()
+        {
+            ByteWriter writer = new ByteWriter();
+            writer.Binary.Write(m_ClientId);
+            return writer.ToArray();
+        }
+
+        public static Client_Request_Party Deserialize(ByteReader reader)
+        {
+            return new Client_Request_Party(reader.Binary.ReadString());
+        }
+    }
+
     public class Client_RequestWorldData
     {
         public byte[] Serialize()

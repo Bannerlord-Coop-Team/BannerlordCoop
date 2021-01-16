@@ -7,6 +7,7 @@ using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RPC;
 using Coop.Mod.Serializers;
+using Coop.NetImpl;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
@@ -184,6 +185,10 @@ namespace Coop.Mod
                 }
                 else
                 {
+                    Session.Connection.Send(
+                        new Packet(
+                            EPacket.Client_RequestWorldData,
+                            new Client_Request_Party(new PlatformAPI().GetPlayerID().ToString()).Serialize()));
                     // TODO get if character exists on server
                     m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.RequiresCharacterCreation);
                 }
@@ -403,4 +408,6 @@ namespace Coop.Mod
             return sRet;
         }
     }
+
+    
 }

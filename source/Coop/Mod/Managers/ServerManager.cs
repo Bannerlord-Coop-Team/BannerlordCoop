@@ -48,7 +48,7 @@ namespace Coop.Mod.Managers
                     {
                         // Hero received from client after character creation
                         Hero hero = (Hero)serializedPlayerHero.Deserialize();
-                        SaveManager.PlayerParties.Add(serializedPlayerHero.PlayerId, hero.Id);
+                        CoopSaveManager.PlayerParties.Add(serializedPlayerHero.PlayerId, hero.Id);
                     }
                 };
             };
