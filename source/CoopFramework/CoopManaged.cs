@@ -33,13 +33,28 @@ namespace CoopFramework
             foreach (MethodId methodId in PatchedMethods())
             {
                 MethodAccess method = MethodRegistry.IdToMethod[methodId];
-                method.SetHandler(_instance, (args) => RuntimeDispatch((object[])args));
+                EvaluatedActionBehaviour behaviour = Evaluate(_callers[ETriggerOrigin.Local].GetBehaviour(methodId)); // TODO: caller evaluation
+                method.SetHandler(_instance, (args) => RuntimeDispatch(behaviour, (object[])args));
             }
         }
 
-        private bool RuntimeDispatch(object[] args)
+        private bool RuntimeDispatch(EvaluatedActionBehaviour behaviour, object[] args)
         {
-            return true;
+            return behaviour.CallOriginal;
+        }
+
+        private EvaluatedActionBehaviour Evaluate(IEnumerable<ActionBehaviour> behaviours)
+        {
+            bool doCallOriginal = true;
+            foreach (ActionBehaviour behaviour in behaviours)
+            {
+                doCallOriginal = behaviour.ExecuteMethod;
+            }
+            
+            return new EvaluatedActionBehaviour()
+            {
+                CallOriginal = doCallOriginal
+            };
         }
 
         private IEnumerable<MethodId> PatchedMethods()
@@ -65,7 +80,10 @@ namespace CoopFramework
         private readonly T _instance;
     }
 
-    
+    struct EvaluatedActionBehaviour
+    {
+        public bool CallOriginal;
+    }
     
     
     

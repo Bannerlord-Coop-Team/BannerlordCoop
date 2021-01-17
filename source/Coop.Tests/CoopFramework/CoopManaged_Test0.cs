@@ -14,6 +14,7 @@ namespace Coop.Tests.CoopFramework
         class Foo
         {
             public int Bar { get; set; } = 42;
+            public int Baz { get; set; } = 42;
         }
 
         class CoopManagedFoo : CoopManaged<Foo>
@@ -21,13 +22,22 @@ namespace Coop.Tests.CoopFramework
             private static readonly PropertyPatch BarPatch =
                 new PropertyPatch(typeof(Foo))
                     .InterceptSetter(nameof(Foo.Bar));
+            
+            private static readonly PropertyPatch BazPatch =
+                new PropertyPatch(typeof(Foo))
+                    .InterceptSetter(nameof(Foo.Baz));
 
             static CoopManagedFoo()
             {
-                // Local calls are ignored
+                // Ignore local calls on Foo.Bar
                 When(ETriggerOrigin.Local)
                     .Calls(BarPatch.Setters)
                     .Ignore();
+                
+                // Allow local calls on Foo.Baz
+                When(ETriggerOrigin.Local)
+                    .Calls(BazPatch.Setters)
+                    .Execute();
             }
 
             [PatchInitializer]
@@ -51,26 +61,42 @@ namespace Coop.Tests.CoopFramework
         }
 
         [Fact]
-        void TestNonSyncableInstanceCanStillBeCalled()
+        void InstanceWithoutSyncCanStillBeChanged()
         {
             Foo foo = new Foo();
             Assert.Equal(42, foo.Bar);
+            Assert.Equal(42, foo.Baz);
 
-            // Since the instance is not yet managed by our syncable, we can still call the setter
+            // Since the instance is not yet managed by our syncable, we can still call the setters
             foo.Bar = 43;
             Assert.Equal(43, foo.Bar);
+            
+            foo.Baz = 43;
+            Assert.Equal(43, foo.Baz);
         }
 
         [Fact]
-        void TestLocalSetterCallIsIgnored()
+        void LocalBarChangeIsIgnored()
         {
             Foo foo = new Foo();
             CoopManagedFoo sync = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.Bar);
 
-            // The setter should be ignored as defined by SyncableFoo
+            // The configured behaviour ignores local changes to Foo.Bar
             foo.Bar = 43;
             Assert.Equal(42, foo.Bar);
+        }
+        
+        [Fact]
+        void LocalBazChangeIsExecuted()
+        {
+            Foo foo = new Foo();
+            CoopManagedFoo sync = new CoopManagedFoo(foo);
+            Assert.Equal(42, foo.Baz);
+
+            // The configured behaviour allows local changes to Foo.Bar
+            foo.Baz = 43;
+            Assert.Equal(43, foo.Baz);
         }
     }
 }
