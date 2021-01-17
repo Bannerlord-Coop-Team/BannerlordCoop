@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Common;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.MethodCall;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;

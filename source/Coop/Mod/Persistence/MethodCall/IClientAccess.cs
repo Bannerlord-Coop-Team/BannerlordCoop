@@ -2,7 +2,7 @@
 using RailgunNet.Connection.Client;
 using Sync.Store;
 
-namespace Coop.Mod.Persistence.RPC
+namespace Coop.Mod.Persistence.MethodCall
 {
     /// <summary>
     ///     Interface to access a clients persistence state. 

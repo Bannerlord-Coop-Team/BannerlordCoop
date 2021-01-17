@@ -2,14 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.MethodCall;
 using Coop.Tests.Sync;
 using JetBrains.Annotations;
 using Network;
 using Network.Protocol;
 using RailgunNet;
 using RailgunNet.Connection.Client;
-using RPC;
+using RemoteAction;
 using Sync;
 using Sync.Store;
 using Xunit;

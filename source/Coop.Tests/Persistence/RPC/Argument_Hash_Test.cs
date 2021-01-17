@@ -1,6 +1,6 @@
 ﻿using System;
-using Coop.Mod.Persistence.RPC;
-using RPC;
+using Coop.Mod.Persistence.MethodCall;
+using RemoteAction;
 using Sync.Store;
 using TaleWorlds.ObjectSystem;
 using Xunit;

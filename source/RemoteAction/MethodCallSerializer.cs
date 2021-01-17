@@ -5,7 +5,7 @@ using RailgunNet;
 using RailgunNet.System.Encoding;
 using Sync;
 
-namespace RPC
+namespace RemoteAction
 {
     /// <summary>
     ///     Railgun encoders and decoders for the remote procedure calls.

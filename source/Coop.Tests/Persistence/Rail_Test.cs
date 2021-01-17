@@ -7,7 +7,7 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Factory;
 using RailgunNet.Logic;
-using RPC;
+using RemoteAction;
 using TaleWorlds.CampaignSystem;
 using Xunit;
 

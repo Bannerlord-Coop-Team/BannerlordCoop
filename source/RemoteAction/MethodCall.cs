@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Sync;
 
-namespace RPC
+namespace RemoteAction
 {
     /// <summary>
     ///     Represents a serializable call to a method including all invocation arguments. Method

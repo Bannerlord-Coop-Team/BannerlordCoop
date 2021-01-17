@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.MethodCall;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using RailgunNet.Connection.Client;
 using RailgunNet.Factory;
 using RailgunNet.Logic;
-using RPC;
+using RemoteAction;
 using Sync;
 using Sync.Store;
 

@@ -1,11 +1,11 @@
 ﻿using Coop.Mod.Persistence.Party;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.MethodCall;
 using JetBrains.Annotations;
 using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 
-namespace RPC
+namespace RemoteAction
 {
     /// <summary>
     ///     Provides an abstraction layer between the persistence and the game for the server.

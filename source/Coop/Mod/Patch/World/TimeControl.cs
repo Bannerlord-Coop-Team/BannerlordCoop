@@ -4,7 +4,7 @@ using Coop.Mod.Persistence;
 using CoopFramework;
 using HarmonyLib;
 using Mono.Reflection;
-using RPC;
+using RemoteAction;
 using Sync;
 using TaleWorlds.CampaignSystem;
 

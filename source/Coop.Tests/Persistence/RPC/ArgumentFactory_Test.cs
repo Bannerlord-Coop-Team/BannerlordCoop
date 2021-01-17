@@ -1,8 +1,8 @@
 ﻿using System;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.MethodCall;
 using Coop.Tests.Sync;
 using RailgunNet.System.Encoding;
-using RPC;
+using RemoteAction;
 using Sync.Store;
 using Xunit;
 

@@ -2,7 +2,7 @@
 using RailgunNet.System.Encoding;
 using Sync.Store;
 
-namespace RPC
+namespace RemoteAction
 {
     /// <summary>
     ///     Serializer for <see cref="Argument" />. It's important to keep in mind, that the

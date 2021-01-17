@@ -7,7 +7,7 @@ using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace RPC
+namespace RemoteAction
 {
     /// <summary>
     ///     Factory to create the transfer wrapper for an argument in a RPC call.

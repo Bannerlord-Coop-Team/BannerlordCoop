@@ -2,7 +2,7 @@
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace RPC
+namespace RemoteAction
 {
     /// <summary>
     ///     Extensions for Railgun to encode & decode TaleWorlds classes.

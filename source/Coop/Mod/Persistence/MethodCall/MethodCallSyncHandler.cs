@@ -9,14 +9,14 @@ using RailgunNet;
 using RailgunNet.Connection.Client;
 using RailgunNet.System.Types;
 using RailgunNet.Util;
-using RPC;
+using RemoteAction;
 using Sync;
 
-namespace Coop.Mod.Persistence.RPC
+namespace Coop.Mod.Persistence.MethodCall
 {
     /// <summary>
     ///     Registers a global call handler for a <see cref="MethodAccess" /> that sends an
-    ///     <see cref="RPC.EventMethodCall" /> to the server.
+    ///     <see cref="EventMethodCall" /> to the server.
     /// </summary>
     [OnlyIn(Component.Client)]
     public class MethodCallSyncHandler
@@ -39,7 +39,7 @@ namespace Coop.Mod.Persistence.RPC
         public MethodAccess MethodAccess { get; }
 
         [Conditional("DEBUG")]
-        private void Trace(MethodCall call, RailClientRoom room)
+        private void Trace(RemoteAction.MethodCall call, RailClientRoom room)
         {
             Stats.History.Push(
                 new Statistics.Trace
@@ -63,7 +63,7 @@ namespace Coop.Mod.Persistence.RPC
                     {
                         bool bDebounce =
                             MethodAccess.Flags.HasFlag(EMethodPatchFlag.DebounceCalls);
-                        MethodCall call = new MethodCall(
+                        RemoteAction.MethodCall call = new RemoteAction.MethodCall(
                             MethodAccess.Id,
                             ArgumentFactory.Create(
                                 m_ClientAccess.GetStore(),
@@ -128,7 +128,7 @@ namespace Coop.Mod.Persistence.RPC
 
             public struct Trace
             {
-                public MethodCall Call { get; set; }
+                public RemoteAction.MethodCall Call { get; set; }
                 public Tick Tick { get; set; }
             }
         }

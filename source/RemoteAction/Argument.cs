@@ -3,16 +3,18 @@ using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace RPC
+namespace RemoteAction
 {
     /// <summary>
-    ///     Wrapper for an argument used in a <see cref="Coop.Mod.Persistence.RPC.EventMethodCall" />.
-    ///     ATTENTION: The persistence is intended to reliably transfer very small amount of data
-    ///     that is to be applied at a synchronized point in time on all client. Maximum payload
-    ///     data in a single event is tiny <see cref="RailgunNet.RailConfig.MAXSIZE_EVENT" />.
-    ///     Larger objects need be transferred using a <see cref="RemoteStore" /> and then referenced
+    ///     Wrapper for an argument used in a remote action.
+    /// 
+    ///     ATTENTION: The used state transfer library, Railgun, is intended to reliably distribute
+    ///     very small amount of data that is to be applied at a synchronized point in time on all clients.
+    ///     Maximum payload data in a single event is tiny <see cref="RailgunNet.RailConfig.MAXSIZE_EVENT" />.
+    ///     Larger objects need be transferred using a <see cref="Sync.Store.RemoteStore" /> and then referenced
     ///     in a <see cref="EventArgType.StoreObjectId" />. The <see cref="ArgumentFactory.Create" />
     ///     can take care of this.
+    /// 
     ///     To add a new argument type:
     ///     1. Add enum entry
     ///     2. Extended <see cref="Argument" /> to store the new type in some way

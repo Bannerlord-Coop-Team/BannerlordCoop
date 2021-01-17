@@ -36,7 +36,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BannerlordSystemTestingLibr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoopFramework", "CoopFramework\CoopFramework.csproj", "{55B13456-9F7F-4724-9CF5-AE12AA3CE81B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RPC", "RPC\RPC.csproj", "{D6E8252C-8EDE-4E01-9A61-6FB92B50FB6F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RemoteAction", "RemoteAction\RemoteAction.csproj", "{D6E8252C-8EDE-4E01-9A61-6FB92B50FB6F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

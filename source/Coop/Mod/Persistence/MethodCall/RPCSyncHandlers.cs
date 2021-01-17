@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Sync;
 
-namespace Coop.Mod.Persistence.RPC
+namespace Coop.Mod.Persistence.MethodCall
 {
     /// <summary>
     ///     Manages a collection of <see cref="MethodCallSyncHandler" />.

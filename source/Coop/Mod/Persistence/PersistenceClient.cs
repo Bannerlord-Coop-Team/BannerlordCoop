@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using Common;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.MethodCall;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using RailgunNet.Connection.Client;
-using RPC;
+using RemoteAction;
 using Sync;
 
 namespace Coop.Mod.Persistence

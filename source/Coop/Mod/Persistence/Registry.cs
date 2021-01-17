@@ -1,9 +1,9 @@
 ﻿using Coop.Mod.Persistence.Party;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.MethodCall;
 using Coop.Mod.Persistence.World;
 using RailgunNet;
 using RailgunNet.Factory;
-using RPC;
+using RemoteAction;
 
 namespace Coop.Mod.Persistence
 {

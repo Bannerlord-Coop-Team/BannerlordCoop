@@ -5,6 +5,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\RemoteAction\RemoteAction.csproj" />
       <ProjectReference Include="..\Sync\Sync.csproj" />
     </ItemGroup>
 

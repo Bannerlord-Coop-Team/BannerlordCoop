@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.MethodCall;
 using Coop.NetImpl.LiteNet;
 using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Factory;
-using RPC;
+using RemoteAction;
 using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;

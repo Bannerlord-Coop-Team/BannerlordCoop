@@ -5,7 +5,7 @@ using System.Net;
 using Common;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.MethodCall;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;

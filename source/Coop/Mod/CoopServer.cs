@@ -23,7 +23,7 @@ using System.Linq;
 using TaleWorlds.ObjectSystem;
 using Coop.Mod.Persistence.Party;
 using RailgunNet.Logic;
-using RPC;
+using RemoteAction;
 
 namespace Coop.Mod
 {

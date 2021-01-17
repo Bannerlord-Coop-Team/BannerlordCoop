@@ -5,7 +5,7 @@ using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 
-namespace RPC
+namespace RemoteAction
 {
     /// <summary>
     ///     Provides an abstraction layer between the persistence and the game for clients.

@@ -4,7 +4,7 @@ using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
-using RPC;
+using RemoteAction;
 using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;

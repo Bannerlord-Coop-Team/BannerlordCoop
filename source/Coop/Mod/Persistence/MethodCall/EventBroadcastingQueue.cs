@@ -7,7 +7,7 @@ using NLog;
 using RailgunNet.Connection.Server;
 using Sync.Store;
 
-namespace Coop.Mod.Persistence.RPC
+namespace Coop.Mod.Persistence.MethodCall
 {
     /// <summary>
     ///     Queue to broadcast events. Sends all events in order and makes sure, that all event

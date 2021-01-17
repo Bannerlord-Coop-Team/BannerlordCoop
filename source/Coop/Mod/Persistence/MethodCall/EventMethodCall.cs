@@ -5,11 +5,11 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using RailgunNet.Util;
-using RPC;
+using RemoteAction;
 using Sync;
-using MethodCall = RPC.MethodCall;
+using MethodCall = RemoteAction.MethodCall;
 
-namespace Coop.Mod.Persistence.RPC
+namespace Coop.Mod.Persistence.MethodCall
 {
     /// <summary>
     ///     RailEvent used to initiate remote procedure calls. The way this event is processed
@@ -44,7 +44,7 @@ namespace Coop.Mod.Persistence.RPC
             m_EnvironmentServer = environment;
         }
 
-        [EventData] public MethodCall Call { get; set; }
+        [EventData] public RemoteAction.MethodCall Call { get; set; }
 
         protected override void Execute(RailRoom room, RailController sender)
         {
