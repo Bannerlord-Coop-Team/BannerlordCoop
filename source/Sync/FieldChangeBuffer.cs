@@ -82,6 +82,8 @@ namespace Sync
                             {
                                 OnBeforeExpectedChange(value, instance);
                             }
+
+                            return true;
                         });
                 }
             }

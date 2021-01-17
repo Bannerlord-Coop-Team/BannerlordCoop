@@ -11,17 +11,14 @@ namespace Sync
     /// </summary>
     public class PropertyPatch
     {
-        private readonly EPatchBehaviour m_Behaviour;
         private readonly Type m_Declaring;
         private readonly MethodPatch m_GetterPatch;
         private readonly MethodPatch m_SetterPatch;
 
         public PropertyPatch(
-            [NotNull] Type declaringType,
-            EPatchBehaviour eBehaviour = EPatchBehaviour.AlwaysCallOriginal)
+            [NotNull] Type declaringType)
         {
             m_Declaring = declaringType;
-            m_Behaviour = eBehaviour;
             m_SetterPatch = new MethodPatch(m_Declaring);
             m_GetterPatch = new MethodPatch(m_Declaring);
         }
@@ -33,8 +30,7 @@ namespace Sync
         {
             m_SetterPatch.Intercept(
                 AccessTools.PropertySetter(m_Declaring, property.Name),
-                EMethodPatchFlag.None,
-                m_Behaviour);
+                EMethodPatchFlag.None);
             return this;
         }
 
@@ -42,8 +38,7 @@ namespace Sync
         {
             m_SetterPatch.Intercept(
                 AccessTools.PropertySetter(m_Declaring, sProperty),
-                EMethodPatchFlag.None,
-                m_Behaviour);
+                EMethodPatchFlag.None);
             return this;
         }
 
@@ -51,8 +46,7 @@ namespace Sync
         {
             m_SetterPatch.Intercept(
                 AccessTools.PropertyGetter(m_Declaring, property.Name),
-                EMethodPatchFlag.None,
-                m_Behaviour);
+                EMethodPatchFlag.None);
             return this;
         }
 
@@ -60,8 +54,7 @@ namespace Sync
         {
             m_SetterPatch.Intercept(
                 AccessTools.PropertyGetter(m_Declaring, sProperty),
-                EMethodPatchFlag.None,
-                m_Behaviour);
+                EMethodPatchFlag.None);
             return this;
         }
     }

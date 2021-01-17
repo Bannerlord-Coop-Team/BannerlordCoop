@@ -86,11 +86,10 @@ namespace Coop.Mod.Persistence.MethodCall
                                                   Trace(evt.Call, m_ClientAccess.GetRoom());
                                               });
                         }
+
+                        return false;
                     }
-                    else
-                    {
-                        throw new ArgumentNullException(nameof(args), "Unexpected argument type.");
-                    }
+                    throw new ArgumentNullException(nameof(args), "Unexpected argument type.");
                 });
             m_IsRegistered = true;
         }

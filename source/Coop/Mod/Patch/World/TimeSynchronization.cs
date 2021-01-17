@@ -26,7 +26,7 @@ namespace Coop.Mod.Patch
         // Patched method: internal void MapTimeTracker.Tick(float seconds)
         private static readonly MethodPatch Patch =
             new MethodPatch(typeof(CampaignTime).Assembly.GetType("TaleWorlds.CampaignSystem.MapTimeTracker", true))
-                .Intercept("Tick", EMethodPatchFlag.None, EPatchBehaviour.NeverCallOriginal);
+                .Intercept("Tick", EMethodPatchFlag.None);
 
         [PatchInitializer]
         public static void Init()
@@ -45,7 +45,7 @@ namespace Coop.Mod.Patch
         /// </summary>
         /// <param name="access">Method access for Tick</param>
         /// <returns>Handler</returns>
-        private static Action<object, object> CreateTickHandler(MethodAccess access)
+        private static Func<object, object, bool> CreateTickHandler(MethodAccess access)
         {
             return (instance, arg) =>
             {
@@ -59,8 +59,7 @@ namespace Coop.Mod.Patch
                 if (Coop.IsArbiter)
                 {
                     // The host is the authority for the campaign time. Go ahead.
-                    access.CallOriginal(instance, args);
-                    return;
+                    return true;
                 }
                 
                 // Take the predicted server side campaign time
@@ -78,6 +77,7 @@ namespace Coop.Mod.Patch
                     args[0] = Math.Max(secondsBehindServer, 0f);
                 }
                 access.CallOriginal(instance, args);
+                return false;
             };
         }
     }

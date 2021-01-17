@@ -31,7 +31,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         /// <param name="val">MovementData</param>
         /// <exception cref="ArgumentException"></exception>
-        private void SendMoveRequest(object val)
+        private bool SendMoveRequest(object val)
         {
             MovementData data = val as MovementData;
             if (data == null)
@@ -52,6 +52,7 @@ namespace Coop.Mod.Persistence.Party
                         SettlementIndex = data.TargetSettlement?.Id ?? MovementState.InvalidIndex
                     };
                 });
+            return false;
         }
 
         /// <summary>

@@ -38,16 +38,8 @@ namespace Coop.Tests.Sync
         private class SomePatch
         {
             public static readonly MethodPatch Patch = new MethodPatch(typeof(A))
-                                                       .Intercept(
-                                                           nameof(A.SyncedMethod),
-                                                           EMethodPatchFlag.None,
-                                                           EPatchBehaviour
-                                                               .CallOriginalBaseOnDispatcherReturn)
-                                                       .Intercept(
-                                                           nameof(A.StaticSyncedMethod),
-                                                           EMethodPatchFlag.None,
-                                                           EPatchBehaviour
-                                                               .CallOriginalBaseOnDispatcherReturn);
+                                                       .Intercept(nameof(A.SyncedMethod))
+                                                       .Intercept(nameof(A.StaticSyncedMethod));
         }
 
         private readonly MethodAccess m_SyncedMethod;
@@ -72,6 +64,7 @@ namespace Coop.Tests.Sync
                 {
                     Assert.Null(instance);
                     ++iNumberOfHandlerCalls;
+                    return false;
                 });
 
             // Trigger the handler
@@ -88,7 +81,11 @@ namespace Coop.Tests.Sync
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            m_SyncedMethod.SetHandler(instance, args => { ++iNumberOfHandlerCalls; });
+            m_SyncedMethod.SetHandler(instance, args =>
+            {
+                ++iNumberOfHandlerCalls;
+                return false;
+            });
 
             // Trigger the handler
             instance.SyncedMethod(42);
@@ -113,7 +110,11 @@ namespace Coop.Tests.Sync
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            m_SyncedMethod.SetHandler(instance, args => { ++iNumberOfHandlerCalls; });
+            m_SyncedMethod.SetHandler(instance, args =>
+            {
+                ++iNumberOfHandlerCalls;
+                return false;
+            });
 
             // Call the original
             int iExpectedValue = 42;

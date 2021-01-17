@@ -37,9 +37,9 @@ namespace CoopFramework
             }
         }
 
-        private void RuntimeDispatch(object[] args)
+        private bool RuntimeDispatch(object[] args)
         {
-            
+            return true;
         }
 
         private IEnumerable<MethodId> PatchedMethods()

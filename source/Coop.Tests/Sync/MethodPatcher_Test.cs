@@ -41,7 +41,11 @@ namespace Coop.Tests.Sync
             int iNumberOfHandlerCalls = 0;
 
             Assert.True(Patch.TryGetMethod(nameof(TestRPC.SyncedMethod), out MethodAccess method));
-            method.SetHandler(instance, args => { ++iNumberOfHandlerCalls; });
+            method.SetHandler(instance, args => 
+            { 
+                ++iNumberOfHandlerCalls;
+                return false;
+            });
 
             // Trigger the handler
             instance.SyncedMethod(42);

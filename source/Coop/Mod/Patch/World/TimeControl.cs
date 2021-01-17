@@ -20,7 +20,7 @@ namespace Coop.Mod.Patch
                 nameof(Campaign.TimeControlModeLock));
 
         private static readonly PropertyPatch IsMainPartyWaitingPatch =
-            new PropertyPatch(typeof(Campaign), EPatchBehaviour.NeverCallOriginal).InterceptSetter(
+            new PropertyPatch(typeof(Campaign)).InterceptSetter(
                 nameof(Campaign.IsMainPartyWaiting));
 
         public static FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; } =
@@ -49,10 +49,10 @@ namespace Coop.Mod.Patch
             mainPartyWaitingSetter.SetGlobalHandler(SetIsMainPartyWaiting);
         }
 
-        private static void SetIsMainPartyWaiting(object instance, object value)
+        private static bool SetIsMainPartyWaiting(object instance, object value)
         {
             IEnvironmentClient env = CoopClient.Instance?.Persistence?.Environment;
-            if (env == null) return;
+            if (env == null) return false;
             if (!(value is object[] args)) throw new ArgumentException();
             if (!(args[0] is bool isLocalMainPartyWaiting)) throw new ArgumentException();
             if (!(instance is Campaign campaign)) throw new ArgumentException();
@@ -66,6 +66,7 @@ namespace Coop.Mod.Patch
             IsMainPartyWaitingPatch
                 .Setters.First()
                 .CallOriginal(instance, new object[] { isEveryMainPartyWaiting });
+            return false;
         }
 
         public static bool DoSyncTimeControl()

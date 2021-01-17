@@ -41,12 +41,11 @@ namespace Sync
         public MethodPatch InterceptAll(
             BindingFlags eBindingFlags =
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly,
-            EMethodPatchFlag eFlags = EMethodPatchFlag.None,
-            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
+            EMethodPatchFlag eFlags = EMethodPatchFlag.None)
         {
             foreach (MethodInfo method in m_Declaring.GetMethods(eBindingFlags))
             {
-                Intercept(method, eFlags, eBehaviour);
+                Intercept(method, eFlags);
             }
 
             return this;
@@ -58,7 +57,6 @@ namespace Sync
         /// </summary>
         /// <param name="method">Method to track.</param>
         /// <param name="eFlags">Flags for the generated interceptor.</param>
-        /// <param name="eBehaviour"></param>
         /// <returns>this</returns>
         /// <exception cref="ArgumentException">
         ///     If the method is not declared in class
@@ -66,8 +64,7 @@ namespace Sync
         /// </exception>
         public MethodPatch Intercept(
             MethodInfo method,
-            EMethodPatchFlag eFlags = EMethodPatchFlag.None,
-            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal)
+            EMethodPatchFlag eFlags = EMethodPatchFlag.None)
         {
             if (method.DeclaringType != m_Declaring)
             {
@@ -76,7 +73,7 @@ namespace Sync
                     nameof(method));
             }
 
-            PatchPrefix(method, eFlags, eBehaviour);
+            PatchPrefix(method, eFlags);
             return this;
         }
 
@@ -86,20 +83,18 @@ namespace Sync
         /// </summary>
         /// <param name="sMethodName">Name of the method</param>
         /// <param name="eFlags">Flags for the generated interceptor.</param>
-        /// <param name="eBehaviour"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException">If no method with that name exists.</exception>
         public MethodPatch Intercept(
             string sMethodName,
             EMethodPatchFlag eFlags = EMethodPatchFlag.None,
-            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal,
             BindingFlags eBindingFlags = All)
         {
             foreach (MethodInfo info in m_Declaring.GetMethods(eBindingFlags))
             {
                 if (info.Name == sMethodName)
                 {
-                    Intercept(info, eFlags, eBehaviour);
+                    Intercept(info, eFlags);
                 }
             }
 
@@ -120,7 +115,6 @@ namespace Sync
             string sMethodName,
             Type[] genericInstantiations,
             EMethodPatchFlag eFlags = EMethodPatchFlag.None,
-            EPatchBehaviour eBehaviour = EPatchBehaviour.NeverCallOriginal,
             BindingFlags eBindingFlags = All)
         {
             foreach (MethodInfo info in m_Declaring.GetMethods(eBindingFlags))
@@ -129,7 +123,7 @@ namespace Sync
                 {
                     foreach (Type genericArg in genericInstantiations)
                     {
-                        Intercept(info.MakeGenericMethod(genericArg), eFlags, eBehaviour);
+                        Intercept(info.MakeGenericMethod(genericArg), eFlags);
                     }
                 }
             }
@@ -178,13 +172,12 @@ namespace Sync
 
         private void PatchPrefix(
             MethodInfo original,
-            EMethodPatchFlag eFlags,
-            EPatchBehaviour eBehaviour)
+            EMethodPatchFlag eFlags)
         {
             MethodInfo dispatcher = AccessTools.Method(
                 typeof(MethodPatch),
                 nameof(DispatchPrefixExecution));
-            MethodAccess access = MethodPatchFactory.AddPrefix(original, dispatcher, eBehaviour);
+            MethodAccess access = MethodPatchFactory.AddPrefix(original, dispatcher);
             access.AddFlags(eFlags);
             m_Access.Add(access);
         }

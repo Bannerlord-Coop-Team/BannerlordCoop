@@ -60,7 +60,7 @@ namespace Coop.Tests.Sync
             params object[] args)
         {
             m_DispatcherCalls.Add(methodAccess);
-            return true;
+            return false;
         }
 
         private static void DispatcherVoid(
@@ -70,7 +70,7 @@ namespace Coop.Tests.Sync
         {
             m_DispatcherCalls.Add(methodAccess);
         }
-
+        
         private static bool DispatcherCallOriginal(
             MethodAccess methodAccess,
             object instance,
@@ -92,8 +92,7 @@ namespace Coop.Tests.Sync
             MethodAccess access = new MethodAccess(method);
             DynamicMethod prefix = MethodPatchFactory.GeneratePrefix(
                 access,
-                dispatcher,
-                EPatchBehaviour.NeverCallOriginal);
+                dispatcher);
 
             // Call
             int iArg = 42;
@@ -101,7 +100,7 @@ namespace Coop.Tests.Sync
             double dArg = 44.0;
             object ret = prefix.Invoke(m_Foo, new object[] {m_Foo, iArg, fArg, dArg});
             Assert.IsType<bool>(ret);
-            Assert.False((bool) ret); // NeverCallOriginal
+            Assert.False((bool) ret); // DispatcherCallOriginal returns false
             Assert.Single(m_DispatcherCalls);
             Assert.NotNull(m_DispatcherCalls[0]);
             Assert.Same(access, m_DispatcherCalls[0]);
@@ -125,7 +124,7 @@ namespace Coop.Tests.Sync
         }
 
         [Fact]
-        private void GeneratePrefixForVoidDispatcherWorks()
+        private void GeneratePrefixForVoidDispatcherThrows()
         {
             // Generate prefix for SingleArg
             MethodInfo method = AccessTools.Method(typeof(Foo), nameof(Foo.SingleArg));
@@ -133,18 +132,7 @@ namespace Coop.Tests.Sync
                 typeof(MethodPatchFactory_Test),
                 nameof(DispatcherVoid));
             MethodAccess access = new MethodAccess(method);
-            DynamicMethod prefix = MethodPatchFactory.GeneratePrefix(
-                access,
-                dispatcher,
-                EPatchBehaviour.AlwaysCallOriginal);
-
-            // Call
-            object ret = prefix.Invoke(m_Foo, new object[] {m_Foo, 42});
-            Assert.IsType<bool>(ret);
-            Assert.True((bool) ret); // AlwaysCallOriginal
-            Assert.Single(m_DispatcherCalls);
-            Assert.NotNull(m_DispatcherCalls[0]);
-            Assert.Same(access, m_DispatcherCalls[0]);
+            Assert.Throws<Exception>(() => MethodPatchFactory.GeneratePrefix(access, dispatcher));
         }
 
         [Fact]
@@ -154,12 +142,11 @@ namespace Coop.Tests.Sync
             MethodInfo method = AccessTools.Method(typeof(Foo), nameof(Foo.ThreeArgs));
             MethodInfo dispatcher = AccessTools.Method(
                 typeof(MethodPatchFactory_Test),
-                nameof(DispatcherVoid));
+                nameof(DispatcherTrue));
             MethodAccess access = new MethodAccess(method);
             DynamicMethod prefix = MethodPatchFactory.GeneratePrefix(
                 access,
-                dispatcher,
-                EPatchBehaviour.AlwaysCallOriginal);
+                dispatcher);
 
             // Call
             object ret = prefix.Invoke(m_Foo, new object[] {m_Foo, 42, 43.0f, 44.0});

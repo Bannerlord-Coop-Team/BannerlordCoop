@@ -90,14 +90,14 @@ namespace Sync
         /// </summary>
         /// <param name="instance"></param>
         /// <param name="args"></param>
-        /// <returns>true if a handler was invoked. False otherwise.</returns>
+        /// <returns>true if the dispatcher wants the original function to be called as well. False otherwise.</returns>
         public bool InvokeOnBeforeCallHandler([CanBeNull] object instance, params object[] args)
         {
-            if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return false;
+            if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return true;
 
-            Action<object> handler = GetHandler(instance);
-            handler?.Invoke(args);
-            return handler == null;
+            Func<object, bool> handler = GetHandler(instance);
+            bool? doCallOriginal = handler?.Invoke(args);
+            return doCallOriginal ?? true;
         }
 
         public override string ToString()

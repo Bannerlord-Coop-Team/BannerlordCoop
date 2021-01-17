@@ -68,7 +68,7 @@ namespace Coop.Tests.CoopFramework
             CoopManagedFoo sync = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.Bar);
 
-            // The setter should be ignore as defined by SyncableFoo
+            // The setter should be ignored as defined by SyncableFoo
             foo.Bar = 43;
             Assert.Equal(42, foo.Bar);
         }

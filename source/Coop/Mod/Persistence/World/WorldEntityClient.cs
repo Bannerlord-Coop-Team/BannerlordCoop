@@ -29,7 +29,7 @@ namespace Coop.Mod.Persistence.World
         /// <param name="instance"></param>
         /// <param name="value"></param>
         /// <exception cref="ArgumentException"></exception>
-        private void RequestTimeControlChange(object instance, object value)
+        private bool RequestTimeControlChange(object instance, object value)
         {
             if (!(value is CampaignTimeControlMode mode))
             {
@@ -38,7 +38,7 @@ namespace Coop.Mod.Persistence.World
 
             if (!TimeControl.CanSyncTimeControlMode)
             {
-                return;
+                return false;
             }
 
             bool modelock = m_Environment.GetCurrentCampaign().TimeControlModeLock;
@@ -54,6 +54,7 @@ namespace Coop.Mod.Persistence.World
                     e.RequestedTimeControlMode = (mode, modelock);
                 });
             TimeControl.CanSyncTimeControlMode = false;
+            return false;
         }
 
         /// <summary>
@@ -62,7 +63,7 @@ namespace Coop.Mod.Persistence.World
         /// <param name="instance"></param>
         /// <param name="value"></param>
         /// <exception cref="ArgumentException"></exception>
-        private void RequestTimeControlLockChange(object instance, object value)
+        private bool RequestTimeControlLockChange(object instance, object value)
         {
             if (!(value is bool modelock))
             {
@@ -81,6 +82,7 @@ namespace Coop.Mod.Persistence.World
                     e.EntityId = Id;
                     e.RequestedTimeControlMode = (mode, modelock);
                 });
+            return false;
         }
 
         /// <summary>

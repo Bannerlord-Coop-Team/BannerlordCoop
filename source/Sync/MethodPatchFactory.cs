@@ -16,21 +16,19 @@ namespace Sync
 
         public static MethodAccess AddPrefix(
             MethodInfo original,
-            MethodInfo dispatcher,
-            EPatchBehaviour eBehaviour)
+            MethodInfo dispatcher)
         {
             lock (Patcher.HarmonyLock)
             {
                 MethodAccess sync = new MethodAccess(original);
-                AddPrefix(sync, dispatcher, eBehaviour);
+                AddPrefix(sync, dispatcher);
                 return sync;
             }
         }
 
         public static void AddPrefix(
             MethodAccess access,
-            MethodInfo dispatcher,
-            EPatchBehaviour eBehaviour)
+            MethodInfo dispatcher)
         {
             lock (Patcher.HarmonyLock)
             {
@@ -39,7 +37,7 @@ namespace Sync
                     throw new Exception("Patch already initialized.");
                 }
 
-                Prefixes[access.MemberInfo] = GeneratePrefix(access, dispatcher, eBehaviour);
+                Prefixes[access.MemberInfo] = GeneratePrefix(access, dispatcher);
 
                 MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPrefix));
 
@@ -74,8 +72,8 @@ namespace Sync
 
         /// <summary>
         ///     Generates a <see cref="DynamicMethod" /> to be used as a harmony prefix. The method
-        ///     signature exactly matches the original method with an additional and automatically
-        ///     captures the instance for non-static functions.
+        ///     signature exactly matches the original method that automatically captures the instance
+        ///     for non-static functions.
         ///     The generated Prefix captures the <paramref name="method" /> and calls the
         ///     <paramref name="dispatcher" /> with the following arguments:
         ///     `dispatcher(MethodAccess access, object instance, object [] args)`.
@@ -83,14 +81,12 @@ namespace Sync
         /// </summary>
         /// <param name="methodAccess">Method that is to be prefixed.</param>
         /// <param name="dispatcher">Dispatcher to be called in the prefix.</param>
-        /// <param name="eBehaviour">Return value behaviour of the generated prefix.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
         public static DynamicMethod GeneratePrefix(
             MethodAccess methodAccess,
-            MethodInfo dispatcher,
-            EPatchBehaviour eBehaviour)
+            MethodInfo dispatcher)
         {
             List<SMethodParameter> parameters = methodAccess.MemberInfo.GetParameters()
                                                             .Select(
@@ -193,36 +189,10 @@ namespace Sync
 
             // Call dispatcher
             il.EmitCall(OpCodes.Call, dispatcher, null);
-
-            switch (eBehaviour)
+            if (dispatcher.ReturnType != typeof(bool))
             {
-                case EPatchBehaviour.AlwaysCallOriginal:
-                    if (dispatcher.ReturnType != typeof(void))
-                    {
-                        il.Emit(OpCodes.Pop);
-                    }
-
-                    il.Emit(OpCodes.Ldc_I4_1);
-                    break;
-                case EPatchBehaviour.NeverCallOriginal:
-                    if (dispatcher.ReturnType != typeof(void))
-                    {
-                        il.Emit(OpCodes.Pop);
-                    }
-
-                    il.Emit(OpCodes.Ldc_I4_0);
-                    break;
-                case EPatchBehaviour.CallOriginalBaseOnDispatcherReturn:
-                    if (dispatcher.ReturnType != typeof(bool))
-                    {
-                        throw new Exception(
-                            "Invalid dispatcher. Dispatcher function required to return a bool to decided if the original function should be called.");
-                    }
-
-                    // Correct value is already on the stack
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(eBehaviour), eBehaviour, null);
+                throw new Exception(
+                    "Invalid dispatcher. Dispatcher function required to return a bool to decided if the original function should be called.");
             }
 
             il.Emit(OpCodes.Ret);

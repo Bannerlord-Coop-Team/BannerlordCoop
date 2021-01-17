@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
-using Sync.Behaviour;
 
 namespace Sync
 {
@@ -11,29 +10,34 @@ namespace Sync
     /// </summary>
     public abstract class Tracker
     {
-        private readonly Dictionary<object, Action<object>> m_InstanceSpecificHandlers =
-            new Dictionary<object, Action<object>>();
+        private readonly Dictionary<object, Func<object, bool>> m_InstanceSpecificHandlers =
+            new Dictionary<object, Func<object, bool>>();
 
-        public Action<object, object> GlobalHandler { get; private set; }
+        public Func<object, object, bool> GlobalHandler { get; private set; }
 
-        public IReadOnlyDictionary<object, Action<object>> InstanceSpecificHandlers =>
+        public IReadOnlyDictionary<object, Func<object, bool>> InstanceSpecificHandlers =>
             m_InstanceSpecificHandlers;
 
         /// <summary>
         ///     Sets the handler to be called when a specific instance of the <see cref="Tracker" />
         ///     requested a change. Multiple instance specific handlers are not supported.
         ///     The argument passed to the action are the arguments, not the instance!
+        ///
+        ///     The return value of the handler decides if the unpatched methods should be called (true)
+        ///     or not (false). Note that in the case of multiple patches for one method, the call order
+        ///     is inverse to the patching order (last patch gets called first). If the first patch returns
+        ///     true, the next patch will be called and so on.
         /// </summary>
         /// <param name="instance"></param>
-        /// <param name="action"></param>
-        public void SetHandler([NotNull] object instance, [NotNull] Action<object> action)
+        /// <param name="handler"></param>
+        public void SetHandler([NotNull] object instance, [NotNull] Func<object, bool> handler)
         {
             if (m_InstanceSpecificHandlers.ContainsKey(instance))
             {
                 throw new ArgumentException($"Cannot have multiple sync handlers for {this}.");
             }
 
-            m_InstanceSpecificHandlers.Add(instance, action);
+            m_InstanceSpecificHandlers.Add(instance, handler);
         }
 
         /// <summary>
@@ -41,20 +45,20 @@ namespace Sync
         /// </summary>
         /// <param name="instance"></param>
         /// <returns>Handler or null</returns>
-        public Action<object> GetHandler(object instance)
+        public Func<object, bool> GetHandler(object instance)
         {
             bool bHasGlobalHandler = GlobalHandler != null;
             if (instance != null &&
                 m_InstanceSpecificHandlers.TryGetValue(
                     instance,
-                    out Action<object> instanceSpecificHandler))
+                    out Func<object, bool> instanceSpecificHandler))
             {
                 if (bHasGlobalHandler)
                 {
                     return args =>
                     {
                         GlobalHandler(instance, args);
-                        instanceSpecificHandler(args);
+                        return instanceSpecificHandler(args);
                     };
                 }
 
@@ -81,16 +85,21 @@ namespace Sync
         /// <summary>
         ///     Sets the handler to be called when no instance specific handler is registered.
         ///     The action arguments are the instance followed by the arguments.
+        ///
+        ///     The return value of the handler decides if the unpatched methods should be called (true)
+        ///     or not (false). Note that in the case of multiple patches for one method, the call order
+        ///     is inverse to the patching order (last patch gets called first). If the first patch returns
+        ///     true, the next patch will be called and so on.
         /// </summary>
-        /// <param name="action"></param>
-        public void SetGlobalHandler(Action<object, object> action)
+        /// <param name="handler"></param>
+        public void SetGlobalHandler(Func<object, object, bool> handler)
         {
             if (GlobalHandler != null)
             {
                 throw new ArgumentException($"Cannot have multiple global handlers for {this}.");
             }
 
-            GlobalHandler = action;
+            GlobalHandler = handler;
         }
 
         public void RemoveGlobalHandler()

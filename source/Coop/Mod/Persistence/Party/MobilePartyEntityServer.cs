@@ -93,7 +93,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         /// <param name="val">MovementData</param>
         /// <exception cref="ArgumentException"></exception>
-        private void SetMovement(object val)
+        private bool SetMovement(object val)
         {
             MovementData data = val as MovementData;
             if (data == null)
@@ -112,6 +112,7 @@ namespace Coop.Mod.Persistence.Party
             State.Movement.TargetPartyIndex = data.TargetParty?.Id ?? MovementState.InvalidIndex;
             State.Movement.SettlementIndex =
                 data.TargetSettlement?.Id ?? MovementState.InvalidIndex;
+            return true;
         }
 
         public override string ToString()

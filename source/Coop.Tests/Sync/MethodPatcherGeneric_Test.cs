@@ -59,7 +59,11 @@ namespace Coop.Tests.Sync
             Assert.Equal(sMessage, instance.LatestArgument);
 
             // Register handler
-            method.SetHandler(instance, args => { ++iNumberOfHandlerCalls; });
+            method.SetHandler(instance, args =>
+            {
+                ++iNumberOfHandlerCalls;
+                return false;
+            });
 
             // Trigger the handler
             instance.SyncedMethod<DateTime>(sMessage);

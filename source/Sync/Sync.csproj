@@ -85,7 +85,6 @@
     <Compile Include="Behaviour\ActionTriggerOrigin.cs" />
     <Compile Include="Behaviour\ETriggerOrigin.cs" />
     <Compile Include="Behaviour\IPendingAction.cs" />
-    <Compile Include="EPatchBehaviour.cs" />
     <Compile Include="MethodPatch.cs" />
     <Compile Include="EMethodPatchFlag.cs" />
     <Compile Include="Store\ISerializableFactory.cs" />
