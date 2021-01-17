@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
 using JetBrains.Annotations;
+using Sync.Behaviour;
 using Sync.Reflection;
 
 namespace Sync
@@ -40,9 +42,11 @@ namespace Sync
         /// <summary>
         ///     If set, this function will be called before invoking any onBeforeCall handlers. If the
         ///     function evaluates to false, the onBeforeCall handlers will not be called.
+        ///
+        ///     The provided object is the instance the method is being called on. null for static methods.
         /// </summary>
         [CanBeNull]
-        public Func<object, bool> Condition { get; set; }
+        public Func<object, bool> ConditionIsPatchActive { get; set; }
 
         public MethodId Id { get; }
 
@@ -89,7 +93,7 @@ namespace Sync
         /// <returns>true if a handler was invoked. False otherwise.</returns>
         public bool InvokeOnBeforeCallHandler([CanBeNull] object instance, params object[] args)
         {
-            if (Condition != null && !Condition(instance)) return false;
+            if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return false;
 
             Action<object> handler = GetHandler(instance);
             handler?.Invoke(args);

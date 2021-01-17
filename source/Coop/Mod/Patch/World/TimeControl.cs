@@ -45,7 +45,7 @@ namespace Coop.Mod.Patch
                 DoSyncTimeControl);
 
             MethodAccess mainPartyWaitingSetter = IsMainPartyWaitingPatch.Setters.First();
-            mainPartyWaitingSetter.Condition = o => Coop.DoSync();
+            mainPartyWaitingSetter.ConditionIsPatchActive = o => Coop.DoSync();
             mainPartyWaitingSetter.SetGlobalHandler(SetIsMainPartyWaiting);
         }
 

@@ -80,6 +80,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Behaviour\ActionBehaviour.cs" />
+    <Compile Include="Behaviour\ActionBehaviourApplicator.cs" />
+    <Compile Include="Behaviour\ActionTriggerOrigin.cs" />
+    <Compile Include="Behaviour\ETriggerOrigin.cs" />
+    <Compile Include="Behaviour\IPendingAction.cs" />
     <Compile Include="EPatchBehaviour.cs" />
     <Compile Include="MethodPatch.cs" />
     <Compile Include="EMethodPatchFlag.cs" />

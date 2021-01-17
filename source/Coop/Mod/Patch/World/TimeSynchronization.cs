@@ -36,7 +36,7 @@ namespace Coop.Mod.Patch
                 throw new Exception("Patching failed. Was MapTimeTracker.Tick(float seconds) in the game DLLs changed?");
             }
             
-            access.Condition = o => Coop.IsClientConnected; 
+            access.ConditionIsPatchActive = o => Coop.IsClientConnected; 
             access.SetGlobalHandler(CreateTickHandler(access));
         }
 
