@@ -27,13 +27,13 @@ namespace Coop.Mod.Persistence.World
         ///     Called to request a change to the time control mode on the server.
         /// </summary>
         /// <param name="instance"></param>
-        /// <param name="value"></param>
+        /// <param name="args"></param>
         /// <exception cref="ArgumentException"></exception>
-        private bool RequestTimeControlChange(object instance, object value)
+        private bool RequestTimeControlChange(object instance, object[] args)
         {
-            if (!(value is CampaignTimeControlMode mode))
+            if (args.Length != 1 || !(args[0] is CampaignTimeControlMode mode))
             {
-                throw new ArgumentException(nameof(value));
+                throw new ArgumentException(nameof(args));
             }
 
             if (!TimeControl.CanSyncTimeControlMode)
@@ -61,13 +61,13 @@ namespace Coop.Mod.Persistence.World
         ///     Called to request a change to the time control lock on the server.
         /// </summary>
         /// <param name="instance"></param>
-        /// <param name="value"></param>
+        /// <param name="args"></param>
         /// <exception cref="ArgumentException"></exception>
-        private bool RequestTimeControlLockChange(object instance, object value)
+        private bool RequestTimeControlLockChange(object instance, object[] args)
         {
-            if (!(value is bool modelock))
+            if (args.Length != 1 || !(args[0] is bool modelock))
             {
-                throw new ArgumentException(nameof(value));
+                throw new ArgumentException(nameof(args));
             }
 
             CampaignTimeControlMode mode = m_Environment.GetCurrentCampaign().TimeControlMode;

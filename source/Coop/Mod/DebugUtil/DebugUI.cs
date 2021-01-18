@@ -131,7 +131,7 @@ namespace Coop.Mod.DebugUtil
                 Imgui.Text("global");
 
                 // instance specific handlers
-                foreach (KeyValuePair<object, Func<ETriggerOrigin, object, bool>> handler in access
+                foreach (KeyValuePair<object, Tracker.InstanceHandlerCallerIdDelegate> handler in access
                     .InstanceSpecificHandlers)
                 {
                     Imgui.Text(handler.Key.ToString());
@@ -148,7 +148,7 @@ namespace Coop.Mod.DebugUtil
                         "-");
 
                 // instance specific handlers
-                foreach (KeyValuePair<object, Func<ETriggerOrigin, object, bool>> handler in access
+                foreach (KeyValuePair<object, Tracker.InstanceHandlerCallerIdDelegate> handler in access
                     .InstanceSpecificHandlers)
                 {
                     Imgui.Text(handler.Value.Target + "." + handler.Value.Method.Name);

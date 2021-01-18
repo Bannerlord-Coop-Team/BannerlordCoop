@@ -59,37 +59,32 @@ namespace Coop.Mod.Persistence.MethodCall
             MethodAccess.SetGlobalHandler(
                 (instance, args) =>
                 {
-                    if (args is object[] objects)
+                    bool bDebounce = MethodAccess.Flags.HasFlag(EMethodPatchFlag.DebounceCalls);
+                    RemoteAction.MethodCall call = new RemoteAction.MethodCall(
+                        MethodAccess.Id,
+                        ArgumentFactory.Create(
+                            m_ClientAccess.GetStore(),
+                            instance,
+                            false),
+                        ProduceArguments(args));
+
+                    if (bDebounce && PendingRequests.Instance.IsPending(call))
                     {
-                        bool bDebounce =
-                            MethodAccess.Flags.HasFlag(EMethodPatchFlag.DebounceCalls);
-                        RemoteAction.MethodCall call = new RemoteAction.MethodCall(
-                            MethodAccess.Id,
-                            ArgumentFactory.Create(
-                                m_ClientAccess.GetStore(),
-                                instance,
-                                false),
-                            ProduceArguments(objects));
-
-                        if (bDebounce && PendingRequests.Instance.IsPending(call))
-                        {
-                            Logger.Debug("Debounced RPC {}", call);
-                        }
-                        else
-                        {
-                            PendingRequests.Instance.Add(call);
-                            m_ClientAccess.GetRoom()
-                                          ?.RaiseEvent<EventMethodCall>(
-                                              evt =>
-                                              {
-                                                  evt.Call = call;
-                                                  Trace(evt.Call, m_ClientAccess.GetRoom());
-                                              });
-                        }
-
-                        return false;
+                        Logger.Debug("Debounced RPC {}", call);
                     }
-                    throw new ArgumentNullException(nameof(args), "Unexpected argument type.");
+                    else
+                    {
+                        PendingRequests.Instance.Add(call);
+                        m_ClientAccess.GetRoom()
+                                      ?.RaiseEvent<EventMethodCall>(
+                                          evt =>
+                                          {
+                                              evt.Call = call;
+                                              Trace(evt.Call, m_ClientAccess.GetRoom());
+                                          });
+                    }
+
+                    return false;
                 });
             m_IsRegistered = true;
         }

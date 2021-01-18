@@ -29,11 +29,11 @@ namespace Coop.Mod.Persistence.Party
         /// <summary>
         ///     Handler to issue a move command for this party to the server.
         /// </summary>
-        /// <param name="val">MovementData</param>
+        /// <param name="args">MovementData</param>
         /// <exception cref="ArgumentException"></exception>
-        private bool SendMoveRequest(object val)
+        private bool SendMoveRequest(object[] args)
         {
-            MovementData data = val as MovementData;
+            MovementData data = args.Length > 0 ? args[0] as MovementData : null;
             if (data == null)
             {
                 throw new ArgumentException(nameof(data));

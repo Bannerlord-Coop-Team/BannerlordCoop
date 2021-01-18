@@ -91,11 +91,11 @@ namespace Coop.Mod.Persistence.Party
         /// <summary>
         ///     Handler to apply a movement command to the authoritative state.
         /// </summary>
-        /// <param name="val">MovementData</param>
+        /// <param name="args">MovementData</param>
         /// <exception cref="ArgumentException"></exception>
-        private bool SetMovement(object val)
+        private bool SetMovement(object[] args)
         {
-            MovementData data = val as MovementData;
+            MovementData data = args.Length > 0 ? args[0] as MovementData : null;
             if (data == null)
             {
                 throw new ArgumentException(nameof(data));

@@ -50,11 +50,11 @@ namespace Coop.Mod.Patch
             mainPartyWaitingSetter.SetGlobalHandler(SetIsMainPartyWaiting);
         }
 
-        private static bool SetIsMainPartyWaiting(object instance, object value)
+        private static bool SetIsMainPartyWaiting(object instance, object[] args)
         {
             IEnvironmentClient env = CoopClient.Instance?.Persistence?.Environment;
             if (env == null) return false;
-            if (!(value is object[] args)) throw new ArgumentException();
+            if (args.Length != 1) throw new ArgumentException();
             if (!(args[0] is bool isLocalMainPartyWaiting)) throw new ArgumentException();
             if (!(instance is Campaign campaign)) throw new ArgumentException();
 

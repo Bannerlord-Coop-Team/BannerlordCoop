@@ -57,7 +57,7 @@ namespace Coop.Mod.Persistence
                     {
                         access.GetHandler(instance)?.Invoke(
                             ETriggerOrigin.Local, // we want to emulate a local "field setter"
-                            instanceBuffer.Value.RequestedValue);
+                            new object[] { instanceBuffer.Value.RequestedValue });
                         instanceBuffer.Value.RequestProcessed = true;
                     }
                 }

@@ -11,12 +11,18 @@ namespace Sync
     /// </summary>
     public abstract class Tracker
     {
-        private readonly Dictionary<object, Func<ETriggerOrigin, object, bool>> m_InstanceSpecificHandlers =
-            new Dictionary<object, Func<ETriggerOrigin, object, bool>>();
+        public delegate bool InstanceHandlerDelegate(object[] args);
+        public delegate bool GlobalHandlerDelegate(object instance, object[] args);
+        public delegate bool InstanceHandlerCallerIdDelegate(ETriggerOrigin eOrigin, object[] args);
+        public delegate bool GlobalHandlerCallerIdDelegate(ETriggerOrigin eOrigin, object instance, object[] args);
+        
+        
+        private readonly Dictionary<object, InstanceHandlerCallerIdDelegate> m_InstanceSpecificHandlers =
+            new Dictionary<object, InstanceHandlerCallerIdDelegate>();
 
-        public Func<ETriggerOrigin, object, object, bool> GlobalHandler { get; private set; }
+        public GlobalHandlerCallerIdDelegate GlobalHandler { get; private set; }
 
-        public IReadOnlyDictionary<object, Func<ETriggerOrigin, object, bool>> InstanceSpecificHandlers =>
+        public IReadOnlyDictionary<object, InstanceHandlerCallerIdDelegate> InstanceSpecificHandlers =>
             m_InstanceSpecificHandlers;
 
         /// <summary>
@@ -31,7 +37,7 @@ namespace Sync
         /// </summary>
         /// <param name="instance"></param>
         /// <param name="handler"></param>
-        public void SetHandler([NotNull] object instance, [NotNull] Func<object, bool> handler)
+        public void SetHandler([NotNull] object instance, [NotNull] InstanceHandlerDelegate handler)
         {
             SetHandler(instance, (eOrigin, args) =>
             {
@@ -52,7 +58,7 @@ namespace Sync
         /// </summary>
         /// <param name="instance"></param>
         /// <param name="handler"></param>
-        public void SetHandler([NotNull] object instance, [NotNull] Func<ETriggerOrigin, object, bool> handler)
+        public void SetHandler([NotNull] object instance, [NotNull] InstanceHandlerCallerIdDelegate handler)
         {
             if (m_InstanceSpecificHandlers.ContainsKey(instance))
             {
@@ -67,13 +73,13 @@ namespace Sync
         /// </summary>
         /// <param name="instance"></param>
         /// <returns>Handler or null</returns>
-        public Func<ETriggerOrigin, object, bool> GetHandler(object instance)
+        public InstanceHandlerCallerIdDelegate GetHandler(object instance)
         {
             bool bHasGlobalHandler = GlobalHandler != null;
             if (instance != null &&
                 m_InstanceSpecificHandlers.TryGetValue(
                     instance,
-                    out Func<ETriggerOrigin, object, bool> instanceSpecificHandler))
+                    out InstanceHandlerCallerIdDelegate instanceSpecificHandler))
             {
                 if (bHasGlobalHandler)
                 {
@@ -89,7 +95,8 @@ namespace Sync
 
             if (GlobalHandler != null)
             {
-                return (eOrigin, args) => GlobalHandler(eOrigin, instance, args);
+                return (eOrigin, args) => 
+                    GlobalHandler(eOrigin, instance, args);
             }
 
             return null;
@@ -114,7 +121,7 @@ namespace Sync
         ///     true, the next patch will be called and so on.
         /// </summary>
         /// <param name="handler"></param>
-        public void SetGlobalHandler(Func<object, object, bool> handler)
+        public void SetGlobalHandler(GlobalHandlerDelegate handler)
         {
             SetGlobalHandler((eOrigin, instance, args) =>
             {
@@ -133,7 +140,7 @@ namespace Sync
         ///     true, the next patch will be called and so on.
         /// </summary>
         /// <param name="handler"></param>
-        public void SetGlobalHandler(Func<ETriggerOrigin, object, object, bool> handler)
+        public void SetGlobalHandler(GlobalHandlerCallerIdDelegate handler)
         {
             if (GlobalHandler != null)
             {

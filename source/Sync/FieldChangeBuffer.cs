@@ -54,41 +54,6 @@ namespace Sync
             ActiveFields.Push(new ValueData(access, target, value));
         }
 
-        /// <summary>
-        ///     During the execution of any of the <paramref name="triggers" /> methods, any change to the
-        ///     value will not be applied but instead written to the change buffer
-        ///     <see cref="BufferedChanges" />.
-        /// </summary>
-        /// <param name="value">Accessor to the value</param>
-        /// <param name="triggers">
-        ///     Trigger methods during which the changes to the value are written to the
-        ///     buffer instead
-        /// </param>
-        /// <param name="condition">The buffer is only active if the condition evaluates to true</param>
-        public void Intercept(
-            ValueAccess value,
-            IEnumerable<MethodAccess> triggers,
-            Func<bool> condition)
-        {
-            lock (Patcher.HarmonyLock)
-            {
-                foreach (MethodAccess method in triggers)
-                {
-                    Patcher.HarmonyInstance.Patch(method.MemberInfo, PatchPrefix, PatchPostfix);
-                    method.SetGlobalHandler(
-                        (instance, args) =>
-                        {
-                            if (condition())
-                            {
-                                OnBeforeExpectedChange(value, instance);
-                            }
-
-                            return true;
-                        });
-                }
-            }
-        }
-
         private void PopActiveFields()
         {
             while (ActiveFields.Count > 0)

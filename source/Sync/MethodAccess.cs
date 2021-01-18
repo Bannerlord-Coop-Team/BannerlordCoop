@@ -98,7 +98,7 @@ namespace Sync
         {
             if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return true;
 
-            Func<ETriggerOrigin, object, bool> handler = GetHandler(instance);
+            var handler = GetHandler(instance);
             bool? doCallOriginal = handler?.Invoke(eOrigin, args);
             return doCallOriginal ?? true;
         }

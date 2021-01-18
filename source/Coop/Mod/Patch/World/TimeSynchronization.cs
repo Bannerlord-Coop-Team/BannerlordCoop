@@ -38,19 +38,8 @@ namespace Coop.Mod.Patch
             }
             
             access.ConditionIsPatchActive = o => Coop.IsClientConnected; 
-            access.SetGlobalHandler(CreateTickHandler(access));
-        }
-
-        /// <summary>
-        /// Creates a handler for the MapTimeTracker.Tick(float seconds) patch.
-        /// </summary>
-        /// <param name="access">Method access for Tick</param>
-        /// <returns>Handler</returns>
-        private static Func<object, object, bool> CreateTickHandler(MethodAccess access)
-        {
-            return (instance, arg) =>
+            access.SetGlobalHandler((instance, args) =>
             {
-                object[] args = (object[]) arg;
                 if (args.Length == 0 || !(args[0] is float))
                 {
                     throw new ArgumentException(
@@ -79,7 +68,7 @@ namespace Coop.Mod.Patch
                 }
                 access.Call(ETriggerOrigin.Authoritative, instance, args);
                 return false;
-            };
+            });
         }
     }
 }
