@@ -8,6 +8,7 @@ using Network.Infrastructure;
 using RailgunNet.Connection.Client;
 using RemoteAction;
 using Sync;
+using Sync.Behaviour;
 
 namespace Coop.Mod.Persistence
 {
@@ -54,7 +55,9 @@ namespace Coop.Mod.Persistence
                     }
                     else if (!instanceBuffer.Value.RequestProcessed)
                     {
-                        access.GetHandler(instance)?.Invoke(instanceBuffer.Value.RequestedValue);
+                        access.GetHandler(instance)?.Invoke(
+                            ETriggerOrigin.Local, // we want to emulate a local "field setter"
+                            instanceBuffer.Value.RequestedValue);
                         instanceBuffer.Value.RequestProcessed = true;
                     }
                 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using Sync;
+using Sync.Behaviour;
 using Xunit;
 
 namespace Coop.Tests.Sync
@@ -53,7 +54,7 @@ namespace Coop.Tests.Sync
             // Verify the method access object
             string sMessage = "Hello World";
             int iNumberOfCalls = 0;
-            method.CallOriginal(instance, new object[] {sMessage});
+            method.Call(ETriggerOrigin.Authoritative, instance, new object[] {sMessage});
             ++iNumberOfCalls;
             Assert.Equal(iNumberOfCalls, instance.NumberOfCalls);
             Assert.Equal(sMessage, instance.LatestArgument);

@@ -15,6 +15,7 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using Sync;
+using Sync.Behaviour;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 
@@ -130,7 +131,7 @@ namespace Coop.Mod.DebugUtil
                 Imgui.Text("global");
 
                 // instance specific handlers
-                foreach (KeyValuePair<object, Func<object, bool>> handler in access
+                foreach (KeyValuePair<object, Func<ETriggerOrigin, object, bool>> handler in access
                     .InstanceSpecificHandlers)
                 {
                     Imgui.Text(handler.Key.ToString());
@@ -147,7 +148,7 @@ namespace Coop.Mod.DebugUtil
                         "-");
 
                 // instance specific handlers
-                foreach (KeyValuePair<object, Func<object, bool>> handler in access
+                foreach (KeyValuePair<object, Func<ETriggerOrigin, object, bool>> handler in access
                     .InstanceSpecificHandlers)
                 {
                     Imgui.Text(handler.Value.Target + "." + handler.Value.Method.Name);

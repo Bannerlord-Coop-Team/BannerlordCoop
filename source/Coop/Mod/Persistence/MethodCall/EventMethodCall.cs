@@ -7,6 +7,7 @@ using RailgunNet.Logic;
 using RailgunNet.Util;
 using RemoteAction;
 using Sync;
+using Sync.Behaviour;
 using MethodCall = RemoteAction.MethodCall;
 
 namespace Coop.Mod.Persistence.MethodCall
@@ -59,7 +60,8 @@ namespace Coop.Mod.Persistence.MethodCall
                 {
                     Logger.Trace("[{eventId}] SyncCall: {call}", EventId, Call);
                     // TODO: The call is not synchronized to a campaign time at this point. We probably want an execution queue of some sorts that executes the call at the right point in time.
-                    method.CallOriginal(
+                    method.Call(
+                        ETriggerOrigin.Authoritative,
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Instance),
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Arguments));
                     PendingRequests.Instance.Remove(Call);

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using JetBrains.Annotations;
+using Sync.Behaviour;
 
 namespace Sync
 {
@@ -53,7 +54,7 @@ namespace Sync
 
         /// <summary>
         ///     Creates a <see cref="MethodAccess" /> and patches in a prefix that relays all calls to
-        ///     <see cref="MethodAccess.InvokeOnBeforeCallHandler" />.
+        ///     <see cref="MethodAccess.InvokePrefix" />.
         /// </summary>
         /// <param name="method">Method to track.</param>
         /// <param name="eFlags">Flags for the generated interceptor.</param>
@@ -79,7 +80,7 @@ namespace Sync
 
         /// <summary>
         ///     Creates a <see cref="MethodAccess" /> and patches in a prefix that relays all calls to
-        ///     <see cref="MethodAccess.InvokeOnBeforeCallHandler" />.
+        ///     <see cref="MethodAccess.InvokePrefix" />.
         /// </summary>
         /// <param name="sMethodName">Name of the method</param>
         /// <param name="eFlags">Flags for the generated interceptor.</param>
@@ -187,7 +188,7 @@ namespace Sync
             object instance,
             params object[] args)
         {
-            return methodAccess.InvokeOnBeforeCallHandler(instance, args);
+            return methodAccess.InvokePrefix(ETriggerOrigin.Local,instance, args);
         }
     }
 }

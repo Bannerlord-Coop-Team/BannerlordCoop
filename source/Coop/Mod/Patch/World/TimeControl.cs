@@ -6,6 +6,7 @@ using HarmonyLib;
 using Mono.Reflection;
 using RemoteAction;
 using Sync;
+using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Patch
@@ -65,7 +66,7 @@ namespace Coop.Mod.Patch
 
             IsMainPartyWaitingPatch
                 .Setters.First()
-                .CallOriginal(instance, new object[] { isEveryMainPartyWaiting });
+                .Call(ETriggerOrigin.Authoritative, instance, new object[] { isEveryMainPartyWaiting });
             return false;
         }
 

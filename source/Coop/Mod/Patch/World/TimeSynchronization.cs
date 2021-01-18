@@ -5,6 +5,7 @@ using HarmonyLib;
 using NLog;
 using RailgunNet.System.Types;
 using Sync;
+using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Patch
@@ -76,7 +77,7 @@ namespace Coop.Mod.Patch
                     Delay.Push((int) Math.Round(secondsBehindServer));
                     args[0] = Math.Max(secondsBehindServer, 0f);
                 }
-                access.CallOriginal(instance, args);
+                access.Call(ETriggerOrigin.Authoritative, instance, args);
                 return false;
             };
         }

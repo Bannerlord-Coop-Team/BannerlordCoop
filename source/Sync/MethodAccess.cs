@@ -74,29 +74,32 @@ namespace Sync
         }
 
         /// <summary>
-        ///     Invokes the original method as it was at the time of creation of this
+        ///     Invokes the method. Note that the prefixes decide on whether the original is called or not.
         ///     <see cref="MethodAccess" />.
         /// </summary>
-        /// <param name="target"></param>
+        /// <param name="eOrigin">Who triggered this call?</param>
+        /// <param name="instance"></param>
         /// <param name="args"></param>
-        public void CallOriginal([CanBeNull] object target, [CanBeNull] object[] args)
+        public void Call(ETriggerOrigin eOrigin, [CanBeNull] object instance, [CanBeNull] object[] args)
         {
-            m_Call?.Invoke(target, args);
+            if (!InvokePrefix(eOrigin, instance, args)) return;
+            m_Call?.Invoke(instance, args);
             m_CallStatic?.Invoke(args);
         }
 
         /// <summary>
         ///     Invokes registered handlers for the given instance.
         /// </summary>
+        /// <param name="eOrigin">Who triggered this call?</param>
         /// <param name="instance"></param>
         /// <param name="args"></param>
-        /// <returns>true if the dispatcher wants the original function to be called as well. False otherwise.</returns>
-        public bool InvokeOnBeforeCallHandler([CanBeNull] object instance, params object[] args)
+        /// <returns>true if the invoked prefix wants the original function to be called as well. False otherwise.</returns>
+        public bool InvokePrefix(ETriggerOrigin eOrigin, [CanBeNull] object instance, params object[] args)
         {
             if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return true;
 
-            Func<object, bool> handler = GetHandler(instance);
-            bool? doCallOriginal = handler?.Invoke(args);
+            Func<ETriggerOrigin, object, bool> handler = GetHandler(instance);
+            bool? doCallOriginal = handler?.Invoke(eOrigin, args);
             return doCallOriginal ?? true;
         }
 

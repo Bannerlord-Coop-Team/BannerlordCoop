@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
 using Sync;
+using Sync.Behaviour;
 using Xunit;
 
 namespace Coop.Tests.Sync
@@ -77,7 +78,7 @@ namespace Coop.Tests.Sync
             params object[] args)
         {
             m_DispatcherCalls.Add(methodAccess);
-            methodAccess.CallOriginal(instance, args);
+            methodAccess.Call(ETriggerOrigin.Authoritative, instance, args);
             return false;
         }
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
+using Sync.Behaviour;
 
 namespace Sync
 {
@@ -10,12 +11,12 @@ namespace Sync
     /// </summary>
     public abstract class Tracker
     {
-        private readonly Dictionary<object, Func<object, bool>> m_InstanceSpecificHandlers =
-            new Dictionary<object, Func<object, bool>>();
+        private readonly Dictionary<object, Func<ETriggerOrigin, object, bool>> m_InstanceSpecificHandlers =
+            new Dictionary<object, Func<ETriggerOrigin, object, bool>>();
 
-        public Func<object, object, bool> GlobalHandler { get; private set; }
+        public Func<ETriggerOrigin, object, object, bool> GlobalHandler { get; private set; }
 
-        public IReadOnlyDictionary<object, Func<object, bool>> InstanceSpecificHandlers =>
+        public IReadOnlyDictionary<object, Func<ETriggerOrigin, object, bool>> InstanceSpecificHandlers =>
             m_InstanceSpecificHandlers;
 
         /// <summary>
@@ -23,7 +24,7 @@ namespace Sync
         ///     requested a change. Multiple instance specific handlers are not supported.
         ///     The argument passed to the action are the arguments, not the instance!
         ///
-        ///     The return value of the handler decides if the unpatched methods should be called (true)
+        ///     The return value of the handler decides if the unpatched method should be called (true)
         ///     or not (false). Note that in the case of multiple patches for one method, the call order
         ///     is inverse to the patching order (last patch gets called first). If the first patch returns
         ///     true, the next patch will be called and so on.
@@ -31,6 +32,27 @@ namespace Sync
         /// <param name="instance"></param>
         /// <param name="handler"></param>
         public void SetHandler([NotNull] object instance, [NotNull] Func<object, bool> handler)
+        {
+            SetHandler(instance, (eOrigin, args) =>
+            {
+                if (eOrigin == ETriggerOrigin.Authoritative) return true;
+                return handler.Invoke(args);
+            });
+        }
+        
+        /// <summary>
+        ///     Sets the handler to be called when a specific instance of the <see cref="Tracker" />
+        ///     requested a change. Multiple instance specific handlers are not supported.
+        ///     The argument passed to the action are the arguments, not the instance!
+        ///
+        ///     The return value of the handler decides if the unpatched method should be called (true)
+        ///     or not (false). Note that in the case of multiple patches for one method, the call order
+        ///     is inverse to the patching order (last patch gets called first). If the first patch returns
+        ///     true, the next patch will be called and so on.
+        /// </summary>
+        /// <param name="instance"></param>
+        /// <param name="handler"></param>
+        public void SetHandler([NotNull] object instance, [NotNull] Func<ETriggerOrigin, object, bool> handler)
         {
             if (m_InstanceSpecificHandlers.ContainsKey(instance))
             {
@@ -45,20 +67,20 @@ namespace Sync
         /// </summary>
         /// <param name="instance"></param>
         /// <returns>Handler or null</returns>
-        public Func<object, bool> GetHandler(object instance)
+        public Func<ETriggerOrigin, object, bool> GetHandler(object instance)
         {
             bool bHasGlobalHandler = GlobalHandler != null;
             if (instance != null &&
                 m_InstanceSpecificHandlers.TryGetValue(
                     instance,
-                    out Func<object, bool> instanceSpecificHandler))
+                    out Func<ETriggerOrigin, object, bool> instanceSpecificHandler))
             {
                 if (bHasGlobalHandler)
                 {
-                    return args =>
+                    return (eOrigin, args) =>
                     {
-                        GlobalHandler(instance, args);
-                        return instanceSpecificHandler(args);
+                        GlobalHandler(eOrigin, instance, args);
+                        return instanceSpecificHandler(eOrigin, args);
                     };
                 }
 
@@ -67,7 +89,7 @@ namespace Sync
 
             if (GlobalHandler != null)
             {
-                return args => GlobalHandler(instance, args);
+                return (eOrigin, args) => GlobalHandler(eOrigin, instance, args);
             }
 
             return null;
@@ -81,7 +103,7 @@ namespace Sync
         {
             m_InstanceSpecificHandlers.Remove(instance);
         }
-
+        
         /// <summary>
         ///     Sets the handler to be called when no instance specific handler is registered.
         ///     The action arguments are the instance followed by the arguments.
@@ -93,6 +115,25 @@ namespace Sync
         /// </summary>
         /// <param name="handler"></param>
         public void SetGlobalHandler(Func<object, object, bool> handler)
+        {
+            SetGlobalHandler((eOrigin, instance, args) =>
+            {
+                if (eOrigin == ETriggerOrigin.Authoritative) return true;
+                return handler.Invoke(instance, args);
+            });
+        }
+
+        /// <summary>
+        ///     Sets the handler to be called when no instance specific handler is registered.
+        ///     The action arguments are the instance followed by the arguments.
+        ///
+        ///     The return value of the handler decides if the unpatched methods should be called (true)
+        ///     or not (false). Note that in the case of multiple patches for one method, the call order
+        ///     is inverse to the patching order (last patch gets called first). If the first patch returns
+        ///     true, the next patch will be called and so on.
+        /// </summary>
+        /// <param name="handler"></param>
+        public void SetGlobalHandler(Func<ETriggerOrigin, object, object, bool> handler)
         {
             if (GlobalHandler != null)
             {
