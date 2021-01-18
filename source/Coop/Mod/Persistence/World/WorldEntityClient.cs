@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using Coop.Mod.Patch;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
@@ -13,7 +14,7 @@ namespace Coop.Mod.Persistence.World
     public class WorldEntityClient : RailEntityClient<WorldState>
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-
+        
         [NotNull] private readonly IEnvironmentClient m_Environment;
 
         public WorldEntityClient(IEnvironmentClient environment)
@@ -34,6 +35,11 @@ namespace Coop.Mod.Persistence.World
                 throw new ArgumentException(nameof(value));
             }
 
+            if (!TimeControl.CanSyncTimeControlMode)
+            {
+                return;
+            }
+
             bool modelock = m_Environment.GetCurrentCampaign().TimeControlModeLock;
 
             Logger.Trace(
@@ -46,6 +52,7 @@ namespace Coop.Mod.Persistence.World
                     e.EntityId = Id;
                     e.RequestedTimeControlMode = (mode, modelock);
                 });
+            TimeControl.CanSyncTimeControlMode = false;
         }
 
         /// <summary>

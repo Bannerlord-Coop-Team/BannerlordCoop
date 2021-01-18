@@ -24,7 +24,7 @@ namespace Coop.Mod.DebugUtil
             return obj is ReplayEvent other &&
                 this.entityId == other.entityId &&
                 this.party?.Id == other.party?.Id &&
-                this.movement.NearlyEquals(other.movement);
+                this.movement.Equals(other.movement);
         }
 
         public override int GetHashCode()

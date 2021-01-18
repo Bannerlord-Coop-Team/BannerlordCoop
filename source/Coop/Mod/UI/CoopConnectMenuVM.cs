@@ -14,7 +14,6 @@ namespace Coop.Mod.UI
     internal class CoopConnectMenuVM : ViewModel
     {
         public string JoinButtonText => "Join";
-        public string CancelButtonText => "Cancel";
         public string GithubButtonText => "Github";
         public string DiscordButtonText => "Discord";
         public string MovieTextHeader => "Join Co-op Campaign";
