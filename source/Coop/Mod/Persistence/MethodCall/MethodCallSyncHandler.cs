@@ -11,6 +11,7 @@ using RailgunNet.System.Types;
 using RailgunNet.Util;
 using RemoteAction;
 using Sync;
+using Sync.Behaviour;
 
 namespace Coop.Mod.Persistence.MethodCall
 {
@@ -84,7 +85,7 @@ namespace Coop.Mod.Persistence.MethodCall
                                           });
                     }
 
-                    return false;
+                    return ECallPropagation.Suppress;
                 });
             m_IsRegistered = true;
         }

@@ -3,6 +3,7 @@ using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
 using RemoteAction;
+using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence.Party
@@ -93,7 +94,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         /// <param name="args">MovementData</param>
         /// <exception cref="ArgumentException"></exception>
-        private bool SetMovement(object[] args)
+        private ECallPropagation SetMovement(object[] args)
         {
             MovementData data = args.Length > 0 ? args[0] as MovementData : null;
             if (data == null)
@@ -112,7 +113,7 @@ namespace Coop.Mod.Persistence.Party
             State.Movement.TargetPartyIndex = data.TargetParty?.Id ?? MovementState.InvalidIndex;
             State.Movement.SettlementIndex =
                 data.TargetSettlement?.Id ?? MovementState.InvalidIndex;
-            return true;
+            return ECallPropagation.CallOriginal;
         }
 
         public override string ToString()

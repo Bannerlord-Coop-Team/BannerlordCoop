@@ -99,7 +99,7 @@ namespace Sync
             if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return true;
 
             var handler = GetHandler(instance);
-            bool? doCallOriginal = handler?.Invoke(eOrigin, args);
+            bool? doCallOriginal = handler?.Invoke(eOrigin, args) == ECallPropagation.CallOriginal;
             return doCallOriginal ?? true;
         }
 

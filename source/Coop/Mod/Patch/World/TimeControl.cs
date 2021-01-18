@@ -50,10 +50,10 @@ namespace Coop.Mod.Patch
             mainPartyWaitingSetter.SetGlobalHandler(SetIsMainPartyWaiting);
         }
 
-        private static bool SetIsMainPartyWaiting(object instance, object[] args)
+        private static ECallPropagation SetIsMainPartyWaiting(object instance, object[] args)
         {
             IEnvironmentClient env = CoopClient.Instance?.Persistence?.Environment;
-            if (env == null) return false;
+            if (env == null) return ECallPropagation.CallOriginal;
             if (args.Length != 1) throw new ArgumentException();
             if (!(args[0] is bool isLocalMainPartyWaiting)) throw new ArgumentException();
             if (!(instance is Campaign campaign)) throw new ArgumentException();
@@ -67,7 +67,7 @@ namespace Coop.Mod.Patch
             IsMainPartyWaitingPatch
                 .Setters.First()
                 .Call(ETriggerOrigin.Authoritative, instance, new object[] { isEveryMainPartyWaiting });
-            return false;
+            return ECallPropagation.Suppress;
         }
 
         public static bool DoSyncTimeControl()

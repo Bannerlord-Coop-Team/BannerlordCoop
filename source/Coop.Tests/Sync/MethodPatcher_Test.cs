@@ -1,5 +1,6 @@
 ﻿using System;
 using Sync;
+using Sync.Behaviour;
 using Xunit;
 
 namespace Coop.Tests.Sync
@@ -44,7 +45,7 @@ namespace Coop.Tests.Sync
             method.SetHandler(instance, args => 
             { 
                 ++iNumberOfHandlerCalls;
-                return false;
+                return ECallPropagation.Suppress;
             });
 
             // Trigger the handler

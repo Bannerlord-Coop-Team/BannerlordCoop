@@ -5,6 +5,7 @@ using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
 using RemoteAction;
+using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence.World
@@ -29,7 +30,7 @@ namespace Coop.Mod.Persistence.World
         /// <param name="instance"></param>
         /// <param name="args"></param>
         /// <exception cref="ArgumentException"></exception>
-        private bool RequestTimeControlChange(object instance, object[] args)
+        private ECallPropagation RequestTimeControlChange(object instance, object[] args)
         {
             if (args.Length != 1 || !(args[0] is CampaignTimeControlMode mode))
             {
@@ -38,7 +39,7 @@ namespace Coop.Mod.Persistence.World
 
             if (!TimeControl.CanSyncTimeControlMode)
             {
-                return false;
+                return ECallPropagation.Suppress;
             }
 
             bool modelock = m_Environment.GetCurrentCampaign().TimeControlModeLock;
@@ -54,7 +55,7 @@ namespace Coop.Mod.Persistence.World
                     e.RequestedTimeControlMode = (mode, modelock);
                 });
             TimeControl.CanSyncTimeControlMode = false;
-            return false;
+            return ECallPropagation.Suppress;
         }
 
         /// <summary>
@@ -63,7 +64,7 @@ namespace Coop.Mod.Persistence.World
         /// <param name="instance"></param>
         /// <param name="args"></param>
         /// <exception cref="ArgumentException"></exception>
-        private bool RequestTimeControlLockChange(object instance, object[] args)
+        private ECallPropagation RequestTimeControlLockChange(object instance, object[] args)
         {
             if (args.Length != 1 || !(args[0] is bool modelock))
             {
@@ -82,7 +83,7 @@ namespace Coop.Mod.Persistence.World
                     e.EntityId = Id;
                     e.RequestedTimeControlMode = (mode, modelock);
                 });
-            return false;
+            return ECallPropagation.Suppress;
         }
 
         /// <summary>

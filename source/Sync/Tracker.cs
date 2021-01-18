@@ -11,10 +11,10 @@ namespace Sync
     /// </summary>
     public abstract class Tracker
     {
-        public delegate bool InstanceHandlerDelegate(object[] args);
-        public delegate bool GlobalHandlerDelegate(object instance, object[] args);
-        public delegate bool InstanceHandlerCallerIdDelegate(ETriggerOrigin eOrigin, object[] args);
-        public delegate bool GlobalHandlerCallerIdDelegate(ETriggerOrigin eOrigin, object instance, object[] args);
+        public delegate ECallPropagation InstanceHandlerDelegate(object[] args);
+        public delegate ECallPropagation GlobalHandlerDelegate(object instance, object[] args);
+        public delegate ECallPropagation InstanceHandlerCallerIdDelegate(ETriggerOrigin eOrigin, object[] args);
+        public delegate ECallPropagation GlobalHandlerCallerIdDelegate(ETriggerOrigin eOrigin, object instance, object[] args);
         
         
         private readonly Dictionary<object, InstanceHandlerCallerIdDelegate> m_InstanceSpecificHandlers =
@@ -41,7 +41,7 @@ namespace Sync
         {
             SetHandler(instance, (eOrigin, args) =>
             {
-                if (eOrigin == ETriggerOrigin.Authoritative) return true;
+                if (eOrigin == ETriggerOrigin.Authoritative) return ECallPropagation.CallOriginal;
                 return handler.Invoke(args);
             });
         }
@@ -125,7 +125,11 @@ namespace Sync
         {
             SetGlobalHandler((eOrigin, instance, args) =>
             {
-                if (eOrigin == ETriggerOrigin.Authoritative) return true;
+                if (eOrigin == ETriggerOrigin.Authoritative)
+                {
+                    // Default behaviour: Authority is always applied
+                    return ECallPropagation.CallOriginal;
+                }
                 return handler.Invoke(instance, args);
             });
         }

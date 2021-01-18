@@ -49,7 +49,7 @@ namespace Coop.Mod.Patch
                 if (Coop.IsArbiter)
                 {
                     // The host is the authority for the campaign time. Go ahead.
-                    return true;
+                    return ECallPropagation.CallOriginal;
                 }
                 
                 // Take the predicted server side campaign time
@@ -67,7 +67,7 @@ namespace Coop.Mod.Patch
                     args[0] = Math.Max(secondsBehindServer, 0f);
                 }
                 access.Call(ETriggerOrigin.Authoritative, instance, args);
-                return false;
+                return ECallPropagation.Suppress;
             });
         }
     }

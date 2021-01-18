@@ -6,13 +6,13 @@ namespace Sync.Behaviour
     {
         public ActionBehaviour Execute()
         {
-            ExecuteMethod = true;
+            CallPropagationBehaviour = ECallPropagation.CallOriginal;
             return this;
         }
         
-        public ActionBehaviour Ignore()
+        public ActionBehaviour Suppress()
         {
-            ExecuteMethod = false;
+            CallPropagationBehaviour = ECallPropagation.Suppress;
             return this;
         }
 
@@ -22,7 +22,7 @@ namespace Sync.Behaviour
             return this;
         }
 
-        public bool ExecuteMethod { get; set; } = true;
+        public ECallPropagation CallPropagationBehaviour { get; private set; } = ECallPropagation.CallOriginal;
         public Action<object, IPendingAction> MethodCallHandler { get; set; }
     }
 }

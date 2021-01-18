@@ -24,7 +24,7 @@ namespace Coop.Tests.CoopFramework
                 // Ignore local calls on Foo.Bar
                 When(ETriggerOrigin.Local)
                     .Calls(Setter(nameof(Foo.Bar)))
-                    .Ignore();
+                    .Suppress();
                 
                 // Allow local calls on Foo.Baz
                 When(ETriggerOrigin.Local)

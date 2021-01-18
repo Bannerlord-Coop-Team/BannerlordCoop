@@ -43,9 +43,9 @@ namespace CoopFramework
             }
         }
 
-        private bool RuntimeDispatch(EvaluatedActionBehaviour behaviour, object[] args)
+        private ECallPropagation RuntimeDispatch(EvaluatedActionBehaviour behaviour, object[] args)
         {
-            return behaviour.CallOriginal;
+            return behaviour.CallBehaviour;
         }
 
         private EvaluatedActionBehaviour Evaluate(IEnumerable<ActionBehaviour> behaviours)
@@ -53,12 +53,12 @@ namespace CoopFramework
             bool doCallOriginal = true;
             foreach (ActionBehaviour behaviour in behaviours)
             {
-                doCallOriginal = behaviour.ExecuteMethod;
+                doCallOriginal = behaviour.CallPropagationBehaviour == ECallPropagation.CallOriginal;
             }
             
             return new EvaluatedActionBehaviour()
             {
-                CallOriginal = doCallOriginal
+                CallBehaviour = doCallOriginal ? ECallPropagation.CallOriginal : ECallPropagation.Suppress
             };
         }
 
@@ -76,7 +76,7 @@ namespace CoopFramework
         {
         }
 
-        private static Dictionary<ETriggerOrigin, ActionTriggerOrigin> _callers = new Dictionary<ETriggerOrigin, ActionTriggerOrigin>()
+        private static readonly Dictionary<ETriggerOrigin, ActionTriggerOrigin> _callers = new Dictionary<ETriggerOrigin, ActionTriggerOrigin>()
         {
             {ETriggerOrigin.Local, new ActionTriggerOrigin()},
             {ETriggerOrigin.Authoritative, new ActionTriggerOrigin()}
@@ -87,7 +87,7 @@ namespace CoopFramework
 
     struct EvaluatedActionBehaviour
     {
-        public bool CallOriginal;
+        public ECallPropagation CallBehaviour;
     }
     
     

@@ -5,6 +5,7 @@ using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
 using RemoteAction;
+using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
@@ -31,7 +32,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         /// <param name="args">MovementData</param>
         /// <exception cref="ArgumentException"></exception>
-        private bool SendMoveRequest(object[] args)
+        private ECallPropagation SendMoveRequest(object[] args)
         {
             MovementData data = args.Length > 0 ? args[0] as MovementData : null;
             if (data == null)
@@ -52,7 +53,7 @@ namespace Coop.Mod.Persistence.Party
                         SettlementIndex = data.TargetSettlement?.Id ?? MovementState.InvalidIndex
                     };
                 });
-            return false;
+            return ECallPropagation.Suppress; // The server will control it
         }
 
         /// <summary>

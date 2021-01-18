@@ -63,7 +63,7 @@ namespace Coop.Tests.Sync
             method.SetHandler(instance, args =>
             {
                 ++iNumberOfHandlerCalls;
-                return false;
+                return ECallPropagation.Suppress;
             });
 
             // Trigger the handler
