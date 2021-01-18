@@ -38,8 +38,20 @@ namespace CoopFramework
             foreach (MethodId methodId in PatchedMethods())
             {
                 MethodAccess method = MethodRegistry.IdToMethod[methodId];
-                EvaluatedActionBehaviour behaviour = Evaluate(_callers[ETriggerOrigin.Local].GetBehaviour(methodId)); // TODO: caller evaluation
-                method.SetHandler(_instance, (args) => RuntimeDispatch(behaviour, (object[])args));
+                EvaluatedActionBehaviour behaviourLocal = Evaluate(_callers[ETriggerOrigin.Local].GetBehaviour(methodId));
+                EvaluatedActionBehaviour behaviourAuth = Evaluate(_callers[ETriggerOrigin.Authoritative].GetBehaviour(methodId));
+                method.SetHandler(_instance, (eOrigin, args) =>
+                {
+                    switch (eOrigin)
+                    {
+                        case ETriggerOrigin.Local:
+                            return RuntimeDispatch(behaviourLocal, args);
+                        case ETriggerOrigin.Authoritative:
+                            return RuntimeDispatch(behaviourAuth, args);
+                        default:
+                            throw new ArgumentOutOfRangeException(nameof(eOrigin), eOrigin, null);
+                    }
+                });
             }
         }
 
@@ -51,10 +63,14 @@ namespace CoopFramework
         private EvaluatedActionBehaviour Evaluate(IEnumerable<ActionBehaviour> behaviours)
         {
             bool doCallOriginal = true;
-            foreach (ActionBehaviour behaviour in behaviours)
+            if (behaviours != null)
             {
-                doCallOriginal = behaviour.CallPropagationBehaviour == ECallPropagation.CallOriginal;
+                foreach (ActionBehaviour behaviour in behaviours)
+                {
+                    doCallOriginal = behaviour.CallPropagationBehaviour == ECallPropagation.CallOriginal;
+                } 
             }
+            
             
             return new EvaluatedActionBehaviour()
             {

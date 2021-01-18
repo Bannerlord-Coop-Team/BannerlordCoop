@@ -99,8 +99,14 @@ namespace Sync
             if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return true;
 
             var handler = GetHandler(instance);
-            bool? doCallOriginal = handler?.Invoke(eOrigin, args) == ECallPropagation.CallOriginal;
-            return doCallOriginal ?? true;
+            if (handler != null)
+            {
+                // Handler decides whether to call the original or not
+                return handler.Invoke(eOrigin, args) == ECallPropagation.CallOriginal;
+            }
+            
+            // Default when no handler is registered: Call original
+            return true;
         }
 
         public override string ToString()

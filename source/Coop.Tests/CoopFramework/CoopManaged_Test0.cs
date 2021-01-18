@@ -19,17 +19,24 @@ namespace Coop.Tests.CoopFramework
 
         class CoopManagedFoo : CoopManaged<Foo>
         {
+            public static MethodAccess BarSetter = Setter(nameof(Foo.Bar));
+            public static MethodAccess BazSetter = Setter(nameof(Foo.Baz));
             static CoopManagedFoo()
             {
                 // Ignore local calls on Foo.Bar
                 When(ETriggerOrigin.Local)
-                    .Calls(Setter(nameof(Foo.Bar)))
+                    .Calls(BarSetter)
                     .Suppress();
                 
                 // Allow local calls on Foo.Baz
                 When(ETriggerOrigin.Local)
-                    .Calls(Setter(nameof(Foo.Baz)))
+                    .Calls(BazSetter)
                     .Execute();
+                
+                // Ignore authoritative calls on Foo.Baz
+                When(ETriggerOrigin.Authoritative)
+                    .Calls(BazSetter)
+                    .Suppress();
             }
 
             [PatchInitializer]
@@ -68,7 +75,7 @@ namespace Coop.Tests.CoopFramework
         }
 
         [Fact]
-        void LocalBarChangeIsIgnored()
+        void LocalBarChangeIsSuppressed()
         {
             Foo foo = new Foo();
             CoopManagedFoo sync = new CoopManagedFoo(foo);
@@ -77,6 +84,17 @@ namespace Coop.Tests.CoopFramework
             // The configured behaviour ignores local changes to Foo.Bar
             foo.Bar = 43;
             Assert.Equal(42, foo.Bar);
+        }
+
+        [Fact]
+        void AuthoritativeBarChangeIsExecute()
+        {
+            Foo foo = new Foo();
+            CoopManagedFoo sync = new CoopManagedFoo(foo);
+            Assert.Equal(42, foo.Bar);
+
+            CoopManagedFoo.BarSetter.Call(ETriggerOrigin.Authoritative, foo, new object[] {43});
+            Assert.Equal(43, foo.Bar);
         }
         
         [Fact]
@@ -89,6 +107,17 @@ namespace Coop.Tests.CoopFramework
             // The configured behaviour allows local changes to Foo.Bar
             foo.Baz = 43;
             Assert.Equal(43, foo.Baz);
+        }
+        
+        [Fact]
+        void AuthoritativeBarChangeIsSuppressed()
+        {
+            Foo foo = new Foo();
+            CoopManagedFoo sync = new CoopManagedFoo(foo);
+            Assert.Equal(42, foo.Baz);
+
+            CoopManagedFoo.BazSetter.Call(ETriggerOrigin.Authoritative, foo, new object[] {43});
+            Assert.Equal(42, foo.Baz);
         }
     }
 }
