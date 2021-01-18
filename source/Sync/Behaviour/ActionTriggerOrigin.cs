@@ -5,6 +5,11 @@ namespace Sync.Behaviour
 {
     public class ActionTriggerOrigin
     {
+        public ActionBehaviour Calls(MethodAccess method)
+        {
+            return Calls(new List<MethodAccess>() {method});
+        }
+        
         public ActionBehaviour Calls(IEnumerable<MethodAccess> methods)
         {
             var behaviour = new ActionBehaviour();

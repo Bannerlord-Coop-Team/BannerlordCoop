@@ -19,24 +19,16 @@ namespace Coop.Tests.CoopFramework
 
         class CoopManagedFoo : CoopManaged<Foo>
         {
-            private static readonly PropertyPatch BarPatch =
-                new PropertyPatch(typeof(Foo))
-                    .InterceptSetter(nameof(Foo.Bar));
-            
-            private static readonly PropertyPatch BazPatch =
-                new PropertyPatch(typeof(Foo))
-                    .InterceptSetter(nameof(Foo.Baz));
-
             static CoopManagedFoo()
             {
                 // Ignore local calls on Foo.Bar
                 When(ETriggerOrigin.Local)
-                    .Calls(BarPatch.Setters)
+                    .Calls(Setter(nameof(Foo.Bar)))
                     .Ignore();
                 
                 // Allow local calls on Foo.Baz
                 When(ETriggerOrigin.Local)
-                    .Calls(BazPatch.Setters)
+                    .Calls(Setter(nameof(Foo.Baz)))
                     .Execute();
             }
 

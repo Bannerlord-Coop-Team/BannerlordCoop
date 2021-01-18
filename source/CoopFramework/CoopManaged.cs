@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using JetBrains.Annotations;
 using Sync;
@@ -16,6 +17,10 @@ namespace CoopFramework
     /// </summary>
     public abstract class CoopManaged<T> where T : class
     {
+        public static MethodAccess Setter(string sPropertyName)
+        {
+            return new PropertyPatch(typeof(T)).InterceptSetter(sPropertyName).Setters.First();
+        }
         /// <summary>
         ///     Creates a new rule set for method calls when the caller is equal to <paramref name="eTriggerOrigin"/>.
         /// </summary>
