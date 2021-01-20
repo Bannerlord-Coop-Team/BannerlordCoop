@@ -39,24 +39,9 @@ namespace Coop.Tests.CoopFramework
                     .Suppress();
             }
 
-            [PatchInitializer]
-            public static void Init()
-            {
-                InitPatches(typeof(CoopManagedFoo));
-            }
-
             public CoopManagedFoo([NotNull] Foo instance) : base(instance)
             {
             }
-        }
-
-        static CoopManaged_Test0()
-        {
-            // Invoke the initializer manually
-            MethodInfo initializer = typeof(CoopManagedFoo)
-                .GetMethods()
-                .Single(m => m.IsDefined(typeof(PatchInitializerAttribute)));
-            initializer.Invoke(null, null);
         }
 
         [Fact]

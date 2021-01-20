@@ -15,14 +15,24 @@ namespace CoopFramework
     /// </code>
     ///     
     /// </summary>
-    public abstract class CoopManaged<T> where T : class
+    public abstract class CoopManaged<TExtended> where TExtended : class
     {
+        #region Patcher
+        /// <summary>
+        ///     Patches a setter of a property on the extended class. Please of the nameof operator instead of raw
+        ///     strings. This allows for compile time errors with updated game versions:
+        /// 
+        ///     <code>Setter(nameof(T.Foo));</code>
+        /// </summary>
+        /// <param name="sPropertyName"></param>
+        /// <returns></returns>
         public static MethodAccess Setter(string sPropertyName)
         {
-            return new PropertyPatch(typeof(T)).InterceptSetter(sPropertyName).Setters.First();
+            return new PropertyPatch(typeof(TExtended)).InterceptSetter(sPropertyName).Setters.First();
         }
         /// <summary>
-        ///     Creates a new rule set for method calls when the caller is equal to <paramref name="eTriggerOrigin"/>.
+        ///     Starting point of a patch for any action. The patch will only be active if the context of the call
+        ///     is equal to <paramref name="eTriggerOrigin"/>.
         /// </summary>
         /// <param name="eTriggerOrigin"></param>
         /// <returns></returns>
@@ -30,17 +40,23 @@ namespace CoopFramework
         {
             return _callers[eTriggerOrigin];
         }
+        #endregion
 
-        public CoopManaged([NotNull] T instance)
+        /// <summary>
+        ///     Creates synchronization for a given instance of <typeparamref name="TExtended"/>.
+        /// </summary>
+        /// <param name="instance">Instance that should be synchronized.</param>
+        /// <exception cref="ArgumentOutOfRangeException">When the instance is null.</exception>
+        public CoopManaged([NotNull] TExtended instance)
         {
-            _instance = instance ?? throw new ArgumentNullException(nameof(instance));
+            Instance = instance ?? throw new ArgumentNullException(nameof(instance));
 
             foreach (MethodId methodId in PatchedMethods())
             {
                 MethodAccess method = MethodRegistry.IdToMethod[methodId];
-                EvaluatedActionBehaviour behaviourLocal = Evaluate(_callers[ETriggerOrigin.Local].GetBehaviour(methodId));
-                EvaluatedActionBehaviour behaviourAuth = Evaluate(_callers[ETriggerOrigin.Authoritative].GetBehaviour(methodId));
-                method.SetHandler(_instance, (eOrigin, args) =>
+                CallBehaviour behaviourLocal = _callers[ETriggerOrigin.Local].GetBehaviour(methodId);
+                CallBehaviour behaviourAuth = _callers[ETriggerOrigin.Authoritative].GetBehaviour(methodId);
+                method.SetHandler(Instance, (eOrigin, args) =>
                 {
                     switch (eOrigin)
                     {
@@ -54,28 +70,20 @@ namespace CoopFramework
                 });
             }
         }
+        
+        /// <summary>
+        ///     Returns the synchronized instance.
+        /// </summary>
+        [NotNull] public TExtended Instance { get; }
 
-        private ECallPropagation RuntimeDispatch(EvaluatedActionBehaviour behaviour, object[] args)
+        #region Private
+        private ECallPropagation RuntimeDispatch(CallBehaviour behaviour, object[] args)
         {
-            return behaviour.CallBehaviour;
-        }
-
-        private EvaluatedActionBehaviour Evaluate(IEnumerable<ActionBehaviour> behaviours)
-        {
-            bool doCallOriginal = true;
-            if (behaviours != null)
+            if (behaviour.MethodCallHandler != null)
             {
-                foreach (ActionBehaviour behaviour in behaviours)
-                {
-                    doCallOriginal = behaviour.CallPropagationBehaviour == ECallPropagation.CallOriginal;
-                } 
+                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(Instance, args));
             }
-            
-            
-            return new EvaluatedActionBehaviour()
-            {
-                CallBehaviour = doCallOriginal ? ECallPropagation.CallOriginal : ECallPropagation.Suppress
-            };
+            return behaviour.CallPropagationBehaviour;
         }
 
         private IEnumerable<MethodId> PatchedMethods()
@@ -88,29 +96,27 @@ namespace CoopFramework
             return ids;
         }
 
-        public static void InitPatches(Type derivedType)
-        {
-        }
-
         private static readonly Dictionary<ETriggerOrigin, ActionTriggerOrigin> _callers = new Dictionary<ETriggerOrigin, ActionTriggerOrigin>()
         {
             {ETriggerOrigin.Local, new ActionTriggerOrigin()},
             {ETriggerOrigin.Authoritative, new ActionTriggerOrigin()}
         };
         
-        private readonly T _instance;
-    }
+        private class PendingMethodCall : IPendingMethodCall
+        {
+            public PendingMethodCall(object instance, object[] args)
+            {
+                Instance = instance;
+                Parameters = args;
+            }
+            public void Broadcast()
+            {
+                throw new NotImplementedException();
+            }
 
-    struct EvaluatedActionBehaviour
-    {
-        public ECallPropagation CallBehaviour;
+            public object Instance { get; }
+            public object[] Parameters { get; }
+        }
+        #endregion
     }
-    
-    
-    
-    
-    
-    
-    
-    
 }

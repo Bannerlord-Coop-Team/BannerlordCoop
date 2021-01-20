@@ -1,28 +1,26 @@
 ﻿using System;
+using JetBrains.Annotations;
 
 namespace Sync.Behaviour
 {
-    public class ActionBehaviour
+    public class CallBehaviour
     {
-        public ActionBehaviour Execute()
+        public void Execute()
         {
             CallPropagationBehaviour = ECallPropagation.CallOriginal;
-            return this;
         }
         
-        public ActionBehaviour Suppress()
+        public void Suppress()
         {
             CallPropagationBehaviour = ECallPropagation.Suppress;
-            return this;
         }
 
-        public ActionBehaviour DelegateTo(Action<object, IPendingAction> handler)
+        public void DelegateTo(Func<IPendingMethodCall, ECallPropagation> handler)
         {
             MethodCallHandler = handler;
-            return this;
         }
 
         public ECallPropagation CallPropagationBehaviour { get; private set; } = ECallPropagation.CallOriginal;
-        public Action<object, IPendingAction> MethodCallHandler { get; set; }
+        [CanBeNull] public Func<IPendingMethodCall, ECallPropagation> MethodCallHandler { get; private set; }
     }
 }

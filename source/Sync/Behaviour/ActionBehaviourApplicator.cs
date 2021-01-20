@@ -8,10 +8,10 @@ namespace Sync.Behaviour
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         
-        public static void Apply(Type behaviourCreator, MethodAccess method, List<ActionBehaviour> behaviours)
+        public static void Apply(Type behaviourCreator, MethodAccess method, List<CallBehaviour> behaviours)
         {
             Logger.Debug("{origin} is patching {method}...", behaviourCreator, method);
-            foreach (ActionBehaviour behaviour in behaviours)
+            foreach (CallBehaviour behaviour in behaviours)
             {
                 Logger.Debug("  ", behaviourCreator, method);
             }

@@ -1,41 +1,43 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using JetBrains.Annotations;
 
 namespace Sync.Behaviour
 {
     public class ActionTriggerOrigin
     {
-        public ActionBehaviour Calls(MethodAccess method)
+        public CallBehaviour Calls(MethodAccess method)
         {
             return Calls(new List<MethodAccess>() {method});
         }
         
-        public ActionBehaviour Calls(IEnumerable<MethodAccess> methods)
+        public CallBehaviour Calls(IEnumerable<MethodAccess> methods)
         {
-            var behaviour = new ActionBehaviour();
+            var behaviour = new CallBehaviour();
             foreach (var method in methods)
             {
+                
                 Register(method.Id, behaviour);
             }
             return behaviour;
         }
         
-        private void Register(MethodId key, ActionBehaviour behaviour)
+        private void Register(MethodId key, CallBehaviour behaviour)
         {
-            if (!Behaviours.TryGetValue(key, out var methodBehaviours))
+            if (Behaviours.ContainsKey(key))
             {
-                methodBehaviours = new List<ActionBehaviour>();
-                Behaviours.Add(key, methodBehaviours);
+                throw new Exception("There's already a behaviour registered for the method.");
             }
-            methodBehaviours.Add(behaviour);
+
+            Behaviours[key] = behaviour;
         }
         
-        public Dictionary<MethodId, List<ActionBehaviour>> Behaviours { get; } = new Dictionary<MethodId, List<ActionBehaviour>>();
+        public Dictionary<MethodId, CallBehaviour> Behaviours { get; } = new Dictionary<MethodId, CallBehaviour>();
 
-        [CanBeNull]
-        public List<ActionBehaviour> GetBehaviour(MethodId methodId)
+        [NotNull]
+        public CallBehaviour GetBehaviour(MethodId methodId)
         {
-            return Behaviours.TryGetValue(methodId, out List<ActionBehaviour> behaviours) ? behaviours : null;
+            return Behaviours.TryGetValue(methodId, out CallBehaviour behaviours) ? behaviours : new CallBehaviour();
         }
     }
 }
