@@ -13,6 +13,11 @@ namespace Sync
     {
         private static readonly Dictionary<MethodBase, DynamicMethod> Prefixes =
             new Dictionary<MethodBase, DynamicMethod>();
+        private static readonly Dictionary<MethodBase, DynamicMethod> Postfixes =
+            new Dictionary<MethodBase, DynamicMethod>();
+
+        private const string GeneratedPrefixName = "Prefix";
+        private const string GeneratedPostfixName = "Postfix";
 
         public static MethodAccess AddPrefix(
             MethodBase original,
@@ -30,6 +35,11 @@ namespace Sync
             MethodAccess access,
             MethodInfo dispatcher)
         {
+            if (dispatcher.ReturnType != typeof(bool))
+            {
+                throw new Exception("Prefix dispatcher require a return type of bool that decide if the original function should be called.");
+            }
+            
             lock (Patcher.HarmonyLock)
             {
                 if (Prefixes.ContainsKey(access.MethodBase))
@@ -37,13 +47,13 @@ namespace Sync
                     throw new Exception("Patch already initialized.");
                 }
 
-                Prefixes[access.MethodBase] = GeneratePrefix(access, dispatcher);
+                Prefixes[access.MethodBase] = GeneratePatch(GeneratedPrefixName, access, dispatcher);
 
                 MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPrefix));
 
                 HarmonyMethod patch = new HarmonyMethod(factoryMethod)
                 {
-                    priority = SyncPriority.MethodPatchGeneratedPrefix,
+                    priority = SyncPriority.MethodPatchGenerated,
 #if DEBUG
                     debug = true
 #endif
@@ -69,7 +79,59 @@ namespace Sync
                 return Prefixes[original];
             }
         }
+        
+        public static MethodAccess AddPostfix(MethodBase original, MethodInfo dispatcher)
+        {
+            lock (Patcher.HarmonyLock)
+            {
+                MethodAccess sync = new MethodAccess(original);
+                AddPostfix(sync, dispatcher);
+                return sync;
+            }
+        }
+        
+        public static void AddPostfix(MethodAccess access, MethodInfo dispatcher)
+        {
+            lock (Patcher.HarmonyLock)
+            {
+                if (Postfixes.ContainsKey(access.MethodBase))
+                {
+                    throw new Exception("Patch already initialized.");
+                }
 
+                Postfixes[access.MethodBase] = GeneratePatch(GeneratedPostfixName, access, dispatcher);
+
+                MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPostfix));
+
+                HarmonyMethod patch = new HarmonyMethod(factoryMethod)
+                {
+                    priority = SyncPriority.MethodPatchGenerated,
+#if DEBUG
+                    debug = true
+#endif
+                };
+                Patcher.HarmonyInstance.Patch(access.MethodBase, null, patch);
+            }
+        }
+        
+        public static void RemovePostfix(MethodBase original)
+        {
+            lock (Patcher.HarmonyLock)
+            {
+                MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPostfix));
+                Patcher.HarmonyInstance.Unpatch(original, factoryMethod);
+                Postfixes.Remove(original);
+            }
+        }
+
+        public static DynamicMethod GetPostfix(MethodBase original)
+        {
+            lock (Patcher.HarmonyLock)
+            {
+                return Postfixes[original];
+            }
+        }
+        
         /// <summary>
         ///     Generates a <see cref="DynamicMethod" /> to be used as a harmony prefix. The method
         ///     signature exactly matches the original method that automatically captures the instance
@@ -84,7 +146,8 @@ namespace Sync
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
-        public static DynamicMethod GeneratePrefix(
+        public static DynamicMethod GeneratePatch(
+            string sMethodName,
             MethodAccess methodAccess,
             MethodInfo dispatcher)
         {
@@ -110,12 +173,25 @@ namespace Sync
                     }); // Inject an __instance
             }
 
-            DynamicMethod dyn = new DynamicMethod(
-                "Prefix",
-                typeof(bool),
-                parameters.Select(p => p.ParameterType).ToArray(),
-                methodAccess.MethodBase.DeclaringType,
-                true);
+            DynamicMethod dyn;
+            if (methodAccess.MethodBase.DeclaringType != null)
+            {
+                // Member method
+                dyn= new DynamicMethod(
+                    sMethodName,
+                    dispatcher.ReturnType,
+                    parameters.Select(p => p.ParameterType).ToArray(),
+                    methodAccess.MethodBase.DeclaringType,
+                    true);
+            }
+            else
+            {
+                dyn = new DynamicMethod(
+                    sMethodName,
+                    dispatcher.ReturnType,
+                    parameters.Select(p => p.ParameterType).ToArray());
+            }
+                
 
             for (int i = 0; i < parameters.Count; ++i)
             {
@@ -189,12 +265,8 @@ namespace Sync
 
             // Call dispatcher
             il.EmitCall(OpCodes.Call, dispatcher, null);
-            if (dispatcher.ReturnType != typeof(bool))
-            {
-                throw new Exception(
-                    "Invalid dispatcher. Dispatcher function required to return a bool to decided if the original function should be called.");
-            }
 
+            // Done
             il.Emit(OpCodes.Ret);
 
             return dyn;
@@ -206,6 +278,7 @@ namespace Sync
             {
                 Patcher.HarmonyInstance.UnpatchAll();
                 Prefixes.Clear();
+                Postfixes.Clear();
             }
         }
 

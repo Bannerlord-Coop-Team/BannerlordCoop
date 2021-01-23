@@ -115,9 +115,12 @@ namespace Sync
             return true;
         }
         
-        public void InvokePostfix(ETriggerOrigin local, object instance, object[] args)
+        public void InvokePostfix(ETriggerOrigin eOrigin, object instance, object[] args)
         {
             if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return;
+            
+            var handler = Postfix.GetHandler(instance);
+            handler?.Invoke(eOrigin, args);
         }
 
         public override string ToString()

@@ -1,13 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
+using Sync.Behaviour;
 
 namespace Sync
 {
     public class Postfix
     {
-        public delegate void InstanceHandlerDelegate(object[] args);
-        public delegate void GlobalHandlerDelegate(object instance, object[] args);
+        public delegate void InstanceHandlerDelegate(ETriggerOrigin eOrigin, object[] args);
+        public delegate void GlobalHandlerDelegate(ETriggerOrigin eOrigin, object instance, object[] args);
+        
         
         private readonly Dictionary<object, InstanceHandlerDelegate> m_InstanceSpecificHandlers =
             new Dictionary<object, InstanceHandlerDelegate>();
@@ -49,10 +51,10 @@ namespace Sync
             {
                 if (bHasGlobalHandler)
                 {
-                    return (args) =>
+                    return (eOrigin, args) =>
                     {
-                        GlobalHandler(instance, args);
-                        instanceSpecificHandler(args);
+                        GlobalHandler(eOrigin, instance, args);
+                        instanceSpecificHandler(eOrigin, args);
                     };
                 }
 
@@ -61,8 +63,8 @@ namespace Sync
 
             if (GlobalHandler != null)
             {
-                return (args) => 
-                    GlobalHandler(instance, args);
+                return (eOrigin, args) => 
+                    GlobalHandler(eOrigin, instance, args);
             }
 
             return null;

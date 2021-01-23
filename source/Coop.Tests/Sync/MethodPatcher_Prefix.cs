@@ -7,7 +7,7 @@ namespace Coop.Tests.Sync
 {
     [Collection(
         "UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
-    public class MethodPatcher_Test
+    public class MethodPatcher_Prefix
     {
         private class TestRPC
         {

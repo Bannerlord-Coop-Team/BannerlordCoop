@@ -71,7 +71,7 @@ namespace Sync
         ///     <see cref="m_Declaring" />
         /// </exception>
         public MethodPatch Intercept(
-            MethodInfo method,
+            MethodBase method,
             EMethodPatchFlag eFlags = EMethodPatchFlag.None)
         {
             if (method.DeclaringType != m_Declaring)
@@ -136,6 +136,37 @@ namespace Sync
                 }
             }
 
+            return this;
+        }
+        
+        public MethodPatch Postfix(
+            string sMethodName, 
+            EMethodPatchFlag eFlags = EMethodPatchFlag.None,
+            BindingFlags eBindingFlags = All)
+        {
+            foreach (MethodInfo info in m_Declaring.GetMethods(eBindingFlags))
+            {
+                if (info.Name == sMethodName)
+                {
+                    Postfix(info, eFlags);
+                }
+            }
+
+            return this;
+        }
+        
+        public MethodPatch Postfix(
+            MethodBase method, 
+            EMethodPatchFlag eFlags = EMethodPatchFlag.None)
+        {
+            if (method.DeclaringType != m_Declaring)
+            {
+                throw new ArgumentException(
+                    $"Provided method {method} is not declared in {m_Declaring}",
+                    nameof(method));
+            }
+
+            PatchPostfix(method, eFlags);
             return this;
         }
 
@@ -209,6 +240,26 @@ namespace Sync
             params object[] args)
         {
             return methodAccess.InvokePrefix(ETriggerOrigin.Local, instance, args);
+        }
+        
+        private void PatchPostfix(
+            MethodBase method, 
+            EMethodPatchFlag eFlags)
+        {
+            MethodInfo dispatcher = AccessTools.Method(
+                typeof(MethodPatch),
+                nameof(DispatchPostfixExecution));
+            MethodAccess access = MethodPatchFactory.AddPostfix(method, dispatcher);
+            access.AddFlags(eFlags);
+            m_Access.Add(access);
+        }
+        
+        private static void DispatchPostfixExecution(
+            MethodAccess methodAccess,
+            [CanBeNull] object instance,
+            params object[] args)
+        {
+            methodAccess.InvokePostfix(ETriggerOrigin.Local, instance, args);
         }
     }
 }

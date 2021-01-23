@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using JetBrains.Annotations;
 using Sync;
 using Sync.Behaviour;
@@ -18,6 +17,15 @@ namespace CoopFramework
     public abstract class CoopManaged<TExtended> where TExtended : class
     {
         #region Patcher
+        /// <summary>
+        ///     Enables an automatic injection of this synchronization class into every instance of <see cref="TExtended"/>
+        ///     that is being created.
+        /// </summary>
+        public static void EnabledForAllInstances()
+        {
+            throw new NotImplementedException();
+        }
+        
         /// <summary>
         ///     Patches a setter of a property on the extended class. Please of the nameof operator instead of raw
         ///     strings. This allows for compile time errors with updated game versions:
@@ -59,7 +67,7 @@ namespace CoopFramework
                 MethodAccess method = MethodRegistry.IdToMethod[methodId];
                 CallBehaviour behaviourLocal = _callers[ETriggerOrigin.Local].GetBehaviour(methodId);
                 CallBehaviour behaviourAuth = _callers[ETriggerOrigin.Authoritative].GetBehaviour(methodId);
-                method.SetHandler(Instance, (eOrigin, args) =>
+                method.Prefix.SetHandler(Instance, (eOrigin, args) =>
                 {
                     switch (eOrigin)
                     {

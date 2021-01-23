@@ -91,7 +91,8 @@ namespace Coop.Tests.Sync
                 typeof(MethodPatchFactory_Test),
                 nameof(DispatcherCallOriginal));
             MethodAccess access = new MethodAccess(method);
-            DynamicMethod prefix = MethodPatchFactory.GeneratePrefix(
+            DynamicMethod prefix = MethodPatchFactory.GeneratePatch(
+                "Prefix",
                 access,
                 dispatcher);
 
@@ -125,18 +126,6 @@ namespace Coop.Tests.Sync
         }
 
         [Fact]
-        private void GeneratePrefixForVoidDispatcherThrows()
-        {
-            // Generate prefix for SingleArg
-            MethodInfo method = AccessTools.Method(typeof(Foo), nameof(Foo.SingleArg));
-            MethodInfo dispatcher = AccessTools.Method(
-                typeof(MethodPatchFactory_Test),
-                nameof(DispatcherVoid));
-            MethodAccess access = new MethodAccess(method);
-            Assert.Throws<Exception>(() => MethodPatchFactory.GeneratePrefix(access, dispatcher));
-        }
-
-        [Fact]
         private void GeneratePrefixWithMultipleArgsWorks()
         {
             // Generate prefix for SingleArg
@@ -145,7 +134,8 @@ namespace Coop.Tests.Sync
                 typeof(MethodPatchFactory_Test),
                 nameof(DispatcherTrue));
             MethodAccess access = new MethodAccess(method);
-            DynamicMethod prefix = MethodPatchFactory.GeneratePrefix(
+            DynamicMethod prefix = MethodPatchFactory.GeneratePatch(
+                "Prefix",
                 access,
                 dispatcher);
 
