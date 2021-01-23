@@ -21,9 +21,27 @@ namespace CoopFramework
         ///     Enables an automatic injection of this synchronization class into every instance of <see cref="TExtended"/>
         ///     that is being created.
         /// </summary>
-        public static void EnabledForAllInstances()
+        /// <param name="factoryMethod">Factory method that creates an instance of the concrete inheriting class."/></param>
+        public static void EnabledForAllInstances(Func<TExtended, CoopManaged<TExtended>> factoryMethod)
         {
-            throw new NotImplementedException();
+            if (m_ConstructorPatch != null)
+            {
+                throw new Exception($"Constructors for {nameof(TExtended)} are already patched!");
+            }
+            
+            m_ConstructorPatch = new ConstructorPatch(typeof(TExtended)).PostfixAll();
+            foreach (MethodAccess methodAccess in m_ConstructorPatch.Methods)
+            {
+                methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
+                {
+                    OnConstructed(factoryMethod(instance as TExtended));
+                });
+            }
+        }
+
+        private static void OnConstructed(CoopManaged<TExtended> newInstance)
+        {
+            m_Instances.Add(newInstance);
         }
         
         /// <summary>
@@ -115,11 +133,15 @@ namespace CoopFramework
             return ids;
         }
 
-        private static readonly Dictionary<ETriggerOrigin, ActionTriggerOrigin> _callers = new Dictionary<ETriggerOrigin, ActionTriggerOrigin>()
-        {
-            {ETriggerOrigin.Local, new ActionTriggerOrigin(true)},
-            {ETriggerOrigin.Authoritative, new ActionTriggerOrigin(false)}
-        };
+        private static readonly Dictionary<ETriggerOrigin, ActionTriggerOrigin> _callers =
+            new Dictionary<ETriggerOrigin, ActionTriggerOrigin>()
+            {
+                {ETriggerOrigin.Local, new ActionTriggerOrigin(true)},
+                {ETriggerOrigin.Authoritative, new ActionTriggerOrigin(false)}
+            };
+
+        private static readonly List<CoopManaged<TExtended>> m_Instances = new List<CoopManaged<TExtended>>();
+        private static ConstructorPatch m_ConstructorPatch;
         
         private class PendingMethodCall : IPendingMethodCall
         {

@@ -22,7 +22,7 @@ namespace Sync
                                          BindingFlags.GetProperty | 
                                          BindingFlags.SetProperty;
         private readonly List<MethodAccess> m_Access = new List<MethodAccess>();
-        private readonly Type m_Declaring;
+        protected readonly Type m_Declaring;
 
         public MethodPatch([NotNull] Type declaringClass)
         {
