@@ -9,6 +9,7 @@ using Xunit;
 
 namespace Coop.Tests.CoopFramework
 {
+    [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class CoopManager_TestDelegate
     {
         class Foo
@@ -18,7 +19,7 @@ namespace Coop.Tests.CoopFramework
             public Func<IPendingMethodCall, ECallPropagation> Callback; // Testing: Will be called by the CoopManagedFoo handling this instance
         }
 
-        class CoopManagedFoo : CoopManaged<Foo>
+        class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
         {
             public static MethodAccess BarSetter = Setter(nameof(Foo.Bar));
             static CoopManagedFoo()

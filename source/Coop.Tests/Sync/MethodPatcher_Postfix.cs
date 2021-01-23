@@ -27,7 +27,7 @@ namespace Coop.Tests.Sync
             }
         }
 
-        private static readonly MethodPatch Patch = new MethodPatch(typeof(TestRPC))
+        private static readonly MethodPatch<MethodPatcher_Postfix> Patch = new MethodPatch<MethodPatcher_Postfix>(typeof(TestRPC))
             .Postfix(nameof(TestRPC.SyncedMethod))
             .Postfix(nameof(TestRPC.StaticSyncedMethod));
 

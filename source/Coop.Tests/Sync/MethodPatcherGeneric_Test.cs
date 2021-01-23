@@ -36,7 +36,7 @@ namespace Coop.Tests.Sync
         {
             // Create patch
             Type[] generics = {typeof(DateTime)};
-            MethodPatch patch = new MethodPatch(typeof(Foo));
+            MethodPatch<MethodPatcherGeneric_Test> patch = new MethodPatch<MethodPatcherGeneric_Test>(typeof(Foo));
             patch.InterceptGeneric(nameof(Foo.SyncedMethod), generics);
 
             // Verify generated patch

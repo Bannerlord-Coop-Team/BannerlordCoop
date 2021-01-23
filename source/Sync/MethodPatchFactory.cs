@@ -9,7 +9,11 @@ using JetBrains.Annotations;
 
 namespace Sync
 {
-    public static class MethodPatchFactory
+    public interface IBla
+    {
+        static void Test();
+    }
+    public static class MethodPatchFactory<TPatch>
     {
         private static readonly Dictionary<MethodBase, DynamicMethod> Prefixes =
             new Dictionary<MethodBase, DynamicMethod>();
@@ -37,7 +41,7 @@ namespace Sync
 
                 Prefixes[access.MethodBase] = GeneratePatch(GeneratedPrefixName, access, dispatcher);
 
-                MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPrefix));
+                MethodInfo factoryMethod = typeof(MethodPatchFactory<TPatch>).GetMethod(nameof(GetPrefix));
 
                 HarmonyMethod patch = new HarmonyMethod(factoryMethod)
                 {
@@ -50,16 +54,6 @@ namespace Sync
             }
         }
 
-        public static void RemovePrefix(MethodBase original)
-        {
-            lock (Patcher.HarmonyLock)
-            {
-                MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPrefix));
-                Patcher.HarmonyInstance.Unpatch(original, factoryMethod);
-                Prefixes.Remove(original);
-            }
-        }
-
         public static DynamicMethod GetPrefix(MethodBase original)
         {
             lock (Patcher.HarmonyLock)
@@ -67,7 +61,7 @@ namespace Sync
                 return Prefixes[original];
             }
         }
-        
+
         public static void AddPostfix(MethodAccess access, MethodInfo dispatcher)
         {
             lock (Patcher.HarmonyLock)
@@ -79,7 +73,7 @@ namespace Sync
 
                 Postfixes[access.MethodBase] = GeneratePatch(GeneratedPostfixName, access, dispatcher);
 
-                MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPostfix));
+                MethodInfo factoryMethod = typeof(MethodPatchFactory<TPatch>).GetMethod(nameof(GetPostfix));
 
                 HarmonyMethod patch = new HarmonyMethod(factoryMethod)
                 {
@@ -89,16 +83,6 @@ namespace Sync
 #endif
                 };
                 Patcher.HarmonyInstance.Patch(access.MethodBase, null, patch);
-            }
-        }
-        
-        public static void RemovePostfix(MethodBase original)
-        {
-            lock (Patcher.HarmonyLock)
-            {
-                MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPostfix));
-                Patcher.HarmonyInstance.Unpatch(original, factoryMethod);
-                Postfixes.Remove(original);
             }
         }
 

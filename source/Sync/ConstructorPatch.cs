@@ -7,7 +7,7 @@ namespace Sync
     /// <summary>
     ///     Creates a patch builder for constructors of a type.
     /// </summary>
-    public class ConstructorPatch : MethodPatch
+    public class ConstructorPatch<TPatch> : MethodPatch<TPatch>
     {
         public ConstructorPatch([NotNull] Type declaringClass) : base(declaringClass)
         {
@@ -17,7 +17,7 @@ namespace Sync
         ///     Creates a postfix for all constructors of the type.
         /// </summary>
         /// <returns></returns>
-        public ConstructorPatch PostfixAll()
+        public ConstructorPatch<TPatch> PostfixAll()
         {
             foreach (ConstructorInfo info in m_Declaring.GetConstructors())
             {

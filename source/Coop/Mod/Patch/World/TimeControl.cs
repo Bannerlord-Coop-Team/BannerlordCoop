@@ -13,15 +13,19 @@ namespace Coop.Mod.Patch
 {
     public static class TimeControl
     {
-        private static readonly PropertyPatch TimeControlPatch =
-            new PropertyPatch(typeof(Campaign)).InterceptSetter(nameof(Campaign.TimeControlMode));
+        private class TPatch
+        {
+            // TODO: Replace TimeControl with a CoopManaged
+        }
+        private static readonly PropertyPatch<TPatch> TimeControlPatch =
+            new PropertyPatch<TPatch>(typeof(Campaign)).InterceptSetter(nameof(Campaign.TimeControlMode));
 
-        private static readonly PropertyPatch TimeControlLockPatch =
-            new PropertyPatch(typeof(Campaign)).InterceptSetter(
+        private static readonly PropertyPatch<TPatch> TimeControlLockPatch =
+            new PropertyPatch<TPatch>(typeof(Campaign)).InterceptSetter(
                 nameof(Campaign.TimeControlModeLock));
 
-        private static readonly PropertyPatch IsMainPartyWaitingPatch =
-            new PropertyPatch(typeof(Campaign)).InterceptSetter(
+        private static readonly PropertyPatch<TPatch> IsMainPartyWaitingPatch =
+            new PropertyPatch<TPatch>(typeof(Campaign)).InterceptSetter(
                 nameof(Campaign.IsMainPartyWaiting));
 
         public static FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; } =

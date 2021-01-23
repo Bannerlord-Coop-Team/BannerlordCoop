@@ -41,7 +41,7 @@ namespace Coop.Tests.Sync
             Persistence = new TestPersistence(registryServer);
 
             foreach (((RailNetPeerWrapper First, RailNetPeerWrapper Second) First, RemoteStore
-                Second) it in RailPeerClient.Zip(RailPeerServer).Zip(StoresClient))
+                Second) it in RailPeerClient.Zip(RailPeerServer, (c, s) => (c, s)).Zip(StoresClient, (c, s) => (c, s)))
             {
                 RailNetPeerWrapper client = it.First.First;
                 RailNetPeerWrapper server = it.First.Second;
@@ -101,7 +101,6 @@ namespace Coop.Tests.Sync
             Stores = null;
             Connections = null;
             ConnectionsRaw = null;
-            MethodPatchFactory.UnpatchAll();
         }
 
         public IClientAccess GetClientAccess(int iClientId)

@@ -9,8 +9,12 @@ namespace Coop.Mod.Patch
 {
     public static class CampaignMapMovement
     {
-        private static readonly PropertyPatch MobilePartyPatch =
-            new PropertyPatch(typeof(MobileParty))
+        private class TPatch
+        {
+            // TODO: Replace TimeControl with a CoopManaged
+        }
+        private static readonly PropertyPatch<TPatch> MobilePartyPatch =
+            new PropertyPatch<TPatch>(typeof(MobileParty))
                 .InterceptSetter(nameof(MobileParty.DefaultBehavior))
                 .InterceptSetter(nameof(MobileParty.TargetSettlement))
                 .InterceptSetter(nameof(MobileParty.TargetParty))

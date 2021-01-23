@@ -23,7 +23,7 @@ namespace Coop.Tests.Persistence.RPC
         public RPC_Test()
         {
             // Init patch
-            MethodPatch Patch = new MethodPatch(typeof(Foo)).Intercept(nameof(Foo.SyncedMethod));
+            MethodPatch<RPC_Test> Patch = new MethodPatch<RPC_Test>(typeof(Foo)).Intercept(nameof(Foo.SyncedMethod));
             Persistence = m_Environment.Persistence ??
                           throw new Exception("Persistence may not be null. Error in test setup.");
             Persistence.SyncHandlers.Register(
@@ -39,6 +39,7 @@ namespace Coop.Tests.Persistence.RPC
 
         public void Dispose()
         {
+            MethodPatchFactory<RPC_Test>.UnpatchAll();
             m_Environment.Destroy();
             Foo.LatestArgument = "";
             Foo.NumberOfCalls = 0;

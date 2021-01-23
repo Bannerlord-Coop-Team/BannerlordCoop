@@ -7,6 +7,7 @@ using Xunit;
 
 namespace Coop.Tests.CoopFramework
 {
+    [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class CoopManaged_TestBroadcast
     {
         class Foo
@@ -22,7 +23,7 @@ namespace Coop.Tests.CoopFramework
             m_SyncMock = new Mock<ISynchronization>();
         }
 
-        class CoopManagedFoo : CoopManaged<Foo>
+        class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
         {
             public static MethodAccess BarSetter = Setter(nameof(Foo.Bar));
             public static MethodAccess BazSetter = Setter(nameof(Foo.Baz));

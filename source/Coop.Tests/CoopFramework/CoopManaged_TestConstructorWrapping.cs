@@ -7,6 +7,7 @@ using Xunit;
 
 namespace Coop.Tests.CoopFramework
 {
+    [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class CoopManaged_TestConstructorWrapping
     {
         class Foo
@@ -19,7 +20,7 @@ namespace Coop.Tests.CoopFramework
             public Action OnFinalizerCalled;
         }
 
-        class CoopManagedFoo : CoopManaged<Foo>
+        class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
         {
             public static MethodAccess BarSetter = Setter(nameof(Foo.Bar));
             static CoopManagedFoo()
@@ -82,8 +83,8 @@ namespace Coop.Tests.CoopFramework
             GC.Collect();
             GC.WaitForPendingFinalizers();
 
-            Assert.False(reference.TryGetTarget(out Bar bar));
-            Assert.Null(bar);
+            Assert.False(reference.TryGetTarget(out Bar restoredInstance));
+            Assert.Null(restoredInstance);
             Assert.True(finalizerCalled);
         }
         
@@ -107,8 +108,8 @@ namespace Coop.Tests.CoopFramework
             GC.Collect();
             GC.WaitForPendingFinalizers();
 
-            Assert.False(reference.TryGetTarget(out Foo foo));
-            Assert.Null(foo);
+            Assert.False(reference.TryGetTarget(out Foo restoredFoo));
+            Assert.Null(restoredFoo);
             Assert.True(finalizerCalled);
         }
     }

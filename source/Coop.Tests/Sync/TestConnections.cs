@@ -36,9 +36,7 @@ namespace Coop.Tests.Sync
         {
             foreach ((InMemoryConnection client, InMemoryConnection server) con in raw
                                                                                    .ConnectionsClient
-                                                                                   .Zip(
-                                                                                       raw
-                                                                                           .ConnectionsServer)
+                                                                                   .Zip(raw.ConnectionsServer, (c, s) => (c, s))
             )
             {
                 IGameStatePersistence persistenceClient = bSetupPersistence ?

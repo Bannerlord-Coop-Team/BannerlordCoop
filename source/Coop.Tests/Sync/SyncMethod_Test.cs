@@ -38,7 +38,7 @@ namespace Coop.Tests.Sync
 
         private class SomePatch
         {
-            public static readonly MethodPatch Patch = new MethodPatch(typeof(A))
+            public static readonly MethodPatch<SomePatch> Patch = new MethodPatch<SomePatch>(typeof(A))
                                                        .Intercept(nameof(A.SyncedMethod))
                                                        .Intercept(nameof(A.StaticSyncedMethod));
         }

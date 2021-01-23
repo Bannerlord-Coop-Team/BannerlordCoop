@@ -91,7 +91,7 @@ namespace Coop.Tests.Sync
                 typeof(MethodPatchFactory_Test),
                 nameof(DispatcherCallOriginal));
             MethodAccess access = new MethodAccess(method);
-            DynamicMethod prefix = MethodPatchFactory.GeneratePatch(
+            DynamicMethod prefix = MethodPatchFactory<MethodPatchFactory_Test>.GeneratePatch(
                 "Prefix",
                 access,
                 dispatcher);
@@ -123,6 +123,8 @@ namespace Coop.Tests.Sync
             Assert.NotNull(m_Foo.ArgsHistory[0][2]);
             Assert.IsType<double>(m_Foo.ArgsHistory[0][2]);
             Assert.Equal(dArg, (double) m_Foo.ArgsHistory[0][2]);
+            
+            MethodPatchFactory<MethodPatchFactory_Test>.UnpatchAll();
         }
 
         [Fact]
@@ -134,7 +136,7 @@ namespace Coop.Tests.Sync
                 typeof(MethodPatchFactory_Test),
                 nameof(DispatcherTrue));
             MethodAccess access = new MethodAccess(method);
-            DynamicMethod prefix = MethodPatchFactory.GeneratePatch(
+            DynamicMethod prefix = MethodPatchFactory<MethodPatchFactory_Test>.GeneratePatch(
                 "Prefix",
                 access,
                 dispatcher);
@@ -143,6 +145,8 @@ namespace Coop.Tests.Sync
             object ret = prefix.Invoke(m_Foo, new object[] {m_Foo, 42, 43.0f, 44.0});
             Assert.IsType<bool>(ret);
             Assert.True((bool) ret); // AlwaysCallOriginal
+            
+            MethodPatchFactory<MethodPatchFactory_Test>.UnpatchAll();
         }
     }
 }

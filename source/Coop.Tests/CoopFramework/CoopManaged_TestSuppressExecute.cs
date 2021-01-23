@@ -17,7 +17,7 @@ namespace Coop.Tests.CoopFramework
             public int Baz { get; set; } = 42;
         }
 
-        class CoopManagedFoo : CoopManaged<Foo>
+        class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
         {
             public static MethodAccess BarSetter = Setter(nameof(Foo.Bar));
             public static MethodAccess BazSetter = Setter(nameof(Foo.Baz));

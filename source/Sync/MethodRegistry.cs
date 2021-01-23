@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using JetBrains.Annotations;
 
 namespace Sync
@@ -14,6 +15,9 @@ namespace Sync
         private static readonly Dictionary<MethodId, MethodAccess> Ids =
             new Dictionary<MethodId, MethodAccess>();
 
+        private static readonly Dictionary<MethodBase, MethodAccess> Methods =
+            new Dictionary<MethodBase, MethodAccess>();
+
         public static IReadOnlyDictionary<MethodAccess, MethodId> MethodToId => MethodIds;
         public static IReadOnlyDictionary<MethodId, MethodAccess> IdToMethod => Ids;
 
@@ -21,7 +25,7 @@ namespace Sync
         {
             lock (Lock)
             {
-                if (MethodIds.ContainsKey(methodAccess))
+                if (MethodIds.ContainsKey(methodAccess) || Methods.ContainsKey(methodAccess.MethodBase))
                 {
                     throw new ArgumentException($"Duplicate register for: {methodAccess}");
                 }

@@ -12,6 +12,10 @@ namespace Coop.Mod.Patch
 {
     public static class TimeSynchronization
     {
+        private class TPatch
+        {
+            // TODO: Replace TimeControl with a CoopManaged
+        }
         /// <summary>
         /// Average offset to the hosts campaign time that had to be compensated. Measured in CampaignTime seconds.
         /// </summary>
@@ -25,8 +29,8 @@ namespace Coop.Mod.Patch
         public static Func<CampaignTime> GetAuthoritativeTime;
         
         // Patched method: internal void MapTimeTracker.Tick(float seconds)
-        private static readonly MethodPatch Patch =
-            new MethodPatch(typeof(CampaignTime).Assembly.GetType("TaleWorlds.CampaignSystem.MapTimeTracker", true))
+        private static readonly MethodPatch<TPatch> Patch =
+            new MethodPatch<TPatch>(typeof(CampaignTime).Assembly.GetType("TaleWorlds.CampaignSystem.MapTimeTracker", true))
                 .Intercept("Tick");
 
         [PatchInitializer]

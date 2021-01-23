@@ -10,8 +10,8 @@ namespace Coop.Tests.Persistence.RPC
         "UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class MBObjectManager_Create_Test
     {
-        private static readonly MethodPatch Patch =
-            new MethodPatch(typeof(MBObjectManager)).InterceptGeneric(
+        private static readonly MethodPatch<MBObjectManager_Create_Test> Patch =
+            new MethodPatch<MBObjectManager_Create_Test>(typeof(MBObjectManager)).InterceptGeneric(
                 nameof(MBObjectManager.CreateObject),
                 new[] {typeof(MobileParty)});
 

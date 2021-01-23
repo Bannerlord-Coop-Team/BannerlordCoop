@@ -16,7 +16,7 @@ namespace CoopFramework
     /// </code>
     ///     
     /// </summary>
-    public abstract class CoopManaged<TExtended> where TExtended : class
+    public abstract class CoopManaged<TSelf, TExtended> where TExtended : class
     {
         #region Patcher
         /// <summary>
@@ -24,14 +24,19 @@ namespace CoopFramework
         ///     that is being created.
         /// </summary>
         /// <param name="factoryMethod">Factory method that creates an instance of the concrete inheriting class."/></param>
-        public static void EnabledForAllInstances(Func<TExtended, CoopManaged<TExtended>> factoryMethod)
+        public static void EnabledForAllInstances(Func<TExtended, CoopManaged<TSelf, TExtended>> factoryMethod)
         {
             if (m_ConstructorPatch != null || m_DestructorPatch != null)
             {
                 throw new Exception($"Constructors for {nameof(TExtended)} are already patched!");
             }
             
-            m_ConstructorPatch = new ConstructorPatch(typeof(TExtended)).PostfixAll();
+            m_ConstructorPatch = new ConstructorPatch<TSelf>(typeof(TExtended)).PostfixAll();
+            if (!m_ConstructorPatch.Methods.Any())
+            {
+                throw new Exception(
+                    $"Class {typeof(TExtended)} has no constructor. Cannot wrap instances automatically");
+            }
             foreach (MethodAccess methodAccess in m_ConstructorPatch.Methods)
             {
                 methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
@@ -40,17 +45,23 @@ namespace CoopFramework
                 });
             }
 
-            m_DestructorPatch = new DestructorPatch(typeof(TExtended)).Prefix();
+            m_DestructorPatch = new DestructorPatch<TSelf>(typeof(TExtended)).Prefix();
+            if (!m_DestructorPatch.Methods.Any())
+            {
+                throw new Exception(
+                    $"Class {typeof(TExtended)} has no destructor. Cannot unwrap instances automatically");
+            }
             foreach (MethodAccess methodAccess in m_DestructorPatch.Methods)
             {
                 methodAccess.Prefix.SetGlobalHandler((origin, instance, args) =>
                 {
-                    var managedInstance = m_Instances
+                    var managedInstances = m_ManagedInstances
                         .Where(wrapper => wrapper.Instance.TryGetTarget(out TExtended o) && o == instance)
                         .ToList();
-                    if (managedInstance.Count > 0)
+                    foreach (var managedInstance in managedInstances)
                     {
-                        managedInstance[0].OnBeforeFinalize(instance as TExtended);
+                        managedInstance.OnBeforeFinalize(instance as TExtended);
+                        m_ManagedInstances.Remove(managedInstance);
                     }
 
                     return ECallPropagation.CallOriginal; // Always call the original desctructor!
@@ -58,9 +69,9 @@ namespace CoopFramework
             }
         }
 
-        private static void OnConstructed(CoopManaged<TExtended> newInstance)
+        private static void OnConstructed(CoopManaged<TSelf, TExtended> newInstance)
         {
-            m_Instances.Add(newInstance);
+            m_ManagedInstances.Add(newInstance);
         }
         
         /// <summary>
@@ -73,7 +84,7 @@ namespace CoopFramework
         /// <returns></returns>
         public static MethodAccess Setter(string sPropertyName)
         {
-            return new PropertyPatch(typeof(TExtended)).InterceptSetter(sPropertyName).Setters.First();
+            return new PropertyPatch<TSelf>(typeof(TExtended)).InterceptSetter(sPropertyName).Setters.First();
         }
         /// <summary>
         ///     Starting point of a patch for any action. The patch will only be active if the context of the call
@@ -128,6 +139,8 @@ namespace CoopFramework
         /// </summary>
         [NotNull] public WeakReference<TExtended> Instance { get; private set; }
 
+        public static IReadOnlyCollection<CoopManaged<TSelf, TExtended>> ManagedInstances => m_ManagedInstances;
+
         #region Private
         private ECallPropagation RuntimeDispatch(MethodAccess methodAccess, CallBehaviour behaviour, object[] args)
         {
@@ -181,9 +194,9 @@ namespace CoopFramework
                 {ETriggerOrigin.Authoritative, new ActionTriggerOrigin(false)}
             };
 
-        private static readonly List<CoopManaged<TExtended>> m_Instances = new List<CoopManaged<TExtended>>();
-        private static ConstructorPatch m_ConstructorPatch;
-        private static DestructorPatch m_DestructorPatch;
+        private static readonly List<CoopManaged<TSelf, TExtended>> m_ManagedInstances = new List<CoopManaged<TSelf, TExtended>>();
+        private static ConstructorPatch<TSelf> m_ConstructorPatch;
+        private static DestructorPatch<TSelf> m_DestructorPatch;
         
         private class PendingMethodCall : IPendingMethodCall
         {
