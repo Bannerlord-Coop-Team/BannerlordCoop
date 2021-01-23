@@ -7,6 +7,7 @@ using Xunit;
 
 namespace Coop.Tests.CoopFramework
 {
+    [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class CoopManaged_TestSeparateStatics
     {
         class Foo
