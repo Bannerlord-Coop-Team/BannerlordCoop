@@ -9,10 +9,6 @@ using JetBrains.Annotations;
 
 namespace Sync
 {
-    public interface IBla
-    {
-        static void Test();
-    }
     public static class MethodPatchFactory<TPatch>
     {
         private static readonly Dictionary<MethodBase, DynamicMethod> Prefixes =
