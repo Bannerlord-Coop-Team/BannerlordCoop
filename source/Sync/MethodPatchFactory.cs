@@ -15,7 +15,7 @@ namespace Sync
             new Dictionary<MethodBase, DynamicMethod>();
 
         public static MethodAccess AddPrefix(
-            MethodInfo original,
+            MethodBase original,
             MethodInfo dispatcher)
         {
             lock (Patcher.HarmonyLock)
@@ -32,12 +32,12 @@ namespace Sync
         {
             lock (Patcher.HarmonyLock)
             {
-                if (Prefixes.ContainsKey(access.MemberInfo))
+                if (Prefixes.ContainsKey(access.MethodBase))
                 {
                     throw new Exception("Patch already initialized.");
                 }
 
-                Prefixes[access.MemberInfo] = GeneratePrefix(access, dispatcher);
+                Prefixes[access.MethodBase] = GeneratePrefix(access, dispatcher);
 
                 MethodInfo factoryMethod = typeof(MethodPatchFactory).GetMethod(nameof(GetPrefix));
 
@@ -48,11 +48,11 @@ namespace Sync
                     debug = true
 #endif
                 };
-                Patcher.HarmonyInstance.Patch(access.MemberInfo, patch);
+                Patcher.HarmonyInstance.Patch(access.MethodBase, patch);
             }
         }
 
-        public static void RemovePrefix(MethodInfo original)
+        public static void RemovePrefix(MethodBase original)
         {
             lock (Patcher.HarmonyLock)
             {
@@ -88,7 +88,7 @@ namespace Sync
             MethodAccess methodAccess,
             MethodInfo dispatcher)
         {
-            List<SMethodParameter> parameters = methodAccess.MemberInfo.GetParameters()
+            List<SMethodParameter> parameters = methodAccess.MethodBase.GetParameters()
                                                             .Select(
                                                                 p => new SMethodParameter
                                                                 {
@@ -98,14 +98,14 @@ namespace Sync
                                                                     Name = p.Name
                                                                 })
                                                             .ToList();
-            if (!methodAccess.MemberInfo.IsStatic)
+            if (!methodAccess.MethodBase.IsStatic)
             {
                 parameters.Insert(
                     0,
                     new SMethodParameter
                     {
                         Info = null,
-                        ParameterType = methodAccess.MemberInfo.DeclaringType,
+                        ParameterType = methodAccess.MethodBase.DeclaringType,
                         Name = "__instance"
                     }); // Inject an __instance
             }
@@ -114,7 +114,7 @@ namespace Sync
                 "Prefix",
                 typeof(bool),
                 parameters.Select(p => p.ParameterType).ToArray(),
-                methodAccess.MemberInfo.DeclaringType,
+                methodAccess.MethodBase.DeclaringType,
                 true);
 
             for (int i = 0; i < parameters.Count; ++i)
@@ -147,7 +147,7 @@ namespace Sync
             il.Emit(OpCodes.Ldobj, typeof(MethodAccess));
 
             // Arg1: The instance. 
-            bool isStatic = methodAccess.MemberInfo.IsStatic;
+            bool isStatic = methodAccess.MethodBase.IsStatic;
             if (isStatic)
             {
                 il.Emit(OpCodes.Ldnull);

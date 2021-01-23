@@ -287,23 +287,27 @@ namespace Sync.Reflection
 
         public static DynamicMethod CreateStandIn(MethodAccess methodAccess)
         {
-            List<Type> parameters = methodAccess.MemberInfo.GetParameters()
+            List<Type> parameters = methodAccess.MethodBase.GetParameters()
                                                 .Select(info => info.ParameterType)
                                                 .ToList();
-            if (!methodAccess.MemberInfo.IsStatic)
+            if (!methodAccess.MethodBase.IsStatic)
             {
                 parameters.Insert(
                     0,
-                    methodAccess.MemberInfo.DeclaringType); // First argument is the instance
+                    methodAccess.MethodBase.DeclaringType); // First argument is the instance
             }
+
+            Type returnType = methodAccess.MethodBase is MethodInfo methodInfo
+                ? methodInfo.ReturnType
+                : typeof(void);
 
             DynamicMethod dyn = new DynamicMethod(
                 "Original",
                 MethodAttributes.Static | MethodAttributes.Public,
                 CallingConventions.Standard,
-                methodAccess.MemberInfo.ReturnType,
+                returnType,
                 parameters.ToArray(),
-                methodAccess.MemberInfo.DeclaringType,
+                methodAccess.MethodBase.DeclaringType,
                 true);
 
             // The standin as it is will never be called. But it still needs a body for the reverse patching.

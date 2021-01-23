@@ -35,7 +35,7 @@ namespace Sync
         {
             foreach (MethodAccess syncMethod in m_Access)
             {
-                MethodPatchFactory.RemovePrefix(syncMethod.MemberInfo);
+                MethodPatchFactory.RemovePrefix(syncMethod.MethodBase);
             }
         }
 
@@ -165,14 +165,14 @@ namespace Sync
             return TryGetMethod(method, out methodAccess);
         }
 
-        public bool TryGetMethod(MethodInfo methodInfo, out MethodAccess methodAccess)
+        public bool TryGetMethod(MethodBase methodInfo, out MethodAccess methodAccess)
         {
-            methodAccess = m_Access.FirstOrDefault(m => m.MemberInfo.Equals(methodInfo));
+            methodAccess = m_Access.FirstOrDefault(m => m.MethodBase.Equals(methodInfo));
             return methodAccess != null;
         }
 
         private void PatchPrefix(
-            MethodInfo original,
+            MethodBase original,
             EMethodPatchFlag eFlags)
         {
             MethodInfo dispatcher = AccessTools.Method(

@@ -41,9 +41,9 @@ namespace Coop.Tests.Sync
 
             // Verify generated patch
             Assert.True(
-                patch.TryGetMethod(patch.Methods.First().MemberInfo, out MethodAccess method));
-            Assert.True(method.MemberInfo.IsGenericMethod);
-            Assert.Equal(generics, method.MemberInfo.GetGenericArguments());
+                patch.TryGetMethod(patch.Methods.First().MethodBase, out MethodAccess method));
+            Assert.True(method.MethodBase.IsGenericMethod);
+            Assert.Equal(generics, method.MethodBase.GetGenericArguments());
             Assert.True(MethodRegistry.MethodToId.ContainsKey(method));
 
             // Init object

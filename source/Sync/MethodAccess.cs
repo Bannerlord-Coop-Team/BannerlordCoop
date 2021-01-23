@@ -21,13 +21,13 @@ namespace Sync
 
         private readonly DynamicMethod m_StandIn;
 
-        public MethodAccess([NotNull] MethodInfo info)
+        public MethodAccess([NotNull] MethodBase info)
         {
-            MemberInfo = info;
+            MethodBase = info;
             Id = MethodRegistry.Register(this);
             m_StandIn = InvokableFactory.CreateStandIn(this);
             InitOriginal(m_StandIn);
-            if (MemberInfo.IsStatic)
+            if (MethodBase.IsStatic)
             {
                 m_CallStatic = InvokableFactory.CreateStaticStandInCaller(m_StandIn);
             }
@@ -50,7 +50,7 @@ namespace Sync
 
         public MethodId Id { get; }
 
-        public MethodInfo MemberInfo { get; }
+        public MethodBase MethodBase { get; }
 
         public void AddFlags(EMethodPatchFlag flag)
         {
@@ -61,7 +61,7 @@ namespace Sync
         {
             lock (Patcher.HarmonyLock)
             {
-                bool bHasPatches = Harmony.GetPatchInfo(MemberInfo) != null;
+                bool bHasPatches = Harmony.GetPatchInfo(MethodBase) != null;
                 HarmonyMethod standin = new HarmonyMethod(toPatch)
                 {
                     method = m_StandIn,
@@ -69,7 +69,7 @@ namespace Sync
                         HarmonyReversePatchType.Snapshot :
                         HarmonyReversePatchType.Original
                 };
-                Harmony.ReversePatch(MemberInfo, standin);
+                Harmony.ReversePatch(MethodBase, standin);
             }
         }
 
@@ -111,7 +111,7 @@ namespace Sync
 
         public override string ToString()
         {
-            return $"{MemberInfo.DeclaringType?.Name}.{MemberInfo.Name}";
+            return $"{MethodBase.DeclaringType?.Name}.{MethodBase.Name}";
         }
     }
 }

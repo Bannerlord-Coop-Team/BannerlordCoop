@@ -20,9 +20,9 @@ namespace Coop.Tests.Persistence.RPC
         {
             // Verify generated patch
             Assert.True(
-                Patch.TryGetMethod(Patch.Methods.First().MemberInfo, out MethodAccess method));
-            Assert.True(method.MemberInfo.IsGenericMethod);
-            Assert.Equal(new[] {typeof(MobileParty)}, method.MemberInfo.GetGenericArguments());
+                Patch.TryGetMethod(Patch.Methods.First().MethodBase, out MethodAccess method));
+            Assert.True(method.MethodBase.IsGenericMethod);
+            Assert.Equal(new[] {typeof(MobileParty)}, method.MethodBase.GetGenericArguments());
             Assert.True(MethodRegistry.MethodToId.ContainsKey(method));
         }
     }
