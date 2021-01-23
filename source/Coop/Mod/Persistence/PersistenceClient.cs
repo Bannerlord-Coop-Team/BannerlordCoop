@@ -55,7 +55,7 @@ namespace Coop.Mod.Persistence
                     }
                     else if (!instanceBuffer.Value.RequestProcessed)
                     {
-                        access.GetHandler(instance)?.Invoke(
+                        access.GetPrefixHandler(instance)?.Invoke(
                             ETriggerOrigin.Local, // we want to emulate a local "field setter"
                             new object[] { instanceBuffer.Value.RequestedValue });
                         instanceBuffer.Value.RequestProcessed = true;

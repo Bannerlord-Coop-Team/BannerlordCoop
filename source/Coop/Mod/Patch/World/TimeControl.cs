@@ -47,7 +47,7 @@ namespace Coop.Mod.Patch
 
             MethodAccess mainPartyWaitingSetter = IsMainPartyWaitingPatch.Setters.First();
             mainPartyWaitingSetter.ConditionIsPatchActive = o => Coop.DoSync();
-            mainPartyWaitingSetter.SetGlobalHandler(SetIsMainPartyWaiting);
+            mainPartyWaitingSetter.SetGlobalPrefixHandler(SetIsMainPartyWaiting);
         }
 
         private static ECallPropagation SetIsMainPartyWaiting(object instance, object[] args)

@@ -99,7 +99,7 @@
     <Compile Include="MethodRegistry.cs" />
     <Compile Include="PropertyPatch.cs" />
     <Compile Include="ValueAccess.cs" />
-    <Compile Include="Tracker.cs" />
+    <Compile Include="Prefix.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Reflection\Extensions.cs" />
     <Compile Include="Reflection\InvokableFactory.cs" />

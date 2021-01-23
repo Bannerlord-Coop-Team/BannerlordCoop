@@ -5,7 +5,7 @@ namespace Sync
     /// <summary>
     ///     Type-erased interface for setting and getting a value from an instance.
     /// </summary>
-    public abstract class ValueAccess : Tracker
+    public abstract class ValueAccess : Prefix
     {
         /// <summary>
         ///     Returns the current value of an instance of this <see cref="ValueAccess" />.

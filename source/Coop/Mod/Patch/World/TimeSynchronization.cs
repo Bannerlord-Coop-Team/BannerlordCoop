@@ -38,7 +38,7 @@ namespace Coop.Mod.Patch
             }
             
             access.ConditionIsPatchActive = o => Coop.IsClientConnected; 
-            access.SetGlobalHandler((instance, args) =>
+            access.SetGlobalPrefixHandler((instance, args) =>
             {
                 if (args.Length == 0 || !(args[0] is float))
                 {

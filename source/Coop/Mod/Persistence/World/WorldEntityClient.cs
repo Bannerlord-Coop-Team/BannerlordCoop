@@ -91,8 +91,8 @@ namespace Coop.Mod.Persistence.World
         /// </summary>
         protected override void OnAdded()
         {
-            m_Environment.TimeControlMode.SetGlobalHandler(RequestTimeControlChange);
-            m_Environment.TimeControlModeLock.SetGlobalHandler(RequestTimeControlLockChange);
+            m_Environment.TimeControlMode.SetGlobalPrefixHandler(RequestTimeControlChange);
+            m_Environment.TimeControlModeLock.SetGlobalPrefixHandler(RequestTimeControlLockChange);
             State.PropertyChanged += State_PropertyChanged;
         }
 
@@ -137,7 +137,7 @@ namespace Coop.Mod.Persistence.World
         /// </summary>
         protected override void OnRemoved()
         {
-            m_Environment.TargetPosition.RemoveGlobalHandler();
+            m_Environment.TargetPosition.RemoveGlobalPrefixHandler();
             State.PropertyChanged -= State_PropertyChanged;
         }
 

@@ -57,7 +57,7 @@ namespace Coop.Mod.Persistence.MethodCall
                 return;
             }
 
-            MethodAccess.SetGlobalHandler(
+            MethodAccess.SetGlobalPrefixHandler(
                 (instance, args) =>
                 {
                     bool bDebounce = MethodAccess.Flags.HasFlag(EMethodPatchFlag.DebounceCalls);
@@ -109,7 +109,7 @@ namespace Coop.Mod.Persistence.MethodCall
                 return;
             }
 
-            MethodAccess.RemoveGlobalHandler();
+            MethodAccess.RemoveGlobalPrefixHandler();
         }
 
         ~MethodCallSyncHandler()

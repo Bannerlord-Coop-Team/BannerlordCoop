@@ -60,7 +60,7 @@ namespace Coop.Tests.Sync
             Assert.Equal(sMessage, instance.LatestArgument);
 
             // Register handler
-            method.SetHandler(instance, args =>
+            method.SetPrefixHandler(instance, args =>
             {
                 ++iNumberOfHandlerCalls;
                 return ECallPropagation.Suppress;

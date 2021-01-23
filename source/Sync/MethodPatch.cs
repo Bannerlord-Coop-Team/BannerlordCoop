@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -39,6 +39,13 @@ namespace Sync
             }
         }
 
+        /// <summary>
+        ///     Patches all member methods of the declaring class with a prefix that relays all calls to
+        ///     <see cref="MethodAccess.InvokePrefix" />.
+        /// </summary>
+        /// <param name="eBindingFlags"></param>
+        /// <param name="eFlags"></param>
+        /// <returns></returns>
         public MethodPatch InterceptAll(
             BindingFlags eBindingFlags =
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly,
@@ -171,6 +178,12 @@ namespace Sync
             return methodAccess != null;
         }
 
+        /// <summary>
+        ///     Dynamically creates a new prefix for a call to <paramref name="original"/> that redirects the call
+        ///     to our static dispatcher <see cref="DispatchPrefixExecution"/>.
+        /// </summary>
+        /// <param name="original">Method to be patched.</param>
+        /// <param name="eFlags">Flags to the patch generator.</param>
         private void PatchPrefix(
             MethodBase original,
             EMethodPatchFlag eFlags)
@@ -183,9 +196,16 @@ namespace Sync
             m_Access.Add(access);
         }
 
+        /// <summary>
+        ///     Dispatcher that is being called for prefixes to forward the call to <see cref="MethodAccess.InvokePrefix" />.
+        /// </summary>
+        /// <param name="methodAccess">Access to the patched method that is being called.</param>
+        /// <param name="instance">Instance that the method is being called on.</param>
+        /// <param name="args">Parameters to the method call.</param>
+        /// <returns></returns>
         private static bool DispatchPrefixExecution(
             MethodAccess methodAccess,
-            object instance,
+            [CanBeNull] object instance,
             params object[] args)
         {
             return methodAccess.InvokePrefix(ETriggerOrigin.Local,instance, args);

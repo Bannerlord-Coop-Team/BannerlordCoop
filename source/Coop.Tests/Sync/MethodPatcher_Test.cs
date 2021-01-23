@@ -42,7 +42,7 @@ namespace Coop.Tests.Sync
             int iNumberOfHandlerCalls = 0;
 
             Assert.True(Patch.TryGetMethod(nameof(TestRPC.SyncedMethod), out MethodAccess method));
-            method.SetHandler(instance, args => 
+            method.SetPrefixHandler(instance, args => 
             { 
                 ++iNumberOfHandlerCalls;
                 return ECallPropagation.Suppress;
@@ -53,7 +53,7 @@ namespace Coop.Tests.Sync
             Assert.Equal(0, instance.NumberOfCalls);
             Assert.Equal(1, iNumberOfHandlerCalls);
 
-            method.RemoveHandler(instance);
+            method.RemovePrefixHandler(instance);
         }
 
         [Fact]

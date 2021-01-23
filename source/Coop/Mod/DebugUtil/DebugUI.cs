@@ -131,8 +131,8 @@ namespace Coop.Mod.DebugUtil
                 Imgui.Text("global");
 
                 // instance specific handlers
-                foreach (KeyValuePair<object, Tracker.InstanceHandlerCallerIdDelegate> handler in access
-                    .InstanceSpecificHandlers)
+                foreach (KeyValuePair<object, Prefix.InstanceHandlerCallerIdDelegate> handler in access
+                    .InstanceSpecificPrefixHandlers)
                 {
                     Imgui.Text(handler.Key.ToString());
                 }
@@ -143,13 +143,13 @@ namespace Coop.Mod.DebugUtil
 
                 // first line: global handler
                 Imgui.Text(
-                    access.GlobalHandler != null ?
-                        access.GlobalHandler.Target + "." + access.GlobalHandler.Method.Name :
+                    access.GlobalPrefixHandler != null ?
+                        access.GlobalPrefixHandler.Target + "." + access.GlobalPrefixHandler.Method.Name :
                         "-");
 
                 // instance specific handlers
-                foreach (KeyValuePair<object, Tracker.InstanceHandlerCallerIdDelegate> handler in access
-                    .InstanceSpecificHandlers)
+                foreach (KeyValuePair<object, Prefix.InstanceHandlerCallerIdDelegate> handler in access
+                    .InstanceSpecificPrefixHandlers)
                 {
                     Imgui.Text(handler.Value.Target + "." + handler.Value.Method.Name);
                 }
