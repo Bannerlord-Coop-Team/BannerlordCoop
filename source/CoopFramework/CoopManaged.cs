@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using NLog;
 using Sync;
 using Sync.Behaviour;
 
 namespace CoopFramework
 {
+    
     /// <summary>
     ///     Base class to extend a type to be managed by the Coop framework.
     ///
@@ -24,7 +26,7 @@ namespace CoopFramework
         /// <param name="factoryMethod">Factory method that creates an instance of the concrete inheriting class."/></param>
         public static void EnabledForAllInstances(Func<TExtended, CoopManaged<TExtended>> factoryMethod)
         {
-            if (m_ConstructorPatch != null)
+            if (m_ConstructorPatch != null || m_DestructorPatch != null)
             {
                 throw new Exception($"Constructors for {nameof(TExtended)} are already patched!");
             }
@@ -35,6 +37,23 @@ namespace CoopFramework
                 methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
                 {
                     OnConstructed(factoryMethod(instance as TExtended));
+                });
+            }
+
+            m_DestructorPatch = new DestructorPatch(typeof(TExtended)).Prefix();
+            foreach (MethodAccess methodAccess in m_DestructorPatch.Methods)
+            {
+                methodAccess.Prefix.SetGlobalHandler((origin, instance, args) =>
+                {
+                    var managedInstance = m_Instances
+                        .Where(wrapper => wrapper.Instance.TryGetTarget(out TExtended o) && o == instance)
+                        .ToList();
+                    if (managedInstance.Count > 0)
+                    {
+                        managedInstance[0].OnBeforeFinalize(instance as TExtended);
+                    }
+
+                    return ECallPropagation.CallOriginal; // Always call the original desctructor!
                 });
             }
         }
@@ -77,15 +96,19 @@ namespace CoopFramework
         /// <exception cref="ArgumentOutOfRangeException">When the instance is null.</exception>
         public CoopManaged([CanBeNull] ISynchronization sync, [NotNull] TExtended instance)
         {
+            if (instance == null)
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
             m_Sync = sync;
-            Instance = instance ?? throw new ArgumentNullException(nameof(instance));
+            Instance = new WeakReference<TExtended>(instance, true);
 
             foreach (MethodId methodId in PatchedMethods())
             {
                 MethodAccess method = MethodRegistry.IdToMethod[methodId];
                 CallBehaviour behaviourLocal = _callers[ETriggerOrigin.Local].GetBehaviour(methodId);
                 CallBehaviour behaviourAuth = _callers[ETriggerOrigin.Authoritative].GetBehaviour(methodId);
-                method.Prefix.SetHandler(Instance, (eOrigin, args) =>
+                method.Prefix.SetHandler(instance, (eOrigin, args) =>
                 {
                     switch (eOrigin)
                     {
@@ -103,22 +126,29 @@ namespace CoopFramework
         /// <summary>
         ///     Returns the synchronized instance.
         /// </summary>
-        [NotNull] public TExtended Instance { get; }
+        [NotNull] public WeakReference<TExtended> Instance { get; private set; }
 
         #region Private
         private ECallPropagation RuntimeDispatch(MethodAccess methodAccess, CallBehaviour behaviour, object[] args)
         {
+            if (!Instance.TryGetTarget(out TExtended instance))
+            {
+                // The instance went out of scope?
+                Logger.Warn("Coop synced {Instance} seems to have expired", ToString());
+                return ECallPropagation.Suppress; // Will not work anyways
+            }
+            
             if (behaviour.DoBroadcast)
             {
                 if (m_Sync == null)
                 {
                     throw new SynchronizationNotInitializedException("No ISynchronization implementation was provided. Unable to use the synchronization behaviours.");
                 }
-                m_Sync.Broadcast(methodAccess.Id, Instance, args);
+                m_Sync.Broadcast(methodAccess.Id, instance, args);
             }
             if (behaviour.MethodCallHandler != null)
             {
-                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, m_Sync, Instance, args));
+                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, m_Sync, instance, args));
             }
             return behaviour.CallPropagationBehaviour;
         }
@@ -133,6 +163,17 @@ namespace CoopFramework
             return ids;
         }
 
+        private void OnBeforeFinalize(TExtended instance)
+        {
+            foreach (MethodId methodId in PatchedMethods())
+            {
+                MethodAccess method = MethodRegistry.IdToMethod[methodId];
+                method.Prefix.RemoveHandler(instance);
+            }
+
+            Instance = new WeakReference<TExtended>(null);
+        }
+
         private static readonly Dictionary<ETriggerOrigin, ActionTriggerOrigin> _callers =
             new Dictionary<ETriggerOrigin, ActionTriggerOrigin>()
             {
@@ -142,6 +183,7 @@ namespace CoopFramework
 
         private static readonly List<CoopManaged<TExtended>> m_Instances = new List<CoopManaged<TExtended>>();
         private static ConstructorPatch m_ConstructorPatch;
+        private static DestructorPatch m_DestructorPatch;
         
         private class PendingMethodCall : IPendingMethodCall
         {
@@ -171,6 +213,8 @@ namespace CoopFramework
         }
 
         [CanBeNull] private readonly ISynchronization m_Sync;
+        
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         #endregion
     }

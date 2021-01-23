@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using JetBrains.Annotations;
 using Sync.Behaviour;
 
@@ -11,12 +12,12 @@ namespace Sync
         public delegate void GlobalHandlerDelegate(ETriggerOrigin eOrigin, object instance, object[] args);
         
         
-        private readonly Dictionary<object, InstanceHandlerDelegate> m_InstanceSpecificHandlers =
-            new Dictionary<object, InstanceHandlerDelegate>();
+        private readonly Dictionary<WeakReference<object>, InstanceHandlerDelegate> m_InstanceSpecificHandlers =
+            new Dictionary<WeakReference<object>, InstanceHandlerDelegate>();
 
         public GlobalHandlerDelegate GlobalHandler { get; private set; }
 
-        public IReadOnlyDictionary<object, InstanceHandlerDelegate> InstanceSpecificHandlers =>
+        public IReadOnlyDictionary<WeakReference<object>, InstanceHandlerDelegate> InstanceSpecificHandlers =>
             m_InstanceSpecificHandlers;
 
         /// <summary>
@@ -29,12 +30,12 @@ namespace Sync
         /// <param name="handler"></param>
         public void SetHandler([NotNull] object instance, [NotNull] InstanceHandlerDelegate handler)
         {
-            if (m_InstanceSpecificHandlers.ContainsKey(instance))
+            if (m_InstanceSpecificHandlers.Any(pair => pair.Key.TryGetTarget(out object o) && o == instance))
             {
                 throw new ArgumentException($"Cannot have multiple sync handlers for {this}.");
             }
 
-            m_InstanceSpecificHandlers.Add(instance, handler);
+            m_InstanceSpecificHandlers.Add(new WeakReference<object>(instance, true), handler);
         }
 
         /// <summary>
@@ -44,21 +45,26 @@ namespace Sync
         public InstanceHandlerDelegate GetHandler(object instance)
         {
             bool bHasGlobalHandler = GlobalHandler != null;
-            if (instance != null &&
-                m_InstanceSpecificHandlers.TryGetValue(
-                    instance,
-                    out InstanceHandlerDelegate instanceSpecificHandler))
+            if (instance != null)
             {
-                if (bHasGlobalHandler)
+                var instanceHandlers = m_InstanceSpecificHandlers
+                    .Where(pair => pair.Key.TryGetTarget(out object o) && o == instance)
+                    .Select(pair => pair.Value)
+                    .ToList();
+                if (instanceHandlers.Count > 0)
                 {
-                    return (eOrigin, args) =>
+                    var instanceSpecificHandler = instanceHandlers[0];
+                    if (bHasGlobalHandler)
                     {
-                        GlobalHandler(eOrigin, instance, args);
-                        instanceSpecificHandler(eOrigin, args);
-                    };
-                }
+                        return (eOrigin, args) =>
+                        {
+                            GlobalHandler(eOrigin, instance, args);
+                            instanceSpecificHandler(eOrigin, args);
+                        };
+                    }
 
-                return instanceSpecificHandler;
+                    return instanceSpecificHandler;
+                }
             }
 
             if (GlobalHandler != null)
@@ -76,7 +82,14 @@ namespace Sync
         /// <param name="instance"></param>
         public void RemoveHandler(object instance)
         {
-            m_InstanceSpecificHandlers.Remove(instance);
+            var key = m_InstanceSpecificHandlers
+                .Where(pair => pair.Key.TryGetTarget(out object o) && o == instance)
+                .Select(pair => pair.Key)
+                .FirstOrDefault();
+            if (key != null)
+            {
+                m_InstanceSpecificHandlers.Remove(key);
+            }
         }
 
         /// <summary>
