@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using JetBrains.Annotations;
+using NLog;
 using Sync.Behaviour;
 
 namespace Sync
@@ -13,6 +14,8 @@ namespace Sync
     /// </summary>
     public class MethodPatch<TPatch>
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        
         private const BindingFlags All = BindingFlags.Instance | 
                                          BindingFlags.Static | 
                                          BindingFlags.Public | 
@@ -219,6 +222,7 @@ namespace Sync
         private void PatchPrefix(
             MethodBase original)
         {
+            Logger.Debug("{original} is being prefixed by {patcher}", original, typeof(TPatch));
             MethodInfo dispatcher = AccessTools.Method(
                 typeof(MethodPatch<TPatch>),
                 nameof(DispatchPrefixExecution));
@@ -248,6 +252,7 @@ namespace Sync
         private void PatchPostfix(
             MethodBase original)
         {
+            Logger.Debug("{original} is being postfixed by {patcher}", original, typeof(TPatch));
             MethodInfo dispatcher = AccessTools.Method(
                 typeof(MethodPatch<TPatch>),
                 nameof(DispatchPostfixExecution));
