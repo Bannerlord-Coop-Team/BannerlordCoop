@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -208,7 +208,7 @@ namespace Sync
             [CanBeNull] object instance,
             params object[] args)
         {
-            return methodAccess.InvokePrefix(ETriggerOrigin.Local,instance, args);
+            return methodAccess.InvokePrefix(ETriggerOrigin.Local, instance, args);
         }
     }
 }

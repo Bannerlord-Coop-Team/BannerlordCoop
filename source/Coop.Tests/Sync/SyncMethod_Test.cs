@@ -60,7 +60,7 @@ namespace Coop.Tests.Sync
             // Register sync handler
             Assert.Equal(0, A.StaticNumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            m_StaticSyncedMethod.SetGlobalPrefixHandler(
+            m_StaticSyncedMethod.Prefix.SetGlobalHandler(
                 (instance, args) =>
                 {
                     Assert.Null(instance);
@@ -72,7 +72,7 @@ namespace Coop.Tests.Sync
             A.StaticSyncedMethod(42);
             Assert.Equal(0, A.StaticNumberOfCalls);
             Assert.Equal(1, iNumberOfHandlerCalls);
-            m_StaticSyncedMethod.RemoveGlobalPrefixHandler();
+            m_StaticSyncedMethod.Prefix.RemoveGlobalHandler();
         }
 
         [Fact]
@@ -82,7 +82,7 @@ namespace Coop.Tests.Sync
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            m_SyncedMethod.SetPrefixHandler(instance, args =>
+            m_SyncedMethod.Prefix.SetHandler(instance, args =>
             {
                 ++iNumberOfHandlerCalls;
                 return ECallPropagation.Suppress;
@@ -111,7 +111,7 @@ namespace Coop.Tests.Sync
             A instance = new A();
             Assert.Equal(0, instance.NumberOfCalls);
             int iNumberOfHandlerCalls = 0;
-            m_SyncedMethod.SetPrefixHandler(instance, args =>
+            m_SyncedMethod.Prefix.SetHandler(instance, args =>
             {
                 ++iNumberOfHandlerCalls;
                 return ECallPropagation.Suppress;

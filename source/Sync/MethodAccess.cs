@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -14,8 +14,14 @@ namespace Sync
     ///     representation of the method is stored internally. The snapshot includes all patches
     ///     to the function already applied. The snapshot can be called using <see cref="CallOriginal" />.
     /// </summary>
-    public class MethodAccess : Prefix
+    public class MethodAccess
     {
+        /// <summary>
+        ///     Get the prefix for this method call.
+        /// </summary>
+        [NotNull] public Prefix Prefix { get; } = new Prefix();
+        [NotNull] public Postfix Postfix { get; } = new Postfix();
+        
         [CanBeNull] private readonly Action<object, object[]> m_Call;
         [CanBeNull] private readonly Action<object[]> m_CallStatic;
 
@@ -98,7 +104,7 @@ namespace Sync
         {
             if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return true;
 
-            var handler = GetPrefixHandler(instance);
+            var handler = Prefix.GetHandler(instance);
             if (handler != null)
             {
                 // Handler decides whether to call the original or not
@@ -107,6 +113,11 @@ namespace Sync
             
             // Default when no handler is registered: Call original
             return true;
+        }
+        
+        public void InvokePostfix(ETriggerOrigin local, object instance, object[] args)
+        {
+            if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return;
         }
 
         public override string ToString()

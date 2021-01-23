@@ -9,7 +9,7 @@ namespace Sync
     ///     Base class for class wrappers that notify when specific instances of the wrapped class
     ///     change internal state.
     /// </summary>
-    public abstract class Prefix
+    public class Prefix
     {
         public delegate ECallPropagation InstanceHandlerDelegate(object[] args);
         public delegate ECallPropagation GlobalHandlerDelegate(object instance, object[] args);
@@ -17,13 +17,13 @@ namespace Sync
         public delegate ECallPropagation GlobalHandlerCallerIdDelegate(ETriggerOrigin eOrigin, object instance, object[] args);
         
         
-        private readonly Dictionary<object, InstanceHandlerCallerIdDelegate> m_InstanceSpecificPrefixHandlers =
+        private readonly Dictionary<object, InstanceHandlerCallerIdDelegate> m_InstanceSpecificHandlers =
             new Dictionary<object, InstanceHandlerCallerIdDelegate>();
 
         public GlobalHandlerCallerIdDelegate GlobalPrefixHandler { get; private set; }
 
-        public IReadOnlyDictionary<object, InstanceHandlerCallerIdDelegate> InstanceSpecificPrefixHandlers =>
-            m_InstanceSpecificPrefixHandlers;
+        public IReadOnlyDictionary<object, InstanceHandlerCallerIdDelegate> InstanceSpecificHandlers =>
+            m_InstanceSpecificHandlers;
 
         /// <summary>
         ///     Sets the handler to be called when a specific instance of the <see cref="Prefix" />
@@ -37,9 +37,9 @@ namespace Sync
         /// </summary>
         /// <param name="instance"></param>
         /// <param name="handler"></param>
-        public void SetPrefixHandler([NotNull] object instance, [NotNull] InstanceHandlerDelegate handler)
+        public void SetHandler([NotNull] object instance, [NotNull] InstanceHandlerDelegate handler)
         {
-            SetPrefixHandler(instance, (eOrigin, args) =>
+            SetHandler(instance, (eOrigin, args) =>
             {
                 if (eOrigin == ETriggerOrigin.Authoritative) return ECallPropagation.CallOriginal;
                 return handler.Invoke(args);
@@ -58,14 +58,14 @@ namespace Sync
         /// </summary>
         /// <param name="instance"></param>
         /// <param name="handler"></param>
-        public void SetPrefixHandler([NotNull] object instance, [NotNull] InstanceHandlerCallerIdDelegate handler)
+        public void SetHandler([NotNull] object instance, [NotNull] InstanceHandlerCallerIdDelegate handler)
         {
-            if (m_InstanceSpecificPrefixHandlers.ContainsKey(instance))
+            if (m_InstanceSpecificHandlers.ContainsKey(instance))
             {
                 throw new ArgumentException($"Cannot have multiple sync handlers for {this}.");
             }
 
-            m_InstanceSpecificPrefixHandlers.Add(instance, handler);
+            m_InstanceSpecificHandlers.Add(instance, handler);
         }
 
         /// <summary>
@@ -73,11 +73,11 @@ namespace Sync
         /// </summary>
         /// <param name="instance"></param>
         /// <returns>Handler or null</returns>
-        public InstanceHandlerCallerIdDelegate GetPrefixHandler(object instance)
+        public InstanceHandlerCallerIdDelegate GetHandler(object instance)
         {
             bool bHasGlobalHandler = GlobalPrefixHandler != null;
             if (instance != null &&
-                m_InstanceSpecificPrefixHandlers.TryGetValue(
+                m_InstanceSpecificHandlers.TryGetValue(
                     instance,
                     out InstanceHandlerCallerIdDelegate instanceSpecificHandler))
             {
@@ -106,9 +106,9 @@ namespace Sync
         ///     Removes an instance specific handler.
         /// </summary>
         /// <param name="instance"></param>
-        public void RemovePrefixHandler(object instance)
+        public void RemoveHandler(object instance)
         {
-            m_InstanceSpecificPrefixHandlers.Remove(instance);
+            m_InstanceSpecificHandlers.Remove(instance);
         }
         
         /// <summary>
@@ -121,9 +121,9 @@ namespace Sync
         ///     true, the next patch will be called and so on.
         /// </summary>
         /// <param name="handler"></param>
-        public void SetGlobalPrefixHandler(GlobalHandlerDelegate handler)
+        public void SetGlobalHandler(GlobalHandlerDelegate handler)
         {
-            SetGlobalPrefixHandler((eOrigin, instance, args) =>
+            SetGlobalHandler((eOrigin, instance, args) =>
             {
                 if (eOrigin == ETriggerOrigin.Authoritative)
                 {
@@ -144,17 +144,17 @@ namespace Sync
         ///     true, the next patch will be called and so on.
         /// </summary>
         /// <param name="handler"></param>
-        public void SetGlobalPrefixHandler(GlobalHandlerCallerIdDelegate handler)
+        public void SetGlobalHandler(GlobalHandlerCallerIdDelegate handler)
         {
             if (GlobalPrefixHandler != null)
             {
-                throw new ArgumentException($"Cannot have multiple global handlers for {this}.");
+                throw new ArgumentException($"Cannot have multiple global prefix handlers for {this}.");
             }
 
             GlobalPrefixHandler = handler;
         }
 
-        public void RemoveGlobalPrefixHandler()
+        public void RemoveGlobalHandler()
         {
             GlobalPrefixHandler = null;
         }

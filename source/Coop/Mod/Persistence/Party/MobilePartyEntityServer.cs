@@ -73,7 +73,7 @@ namespace Coop.Mod.Persistence.Party
                     return;
                 }
 
-                m_Environment.TargetPosition.SetPrefixHandler(m_Instance, SetMovement);
+                m_Environment.TargetPosition.Prefix.SetHandler(m_Instance, SetMovement);
             }
         }
 
@@ -84,7 +84,7 @@ namespace Coop.Mod.Persistence.Party
         {
             if (m_Instance != null)
             {
-                m_Environment.TargetPosition.RemovePrefixHandler(m_Instance);
+                m_Environment.TargetPosition.Prefix.RemoveHandler(m_Instance);
                 State.IsPlayerControlled = true;
             }
         }

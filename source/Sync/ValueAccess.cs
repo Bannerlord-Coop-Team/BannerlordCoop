@@ -1,12 +1,15 @@
 ﻿using System;
+using JetBrains.Annotations;
 
 namespace Sync
 {
     /// <summary>
     ///     Type-erased interface for setting and getting a value from an instance.
     /// </summary>
-    public abstract class ValueAccess : Prefix
+    public abstract class ValueAccess
     {
+        [NotNull] public Prefix Prefix { get; } = new Prefix();
+        
         /// <summary>
         ///     Returns the current value of an instance of this <see cref="ValueAccess" />.
         /// </summary>
