@@ -29,32 +29,28 @@ namespace Sync
         public PropertyPatch InterceptSetter([NotNull] PropertyInfo property)
         {
             m_SetterPatch.Intercept(
-                AccessTools.PropertySetter(m_Declaring, property.Name),
-                EMethodPatchFlag.None);
+                AccessTools.PropertySetter(m_Declaring, property.Name));
             return this;
         }
 
         public PropertyPatch InterceptSetter(string sProperty)
         {
             m_SetterPatch.Intercept(
-                AccessTools.PropertySetter(m_Declaring, sProperty),
-                EMethodPatchFlag.None);
+                AccessTools.PropertySetter(m_Declaring, sProperty));
             return this;
         }
 
         public PropertyPatch InterceptGetter([NotNull] PropertyInfo property)
         {
             m_SetterPatch.Intercept(
-                AccessTools.PropertyGetter(m_Declaring, property.Name),
-                EMethodPatchFlag.None);
+                AccessTools.PropertyGetter(m_Declaring, property.Name));
             return this;
         }
 
         public PropertyPatch InterceptGetter(string sProperty)
         {
             m_SetterPatch.Intercept(
-                AccessTools.PropertyGetter(m_Declaring, sProperty),
-                EMethodPatchFlag.None);
+                AccessTools.PropertyGetter(m_Declaring, sProperty));
             return this;
         }
     }

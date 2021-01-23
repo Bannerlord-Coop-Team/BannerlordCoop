@@ -19,18 +19,6 @@ namespace Sync
         private const string GeneratedPrefixName = "Prefix";
         private const string GeneratedPostfixName = "Postfix";
 
-        public static MethodAccess AddPrefix(
-            MethodBase original,
-            MethodInfo dispatcher)
-        {
-            lock (Patcher.HarmonyLock)
-            {
-                MethodAccess sync = new MethodAccess(original);
-                AddPrefix(sync, dispatcher);
-                return sync;
-            }
-        }
-
         public static void AddPrefix(
             MethodAccess access,
             MethodInfo dispatcher)
@@ -77,16 +65,6 @@ namespace Sync
             lock (Patcher.HarmonyLock)
             {
                 return Prefixes[original];
-            }
-        }
-        
-        public static MethodAccess AddPostfix(MethodBase original, MethodInfo dispatcher)
-        {
-            lock (Patcher.HarmonyLock)
-            {
-                MethodAccess sync = new MethodAccess(original);
-                AddPostfix(sync, dispatcher);
-                return sync;
             }
         }
         

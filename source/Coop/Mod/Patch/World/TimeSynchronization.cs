@@ -27,7 +27,7 @@ namespace Coop.Mod.Patch
         // Patched method: internal void MapTimeTracker.Tick(float seconds)
         private static readonly MethodPatch Patch =
             new MethodPatch(typeof(CampaignTime).Assembly.GetType("TaleWorlds.CampaignSystem.MapTimeTracker", true))
-                .Intercept("Tick", EMethodPatchFlag.None);
+                .Intercept("Tick");
 
         [PatchInitializer]
         public static void Init()

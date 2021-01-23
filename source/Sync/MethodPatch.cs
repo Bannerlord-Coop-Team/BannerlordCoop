@@ -44,16 +44,14 @@ namespace Sync
         ///     <see cref="MethodAccess.InvokePrefix" />.
         /// </summary>
         /// <param name="eBindingFlags"></param>
-        /// <param name="eFlags"></param>
         /// <returns></returns>
         public MethodPatch InterceptAll(
             BindingFlags eBindingFlags =
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly,
-            EMethodPatchFlag eFlags = EMethodPatchFlag.None)
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly)
         {
             foreach (MethodInfo method in m_Declaring.GetMethods(eBindingFlags))
             {
-                Intercept(method, eFlags);
+                Intercept(method);
             }
 
             return this;
@@ -64,15 +62,13 @@ namespace Sync
         ///     <see cref="MethodAccess.InvokePrefix" />.
         /// </summary>
         /// <param name="method">Method to track.</param>
-        /// <param name="eFlags">Flags for the generated interceptor.</param>
         /// <returns>this</returns>
         /// <exception cref="ArgumentException">
         ///     If the method is not declared in class
         ///     <see cref="m_Declaring" />
         /// </exception>
         public MethodPatch Intercept(
-            MethodBase method,
-            EMethodPatchFlag eFlags = EMethodPatchFlag.None)
+            MethodBase method)
         {
             if (method.DeclaringType != m_Declaring)
             {
@@ -81,7 +77,7 @@ namespace Sync
                     nameof(method));
             }
 
-            PatchPrefix(method, eFlags);
+            PatchPrefix(method);
             return this;
         }
 
@@ -95,14 +91,13 @@ namespace Sync
         /// <exception cref="ArgumentException">If no method with that name exists.</exception>
         public MethodPatch Intercept(
             string sMethodName,
-            EMethodPatchFlag eFlags = EMethodPatchFlag.None,
             BindingFlags eBindingFlags = All)
         {
             foreach (MethodInfo info in m_Declaring.GetMethods(eBindingFlags))
             {
                 if (info.Name == sMethodName)
                 {
-                    Intercept(info, eFlags);
+                    Intercept(info);
                 }
             }
 
@@ -115,14 +110,12 @@ namespace Sync
         /// </summary>
         /// <param name="sMethodName"></param>
         /// <param name="genericInstantiations"></param>
-        /// <param name="eFlags"></param>
         /// <param name="eBehaviour"></param>
         /// <returns></returns>
         [Obsolete]
         public MethodPatch InterceptGeneric(
             string sMethodName,
             Type[] genericInstantiations,
-            EMethodPatchFlag eFlags = EMethodPatchFlag.None,
             BindingFlags eBindingFlags = All)
         {
             foreach (MethodInfo info in m_Declaring.GetMethods(eBindingFlags))
@@ -131,7 +124,7 @@ namespace Sync
                 {
                     foreach (Type genericArg in genericInstantiations)
                     {
-                        Intercept(info.MakeGenericMethod(genericArg), eFlags);
+                        Intercept(info.MakeGenericMethod(genericArg));
                     }
                 }
             }
@@ -139,16 +132,21 @@ namespace Sync
             return this;
         }
         
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="sMethodName"></param>
+        /// <param name="eBindingFlags"></param>
+        /// <returns></returns>
         public MethodPatch Postfix(
-            string sMethodName, 
-            EMethodPatchFlag eFlags = EMethodPatchFlag.None,
+            string sMethodName,
             BindingFlags eBindingFlags = All)
         {
             foreach (MethodInfo info in m_Declaring.GetMethods(eBindingFlags))
             {
                 if (info.Name == sMethodName)
                 {
-                    Postfix(info, eFlags);
+                    Postfix(info);
                 }
             }
 
@@ -156,8 +154,7 @@ namespace Sync
         }
         
         public MethodPatch Postfix(
-            MethodBase method, 
-            EMethodPatchFlag eFlags = EMethodPatchFlag.None)
+            MethodBase method)
         {
             if (method.DeclaringType != m_Declaring)
             {
@@ -166,7 +163,20 @@ namespace Sync
                     nameof(method));
             }
 
-            PatchPostfix(method, eFlags);
+            PatchPostfix(method);
+            return this;
+        }
+
+        public MethodPatch AddFlags(
+            MethodBase method, 
+            EMethodPatchFlag eFlags)
+        {
+            if (!TryGetMethod(method, out MethodAccess access))
+            {
+                access = new MethodAccess(method);
+                m_Access.Add(access);
+            }
+            access.AddFlags(eFlags);
             return this;
         }
 
@@ -214,17 +224,18 @@ namespace Sync
         ///     to our static dispatcher <see cref="DispatchPrefixExecution"/>.
         /// </summary>
         /// <param name="original">Method to be patched.</param>
-        /// <param name="eFlags">Flags to the patch generator.</param>
         private void PatchPrefix(
-            MethodBase original,
-            EMethodPatchFlag eFlags)
+            MethodBase original)
         {
             MethodInfo dispatcher = AccessTools.Method(
                 typeof(MethodPatch),
                 nameof(DispatchPrefixExecution));
-            MethodAccess access = MethodPatchFactory.AddPrefix(original, dispatcher);
-            access.AddFlags(eFlags);
-            m_Access.Add(access);
+            if (!TryGetMethod(original, out MethodAccess access))
+            {
+                access = new MethodAccess(original);
+                m_Access.Add(access);
+            }
+            MethodPatchFactory.AddPrefix(access, dispatcher);
         }
 
         /// <summary>
@@ -243,15 +254,17 @@ namespace Sync
         }
         
         private void PatchPostfix(
-            MethodBase method, 
-            EMethodPatchFlag eFlags)
+            MethodBase original)
         {
             MethodInfo dispatcher = AccessTools.Method(
                 typeof(MethodPatch),
                 nameof(DispatchPostfixExecution));
-            MethodAccess access = MethodPatchFactory.AddPostfix(method, dispatcher);
-            access.AddFlags(eFlags);
-            m_Access.Add(access);
+            if (!TryGetMethod(original, out MethodAccess access))
+            {
+                access = new MethodAccess(original);
+                m_Access.Add(access);
+            }
+            MethodPatchFactory.AddPostfix(access, dispatcher);
         }
         
         private static void DispatchPostfixExecution(
