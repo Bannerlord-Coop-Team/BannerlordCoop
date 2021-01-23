@@ -7,7 +7,7 @@ namespace CoopFramework
 {
     public interface ISynchronization
     {
-        void Broadcast(MethodCall call);
+        void Broadcast(MethodId id, object instance, object[] args);
 
         void RegisterSyncedField(ValueAccess value,
             IEnumerable<MethodAccess> triggers,

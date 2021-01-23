@@ -81,7 +81,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Behaviour\CallBehaviour.cs" />
-    <Compile Include="Behaviour\ActionBehaviourApplicator.cs" />
     <Compile Include="Behaviour\ActionTriggerOrigin.cs" />
     <Compile Include="Behaviour\ECallPropagation.cs" />
     <Compile Include="Behaviour\ETriggerOrigin.cs" />

@@ -6,6 +6,10 @@ namespace Sync.Behaviour
 {
     public class ActionTriggerOrigin
     {
+        public ActionTriggerOrigin(bool isBroadcastAllowed)
+        {
+            m_IsBroadcastAllowed = isBroadcastAllowed;
+        }
         public CallBehaviour Calls(MethodAccess method)
         {
             return Calls(new List<MethodAccess>() {method});
@@ -13,7 +17,7 @@ namespace Sync.Behaviour
         
         public CallBehaviour Calls(IEnumerable<MethodAccess> methods)
         {
-            var behaviour = new CallBehaviour();
+            var behaviour = new CallBehaviour(m_IsBroadcastAllowed);
             foreach (var method in methods)
             {
                 
@@ -37,7 +41,9 @@ namespace Sync.Behaviour
         [NotNull]
         public CallBehaviour GetBehaviour(MethodId methodId)
         {
-            return Behaviours.TryGetValue(methodId, out CallBehaviour behaviours) ? behaviours : new CallBehaviour();
+            return Behaviours.TryGetValue(methodId, out CallBehaviour behaviours) ? behaviours : new CallBehaviour(m_IsBroadcastAllowed);
         }
+        
+        private readonly bool m_IsBroadcastAllowed;
     }
 }

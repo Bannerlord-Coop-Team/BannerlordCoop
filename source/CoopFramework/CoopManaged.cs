@@ -45,10 +45,13 @@ namespace CoopFramework
         /// <summary>
         ///     Creates synchronization for a given instance of <typeparamref name="TExtended"/>.
         /// </summary>
+        /// <param name="sync">Implementation of the synchronization. If this is set to null, the synchronization
+        /// behaviours may not be used.</param>
         /// <param name="instance">Instance that should be synchronized.</param>
         /// <exception cref="ArgumentOutOfRangeException">When the instance is null.</exception>
-        public CoopManaged([NotNull] TExtended instance)
+        public CoopManaged([CanBeNull] ISynchronization sync, [NotNull] TExtended instance)
         {
+            m_Sync = sync;
             Instance = instance ?? throw new ArgumentNullException(nameof(instance));
 
             foreach (MethodId methodId in PatchedMethods())
@@ -61,9 +64,9 @@ namespace CoopFramework
                     switch (eOrigin)
                     {
                         case ETriggerOrigin.Local:
-                            return RuntimeDispatch(behaviourLocal, args);
+                            return RuntimeDispatch(method, behaviourLocal, args);
                         case ETriggerOrigin.Authoritative:
-                            return RuntimeDispatch(behaviourAuth, args);
+                            return RuntimeDispatch(method, behaviourAuth, args);
                         default:
                             throw new ArgumentOutOfRangeException(nameof(eOrigin), eOrigin, null);
                     }
@@ -77,11 +80,19 @@ namespace CoopFramework
         [NotNull] public TExtended Instance { get; }
 
         #region Private
-        private ECallPropagation RuntimeDispatch(CallBehaviour behaviour, object[] args)
+        private ECallPropagation RuntimeDispatch(MethodAccess methodAccess, CallBehaviour behaviour, object[] args)
         {
+            if (behaviour.DoBroadcast)
+            {
+                if (m_Sync == null)
+                {
+                    throw new SynchronizationNotInitializedException("No ISynchronization implementation was provided. Unable to use the synchronization behaviours.");
+                }
+                m_Sync.Broadcast(methodAccess.Id, Instance, args);
+            }
             if (behaviour.MethodCallHandler != null)
             {
-                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(Instance, args));
+                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, m_Sync, Instance, args));
             }
             return behaviour.CallPropagationBehaviour;
         }
@@ -98,25 +109,39 @@ namespace CoopFramework
 
         private static readonly Dictionary<ETriggerOrigin, ActionTriggerOrigin> _callers = new Dictionary<ETriggerOrigin, ActionTriggerOrigin>()
         {
-            {ETriggerOrigin.Local, new ActionTriggerOrigin()},
-            {ETriggerOrigin.Authoritative, new ActionTriggerOrigin()}
+            {ETriggerOrigin.Local, new ActionTriggerOrigin(true)},
+            {ETriggerOrigin.Authoritative, new ActionTriggerOrigin(false)}
         };
         
         private class PendingMethodCall : IPendingMethodCall
         {
-            public PendingMethodCall(object instance, object[] args)
+            public PendingMethodCall(MethodId method, [CanBeNull] ISynchronization sync, [CanBeNull] object instance, [NotNull] object[] args)
             {
+                m_Method = method;
+                m_Sync = sync;
                 Instance = instance;
                 Parameters = args;
             }
             public void Broadcast()
             {
-                throw new NotImplementedException();
+                if (m_Sync == null)
+                {
+                    throw new SynchronizationNotInitializedException("No ISynchronization implementation was provided. Unable to use the synchronization behaviours.");
+                }
+                
+                m_Sync.Broadcast(m_Method, Instance, Parameters);
             }
 
             public object Instance { get; }
             public object[] Parameters { get; }
+
+            [CanBeNull] private readonly ISynchronization m_Sync;
+
+            private readonly MethodId m_Method;
         }
+
+        [CanBeNull] private readonly ISynchronization m_Sync;
+
         #endregion
     }
 }

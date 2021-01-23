@@ -29,7 +29,7 @@ namespace Coop.Tests.CoopFramework
                     .DelegateTo(BarSetterHandler);
             }
 
-            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
+            public CoopManagedFoo([NotNull] Foo instance) : base(null, instance)
             {
             }
 

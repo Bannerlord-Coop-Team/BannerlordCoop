@@ -9,7 +9,7 @@ using Xunit;
 namespace Coop.Tests.CoopFramework
 {
     [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
-    public class CoopManaged_Test0
+    public class CoopManaged_TestSuppressExecute
     {
         class Foo
         {
@@ -39,7 +39,7 @@ namespace Coop.Tests.CoopFramework
                     .Suppress();
             }
 
-            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
+            public CoopManagedFoo([NotNull] Foo instance) : base(null, instance)
             {
             }
         }
