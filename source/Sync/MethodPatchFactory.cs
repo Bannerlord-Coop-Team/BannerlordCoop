@@ -37,7 +37,7 @@ namespace Sync
 
                 Prefixes[access.MethodBase] = GeneratePatch(GeneratedPrefixName, access, dispatcher);
 
-                MethodInfo factoryMethod = typeof(MethodPatchFactory<TPatch>).GetMethod(nameof(GetPrefix));
+                MethodInfo factoryMethod = GetPrefixBuilder.CreateFactoryMethod<TPatch>(Prefixes[access.MethodBase]);
 
                 HarmonyMethod patch = new HarmonyMethod(factoryMethod)
                 {
@@ -47,14 +47,6 @@ namespace Sync
 #endif
                 };
                 Patcher.HarmonyInstance.Patch(access.MethodBase, patch);
-            }
-        }
-
-        public static DynamicMethod GetPrefix(MethodBase original)
-        {
-            lock (Patcher.HarmonyLock)
-            {
-                return Prefixes[original];
             }
         }
 
@@ -69,7 +61,7 @@ namespace Sync
 
                 Postfixes[access.MethodBase] = GeneratePatch(GeneratedPostfixName, access, dispatcher);
 
-                MethodInfo factoryMethod = typeof(MethodPatchFactory<TPatch>).GetMethod(nameof(GetPostfix));
+                MethodInfo factoryMethod = GetPrefixBuilder.CreateFactoryMethod<TPatch>(Postfixes[access.MethodBase]);
 
                 HarmonyMethod patch = new HarmonyMethod(factoryMethod)
                 {
@@ -79,14 +71,6 @@ namespace Sync
 #endif
                 };
                 Patcher.HarmonyInstance.Patch(access.MethodBase, null, patch);
-            }
-        }
-
-        public static DynamicMethod GetPostfix(MethodBase original)
-        {
-            lock (Patcher.HarmonyLock)
-            {
-                return Postfixes[original];
             }
         }
         

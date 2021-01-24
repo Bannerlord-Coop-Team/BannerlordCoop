@@ -88,6 +88,7 @@
     <Compile Include="Behaviour\IPendingMethodCall.cs" />
     <Compile Include="ConstructorPatch.cs" />
     <Compile Include="DestructorPatch.cs" />
+    <Compile Include="GetPrefixBuilder.cs" />
     <Compile Include="MethodPatch.cs" />
     <Compile Include="EMethodPatchFlag.cs" />
     <Compile Include="Postfix.cs" />
