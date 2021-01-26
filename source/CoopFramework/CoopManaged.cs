@@ -159,6 +159,12 @@ namespace CoopFramework
                 }
                 m_Sync.Broadcast(methodAccess.Id, instance, args);
             }
+
+            if (behaviour.MethodCallHandlerInstance != null)
+            {
+                return behaviour.MethodCallHandlerInstance.Invoke(this,
+                    new PendingMethodCall(methodAccess.Id, m_Sync, instance, args));
+            }
             if (behaviour.MethodCallHandler != null)
             {
                 return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, m_Sync, instance, args));

@@ -9,18 +9,50 @@ namespace Sync.Behaviour
         {
             m_IsBroadcastAllowed = isBroadcastAllowed;
         }
+        
+        /// <summary>
+        ///     Propagate the call to the function to the original or the next patch (if one exists).
+        /// </summary>
         public void Execute()
         {
             CallPropagationBehaviour = ECallPropagation.CallOriginal;
         }
+        
+        /// <summary>
+        ///     Suppress the original call. No further patch nor the original will be called.
+        /// </summary>
         public void Suppress()
         {
             CallPropagationBehaviour = ECallPropagation.Suppress;
         }
+        
+        /// <summary>
+        ///     Delegate the call to a static handler. The handler can control the behaviour at runtime using the
+        ///     provided <see cref="IPendingMethodCall"/> argument.
+        ///
+        ///     1st argument:   The method call that is being processed.
+        /// </summary>
+        /// <param name="handler"></param>
         public void DelegateTo(Func<IPendingMethodCall, ECallPropagation> handler)
         {
             MethodCallHandler = handler;
         }
+        
+        /// <summary>
+        ///     Delegate the call to a static handler. The handler can control the behaviour at runtime using the
+        ///     provided <see cref="IPendingMethodCall"/> argument.
+        ///
+        ///     1st argument:   The instance of the <see cref="CoopManaged"/> class that manages the object the method
+        ///                     is being called on, i.e. `this`.
+        ///     2nd argument:   The method call that is being processed.
+        ///
+        /// </summary>
+        /// <param name="handler"></param>
+        public void DelegateTo(Func<object, IPendingMethodCall, ECallPropagation> handler)
+        {
+            MethodCallHandlerInstance = handler;
+        }
+        
         /// <summary>
         ///     The local call will be broadcast to all clients as an authoritative call. All clients will receive the
         ///     call on the same campaign tick. The originator of the call will receive the authoritative call as well.
@@ -37,6 +69,7 @@ namespace Sync.Behaviour
         public ECallPropagation CallPropagationBehaviour { get; private set; } = ECallPropagation.CallOriginal;
         public bool DoBroadcast { get; private set; } = false;
         [CanBeNull] public Func<IPendingMethodCall, ECallPropagation> MethodCallHandler { get; private set; }
+        [CanBeNull] public Func<object, IPendingMethodCall, ECallPropagation> MethodCallHandlerInstance { get; private set; }
 
         private readonly bool m_IsBroadcastAllowed;
     }

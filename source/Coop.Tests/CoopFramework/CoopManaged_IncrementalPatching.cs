@@ -1,4 +1,7 @@
-﻿using CoopFramework;
+﻿using System;
+using System.Runtime.CompilerServices;
+using CoopFramework;
+using HarmonyLib;
 using JetBrains.Annotations;
 using Sync;
 using Sync.Behaviour;
@@ -25,12 +28,25 @@ namespace Coop.Tests.CoopFramework
             {
                 When(ETriggerOrigin.Local)
                     .Calls(BarSetter)
-                    .Execute();
+                    .DelegateTo((managedFoo, call) =>
+                    {
+                        var instance = (managedFoo as CoopManagedFoo);
+                        instance.WasCalled = true;
+                        if (instance.BarHandler != null)
+                        {
+                            return instance.BarHandler(call);
+                        }
+
+                        return ECallPropagation.CallOriginal;
+                    });
             }
 
             public CoopManagedFoo(ISynchronization sync, [NotNull] Foo instance) : base(sync, instance)
             {
             }
+
+            public Func<IPendingMethodCall, ECallPropagation> BarHandler;
+            public bool WasCalled = false;
         }
         
         class CoopManagedFoo2 : CoopManaged<CoopManagedFoo2, Foo>
@@ -40,25 +56,69 @@ namespace Coop.Tests.CoopFramework
             {
                 When(ETriggerOrigin.Local)
                     .Calls(BarSetter)
-                    .Execute();
+                    .DelegateTo((managedFoo, call) =>
+                    {
+                        var instance = (managedFoo as CoopManagedFoo2);
+                        instance.WasCalled = true;
+                        if (instance.BarHandler != null)
+                        {
+                            return instance.BarHandler(call);
+                        }
+
+                        return ECallPropagation.CallOriginal;
+                    });
             }
 
             public CoopManagedFoo2(ISynchronization sync, [NotNull] Foo instance) : base(sync, instance)
             {
             }
+            
+            public Func<IPendingMethodCall, ECallPropagation> BarHandler;
+            public bool WasCalled = false;
         }
 
         static CoopManaged_IncrementalPatching()
         {
             // Initialize the static constructors of our 2 wrappers
-            System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo).TypeHandle);
-            System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo2).TypeHandle);
+            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo).TypeHandle);
+            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo2).TypeHandle);
+            
         }
 
         [Fact]
         void CanBePatched()
         {
+            Foo foo = new Foo();
+            CoopManagedFoo fooManaged = new CoopManagedFoo(null, foo);
+            CoopManagedFoo2 fooManaged2 = new CoopManagedFoo2(null, foo);
+            foo.Bar = 43;
+            Assert.True(fooManaged.WasCalled);
+            Assert.True(fooManaged2.WasCalled);
+        }
+        
+        [Fact]
+        void PatchesAreCalledInOrderFIFO()
+        {
+            Foo foo = new Foo();
+            CoopManagedFoo fooManaged = new CoopManagedFoo(null, foo);
+            CoopManagedFoo2 fooManaged2 = new CoopManagedFoo2(null, foo);
             
+            // configure fooManaged to suppress the call
+            fooManaged.BarHandler = call => ECallPropagation.Suppress;
+
+            foo.Bar = 43;
+            Assert.True(fooManaged.WasCalled);
+            Assert.False(fooManaged2.WasCalled);
+            Assert.Equal(42, foo.Bar); // Not changed!
+            
+            // configure fooManaged to propagate the call so it reaches fooManaged2
+            fooManaged.WasCalled = false;
+            fooManaged.BarHandler = call => ECallPropagation.CallOriginal;
+            fooManaged2.BarHandler = call => ECallPropagation.Suppress;
+            
+            foo.Bar = 43;
+            Assert.True(fooManaged2.WasCalled);
+            Assert.True(fooManaged.WasCalled);
         }
     }
 }
