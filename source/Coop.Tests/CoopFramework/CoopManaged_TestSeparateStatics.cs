@@ -36,11 +36,16 @@ namespace Coop.Tests.CoopFramework
                 When(ETriggerOrigin.Local)
                     .Calls(BarSetter)
                     .Suppress();
-                EnabledForAllInstances((instance => new CoopManagedFoo(null, instance)));
+                EnabledForAllInstances((instance => new CoopManagedFoo(instance)));
             }
 
-            public CoopManagedFoo(ISynchronization sync, [NotNull] Foo instance) : base(sync, instance)
+            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
             {
+            }
+
+            protected override ISynchronization GetSynchronization()
+            {
+                return null;
             }
         }
         
@@ -52,11 +57,16 @@ namespace Coop.Tests.CoopFramework
                 When(ETriggerOrigin.Local)
                     .Calls(BarSetter)
                     .Suppress();
-                EnabledForAllInstances((instance => new CoopManagedFoo2(null, instance)));
+                EnabledForAllInstances((instance => new CoopManagedFoo2(instance)));
             }
 
-            public CoopManagedFoo2(ISynchronization sync, [NotNull] Foo2 instance) : base(sync, instance)
+            public CoopManagedFoo2([NotNull] Foo2 instance) : base(instance)
             {
+            }
+
+            protected override ISynchronization GetSynchronization()
+            {
+                return null;
             }
         }
         

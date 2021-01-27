@@ -41,12 +41,16 @@ namespace Coop.Tests.CoopFramework
                     });
             }
 
-            public CoopManagedFoo(ISynchronization sync, [NotNull] Foo instance) : base(sync, instance)
+            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
             {
             }
 
             public Func<IPendingMethodCall, ECallPropagation> BarHandler;
             public bool WasCalled = false;
+            protected override ISynchronization GetSynchronization()
+            {
+                return null;
+            }
         }
         
         class CoopManagedFoo2 : CoopManaged<CoopManagedFoo2, Foo>
@@ -69,12 +73,16 @@ namespace Coop.Tests.CoopFramework
                     });
             }
 
-            public CoopManagedFoo2(ISynchronization sync, [NotNull] Foo instance) : base(sync, instance)
+            public CoopManagedFoo2([NotNull] Foo instance) : base(instance)
             {
             }
             
             public Func<IPendingMethodCall, ECallPropagation> BarHandler;
             public bool WasCalled = false;
+            protected override ISynchronization GetSynchronization()
+            {
+                return null;
+            }
         }
 
         static CoopManaged_IncrementalPatching()
@@ -89,8 +97,8 @@ namespace Coop.Tests.CoopFramework
         void CanBePatched()
         {
             Foo foo = new Foo();
-            CoopManagedFoo fooManaged = new CoopManagedFoo(null, foo);
-            CoopManagedFoo2 fooManaged2 = new CoopManagedFoo2(null, foo);
+            CoopManagedFoo fooManaged = new CoopManagedFoo(foo);
+            CoopManagedFoo2 fooManaged2 = new CoopManagedFoo2(foo);
             foo.Bar = 43;
             Assert.True(fooManaged.WasCalled);
             Assert.True(fooManaged2.WasCalled);
@@ -100,8 +108,8 @@ namespace Coop.Tests.CoopFramework
         void PatchesAreCalledInOrderFIFO()
         {
             Foo foo = new Foo();
-            CoopManagedFoo fooManaged = new CoopManagedFoo(null, foo);
-            CoopManagedFoo2 fooManaged2 = new CoopManagedFoo2(null, foo);
+            CoopManagedFoo fooManaged = new CoopManagedFoo(foo);
+            CoopManagedFoo2 fooManaged2 = new CoopManagedFoo2(foo);
             
             // configure fooManaged to suppress the call
             fooManaged.BarHandler = call => ECallPropagation.Suppress;

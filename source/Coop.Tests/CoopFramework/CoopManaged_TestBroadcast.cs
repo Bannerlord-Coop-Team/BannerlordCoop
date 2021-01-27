@@ -42,8 +42,16 @@ namespace Coop.Tests.CoopFramework
                     .Execute();
             }
 
-            public CoopManagedFoo(ISynchronization sync, [NotNull] Foo instance) : base(sync, instance)
+            public CoopManagedFoo(ISynchronization sync, [NotNull] Foo instance) : base(instance)
             {
+                m_Sync = sync;
+            }
+
+            private readonly ISynchronization m_Sync;
+
+            protected override ISynchronization GetSynchronization()
+            {
+                return m_Sync;
             }
         }
 

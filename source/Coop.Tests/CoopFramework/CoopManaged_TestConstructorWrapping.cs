@@ -30,11 +30,16 @@ namespace Coop.Tests.CoopFramework
                     .Calls(BarSetter)
                     .Suppress();
                 
-                EnabledForAllInstances((instance => new CoopManagedFoo(null, instance)));
+                EnabledForAllInstances((instance => new CoopManagedFoo(instance)));
             }
 
-            public CoopManagedFoo(ISynchronization sync, [NotNull] Foo instance) : base(sync, instance)
+            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
             {
+            }
+
+            protected override ISynchronization GetSynchronization()
+            {
+                return null;
             }
         }
 

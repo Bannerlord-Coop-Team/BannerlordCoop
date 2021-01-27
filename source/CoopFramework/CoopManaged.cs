@@ -69,11 +69,6 @@ namespace CoopFramework
             }
         }
 
-        private static void OnConstructed(CoopManaged<TSelf, TExtended> newInstance)
-        {
-            m_ManagedInstances.Add(newInstance);
-        }
-        
         /// <summary>
         ///     Patches a setter of a property on the extended class. Please of the nameof operator instead of raw
         ///     strings. This allows for compile time errors with updated game versions:
@@ -101,17 +96,14 @@ namespace CoopFramework
         /// <summary>
         ///     Creates synchronization for a given instance of <typeparamref name="TExtended"/>.
         /// </summary>
-        /// <param name="sync">Implementation of the synchronization. If this is set to null, the synchronization
-        /// behaviours may not be used.</param>
         /// <param name="instance">Instance that should be synchronized.</param>
         /// <exception cref="ArgumentOutOfRangeException">When the instance is null.</exception>
-        public CoopManaged([CanBeNull] ISynchronization sync, [NotNull] TExtended instance)
+        public CoopManaged([NotNull] TExtended instance)
         {
             if (instance == null)
             {
                 throw new ArgumentNullException(nameof(instance));
             }
-            m_Sync = sync;
             Instance = new WeakReference<TExtended>(instance, true);
 
             foreach (MethodId methodId in PatchedMethods())
@@ -141,7 +133,21 @@ namespace CoopFramework
 
         public static IReadOnlyCollection<CoopManaged<TSelf, TExtended>> ManagedInstances => m_ManagedInstances;
 
+        /// <summary>
+        ///     Returns the implementation of the synchronization. If this returns null, the synchronization
+        ///     behaviours may not be used.
+        ///
+        ///     This method is called on every method call that requires synchronization.
+        /// </summary>
+        /// <returns>synchronization</returns>
+        [CanBeNull] protected abstract ISynchronization GetSynchronization();
+
         #region Private
+        
+        private static void OnConstructed(CoopManaged<TSelf, TExtended> newInstance)
+        {
+            m_ManagedInstances.Add(newInstance);
+        }
         private ECallPropagation RuntimeDispatch(MethodAccess methodAccess, CallBehaviour behaviour, object[] args)
         {
             if (!Instance.TryGetTarget(out TExtended instance))
@@ -153,21 +159,22 @@ namespace CoopFramework
             
             if (behaviour.DoBroadcast)
             {
-                if (m_Sync == null)
+                ISynchronization sync = GetSynchronization();
+                if (sync == null)
                 {
                     throw new SynchronizationNotInitializedException("No ISynchronization implementation was provided. Unable to use the synchronization behaviours.");
                 }
-                m_Sync.Broadcast(methodAccess.Id, instance, args);
+                sync.Broadcast(methodAccess.Id, instance, args);
             }
 
             if (behaviour.MethodCallHandlerInstance != null)
             {
                 return behaviour.MethodCallHandlerInstance.Invoke(this,
-                    new PendingMethodCall(methodAccess.Id, m_Sync, instance, args));
+                    new PendingMethodCall(methodAccess.Id, GetSynchronization(), instance, args));
             }
             if (behaviour.MethodCallHandler != null)
             {
-                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, m_Sync, instance, args));
+                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, GetSynchronization(), instance, args));
             }
             return behaviour.CallPropagationBehaviour;
         }
@@ -230,8 +237,6 @@ namespace CoopFramework
 
             private readonly MethodId m_Method;
         }
-
-        [CanBeNull] private readonly ISynchronization m_Sync;
         
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 

@@ -39,8 +39,13 @@ namespace Coop.Tests.CoopFramework
                     .Suppress();
             }
 
-            public CoopManagedFoo([NotNull] Foo instance) : base(null, instance)
+            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
             {
+            }
+
+            protected override ISynchronization GetSynchronization()
+            {
+                return null;
             }
         }
 

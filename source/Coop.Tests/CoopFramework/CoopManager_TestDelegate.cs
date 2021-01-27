@@ -30,7 +30,7 @@ namespace Coop.Tests.CoopFramework
                     .DelegateTo(BarSetterHandler);
             }
 
-            public CoopManagedFoo([NotNull] Foo instance) : base(null, instance)
+            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
             {
             }
 
@@ -40,6 +40,11 @@ namespace Coop.Tests.CoopFramework
                 Assert.NotNull(fooInstance);
                 Assert.NotNull(fooInstance.Callback);
                 return fooInstance.Callback.Invoke(pendingMethodCall);
+            }
+
+            protected override ISynchronization GetSynchronization()
+            {
+                return null;
             }
         }
 
