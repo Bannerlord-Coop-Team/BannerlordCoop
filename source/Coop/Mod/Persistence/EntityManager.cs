@@ -179,6 +179,15 @@ namespace Coop.Mod.Persistence
             }
         }
 
+        public void RemoveParty(MobileParty party)
+        {
+            m_Room.MarkForRemoval(m_Parties[party]);
+            lock (m_Lock)
+            {
+                m_Parties.Remove(party);
+            }
+        }
+
         public void GrantPartyControl(MobileParty party, RailServerPeer peer)
         {
             peer.GrantControl(m_Parties[party]);
