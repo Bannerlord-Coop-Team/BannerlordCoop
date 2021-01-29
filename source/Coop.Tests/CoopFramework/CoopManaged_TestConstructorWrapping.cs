@@ -36,11 +36,6 @@ namespace Coop.Tests.CoopFramework
             public CoopManagedFoo([NotNull] Foo instance) : base(instance)
             {
             }
-
-            protected override ISynchronization GetSynchronization()
-            {
-                return null;
-            }
         }
 
         static CoopManaged_TestConstructorWrapping()

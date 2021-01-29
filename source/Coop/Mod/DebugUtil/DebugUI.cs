@@ -14,6 +14,7 @@ using RailgunNet.Connection;
 using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
+using RemoteAction;
 using Sync;
 using Sync.Behaviour;
 using TaleWorlds.Core;
@@ -378,14 +379,12 @@ namespace Coop.Mod.DebugUtil
                 return;
             }
 
-            if (CoopClient.Instance?.Persistence?.RpcSyncHandlers == null)
+            if (CoopClient.Instance?.Synchronization.BroadcastHistory == null)
             {
                 Imgui.Text("Coop client not connected.");
             }
             else
             {
-                RPCSyncHandlers manager = CoopClient.Instance?.Persistence?.RpcSyncHandlers;
-
                 EventBroadcastingQueue queue = CoopServer.Instance.Environment?.EventQueue;
                 if (queue != null)
                 {
@@ -399,36 +398,29 @@ namespace Coop.Mod.DebugUtil
                         $"Pending RPC: {PendingRequests.Instance.PendingRequestCount()}");
                 }
 
-                foreach (MethodCallSyncHandler handler in manager.Handlers)
-                {
-                    if (!Imgui.TreeNode(handler.MethodAccess.ToString()))
-                    {
-                        continue;
-                    }
 #if DEBUG
-                    Imgui.Columns(2);
-                    Imgui.Separator();
-                    Imgui.Text("Requested on");
-
-                    foreach (MethodCallSyncHandler.Statistics.Trace trace in handler.Stats.History)
-                    {
-                        Imgui.Text(trace.Tick.ToString());
-                    }
-
-                    Imgui.NextColumn();
-                    Imgui.Text("Request");
-                    Imgui.Separator();
-                    foreach (MethodCallSyncHandler.Statistics.Trace trace in handler.Stats.History)
-                    {
-                        Imgui.Text(trace.Call.ToString());
-                    }
-
-                    Imgui.Columns();
-                    Imgui.TreePop();
+                CallStatistics history = CoopClient.Instance?.Synchronization.BroadcastHistory;
+                Imgui.Columns(2);
+                
+                Imgui.Text("Tick");
+                foreach (CallTrace trace in history)
+                {
+                    Imgui.Text(trace.Tick.ToString());
+                }
+                
+                Imgui.NextColumn();
+                Imgui.Text("Call");
+                foreach (CallTrace trace in history)
+                {
+                    Imgui.Text(trace.Call.ToString());
+                }
+                
+                Imgui.Columns();
+                
+                
 #else
                     DisplayDebugDisabledText();
 #endif
-                }
             }
 
             Imgui.TreePop();

@@ -4,6 +4,7 @@ using System.Linq;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.MethodCall;
 using Coop.Tests.Sync;
+using CoopFramework;
 using JetBrains.Annotations;
 using Network;
 using Network.Protocol;
@@ -11,6 +12,7 @@ using RailgunNet;
 using RailgunNet.Connection.Client;
 using RemoteAction;
 using Sync;
+using Sync.Behaviour;
 using Sync.Store;
 using Xunit;
 
@@ -20,29 +22,22 @@ namespace Coop.Tests.Persistence.RPC
         "UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class RPC_Test : IDisposable
     {
+        private readonly ISynchronization sync0;
         public RPC_Test()
         {
-            // Init patch
-            MethodPatch<RPC_Test> Patch = new MethodPatch<RPC_Test>(typeof(Foo)).Intercept(nameof(Foo.SyncedMethod));
             Persistence = m_Environment.Persistence ??
                           throw new Exception("Persistence may not be null. Error in test setup.");
-            Persistence.SyncHandlers.Register(
-                Patch.Methods,
-                m_Environment.GetClientAccess(ClientId0));
-            Access = Patch.Methods.First();
-            SyncHandler = Persistence.SyncHandlers.Handlers.Find(o => o.MethodAccess == Access);
-            if (SyncHandler == null)
-            {
-                throw new Exception("Error during setup.");
-            }
+            sync0 = new Synchronization(m_Environment.GetClientAccess(ClientId0));
+            ManagedFoo.Sync = sync0;
         }
 
         public void Dispose()
         {
-            MethodPatchFactory<RPC_Test>.UnpatchAll();
+            // MethodPatchFactory<RPC_Test>.UnpatchAll();
             m_Environment.Destroy();
             Foo.LatestArgument = "";
             Foo.NumberOfCalls = 0;
+            PendingRequests.Instance.Clear();
         }
 
         private class Foo
@@ -57,15 +52,35 @@ namespace Coop.Tests.Persistence.RPC
             }
         }
 
+        private class ManagedFoo : CoopManaged<ManagedFoo, Foo>
+        {
+            static ManagedFoo()
+            {
+                When(ETriggerOrigin.Local)
+                    .Calls(Method(nameof(Foo.SyncedMethod)))
+                    .Broadcast()
+                    .Suppress();
+                EnableForStatics();
+            }
+            public ManagedFoo([NotNull] Foo instance) : base(instance)
+            {
+            }
+
+            [SyncFactory]
+            private static ISynchronization GetSynchronization()
+            {
+                return Sync;
+            }
+
+            public static ISynchronization Sync;
+        }
+
         private readonly TestEnvironment m_Environment = new TestEnvironment(
             2,
             Registry.Client,
             Registry.Server);
 
         [NotNull] private TestPersistence Persistence { get; }
-        [NotNull] private MethodAccess Access { get; }
-
-        [NotNull] private MethodCallSyncHandler SyncHandler { get; }
 
         private const int ClientId0 = 0;
         private const int ClientId1 = 1;
@@ -100,7 +115,7 @@ namespace Coop.Tests.Persistence.RPC
 
             // Verify initial state
             Assert.Equal(iNumberOfExpectedCalls, Foo.NumberOfCalls);
-            Assert.Empty(SyncHandler.Stats.History);
+            Assert.Empty(sync0.BroadcastHistory);
             Assert.Empty(conClientToServer.SendBuffer);
 
             // Call method
@@ -108,8 +123,8 @@ namespace Coop.Tests.Persistence.RPC
             Assert.Equal(iNumberOfExpectedCalls, Foo.NumberOfCalls);
 
             // Verify that the sync handler was called
-            Assert.Single(SyncHandler.Stats.History);
-            MethodCallSyncHandler.Statistics.Trace trace = SyncHandler.Stats.History.Peek();
+            Assert.Single(sync0.BroadcastHistory);
+            CallTrace trace = sync0.BroadcastHistory.Peek();
             Assert.Equal(Persistence.Rooms[ClientId0].Tick, trace.Tick);
             Assert.Equal(
                 Argument.Null,
@@ -166,7 +181,7 @@ namespace Coop.Tests.Persistence.RPC
             Foo.SyncedMethod(sMessage);
             client0.Update();
             conClient0ToServer.ExecuteSends();
-            MethodCallSyncHandler.Statistics.Trace trace = SyncHandler.Stats.History.Peek();
+            CallTrace trace = sync0.BroadcastHistory.Peek();
             ObjectId messageId = trace.Call.Arguments[0].StoreObjectId.Value;
 
             // Client0 is waiting for the ACK
@@ -299,7 +314,7 @@ namespace Coop.Tests.Persistence.RPC
             Assert.Single(m_Environment.StoreServer.Data);
 
             // Verify the argument was received by the server
-            MethodCallSyncHandler.Statistics.Trace trace = SyncHandler.Stats.History.Peek();
+            CallTrace trace = sync0.BroadcastHistory.Peek();
             ObjectId messageId = trace.Call.Arguments[0].StoreObjectId.Value;
             Assert.True(m_Environment.StoreServer.Data.ContainsKey(messageId));
         }
@@ -396,7 +411,7 @@ namespace Coop.Tests.Persistence.RPC
             // Call method
             string sMessage = "Hello World";
             Foo.SyncedMethod(sMessage);
-            MethodCallSyncHandler.Statistics.Trace trace = SyncHandler.Stats.History.Peek();
+            CallTrace trace = sync0.BroadcastHistory.Peek();
             ObjectId messageId = trace.Call.Arguments[0].StoreObjectId.Value;
 
             // Sync to server
@@ -435,7 +450,7 @@ namespace Coop.Tests.Persistence.RPC
             Foo.SyncedMethod(sMessage);
             client0.Update();
             conClient0ToServer.ExecuteSends();
-            MethodCallSyncHandler.Statistics.Trace trace = SyncHandler.Stats.History.Peek();
+            CallTrace trace = sync0.BroadcastHistory.Peek();
             ObjectId messageId = trace.Call.Arguments[0].StoreObjectId.Value;
 
             // The server relayed the StoreAdd to client 1
@@ -503,12 +518,12 @@ namespace Coop.Tests.Persistence.RPC
             string sMessage = "Hello World";
             int iNumberOfExpectedCalls = 0;
             Assert.Equal(iNumberOfExpectedCalls, Foo.NumberOfCalls);
-            Assert.Empty(SyncHandler.Stats.History);
+            Assert.Empty(sync0.BroadcastHistory);
             Foo.SyncedMethod(sMessage);
             Assert.Equal(iNumberOfExpectedCalls, Foo.NumberOfCalls);
 
             // Verify the SyncHandler was called at all
-            Assert.Single(SyncHandler.Stats.History);
+            Assert.Single(sync0.BroadcastHistory);
 
             // There should be an outgoing event in the clients queue. We should be able to observe the event being sent on the next update.
             RailClient client0 = Persistence.Clients[ClientId0];

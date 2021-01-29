@@ -49,7 +49,8 @@ namespace Coop.Tests.CoopFramework
 
             private readonly ISynchronization m_Sync;
 
-            protected override ISynchronization GetSynchronization()
+            [SyncFactory]
+            private ISynchronization GetSynchronization()
             {
                 return m_Sync;
             }

@@ -49,7 +49,7 @@ namespace Coop.Tests.Sync
 
             // Call
             foo.SyncedMethod(42);
-            // Assert.True(bPrefix0Called);
+            Assert.True(bPrefix0Called);
             Assert.True(bPrefix1Called);
         }
     }

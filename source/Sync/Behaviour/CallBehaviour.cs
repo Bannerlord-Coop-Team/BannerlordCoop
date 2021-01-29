@@ -43,7 +43,7 @@ namespace Sync.Behaviour
         ///     provided <see cref="IPendingMethodCall"/> argument.
         ///
         ///     1st argument:   The instance of the <see cref="CoopManaged"/> class that manages the object the method
-        ///                     is being called on, i.e. `this`.
+        ///                     is being called on, i.e. `this`. null for static calls.
         ///     2nd argument:   The method call that is being processed.
         ///
         /// </summary>

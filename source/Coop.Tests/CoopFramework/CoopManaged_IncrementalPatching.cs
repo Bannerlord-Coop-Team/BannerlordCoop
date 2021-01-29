@@ -47,10 +47,6 @@ namespace Coop.Tests.CoopFramework
 
             public Func<IPendingMethodCall, ECallPropagation> BarHandler;
             public bool WasCalled = false;
-            protected override ISynchronization GetSynchronization()
-            {
-                return null;
-            }
         }
         
         class CoopManagedFoo2 : CoopManaged<CoopManagedFoo2, Foo>
@@ -79,10 +75,6 @@ namespace Coop.Tests.CoopFramework
             
             public Func<IPendingMethodCall, ECallPropagation> BarHandler;
             public bool WasCalled = false;
-            protected override ISynchronization GetSynchronization()
-            {
-                return null;
-            }
         }
 
         static CoopManaged_IncrementalPatching()

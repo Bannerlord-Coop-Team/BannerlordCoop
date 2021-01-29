@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Common;
 using Coop.Mod.Persistence.MethodCall;
 using Coop.NetImpl.LiteNet;
+using CoopFramework;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using RailgunNet.Connection.Client;
@@ -27,13 +28,10 @@ namespace Coop.Mod.Persistence
             Environment = environment;
             m_RailClient = new RailClient(Registry.Client(Environment));
             Room = m_RailClient.StartRoom();
-            RpcSyncHandlers = new RPCSyncHandlers();
         }
 
         public IEnvironmentClient Environment { get; }
         [CanBeNull] public RailClientPeer Peer => m_RailClient.ServerPeer;
-
-        [NotNull] public RPCSyncHandlers RpcSyncHandlers { get; }
 
         [NotNull] public RailClientRoom Room { get; }
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using JetBrains.Annotations;
 using NLog;
 using Sync;
@@ -69,6 +70,35 @@ namespace CoopFramework
             }
         }
 
+        public static void EnableForStatics()
+        {
+            foreach (MethodId methodId in PatchedMethods())
+            {
+                MethodAccess method = MethodRegistry.IdToMethod[methodId];
+                CallBehaviour behaviourLocal = _callers[ETriggerOrigin.Local].GetBehaviour(methodId);
+                CallBehaviour behaviourAuth = _callers[ETriggerOrigin.Authoritative].GetBehaviour(methodId);
+                method.Prefix.SetGlobalHandler((eOrigin, instance, args) =>
+                {
+                    if (instance != null)
+                    {
+                        // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
+                        return ECallPropagation.CallOriginal;
+                    }
+                    
+                    // So it's a static call -> Dispatch it
+                    switch (eOrigin)
+                    {
+                        case ETriggerOrigin.Local:
+                            return StaticDispatch(method, behaviourLocal, args);
+                        case ETriggerOrigin.Authoritative:
+                            return StaticDispatch(method, behaviourAuth, args);
+                        default:
+                            throw new ArgumentOutOfRangeException(nameof(eOrigin), eOrigin, null);
+                    }
+                });
+            }
+        }
+
         /// <summary>
         ///     Patches a setter of a property on the extended class. Please of the nameof operator instead of raw
         ///     strings. This allows for compile time errors with updated game versions:
@@ -80,6 +110,19 @@ namespace CoopFramework
         public static MethodAccess Setter(string sPropertyName)
         {
             return new PropertyPatch<TSelf>(typeof(TExtended)).InterceptSetter(sPropertyName).Setters.First();
+        }
+        /// <summary>
+        ///     Patches a method on the extended class with a prefix. Please of the nameof operator instead of raw
+        ///     strings. This allows for compile time errors with updated game versions:
+        /// 
+        ///     <code>Method(nameof(T.Foo));</code>
+        ///     
+        /// </summary>
+        /// <param name="sMethodName"></param>
+        /// <returns></returns>
+        public static MethodAccess Method(string sMethodName)
+        {
+            return new MethodPatch<TSelf>(typeof(TExtended)).Intercept(sMethodName).Methods.First();
         }
         /// <summary>
         ///     Starting point of a patch for any action. The patch will only be active if the context of the call
@@ -105,6 +148,19 @@ namespace CoopFramework
                 throw new ArgumentNullException(nameof(instance));
             }
             Instance = new WeakReference<TExtended>(instance, true);
+            m_GetSync = new Lazy<Func<ISynchronization>>(() =>
+            {
+                foreach (MethodInfo method in typeof(TSelf).GetMethods(BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.NonPublic))
+                {
+                    if (Attribute.IsDefined(method, typeof(SyncFactoryAttribute)) && 
+                        method.ReturnType == typeof(ISynchronization))
+                    {
+                        return () => method.Invoke(this, new object[]{}) as ISynchronization;
+                    }
+                }
+
+                return m_GetSyncStatic?.Value;
+            });
 
             foreach (MethodId methodId in PatchedMethods())
             {
@@ -133,21 +189,37 @@ namespace CoopFramework
 
         public static IReadOnlyCollection<CoopManaged<TSelf, TExtended>> ManagedInstances => m_ManagedInstances;
 
-        /// <summary>
-        ///     Returns the implementation of the synchronization. If this returns null, the synchronization
-        ///     behaviours may not be used.
-        ///
-        ///     This method is called on every method call that requires synchronization.
-        /// </summary>
-        /// <returns>synchronization</returns>
-        [CanBeNull] protected abstract ISynchronization GetSynchronization();
-
         #region Private
         
         private static void OnConstructed(CoopManaged<TSelf, TExtended> newInstance)
         {
             m_ManagedInstances.Add(newInstance);
         }
+
+        private static ECallPropagation StaticDispatch(MethodAccess methodAccess, CallBehaviour behaviour, object[] args)
+        {
+            ISynchronization sync = m_GetSyncStatic.Value?.Invoke();
+            if (behaviour.DoBroadcast)
+            {
+                if (sync == null)
+                {
+                    throw new SynchronizationNotInitializedException("No ISynchronization implementation was provided. Unable to use the synchronization behaviours.");
+                }
+                sync.Broadcast(methodAccess.Id, null, args);
+            }
+
+            if (behaviour.MethodCallHandlerInstance != null)
+            {
+                return behaviour.MethodCallHandlerInstance.Invoke(null,
+                    new PendingMethodCall(methodAccess.Id, sync, null, args));
+            }
+            if (behaviour.MethodCallHandler != null)
+            {
+                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, sync, null, args));
+            }
+            return behaviour.CallPropagationBehaviour;
+        }
+
         private ECallPropagation RuntimeDispatch(MethodAccess methodAccess, CallBehaviour behaviour, object[] args)
         {
             if (!Instance.TryGetTarget(out TExtended instance))
@@ -156,10 +228,11 @@ namespace CoopFramework
                 Logger.Warn("Coop synced {Instance} seems to have expired", ToString());
                 return ECallPropagation.Suppress; // Will not work anyways
             }
+
+            ISynchronization sync = m_GetSync.Value?.Invoke();
             
             if (behaviour.DoBroadcast)
             {
-                ISynchronization sync = GetSynchronization();
                 if (sync == null)
                 {
                     throw new SynchronizationNotInitializedException("No ISynchronization implementation was provided. Unable to use the synchronization behaviours.");
@@ -170,16 +243,16 @@ namespace CoopFramework
             if (behaviour.MethodCallHandlerInstance != null)
             {
                 return behaviour.MethodCallHandlerInstance.Invoke(this,
-                    new PendingMethodCall(methodAccess.Id, GetSynchronization(), instance, args));
+                    new PendingMethodCall(methodAccess.Id, sync, instance, args));
             }
             if (behaviour.MethodCallHandler != null)
             {
-                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, GetSynchronization(), instance, args));
+                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, sync, instance, args));
             }
             return behaviour.CallPropagationBehaviour;
         }
 
-        private IEnumerable<MethodId> PatchedMethods()
+        private static IEnumerable<MethodId> PatchedMethods()
         {
             HashSet<MethodId> ids = new HashSet<MethodId>();
             foreach (ActionTriggerOrigin origin in _callers.Values)
@@ -238,6 +311,23 @@ namespace CoopFramework
             private readonly MethodId m_Method;
         }
         
+        [CanBeNull] private static readonly Lazy<Func<ISynchronization>> m_GetSyncStatic =
+            new Lazy<Func<ISynchronization>>(() =>
+            {
+                foreach (MethodInfo method in typeof(TSelf).GetMethods(BindingFlags.Static | BindingFlags.DeclaredOnly | BindingFlags.NonPublic))
+                {
+                    if (Attribute.IsDefined(method, typeof(SyncFactoryAttribute)) && 
+                        method.ReturnType == typeof(ISynchronization))
+                    {
+                        return () => method.Invoke(null, new object[]{}) as ISynchronization;
+                    }
+                }
+
+                return null;
+            });
+        
+        [CanBeNull] private readonly Lazy<Func<ISynchronization>> m_GetSync;
+
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         #endregion

@@ -41,11 +41,6 @@ namespace Coop.Tests.CoopFramework
                 Assert.NotNull(fooInstance.Callback);
                 return fooInstance.Callback.Invoke(pendingMethodCall);
             }
-
-            protected override ISynchronization GetSynchronization()
-            {
-                return null;
-            }
         }
 
         [Fact]

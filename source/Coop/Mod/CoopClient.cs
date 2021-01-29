@@ -8,6 +8,7 @@ using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.MethodCall;
 using Coop.Mod.Serializers;
 using Coop.NetImpl.LiteNet;
+using CoopFramework;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using Network.Protocol;
@@ -35,6 +36,7 @@ namespace Coop.Mod
 
     public class CoopClient : IUpdateable, IClientAccess
     {
+        #region Private
         private const int MaxReconnectAttempts = 2;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -55,6 +57,7 @@ namespace Coop.Mod
         private int m_ReconnectAttempts = MaxReconnectAttempts;
         private Hero m_Hero;
         private ObjectId m_HeroId;
+        #endregion
         public Action<PersistenceClient> OnPersistenceInitialized;
 
         public Action<RemoteStore> RemoteStoreCreated;
@@ -67,6 +70,7 @@ namespace Coop.Mod
             GameState = new CoopGameState();
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
+            Synchronization = new Synchronization(this);
             
             #region State Machine Callbacks
             m_CoopClientSM.CharacterCreationState.OnEntry(CreateCharacter);
@@ -86,6 +90,8 @@ namespace Coop.Mod
         public RemoteStore SyncedObjectStore { get; private set; }
 
         [CanBeNull] public PersistenceClient Persistence { get; private set; }
+        
+        [NotNull] public ISynchronization Synchronization { get; }
 
         [NotNull] public GameSession Session { get; }
 

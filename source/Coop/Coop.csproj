@@ -310,6 +310,7 @@
     <Compile Include="Mod\Persistence\Compression.cs" />
     <Compile Include="Mod\Persistence\IEnvironmentClient.cs" />
     <Compile Include="Mod\Persistence\IEnvironmentServer.cs" />
+    <Compile Include="Mod\Persistence\MethodCall\Synchronization.cs" />
     <Compile Include="Mod\Persistence\Party\EventPartyMoveTo.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityClient.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityServer.cs" />
@@ -321,9 +322,7 @@
     <Compile Include="Mod\Persistence\MethodCall\EventBroadcastingQueue.cs" />
     <Compile Include="Mod\Persistence\MethodCall\EventMethodCall.cs" />
     <Compile Include="Mod\Persistence\MethodCall\IClientAccess.cs" />
-    <Compile Include="Mod\Persistence\MethodCall\MethodCallSyncHandler.cs" />
     <Compile Include="Mod\Persistence\MethodCall\PendingRequests.cs" />
-    <Compile Include="Mod\Persistence\MethodCall\RPCSyncHandlers.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityClient.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityServer.cs" />
     <Compile Include="Mod\Persistence\World\EventTimeControl.cs" />

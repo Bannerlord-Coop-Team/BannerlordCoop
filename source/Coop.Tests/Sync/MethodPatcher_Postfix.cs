@@ -60,7 +60,6 @@ namespace Coop.Tests.Sync
             Assert.Equal(0, instance.NumberOfCalls);
 
             Assert.True(Patch.TryGetMethod(nameof(TestRPC.SyncedMethod), out MethodAccess method));
-            int? ArgumentAtHandlerCallTime;
             bool bWasHandlerCalled = false;
             method.Postfix.SetHandler(instance, (eOrigin, args) =>
             {

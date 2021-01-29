@@ -30,7 +30,11 @@ namespace Coop.Mod.Persistence.MethodCall
         public int PendingRequestCount()
         {
             return m_Pending.Count;
-            
+        }
+
+        public void Clear()
+        {
+            m_Pending.Clear();
         }
     }
 }

@@ -27,8 +27,6 @@ namespace Coop.Tests.Sync
 
         public List<RailClientRoom> Rooms { get; } = new List<RailClientRoom>();
 
-        public RPCSyncHandlers SyncHandlers { get; } = new RPCSyncHandlers();
-
         public void AddClient(
             RailRegistry registryClient,
             RailNetPeerWrapper connectionClientSide,
