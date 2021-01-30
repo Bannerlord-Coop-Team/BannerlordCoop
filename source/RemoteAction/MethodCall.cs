@@ -6,16 +6,15 @@ namespace RemoteAction
     /// <summary>
     ///     Represents a serializable call to a method including all invocation arguments. Method
     ///     pointer, instance and arguments have to resolved before execution. In order to resolve
-    ///     a method call refer to <see cref="Sync.MethodRegistry" /> and <see cref="ArgumentFactory" />.
+    ///     a method call refer to <see cref="Registry" /> and <see cref="ArgumentFactory" />.
     /// </summary>
-    public readonly struct MethodCall
+    public readonly struct MethodCall : IAction
     {
-        public readonly List<Argument> Arguments;
-
+        public IEnumerable<Argument> Arguments { get; }
         public readonly MethodId Id;
         public readonly Argument Instance; // Instance to call the method on.
 
-        public MethodCall(MethodId id, Argument instance, List<Argument> arguments)
+        public MethodCall(MethodId id, Argument instance, IEnumerable<Argument> arguments)
         {
             Arguments = arguments;
             Id = id;
@@ -25,7 +24,7 @@ namespace RemoteAction
         public override string ToString()
         {
             string sRet = Instance.EventType == EventArgType.Null ? "static " : $"{Instance} ";
-            if (MethodRegistry.IdToMethod.TryGetValue(Id, out MethodAccess method))
+            if (Registry.IdToMethod.TryGetValue(Id, out MethodAccess method))
             {
                 sRet += $"{method}";
             }

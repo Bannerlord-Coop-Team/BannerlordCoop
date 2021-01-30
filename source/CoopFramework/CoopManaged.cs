@@ -17,7 +17,7 @@ namespace CoopFramework
     /// </code>
     ///     
     /// </summary>
-    public abstract class CoopManaged<TSelf, TExtended> where TExtended : class
+    public abstract class CoopManaged<TSelf, TExtended> where TExtended : class 
     {
         /// <summary>
         ///     Creates synchronization for a given instance of <typeparamref name="TExtended"/>.
@@ -224,7 +224,7 @@ namespace CoopFramework
         {
             foreach (MethodId methodId in PatchedMethods())
             {
-                MethodAccess method = MethodRegistry.IdToMethod[methodId];
+                MethodAccess method = Registry.IdToMethod[methodId];
                 method.Prefix.RemoveHandler(instance);
             }
 
@@ -363,7 +363,7 @@ namespace CoopFramework
             
             foreach (MethodId methodId in PatchedMethods())
             {
-                MethodAccess method = MethodRegistry.IdToMethod[methodId];
+                MethodAccess method = Registry.IdToMethod[methodId];
                 CallBehaviourBuilder local = _callers[EActionOrigin.Local].GetCallBehaviour(methodId);
                 CallBehaviourBuilder auth = _callers[EActionOrigin.Authoritative].GetCallBehaviour(methodId);
                 method.Prefix.SetHandler(instance, (eOrigin, args) =>
@@ -385,7 +385,7 @@ namespace CoopFramework
         {
             foreach (MethodId methodId in PatchedMethods())
             {
-                MethodAccess method = MethodRegistry.IdToMethod[methodId];
+                MethodAccess method = Registry.IdToMethod[methodId];
                 CallBehaviourBuilder behaviourBuilderLocal = _callers[EActionOrigin.Local].GetCallBehaviour(methodId);
                 CallBehaviourBuilder behaviourBuilderAuth = _callers[EActionOrigin.Authoritative].GetCallBehaviour(methodId);
                 method.Prefix.SetGlobalHandler((eOrigin, instance, args) =>

@@ -310,7 +310,9 @@
     <Compile Include="Mod\Persistence\Compression.cs" />
     <Compile Include="Mod\Persistence\IEnvironmentClient.cs" />
     <Compile Include="Mod\Persistence\IEnvironmentServer.cs" />
-    <Compile Include="Mod\Persistence\MethodCall\Synchronization.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\EventFieldChange.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\EventActionBase.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\Synchronization.cs" />
     <Compile Include="Mod\Persistence\Party\EventPartyMoveTo.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityClient.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityServer.cs" />
@@ -319,10 +321,10 @@
     <Compile Include="Mod\Persistence\PersistenceClient.cs" />
     <Compile Include="Mod\Persistence\EntityManager.cs" />
     <Compile Include="Mod\Persistence\Registry.cs" />
-    <Compile Include="Mod\Persistence\MethodCall\EventBroadcastingQueue.cs" />
-    <Compile Include="Mod\Persistence\MethodCall\EventMethodCall.cs" />
-    <Compile Include="Mod\Persistence\MethodCall\IClientAccess.cs" />
-    <Compile Include="Mod\Persistence\MethodCall\PendingRequests.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\EventBroadcastingQueue.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\EventMethodCall.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\IClientAccess.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\PendingRequests.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityClient.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityServer.cs" />
     <Compile Include="Mod\Persistence\World\EventTimeControl.cs" />

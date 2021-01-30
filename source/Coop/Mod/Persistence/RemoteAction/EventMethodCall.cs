@@ -1,4 +1,5 @@
-﻿using JetBrains.Annotations;
+﻿using System.Collections.Generic;
+using JetBrains.Annotations;
 using NLog;
 using RailgunNet;
 using RailgunNet.Connection.Client;
@@ -6,11 +7,9 @@ using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using RailgunNet.Util;
 using RemoteAction;
-using Sync;
 using Sync.Behaviour;
-using MethodCall = RemoteAction.MethodCall;
 
-namespace Coop.Mod.Persistence.MethodCall
+namespace Coop.Mod.Persistence.RemoteAction
 {
     /// <summary>
     ///     RailEvent used to initiate remote procedure calls. The way this event is processed
@@ -21,17 +20,13 @@ namespace Coop.Mod.Persistence.MethodCall
     ///     transferred to all clients.
     ///     - Clients will resolve the call and arguments locally and execute it.
     /// </summary>
-    public class EventMethodCall : RailEvent
+    public class EventMethodCall : EventActionBase
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        [OnlyIn(Component.Client)]
-        [CanBeNull]
-        private readonly IEnvironmentClient m_EnvironmentClient;
+        [OnlyIn(Component.Client)] [CanBeNull] private readonly IEnvironmentClient m_EnvironmentClient;
 
-        [OnlyIn(Component.Server)]
-        [CanBeNull]
-        private readonly IEnvironmentServer m_EnvironmentServer;
+        [OnlyIn(Component.Server)] [CanBeNull] private readonly IEnvironmentServer m_EnvironmentServer;
 
         [OnlyIn(Component.Client)]
         public EventMethodCall([NotNull] IEnvironmentClient environment)
@@ -45,11 +40,12 @@ namespace Coop.Mod.Persistence.MethodCall
             m_EnvironmentServer = environment;
         }
 
-        [EventData] public RemoteAction.MethodCall Call { get; set; }
+        [EventData] public MethodCall Call { get; set; }
+        public override IEnumerable<Argument> Arguments => Call.Arguments;
 
         protected override void Execute(RailRoom room, RailController sender)
         {
-            if (MethodRegistry.IdToMethod.TryGetValue(Call.Id, out MethodAccess method))
+            if (Sync.Registry.IdToMethod.TryGetValue(Call.Id, out var method))
             {
                 if (room is RailServerRoom serverRoom)
                 {

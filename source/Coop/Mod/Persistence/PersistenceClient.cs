@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Common;
-using Coop.Mod.Persistence.MethodCall;
+using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
 using CoopFramework;
 using JetBrains.Annotations;
@@ -39,31 +39,32 @@ namespace Coop.Mod.Persistence
 
         public void Update(TimeSpan frameTime)
         {
-            List<object> toRemove = new List<object>();
-            foreach (KeyValuePair<ValueAccess, Dictionary<object, ValueChangeRequest>> buffer in
-                ChangeStack.BufferedChanges)
-            {
-                ValueAccess access = buffer.Key;
-                foreach (KeyValuePair<object, ValueChangeRequest> instanceBuffer in buffer.Value)
-                {
-                    object instance = instanceBuffer.Key;
-                    if (CheckShouldRemove(access, instance, instanceBuffer.Value))
-                    {
-                        toRemove.Add(instanceBuffer.Key);
-                    }
-                    else if (!instanceBuffer.Value.RequestProcessed)
-                    {
-                        access.Prefix.GetHandler(instance)?.Invoke(
-                            EActionOrigin.Local, // we want to emulate a local "field setter"
-                            new object[] { instanceBuffer.Value.RequestedValue });
-                        instanceBuffer.Value.RequestProcessed = true;
-                    }
-                }
-
-                toRemove.ForEach(o => buffer.Value.Remove(o));
-                toRemove.Clear();
-            }
-
+            // TODO
+            // List<object> toRemove = new List<object>();
+            // foreach (KeyValuePair<ValueAccess, Dictionary<object, ValueChangeRequest>> buffer in
+            //     ChangeStack.BufferedChanges)
+            // {
+            //     ValueAccess access = buffer.Key;
+            //     foreach (KeyValuePair<object, ValueChangeRequest> instanceBuffer in buffer.Value)
+            //     {
+            //         object instance = instanceBuffer.Key;
+            //         if (CheckShouldRemove(access, instance, instanceBuffer.Value))
+            //         {
+            //             toRemove.Add(instanceBuffer.Key);
+            //         }
+            //         else if (!instanceBuffer.Value.RequestProcessed)
+            //         {
+            //             access.Prefix.GetHandler(instance)?.Invoke(
+            //                 EActionOrigin.Local, // we want to emulate a local "field setter"
+            //                 new object[] { instanceBuffer.Value.RequestedValue });
+            //             instanceBuffer.Value.RequestProcessed = true;
+            //         }
+            //     }
+// 
+            //     toRemove.ForEach(o => buffer.Value.Remove(o));
+            //     toRemove.Clear();
+            // }
+// 
             m_RailClient.Update();
         }
 

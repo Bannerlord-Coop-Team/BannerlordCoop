@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Linq;
+using Coop.Mod.Patch.CampaignPatches;
 using Coop.Mod.Persistence;
 using CoopFramework;
 using HarmonyLib;
+using JetBrains.Annotations;
 using Mono.Reflection;
 using RemoteAction;
 using Sync;

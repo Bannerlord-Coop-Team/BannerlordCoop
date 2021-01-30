@@ -1,17 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using Common;
 using CoopFramework;
 using JetBrains.Annotations;
 using NLog;
-using RailgunNet.Connection.Client;
-using RailgunNet.System.Types;
 using RemoteAction;
 using Sync;
 
-namespace Coop.Mod.Persistence.MethodCall
+namespace Coop.Mod.Persistence.RemoteAction
 {
     public class Synchronization : ISynchronization
     {
@@ -19,12 +15,12 @@ namespace Coop.Mod.Persistence.MethodCall
         {
             m_ClientAccess = access;
         }
-        
+
         public void Broadcast(MethodId id, object instance, object[] args)
         {
-            MethodAccess access = MethodRegistry.IdToMethod[id];
-            bool bDebounce = access.Flags.HasFlag(EMethodPatchFlag.DebounceCalls);
-            RemoteAction.MethodCall call = new RemoteAction.MethodCall(
+            var access = Sync.Registry.IdToMethod[id];
+            var bDebounce = access.Flags.HasFlag(EMethodPatchFlag.DebounceCalls);
+            var call = new MethodCall(
                 id,
                 ArgumentFactory.Create(
                     m_ClientAccess.GetStore(),
@@ -48,23 +44,24 @@ namespace Coop.Mod.Persistence.MethodCall
                         });
             }
         }
-        
+
         public void RegisterSyncedField(ValueAccess value, IEnumerable<MethodAccess> triggers, Func<bool> condition)
         {
             throw new NotImplementedException();
         }
 
-        
 
         #region Debug
 
         public CallStatistics BroadcastHistory { get; } = new CallStatistics();
+
         #endregion
 
         #region Private
+
         private List<Argument> ProduceArguments(EMethodPatchFlag flags, object[] args)
         {
-            bool bTransferByValue = flags.HasFlag(EMethodPatchFlag.TransferArgumentsByValue);
+            var bTransferByValue = flags.HasFlag(EMethodPatchFlag.TransferArgumentsByValue);
             return args.Select(
                     obj => ArgumentFactory.Create(
                         m_ClientAccess.GetStore(),
@@ -72,12 +69,10 @@ namespace Coop.Mod.Persistence.MethodCall
                         bTransferByValue))
                 .ToList();
         }
-        
+
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         [NotNull] private readonly IClientAccess m_ClientAccess;
-        
-        #endregion
 
-        
+        #endregion
     }
 }

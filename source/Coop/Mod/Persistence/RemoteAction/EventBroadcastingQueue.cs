@@ -7,7 +7,7 @@ using NLog;
 using RailgunNet.Connection.Server;
 using Sync.Store;
 
-namespace Coop.Mod.Persistence.MethodCall
+namespace Coop.Mod.Persistence.RemoteAction
 {
     /// <summary>
     ///     Queue to broadcast events. Sends all events in order and makes sure, that all event
@@ -23,7 +23,7 @@ namespace Coop.Mod.Persistence.MethodCall
         ///     DEBUG to identify situations where events are starving in the queue. Might need
         ///     to be adjusted depending on how much is done using events.
         /// </summary>
-        public static readonly int MaximumQueueSize = Common.Globals.DEBUG ? 512 : 8192;
+        public static readonly int MaximumQueueSize = Globals.DEBUG ? 512 : 8192;
 
         private readonly OrderedHashSet<ObjectId> m_DistributedObjects =
             new OrderedHashSet<ObjectId>();
@@ -61,14 +61,14 @@ namespace Coop.Mod.Persistence.MethodCall
 
         public void Update(TimeSpan frameTime)
         {
-            int numberOfBroadcastEvents = 0;
+            var numberOfBroadcastEvents = 0;
             lock (m_Queue)
             {
-                foreach (Call call in m_Queue)
+                foreach (var call in m_Queue)
                 {
                     if (!call.TryBroadcast())
                     {
-                        TimeSpan timeSinceCreation = DateTime.Now - call.CreatedAt;
+                        var timeSinceCreation = DateTime.Now - call.CreatedAt;
                         if (timeSinceCreation > m_Timeout)
                         {
                             Logger.Error(
@@ -98,18 +98,17 @@ namespace Coop.Mod.Persistence.MethodCall
         /// </summary>
         /// <param name="room">Room to send the event to.</param>
         /// <param name="rpc"></param>
-        public void Add(RailServerRoom room, EventMethodCall rpc)
+        public void Add(RailServerRoom room, EventActionBase rpc)
         {
             lock (m_Queue)
             {
-                Call call = new Call(room, rpc);
+                var call = new Call(room, rpc);
                 call.ObjectsToBeDistributed.RemoveAll(id => m_DistributedObjects.Contains(id));
 
                 if (m_Queue.Count >= MaximumQueueSize)
                 {
                     Logger.Error("Event queue is full!");
-                    if (Common.Globals.DEBUG)
-                    {
+                    if (Globals.DEBUG)
                         // Events seem to starve in the queue. This indicates an underlying issue.
                         // Do one of the following:
                         // 1. Did you change anything that increases the number of generated events
@@ -122,7 +121,6 @@ namespace Coop.Mod.Persistence.MethodCall
                         //           sequence to guarantee a consistent state.
                         // 3. Open a bug.
                         throw new IndexOutOfRangeException();
-                    }
                 }
 
                 m_Queue.Add(call);
@@ -134,28 +132,25 @@ namespace Coop.Mod.Persistence.MethodCall
             lock (m_Queue)
             {
                 m_DistributedObjects.Add(id);
-                foreach (Call call in m_Queue)
-                {
-                    call.OnObjectDistributed(id);
-                }
+                foreach (var call in m_Queue) call.OnObjectDistributed(id);
             }
         }
 
         private class Call
         {
-            public Call(RailServerRoom room, EventMethodCall rpc)
+            public Call(RailServerRoom room, EventActionBase rpc)
             {
                 CreatedAt = DateTime.Now;
                 Room = room;
                 RPC = rpc;
 
-                ObjectsToBeDistributed = Enumerable.ToList<ObjectId>(RPC.Call.Arguments.Where(arg => arg.StoreObjectId.HasValue)
-                                                .Select(arg => arg.StoreObjectId.Value));
+                ObjectsToBeDistributed = RPC.Arguments.Where(arg => arg.StoreObjectId.HasValue)
+                    .Select(arg => arg.StoreObjectId.Value).ToList();
             }
 
             [NotNull] public RailServerRoom Room { get; }
 
-            public EventMethodCall RPC { get; }
+            public EventActionBase RPC { get; }
             [NotNull] public List<ObjectId> ObjectsToBeDistributed { get; }
 
             public DateTime CreatedAt { get; }
@@ -173,7 +168,7 @@ namespace Coop.Mod.Persistence.MethodCall
             public bool TryBroadcast()
             {
                 if (!IsReadyToBeSent()) return false;
-                Logger.Trace("Broadcast: {event}", RPC.Call);
+                Logger.Trace("Broadcast: {event}", RPC);
                 Room.BroadcastEvent(RPC);
                 return true;
             }

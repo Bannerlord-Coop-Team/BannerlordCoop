@@ -5,7 +5,7 @@ using System.Net;
 using Common;
 using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.MethodCall;
+using Coop.Mod.Persistence.RemoteAction;
 using Coop.Mod.Serializers;
 using Coop.NetImpl.LiteNet;
 using CoopFramework;

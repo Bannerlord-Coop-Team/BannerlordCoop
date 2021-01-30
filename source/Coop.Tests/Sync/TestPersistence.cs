@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
-using Coop.Mod.Persistence.MethodCall;
+using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
 using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;

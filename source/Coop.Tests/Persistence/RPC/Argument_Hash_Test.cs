@@ -1,5 +1,5 @@
 ﻿using System;
-using Coop.Mod.Persistence.MethodCall;
+using Coop.Mod.Persistence.RemoteAction;
 using RemoteAction;
 using Sync.Store;
 using TaleWorlds.ObjectSystem;

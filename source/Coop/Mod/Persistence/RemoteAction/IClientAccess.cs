@@ -2,10 +2,10 @@
 using RailgunNet.Connection.Client;
 using Sync.Store;
 
-namespace Coop.Mod.Persistence.MethodCall
+namespace Coop.Mod.Persistence.RemoteAction
 {
     /// <summary>
-    ///     Interface to access a clients persistence state. 
+    ///     Interface to access a clients persistence state.
     /// </summary>
     public interface IClientAccess
     {

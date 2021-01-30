@@ -1,5 +1,5 @@
 ﻿using System;
-using Coop.Mod.Persistence.MethodCall;
+using Coop.Mod.Persistence.RemoteAction;
 using Coop.Tests.Sync;
 using RailgunNet.System.Encoding;
 using RemoteAction;

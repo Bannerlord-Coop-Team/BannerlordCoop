@@ -17,9 +17,8 @@ namespace Sync
         /// <summary>
         ///     Buffer of all recorded changes to field values.
         /// </summary>
-        public Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>> BufferedChanges { get; } =
-            new Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>();
-
+        public ValueChangeBuffer BufferedChanges { get; } = new ValueChangeBuffer();
+        
         /// <summary>
         ///     Pushes a marker to the stack. The next call to <see cref="PopUntilMarker"/> will pop until this marker
         ///     is encountered.
@@ -61,32 +60,16 @@ namespace Sync
 
                 if (!changed) continue;
 
-                Dictionary<object, ValueChangeRequest> fieldBuffer = BufferedChanges.Assert(field);
-                if (fieldBuffer.TryGetValue(data.Target, out ValueChangeRequest cached))
-                {
-                    if (cached.RequestProcessed)
-                    {
-                        cached.RequestProcessed = false;
-                    }
-
-                    cached.RequestedValue = newValue;
-                    field.Set(data.Target, cached.LatestActualValue);
-                    continue;
-                }
-
-                fieldBuffer[data.Target] = new ValueChangeRequest
-                {
-                    LatestActualValue = data.Value,
-                    RequestedValue = newValue
-                };
-
+                object latestActualValue = BufferedChanges.AddChange(field, data, newValue);
                 if (bRevertToOriginalValue)
                 {
-                    field.Set(data.Target, data.Value);
+                    field.Set(data.Target, latestActualValue);
                 }
             }
         }
+
         
+
         #region Private
         private readonly Stack<ValueData> m_ActiveFields = new Stack<ValueData>();
         #endregion

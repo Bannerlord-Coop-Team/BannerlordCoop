@@ -1,5 +1,5 @@
 ﻿using Coop.Mod.Persistence.Party;
-using Coop.Mod.Persistence.MethodCall;
+using Coop.Mod.Persistence.RemoteAction;
 using JetBrains.Annotations;
 using Sync;
 using Sync.Store;

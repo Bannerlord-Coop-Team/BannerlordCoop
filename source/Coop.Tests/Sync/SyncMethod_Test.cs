@@ -50,8 +50,8 @@ namespace Coop.Tests.Sync
         private void IsRegistered()
         {
             // Statically registered
-            Assert.True(MethodRegistry.MethodToId.ContainsKey(m_SyncedMethod));
-            Assert.True(MethodRegistry.MethodToId.ContainsKey(m_StaticSyncedMethod));
+            Assert.True(Registry.MethodToId.ContainsKey(m_SyncedMethod));
+            Assert.True(Registry.MethodToId.ContainsKey(m_StaticSyncedMethod));
         }
 
         [Fact]

@@ -2,29 +2,29 @@
 using System.Collections.Generic;
 using RemoteAction;
 
-namespace Coop.Mod.Persistence.MethodCall
+namespace Coop.Mod.Persistence.RemoteAction
 {
     public class PendingRequests
     {
         private static readonly Lazy<PendingRequests> m_Instance =
             new Lazy<PendingRequests>(() => new PendingRequests());
+
+        private readonly Dictionary<int, IAction> m_Pending = new Dictionary<int, IAction>();
         public static PendingRequests Instance => m_Instance.Value;
-        
-        private readonly Dictionary<int, RemoteAction.MethodCall> m_Pending = new Dictionary<int, RemoteAction.MethodCall>();
 
-        public void Add(RemoteAction.MethodCall call)
+        public void Add(IAction action)
         {
-            m_Pending.Add(call.GetHashCode(), call);
+            m_Pending.Add(action.GetHashCode(), action);
         }
 
-        public bool IsPending(RemoteAction.MethodCall call)
+        public bool IsPending(IAction action)
         {
-            return m_Pending.ContainsKey(call.GetHashCode());
+            return m_Pending.ContainsKey(action.GetHashCode());
         }
 
-        public void Remove(RemoteAction.MethodCall call)
+        public void Remove(IAction action)
         {
-            m_Pending.Remove(call.GetHashCode());
+            m_Pending.Remove(action.GetHashCode());
         }
 
         public int PendingRequestCount()

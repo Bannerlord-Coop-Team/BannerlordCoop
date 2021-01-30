@@ -30,7 +30,7 @@ namespace Sync
         public MethodAccess([NotNull] MethodBase info)
         {
             MethodBase = info;
-            Id = MethodRegistry.Register(this);
+            Id = Registry.Register(this);
             m_StandIn = InvokableFactory.CreateStandIn(this);
             InitOriginal(m_StandIn);
             if (MethodBase.IsStatic)

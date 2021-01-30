@@ -3,7 +3,7 @@ using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
-using Coop.Mod.Persistence.MethodCall;
+using Coop.Mod.Persistence.RemoteAction;
 using NLog;
 using RemoteAction;
 using Sync;

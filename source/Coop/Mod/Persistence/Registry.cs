@@ -1,5 +1,5 @@
 ﻿using Coop.Mod.Persistence.Party;
-using Coop.Mod.Persistence.MethodCall;
+using Coop.Mod.Persistence.RemoteAction;
 using Coop.Mod.Persistence.World;
 using RailgunNet;
 using RailgunNet.Factory;
@@ -25,6 +25,7 @@ namespace Coop.Mod.Persistence
             reg.AddEventType<EventTimeControl>();
             reg.AddEventType<EventPartyMoveTo>();
             reg.AddEventType<EventMethodCall>(new object[] {environment});
+            reg.AddEventType<EventFieldChange>(new object[] {environment});
 
             return reg;
         }
@@ -42,6 +43,7 @@ namespace Coop.Mod.Persistence
             reg.AddEventType<EventTimeControl>();
             reg.AddEventType<EventPartyMoveTo>();
             reg.AddEventType<EventMethodCall>(new object[] {environment});
+            reg.AddEventType<EventFieldChange>(new object[] {environment});
 
             return reg;
         }

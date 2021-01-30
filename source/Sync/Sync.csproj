@@ -91,6 +91,7 @@
     <Compile Include="Behaviour\IPendingMethodCall.cs" />
     <Compile Include="ConstructorPatch.cs" />
     <Compile Include="DestructorPatch.cs" />
+    <Compile Include="FieldId.cs" />
     <Compile Include="GetPrefixBuilder.cs" />
     <Compile Include="MethodPatch.cs" />
     <Compile Include="EMethodPatchFlag.cs" />
@@ -100,11 +101,12 @@
     <Compile Include="Store\RemoteStore.cs" />
     <Compile Include="Store\SharedRemoteStore.cs" />
     <Compile Include="Store\StoreSerializer.cs" />
+    <Compile Include="ValueChangeBuffer.cs" />
     <Compile Include="ValueChangeRequest.cs" />
     <Compile Include="FieldChangeStack.cs" />
     <Compile Include="MethodId.cs" />
     <Compile Include="MethodPatchFactory.cs" />
-    <Compile Include="MethodRegistry.cs" />
+    <Compile Include="Registry.cs" />
     <Compile Include="PropertyPatch.cs" />
     <Compile Include="ValueAccess.cs" />
     <Compile Include="Prefix.cs" />

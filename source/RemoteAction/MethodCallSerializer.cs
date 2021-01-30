@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using NLog;
 using RailgunNet;
 using RailgunNet.System.Encoding;
@@ -20,7 +21,7 @@ namespace RemoteAction
             int bufferSizeBefore = buffer.ByteSize;
             buffer.WriteInt(pack.Id.InternalValue);
             ArgumentSerializer.EncodeEventArg(buffer, pack.Instance);
-            buffer.WriteInt(pack.Arguments.Count);
+            buffer.WriteInt(pack.Arguments.Count());
             foreach (Argument arg in pack.Arguments)
             {
                 ArgumentSerializer.EncodeEventArg(buffer, arg);

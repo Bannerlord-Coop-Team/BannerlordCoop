@@ -37,12 +37,15 @@ namespace Sync
     /// </summary>
     public abstract class FieldAccess : ValueAccess
     {
+        public readonly FieldId Id;
+        
         [NotNull] private readonly Func<object, object> m_GetterLocal;
         [NotNull] private readonly FieldInfo m_MemberInfo;
         [NotNull] private readonly Action<object, object> m_Setter;
 
         protected FieldAccess([NotNull] FieldInfo memberInfo)
         {
+            Id = Registry.Register(this);
             m_MemberInfo = memberInfo;
             m_GetterLocal = InvokableFactory.CreateUntypedGetter<object>(memberInfo);
             m_Setter = InvokableFactory.CreateUntypedSetter<object>(memberInfo);

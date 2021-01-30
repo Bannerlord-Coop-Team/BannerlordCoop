@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Coop.Mod.Persistence.MethodCall;
+using Coop.Mod.Persistence.RemoteAction;
 using RemoteAction;
 using Sync;
 using Sync.Store;

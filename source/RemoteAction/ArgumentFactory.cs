@@ -74,7 +74,7 @@ namespace RemoteAction
         /// <param name="store">Clients remote store instance.</param>
         /// <param name="args">Argument to be resolved.</param>
         /// <returns>A list of the unwrapped arguments.</returns>
-        public static object[] Resolve(IStore store, List<Argument> args)
+        public static object[] Resolve(IStore store, IEnumerable<Argument> args)
         {
             return args.Select(arg => Resolve(store, (Argument) arg)).ToArray();
         }

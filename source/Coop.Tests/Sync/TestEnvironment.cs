@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.MethodCall;
+using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using RailgunNet.Connection.Client;

@@ -5,7 +5,7 @@ using System.Net;
 using Common;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.MethodCall;
+using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
@@ -19,6 +19,7 @@ using Sync;
 using Sync.Behaviour;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using Registry = Sync.Registry;
 
 namespace Coop.Mod.DebugUtil
 {
@@ -114,7 +115,7 @@ namespace Coop.Mod.DebugUtil
                 return;
             }
 
-            foreach (KeyValuePair<MethodId, MethodAccess> registrar in MethodRegistry.IdToMethod)
+            foreach (KeyValuePair<MethodId, MethodAccess> registrar in Registry.IdToMethod)
             {
                 MethodAccess access = registrar.Value;
                 string sName = $"{registrar.Key} {access}";
