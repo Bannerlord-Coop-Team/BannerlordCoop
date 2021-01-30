@@ -76,9 +76,9 @@ namespace Coop.Tests.CoopFramework
         [Fact]
         void FooIsAutoPatched()
         {
-            Assert.Empty(CoopManagedFoo.ManagedInstances);
+            Assert.Empty(CoopManagedFoo.AutoWrappedInstances);
             Foo foo = new Foo();
-            Assert.Single(CoopManagedFoo.ManagedInstances);
+            Assert.Single(CoopManagedFoo.AutoWrappedInstances);
             Assert.Equal(42, foo.Bar);
             foo.Bar = 43;
             Assert.Equal(42, foo.Bar); // Suppressed
@@ -87,9 +87,9 @@ namespace Coop.Tests.CoopFramework
         [Fact]
         void Foo2IsAutoPatched()
         {
-            Assert.Empty(CoopManagedFoo2.ManagedInstances);
+            Assert.Empty(CoopManagedFoo2.AutoWrappedInstances);
             Foo2 foo = new Foo2();
-            Assert.Single(CoopManagedFoo2.ManagedInstances);
+            Assert.Single(CoopManagedFoo2.AutoWrappedInstances);
             Assert.Equal(42, foo.Bar);
             foo.Bar = 43;
             Assert.Equal(42, foo.Bar); // Suppressed
@@ -98,14 +98,14 @@ namespace Coop.Tests.CoopFramework
         [Fact]
         void ManagedInstancePoolsAreSeparate()
         {
-            Assert.Empty(CoopManagedFoo.ManagedInstances);
-            Assert.Empty(CoopManagedFoo2.ManagedInstances);
+            Assert.Empty(CoopManagedFoo.AutoWrappedInstances);
+            Assert.Empty(CoopManagedFoo2.AutoWrappedInstances);
             Foo foo = new Foo();
-            Assert.Single(CoopManagedFoo.ManagedInstances);
-            Assert.Empty(CoopManagedFoo2.ManagedInstances);
+            Assert.Single(CoopManagedFoo.AutoWrappedInstances);
+            Assert.Empty(CoopManagedFoo2.AutoWrappedInstances);
             Foo2 foo2 = new Foo2();
-            Assert.Single(CoopManagedFoo.ManagedInstances);
-            Assert.Single(CoopManagedFoo2.ManagedInstances);
+            Assert.Single(CoopManagedFoo.AutoWrappedInstances);
+            Assert.Single(CoopManagedFoo2.AutoWrappedInstances);
         }
     }
 }

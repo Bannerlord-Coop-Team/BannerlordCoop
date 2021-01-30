@@ -25,31 +25,30 @@ namespace Sync
 
         public IEnumerable<MethodAccess> Setters => m_SetterPatch.Methods;
         public IEnumerable<MethodAccess> Getters => m_GetterPatch.Methods;
-
-        public PropertyPatch<TPatch> InterceptSetter([NotNull] PropertyInfo property)
-        {
-            m_SetterPatch.Intercept(
-                AccessTools.PropertySetter(m_Declaring, property.Name));
-            return this;
-        }
-
+        
         public PropertyPatch<TPatch> InterceptSetter(string sProperty)
         {
             m_SetterPatch.Intercept(
                 AccessTools.PropertySetter(m_Declaring, sProperty));
             return this;
         }
-
-        public PropertyPatch<TPatch> InterceptGetter([NotNull] PropertyInfo property)
+        
+        public PropertyPatch<TPatch> PostfixSetter(string sProperty)
         {
-            m_SetterPatch.Intercept(
-                AccessTools.PropertyGetter(m_Declaring, property.Name));
+            m_SetterPatch.Postfix(
+                AccessTools.PropertySetter(m_Declaring, sProperty));
             return this;
         }
 
         public PropertyPatch<TPatch> InterceptGetter(string sProperty)
         {
-            m_SetterPatch.Intercept(
+            m_GetterPatch.Intercept(
+                AccessTools.PropertyGetter(m_Declaring, sProperty));
+            return this;
+        }
+        public PropertyPatch<TPatch> PostfixGetter(string sProperty)
+        {
+            m_GetterPatch.Postfix(
                 AccessTools.PropertyGetter(m_Declaring, sProperty));
             return this;
         }

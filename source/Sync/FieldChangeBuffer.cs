@@ -16,45 +16,21 @@ namespace Sync
     {
         private readonly Stack<ValueData> ActiveFields = new Stack<ValueData>();
 
-        private readonly HarmonyMethod PatchPrefix = new HarmonyMethod(
-            AccessTools.Method(typeof(FieldChangeBuffer), nameof(PushActiveFields)))
-        {
-            priority = SyncPriority.FieldWatcherPre
-        };
-
-        private readonly HarmonyMethod PatchPostfix = new HarmonyMethod(
-            AccessTools.Method(typeof(FieldChangeBuffer), nameof(PopActiveFields)))
-        {
-            priority = SyncPriority.FieldWatcherPost
-        };
-
         public Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>
             BufferedChanges { get; } =
             new Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>();
 
-        private void PushActiveFields()
+        public void PushActiveFieldMarker()
         {
             ActiveFields.Push(null);
         }
 
-        private void OnBeforeExpectedChange(ValueAccess access, object target)
+        public void PushActiveField(ValueAccess access, object target)
         {
-            object value;
-            if (BufferedChanges.ContainsKey(access) &&
-                BufferedChanges[access].TryGetValue(target, out ValueChangeRequest cache))
-            {
-                value = cache.RequestedValue;
-                access.Set(target, value);
-            }
-            else
-            {
-                value = access.Get(target);
-            }
-
-            ActiveFields.Push(new ValueData(access, target, value));
+            ActiveFields.Push(new ValueData(access, target, access.Get(target)));
         }
 
-        private void PopActiveFields()
+        public void PopActiveFields(bool bRevertToOriginalValue)
         {
             while (ActiveFields.Count > 0)
             {
@@ -89,7 +65,11 @@ namespace Sync
                     LatestActualValue = data.Value,
                     RequestedValue = newValue
                 };
-                field.Set(data.Target, data.Value);
+
+                if (bRevertToOriginalValue)
+                {
+                    field.Set(data.Target, data.Value);
+                }
             }
         }
     }

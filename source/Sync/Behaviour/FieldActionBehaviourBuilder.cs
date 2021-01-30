@@ -19,9 +19,10 @@ namespace Sync.Behaviour
         public FieldBehaviourBuilder Through(params MethodAccess[] accessors)
         {
             Accessors.AddRange(accessors);
-            return new FieldBehaviourBuilder();
+            return Behaviour;
         }
 
         public List<MethodAccess> Accessors { get; } = new List<MethodAccess>();
+        public FieldBehaviourBuilder Behaviour { get; } = new FieldBehaviourBuilder();
     }
 }

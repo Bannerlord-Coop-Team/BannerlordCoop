@@ -39,18 +39,54 @@ namespace Coop.Tests.CoopFramework
             }
         }
 
+        public CoopManaged_FieldPatching()
+        {
+            CoopManagedFoo.FieldBuffer.BufferedChanges.Clear();
+        }
+
         [Fact]
-        void DoesRevertBarFieldChange()
+        void DoesRevertBarFieldChangeThroughProperty()
         {
             Foo foo = new Foo();
             CoopManagedFoo fooManaged = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.m_Bar);
+            Assert.Empty(CoopManagedFoo.FieldBuffer.BufferedChanges);
             
             // Change through property
             foo.BarProperty = 43;
-
-            // Unchanged because of the suppress patch
             Assert.Equal(42, foo.m_Bar);
+            Assert.Single(CoopManagedFoo.FieldBuffer.BufferedChanges);
+        }
+        [Fact]
+        void DoesRevertBarFieldChangeThroughMethod()
+        {
+            Foo foo = new Foo();
+            CoopManagedFoo fooManaged = new CoopManagedFoo(foo);
+            Assert.Equal(42, foo.m_Bar);
+            Assert.Empty(CoopManagedFoo.FieldBuffer.BufferedChanges);
+            
+            // Change through method call
+            foo.SetBar(43);
+            Assert.Equal(42, foo.m_Bar);
+            Assert.Single(CoopManagedFoo.FieldBuffer.BufferedChanges);
+        }
+        [Fact]
+        void DoesRevertBarFieldChangeBoth()
+        {
+            Foo foo = new Foo();
+            CoopManagedFoo fooManaged = new CoopManagedFoo(foo);
+            Assert.Equal(42, foo.m_Bar);
+            Assert.Empty(CoopManagedFoo.FieldBuffer.BufferedChanges);
+            
+            // Change through property
+            foo.BarProperty = 43;
+            Assert.Equal(42, foo.m_Bar);
+            Assert.Single(CoopManagedFoo.FieldBuffer.BufferedChanges);
+            
+            // Change through method call
+            foo.SetBar(43);
+            Assert.Equal(42, foo.m_Bar);
+            Assert.Single(CoopManagedFoo.FieldBuffer.BufferedChanges); // Actually stays single because the buffered change is reused
         }
     }
 }

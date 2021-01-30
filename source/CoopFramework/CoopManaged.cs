@@ -34,7 +34,6 @@ namespace CoopFramework
             m_GetSync = new Lazy<Func<ISynchronization>>(FindSyncFactory);
 
             SetupInstanceHandlers(instance);
-            OnConstructed(this);
         }
         #region Patcher
         /// <summary>
@@ -71,7 +70,7 @@ namespace CoopFramework
         /// <returns></returns>
         protected static MethodAccess Setter(string sPropertyName)
         {
-            return new PropertyPatch<TSelf>(typeof(TExtended)).InterceptSetter(sPropertyName).Setters.First();
+            return new PropertyPatch<TSelf>(typeof(TExtended)).InterceptSetter(sPropertyName).PostfixSetter(sPropertyName).Setters.First();
         }
         /// <summary>
         ///     Patches a method on the extended class with a prefix. Please of the nameof operator instead of raw
@@ -84,7 +83,7 @@ namespace CoopFramework
         /// <returns></returns>
         protected static MethodAccess Method(string sMethodName)
         {
-            return new MethodPatch<TSelf>(typeof(TExtended)).Intercept(sMethodName).Methods.First();
+            return new MethodPatch<TSelf>(typeof(TExtended)).Intercept(sMethodName).Postfix(sMethodName).Methods.First();
         }
 
         /// <summary>
@@ -129,16 +128,19 @@ namespace CoopFramework
         [NotNull] protected WeakReference<TExtended> Instance { get; set; }
 
         /// <summary>
-        ///     Returns all instances of this <see cref="TSelf"/>.
+        ///     Returns all instances of this <see cref="TSelf"/> that very automatically created because
+        ///     <see cref="AutoWrapAllInstances"/> is enabled.
         /// </summary>
-        public static IReadOnlyCollection<CoopManaged<TSelf, TExtended>> ManagedInstances => m_ManagedInstances;
+        public static IReadOnlyCollection<CoopManaged<TSelf, TExtended>> AutoWrappedInstances => m_AutoWrappedInstances;
+        
+        public static readonly FieldChangeBuffer FieldBuffer = new FieldChangeBuffer();
         #endregion
 
         #region Private
         
         private static void OnConstructed(CoopManaged<TSelf, TExtended> newInstance)
         {
-            m_ManagedInstances.Add(newInstance);
+            m_AutoWrappedInstances.Add(newInstance);
         }
 
         private static ECallPropagation StaticDispatch(MethodAccess methodAccess, CallBehaviourBuilder behaviourBuilder, object[] args)
@@ -200,11 +202,22 @@ namespace CoopFramework
         private static IEnumerable<MethodId> PatchedMethods()
         {
             HashSet<MethodId> ids = new HashSet<MethodId>();
-            foreach (ActionBehaviourBuilder origin in _callers.Values)
+            foreach (ActionBehaviourBuilder builder in _callers.Values)
             {
-                ids.UnionWith(origin.CallBehaviours.Keys);
+                ids.UnionWith(builder.CallBehaviours.Keys);
             }
             return ids;
+        }
+
+        private static IEnumerable<FieldAccess> PatchedFields()
+        {
+            HashSet<FieldAccess> fields = new HashSet<FieldAccess>();
+            foreach (ActionBehaviourBuilder builder in _callers.Values)
+            {
+                fields.UnionWith(builder.FieldChangeAction.Keys);
+            }
+
+            return fields;
         }
 
         private void OnBeforeFinalize(TExtended instance)
@@ -225,7 +238,7 @@ namespace CoopFramework
                 {EActionOrigin.Authoritative, new ActionBehaviourBuilder()}
             };
 
-        private static readonly List<CoopManaged<TSelf, TExtended>> m_ManagedInstances = new List<CoopManaged<TSelf, TExtended>>();
+        private static readonly List<CoopManaged<TSelf, TExtended>> m_AutoWrappedInstances = new List<CoopManaged<TSelf, TExtended>>();
         private static ConstructorPatch<TSelf> m_ConstructorPatch;
         private static DestructorPatch<TSelf> m_DestructorPatch;
         
@@ -269,7 +282,7 @@ namespace CoopFramework
             {
                 methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
                 {
-                    factoryMethod(instance as TExtended);
+                    OnConstructed(factoryMethod(instance as TExtended));
                 });
             }
 
@@ -284,13 +297,13 @@ namespace CoopFramework
             {
                 methodAccess.Prefix.SetGlobalHandler((origin, instance, args) =>
                 {
-                    var managedInstances = m_ManagedInstances
+                    var managedInstances = m_AutoWrappedInstances
                         .Where(wrapper => wrapper.Instance.TryGetTarget(out TExtended o) && o == instance)
                         .ToList();
                     foreach (var managedInstance in managedInstances)
                     {
                         managedInstance.OnBeforeFinalize(instance as TExtended);
-                        m_ManagedInstances.Remove(managedInstance);
+                        m_AutoWrappedInstances.Remove(managedInstance);
                     }
 
                     return ECallPropagation.CallOriginal; // Always call the original desctructor!
@@ -300,26 +313,74 @@ namespace CoopFramework
         
         private void SetupInstanceHandlers(TExtended instance)
         {
+            foreach (FieldAccess field in PatchedFields())
+            {
+                FieldActionBehaviourBuilder local = _callers[EActionOrigin.Local].GetFieldBehaviour(field);
+                FieldActionBehaviourBuilder auth = _callers[EActionOrigin.Authoritative].GetFieldBehaviour(field);
+                IEnumerable<MethodAccess> accessors = local.Accessors.Union(auth.Accessors);
+                foreach (MethodAccess accessor in accessors)
+                {
+                    accessor.Prefix.SetHandler(instance, (origin, args) =>
+                    {
+                        if (!Instance.TryGetTarget(out TExtended instanceResolved))
+                        {
+                            // The instance went out of scope?
+                            Logger.Warn("Coop synced {Instance} seems to have expired", ToString());
+                            return ECallPropagation.Suppress; // Will not work anyways
+                        }
+                        
+                        FieldBuffer.PushActiveFieldMarker();
+                        FieldBuffer.PushActiveField(field, instanceResolved);
+                        return ECallPropagation.CallOriginal;
+                    });
+                    accessor.Postfix.SetHandler(instance, (origin, args) =>
+                    {
+                        switch (origin)
+                        {
+                            case EActionOrigin.Local:
+                            {
+                                if (local.Behaviour.DoBroadcast)
+                                {
+                                    // TODO:
+                                }
+
+                                FieldBuffer.PopActiveFields(local.Behaviour.Action == EFieldChangeAction.Revert);
+                                break;
+                            }
+                            case EActionOrigin.Authoritative:
+                            {
+                                if (auth.Behaviour.DoBroadcast)
+                                {
+                                    // TODO:
+                                }
+                                FieldBuffer.PopActiveFields(auth.Behaviour.Action == EFieldChangeAction.Revert);
+                                break;
+                            }
+                        }
+                    });
+                }
+            }
+            
             foreach (MethodId methodId in PatchedMethods())
             {
                 MethodAccess method = MethodRegistry.IdToMethod[methodId];
-                CallBehaviourBuilder behaviourBuilderLocal = _callers[EActionOrigin.Local].GetCallBehaviour(methodId);
-                CallBehaviourBuilder behaviourBuilderAuth = _callers[EActionOrigin.Authoritative].GetCallBehaviour(methodId);
+                CallBehaviourBuilder local = _callers[EActionOrigin.Local].GetCallBehaviour(methodId);
+                CallBehaviourBuilder auth = _callers[EActionOrigin.Authoritative].GetCallBehaviour(methodId);
                 method.Prefix.SetHandler(instance, (eOrigin, args) =>
                 {
                     switch (eOrigin)
                     {
                         case EActionOrigin.Local:
-                            return RuntimeDispatch(method, behaviourBuilderLocal, args);
+                            return RuntimeDispatch(method, local, args);
                         case EActionOrigin.Authoritative:
-                            return RuntimeDispatch(method, behaviourBuilderAuth, args);
+                            return RuntimeDispatch(method, auth, args);
                         default:
                             throw new ArgumentOutOfRangeException(nameof(eOrigin), eOrigin, null);
                     }
                 });
             }
         }
-        
+
         private static void SetupStaticHandlers()
         {
             foreach (MethodId methodId in PatchedMethods())
@@ -380,7 +441,7 @@ namespace CoopFramework
             });
         
         [CanBeNull] private readonly Lazy<Func<ISynchronization>> m_GetSync;
-
+        
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         #endregion
