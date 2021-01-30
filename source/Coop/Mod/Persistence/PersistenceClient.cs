@@ -14,7 +14,7 @@ using Sync.Behaviour;
 namespace Coop.Mod.Persistence
 {
     /// <summary>
-    ///     Manages the <see cref="FieldChangeBuffer" />, that is it calls the responsible handlers
+    ///     Manages the <see cref="FieldChangeStack" />, that is it calls the responsible handlers
     ///     for all requested changes once per <see cref="Update" />. As the server is currently
     ///     running in the host client, this class is also responsible for triggering the serverside
     ///     field updates!
@@ -35,13 +35,13 @@ namespace Coop.Mod.Persistence
 
         [NotNull] public RailClientRoom Room { get; }
 
-        [NotNull] public FieldChangeBuffer ChangeBuffer { get; } = new FieldChangeBuffer();
+        [NotNull] public FieldChangeStack ChangeStack { get; } = new FieldChangeStack();
 
         public void Update(TimeSpan frameTime)
         {
             List<object> toRemove = new List<object>();
             foreach (KeyValuePair<ValueAccess, Dictionary<object, ValueChangeRequest>> buffer in
-                ChangeBuffer.BufferedChanges)
+                ChangeStack.BufferedChanges)
             {
                 ValueAccess access = buffer.Key;
                 foreach (KeyValuePair<object, ValueChangeRequest> instanceBuffer in buffer.Value)

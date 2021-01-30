@@ -133,7 +133,7 @@ namespace CoopFramework
         /// </summary>
         public static IReadOnlyCollection<CoopManaged<TSelf, TExtended>> AutoWrappedInstances => m_AutoWrappedInstances;
         
-        public static readonly FieldChangeBuffer FieldBuffer = new FieldChangeBuffer();
+        public static readonly FieldChangeStack FieldStack = new FieldChangeStack();
         #endregion
 
         #region Private
@@ -329,8 +329,8 @@ namespace CoopFramework
                             return ECallPropagation.Suppress; // Will not work anyways
                         }
                         
-                        FieldBuffer.PushActiveFieldMarker();
-                        FieldBuffer.PushActiveField(field, instanceResolved);
+                        FieldStack.PushMarker();
+                        FieldStack.PushValue(field, instanceResolved);
                         return ECallPropagation.CallOriginal;
                     });
                     accessor.Postfix.SetHandler(instance, (origin, args) =>
@@ -344,7 +344,7 @@ namespace CoopFramework
                                     // TODO:
                                 }
 
-                                FieldBuffer.PopActiveFields(local.Behaviour.Action == EFieldChangeAction.Revert);
+                                FieldStack.PopUntilMarker(local.Behaviour.Action == EFieldChangeAction.Revert);
                                 break;
                             }
                             case EActionOrigin.Authoritative:
@@ -353,7 +353,7 @@ namespace CoopFramework
                                 {
                                     // TODO:
                                 }
-                                FieldBuffer.PopActiveFields(auth.Behaviour.Action == EFieldChangeAction.Revert);
+                                FieldStack.PopUntilMarker(auth.Behaviour.Action == EFieldChangeAction.Revert);
                                 break;
                             }
                         }

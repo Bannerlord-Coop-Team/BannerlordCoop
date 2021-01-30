@@ -8,13 +8,29 @@ namespace Coop.Tests.CoopFramework
     [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class CoopManaged_CallTakesVarArgs
     {
-        class Foo
+        [Fact]
+        private void DoesApplyPatches()
+        {
+            var foo = new Foo();
+            var fooManaged = new CoopManagedFoo(foo);
+            Assert.Equal(42, foo.Bar);
+            Assert.Equal(42, foo.Baz);
+
+            foo.Bar = 43;
+            foo.Baz = 43;
+
+            // Unchanged because of the suppress patch
+            Assert.Equal(42, foo.Bar);
+            Assert.Equal(42, foo.Baz);
+        }
+
+        private class Foo
         {
             public int Bar { get; set; } = 42;
             public int Baz { get; set; } = 42;
         }
 
-        class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
+        private class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
         {
             static CoopManagedFoo()
             {
@@ -28,22 +44,6 @@ namespace Coop.Tests.CoopFramework
             public CoopManagedFoo([NotNull] Foo instance) : base(instance)
             {
             }
-        }
-
-        [Fact]
-        void DoesApplyPatches()
-        {
-            Foo foo = new Foo();
-            CoopManagedFoo fooManaged = new CoopManagedFoo(foo);
-            Assert.Equal(42, foo.Bar);
-            Assert.Equal(42, foo.Baz);
-
-            foo.Bar = 43;
-            foo.Baz = 43;
-
-            // Unchanged because of the suppress patch
-            Assert.Equal(42, foo.Bar);
-            Assert.Equal(42, foo.Baz);
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using CoopFramework;
 using JetBrains.Annotations;
 using Sync;
@@ -10,61 +11,11 @@ namespace Coop.Tests.CoopFramework
     [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class CoopManaged_TestSeparateStatics
     {
-        class Foo
-        {
-            // For some simpler types the runtime apparently does not generate a destructor. But we need one for the automatic lifetime management.
-            ~Foo()
-            {
-            }
-            public int Bar { get; set; } = 42;
-        }
-        
-        class Foo2
-        {
-            // For some simpler types the runtime apparently does not generate a destructor. But we need one for the automatic lifetime management.
-            ~Foo2()
-            {
-            }
-            public int Bar { get; set; } = 42;
-        }
-        
-        class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
-        {
-            public static MethodAccess BarSetter = Setter(nameof(Foo.Bar));
-            static CoopManagedFoo()
-            {
-                When(EActionOrigin.Local)
-                    .Calls(BarSetter)
-                    .Suppress();
-                AutoWrapAllInstances((instance => new CoopManagedFoo(instance)));
-            }
-
-            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
-            {
-            }
-        }
-        
-        class CoopManagedFoo2 : CoopManaged<CoopManagedFoo2, Foo2>
-        {
-            public static MethodAccess BarSetter = Setter(nameof(Foo2.Bar));
-            static CoopManagedFoo2()
-            {
-                When(EActionOrigin.Local)
-                    .Calls(BarSetter)
-                    .Suppress();
-                AutoWrapAllInstances((instance => new CoopManagedFoo2(instance)));
-            }
-
-            public CoopManagedFoo2([NotNull] Foo2 instance) : base(instance)
-            {
-            }
-        }
-        
         static CoopManaged_TestSeparateStatics()
         {
             // Ensure the static constructor is called
-            System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo).TypeHandle);  
-            System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo2).TypeHandle);  
+            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo).TypeHandle);
+            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo2).TypeHandle);
         }
 
         public CoopManaged_TestSeparateStatics()
@@ -74,38 +25,92 @@ namespace Coop.Tests.CoopFramework
         }
 
         [Fact]
-        void FooIsAutoPatched()
+        private void FooIsAutoPatched()
         {
             Assert.Empty(CoopManagedFoo.AutoWrappedInstances);
-            Foo foo = new Foo();
+            var foo = new Foo();
             Assert.Single(CoopManagedFoo.AutoWrappedInstances);
             Assert.Equal(42, foo.Bar);
             foo.Bar = 43;
             Assert.Equal(42, foo.Bar); // Suppressed
         }
-        
+
         [Fact]
-        void Foo2IsAutoPatched()
+        private void Foo2IsAutoPatched()
         {
             Assert.Empty(CoopManagedFoo2.AutoWrappedInstances);
-            Foo2 foo = new Foo2();
+            var foo = new Foo2();
             Assert.Single(CoopManagedFoo2.AutoWrappedInstances);
             Assert.Equal(42, foo.Bar);
             foo.Bar = 43;
             Assert.Equal(42, foo.Bar); // Suppressed
         }
-        
+
         [Fact]
-        void ManagedInstancePoolsAreSeparate()
+        private void ManagedInstancePoolsAreSeparate()
         {
             Assert.Empty(CoopManagedFoo.AutoWrappedInstances);
             Assert.Empty(CoopManagedFoo2.AutoWrappedInstances);
-            Foo foo = new Foo();
+            var foo = new Foo();
             Assert.Single(CoopManagedFoo.AutoWrappedInstances);
             Assert.Empty(CoopManagedFoo2.AutoWrappedInstances);
-            Foo2 foo2 = new Foo2();
+            var foo2 = new Foo2();
             Assert.Single(CoopManagedFoo.AutoWrappedInstances);
             Assert.Single(CoopManagedFoo2.AutoWrappedInstances);
+        }
+
+        private class Foo
+        {
+            public int Bar { get; set; } = 42;
+
+            // For some simpler types the runtime apparently does not generate a destructor. But we need one for the automatic lifetime management.
+            ~Foo()
+            {
+            }
+        }
+
+        private class Foo2
+        {
+            public int Bar { get; set; } = 42;
+
+            // For some simpler types the runtime apparently does not generate a destructor. But we need one for the automatic lifetime management.
+            ~Foo2()
+            {
+            }
+        }
+
+        private class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
+        {
+            public static readonly MethodAccess BarSetter = Setter(nameof(Foo.Bar));
+
+            static CoopManagedFoo()
+            {
+                When(EActionOrigin.Local)
+                    .Calls(BarSetter)
+                    .Suppress();
+                AutoWrapAllInstances(instance => new CoopManagedFoo(instance));
+            }
+
+            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
+            {
+            }
+        }
+
+        private class CoopManagedFoo2 : CoopManaged<CoopManagedFoo2, Foo2>
+        {
+            public static readonly MethodAccess BarSetter = Setter(nameof(Foo2.Bar));
+
+            static CoopManagedFoo2()
+            {
+                When(EActionOrigin.Local)
+                    .Calls(BarSetter)
+                    .Suppress();
+                AutoWrapAllInstances(instance => new CoopManagedFoo2(instance));
+            }
+
+            public CoopManagedFoo2([NotNull] Foo2 instance) : base(instance)
+            {
+            }
         }
     }
 }

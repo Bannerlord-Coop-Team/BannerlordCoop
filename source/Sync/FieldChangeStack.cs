@@ -12,29 +12,43 @@ namespace Sync
     ///     The buffer <see cref="BufferedChanges" /> will never be cleared internally. The game
     ///     loop is responsible to process the buffered changes and apply or discard them.
     /// </summary>
-    public class FieldChangeBuffer
+    public class FieldChangeStack
     {
-        private readonly Stack<ValueData> ActiveFields = new Stack<ValueData>();
-
-        public Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>
-            BufferedChanges { get; } =
+        /// <summary>
+        ///     Buffer of all recorded changes to field values.
+        /// </summary>
+        public Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>> BufferedChanges { get; } =
             new Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>();
 
-        public void PushActiveFieldMarker()
+        /// <summary>
+        ///     Pushes a marker to the stack. The next call to <see cref="PopUntilMarker"/> will pop until this marker
+        ///     is encountered.
+        /// </summary>
+        public void PushMarker()
         {
-            ActiveFields.Push(null);
+            m_ActiveFields.Push(null);
         }
 
-        public void PushActiveField(ValueAccess access, object target)
+        /// <summary>
+        ///     Pushes the current value of the given field to the stack.
+        /// </summary>
+        /// <param name="access">Access object to the field value</param>
+        /// <param name="target">Instance that the field belongs to</param>
+        public void PushValue(ValueAccess access, object target)
         {
-            ActiveFields.Push(new ValueData(access, target, access.Get(target)));
+            m_ActiveFields.Push(new ValueData(access, target, access.Get(target)));
         }
 
-        public void PopActiveFields(bool bRevertToOriginalValue)
+        /// <summary>
+        ///     Pops all changes until a marker is encountered. The popped field changes are stored in the
+        ///     <see cref="BufferedChanges"/>.
+        /// </summary>
+        /// <param name="bRevertToOriginalValue"></param>
+        public void PopUntilMarker(bool bRevertToOriginalValue)
         {
-            while (ActiveFields.Count > 0)
+            while (m_ActiveFields.Count > 0)
             {
-                ValueData data = ActiveFields.Pop();
+                ValueData data = m_ActiveFields.Pop();
                 if (data == null)
                 {
                     break; // The marker
@@ -72,5 +86,9 @@ namespace Sync
                 }
             }
         }
+        
+        #region Private
+        private readonly Stack<ValueData> m_ActiveFields = new Stack<ValueData>();
+        #endregion
     }
 }

@@ -101,7 +101,7 @@
     <Compile Include="Store\SharedRemoteStore.cs" />
     <Compile Include="Store\StoreSerializer.cs" />
     <Compile Include="ValueChangeRequest.cs" />
-    <Compile Include="FieldChangeBuffer.cs" />
+    <Compile Include="FieldChangeStack.cs" />
     <Compile Include="MethodId.cs" />
     <Compile Include="MethodPatchFactory.cs" />
     <Compile Include="MethodRegistry.cs" />

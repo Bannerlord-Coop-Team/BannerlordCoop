@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Linq;
-using System.Reflection;
 using CoopFramework;
 using JetBrains.Annotations;
 using Sync;
@@ -12,16 +10,64 @@ namespace Coop.Tests.CoopFramework
     [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class CoopManager_TestDelegate
     {
-        class Foo
+        [Fact]
+        private void FooCallbackIsCalled()
         {
-            public int Bar { get; set; } = 42;
+            var foo = new Foo();
+            var sync = new CoopManagedFoo(foo);
+            var bCallbackWasExecuted = false;
+            foo.Callback = call =>
+            {
+                bCallbackWasExecuted = true;
+                return ECallPropagation.CallOriginal;
+            };
 
-            public Func<IPendingMethodCall, ECallPropagation> Callback; // Testing: Will be called by the CoopManagedFoo handling this instance
+            foo.Bar = 43;
+            Assert.True(bCallbackWasExecuted);
         }
 
-        class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
+        [Fact]
+        private void HandlerCanControlCallPropagation()
         {
-            public static MethodAccess BarSetter = Setter(nameof(Foo.Bar));
+            var foo = new Foo();
+            var sync = new CoopManagedFoo(foo);
+            Assert.Equal(42, foo.Bar);
+
+            // Call original
+            var bCallbackWasExecuted = false;
+            foo.Callback = call =>
+            {
+                bCallbackWasExecuted = true;
+                return ECallPropagation.CallOriginal;
+            };
+            foo.Bar = 43;
+            Assert.True(bCallbackWasExecuted);
+            Assert.Equal(43, foo.Bar);
+
+            // Suppress original call
+            bCallbackWasExecuted = false;
+            foo.Callback = call =>
+            {
+                bCallbackWasExecuted = true;
+                return ECallPropagation.Suppress;
+            };
+            foo.Bar = 44;
+            Assert.True(bCallbackWasExecuted);
+            Assert.Equal(43, foo.Bar); // unchanged
+        }
+
+        private class Foo
+        {
+            public Func<IPendingMethodCall, ECallPropagation>
+                Callback; // Testing: Will be called by the CoopManagedFoo handling this instance
+
+            public int Bar { get; set; } = 42;
+        }
+
+        private class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
+        {
+            public static readonly MethodAccess BarSetter = Setter(nameof(Foo.Bar));
+
             static CoopManagedFoo()
             {
                 // Ignore local calls on Foo.Bar
@@ -36,57 +82,11 @@ namespace Coop.Tests.CoopFramework
 
             public static ECallPropagation BarSetterHandler(IPendingMethodCall pendingMethodCall)
             {
-                Foo fooInstance = pendingMethodCall.Instance as Foo;
+                var fooInstance = pendingMethodCall.Instance as Foo;
                 Assert.NotNull(fooInstance);
                 Assert.NotNull(fooInstance.Callback);
                 return fooInstance.Callback.Invoke(pendingMethodCall);
             }
-        }
-
-        [Fact]
-        void FooCallbackIsCalled()
-        {
-            Foo foo = new Foo();
-            CoopManagedFoo sync = new CoopManagedFoo(foo);
-            bool bCallbackWasExecuted = false;
-            foo.Callback = call =>
-            {
-                bCallbackWasExecuted = true;
-                return ECallPropagation.CallOriginal;
-            };
-            
-            foo.Bar = 43;
-            Assert.True(bCallbackWasExecuted);
-        }
-
-        [Fact]
-        void HandlerCanControlCallPropagation()
-        {
-            Foo foo = new Foo();
-            CoopManagedFoo sync = new CoopManagedFoo(foo);
-            Assert.Equal(42, foo.Bar);
-            
-            // Call original
-            bool bCallbackWasExecuted = false;
-            foo.Callback = call =>
-            {
-                bCallbackWasExecuted = true;
-                return ECallPropagation.CallOriginal;
-            };
-            foo.Bar = 43;
-            Assert.True(bCallbackWasExecuted);
-            Assert.Equal(43, foo.Bar);
-            
-            // Suppress original call
-            bCallbackWasExecuted = false;
-            foo.Callback = call =>
-            {
-                bCallbackWasExecuted = true;
-                return ECallPropagation.Suppress;
-            };
-            foo.Bar = 44;
-            Assert.True(bCallbackWasExecuted);
-            Assert.Equal(43, foo.Bar); // unchanged
         }
     }
 }
