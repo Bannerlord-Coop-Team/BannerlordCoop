@@ -25,7 +25,7 @@ namespace Coop.Tests.CoopFramework
             static CoopManagedFoo()
             {
                 // Ignore local calls on Foo.Bar
-                When(ETriggerOrigin.Local)
+                When(EActionOrigin.Local)
                     .Calls(BarSetter)
                     .DelegateTo(BarSetterHandler);
             }

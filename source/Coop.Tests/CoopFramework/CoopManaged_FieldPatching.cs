@@ -1,17 +1,25 @@
 ﻿using CoopFramework;
 using JetBrains.Annotations;
+using Sync;
 using Sync.Behaviour;
 using Xunit;
 
 namespace Coop.Tests.CoopFramework
 {
     [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
-    public class CoopManaged_CallTakesVarArgs
+    public class CoopManaged_FieldPatching
     {
         class Foo
         {
-            public int Bar { get; set; } = 42;
-            public int Baz { get; set; } = 42;
+            public int m_Bar = 42;
+            public int BarProperty
+            {
+                set => m_Bar = value;
+            }
+            public void SetBar(int i)
+            {
+                m_Bar = i;
+            }
         }
 
         class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
@@ -19,10 +27,11 @@ namespace Coop.Tests.CoopFramework
             static CoopManagedFoo()
             {
                 When(EActionOrigin.Local)
-                    .Calls(
-                        Setter(nameof(Foo.Bar)),
-                        Setter(nameof(Foo.Baz)))
-                    .Suppress();
+                    .Changes(Field<int>(nameof(Foo.m_Bar)))
+                    .Through(
+                        Setter(nameof(Foo.BarProperty)), 
+                        Method(nameof(Foo.SetBar)))
+                    .Revert();
             }
 
             public CoopManagedFoo([NotNull] Foo instance) : base(instance)
@@ -31,19 +40,17 @@ namespace Coop.Tests.CoopFramework
         }
 
         [Fact]
-        void DoesApplyPatches()
+        void DoesRevertBarFieldChange()
         {
             Foo foo = new Foo();
             CoopManagedFoo fooManaged = new CoopManagedFoo(foo);
-            Assert.Equal(42, foo.Bar);
-            Assert.Equal(42, foo.Baz);
-
-            foo.Bar = 43;
-            foo.Baz = 43;
+            Assert.Equal(42, foo.m_Bar);
+            
+            // Change through property
+            foo.BarProperty = 43;
 
             // Unchanged because of the suppress patch
-            Assert.Equal(42, foo.Bar);
-            Assert.Equal(42, foo.Baz);
+            Assert.Equal(42, foo.m_Bar);
         }
     }
 }

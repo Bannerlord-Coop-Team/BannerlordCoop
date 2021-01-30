@@ -26,7 +26,7 @@ namespace Coop.Tests.CoopFramework
             public static MethodAccess BarSetter = Setter(nameof(Foo.Bar));
             static CoopManagedFoo()
             {
-                When(ETriggerOrigin.Local)
+                When(EActionOrigin.Local)
                     .Calls(BarSetter)
                     .DelegateTo((managedFoo, call) =>
                     {
@@ -54,7 +54,7 @@ namespace Coop.Tests.CoopFramework
             public static MethodAccess BarSetter = Setter(nameof(Foo.Bar));
             static CoopManagedFoo2()
             {
-                When(ETriggerOrigin.Local)
+                When(EActionOrigin.Local)
                     .Calls(BarSetter)
                     .DelegateTo((managedFoo, call) =>
                     {

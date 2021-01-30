@@ -119,7 +119,7 @@ namespace Coop.Tests.Sync
 
             // Call the original
             int iExpectedValue = 42;
-            m_SyncedMethod.Call(ETriggerOrigin.Authoritative, instance, new object[] {iExpectedValue});
+            m_SyncedMethod.Call(EActionOrigin.Authoritative, instance, new object[] {iExpectedValue});
             Assert.Equal(0, iNumberOfHandlerCalls);
             Assert.Equal(1, instance.NumberOfCalls);
             Assert.Equal(iExpectedValue, instance.LatestArgument);

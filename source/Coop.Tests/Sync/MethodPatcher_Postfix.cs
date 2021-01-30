@@ -41,7 +41,7 @@ namespace Coop.Tests.Sync
             Assert.True(Patch.TryGetMethod(nameof(TestRPC.SyncedMethod), out MethodAccess method));
             method.Postfix.SetHandler(instance, (eOrigin, args) => 
             { 
-                Assert.Equal(ETriggerOrigin.Local, eOrigin);
+                Assert.Equal(EActionOrigin.Local, eOrigin);
                 ++iNumberOfHandlerCalls;
             });
 
@@ -64,7 +64,7 @@ namespace Coop.Tests.Sync
             method.Postfix.SetHandler(instance, (eOrigin, args) =>
             {
                 bWasHandlerCalled = true;
-                Assert.Equal(ETriggerOrigin.Local, eOrigin);
+                Assert.Equal(EActionOrigin.Local, eOrigin);
                 Assert.Single(args);
                 Assert.IsType<int>(args[0]);
                 Assert.True(instance.LatestArgument.HasValue);

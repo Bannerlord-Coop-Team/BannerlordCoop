@@ -78,7 +78,7 @@ namespace Coop.Tests.Sync
             params object[] args)
         {
             m_DispatcherCalls.Add(methodAccess);
-            methodAccess.Call(ETriggerOrigin.Authoritative, instance, args);
+            methodAccess.Call(EActionOrigin.Authoritative, instance, args);
             return false;
         }
 

@@ -24,17 +24,17 @@ namespace Coop.Tests.CoopFramework
             static CoopManagedFoo()
             {
                 // Ignore local calls on Foo.Bar
-                When(ETriggerOrigin.Local)
+                When(EActionOrigin.Local)
                     .Calls(BarSetter)
                     .Suppress();
                 
                 // Allow local calls on Foo.Baz
-                When(ETriggerOrigin.Local)
+                When(EActionOrigin.Local)
                     .Calls(BazSetter)
                     .Execute();
                 
                 // Ignore authoritative calls on Foo.Baz
-                When(ETriggerOrigin.Authoritative)
+                When(EActionOrigin.Authoritative)
                     .Calls(BazSetter)
                     .Suppress();
             }
@@ -78,7 +78,7 @@ namespace Coop.Tests.CoopFramework
             CoopManagedFoo sync = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.Bar);
 
-            CoopManagedFoo.BarSetter.Call(ETriggerOrigin.Authoritative, foo, new object[] {43});
+            CoopManagedFoo.BarSetter.Call(EActionOrigin.Authoritative, foo, new object[] {43});
             Assert.Equal(43, foo.Bar);
         }
         
@@ -101,7 +101,7 @@ namespace Coop.Tests.CoopFramework
             CoopManagedFoo sync = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.Baz);
 
-            CoopManagedFoo.BazSetter.Call(ETriggerOrigin.Authoritative, foo, new object[] {43});
+            CoopManagedFoo.BazSetter.Call(EActionOrigin.Authoritative, foo, new object[] {43});
             Assert.Equal(42, foo.Baz);
         }
     }

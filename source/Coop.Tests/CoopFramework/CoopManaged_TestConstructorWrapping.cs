@@ -26,7 +26,7 @@ namespace Coop.Tests.CoopFramework
             static CoopManagedFoo()
             {
                 // Broadcast local calls on Foo.Bar instead of applying it directly
-                When(ETriggerOrigin.Local)
+                When(EActionOrigin.Local)
                     .Calls(BarSetter)
                     .Suppress();
                 

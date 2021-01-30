@@ -70,7 +70,7 @@ namespace Coop.Mod.Patch
 
             IsMainPartyWaitingPatch
                 .Setters.First()
-                .Call(ETriggerOrigin.Authoritative, instance, new object[] { isEveryMainPartyWaiting });
+                .Call(EActionOrigin.Authoritative, instance, new object[] { isEveryMainPartyWaiting });
             return ECallPropagation.Suppress;
         }
 

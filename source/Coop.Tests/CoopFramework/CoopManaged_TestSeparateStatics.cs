@@ -33,7 +33,7 @@ namespace Coop.Tests.CoopFramework
             public static MethodAccess BarSetter = Setter(nameof(Foo.Bar));
             static CoopManagedFoo()
             {
-                When(ETriggerOrigin.Local)
+                When(EActionOrigin.Local)
                     .Calls(BarSetter)
                     .Suppress();
                 EnabledForAllInstances((instance => new CoopManagedFoo(instance)));
@@ -49,7 +49,7 @@ namespace Coop.Tests.CoopFramework
             public static MethodAccess BarSetter = Setter(nameof(Foo2.Bar));
             static CoopManagedFoo2()
             {
-                When(ETriggerOrigin.Local)
+                When(EActionOrigin.Local)
                     .Calls(BarSetter)
                     .Suppress();
                 EnabledForAllInstances((instance => new CoopManagedFoo2(instance)));

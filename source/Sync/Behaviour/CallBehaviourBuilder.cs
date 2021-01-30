@@ -3,13 +3,11 @@ using JetBrains.Annotations;
 
 namespace Sync.Behaviour
 {
-    public class CallBehaviour
+    /// <summary>
+    ///     Builder class to define the behaviour of a patched method or property getter / setter.
+    /// </summary>
+    public class CallBehaviourBuilder
     {
-        public CallBehaviour(bool isBroadcastAllowed)
-        {
-            m_IsBroadcastAllowed = isBroadcastAllowed;
-        }
-        
         /// <summary>
         ///     Propagate the call to the function to the original or the next patch (if one exists).
         /// </summary>
@@ -57,12 +55,8 @@ namespace Sync.Behaviour
         ///     The local call will be broadcast to all clients as an authoritative call. All clients will receive the
         ///     call on the same campaign tick. The originator of the call will receive the authoritative call as well.
         /// </summary>
-        public CallBehaviour Broadcast()
+        public CallBehaviourBuilder Broadcast()
         {
-            if (!m_IsBroadcastAllowed)
-            {
-                throw new Exception("Invalid call behaviour: Not allowed to broadcast an authoritative call.");
-            }
             DoBroadcast = true;
             return this;
         }
@@ -70,7 +64,5 @@ namespace Sync.Behaviour
         public bool DoBroadcast { get; private set; } = false;
         [CanBeNull] public Func<IPendingMethodCall, ECallPropagation> MethodCallHandler { get; private set; }
         [CanBeNull] public Func<object, IPendingMethodCall, ECallPropagation> MethodCallHandlerInstance { get; private set; }
-
-        private readonly bool m_IsBroadcastAllowed;
     }
 }

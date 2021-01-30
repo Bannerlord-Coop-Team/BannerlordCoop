@@ -56,7 +56,7 @@ namespace Coop.Tests.Persistence.RPC
         {
             static ManagedFoo()
             {
-                When(ETriggerOrigin.Local)
+                When(EActionOrigin.Local)
                     .Calls(Method(nameof(Foo.SyncedMethod)))
                     .Broadcast()
                     .Suppress();

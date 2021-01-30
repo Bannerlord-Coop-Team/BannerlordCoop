@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
 using Sync;
@@ -12,7 +13,6 @@ namespace CoopFramework
     
     /// <summary>
     ///     Base class to extend a type to be managed by the Coop framework.
-    ///
     /// <code>
     /// </code>
     ///     
@@ -25,7 +25,7 @@ namespace CoopFramework
         ///     that is being created.
         /// </summary>
         /// <param name="factoryMethod">Factory method that creates an instance of the concrete inheriting class."/></param>
-        public static void EnabledForAllInstances(Func<TExtended, CoopManaged<TSelf, TExtended>> factoryMethod)
+        protected static void EnabledForAllInstances(Func<TExtended, CoopManaged<TSelf, TExtended>> factoryMethod)
         {
             if (m_ConstructorPatch != null || m_DestructorPatch != null)
             {
@@ -70,13 +70,19 @@ namespace CoopFramework
             }
         }
 
-        public static void EnableForStatics()
+        /// <summary>
+        ///     Enables patching of static functions. Default: Off
+        ///
+        ///     ATTENTION: Call this method AFTER defining your static patches in your static constructor. Otherwise
+        ///     they will not be recognized.
+        /// </summary>
+        protected static void EnableForStatics()
         {
             foreach (MethodId methodId in PatchedMethods())
             {
                 MethodAccess method = MethodRegistry.IdToMethod[methodId];
-                CallBehaviour behaviourLocal = _callers[ETriggerOrigin.Local].GetBehaviour(methodId);
-                CallBehaviour behaviourAuth = _callers[ETriggerOrigin.Authoritative].GetBehaviour(methodId);
+                CallBehaviourBuilder behaviourBuilderLocal = _callers[EActionOrigin.Local].GetCallBehaviour(methodId);
+                CallBehaviourBuilder behaviourBuilderAuth = _callers[EActionOrigin.Authoritative].GetCallBehaviour(methodId);
                 method.Prefix.SetGlobalHandler((eOrigin, instance, args) =>
                 {
                     if (instance != null)
@@ -88,10 +94,10 @@ namespace CoopFramework
                     // So it's a static call -> Dispatch it
                     switch (eOrigin)
                     {
-                        case ETriggerOrigin.Local:
-                            return StaticDispatch(method, behaviourLocal, args);
-                        case ETriggerOrigin.Authoritative:
-                            return StaticDispatch(method, behaviourAuth, args);
+                        case EActionOrigin.Local:
+                            return StaticDispatch(method, behaviourBuilderLocal, args);
+                        case EActionOrigin.Authoritative:
+                            return StaticDispatch(method, behaviourBuilderAuth, args);
                         default:
                             throw new ArgumentOutOfRangeException(nameof(eOrigin), eOrigin, null);
                     }
@@ -101,38 +107,64 @@ namespace CoopFramework
 
         /// <summary>
         ///     Patches a setter of a property on the extended class. Please of the nameof operator instead of raw
-        ///     strings. This allows for compile time errors with updated game versions:
+        ///     strings if possible. This allows for compile time errors with updated game versions:
         /// 
         ///     <code>Setter(nameof(T.Foo));</code>
         /// </summary>
         /// <param name="sPropertyName"></param>
         /// <returns></returns>
-        public static MethodAccess Setter(string sPropertyName)
+        protected static MethodAccess Setter(string sPropertyName)
         {
             return new PropertyPatch<TSelf>(typeof(TExtended)).InterceptSetter(sPropertyName).Setters.First();
         }
         /// <summary>
         ///     Patches a method on the extended class with a prefix. Please of the nameof operator instead of raw
-        ///     strings. This allows for compile time errors with updated game versions:
+        ///     strings if possible. This allows for compile time errors with updated game versions:
         /// 
         ///     <code>Method(nameof(T.Foo));</code>
         ///     
         /// </summary>
         /// <param name="sMethodName"></param>
         /// <returns></returns>
-        public static MethodAccess Method(string sMethodName)
+        protected static MethodAccess Method(string sMethodName)
         {
             return new MethodPatch<TSelf>(typeof(TExtended)).Intercept(sMethodName).Methods.First();
         }
+
+        /// <summary>
+        ///     Sets up a field to be monitored for changes. Please of the nameof operator instead of raw
+        ///     strings if possible. This allows for compile time errors with updated game versions:
+        ///
+        ///     <code>Field(nameof(T.Foo));</code>
+        /// </summary>
+        /// <param name="sFieldName"></param>
+        /// <typeparam name="TField"></typeparam>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        protected static FieldAccess Field<TField>(string sFieldName)
+        {
+            FieldInfo info = AccessTools.Field(typeof(TExtended), sFieldName);
+            if (info == null)
+            {
+                throw new Exception($"Field {typeof(TExtended)}.{sFieldName} not found.");
+            }
+
+            if (info.FieldType != typeof(TField))
+            {
+                throw new Exception($"Unexpected field type for {typeof(TExtended)}.{sFieldName}. Expected {typeof(TField)}, got {info.FieldType}.");
+            }
+
+            return new FieldAccess<TExtended, TField>(info);
+        }
         /// <summary>
         ///     Starting point of a patch for any action. The patch will only be active if the context of the call
-        ///     is equal to <paramref name="eTriggerOrigin"/>.
+        ///     is equal to <paramref name="eActionOrigin"/>.
         /// </summary>
-        /// <param name="eTriggerOrigin"></param>
+        /// <param name="eActionOrigin"></param>
         /// <returns></returns>
-        public static ActionTriggerOrigin When(ETriggerOrigin eTriggerOrigin)
+        protected static ActionBehaviourBuilder When(EActionOrigin eActionOrigin)
         {
-            return _callers[eTriggerOrigin];
+            return _callers[eActionOrigin];
         }
         #endregion
 
@@ -141,7 +173,7 @@ namespace CoopFramework
         /// </summary>
         /// <param name="instance">Instance that should be synchronized.</param>
         /// <exception cref="ArgumentOutOfRangeException">When the instance is null.</exception>
-        public CoopManaged([NotNull] TExtended instance)
+        protected CoopManaged([NotNull] TExtended instance)
         {
             if (instance == null)
             {
@@ -165,16 +197,16 @@ namespace CoopFramework
             foreach (MethodId methodId in PatchedMethods())
             {
                 MethodAccess method = MethodRegistry.IdToMethod[methodId];
-                CallBehaviour behaviourLocal = _callers[ETriggerOrigin.Local].GetBehaviour(methodId);
-                CallBehaviour behaviourAuth = _callers[ETriggerOrigin.Authoritative].GetBehaviour(methodId);
+                CallBehaviourBuilder behaviourBuilderLocal = _callers[EActionOrigin.Local].GetCallBehaviour(methodId);
+                CallBehaviourBuilder behaviourBuilderAuth = _callers[EActionOrigin.Authoritative].GetCallBehaviour(methodId);
                 method.Prefix.SetHandler(instance, (eOrigin, args) =>
                 {
                     switch (eOrigin)
                     {
-                        case ETriggerOrigin.Local:
-                            return RuntimeDispatch(method, behaviourLocal, args);
-                        case ETriggerOrigin.Authoritative:
-                            return RuntimeDispatch(method, behaviourAuth, args);
+                        case EActionOrigin.Local:
+                            return RuntimeDispatch(method, behaviourBuilderLocal, args);
+                        case EActionOrigin.Authoritative:
+                            return RuntimeDispatch(method, behaviourBuilderAuth, args);
                         default:
                             throw new ArgumentOutOfRangeException(nameof(eOrigin), eOrigin, null);
                     }
@@ -185,7 +217,7 @@ namespace CoopFramework
         /// <summary>
         ///     Returns the synchronized instance.
         /// </summary>
-        [NotNull] public WeakReference<TExtended> Instance { get; private set; }
+        [NotNull] protected WeakReference<TExtended> Instance { get; set; }
 
         public static IReadOnlyCollection<CoopManaged<TSelf, TExtended>> ManagedInstances => m_ManagedInstances;
 
@@ -196,10 +228,10 @@ namespace CoopFramework
             m_ManagedInstances.Add(newInstance);
         }
 
-        private static ECallPropagation StaticDispatch(MethodAccess methodAccess, CallBehaviour behaviour, object[] args)
+        private static ECallPropagation StaticDispatch(MethodAccess methodAccess, CallBehaviourBuilder behaviourBuilder, object[] args)
         {
             ISynchronization sync = m_GetSyncStatic.Value?.Invoke();
-            if (behaviour.DoBroadcast)
+            if (behaviourBuilder.DoBroadcast)
             {
                 if (sync == null)
                 {
@@ -208,19 +240,19 @@ namespace CoopFramework
                 sync.Broadcast(methodAccess.Id, null, args);
             }
 
-            if (behaviour.MethodCallHandlerInstance != null)
+            if (behaviourBuilder.MethodCallHandlerInstance != null)
             {
-                return behaviour.MethodCallHandlerInstance.Invoke(null,
+                return behaviourBuilder.MethodCallHandlerInstance.Invoke(null,
                     new PendingMethodCall(methodAccess.Id, sync, null, args));
             }
-            if (behaviour.MethodCallHandler != null)
+            if (behaviourBuilder.MethodCallHandler != null)
             {
-                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, sync, null, args));
+                return behaviourBuilder.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, sync, null, args));
             }
-            return behaviour.CallPropagationBehaviour;
+            return behaviourBuilder.CallPropagationBehaviour;
         }
 
-        private ECallPropagation RuntimeDispatch(MethodAccess methodAccess, CallBehaviour behaviour, object[] args)
+        private ECallPropagation RuntimeDispatch(MethodAccess methodAccess, CallBehaviourBuilder behaviourBuilder, object[] args)
         {
             if (!Instance.TryGetTarget(out TExtended instance))
             {
@@ -231,7 +263,7 @@ namespace CoopFramework
 
             ISynchronization sync = m_GetSync.Value?.Invoke();
             
-            if (behaviour.DoBroadcast)
+            if (behaviourBuilder.DoBroadcast)
             {
                 if (sync == null)
                 {
@@ -240,24 +272,24 @@ namespace CoopFramework
                 sync.Broadcast(methodAccess.Id, instance, args);
             }
 
-            if (behaviour.MethodCallHandlerInstance != null)
+            if (behaviourBuilder.MethodCallHandlerInstance != null)
             {
-                return behaviour.MethodCallHandlerInstance.Invoke(this,
+                return behaviourBuilder.MethodCallHandlerInstance.Invoke(this,
                     new PendingMethodCall(methodAccess.Id, sync, instance, args));
             }
-            if (behaviour.MethodCallHandler != null)
+            if (behaviourBuilder.MethodCallHandler != null)
             {
-                return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, sync, instance, args));
+                return behaviourBuilder.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, sync, instance, args));
             }
-            return behaviour.CallPropagationBehaviour;
+            return behaviourBuilder.CallPropagationBehaviour;
         }
 
         private static IEnumerable<MethodId> PatchedMethods()
         {
             HashSet<MethodId> ids = new HashSet<MethodId>();
-            foreach (ActionTriggerOrigin origin in _callers.Values)
+            foreach (ActionBehaviourBuilder origin in _callers.Values)
             {
-                ids.UnionWith(origin.Behaviours.Keys);
+                ids.UnionWith(origin.CallBehaviours.Keys);
             }
             return ids;
         }
@@ -273,11 +305,11 @@ namespace CoopFramework
             Instance = new WeakReference<TExtended>(null);
         }
 
-        private static readonly Dictionary<ETriggerOrigin, ActionTriggerOrigin> _callers =
-            new Dictionary<ETriggerOrigin, ActionTriggerOrigin>()
+        private static readonly Dictionary<EActionOrigin, ActionBehaviourBuilder> _callers =
+            new Dictionary<EActionOrigin, ActionBehaviourBuilder>()
             {
-                {ETriggerOrigin.Local, new ActionTriggerOrigin(true)},
-                {ETriggerOrigin.Authoritative, new ActionTriggerOrigin(false)}
+                {EActionOrigin.Local, new ActionBehaviourBuilder()},
+                {EActionOrigin.Authoritative, new ActionBehaviourBuilder()}
             };
 
         private static readonly List<CoopManaged<TSelf, TExtended>> m_ManagedInstances = new List<CoopManaged<TSelf, TExtended>>();

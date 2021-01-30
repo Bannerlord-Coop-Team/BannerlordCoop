@@ -81,10 +81,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Behaviour\CallBehaviour.cs" />
-    <Compile Include="Behaviour\ActionTriggerOrigin.cs" />
+    <Compile Include="Behaviour\CallBehaviourBuilder.cs" />
+    <Compile Include="Behaviour\ActionBehaviourBuilder.cs" />
     <Compile Include="Behaviour\ECallPropagation.cs" />
-    <Compile Include="Behaviour\ETriggerOrigin.cs" />
+    <Compile Include="Behaviour\EFieldChangeAction.cs" />
+    <Compile Include="Behaviour\EActionOrigin.cs" />
+    <Compile Include="Behaviour\FieldActionBehaviourBuilder.cs" />
+    <Compile Include="Behaviour\FieldBehaviourBuilder.cs" />
     <Compile Include="Behaviour\IPendingMethodCall.cs" />
     <Compile Include="ConstructorPatch.cs" />
     <Compile Include="DestructorPatch.cs" />
