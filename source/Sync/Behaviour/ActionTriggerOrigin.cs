@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using JetBrains.Annotations;
 
 namespace Sync.Behaviour
@@ -10,12 +11,7 @@ namespace Sync.Behaviour
         {
             m_IsBroadcastAllowed = isBroadcastAllowed;
         }
-        public CallBehaviour Calls(MethodAccess method)
-        {
-            return Calls(new List<MethodAccess>() {method});
-        }
-        
-        public CallBehaviour Calls(IEnumerable<MethodAccess> methods)
+        public CallBehaviour Calls(params MethodAccess[] methods)
         {
             var behaviour = new CallBehaviour(m_IsBroadcastAllowed);
             foreach (var method in methods)
@@ -25,7 +21,6 @@ namespace Sync.Behaviour
             }
             return behaviour;
         }
-        
         private void Register(MethodId key, CallBehaviour behaviour)
         {
             if (Behaviours.ContainsKey(key))
