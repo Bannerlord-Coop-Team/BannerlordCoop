@@ -60,7 +60,7 @@ namespace Coop.Tests.Persistence.RPC
                     .Calls(Method(nameof(Foo.SyncedMethod)))
                     .Broadcast()
                     .Suppress();
-                EnableForStatics();
+                ApplyStaticPatches();
             }
             public ManagedFoo([NotNull] Foo instance) : base(instance)
             {

@@ -30,7 +30,7 @@ namespace Coop.Tests.CoopFramework
                     .Calls(BarSetter)
                     .Suppress();
                 
-                EnabledForAllInstances((instance => new CoopManagedFoo(instance)));
+                AutoWrapAllInstances((instance => new CoopManagedFoo(instance)));
             }
 
             public CoopManagedFoo([NotNull] Foo instance) : base(instance)

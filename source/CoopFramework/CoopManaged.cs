@@ -19,92 +19,48 @@ namespace CoopFramework
     /// </summary>
     public abstract class CoopManaged<TSelf, TExtended> where TExtended : class
     {
+        /// <summary>
+        ///     Creates synchronization for a given instance of <typeparamref name="TExtended"/>.
+        /// </summary>
+        /// <param name="instance">Instance that should be synchronized.</param>
+        /// <exception cref="ArgumentOutOfRangeException">When the instance is null.</exception>
+        protected CoopManaged([NotNull] TExtended instance)
+        {
+            if (instance == null)
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
+            Instance = new WeakReference<TExtended>(instance, true);
+            m_GetSync = new Lazy<Func<ISynchronization>>(FindSyncFactory);
+
+            SetupInstanceHandlers(instance);
+            OnConstructed(this);
+        }
         #region Patcher
         /// <summary>
         ///     Enables an automatic injection of this synchronization class into every instance of <see cref="TExtended"/>
         ///     that is being created.
         /// </summary>
         /// <param name="factoryMethod">Factory method that creates an instance of the concrete inheriting class."/></param>
-        protected static void EnabledForAllInstances(Func<TExtended, CoopManaged<TSelf, TExtended>> factoryMethod)
+        protected static void AutoWrapAllInstances(Func<TExtended, CoopManaged<TSelf, TExtended>> factoryMethod)
         {
             if (m_ConstructorPatch != null || m_DestructorPatch != null)
             {
                 throw new Exception($"Constructors for {nameof(TExtended)} are already patched!");
             }
-            
-            m_ConstructorPatch = new ConstructorPatch<TSelf>(typeof(TExtended)).PostfixAll();
-            if (!m_ConstructorPatch.Methods.Any())
-            {
-                throw new Exception(
-                    $"Class {typeof(TExtended)} has no constructor. Cannot wrap instances automatically");
-            }
-            foreach (MethodAccess methodAccess in m_ConstructorPatch.Methods)
-            {
-                methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
-                {
-                    OnConstructed(factoryMethod(instance as TExtended));
-                });
-            }
 
-            m_DestructorPatch = new DestructorPatch<TSelf>(typeof(TExtended)).Prefix();
-            if (!m_DestructorPatch.Methods.Any())
-            {
-                throw new Exception(
-                    $"Class {typeof(TExtended)} has no destructor. Cannot unwrap instances automatically");
-            }
-            foreach (MethodAccess methodAccess in m_DestructorPatch.Methods)
-            {
-                methodAccess.Prefix.SetGlobalHandler((origin, instance, args) =>
-                {
-                    var managedInstances = m_ManagedInstances
-                        .Where(wrapper => wrapper.Instance.TryGetTarget(out TExtended o) && o == instance)
-                        .ToList();
-                    foreach (var managedInstance in managedInstances)
-                    {
-                        managedInstance.OnBeforeFinalize(instance as TExtended);
-                        m_ManagedInstances.Remove(managedInstance);
-                    }
-
-                    return ECallPropagation.CallOriginal; // Always call the original desctructor!
-                });
-            }
+            HookIntoObjectLifetime(factoryMethod);
         }
-
         /// <summary>
-        ///     Enables patching of static functions. Default: Off
+        ///     Applies all static patches defined before this call.
         ///
-        ///     ATTENTION: Call this method AFTER defining your static patches in your static constructor. Otherwise
-        ///     they will not be recognized.
+        ///     ATTENTION: This function is not called automatically! i.e. static patches will not work unless this
+        ///     method is called after they where defined.
         /// </summary>
-        protected static void EnableForStatics()
+        protected static void ApplyStaticPatches()
         {
-            foreach (MethodId methodId in PatchedMethods())
-            {
-                MethodAccess method = MethodRegistry.IdToMethod[methodId];
-                CallBehaviourBuilder behaviourBuilderLocal = _callers[EActionOrigin.Local].GetCallBehaviour(methodId);
-                CallBehaviourBuilder behaviourBuilderAuth = _callers[EActionOrigin.Authoritative].GetCallBehaviour(methodId);
-                method.Prefix.SetGlobalHandler((eOrigin, instance, args) =>
-                {
-                    if (instance != null)
-                    {
-                        // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
-                        return ECallPropagation.CallOriginal;
-                    }
-                    
-                    // So it's a static call -> Dispatch it
-                    switch (eOrigin)
-                    {
-                        case EActionOrigin.Local:
-                            return StaticDispatch(method, behaviourBuilderLocal, args);
-                        case EActionOrigin.Authoritative:
-                            return StaticDispatch(method, behaviourBuilderAuth, args);
-                        default:
-                            throw new ArgumentOutOfRangeException(nameof(eOrigin), eOrigin, null);
-                    }
-                });
-            }
+            SetupStaticHandlers();
         }
-
         /// <summary>
         ///     Patches a setter of a property on the extended class. Please of the nameof operator instead of raw
         ///     strings if possible. This allows for compile time errors with updated game versions:
@@ -148,12 +104,10 @@ namespace CoopFramework
             {
                 throw new Exception($"Field {typeof(TExtended)}.{sFieldName} not found.");
             }
-
             if (info.FieldType != typeof(TField))
             {
                 throw new Exception($"Unexpected field type for {typeof(TExtended)}.{sFieldName}. Expected {typeof(TField)}, got {info.FieldType}.");
             }
-
             return new FieldAccess<TExtended, TField>(info);
         }
         /// <summary>
@@ -167,59 +121,18 @@ namespace CoopFramework
             return _callers[eActionOrigin];
         }
         #endregion
-
-        /// <summary>
-        ///     Creates synchronization for a given instance of <typeparamref name="TExtended"/>.
-        /// </summary>
-        /// <param name="instance">Instance that should be synchronized.</param>
-        /// <exception cref="ArgumentOutOfRangeException">When the instance is null.</exception>
-        protected CoopManaged([NotNull] TExtended instance)
-        {
-            if (instance == null)
-            {
-                throw new ArgumentNullException(nameof(instance));
-            }
-            Instance = new WeakReference<TExtended>(instance, true);
-            m_GetSync = new Lazy<Func<ISynchronization>>(() =>
-            {
-                foreach (MethodInfo method in typeof(TSelf).GetMethods(BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.NonPublic))
-                {
-                    if (Attribute.IsDefined(method, typeof(SyncFactoryAttribute)) && 
-                        method.ReturnType == typeof(ISynchronization))
-                    {
-                        return () => method.Invoke(this, new object[]{}) as ISynchronization;
-                    }
-                }
-
-                return m_GetSyncStatic?.Value;
-            });
-
-            foreach (MethodId methodId in PatchedMethods())
-            {
-                MethodAccess method = MethodRegistry.IdToMethod[methodId];
-                CallBehaviourBuilder behaviourBuilderLocal = _callers[EActionOrigin.Local].GetCallBehaviour(methodId);
-                CallBehaviourBuilder behaviourBuilderAuth = _callers[EActionOrigin.Authoritative].GetCallBehaviour(methodId);
-                method.Prefix.SetHandler(instance, (eOrigin, args) =>
-                {
-                    switch (eOrigin)
-                    {
-                        case EActionOrigin.Local:
-                            return RuntimeDispatch(method, behaviourBuilderLocal, args);
-                        case EActionOrigin.Authoritative:
-                            return RuntimeDispatch(method, behaviourBuilderAuth, args);
-                        default:
-                            throw new ArgumentOutOfRangeException(nameof(eOrigin), eOrigin, null);
-                    }
-                });
-            }
-        }
         
+        #region Object instances
         /// <summary>
-        ///     Returns the synchronized instance.
+        ///     Returns the instance that is being managed by this <see cref="TSelf"/>.
         /// </summary>
         [NotNull] protected WeakReference<TExtended> Instance { get; set; }
 
+        /// <summary>
+        ///     Returns all instances of this <see cref="TSelf"/>.
+        /// </summary>
         public static IReadOnlyCollection<CoopManaged<TSelf, TExtended>> ManagedInstances => m_ManagedInstances;
+        #endregion
 
         #region Private
         
@@ -341,6 +254,114 @@ namespace CoopFramework
             [CanBeNull] private readonly ISynchronization m_Sync;
 
             private readonly MethodId m_Method;
+        }
+        
+        private static void HookIntoObjectLifetime(Func<TExtended, CoopManaged<TSelf, TExtended>> factoryMethod)
+        {
+            m_ConstructorPatch = new ConstructorPatch<TSelf>(typeof(TExtended)).PostfixAll();
+            if (!m_ConstructorPatch.Methods.Any())
+            {
+                throw new Exception(
+                    $"Class {typeof(TExtended)} has no constructor. Cannot wrap instances automatically");
+            }
+
+            foreach (MethodAccess methodAccess in m_ConstructorPatch.Methods)
+            {
+                methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
+                {
+                    factoryMethod(instance as TExtended);
+                });
+            }
+
+            m_DestructorPatch = new DestructorPatch<TSelf>(typeof(TExtended)).Prefix();
+            if (!m_DestructorPatch.Methods.Any())
+            {
+                throw new Exception(
+                    $"Class {typeof(TExtended)} has no destructor. Cannot unwrap instances automatically");
+            }
+
+            foreach (MethodAccess methodAccess in m_DestructorPatch.Methods)
+            {
+                methodAccess.Prefix.SetGlobalHandler((origin, instance, args) =>
+                {
+                    var managedInstances = m_ManagedInstances
+                        .Where(wrapper => wrapper.Instance.TryGetTarget(out TExtended o) && o == instance)
+                        .ToList();
+                    foreach (var managedInstance in managedInstances)
+                    {
+                        managedInstance.OnBeforeFinalize(instance as TExtended);
+                        m_ManagedInstances.Remove(managedInstance);
+                    }
+
+                    return ECallPropagation.CallOriginal; // Always call the original desctructor!
+                });
+            }
+        }
+        
+        private void SetupInstanceHandlers(TExtended instance)
+        {
+            foreach (MethodId methodId in PatchedMethods())
+            {
+                MethodAccess method = MethodRegistry.IdToMethod[methodId];
+                CallBehaviourBuilder behaviourBuilderLocal = _callers[EActionOrigin.Local].GetCallBehaviour(methodId);
+                CallBehaviourBuilder behaviourBuilderAuth = _callers[EActionOrigin.Authoritative].GetCallBehaviour(methodId);
+                method.Prefix.SetHandler(instance, (eOrigin, args) =>
+                {
+                    switch (eOrigin)
+                    {
+                        case EActionOrigin.Local:
+                            return RuntimeDispatch(method, behaviourBuilderLocal, args);
+                        case EActionOrigin.Authoritative:
+                            return RuntimeDispatch(method, behaviourBuilderAuth, args);
+                        default:
+                            throw new ArgumentOutOfRangeException(nameof(eOrigin), eOrigin, null);
+                    }
+                });
+            }
+        }
+        
+        private static void SetupStaticHandlers()
+        {
+            foreach (MethodId methodId in PatchedMethods())
+            {
+                MethodAccess method = MethodRegistry.IdToMethod[methodId];
+                CallBehaviourBuilder behaviourBuilderLocal = _callers[EActionOrigin.Local].GetCallBehaviour(methodId);
+                CallBehaviourBuilder behaviourBuilderAuth = _callers[EActionOrigin.Authoritative].GetCallBehaviour(methodId);
+                method.Prefix.SetGlobalHandler((eOrigin, instance, args) =>
+                {
+                    if (instance != null)
+                    {
+                        // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
+                        return ECallPropagation.CallOriginal;
+                    }
+
+                    // So it's a static call -> Dispatch it
+                    switch (eOrigin)
+                    {
+                        case EActionOrigin.Local:
+                            return StaticDispatch(method, behaviourBuilderLocal, args);
+                        case EActionOrigin.Authoritative:
+                            return StaticDispatch(method, behaviourBuilderAuth, args);
+                        default:
+                            throw new ArgumentOutOfRangeException(nameof(eOrigin), eOrigin, null);
+                    }
+                });
+            }
+        }
+        
+        private Func<ISynchronization> FindSyncFactory()
+        {
+            foreach (MethodInfo method in typeof(TSelf).GetMethods(BindingFlags.Instance | BindingFlags.DeclaredOnly |
+                                                                   BindingFlags.NonPublic))
+            {
+                if (Attribute.IsDefined(method, typeof(SyncFactoryAttribute)) &&
+                    method.ReturnType == typeof(ISynchronization))
+                {
+                    return () => method.Invoke(this, new object[] { }) as ISynchronization;
+                }
+            }
+
+            return m_GetSyncStatic?.Value;
         }
         
         [CanBeNull] private static readonly Lazy<Func<ISynchronization>> m_GetSyncStatic =
