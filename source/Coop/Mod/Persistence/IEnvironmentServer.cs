@@ -18,11 +18,6 @@ namespace RemoteAction
         FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
 
         /// <summary>
-        ///     Determines if the campaign time control mode could be changed right now.
-        /// </summary>
-        bool CanChangeTimeControlMode { get; }
-
-        /// <summary>
         ///     Returns the shared object store for this server.
         /// </summary>
         [NotNull]

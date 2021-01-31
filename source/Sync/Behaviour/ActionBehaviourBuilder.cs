@@ -13,7 +13,7 @@ namespace Sync.Behaviour
     {
         public CallBehaviourBuilder Calls(params MethodAccess[] methods)
         {
-            var behaviour = new CallBehaviourBuilder();
+            var behaviour = new CallBehaviourBuilder(methods.Select(m => m.Id));
             foreach (var method in methods)
             {
                 
@@ -23,7 +23,7 @@ namespace Sync.Behaviour
         }
         public FieldActionBehaviourBuilder Changes(params FieldAccess[] fields)
         {
-            var fieldChangeAction = new FieldActionBehaviourBuilder();
+            var fieldChangeAction = new FieldActionBehaviourBuilder(fields.Select(f => f.Id));
             foreach (var field in fields)
             {
                 Register(field, fieldChangeAction);
@@ -43,7 +43,7 @@ namespace Sync.Behaviour
         [NotNull]
         public FieldActionBehaviourBuilder GetFieldBehaviour(FieldAccess fieldAccess)
         {
-            return FieldChangeAction.TryGetValue(fieldAccess, out FieldActionBehaviourBuilder behaviour) ? behaviour : new FieldActionBehaviourBuilder();
+            return FieldChangeAction.TryGetValue(fieldAccess, out FieldActionBehaviourBuilder behaviour) ? behaviour : new FieldActionBehaviourBuilder(new[] {fieldAccess.Id});
         }
         #endregion
         

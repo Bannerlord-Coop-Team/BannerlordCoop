@@ -2,7 +2,7 @@
 
 namespace RemoteAction
 {
-    public interface IAction
+    public interface ISynchronizedAction
     {
         IEnumerable<Argument> Arguments { get; }
     }

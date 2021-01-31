@@ -8,7 +8,7 @@ namespace RemoteAction
     ///     pointer, instance and arguments have to resolved before execution. In order to resolve
     ///     a method call refer to <see cref="Registry" /> and <see cref="ArgumentFactory" />.
     /// </summary>
-    public readonly struct MethodCall : IAction
+    public readonly struct MethodCall : ISynchronizedAction
     {
         public IEnumerable<Argument> Arguments { get; }
         public readonly MethodId Id;

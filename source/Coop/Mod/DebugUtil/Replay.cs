@@ -188,10 +188,11 @@ namespace Coop.Mod.DebugUtil
             state = ReplayState.Playback;
             ReplayPlayback += OnEventPlayback;
 
-            CoopServer.Instance.Persistence.EntityManager.WorldEntityServer.State.TimeControl =
-                CampaignTimeControlMode.UnstoppablePlay;
-            CoopServer.Instance.Persistence.EntityManager.WorldEntityServer.State.TimeControlLock =
-                false;
+            // TODO
+            // CoopServer.Instance.Persistence.EntityManager.WorldEntityServer.State.TimeControl =
+            //     CampaignTimeControlMode.UnstoppablePlay;
+            // CoopServer.Instance.Persistence.EntityManager.WorldEntityServer.State.TimeControlLock =
+            //     false;
 
             return $"Playback file '{filename}' started.";
         }

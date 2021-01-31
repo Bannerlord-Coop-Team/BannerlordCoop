@@ -10,6 +10,11 @@ namespace Sync.Behaviour
     /// </summary>
     public class FieldActionBehaviourBuilder
     {
+        public FieldActionBehaviourBuilder(IEnumerable<FieldId> fieldIds)
+        {
+            m_FieldIds = fieldIds;
+        }
+
         /// <summary>
         ///     Defines the accessors through which the field is changed. i.e. the methods and property setters
         ///     that change the field. These will be patched in order to monitor the field for changes.
@@ -19,10 +24,14 @@ namespace Sync.Behaviour
         public FieldBehaviourBuilder Through(params MethodAccess[] accessors)
         {
             Accessors.AddRange(accessors);
+            Behaviour = new FieldBehaviourBuilder(m_FieldIds);
             return Behaviour;
         }
 
         public List<MethodAccess> Accessors { get; } = new List<MethodAccess>();
-        public FieldBehaviourBuilder Behaviour { get; } = new FieldBehaviourBuilder();
+        public FieldBehaviourBuilder Behaviour { get; private set; }
+        #region Private
+        private readonly IEnumerable<FieldId> m_FieldIds;
+        #endregion
     }
 }

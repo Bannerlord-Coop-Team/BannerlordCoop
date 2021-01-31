@@ -1,4 +1,6 @@
-﻿namespace Sync
+﻿using Common;
+
+namespace Sync
 {
     public readonly struct MethodId
     {

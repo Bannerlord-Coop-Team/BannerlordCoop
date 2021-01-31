@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using JetBrains.Annotations;
 using RemoteAction;
 using Sync;
+using Sync.Behaviour;
 
 namespace CoopFramework
 {

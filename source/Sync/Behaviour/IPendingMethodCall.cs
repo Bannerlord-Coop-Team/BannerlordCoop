@@ -20,5 +20,9 @@ namespace Sync.Behaviour
         ///     Call parameters to the methods.
         /// </summary>
         [NotNull] object[] Parameters { get; }
+        /// <summary>
+        ///     Get the method id of the call.
+        /// </summary>
+        MethodId Id { get; }
     }
 }

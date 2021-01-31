@@ -16,17 +16,7 @@ namespace RemoteAction
         ///     Access to the movement data for all parties in the clients game world.
         /// </summary>
         FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
-
-        /// <summary>
-        ///     Access to the campaign time control mode in the clients game world.
-        /// </summary>
-        FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; }
-
-        /// <summary>
-        ///     Access to the campaign time control lock in the clients game world.
-        /// </summary>
-        FieldAccess<Campaign, bool> TimeControlModeLock { get; }
-
+        
         /// <summary>
         ///     The master campaign time. On the host this equals to the local campaign time.
         ///     On remote clients this is the latest campaign time dictated by the host.

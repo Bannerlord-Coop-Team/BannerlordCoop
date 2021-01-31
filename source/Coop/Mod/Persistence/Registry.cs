@@ -22,7 +22,6 @@ namespace Coop.Mod.Persistence
                 new object[] {environment});
 
             // Events
-            reg.AddEventType<EventTimeControl>();
             reg.AddEventType<EventPartyMoveTo>();
             reg.AddEventType<EventMethodCall>(new object[] {environment});
             reg.AddEventType<EventFieldChange>(new object[] {environment});
@@ -40,7 +39,6 @@ namespace Coop.Mod.Persistence
                 new object[] {environment});
 
             // Events
-            reg.AddEventType<EventTimeControl>();
             reg.AddEventType<EventPartyMoveTo>();
             reg.AddEventType<EventMethodCall>(new object[] {environment});
             reg.AddEventType<EventFieldChange>(new object[] {environment});

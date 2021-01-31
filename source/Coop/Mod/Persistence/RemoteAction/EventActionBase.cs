@@ -8,7 +8,7 @@ namespace Coop.Mod.Persistence.RemoteAction
     ///     Base class for <see cref="RailEvent"/> that represent a remote action such as a
     ///     method call or a field change.
     /// </summary>
-    public abstract class EventActionBase : RailEvent, IAction
+    public abstract class EventActionBase : RailEvent, ISynchronizedAction
     {
         /// <summary>
         ///     Returns the arguments that are passed to the remove action execution.

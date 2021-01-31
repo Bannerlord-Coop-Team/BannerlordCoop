@@ -23,76 +23,12 @@ namespace Coop.Mod.Persistence.World
         {
             m_Environment = environment ?? throw new ArgumentNullException(nameof(environment));
         }
-
-        /// <summary>
-        ///     Called to request a change to the time control mode on the server.
-        /// </summary>
-        /// <param name="instance"></param>
-        /// <param name="args"></param>
-        /// <exception cref="ArgumentException"></exception>
-        private ECallPropagation RequestTimeControlChange(object instance, object[] args)
-        {
-            if (args.Length != 1 || !(args[0] is CampaignTimeControlMode mode))
-            {
-                throw new ArgumentException(nameof(args));
-            }
-
-            if (!TimeControl.CanSyncTimeControlMode)
-            {
-                return ECallPropagation.Suppress;
-            }
-
-            bool modelock = m_Environment.GetCurrentCampaign().TimeControlModeLock;
-
-            Logger.Trace(
-                "[{tick}] Request time control mode '{mode}'.",
-                Room.Tick,
-                (mode, modelock));
-            Room.RaiseEvent<EventTimeControl>(
-                e =>
-                {
-                    e.EntityId = Id;
-                    e.RequestedTimeControlMode = (mode, modelock);
-                });
-            TimeControl.CanSyncTimeControlMode = false;
-            return ECallPropagation.Suppress;
-        }
-
-        /// <summary>
-        ///     Called to request a change to the time control lock on the server.
-        /// </summary>
-        /// <param name="instance"></param>
-        /// <param name="args"></param>
-        /// <exception cref="ArgumentException"></exception>
-        private ECallPropagation RequestTimeControlLockChange(object instance, object[] args)
-        {
-            if (args.Length != 1 || !(args[0] is bool modelock))
-            {
-                throw new ArgumentException(nameof(args));
-            }
-
-            CampaignTimeControlMode mode = m_Environment.GetCurrentCampaign().TimeControlMode;
-
-            Logger.Trace(
-                "[{tick}] Request time control mode '{mode}'.",
-                Room.Tick,
-                (mode, modelock));
-            Room.RaiseEvent<EventTimeControl>(
-                e =>
-                {
-                    e.EntityId = Id;
-                    e.RequestedTimeControlMode = (mode, modelock);
-                });
-            return ECallPropagation.Suppress;
-        }
-
+        
         /// <summary>
         ///     Called when the world entity was added to the Railgun room.
         /// </summary>
         protected override void OnAdded()
         {
-            m_Environment.TimeControlMode.Prefix.SetGlobalHandler(RequestTimeControlChange);
-            m_Environment.TimeControlModeLock.Prefix.SetGlobalHandler(RequestTimeControlLockChange);
             State.PropertyChanged += State_PropertyChanged;
         }
 
@@ -105,26 +41,6 @@ namespace Coop.Mod.Persistence.World
         {
             switch (e.PropertyName)
             {
-                case nameof(State.TimeControl):
-                    Logger.Trace(
-                        "[{tick}] Received time control mode change to '{mode}'.",
-                        Room.Tick,
-                        State.TimeControl);
-
-                    m_Environment.TimeControlMode.SetTyped(
-                        m_Environment.GetCurrentCampaign(),
-                        State.TimeControl);
-                    break;
-                case nameof(State.TimeControlLock):
-                    Logger.Trace(
-                        "[{tick}] Received time control lock change to '{lock}'.",
-                        Room.Tick,
-                        State.TimeControlLock);
-
-                    m_Environment.TimeControlModeLock.SetTyped(
-                        m_Environment.GetCurrentCampaign(),
-                        State.TimeControlLock);
-                    break;
                 case nameof(State.CampaignTimeTicks):
                     m_Environment.AuthoritativeTime =
                         Extensions.CreateCampaignTime(State.CampaignTimeTicks);

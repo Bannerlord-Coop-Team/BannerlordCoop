@@ -9,20 +9,20 @@ namespace Coop.Mod.Persistence.RemoteAction
         private static readonly Lazy<PendingRequests> m_Instance =
             new Lazy<PendingRequests>(() => new PendingRequests());
 
-        private readonly Dictionary<int, IAction> m_Pending = new Dictionary<int, IAction>();
+        private readonly Dictionary<int, ISynchronizedAction> m_Pending = new Dictionary<int, ISynchronizedAction>();
         public static PendingRequests Instance => m_Instance.Value;
 
-        public void Add(IAction action)
+        public void Add(ISynchronizedAction action)
         {
             m_Pending.Add(action.GetHashCode(), action);
         }
 
-        public bool IsPending(IAction action)
+        public bool IsPending(ISynchronizedAction action)
         {
             return m_Pending.ContainsKey(action.GetHashCode());
         }
 
-        public void Remove(IAction action)
+        public void Remove(ISynchronizedAction action)
         {
             m_Pending.Remove(action.GetHashCode());
         }

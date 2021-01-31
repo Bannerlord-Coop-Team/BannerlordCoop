@@ -88,7 +88,9 @@
     <Compile Include="Behaviour\EActionOrigin.cs" />
     <Compile Include="Behaviour\FieldActionBehaviourBuilder.cs" />
     <Compile Include="Behaviour\FieldBehaviourBuilder.cs" />
+    <Compile Include="Behaviour\IActionValidator.cs" />
     <Compile Include="Behaviour\IPendingMethodCall.cs" />
+    <Compile Include="Behaviour\ActionValidatorRegistry.cs" />
     <Compile Include="ConstructorPatch.cs" />
     <Compile Include="DestructorPatch.cs" />
     <Compile Include="FieldId.cs" />
@@ -124,6 +126,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Network\Network.csproj">
       <Project>{b0ff5e24-4d98-4ec8-bbce-6cdb85cb685d}</Project>
       <Name>Network</Name>

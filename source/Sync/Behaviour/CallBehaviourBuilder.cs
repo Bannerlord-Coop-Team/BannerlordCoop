@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using JetBrains.Annotations;
 
 namespace Sync.Behaviour
@@ -8,6 +9,14 @@ namespace Sync.Behaviour
     /// </summary>
     public class CallBehaviourBuilder
     {
+        public CallBehaviourBuilder()
+        {
+            
+        }
+        public CallBehaviourBuilder(IEnumerable<MethodId> ids)
+        {
+            m_MethodIds = ids;
+        }
         /// <summary>
         ///     Propagate the call to the function to the original or the next patch (if one exists).
         /// </summary>
@@ -55,14 +64,27 @@ namespace Sync.Behaviour
         ///     The local call will be broadcast to all clients as an authoritative call. All clients will receive the
         ///     call on the same campaign tick. The originator of the call will receive the authoritative call as well.
         /// </summary>
-        public CallBehaviourBuilder Broadcast()
+        public CallBehaviourBuilder Broadcast(IActionValidator validator = null)
         {
             DoBroadcast = true;
+            if (validator != null)
+            {
+                foreach (MethodId id in m_MethodIds)
+                {
+                    ActionValidatorRegistry.Register(id, validator);
+                }
+            }
             return this;
         }
         public ECallPropagation CallPropagationBehaviour { get; private set; } = ECallPropagation.CallOriginal;
         public bool DoBroadcast { get; private set; } = false;
         [CanBeNull] public Func<IPendingMethodCall, ECallPropagation> MethodCallHandler { get; private set; }
         [CanBeNull] public Func<object, IPendingMethodCall, ECallPropagation> MethodCallHandlerInstance { get; private set; }
+        
+        #region Private
+
+        private readonly IEnumerable<MethodId> m_MethodIds;
+
+        #endregion
     }
 }

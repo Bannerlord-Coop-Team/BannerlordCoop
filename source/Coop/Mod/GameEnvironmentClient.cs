@@ -23,12 +23,6 @@ namespace Coop.Mod
 
         public FieldAccessGroup<MobileParty, MovementData> TargetPosition =>
             CampaignMapMovement.Movement;
-
-        public FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode =>
-            TimeControl.TimeControlMode;
-
-        public FieldAccess<Campaign, bool> TimeControlModeLock => TimeControl.TimeControlModeLock;
-
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;
 
         public void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled)

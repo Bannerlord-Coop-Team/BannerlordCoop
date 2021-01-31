@@ -7,7 +7,7 @@ namespace RemoteAction
     /// <summary>
     ///     Represent a serializable change of a field value.
     /// </summary>
-    public readonly struct FieldChange : IAction
+    public readonly struct FieldChange : ISynchronizedAction
     {
         public readonly FieldId Id;
         public readonly Argument Instance; // Instance of the object containing the field.

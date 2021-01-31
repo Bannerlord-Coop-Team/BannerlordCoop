@@ -152,7 +152,7 @@ namespace CoopFramework
                 {
                     throw new SynchronizationNotInitializedException("No ISynchronization implementation was provided. Unable to use the synchronization behaviours.");
                 }
-                sync.Broadcast(methodAccess.Id, null, args);
+                sync.Broadcast(methodAccess.Id,null, args);
             }
 
             if (behaviourBuilder.MethodCallHandlerInstance != null)
@@ -263,6 +263,7 @@ namespace CoopFramework
 
             public object Instance { get; }
             public object[] Parameters { get; }
+            public MethodId Id => m_Method;
 
             [CanBeNull] private readonly ISynchronization m_Sync;
 

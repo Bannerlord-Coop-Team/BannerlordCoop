@@ -14,13 +14,10 @@ namespace Coop.Mod.Persistence.World
 #pragma warning restore 67
         public override string ToString()
         {
-            return $"{CampaignTimeTicks} :: {TimeControl} {TimeControlLock}";
+            return $"{CampaignTimeTicks}";
         }
 
         #region synced data
-        [Mutable] public CampaignTimeControlMode TimeControl { get; set; }
-
-        [Mutable] public bool TimeControlLock { get; set; }
 
         [Mutable] public long CampaignTimeTicks { get; set; }
         #endregion

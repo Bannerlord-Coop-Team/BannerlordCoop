@@ -89,6 +89,16 @@ namespace Sync
         public void Call(EActionOrigin eOrigin, [CanBeNull] object instance, [CanBeNull] object[] args)
         {
             if (!InvokePrefix(eOrigin, instance, args)) return;
+            CallOriginal(instance, args);
+        }
+
+        /// <summary>
+        ///     Calls the original function without the prefixes or applied.
+        /// </summary>
+        /// <param name="instance"></param>
+        /// <param name="args"></param>
+        public void CallOriginal([CanBeNull] object instance, [CanBeNull] object[] args)
+        {
             m_Call?.Invoke(instance, args);
             m_CallStatic?.Invoke(args);
         }

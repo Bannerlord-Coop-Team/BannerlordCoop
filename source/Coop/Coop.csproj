@@ -327,7 +327,6 @@
     <Compile Include="Mod\Persistence\RemoteAction\PendingRequests.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityClient.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityServer.cs" />
-    <Compile Include="Mod\Persistence\World\EventTimeControl.cs" />
     <Compile Include="Mod\Persistence\World\WorldState.cs" />
     <Compile Include="Mod\CoopServerRail.cs" />
     <Compile Include="Mod\SaveGameData.cs" />
