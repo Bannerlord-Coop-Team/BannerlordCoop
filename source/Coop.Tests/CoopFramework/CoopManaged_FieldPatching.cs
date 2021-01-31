@@ -79,7 +79,7 @@ namespace Coop.Tests.CoopFramework
         {
             static CoopManagedFoo()
             {
-                When(EActionOrigin.Local)
+                When(EOriginator.Game)
                     .Changes(Field<int>(nameof(Foo.m_Bar)))
                     .Through(
                         Setter(nameof(Foo.BarProperty)),

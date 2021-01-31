@@ -43,7 +43,7 @@ namespace Coop.Tests.CoopFramework
             var sync = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.Bar);
 
-            CoopManagedFoo.BarSetter.Call(EActionOrigin.Authoritative, foo, new object[] {43});
+            CoopManagedFoo.BarSetter.Call(EOriginator.RemoteAuthority, foo, new object[] {43});
             Assert.Equal(43, foo.Bar);
         }
 
@@ -66,7 +66,7 @@ namespace Coop.Tests.CoopFramework
             var sync = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.Baz);
 
-            CoopManagedFoo.BazSetter.Call(EActionOrigin.Authoritative, foo, new object[] {43});
+            CoopManagedFoo.BazSetter.Call(EOriginator.RemoteAuthority, foo, new object[] {43});
             Assert.Equal(42, foo.Baz);
         }
 
@@ -84,17 +84,17 @@ namespace Coop.Tests.CoopFramework
             static CoopManagedFoo()
             {
                 // Ignore local calls on Foo.Bar
-                When(EActionOrigin.Local)
+                When(EOriginator.Game)
                     .Calls(BarSetter)
                     .Suppress();
 
                 // Allow local calls on Foo.Baz
-                When(EActionOrigin.Local)
+                When(EOriginator.Game)
                     .Calls(BazSetter)
                     .Execute();
 
                 // Ignore authoritative calls on Foo.Baz
-                When(EActionOrigin.Authoritative)
+                When(EOriginator.RemoteAuthority)
                     .Calls(BazSetter)
                     .Suppress();
             }

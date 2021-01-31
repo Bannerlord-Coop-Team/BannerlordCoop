@@ -34,7 +34,7 @@ namespace Coop.Tests.CoopFramework
         {
             static CoopManagedFoo()
             {
-                When(EActionOrigin.Local)
+                When(EOriginator.Game)
                     .Calls(
                         Setter(nameof(Foo.Bar)),
                         Setter(nameof(Foo.Baz)))

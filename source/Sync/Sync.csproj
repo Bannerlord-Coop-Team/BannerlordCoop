@@ -81,16 +81,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Behaviour\ActionBehaviour.cs" />
     <Compile Include="Behaviour\CallBehaviourBuilder.cs" />
     <Compile Include="Behaviour\ActionBehaviourBuilder.cs" />
     <Compile Include="Behaviour\ECallPropagation.cs" />
     <Compile Include="Behaviour\EFieldChangeAction.cs" />
-    <Compile Include="Behaviour\EActionOrigin.cs" />
+    <Compile Include="Behaviour\EOriginator.cs" />
     <Compile Include="Behaviour\FieldActionBehaviourBuilder.cs" />
     <Compile Include="Behaviour\FieldBehaviourBuilder.cs" />
     <Compile Include="Behaviour\IActionValidator.cs" />
     <Compile Include="Behaviour\IPendingMethodCall.cs" />
     <Compile Include="Behaviour\ActionValidatorRegistry.cs" />
+    <Compile Include="Behaviour\Util.cs" />
     <Compile Include="ConstructorPatch.cs" />
     <Compile Include="DestructorPatch.cs" />
     <Compile Include="FieldId.cs" />

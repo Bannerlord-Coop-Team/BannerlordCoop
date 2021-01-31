@@ -2,9 +2,9 @@
 
 namespace Sync.Behaviour
 {
-    public class FieldBehaviourBuilder
+    public class FieldBehaviourBuilder : ActionBehaviour
     {
-        public FieldBehaviourBuilder(IEnumerable<FieldId> fieldIds)
+        public FieldBehaviourBuilder(IEnumerable<FieldId> fieldIds, IsApplicableDelegate decider) : base(decider)
         {
             m_FieldIds = fieldIds;
         }

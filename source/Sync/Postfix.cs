@@ -8,8 +8,8 @@ namespace Sync
 {
     public class Postfix
     {
-        public delegate void InstanceHandlerDelegate(EActionOrigin eOrigin, object[] args);
-        public delegate void GlobalHandlerDelegate(EActionOrigin eOrigin, object instance, object[] args);
+        public delegate void InstanceHandlerDelegate(EOriginator eOrigin, object[] args);
+        public delegate void GlobalHandlerDelegate(EOriginator eOrigin, object instance, object[] args);
         
         
         private readonly Dictionary<WeakReference<object>, InstanceHandlerDelegate> m_InstanceSpecificHandlers =

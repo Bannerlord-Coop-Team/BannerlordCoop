@@ -246,7 +246,7 @@ namespace Sync
             [CanBeNull] object instance,
             params object[] args)
         {
-            return methodAccess.InvokePrefix(EActionOrigin.Local, instance, args);
+            return methodAccess.InvokePrefix(EOriginator.Game, instance, args);
         }
         
         private void PatchPostfix(
@@ -269,7 +269,7 @@ namespace Sync
             [CanBeNull] object instance,
             params object[] args)
         {
-            methodAccess.InvokePostfix(EActionOrigin.Local, instance, args);
+            methodAccess.InvokePostfix(EOriginator.Game, instance, args);
         }
     }
 }

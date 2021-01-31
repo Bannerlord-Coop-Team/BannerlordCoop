@@ -11,22 +11,25 @@ namespace Sync.Behaviour
     /// </summary>
     public class ActionBehaviourBuilder
     {
+        public ActionBehaviourBuilder(ActionBehaviour.IsApplicableDelegate decider)
+        {
+            m_Decider = decider;
+        }
         public CallBehaviourBuilder Calls(params MethodAccess[] methods)
         {
-            var behaviour = new CallBehaviourBuilder(methods.Select(m => m.Id));
+            var behaviour = new CallBehaviourBuilder(methods.Select(m => m.Id), m_Decider);
             foreach (var method in methods)
             {
-                
                 Register(method.Id, behaviour);
             }
             return behaviour;
         }
         public FieldActionBehaviourBuilder Changes(params FieldAccess[] fields)
         {
-            var fieldChangeAction = new FieldActionBehaviourBuilder(fields.Select(f => f.Id));
-            foreach (var field in fields)
+            var fieldChangeAction = new FieldActionBehaviourBuilder(fields.Select(f => f.Id), m_Decider);
+            foreach (FieldAccess field in fields)
             {
-                Register(field, fieldChangeAction);
+                Register(field.Id, fieldChangeAction);
             }
 
             return fieldChangeAction;
@@ -34,17 +37,7 @@ namespace Sync.Behaviour
 
         #region Getters
         public Dictionary<MethodId, CallBehaviourBuilder> CallBehaviours { get; } = new Dictionary<MethodId, CallBehaviourBuilder>();
-        public Dictionary<FieldAccess, FieldActionBehaviourBuilder> FieldChangeAction { get; } = new Dictionary<FieldAccess, FieldActionBehaviourBuilder>();
-        [NotNull]
-        public CallBehaviourBuilder GetCallBehaviour(MethodId methodId)
-        {
-            return CallBehaviours.TryGetValue(methodId, out CallBehaviourBuilder behaviours) ? behaviours : new CallBehaviourBuilder();
-        }
-        [NotNull]
-        public FieldActionBehaviourBuilder GetFieldBehaviour(FieldAccess fieldAccess)
-        {
-            return FieldChangeAction.TryGetValue(fieldAccess, out FieldActionBehaviourBuilder behaviour) ? behaviour : new FieldActionBehaviourBuilder(new[] {fieldAccess.Id});
-        }
+        public Dictionary<FieldId, FieldActionBehaviourBuilder> FieldChangeAction { get; } = new Dictionary<FieldId, FieldActionBehaviourBuilder>();
         #endregion
         
         
@@ -59,7 +52,7 @@ namespace Sync.Behaviour
             CallBehaviours[key] = behaviourBuilder;
         }
 
-        private void Register(FieldAccess key, FieldActionBehaviourBuilder change)
+        private void Register(FieldId key, FieldActionBehaviourBuilder change)
         {
             if (FieldChangeAction.ContainsKey(key))
             {
@@ -68,6 +61,9 @@ namespace Sync.Behaviour
 
             FieldChangeAction[key] = change;
         }
+        
+        private ActionBehaviour.IsApplicableDelegate m_Decider;
+
         #endregion
     }
 }

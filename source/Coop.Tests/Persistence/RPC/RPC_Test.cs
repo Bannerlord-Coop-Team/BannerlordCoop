@@ -57,7 +57,7 @@ namespace Coop.Tests.Persistence.RPC
         {
             static ManagedFoo()
             {
-                When(EActionOrigin.Local)
+                When(EOriginator.Game)
                     .Calls(Method(nameof(Foo.SyncedMethod)))
                     .Broadcast()
                     .Suppress();

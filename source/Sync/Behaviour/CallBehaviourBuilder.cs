@@ -7,13 +7,9 @@ namespace Sync.Behaviour
     /// <summary>
     ///     Builder class to define the behaviour of a patched method or property getter / setter.
     /// </summary>
-    public class CallBehaviourBuilder
+    public class CallBehaviourBuilder : ActionBehaviour
     {
-        public CallBehaviourBuilder()
-        {
-            
-        }
-        public CallBehaviourBuilder(IEnumerable<MethodId> ids)
+        public CallBehaviourBuilder(IEnumerable<MethodId> ids, IsApplicableDelegate decider) : base(decider)
         {
             m_MethodIds = ids;
         }

@@ -85,7 +85,7 @@ namespace Coop.Tests.CoopFramework
 
             static CoopManagedFoo()
             {
-                When(EActionOrigin.Local)
+                When(EOriginator.Game)
                     .Calls(BarSetter)
                     .Suppress();
                 AutoWrapAllInstances(instance => new CoopManagedFoo(instance));
@@ -102,7 +102,7 @@ namespace Coop.Tests.CoopFramework
 
             static CoopManagedFoo2()
             {
-                When(EActionOrigin.Local)
+                When(EOriginator.Game)
                     .Calls(BarSetter)
                     .Suppress();
                 AutoWrapAllInstances(instance => new CoopManagedFoo2(instance));

@@ -70,7 +70,7 @@ namespace Coop.Mod.Patch
                     Delay.Push((int) Math.Round(secondsBehindServer));
                     args[0] = Math.Max(secondsBehindServer, 0f);
                 }
-                access.Call(EActionOrigin.Authoritative, instance, args);
+                access.Call(EOriginator.RemoteAuthority, instance, args);
                 return ECallPropagation.Suppress;
             });
         }

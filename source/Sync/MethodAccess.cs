@@ -86,7 +86,7 @@ namespace Sync
         /// <param name="eOrigin">Who triggered this call?</param>
         /// <param name="instance"></param>
         /// <param name="args"></param>
-        public void Call(EActionOrigin eOrigin, [CanBeNull] object instance, [CanBeNull] object[] args)
+        public void Call(EOriginator eOrigin, [CanBeNull] object instance, [CanBeNull] object[] args)
         {
             if (!InvokePrefix(eOrigin, instance, args)) return;
             CallOriginal(instance, args);
@@ -110,7 +110,7 @@ namespace Sync
         /// <param name="instance"></param>
         /// <param name="args"></param>
         /// <returns>true if the invoked prefix wants the original function to be called as well. False otherwise.</returns>
-        public bool InvokePrefix(EActionOrigin eOrigin, [CanBeNull] object instance, params object[] args)
+        public bool InvokePrefix(EOriginator eOrigin, [CanBeNull] object instance, params object[] args)
         {
             if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return true;
 
@@ -125,7 +125,7 @@ namespace Sync
             return true;
         }
         
-        public void InvokePostfix(EActionOrigin eOrigin, object instance, object[] args)
+        public void InvokePostfix(EOriginator eOrigin, object instance, object[] args)
         {
             if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return;
             

@@ -78,7 +78,7 @@ namespace Coop.Tests.Sync
             params object[] args)
         {
             m_DispatcherCalls.Add(methodAccess);
-            methodAccess.Call(EActionOrigin.Authoritative, instance, args);
+            methodAccess.Call(EOriginator.RemoteAuthority, instance, args);
             return false;
         }
 

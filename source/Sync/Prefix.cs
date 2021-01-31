@@ -14,8 +14,8 @@ namespace Sync
     {
         public delegate ECallPropagation InstanceHandlerDelegate(object[] args);
         public delegate ECallPropagation GlobalHandlerDelegate(object instance, object[] args);
-        public delegate ECallPropagation InstanceHandlerCallerIdDelegate(EActionOrigin eOrigin, object[] args);
-        public delegate ECallPropagation GlobalHandlerCallerIdDelegate(EActionOrigin eOrigin, object instance, object[] args);
+        public delegate ECallPropagation InstanceHandlerCallerIdDelegate(EOriginator eOrigin, object[] args);
+        public delegate ECallPropagation GlobalHandlerCallerIdDelegate(EOriginator eOrigin, object instance, object[] args);
         
         
         private readonly Dictionary<WeakReference<object>, InstanceHandlerCallerIdDelegate> m_InstanceSpecificHandlers =
@@ -42,7 +42,7 @@ namespace Sync
         {
             SetHandler(instance, (eOrigin, args) =>
             {
-                if (eOrigin == EActionOrigin.Authoritative) return ECallPropagation.CallOriginal;
+                if (eOrigin == EOriginator.RemoteAuthority) return ECallPropagation.CallOriginal;
                 return handler.Invoke(args);
             });
         }
@@ -137,7 +137,7 @@ namespace Sync
         {
             SetGlobalHandler((eOrigin, instance, args) =>
             {
-                if (eOrigin == EActionOrigin.Authoritative)
+                if (eOrigin == EOriginator.RemoteAuthority)
                 {
                     // Default behaviour: Authority is always applied
                     return ECallPropagation.CallOriginal;
