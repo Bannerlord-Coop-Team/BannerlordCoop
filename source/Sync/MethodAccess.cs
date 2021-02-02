@@ -21,11 +21,6 @@ namespace Sync
         /// </summary>
         [NotNull] public Prefix Prefix { get; } = new Prefix();
         [NotNull] public Postfix Postfix { get; } = new Postfix();
-        
-        [CanBeNull] private readonly Action<object, object[]> m_Call;
-        [CanBeNull] private readonly Action<object[]> m_CallStatic;
-
-        private readonly DynamicMethod m_StandIn;
 
         public MethodAccess([NotNull] MethodBase info)
         {
@@ -45,15 +40,6 @@ namespace Sync
 
         public EMethodPatchFlag Flags { get; private set; } = EMethodPatchFlag.None;
 
-        /// <summary>
-        ///     If set, this function will be called before invoking any onBeforeCall handlers. If the
-        ///     function evaluates to false, the onBeforeCall handlers will not be called.
-        ///
-        ///     The provided object is the instance the method is being called on. null for static methods.
-        /// </summary>
-        [CanBeNull]
-        public Func<object, bool> ConditionIsPatchActive { get; set; }
-
         public MethodId Id { get; }
 
         public MethodBase MethodBase { get; }
@@ -61,22 +47,6 @@ namespace Sync
         public void AddFlags(EMethodPatchFlag flag)
         {
             Flags |= flag;
-        }
-
-        private void InitOriginal(DynamicMethod toPatch)
-        {
-            lock (Patcher.HarmonyLock)
-            {
-                bool bHasPatches = Harmony.GetPatchInfo(MethodBase) != null;
-                HarmonyMethod standin = new HarmonyMethod(toPatch)
-                {
-                    method = m_StandIn,
-                    reversePatchType = bHasPatches ?
-                        HarmonyReversePatchType.Snapshot :
-                        HarmonyReversePatchType.Original
-                };
-                Harmony.ReversePatch(MethodBase, standin);
-            }
         }
 
         /// <summary>
@@ -112,8 +82,6 @@ namespace Sync
         /// <returns>true if the invoked prefix wants the original function to be called as well. False otherwise.</returns>
         public bool InvokePrefix(EOriginator eOrigin, [CanBeNull] object instance, params object[] args)
         {
-            if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return true;
-
             var handler = Prefix.GetHandler(instance);
             if (handler != null)
             {
@@ -127,8 +95,6 @@ namespace Sync
         
         public void InvokePostfix(EOriginator eOrigin, object instance, object[] args)
         {
-            if (ConditionIsPatchActive != null && !ConditionIsPatchActive(instance)) return;
-            
             var handler = Postfix.GetHandler(instance);
             handler?.Invoke(eOrigin, args);
         }
@@ -137,5 +103,28 @@ namespace Sync
         {
             return $"{MethodBase.DeclaringType?.Name}.{MethodBase.Name}";
         }
+        
+        #region Private
+        private void InitOriginal(DynamicMethod toPatch)
+        {
+            lock (Patcher.HarmonyLock)
+            {
+                bool bHasPatches = Harmony.GetPatchInfo(MethodBase) != null;
+                HarmonyMethod standin = new HarmonyMethod(toPatch)
+                {
+                    method = m_StandIn,
+                    reversePatchType = bHasPatches ?
+                        HarmonyReversePatchType.Snapshot :
+                        HarmonyReversePatchType.Original
+                };
+                Harmony.ReversePatch(MethodBase, standin);
+            }
+        }
+        
+        [CanBeNull] private readonly Action<object, object[]> m_Call;
+        [CanBeNull] private readonly Action<object[]> m_CallStatic;
+
+        private readonly DynamicMethod m_StandIn;
+        #endregion
     }
 }

@@ -155,15 +155,17 @@ namespace CoopFramework
                 return ECallPropagation.Suppress; // Will not work anyways
             }
 
-            var sync = self != null ? self.m_GetSync.Value?.Invoke() : m_GetSyncStatic.Value?.Invoke();
+            var sync = self != null ? self.m_GetSync.Value?.Invoke() : m_GetSyncStatic?.Value.Invoke();
+            if (sync == null)
+            {
+                return ECallPropagation.CallOriginal;
+            }
+            
             foreach (var behaviour in behaviours)
             {
                 if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) continue;
                 if (behaviour.DoBroadcast)
                 {
-                    if (sync == null)
-                        throw new SynchronizationNotInitializedException(
-                            "No ISynchronization implementation was provided. Unable to use the synchronization behaviours.");
                     sync.Broadcast(methodAccess.Id, instanceResolved, args);
                 }
 
@@ -374,6 +376,12 @@ namespace CoopFramework
             EOriginator origin,
             FieldBehaviourBuilder[] behaviours)
         {
+            var sync = self != null ? self.m_GetSync.Value.Invoke() : m_GetSyncStatic.Value.Invoke();
+            if (sync == null)
+            {
+                return;
+            }
+            
             foreach (var behaviour in behaviours)
             {
                 if (!behaviour.DoesBehaviourApply(origin, self)) return;
@@ -401,6 +409,12 @@ namespace CoopFramework
             IEnumerable<FieldBehaviourBuilder> behaviours,
             FieldAccess fieldAccess)
         {
+            var sync = self != null ? self.m_GetSync.Value.Invoke() : m_GetSyncStatic.Value.Invoke();
+            if (sync == null)
+            {
+                return ECallPropagation.CallOriginal;
+            }
+            
             foreach (var behaviour in behaviours)
             {
                 if (!behaviour.DoesBehaviourApply(origin, self)) return ECallPropagation.CallOriginal;
@@ -430,8 +444,7 @@ namespace CoopFramework
 
             return m_GetSyncStatic?.Value;
         }
-
-
+        
         [NotNull] private static readonly Lazy<Func<ISynchronization>> m_GetSyncStatic =
             new Lazy<Func<ISynchronization>>(() =>
             {
@@ -441,8 +454,10 @@ namespace CoopFramework
                         method.ReturnType == typeof(ISynchronization))
                         return () => method.Invoke(null, new object[] { }) as ISynchronization;
 
-                return null;
+                return CoopFramework.SynchronizationFactory;
             });
+
+        [CanBeNull] private static Func<ISynchronization> m_GlobalSyncFactory;
 
         [NotNull] private readonly Lazy<Func<ISynchronization>> m_GetSync;
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using CoopFramework;
 using JetBrains.Annotations;
+using Moq;
 using Sync;
 using Sync.Behaviour;
 using Xunit;
@@ -86,6 +87,12 @@ namespace Coop.Tests.CoopFramework
                 Assert.NotNull(fooInstance);
                 Assert.NotNull(fooInstance.Callback);
                 return fooInstance.Callback.Invoke(pendingMethodCall);
+            }
+            
+            [SyncFactory]
+            private static ISynchronization GetSynchronization()
+            {
+                return new Mock<ISynchronization>().Object;
             }
         }
     }

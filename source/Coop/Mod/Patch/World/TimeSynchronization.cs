@@ -40,8 +40,6 @@ namespace Coop.Mod.Patch
             {
                 throw new Exception("Patching failed. Was MapTimeTracker.Tick(float seconds) in the game DLLs changed?");
             }
-            
-            access.ConditionIsPatchActive = o => Coop.IsClientConnected; 
             access.Prefix.SetGlobalHandler((instance, args) =>
             {
                 if (args.Length == 0 || !(args[0] is float))

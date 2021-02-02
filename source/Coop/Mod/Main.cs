@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
@@ -31,7 +30,7 @@ namespace Coop.Mod
     internal class Main : NoHarmonyLoader
     {
         // Test Symbols
-        public static readonly bool TESTING_ENABLED = true;
+        public static readonly bool TESTING_ENABLED = false;
 
         public static readonly string LOAD_GAME = "MP";
 
@@ -112,21 +111,7 @@ namespace Coop.Mod
             AddBehavior<GameLoadedBehaviour>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
-            IEnumerable<MethodInfo> patchInitializers =
-                from t in Assembly.GetExecutingAssembly().GetTypes()
-                from m in t.GetMethods()
-                where m.IsDefined(typeof(PatchInitializerAttribute))
-                select m;
-            foreach (MethodInfo initializer in patchInitializers)
-            {
-                if (!initializer.IsStatic)
-                {
-                    throw new Exception("Invalid [PatchInitializer]. Has to be static.");
-                }
-                
-                Logger.Info("Init patch {}", initializer.DeclaringType);
-                initializer.Invoke(null, null);
-            }
+            CoopFramework.CoopFramework.InitPatches(() => Coop.DoSync() ? CoopClient.Instance.Synchronization : null);
 
             // Skip startup splash screen
             if (Globals.DEBUG)

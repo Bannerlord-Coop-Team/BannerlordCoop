@@ -1,5 +1,6 @@
 ﻿using CoopFramework;
 using JetBrains.Annotations;
+using Moq;
 using Sync.Behaviour;
 using Xunit;
 
@@ -43,6 +44,12 @@ namespace Coop.Tests.CoopFramework
 
             public CoopManagedFoo([NotNull] Foo instance) : base(instance)
             {
+            }
+            
+            [SyncFactory]
+            private static ISynchronization GetSynchronization()
+            {
+                return new Mock<ISynchronization>().Object;
             }
         }
     }
