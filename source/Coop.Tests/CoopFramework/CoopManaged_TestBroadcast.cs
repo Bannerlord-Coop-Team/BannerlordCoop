@@ -80,7 +80,7 @@ namespace Coop.Tests.CoopFramework
                 When(GameLoop)
                     .Calls(BarSetter)
                     .Broadcast()
-                    .Suppress();
+                    .Skip();
 
                 // Broadcast local call on Foo.Baz and apply them immediately
                 When(GameLoop)

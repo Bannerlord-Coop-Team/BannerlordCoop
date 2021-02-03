@@ -50,7 +50,7 @@ namespace Coop.Tests.CoopFramework
             foo.Callback = call =>
             {
                 bCallbackWasExecuted = true;
-                return ECallPropagation.Suppress;
+                return ECallPropagation.Skip;
             };
             foo.Bar = 44;
             Assert.True(bCallbackWasExecuted);

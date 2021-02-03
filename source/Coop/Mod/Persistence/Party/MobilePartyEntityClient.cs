@@ -53,7 +53,7 @@ namespace Coop.Mod.Persistence.Party
                         SettlementIndex = data.TargetSettlement?.Id ?? MovementState.InvalidIndex
                     };
                 });
-            return ECallPropagation.Suppress; // The server will control it
+            return ECallPropagation.Skip; // The server will control it
         }
 
         /// <summary>

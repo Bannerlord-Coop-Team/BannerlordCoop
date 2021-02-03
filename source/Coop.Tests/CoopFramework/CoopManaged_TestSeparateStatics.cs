@@ -88,7 +88,7 @@ namespace Coop.Tests.CoopFramework
             {
                 When(GameLoop)
                     .Calls(BarSetter)
-                    .Suppress();
+                    .Skip();
                 AutoWrapAllInstances(instance => new CoopManagedFoo(instance));
             }
 
@@ -111,7 +111,7 @@ namespace Coop.Tests.CoopFramework
             {
                 When(GameLoop)
                     .Calls(BarSetter)
-                    .Suppress();
+                    .Skip();
                 AutoWrapAllInstances(instance => new CoopManagedFoo2(instance));
             }
 

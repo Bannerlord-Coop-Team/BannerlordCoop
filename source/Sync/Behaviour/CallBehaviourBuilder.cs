@@ -24,9 +24,9 @@ namespace Sync.Behaviour
         /// <summary>
         ///     Suppress the original call. No further patch nor the original will be called.
         /// </summary>
-        public void Suppress()
+        public void Skip()
         {
-            CallPropagationBehaviour = ECallPropagation.Suppress;
+            CallPropagationBehaviour = ECallPropagation.Skip;
         }
         
         /// <summary>

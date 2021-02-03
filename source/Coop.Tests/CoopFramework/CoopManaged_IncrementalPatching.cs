@@ -38,7 +38,7 @@ namespace Coop.Tests.CoopFramework
             var fooManaged2 = new CoopManagedFoo2(foo);
 
             // configure fooManaged to suppress the call
-            fooManaged.BarHandler = call => ECallPropagation.Suppress;
+            fooManaged.BarHandler = call => ECallPropagation.Skip;
 
             foo.Bar = 43;
             Assert.True(fooManaged.WasCalled);
@@ -48,7 +48,7 @@ namespace Coop.Tests.CoopFramework
             // configure fooManaged to propagate the call so it reaches fooManaged2
             fooManaged.WasCalled = false;
             fooManaged.BarHandler = call => ECallPropagation.CallOriginal;
-            fooManaged2.BarHandler = call => ECallPropagation.Suppress;
+            fooManaged2.BarHandler = call => ECallPropagation.Skip;
 
             foo.Bar = 43;
             Assert.True(fooManaged2.WasCalled);

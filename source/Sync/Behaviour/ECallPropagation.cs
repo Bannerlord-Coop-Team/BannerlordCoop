@@ -14,6 +14,6 @@
         /// behaviour is to intercept a function call locally in order to reroute it via the Coop server. The rerouted
         /// call can then be executed again once it has been sent to all clients.
         /// </summary>
-        Suppress
+        Skip
     }
 }

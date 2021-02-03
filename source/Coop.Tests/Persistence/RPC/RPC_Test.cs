@@ -60,7 +60,7 @@ namespace Coop.Tests.Persistence.RPC
                 When(GameLoop)
                     .Calls(Method(nameof(Foo.SyncedMethod)))
                     .Broadcast()
-                    .Suppress();
+                    .Skip();
                 ApplyStaticPatches();
             }
             public ManagedFoo([NotNull] Foo instance) : base(instance)

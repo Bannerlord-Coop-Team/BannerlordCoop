@@ -39,7 +39,7 @@ namespace Coop.Tests.CoopFramework
                     .Calls(
                         Setter(nameof(Foo.Bar)),
                         Setter(nameof(Foo.Baz)))
-                    .Suppress();
+                    .Skip();
             }
 
             public CoopManagedFoo([NotNull] Foo instance) : base(instance)

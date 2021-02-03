@@ -45,7 +45,7 @@ namespace Coop.Tests.Sync
             method.Prefix.SetHandler(instance, args => 
             { 
                 ++iNumberOfHandlerCalls;
-                return ECallPropagation.Suppress;
+                return ECallPropagation.Skip;
             });
 
             // Trigger the handler

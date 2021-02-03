@@ -93,7 +93,7 @@ namespace Coop.Tests.CoopFramework
                 // Broadcast local calls on Foo.Bar instead of applying it directly
                 When(GameLoop)
                     .Calls(BarSetter)
-                    .Suppress();
+                    .Skip();
 
                 AutoWrapAllInstances(instance => new CoopManagedFoo(instance));
             }

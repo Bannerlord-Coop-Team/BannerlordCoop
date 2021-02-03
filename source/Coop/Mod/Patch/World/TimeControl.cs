@@ -16,7 +16,7 @@ namespace Coop.Mod.Patch.World
             When(GameLoop)
                 .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)))
                 .Broadcast(new CanChangeTimeValidator())
-                .Suppress();
+                .Skip();
         
             When(GameLoop)
                 .Calls(Setter(nameof(Campaign.IsMainPartyWaiting)))
@@ -51,7 +51,7 @@ namespace Coop.Mod.Patch.World
 
             // Override
             Registry.IdToMethod[call.Id].CallOriginal(call.Instance, call.Parameters);
-            return ECallPropagation.Suppress;
+            return ECallPropagation.Skip;
         }
     }
 }

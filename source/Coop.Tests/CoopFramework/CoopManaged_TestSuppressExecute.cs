@@ -87,7 +87,7 @@ namespace Coop.Tests.CoopFramework
                 // Ignore local calls on Foo.Bar
                 When(GameLoop)
                     .Calls(BarSetter)
-                    .Suppress();
+                    .Skip();
 
                 // Allow local calls on Foo.Baz
                 When(GameLoop)
@@ -97,7 +97,7 @@ namespace Coop.Tests.CoopFramework
                 // Ignore authoritative calls on Foo.Baz
                 When(RemoteAuthority)
                     .Calls(BazSetter)
-                    .Suppress();
+                    .Skip();
             }
 
             public CoopManagedFoo([NotNull] Foo instance) : base(instance)

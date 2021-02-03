@@ -71,7 +71,7 @@ namespace Coop.Tests.CoopFramework
                     .Revert();
                 When(GameLoop)
                     .Calls(Setter(nameof(Foo.Baz)))
-                    .Suppress();
+                    .Skip();
             }
             
             public CoopManagedFoo(ISynchronization sync, [NotNull] Foo instance) : base(instance)

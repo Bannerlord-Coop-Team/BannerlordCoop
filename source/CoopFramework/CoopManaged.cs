@@ -154,7 +154,7 @@ namespace CoopFramework
             {
                 // The instance went out of scope?
                 Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
-                return ECallPropagation.Suppress; // Will not work anyways
+                return ECallPropagation.Skip; // Will not work anyways
             }
 
             var sync = self != null ? self.m_GetSync.Value?.Invoke() : m_GetSyncStatic?.Value.Invoke();
@@ -178,7 +178,7 @@ namespace CoopFramework
                     return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, sync,
                         instanceResolved,
                         args));
-                if (behaviour.CallPropagationBehaviour == ECallPropagation.Suppress) return ECallPropagation.Suppress;
+                if (behaviour.CallPropagationBehaviour == ECallPropagation.Skip) return ECallPropagation.Skip;
             }
 
             return ECallPropagation.CallOriginal;
@@ -426,7 +426,7 @@ namespace CoopFramework
                 {
                     // The instance went out of scope?
                     Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
-                    return ECallPropagation.Suppress; // Will not work anyways
+                    return ECallPropagation.Skip; // Will not work anyways
                 }
 
                 FieldStack.PushMarker();

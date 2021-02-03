@@ -65,7 +65,7 @@ namespace Coop.Tests.Sync
                 {
                     Assert.Null(instance);
                     ++iNumberOfHandlerCalls;
-                    return ECallPropagation.Suppress;
+                    return ECallPropagation.Skip;
                 });
 
             // Trigger the handler
@@ -85,7 +85,7 @@ namespace Coop.Tests.Sync
             m_SyncedMethod.Prefix.SetHandler(instance, args =>
             {
                 ++iNumberOfHandlerCalls;
-                return ECallPropagation.Suppress;
+                return ECallPropagation.Skip;
             });
 
             // Trigger the handler
@@ -114,7 +114,7 @@ namespace Coop.Tests.Sync
             m_SyncedMethod.Prefix.SetHandler(instance, args =>
             {
                 ++iNumberOfHandlerCalls;
-                return ECallPropagation.Suppress;
+                return ECallPropagation.Skip;
             });
 
             // Call the original
