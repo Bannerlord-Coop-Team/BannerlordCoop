@@ -1,11 +1,7 @@
-﻿using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.Party;
-using CoopFramework;
+﻿using CoopFramework;
 using JetBrains.Annotations;
-using Sync;
 using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.Patch

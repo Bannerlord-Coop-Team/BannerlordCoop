@@ -15,8 +15,7 @@ namespace Coop.Tests.CoopFramework
     {
         static CoopManaged_TestConstructorWrapping()
         {
-            // Ensure the static constructor is called
-            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo).TypeHandle);
+            Util.CallPatchInitializer(typeof(CoopManagedFoo));
         }
 
         [Fact]

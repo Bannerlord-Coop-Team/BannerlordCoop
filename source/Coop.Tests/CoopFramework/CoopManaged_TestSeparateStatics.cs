@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using CoopFramework;
 using JetBrains.Annotations;
@@ -12,11 +15,11 @@ namespace Coop.Tests.CoopFramework
     [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class CoopManaged_TestSeparateStatics
     {
+        
         static CoopManaged_TestSeparateStatics()
         {
-            // Ensure the static constructor is called
-            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo).TypeHandle);
-            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo2).TypeHandle);
+            Util.CallPatchInitializer(typeof(CoopManagedFoo));
+            Util.CallPatchInitializer(typeof(CoopManagedFoo2));
         }
 
         public CoopManaged_TestSeparateStatics()

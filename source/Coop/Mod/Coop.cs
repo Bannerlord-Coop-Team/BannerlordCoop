@@ -32,6 +32,11 @@ namespace Coop.Mod
             {
                 return true;
             }
+
+            if (party == null)
+            {
+                return false;
+            }
             
             bool isPlayerControlled = CoopClient.Instance.GameState.IsPlayerControlledParty(party);
             if (isPlayerControlled && party == MobileParty.MainParty)

@@ -12,13 +12,6 @@ namespace Coop.Tests.CoopFramework
     [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class CoopManaged_IncrementalPatching
     {
-        static CoopManaged_IncrementalPatching()
-        {
-            // Initialize the static constructors of our 2 wrappers
-            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo).TypeHandle);
-            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo2).TypeHandle);
-        }
-
         [Fact]
         private void CanBePatched()
         {

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
@@ -137,6 +138,16 @@ namespace CoopFramework
         #endregion
 
         #region Private
+
+        /// <summary>
+        ///     Ensures that the static constructors of the inheriting class are called in order to initialize
+        ///     the patch definitions. Needs to be called exactly once on startup.
+        /// </summary>
+        [PatchInitializer]
+        protected static void RunStaticConstructor()
+        {
+            RuntimeHelpers.RunClassConstructor(typeof(TSelf).TypeHandle);
+        }
 
         private static void OnConstructed(CoopManaged<TSelf, TExtended> newInstance)
         {
