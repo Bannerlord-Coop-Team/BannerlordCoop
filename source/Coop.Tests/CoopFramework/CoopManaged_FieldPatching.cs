@@ -80,7 +80,7 @@ namespace Coop.Tests.CoopFramework
         {
             static CoopManagedFoo()
             {
-                When(EOriginator.Game)
+                When(GameLoop)
                     .Changes(Field<int>(nameof(Foo.m_Bar)))
                     .Through(
                         Setter(nameof(Foo.BarProperty)),

@@ -2,19 +2,17 @@
 {
     public abstract class ActionBehaviour
     {
-        public delegate bool IsApplicableDelegate(EOriginator eOrigin, object instance);
-        
-        public ActionBehaviour(IsApplicableDelegate decider)
+        public ActionBehaviour(Condition condition)
         {
-            m_Decider = decider;
+            m_Condition = condition;
         }
         public bool DoesBehaviourApply(EOriginator origin, object instance)
         {
-            return m_Decider == null || m_Decider(origin, instance);
+            return m_Condition == null || m_Condition.Evaluate(origin, instance);
         }
         
         #region Private
-        private IsApplicableDelegate m_Decider;
+        private Condition m_Condition;
         #endregion
     }
 }

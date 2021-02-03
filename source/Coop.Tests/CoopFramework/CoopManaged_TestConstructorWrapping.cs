@@ -6,6 +6,7 @@ using Moq;
 using Sync;
 using Sync.Behaviour;
 using Xunit;
+using Action = System.Action;
 
 namespace Coop.Tests.CoopFramework
 {
@@ -90,7 +91,7 @@ namespace Coop.Tests.CoopFramework
             static CoopManagedFoo()
             {
                 // Broadcast local calls on Foo.Bar instead of applying it directly
-                When(EOriginator.Game)
+                When(GameLoop)
                     .Calls(BarSetter)
                     .Suppress();
 

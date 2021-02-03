@@ -85,17 +85,17 @@ namespace Coop.Tests.CoopFramework
             static CoopManagedFoo()
             {
                 // Ignore local calls on Foo.Bar
-                When(EOriginator.Game)
+                When(GameLoop)
                     .Calls(BarSetter)
                     .Suppress();
 
                 // Allow local calls on Foo.Baz
-                When(EOriginator.Game)
+                When(GameLoop)
                     .Calls(BazSetter)
                     .Execute();
 
                 // Ignore authoritative calls on Foo.Baz
-                When(EOriginator.RemoteAuthority)
+                When(RemoteAuthority)
                     .Calls(BazSetter)
                     .Suppress();
             }

@@ -77,13 +77,13 @@ namespace Coop.Tests.CoopFramework
             static CoopManagedFoo()
             {
                 // Broadcast local calls on Foo.Bar instead of applying it directly
-                When(EOriginator.Game)
+                When(GameLoop)
                     .Calls(BarSetter)
                     .Broadcast()
                     .Suppress();
 
                 // Broadcast local call on Foo.Baz and apply them immediately
-                When(EOriginator.Game)
+                When(GameLoop)
                     .Calls(BazSetter)
                     .Broadcast()
                     .Execute();

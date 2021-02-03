@@ -10,10 +10,10 @@ namespace Sync.Behaviour
     /// </summary>
     public class FieldActionBehaviourBuilder
     {
-        public FieldActionBehaviourBuilder(IEnumerable<FieldId> fieldIds, ActionBehaviour.IsApplicableDelegate decider)
+        public FieldActionBehaviourBuilder(IEnumerable<FieldId> fieldIds, Condition condition)
         {
             m_FieldIds = fieldIds;
-            m_Decider = decider;
+            m_Condition = condition;
         }
 
         /// <summary>
@@ -25,7 +25,7 @@ namespace Sync.Behaviour
         public FieldBehaviourBuilder Through(params MethodAccess[] accessors)
         {
             Accessors.AddRange(accessors);
-            Behaviour = new FieldBehaviourBuilder(m_FieldIds, m_Decider);
+            Behaviour = new FieldBehaviourBuilder(m_FieldIds, m_Condition);
             return Behaviour;
         }
 
@@ -33,7 +33,7 @@ namespace Sync.Behaviour
         public FieldBehaviourBuilder Behaviour { get; private set; }
         #region Private
         private readonly IEnumerable<FieldId> m_FieldIds;
-        private ActionBehaviour.IsApplicableDelegate m_Decider;
+        private Condition m_Condition;
         #endregion
     }
 }

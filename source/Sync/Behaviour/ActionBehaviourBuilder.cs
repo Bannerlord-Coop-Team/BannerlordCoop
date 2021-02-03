@@ -11,13 +11,13 @@ namespace Sync.Behaviour
     /// </summary>
     public class ActionBehaviourBuilder
     {
-        public ActionBehaviourBuilder(ActionBehaviour.IsApplicableDelegate decider)
+        public ActionBehaviourBuilder(Condition condition)
         {
-            m_Decider = decider;
+            m_Condition = condition;
         }
         public CallBehaviourBuilder Calls(params MethodAccess[] methods)
         {
-            var behaviour = new CallBehaviourBuilder(methods.Select(m => m.Id), m_Decider);
+            var behaviour = new CallBehaviourBuilder(methods.Select(m => m.Id), m_Condition);
             foreach (var method in methods)
             {
                 Register(method.Id, behaviour);
@@ -26,7 +26,7 @@ namespace Sync.Behaviour
         }
         public FieldActionBehaviourBuilder Changes(params FieldAccess[] fields)
         {
-            var fieldChangeAction = new FieldActionBehaviourBuilder(fields.Select(f => f.Id), m_Decider);
+            var fieldChangeAction = new FieldActionBehaviourBuilder(fields.Select(f => f.Id), m_Condition);
             foreach (FieldAccess field in fields)
             {
                 Register(field.Id, fieldChangeAction);
@@ -62,7 +62,7 @@ namespace Sync.Behaviour
             FieldChangeAction[key] = change;
         }
         
-        private ActionBehaviour.IsApplicableDelegate m_Decider;
+        private Condition m_Condition;
 
         #endregion
     }

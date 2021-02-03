@@ -15,7 +15,7 @@ namespace CoopFramework
     ///     <code>
     /// </code>
     /// </summary>
-    public abstract class CoopManaged<TSelf, TExtended> where TExtended : class
+    public abstract class CoopManaged<TSelf, TExtended> : CoopConditions where TExtended : class
     {
         /// <summary>
         ///     Creates synchronization for a given instance of <typeparamref name="TExtended" />.
@@ -102,14 +102,16 @@ namespace CoopFramework
         }
 
         /// <summary>
-        ///     Starting point of a patch for any action. The patch will only be active if the context of the call
-        ///     is equal to <paramref name="eOriginator" />.
+        ///     Declares a Coop patch that is active when the <param name="condition"></param> evaluates
+        ///     to true. See <see cref="CoopConditions"/> for predefined conditions.
+        ///
+        ///     The condition is evaluated when the patched action is executed.
         /// </summary>
-        /// <param name="eOriginator"></param>
+        /// <param name="condition"></param>
         /// <returns></returns>
-        protected static ActionBehaviourBuilder When(EOriginator eOriginator)
+        protected static ActionBehaviourBuilder When(Condition condition)
         {
-            var builder = new ActionBehaviourBuilder((eOrigin, _) => eOrigin == eOriginator);
+            var builder = new ActionBehaviourBuilder(condition);
             m_DefinedBehaviours.Add(builder);
             return builder;
         }

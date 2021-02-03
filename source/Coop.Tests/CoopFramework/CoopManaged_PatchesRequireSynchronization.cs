@@ -65,11 +65,11 @@ namespace Coop.Tests.CoopFramework
         {
             static CoopManagedFoo()
             {
-                When(EOriginator.Game)
+                When(GameLoop)
                     .Changes(Field<int>(nameof(Foo.Bar)))
                     .Through(Method(nameof(Foo.SetBar)))
                     .Revert();
-                When(EOriginator.Game)
+                When(GameLoop)
                     .Calls(Setter(nameof(Foo.Baz)))
                     .Suppress();
             }

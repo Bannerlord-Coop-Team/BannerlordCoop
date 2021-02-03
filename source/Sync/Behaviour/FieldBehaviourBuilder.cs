@@ -4,7 +4,7 @@ namespace Sync.Behaviour
 {
     public class FieldBehaviourBuilder : ActionBehaviour
     {
-        public FieldBehaviourBuilder(IEnumerable<FieldId> fieldIds, IsApplicableDelegate decider) : base(decider)
+        public FieldBehaviourBuilder(IEnumerable<FieldId> fieldIds, Condition condition) : base(condition)
         {
             m_FieldIds = fieldIds;
         }

@@ -84,6 +84,7 @@
     <Compile Include="Behaviour\ActionBehaviour.cs" />
     <Compile Include="Behaviour\CallBehaviourBuilder.cs" />
     <Compile Include="Behaviour\ActionBehaviourBuilder.cs" />
+    <Compile Include="Behaviour\Condition.cs" />
     <Compile Include="Behaviour\ECallPropagation.cs" />
     <Compile Include="Behaviour\EFieldChangeAction.cs" />
     <Compile Include="Behaviour\EOriginator.cs" />

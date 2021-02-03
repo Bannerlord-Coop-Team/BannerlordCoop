@@ -13,12 +13,12 @@ namespace Coop.Mod.Patch.World
         public static bool CanSyncTimeControlMode = false;
         static TimeControl()
         {
-            When(EOriginator.Game)
+            When(GameLoop)
                 .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)))
                 .Broadcast(new CanChangeTimeValidator())
                 .Suppress();
         
-            When(EOriginator.Game)
+            When(GameLoop)
                 .Calls(Setter(nameof(Campaign.IsMainPartyWaiting)))
                 .DelegateTo(SetIsMainPartyWaiting);
         }

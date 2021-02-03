@@ -9,7 +9,7 @@ namespace Sync.Behaviour
     /// </summary>
     public class CallBehaviourBuilder : ActionBehaviour
     {
-        public CallBehaviourBuilder(IEnumerable<MethodId> ids, IsApplicableDelegate decider) : base(decider)
+        public CallBehaviourBuilder(IEnumerable<MethodId> ids, Condition condition) : base(condition)
         {
             m_MethodIds = ids;
         }
