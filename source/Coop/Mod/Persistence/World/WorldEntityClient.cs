@@ -53,7 +53,6 @@ namespace Coop.Mod.Persistence.World
         /// </summary>
         protected override void OnRemoved()
         {
-            m_Environment.TargetPosition.Prefix.RemoveGlobalHandler();
             State.PropertyChanged -= State_PropertyChanged;
         }
 

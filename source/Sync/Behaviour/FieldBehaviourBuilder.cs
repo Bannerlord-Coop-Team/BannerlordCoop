@@ -14,7 +14,7 @@ namespace Sync.Behaviour
         ///     receive the changed value on the same campaign tick. The originator of the call will receive the
         ///     authoritative change as well.
         /// </summary>
-        public FieldBehaviourBuilder Broadcast(IActionValidator validator)
+        public FieldBehaviourBuilder Broadcast(IActionValidator validator = null)
         {
             DoBroadcast = true;
             if (validator != null)

@@ -111,7 +111,7 @@ namespace Coop.Mod
             AddBehavior<GameLoadedBehaviour>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
-            CoopFramework.CoopFramework.InitPatches(() => Coop.DoSync() ? CoopClient.Instance.Synchronization : null);
+            CoopFramework.CoopFramework.InitPatches(() => Coop.IsCoopGameSession() ? CoopClient.Instance.Synchronization : null);
 
             // Skip startup splash screen
             if (Globals.DEBUG)

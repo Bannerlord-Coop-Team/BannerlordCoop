@@ -106,7 +106,7 @@
     <Compile Include="Store\RemoteStore.cs" />
     <Compile Include="Store\SharedRemoteStore.cs" />
     <Compile Include="Store\StoreSerializer.cs" />
-    <Compile Include="ValueChangeBuffer.cs" />
+    <Compile Include="FieldChangeBuffer.cs" />
     <Compile Include="ValueChangeRequest.cs" />
     <Compile Include="FieldChangeStack.cs" />
     <Compile Include="MethodId.cs" />
@@ -119,7 +119,7 @@
     <Compile Include="Reflection\Extensions.cs" />
     <Compile Include="Reflection\InvokableFactory.cs" />
     <Compile Include="Patcher.cs" />
-    <Compile Include="ValueData.cs" />
+    <Compile Include="FieldData.cs" />
     <Compile Include="FieldAccess.cs" />
     <Compile Include="FieldAccessGroup.cs" />
     <Compile Include="MethodAccess.cs" />

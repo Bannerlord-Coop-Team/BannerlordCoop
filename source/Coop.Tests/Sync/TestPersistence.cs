@@ -59,10 +59,15 @@ namespace Coop.Tests.Sync
         {
             Store = store;
         }
-
-        public FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
+        
         public FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; }
         public FieldAccess<Campaign, bool> TimeControlModeLock { get; }
+
+        public void SetAuthoritative(MobileParty party, MovementData data)
+        {
+            // TODO
+            throw new NotImplementedException();
+        }
 
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Zero;
 

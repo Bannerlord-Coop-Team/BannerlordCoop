@@ -21,8 +21,12 @@ namespace Coop.Mod
         public HashSet<MobileParty> PlayerControlledMobileParties { get; } =
             new HashSet<MobileParty>();
 
-        public FieldAccessGroup<MobileParty, MovementData> TargetPosition =>
-            CampaignMapMovement.Movement;
+        public void SetAuthoritative(MobileParty party, MovementData data)
+        {
+            // TODO
+            throw new NotImplementedException();
+        }
+
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;
 
         public void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled)

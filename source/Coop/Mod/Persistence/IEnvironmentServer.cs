@@ -12,10 +12,6 @@ namespace RemoteAction
     /// </summary>
     public interface IEnvironmentServer
     {
-        /// <summary>
-        ///     Access to the movement data for all parties in the clients game world.
-        /// </summary>
-        FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
 
         /// <summary>
         ///     Returns the shared object store for this server.

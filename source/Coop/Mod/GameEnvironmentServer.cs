@@ -16,9 +16,6 @@ namespace Coop.Mod
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public FieldAccessGroup<MobileParty, MovementData> TargetPosition =>
-            CampaignMapMovement.Movement;
-
         public bool CanChangeTimeControlMode => CoopServer.Instance.AreAllClientsPlaying;
 
         public EventBroadcastingQueue EventQueue => CoopServer.Instance.Persistence?.EventQueue;

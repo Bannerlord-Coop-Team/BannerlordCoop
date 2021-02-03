@@ -1,37 +1,43 @@
 ﻿using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using CoopFramework;
+using JetBrains.Annotations;
 using Sync;
+using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.Patch
 {
-    public static class CampaignMapMovement
+    public class CampaignMapMovement : CoopManaged<CampaignMapMovement, MobileParty>
     {
-        private class TPatch
+        private static Condition PartyController = new Condition((eOriginator, instance) =>
         {
-            // TODO: Replace TimeControl with a CoopManaged
+            return eOriginator == EOriginator.Game && Coop.IsController(instance as MobileParty);
+        });
+        static CampaignMapMovement()
+        {
+            When(PartyController)
+                .Changes(
+                    Field<AiBehavior>("_defaultBehavior"),
+                    Field<Settlement>("_targetSettlement"),
+                    Field<MobileParty>("_targetParty"),
+                    Field<Vec2>("_targetPosition"),
+                    Field<int>("_numberOfFleeingsAtLastTravel"))
+                .Through(
+                    Setter(nameof(MobileParty.DefaultBehavior)),
+                    Setter(nameof(MobileParty.TargetSettlement)),
+                    Setter(nameof(MobileParty.TargetParty)),
+                    Setter(nameof(MobileParty.TargetPosition)))
+                .Broadcast()
+                .Keep(); // Keep the changes as a preview
+            
+            AutoWrapAllInstances(party => new CampaignMapMovement(party));
         }
-        private static readonly PropertyPatch<TPatch> MobilePartyPatch =
-            new PropertyPatch<TPatch>(typeof(MobileParty))
-                .InterceptSetter(nameof(MobileParty.DefaultBehavior))
-                .InterceptSetter(nameof(MobileParty.TargetSettlement))
-                .InterceptSetter(nameof(MobileParty.TargetParty))
-                .InterceptSetter(nameof(MobileParty.TargetPosition));
 
-        public static FieldAccessGroup<MobileParty, MovementData> Movement { get; } =
-            new FieldAccessGroup<MobileParty, MovementData>()
-                .AddField<AiBehavior>("_defaultBehavior")
-                .AddField<Settlement>("_targetSettlement")
-                .AddField<MobileParty>("_targetParty")
-                .AddField<Vec2>("_targetPosition")
-                .AddField<int>("_numberOfFleeingsAtLastTravel");
-
-        [PatchInitializer]
-        public static void Init(ISynchronization sync)
+        public CampaignMapMovement([NotNull] MobileParty instance) : base(instance)
         {
-            sync.RegisterSyncedField(Movement, MobilePartyPatch.Setters, Coop.DoSync);
         }
     }
 }

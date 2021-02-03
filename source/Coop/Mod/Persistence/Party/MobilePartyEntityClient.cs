@@ -88,7 +88,7 @@ namespace Coop.Mod.Persistence.Party
                 Id,
                 party,
                 data);
-            m_Environment.TargetPosition.SetTyped(party, data);
+            m_Environment.SetAuthoritative(party, data);
 
             if (State.IsPlayerControlled && party != m_Environment.GetCurrentCampaign().MainParty)
             {
@@ -167,8 +167,6 @@ namespace Coop.Mod.Persistence.Party
                 {
                     throw new Exception($"Mobile party id {State.PartyId} not found.");
                 }
-
-                m_Environment.TargetPosition.Prefix.SetHandler(m_Instance, SendMoveRequest);
             }
         }
 
@@ -177,11 +175,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         private void Unregister()
         {
-            if (m_Instance != null)
-            {
-                m_Environment.TargetPosition.Prefix.RemoveHandler(m_Instance);
-                m_Instance = null;
-            }
+            m_Instance = null;
         }
 
         public override string ToString()

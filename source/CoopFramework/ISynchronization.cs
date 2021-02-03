@@ -20,9 +20,6 @@ namespace CoopFramework
 
 
         void Broadcast(MethodId id, object instance, object[] args);
-
-        void RegisterSyncedField(ValueAccess value,
-            IEnumerable<MethodAccess> triggers,
-            Func<bool> condition);
+        void Broadcast(FieldChangeBuffer buffer);
     }
 }

@@ -8,8 +8,6 @@ namespace Sync
     /// </summary>
     public abstract class ValueAccess
     {
-        [NotNull] public Prefix Prefix { get; } = new Prefix();
-        
         /// <summary>
         ///     Returns the current value of an instance of this <see cref="ValueAccess" />.
         /// </summary>

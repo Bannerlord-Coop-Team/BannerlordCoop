@@ -127,13 +127,15 @@ namespace Coop.Tests.Persistence.RPC
             Assert.Single(sync0.BroadcastHistory);
             CallTrace trace = sync0.BroadcastHistory.Peek();
             Assert.Equal(Persistence.Rooms[ClientId0].Tick, trace.Tick);
+            Assert.True(trace.Call.HasValue);
+            MethodCall tracedCall = trace.Call.Value;
             Assert.Equal(
                 Argument.Null,
-                trace.Call.Instance); // Since it's a static call the instance is null
+                tracedCall.Instance); // Since it's a static call the instance is null
 
             // Verify the RPC argument
-            Assert.Single(trace.Call.Arguments);
-            Argument arg0 = trace.Call.Arguments.ToList()[ClientId0];
+            Assert.Single(tracedCall.Arguments);
+            Argument arg0 = tracedCall.Arguments.ToList()[ClientId0];
             Assert.Equal(
                 EventArgType.StoreObjectId,
                 arg0.EventType); // strings are always put into the store
@@ -183,7 +185,9 @@ namespace Coop.Tests.Persistence.RPC
             client0.Update();
             conClient0ToServer.ExecuteSends();
             CallTrace trace = sync0.BroadcastHistory.Peek();
-            ObjectId messageId = trace.Call.Arguments.ToList()[0].StoreObjectId.Value;
+            Assert.True(trace.Call.HasValue);
+            MethodCall tracedCall = trace.Call.Value;
+            ObjectId messageId = tracedCall.Arguments.ToList()[0].StoreObjectId.Value;
 
             // Client0 is waiting for the ACK
             Assert.Single(client0Store.State);
@@ -316,7 +320,9 @@ namespace Coop.Tests.Persistence.RPC
 
             // Verify the argument was received by the server
             CallTrace trace = sync0.BroadcastHistory.Peek();
-            ObjectId messageId = trace.Call.Arguments.ToList()[0].StoreObjectId.Value;
+            Assert.True(trace.Call.HasValue);
+            MethodCall tracedCall = trace.Call.Value;
+            ObjectId messageId = tracedCall.Arguments.ToList()[0].StoreObjectId.Value;
             Assert.True(m_Environment.StoreServer.Data.ContainsKey(messageId));
         }
 
@@ -413,7 +419,9 @@ namespace Coop.Tests.Persistence.RPC
             string sMessage = "Hello World";
             Foo.SyncedMethod(sMessage);
             CallTrace trace = sync0.BroadcastHistory.Peek();
-            ObjectId messageId = trace.Call.Arguments.ToList()[0].StoreObjectId.Value;
+            Assert.True(trace.Call.HasValue);
+            MethodCall tracedCall = trace.Call.Value;
+            ObjectId messageId = tracedCall.Arguments.ToList()[0].StoreObjectId.Value;
 
             // Sync to server
             client0.Update();
@@ -452,7 +460,9 @@ namespace Coop.Tests.Persistence.RPC
             client0.Update();
             conClient0ToServer.ExecuteSends();
             CallTrace trace = sync0.BroadcastHistory.Peek();
-            ObjectId messageId = trace.Call.Arguments.ToList()[0].StoreObjectId.Value;
+            Assert.True(trace.Call.HasValue);
+            MethodCall tracedCall = trace.Call.Value;
+            ObjectId messageId = tracedCall.Arguments.ToList()[0].StoreObjectId.Value;
 
             // The server relayed the StoreAdd to client 1
             Assert.Single(conServerToClient1.SendBuffer);

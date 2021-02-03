@@ -6,48 +6,42 @@ namespace Coop.Mod
     {
         public static bool IsServer => CoopServer.Instance.Current != null;
         public static bool IsClientConnected => CoopClient.Instance.ClientConnected;
-        public static bool IsClientPlaying => CoopClient.Instance.ClientPlaying;
 
         /// <summary>
-        ///     The arbiter is the game instance with authority over all clients.
+        ///     The arbiter is the game instance with authority over all other clients.
         /// </summary>
-        public static bool IsArbiter =>
-            IsServer && IsClientConnected; // The server currently runs in the hosts game session.
+        public static bool IsArbiter => IsServer && IsClientConnected; // The server game session is connected as a client as well!
 
-        public static bool DoSync()
+        /// <summary>
+        ///     If the active game session is a coop game that should be synchronized between all clients.
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsCoopGameSession()
         {
             return IsClientConnected || IsServer;
         }
-
+        
         /// <summary>
-        ///     Returns whether changes to an object should be synchronized.
+        ///     Return whether the given MobileParty can be controlled by this game instance.
         /// </summary>
-        /// <param name="instance"></param>
+        /// <param name="party"></param>
         /// <returns></returns>
-        public static bool DoSync(object instance)
+        public static bool IsController(MobileParty party)
         {
-            if (instance is MobileParty party)
+            if (!IsCoopGameSession())
             {
-                return DoSync(party);
+                return true;
+            }
+            
+            bool isPlayerControlled = CoopClient.Instance.GameState.IsPlayerControlledParty(party);
+            if (isPlayerControlled && party == MobileParty.MainParty)
+            {
+                // Main party of the local client
+                return true;
             }
 
+            // Every other party is controlled by the arbiter.
             return IsArbiter;
-        }
-
-        public static bool DoSync(MobileParty party)
-        {
-            bool isPlayerController = CoopClient.Instance.GameState.IsPlayerControlledParty(party);
-            if (isPlayerController && party == MobileParty.MainParty)
-            {
-                return true;
-            }
-
-            if (IsArbiter && !isPlayerController)
-            {
-                return true;
-            }
-
-            return false;
         }
     }
 }

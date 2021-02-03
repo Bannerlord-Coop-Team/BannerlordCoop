@@ -6,7 +6,8 @@ namespace RemoteAction
 {
     public struct CallTrace
     {
-        public MethodCall Call { get; set; }
+        public FieldChange? Change { get; set; }
+        public MethodCall? Call { get; set; }
         public Tick Tick { get; set; }
     }
     
@@ -23,6 +24,16 @@ namespace RemoteAction
             Push(new CallTrace()
             {
                 Call = call,
+                Tick = tick
+            });
+        }
+
+        [Conditional("DEBUG")]
+        public void Push(FieldChange change, Tick tick)
+        {
+            Push(new CallTrace()
+            {
+                Change = change,
                 Tick = tick
             });
         }

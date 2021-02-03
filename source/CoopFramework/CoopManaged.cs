@@ -22,7 +22,7 @@ namespace CoopFramework
         /// </summary>
         /// <param name="instance">Instance that should be synchronized.</param>
         /// <exception cref="ArgumentOutOfRangeException">When the instance is null.</exception>
-        protected CoopManaged([NotNull] TExtended instance)
+        public CoopManaged([NotNull] TExtended instance)
         {
             if (instance == null) throw new ArgumentNullException(nameof(instance));
             Instance = new WeakReference<TExtended>(instance, true);
@@ -396,12 +396,11 @@ namespace CoopFramework
                     return;
                 }
 
+                FieldChangeBuffer changes = FieldStack.PopUntilMarker(behaviour.Action == EFieldChangeAction.Revert);
                 if (behaviour.DoBroadcast)
                 {
-                    // TODO:
+                    sync.Broadcast(changes);
                 }
-
-                FieldStack.PopUntilMarker(behaviour.Action == EFieldChangeAction.Revert);
             }
         }
 

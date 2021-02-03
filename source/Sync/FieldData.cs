@@ -2,16 +2,16 @@
 
 namespace Sync
 {
-    public class ValueData
+    public class FieldData
     {
-        public ValueData([NotNull] ValueAccess access, object target, object value)
+        public FieldData([NotNull] FieldAccess access, object target, object value)
         {
             Access = access;
             Target = target;
             Value = value;
         }
 
-        public ValueAccess Access { get; }
+        public FieldAccess Access { get; }
         public object Target { get; }
         public object Value { get; }
     }

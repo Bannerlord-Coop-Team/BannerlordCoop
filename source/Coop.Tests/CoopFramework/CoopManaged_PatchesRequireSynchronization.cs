@@ -11,7 +11,6 @@ namespace Coop.Tests.CoopFramework
     {
         public CoopManaged_PatchesRequireSynchronization()
         {
-            CoopManagedFoo.FieldStack.BufferedChanges.FetchChanges();
         }
         
         [Fact]
@@ -21,14 +20,12 @@ namespace Coop.Tests.CoopFramework
             var managedFoo = new CoopManagedFoo(null, foo);
             Assert.Equal(42, foo.Bar);
             Assert.Equal(42, foo.Baz);
-            Assert.Equal(0, CoopManagedFoo.FieldStack.BufferedChanges.Count());
             
             foo.SetBar(43);
             foo.Baz = 43;
 
             Assert.Equal(43, foo.Bar);
             Assert.Equal(43, foo.Baz);
-            Assert.Equal(0, CoopManagedFoo.FieldStack.BufferedChanges.Count());
         }
         
         [Fact]
@@ -39,14 +36,12 @@ namespace Coop.Tests.CoopFramework
             var managedFoo = new CoopManagedFoo(new Mock<ISynchronization>().Object, foo);
             Assert.Equal(42, foo.Bar);
             Assert.Equal(42, foo.Baz);
-            Assert.Equal(0, CoopManagedFoo.FieldStack.BufferedChanges.Count());
             
             foo.SetBar(43);
             foo.Baz = 43;
 
             Assert.Equal(42, foo.Bar);
             Assert.Equal(42, foo.Baz);
-            Assert.Equal(1, CoopManagedFoo.FieldStack.BufferedChanges.Count());
         }
         
         private class Foo

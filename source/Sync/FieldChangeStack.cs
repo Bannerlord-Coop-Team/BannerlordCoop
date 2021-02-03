@@ -15,11 +15,6 @@ namespace Sync
     public class FieldChangeStack
     {
         /// <summary>
-        ///     Buffer of all recorded changes to field values.
-        /// </summary>
-        public ValueChangeBuffer BufferedChanges { get; } = new ValueChangeBuffer();
-        
-        /// <summary>
         ///     Pushes a marker to the stack. The next call to <see cref="PopUntilMarker"/> will pop until this marker
         ///     is encountered.
         /// </summary>
@@ -33,9 +28,9 @@ namespace Sync
         /// </summary>
         /// <param name="access">Access object to the field value</param>
         /// <param name="target">Instance that the field belongs to</param>
-        public void PushValue(ValueAccess access, object target)
+        public void PushValue(FieldAccess access, object target)
         {
-            m_ActiveFields.Push(new ValueData(access, target, access.Get(target)));
+            m_ActiveFields.Push(new FieldData(access, target, access.Get(target)));
         }
 
         /// <summary>
@@ -43,35 +38,36 @@ namespace Sync
         ///     <see cref="BufferedChanges"/>.
         /// </summary>
         /// <param name="bRevertToOriginalValue"></param>
-        public void PopUntilMarker(bool bRevertToOriginalValue)
+        public FieldChangeBuffer PopUntilMarker(bool bRevertToOriginalValue)
         {
+            var buffer = new FieldChangeBuffer();
             while (m_ActiveFields.Count > 0)
             {
-                ValueData data = m_ActiveFields.Pop();
+                FieldData data = m_ActiveFields.Pop();
                 if (data == null)
                 {
                     break; // The marker
                 }
 
-                ValueAccess field = data.Access;
+                FieldAccess field = data.Access;
 
                 object newValue = data.Access.Get(data.Target);
                 bool changed = !newValue.Equals(data.Value);
 
                 if (!changed) continue;
 
-                object latestActualValue = BufferedChanges.AddChange(field, data, newValue);
+                object latestActualValue = buffer.AddChange(field, data, newValue);
                 if (bRevertToOriginalValue)
                 {
                     field.Set(data.Target, latestActualValue);
                 }
             }
+
+            return buffer;
         }
 
-        
-
         #region Private
-        private readonly Stack<ValueData> m_ActiveFields = new Stack<ValueData>();
+        private readonly Stack<FieldData> m_ActiveFields = new Stack<FieldData>();
         #endregion
     }
 }

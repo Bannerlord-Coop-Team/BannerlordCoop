@@ -11,7 +11,6 @@ namespace Coop.Tests.CoopFramework
     {
         public CoopManaged_FieldPatching()
         {
-            CoopManagedFoo.FieldStack.BufferedChanges.FetchChanges();
         }
 
         [Fact]
@@ -20,12 +19,10 @@ namespace Coop.Tests.CoopFramework
             var foo = new Foo();
             var fooManaged = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.m_Bar);
-            Assert.Equal(0, CoopManagedFoo.FieldStack.BufferedChanges.Count());
 
             // Change through property
             foo.BarProperty = 43;
             Assert.Equal(42, foo.m_Bar);
-            Assert.Equal(1, CoopManagedFoo.FieldStack.BufferedChanges.Count());
         }
 
         [Fact]
@@ -34,12 +31,10 @@ namespace Coop.Tests.CoopFramework
             var foo = new Foo();
             var fooManaged = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.m_Bar);
-            Assert.Equal(0, CoopManagedFoo.FieldStack.BufferedChanges.Count());
 
             // Change through method call
             foo.SetBar(43);
             Assert.Equal(42, foo.m_Bar);
-            Assert.Equal(1, CoopManagedFoo.FieldStack.BufferedChanges.Count());
         }
 
         [Fact]
@@ -48,17 +43,14 @@ namespace Coop.Tests.CoopFramework
             var foo = new Foo();
             var fooManaged = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.m_Bar);
-            Assert.Equal(0, CoopManagedFoo.FieldStack.BufferedChanges.Count());
 
             // Change through property
             foo.BarProperty = 43;
             Assert.Equal(42, foo.m_Bar);
-            Assert.Equal(1, CoopManagedFoo.FieldStack.BufferedChanges.Count());
 
             // Change through method call
             foo.SetBar(43);
             Assert.Equal(42, foo.m_Bar);
-            Assert.Equal(1, CoopManagedFoo.FieldStack.BufferedChanges.Count()); // Actually stays 1 because the buffered change is reused
         }
 
         private class Foo

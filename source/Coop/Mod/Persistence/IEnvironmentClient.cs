@@ -13,9 +13,9 @@ namespace RemoteAction
     public interface IEnvironmentClient
     {
         /// <summary>
-        ///     Access to the movement data for all parties in the clients game world.
+        ///     Set the movement data of the given party as an authoritative action.
         /// </summary>
-        FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
+        void SetAuthoritative(MobileParty party, MovementData data);
         
         /// <summary>
         ///     The master campaign time. On the host this equals to the local campaign time.

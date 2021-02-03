@@ -45,8 +45,36 @@ namespace Coop.Mod.Persistence.RemoteAction
             }
         }
 
-        public void RegisterSyncedField(ValueAccess value, IEnumerable<MethodAccess> triggers, Func<bool> condition)
+        public void Broadcast(FieldChangeBuffer buffer)
         {
+            foreach (var change in buffer.FetchChanges())
+            {
+                FieldAccess access = change.Key;
+                foreach (var instanceChange in change.Value)
+                {
+                    var argInstance = ArgumentFactory.Create(
+                        m_ClientAccess.GetStore(),
+                        instanceChange.Key,
+                        false);
+                    var argValue = ArgumentFactory.Create(
+                        m_ClientAccess.GetStore(),
+                        instanceChange.Value.RequestedValue,
+                        false);
+                    var fieldChange = new FieldChange(
+                        access.Id,
+                        argInstance,
+                        argValue);
+                    
+                    PendingRequests.Instance.Add(fieldChange);
+                    m_ClientAccess.GetRoom()
+                        ?.RaiseEvent<EventFieldChange>(
+                            evt =>
+                            {
+                                evt.Field = fieldChange;
+                                BroadcastHistory.Push(evt.Field, m_ClientAccess.GetRoom().Tick);
+                            });
+                }
+            }
             throw new NotImplementedException();
         }
 
