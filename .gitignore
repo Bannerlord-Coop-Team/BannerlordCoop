@@ -542,3 +542,6 @@ mb2/**
 source/.editorconfig
 # Rider IDE
 source/.idea
+
+# Docs
+docs/_site/**
