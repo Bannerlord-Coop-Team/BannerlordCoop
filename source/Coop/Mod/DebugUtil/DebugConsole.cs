@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Runtime.InteropServices;
 
 namespace Coop.Mod.DebugUtil
 {
@@ -12,7 +13,8 @@ namespace Coop.Mod.DebugUtil
 
         public static void Toggle()
         {
-            rgl_ToggleImguiConsoleVisibility();
+            throw new Exception("doesn't work anymore. Disabled for now.");
+            // rgl_ToggleImguiConsoleVisibility();
         }
     }
 }
