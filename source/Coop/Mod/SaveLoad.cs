@@ -1,12 +1,9 @@
 ﻿using System.Collections.Generic;
-using Coop.Mod.Managers;
 using Coop.Mod.Patch;
 using NLog;
-using SandBox;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
-using TaleWorlds.Library;
+using TaleWorlds.ModuleManager;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
@@ -83,15 +80,11 @@ namespace Coop.Mod
 
         private static List<ModuleInfo> GetModules()
         {
-            List<ModuleInfo> list = new List<ModuleInfo>();
-            foreach (string moduleName in Utilities.GetModulesNames())
-            {
-                ModuleInfo moduleInfo = new ModuleInfo();
-                moduleInfo.Load(moduleName);
-                list.Add(moduleInfo);
-            }
-
-            return list;
+            return Utils.InvokePrivateMethod<List<ModuleInfo>>(
+                typeof(ModuleHelper),
+                "GetPhysicalModules",
+                null,
+                new object[] {});
         }
 
         private static MetaData GetMetaData()
