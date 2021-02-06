@@ -82,12 +82,6 @@ namespace Coop.Tests.CoopFramework
             public CoopManagedFoo([NotNull] Foo instance) : base(instance)
             {
             }
-            
-            [SyncFactory]
-            private static SynchronizationClient GetSynchronization()
-            {
-                return new Mock<SynchronizationClient>().Object;
-            }
         }
 
         private class CoopManagedFoo2 : CoopManaged<CoopManagedFoo2, Foo>
@@ -113,12 +107,6 @@ namespace Coop.Tests.CoopFramework
 
             public CoopManagedFoo2([NotNull] Foo instance) : base(instance)
             {
-            }
-            
-            [SyncFactory]
-            private static SynchronizationClient GetSynchronization()
-            {
-                return new Mock<SynchronizationClient>().Object;
             }
         }
     }

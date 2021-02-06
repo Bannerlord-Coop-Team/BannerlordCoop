@@ -39,29 +39,19 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                     Setter(nameof(MobileParty.TargetSettlement)),
                     Setter(nameof(MobileParty.TargetParty)),
                     Setter(nameof(MobileParty.TargetPosition)))
-                .Broadcast()
+                .Broadcast(() => Sync)
                 .Keep(); // Keep the local changes as a preview.
             
             AutoWrapAllInstances(party => new CampaignMapMovement(party));
         }
         
         /// <summary>
-        ///     Returns the shared synchronization of all movement data.
+        ///     Synchronization instance for all movement data.
         /// </summary>
-        /// <returns></returns>
-        [SyncFactory]
-        public static MobilePartySync GetSync()
-        {
-            return Sync;
-        }
+        public static MobilePartySync Sync { get; } = new MobilePartySync();
 
         public CampaignMapMovement([NotNull] MobileParty instance) : base(instance)
         {
         }
-        
-        /// <summary>
-        ///     Synchronization instance for all movement data.
-        /// </summary>
-        private static MobilePartySync Sync { get; } = new MobilePartySync();
     }
 }

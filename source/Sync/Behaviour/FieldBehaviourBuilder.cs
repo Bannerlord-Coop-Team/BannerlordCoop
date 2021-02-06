@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using CoopFramework;
+using JetBrains.Annotations;
 
 namespace Sync.Behaviour
 {
@@ -14,8 +17,9 @@ namespace Sync.Behaviour
         ///     receive the changed value on the same campaign tick. The originator of the call will receive the
         ///     authoritative change as well.
         /// </summary>
-        public FieldBehaviourBuilder Broadcast(IActionValidator validator = null)
+        public FieldBehaviourBuilder Broadcast([NotNull] Func<ISynchronization> syncFactory, [NotNull] IActionValidator validator = null)
         {
+            SynchronizationFactory = syncFactory;
             DoBroadcast = true;
             if (validator != null)
             {
@@ -26,6 +30,7 @@ namespace Sync.Behaviour
             }
             return this;
         }
+        
         /// <summary>
         ///     The change to the field is kept.
         /// </summary>
@@ -48,6 +53,8 @@ namespace Sync.Behaviour
         ///     Whether or not the change shall be broadcast sent to the server in order to broadcast it.
         /// </summary>
         public bool DoBroadcast { get; private set; } = false;
+        
+        public Func<ISynchronization> SynchronizationFactory { get; private set; }
         
         #region Private
         private readonly IEnumerable<FieldId> m_FieldIds;

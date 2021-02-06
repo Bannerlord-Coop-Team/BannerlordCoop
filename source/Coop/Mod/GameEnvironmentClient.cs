@@ -50,7 +50,7 @@ namespace Coop.Mod
         }
 
         public IEnumerable<MobileParty> PlayerControlledParties => PlayerControlledMobileParties;
-        public MobilePartySync PartySync { get; } = CampaignMapMovement.GetSync();
+        public MobilePartySync PartySync { get; } = CampaignMapMovement.Sync;
 
         public RemoteStore Store =>
             CoopClient.Instance.SyncedObjectStore ??

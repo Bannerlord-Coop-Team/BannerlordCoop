@@ -57,18 +57,12 @@ namespace Coop.Tests.Persistence.RPC
             {
                 When(GameLoop)
                     .Calls(Method(nameof(Foo.SyncedMethod)))
-                    .Broadcast()
+                    .Broadcast(() => Sync)
                     .Skip();
                 ApplyStaticPatches();
             }
             public ManagedFoo([NotNull] Foo instance) : base(instance)
             {
-            }
-
-            [SyncFactory]
-            private static SynchronizationClient GetSynchronization()
-            {
-                return Sync;
             }
 
             public static SynchronizationClient Sync;

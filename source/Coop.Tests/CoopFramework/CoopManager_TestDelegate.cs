@@ -88,12 +88,6 @@ namespace Coop.Tests.CoopFramework
                 Assert.NotNull(fooInstance.Callback);
                 return fooInstance.Callback.Invoke(pendingMethodCall);
             }
-            
-            [SyncFactory]
-            private static SynchronizationClient GetSynchronization()
-            {
-                return new Mock<SynchronizationClient>().Object;
-            }
         }
     }
 }

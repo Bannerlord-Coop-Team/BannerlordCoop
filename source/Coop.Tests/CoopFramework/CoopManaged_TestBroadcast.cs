@@ -20,8 +20,9 @@ namespace Coop.Tests.CoopFramework
         [Fact]
         private void BarIsBroadcastAndSuppressed()
         {
+            CoopManagedFoo.Sync = m_SyncMock.Object;
             var foo = new Foo();
-            var sync = new CoopManagedFoo(m_SyncMock.Object, foo);
+            var sync = new CoopManagedFoo(foo);
 
             // Invoke setter
             foo.Bar = 43;
@@ -42,8 +43,9 @@ namespace Coop.Tests.CoopFramework
         [Fact]
         private void BazIsBroadcastAndExecuted()
         {
+            CoopManagedFoo.Sync = m_SyncMock.Object;
             var foo = new Foo();
-            var sync = new CoopManagedFoo(m_SyncMock.Object, foo);
+            var sync = new CoopManagedFoo(foo);
 
             // Invoke setter
             foo.Baz = 43;
@@ -72,32 +74,25 @@ namespace Coop.Tests.CoopFramework
             public static readonly MethodAccess BarSetter = Setter(nameof(Foo.Bar));
             public static readonly MethodAccess BazSetter = Setter(nameof(Foo.Baz));
 
-            private readonly SynchronizationClient m_Sync;
+            public static SynchronizationClient Sync;
 
             static CoopManagedFoo()
             {
                 // Broadcast local calls on Foo.Bar instead of applying it directly
                 When(GameLoop)
                     .Calls(BarSetter)
-                    .Broadcast()
+                    .Broadcast(() => Sync)
                     .Skip();
 
                 // Broadcast local call on Foo.Baz and apply them immediately
                 When(GameLoop)
                     .Calls(BazSetter)
-                    .Broadcast()
+                    .Broadcast(() => Sync)
                     .Execute();
             }
 
-            public CoopManagedFoo(SynchronizationClient sync, [NotNull] Foo instance) : base(instance)
+            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
             {
-                m_Sync = sync;
-            }
-
-            [SyncFactory]
-            private SynchronizationClient GetSynchronization()
-            {
-                return m_Sync;
             }
         }
     }

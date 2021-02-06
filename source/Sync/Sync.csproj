@@ -94,6 +94,7 @@
     <Compile Include="Behaviour\IActionValidator.cs" />
     <Compile Include="Behaviour\IPendingMethodCall.cs" />
     <Compile Include="Behaviour\ActionValidatorRegistry.cs" />
+    <Compile Include="Behaviour\ISynchronization.cs" />
     <Compile Include="Behaviour\Util.cs" />
     <Compile Include="ConstructorPatch.cs" />
     <Compile Include="DestructorPatch.cs" />

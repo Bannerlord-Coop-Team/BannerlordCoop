@@ -32,7 +32,7 @@ namespace Coop.Mod
             return ret;
         }
 
-        public MobilePartySync PartySync { get; } = CampaignMapMovement.GetSync();
+        public MobilePartySync PartySync { get; } = CampaignMapMovement.Sync;
 
         public SharedRemoteStore Store =>
             CoopServer.Instance.SyncedObjectStore ??

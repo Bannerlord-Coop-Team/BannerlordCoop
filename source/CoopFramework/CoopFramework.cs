@@ -9,15 +9,16 @@ namespace CoopFramework
 {
     public static class CoopFramework
     {
-        public static void InitPatches([NotNull] Func<SynchronizationClient> syncFactory)
+        public static bool IsEnabled => m_IsCoopEnabled?.Invoke() ?? true;
+
+        public static void InitPatches(Func<bool> isCoopEnabled)
         {
+            m_IsCoopEnabled = isCoopEnabled;
             if (m_Initialized)
             {
                 Logger.Error("CoopFramework.InitPatches can only be called once.");
                 return;
             }
-            
-            m_GlobalFactory = syncFactory;
             
             IEnumerable<MethodInfo> patchInitializers =
                 from t in Assembly.GetExecutingAssembly().GetTypes()
@@ -36,12 +37,10 @@ namespace CoopFramework
             }
         }
 
-        [CanBeNull] public static Func<SynchronizationClient> SynchronizationFactory => m_GlobalFactory;
-
         #region Private
-        private static Func<SynchronizationClient> m_GlobalFactory;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private static bool m_Initialized = false;
+        private static Func<bool> m_IsCoopEnabled;
 
         #endregion
     }

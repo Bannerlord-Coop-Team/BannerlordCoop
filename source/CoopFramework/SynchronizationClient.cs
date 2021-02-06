@@ -6,7 +6,7 @@ using Sync;
 
 namespace CoopFramework
 {
-    public abstract class SynchronizationClient
+    public abstract class SynchronizationClient : ISynchronization
     {
         #region Debug
         /// <summary>
@@ -15,8 +15,9 @@ namespace CoopFramework
         [NotNull] public CallStatistics BroadcastHistory { get; } = new CallStatistics();
 
         #endregion
-        
+
         public abstract void Broadcast(MethodId id, object instance, object[] args);
+
         public abstract void Broadcast(FieldChangeBuffer buffer);
     }
 }

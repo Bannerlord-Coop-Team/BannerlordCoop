@@ -27,8 +27,6 @@ namespace CoopFramework
         {
             if (instance == null) throw new ArgumentNullException(nameof(instance));
             Instance = new WeakReference<TExtended>(instance, true);
-            m_GetSync = new Lazy<Func<SynchronizationClient>>(FindSyncFactory);
-
             SetupHandlers(this);
         }
 
@@ -167,26 +165,20 @@ namespace CoopFramework
                 Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
                 return ECallPropagation.Skip; // Will not work anyways
             }
-
-            var sync = self != null ? self.m_GetSync.Value?.Invoke() : m_GetSyncStatic?.Value.Invoke();
-            if (sync == null)
-            {
-                return ECallPropagation.CallOriginal;
-            }
             
             foreach (var behaviour in behaviours)
             {
                 if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) continue;
                 if (behaviour.DoBroadcast)
                 {
-                    sync.Broadcast(methodAccess.Id, instanceResolved, args);
+                    behaviour.SynchronizationFactory()?.Broadcast(methodAccess.Id, instanceResolved, args);
                 }
 
                 if (behaviour.MethodCallHandlerInstance != null)
                     return behaviour.MethodCallHandlerInstance.Invoke(self,
-                        new PendingMethodCall(methodAccess.Id, sync, instanceResolved, args));
+                        new PendingMethodCall(methodAccess.Id, behaviour.SynchronizationFactory, instanceResolved, args));
                 if (behaviour.MethodCallHandler != null)
-                    return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, sync,
+                    return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, behaviour.SynchronizationFactory,
                         instanceResolved,
                         args));
                 if (behaviour.CallPropagationBehaviour == ECallPropagation.Skip) return ECallPropagation.Skip;
@@ -233,24 +225,24 @@ namespace CoopFramework
 
         private class PendingMethodCall : IPendingMethodCall
         {
-            [CanBeNull] private readonly SynchronizationClient m_Sync;
+            [CanBeNull] private readonly Func<ISynchronization> m_SyncFactory;
 
-            public PendingMethodCall(MethodId method, [CanBeNull] SynchronizationClient sync, [CanBeNull] object instance,
+            public PendingMethodCall(MethodId method, [CanBeNull] Func<ISynchronization> syncFactory, [CanBeNull] object instance,
                 [NotNull] object[] args)
             {
                 Id = method;
-                m_Sync = sync;
+                m_SyncFactory = syncFactory;
                 Instance = instance;
                 Parameters = args;
             }
 
             public void Broadcast()
             {
-                if (m_Sync == null)
+                if (m_SyncFactory?.Invoke() == null)
                     throw new SynchronizationNotInitializedException(
                         "No ISynchronization implementation was provided. Unable to use the synchronization behaviours.");
 
-                m_Sync.Broadcast(Id, Instance, Parameters);
+                m_SyncFactory().Broadcast(Id, Instance, Parameters);
             }
 
             public object Instance { get; }
@@ -320,7 +312,7 @@ namespace CoopFramework
                 // Static patch
                 methodAccess.Prefix.SetGlobalHandler((eOrigin, target, args) =>
                 {
-                    if (target != null)
+                    if (!CoopFramework.IsEnabled || target != null)
                         // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
                         return ECallPropagation.CallOriginal;
 
@@ -329,7 +321,14 @@ namespace CoopFramework
             else
                 // Instance patch
                 methodAccess.Prefix.SetHandler(instanceResolved,
-                    (eOrigin, args) => { return Dispatch(self, eOrigin, methodAccess, relevantBehaviours, args); });
+                    (eOrigin, args) =>
+                    {
+                        if (!CoopFramework.IsEnabled)
+                        {
+                            return ECallPropagation.CallOriginal;
+                        }
+                        return Dispatch(self, eOrigin, methodAccess, relevantBehaviours, args);
+                    });
         }
 
         private static void InitFieldPatches(
@@ -357,14 +356,14 @@ namespace CoopFramework
                 {
                     accessor.Prefix.SetGlobalHandler((eOrigin, target, args) =>
                     {
-                        if (target != null)
+                        if (!CoopFramework.IsEnabled || target != null)
                             // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
                             return ECallPropagation.CallOriginal;
                         return DispatchPrefix(null, eOrigin, methodRelevantBehaviours, fieldAccess);
                     });
                     accessor.Postfix.SetGlobalHandler((eOrigin, target, args) =>
                     {
-                        if (target != null)
+                        if (!CoopFramework.IsEnabled || target != null)
                             // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
                             return;
                         DispatchPostfix(null, eOrigin, methodRelevantBehaviours);
@@ -376,10 +375,21 @@ namespace CoopFramework
                     accessor.Prefix.SetHandler(instanceResolved,
                         (origin, args) =>
                         {
+                            if (!CoopFramework.IsEnabled)
+                            {
+                                return ECallPropagation.CallOriginal;
+                            }
                             return DispatchPrefix(self, origin, methodRelevantBehaviours, fieldAccess);
                         });
                     accessor.Postfix.SetHandler(instanceResolved,
-                        (origin, args) => { DispatchPostfix(self, origin, methodRelevantBehaviours); });
+                        (origin, args) =>
+                        {
+                            if (!CoopFramework.IsEnabled)
+                            {
+                                return;
+                            }
+                            DispatchPostfix(self, origin, methodRelevantBehaviours);
+                        });
                 }
             }
         }
@@ -389,12 +399,6 @@ namespace CoopFramework
             EOriginator origin,
             FieldBehaviourBuilder[] behaviours)
         {
-            var sync = self != null ? self.m_GetSync.Value.Invoke() : m_GetSyncStatic.Value.Invoke();
-            if (sync == null)
-            {
-                return;
-            }
-            
             foreach (var behaviour in behaviours)
             {
                 if (!behaviour.DoesBehaviourApply(origin, self)) return;
@@ -410,7 +414,7 @@ namespace CoopFramework
                 FieldChangeBuffer changes = FieldStack.PopUntilMarker(behaviour.Action == EFieldChangeAction.Revert);
                 if (behaviour.DoBroadcast)
                 {
-                    sync.Broadcast(changes);
+                    behaviour.SynchronizationFactory()?.Broadcast(changes);
                 }
             }
         }
@@ -421,12 +425,6 @@ namespace CoopFramework
             IEnumerable<FieldBehaviourBuilder> behaviours,
             FieldAccess fieldAccess)
         {
-            var sync = self != null ? self.m_GetSync.Value.Invoke() : m_GetSyncStatic.Value.Invoke();
-            if (sync == null)
-            {
-                return ECallPropagation.CallOriginal;
-            }
-            
             foreach (var behaviour in behaviours)
             {
                 if (!behaviour.DoesBehaviourApply(origin, self)) return ECallPropagation.CallOriginal;
@@ -445,33 +443,6 @@ namespace CoopFramework
 
             return ECallPropagation.CallOriginal;
         }
-
-        private Func<SynchronizationClient> FindSyncFactory()
-        {
-            foreach (var method in typeof(TSelf).GetMethods(BindingFlags.Instance | BindingFlags.DeclaredOnly |
-                                                            BindingFlags.NonPublic))
-                if (Attribute.IsDefined(method, typeof(SyncFactoryAttribute)) &&
-                    typeof(SynchronizationClient).IsAssignableFrom(method.ReturnType))
-                    return () => method.Invoke(this, new object[] { }) as SynchronizationClient;
-
-            return m_GetSyncStatic?.Value;
-        }
-        
-        [NotNull] private static readonly Lazy<Func<SynchronizationClient>> m_GetSyncStatic =
-            new Lazy<Func<SynchronizationClient>>(() =>
-            {
-                foreach (var method in typeof(TSelf).GetMethods(BindingFlags.Static | BindingFlags.DeclaredOnly |
-                                                                BindingFlags.NonPublic))
-                    if (Attribute.IsDefined(method, typeof(SyncFactoryAttribute)) &&
-                        typeof(SynchronizationClient).IsAssignableFrom(method.ReturnType))
-                        return () => method.Invoke(null, new object[] { }) as SynchronizationClient;
-
-                return CoopFramework.SynchronizationFactory;
-            });
-
-        [CanBeNull] private static Func<SynchronizationClient> m_GlobalSyncFactory;
-
-        [NotNull] private readonly Lazy<Func<SynchronizationClient>> m_GetSync;
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
