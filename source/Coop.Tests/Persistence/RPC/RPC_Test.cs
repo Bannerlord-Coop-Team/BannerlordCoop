@@ -11,8 +11,6 @@ using Network.Protocol;
 using RailgunNet;
 using RailgunNet.Connection.Client;
 using RemoteAction;
-using Sync;
-using Sync.Behaviour;
 using Sync.Store;
 using Xunit;
 using Registry = Coop.Mod.Persistence.Registry;
@@ -23,12 +21,12 @@ namespace Coop.Tests.Persistence.RPC
         "UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class RPC_Test : IDisposable
     {
-        private readonly ISynchronization sync0;
+        private readonly SynchronizationClient sync0;
         public RPC_Test()
         {
             Persistence = m_Environment.Persistence ??
                           throw new Exception("Persistence may not be null. Error in test setup.");
-            sync0 = new Synchronization(m_Environment.GetClientAccess(ClientId0));
+            sync0 = new CoopSync(m_Environment.GetClientAccess(ClientId0));
             ManagedFoo.Sync = sync0;
         }
 
@@ -68,12 +66,12 @@ namespace Coop.Tests.Persistence.RPC
             }
 
             [SyncFactory]
-            private static ISynchronization GetSynchronization()
+            private static SynchronizationClient GetSynchronization()
             {
                 return Sync;
             }
 
-            public static ISynchronization Sync;
+            public static SynchronizationClient Sync;
         }
 
         private readonly TestEnvironment m_Environment = new TestEnvironment(

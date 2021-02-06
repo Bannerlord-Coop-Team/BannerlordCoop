@@ -15,7 +15,7 @@ namespace Coop.Mod.Persistence.Party
     ///     Railgun: Mobile party implementation for clients. One instance for each mobile party
     ///     that is registered in the Railgun room.
     /// </summary>
-    public class MobilePartyEntityClient : RailEntityClient<MobilePartyState>
+    public class MobilePartyEntityClient : RailEntityClient<MobilePartyState>, IMovementHandler
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -32,9 +32,8 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         /// <param name="args">MovementData</param>
         /// <exception cref="ArgumentException"></exception>
-        private ECallPropagation SendMoveRequest(object[] args)
+        public void RequestMovement([NotNull] MovementData data)
         {
-            MovementData data = args.Length > 0 ? args[0] as MovementData : null;
             if (data == null)
             {
                 throw new ArgumentException(nameof(data));
@@ -53,7 +52,6 @@ namespace Coop.Mod.Persistence.Party
                         SettlementIndex = data.TargetSettlement?.Id ?? MovementState.InvalidIndex
                     };
                 });
-            return ECallPropagation.Skip; // The server will control it
         }
 
         /// <summary>
@@ -69,19 +67,7 @@ namespace Coop.Mod.Persistence.Party
 
             MobileParty party = m_Environment.GetMobilePartyByIndex(State.PartyId);
             if (party == null) return;
-            MovementData data = new MovementData
-            {
-                DefaultBehaviour = State.Movement.DefaultBehavior,
-                TargetPosition = State.Movement.Position,
-                TargetParty = State.Movement.TargetPartyIndex != MovementState.InvalidIndex ?
-                    MBObjectManager.Instance.GetObject(State.Movement.TargetPartyIndex) as
-                        MobileParty :
-                    null,
-                TargetSettlement = State.Movement.SettlementIndex != MovementState.InvalidIndex ?
-                    MBObjectManager.Instance.GetObject(
-                        State.Movement.SettlementIndex) as Settlement :
-                    null
-            };
+            MovementData data = GetLatest();
             Logger.Trace(
                 "[{tick}] Received move entity {id} ({party}) to {position}.",
                 Room.Tick,
@@ -100,6 +86,23 @@ namespace Coop.Mod.Persistence.Party
             SetDefaultBehaviourNeedsUpdate(party);
 
             Replay.ReplayRecording?.Invoke(Id, party, data);
+        }
+
+        public MovementData GetLatest()
+        {
+            return new MovementData
+            {
+                DefaultBehaviour = State.Movement.DefaultBehavior,
+                TargetPosition = State.Movement.Position,
+                TargetParty = State.Movement.TargetPartyIndex != MovementState.InvalidIndex
+                    ? MBObjectManager.Instance.GetObject(State.Movement.TargetPartyIndex) as
+                        MobileParty
+                    : null,
+                TargetSettlement = State.Movement.SettlementIndex != MovementState.InvalidIndex
+                    ? MBObjectManager.Instance.GetObject(
+                        State.Movement.SettlementIndex) as Settlement
+                    : null
+            };
         }
 
         private void SetDefaultBehaviourNeedsUpdate(MobileParty party)
@@ -167,6 +170,7 @@ namespace Coop.Mod.Persistence.Party
                 {
                     throw new Exception($"Mobile party id {State.PartyId} not found.");
                 }
+                m_Environment.PartySync.Register(m_Instance, this);
             }
         }
 
@@ -175,6 +179,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         private void Unregister()
         {
+            m_Environment.PartySync.Unregister(this);
             m_Instance = null;
         }
 

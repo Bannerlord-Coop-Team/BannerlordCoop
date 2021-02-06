@@ -7,9 +7,7 @@ namespace Sync
 {
     public static class Registry
     {
-        public static IReadOnlyDictionary<MethodAccess, MethodId> MethodToId => m_MethodToId;
         public static IReadOnlyDictionary<MethodId, MethodAccess> IdToMethod => m_IdToMethod;
-        public static IReadOnlyDictionary<FieldAccess, FieldId> FieldToId => m_FieldToId;
         public static IReadOnlyDictionary<FieldId, FieldAccess> IdToField => m_IdToField;
 
         public static MethodId Register([NotNull] MethodAccess methodAccess)

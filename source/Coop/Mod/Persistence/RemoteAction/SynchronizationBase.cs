@@ -9,14 +9,14 @@ using Sync;
 
 namespace Coop.Mod.Persistence.RemoteAction
 {
-    public class Synchronization : ISynchronization
+    public class CoopSync : SynchronizationClient
     {
-        public Synchronization([NotNull] IClientAccess access)
+        public CoopSync([NotNull] IClientAccess access)
         {
             m_ClientAccess = access;
         }
 
-        public void Broadcast(MethodId id, object instance, object[] args)
+        public override void Broadcast(MethodId id, object instance, object[] args)
         {
             var access = Sync.Registry.IdToMethod[id];
             var bDebounce = access.Flags.HasFlag(EMethodPatchFlag.DebounceCalls);
@@ -45,7 +45,7 @@ namespace Coop.Mod.Persistence.RemoteAction
             }
         }
 
-        public void Broadcast(FieldChangeBuffer buffer)
+        public override void Broadcast(FieldChangeBuffer buffer)
         {
             foreach (var change in buffer.FetchChanges())
             {
@@ -78,13 +78,6 @@ namespace Coop.Mod.Persistence.RemoteAction
 
             throw new NotImplementedException();
         }
-
-
-        #region Debug
-
-        public CallStatistics BroadcastHistory { get; } = new CallStatistics();
-
-        #endregion
 
         #region Private
 

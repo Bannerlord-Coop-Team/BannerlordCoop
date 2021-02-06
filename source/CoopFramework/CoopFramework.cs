@@ -9,7 +9,7 @@ namespace CoopFramework
 {
     public static class CoopFramework
     {
-        public static void InitPatches([NotNull] Func<ISynchronization> syncFactory)
+        public static void InitPatches([NotNull] Func<SynchronizationClient> syncFactory)
         {
             if (m_Initialized)
             {
@@ -36,10 +36,10 @@ namespace CoopFramework
             }
         }
 
-        [CanBeNull] public static Func<ISynchronization> SynchronizationFactory => m_GlobalFactory;
+        [CanBeNull] public static Func<SynchronizationClient> SynchronizationFactory => m_GlobalFactory;
 
         #region Private
-        private static Func<ISynchronization> m_GlobalFactory;
+        private static Func<SynchronizationClient> m_GlobalFactory;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private static bool m_Initialized = false;
 

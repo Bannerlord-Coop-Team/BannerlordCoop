@@ -39,18 +39,8 @@ namespace Sync
     {
         public readonly FieldId Id;
         
-        [NotNull] private readonly Func<object, object> m_GetterLocal;
-        [NotNull] private readonly FieldInfo m_MemberInfo;
-        [NotNull] private readonly Action<object, object> m_Setter;
-
-        protected FieldAccess([NotNull] FieldInfo memberInfo)
-        {
-            Id = Registry.Register(this);
-            m_MemberInfo = memberInfo;
-            m_GetterLocal = InvokableFactory.CreateUntypedGetter<object>(memberInfo);
-            m_Setter = InvokableFactory.CreateUntypedSetter<object>(memberInfo);
-        }
-
+        [NotNull] public readonly FieldInfo MemberInfo;
+        
         /// <inheritdoc />
         public override object Get([CanBeNull] object target)
         {
@@ -70,7 +60,23 @@ namespace Sync
 
         public override string ToString()
         {
-            return $"{m_MemberInfo.DeclaringType?.Name}.{m_MemberInfo.Name}";
+            return $"{MemberInfo.DeclaringType?.Name}.{MemberInfo.Name}";
         }
+        
+        protected FieldAccess([NotNull] FieldInfo memberInfo)
+        {
+            Id = Registry.Register(this);
+            MemberInfo = memberInfo;
+            m_GetterLocal = InvokableFactory.CreateUntypedGetter<object>(memberInfo);
+            m_Setter = InvokableFactory.CreateUntypedSetter<object>(memberInfo);
+        }
+        
+        #region Private
+
+        [NotNull] private readonly Func<object, object> m_GetterLocal;
+        
+        [NotNull] private readonly Action<object, object> m_Setter;
+
+        #endregion
     }
 }

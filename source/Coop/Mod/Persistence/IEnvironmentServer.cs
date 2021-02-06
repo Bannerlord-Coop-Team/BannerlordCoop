@@ -32,5 +32,10 @@ namespace RemoteAction
         /// <returns></returns>
         [CanBeNull]
         MobileParty GetMobilePartyByIndex(int iPartyIndex);
+        
+        /// <summary>
+        ///     Gets the synchronization for <see cref="MobileParty"/> instances.
+        /// </summary>
+        MobilePartySync PartySync { get; }
     }
 }

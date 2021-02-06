@@ -27,6 +27,11 @@ namespace RemoteAction
         ///     Returns all parties that are controlled by human players, local or remote.
         /// </summary>
         IEnumerable<MobileParty> PlayerControlledParties { get; }
+        
+        /// <summary>
+        ///     Gets the synchronization for <see cref="MobileParty"/> instances.
+        /// </summary>
+        MobilePartySync PartySync { get; }
 
         /// <summary>
         ///     Returns the object store shared with all other clients.

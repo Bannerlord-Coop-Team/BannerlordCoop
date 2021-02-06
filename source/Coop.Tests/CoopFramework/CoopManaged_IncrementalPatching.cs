@@ -84,9 +84,9 @@ namespace Coop.Tests.CoopFramework
             }
             
             [SyncFactory]
-            private static ISynchronization GetSynchronization()
+            private static SynchronizationClient GetSynchronization()
             {
-                return new Mock<ISynchronization>().Object;
+                return new Mock<SynchronizationClient>().Object;
             }
         }
 
@@ -116,9 +116,9 @@ namespace Coop.Tests.CoopFramework
             }
             
             [SyncFactory]
-            private static ISynchronization GetSynchronization()
+            private static SynchronizationClient GetSynchronization()
             {
-                return new Mock<ISynchronization>().Object;
+                return new Mock<SynchronizationClient>().Object;
             }
         }
     }

@@ -3,8 +3,8 @@ using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
 using RemoteAction;
-using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.Party
 {
@@ -12,7 +12,7 @@ namespace Coop.Mod.Persistence.Party
     ///     Railgun: Mobile party implementation for the server. One instance for each mobile party
     ///     that is registered in the Railgun room.
     /// </summary>
-    public class MobilePartyEntityServer : RailEntityServer<MobilePartyState>
+    public class MobilePartyEntityServer : RailEntityServer<MobilePartyState>, IMovementHandler
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         [NotNull] private readonly IEnvironmentServer m_Environment;
@@ -72,6 +72,7 @@ namespace Coop.Mod.Persistence.Party
                         State.PartyId);
                     return;
                 }
+                m_Environment.PartySync.Register(m_Instance, this);
             }
         }
 
@@ -91,14 +92,8 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         /// <param name="args">MovementData</param>
         /// <exception cref="ArgumentException"></exception>
-        private ECallPropagation SetMovement(object[] args)
+        public void RequestMovement(MovementData data)
         {
-            MovementData data = args.Length > 0 ? args[0] as MovementData : null;
-            if (data == null)
-            {
-                throw new ArgumentException(nameof(data));
-            }
-
             Logger.Trace(
                 "[{tick}] Server controlled entity move {id} to '{position}'.",
                 Room.Tick,
@@ -110,7 +105,23 @@ namespace Coop.Mod.Persistence.Party
             State.Movement.TargetPartyIndex = data.TargetParty?.Id ?? MovementState.InvalidIndex;
             State.Movement.SettlementIndex =
                 data.TargetSettlement?.Id ?? MovementState.InvalidIndex;
-            return ECallPropagation.CallOriginal;
+        }
+
+        public MovementData GetLatest()
+        {
+            return new MovementData
+            {
+                DefaultBehaviour = State.Movement.DefaultBehavior,
+                TargetPosition = State.Movement.Position,
+                TargetParty = State.Movement.TargetPartyIndex != MovementState.InvalidIndex
+                    ? MBObjectManager.Instance.GetObject(State.Movement.TargetPartyIndex) as
+                        MobileParty
+                    : null,
+                TargetSettlement = State.Movement.SettlementIndex != MovementState.InvalidIndex
+                    ? MBObjectManager.Instance.GetObject(
+                        State.Movement.SettlementIndex) as Settlement
+                    : null
+            };
         }
 
         public override string ToString()

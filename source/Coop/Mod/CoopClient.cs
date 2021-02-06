@@ -15,11 +15,8 @@ using Network.Protocol;
 using NLog;
 using RailgunNet.Connection.Client;
 using RailgunNet.Logic;
-using StoryMode;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Logger = NLog.Logger;
 
@@ -70,7 +67,7 @@ namespace Coop.Mod
             GameState = new CoopGameState();
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
-            Synchronization = new Synchronization(this);
+            SynchronizationClient = new CoopSync(this);
             
             #region State Machine Callbacks
             m_CoopClientSM.CharacterCreationState.OnEntry(CreateCharacter);
@@ -91,7 +88,7 @@ namespace Coop.Mod
 
         [CanBeNull] public PersistenceClient Persistence { get; private set; }
         
-        [NotNull] public ISynchronization Synchronization { get; }
+        [NotNull] public SynchronizationClient SynchronizationClient { get; }
 
         [NotNull] public GameSession Session { get; }
 

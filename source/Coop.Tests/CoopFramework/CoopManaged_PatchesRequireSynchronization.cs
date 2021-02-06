@@ -33,7 +33,7 @@ namespace Coop.Tests.CoopFramework
         {
             
             var foo = new Foo();
-            var managedFoo = new CoopManagedFoo(new Mock<ISynchronization>().Object, foo);
+            var managedFoo = new CoopManagedFoo(new Mock<SynchronizationClient>().Object, foo);
             Assert.Equal(42, foo.Bar);
             Assert.Equal(42, foo.Baz);
             
@@ -69,18 +69,18 @@ namespace Coop.Tests.CoopFramework
                     .Skip();
             }
             
-            public CoopManagedFoo(ISynchronization sync, [NotNull] Foo instance) : base(instance)
+            public CoopManagedFoo(SynchronizationClient sync, [NotNull] Foo instance) : base(instance)
             {
                 m_Sync = sync;
             }
 
             [SyncFactory]
-            private ISynchronization GetSynchronization()
+            private SynchronizationClient GetSynchronization()
             {
                 return m_Sync;
             }
 
-            private readonly ISynchronization m_Sync;
+            private readonly SynchronizationClient m_Sync;
         }
     }
 }

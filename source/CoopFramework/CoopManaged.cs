@@ -27,7 +27,7 @@ namespace CoopFramework
         {
             if (instance == null) throw new ArgumentNullException(nameof(instance));
             Instance = new WeakReference<TExtended>(instance, true);
-            m_GetSync = new Lazy<Func<ISynchronization>>(FindSyncFactory);
+            m_GetSync = new Lazy<Func<SynchronizationClient>>(FindSyncFactory);
 
             SetupHandlers(this);
         }
@@ -233,9 +233,9 @@ namespace CoopFramework
 
         private class PendingMethodCall : IPendingMethodCall
         {
-            [CanBeNull] private readonly ISynchronization m_Sync;
+            [CanBeNull] private readonly SynchronizationClient m_Sync;
 
-            public PendingMethodCall(MethodId method, [CanBeNull] ISynchronization sync, [CanBeNull] object instance,
+            public PendingMethodCall(MethodId method, [CanBeNull] SynchronizationClient sync, [CanBeNull] object instance,
                 [NotNull] object[] args)
             {
                 Id = method;
@@ -446,32 +446,32 @@ namespace CoopFramework
             return ECallPropagation.CallOriginal;
         }
 
-        private Func<ISynchronization> FindSyncFactory()
+        private Func<SynchronizationClient> FindSyncFactory()
         {
             foreach (var method in typeof(TSelf).GetMethods(BindingFlags.Instance | BindingFlags.DeclaredOnly |
                                                             BindingFlags.NonPublic))
                 if (Attribute.IsDefined(method, typeof(SyncFactoryAttribute)) &&
-                    method.ReturnType == typeof(ISynchronization))
-                    return () => method.Invoke(this, new object[] { }) as ISynchronization;
+                    typeof(SynchronizationClient).IsAssignableFrom(method.ReturnType))
+                    return () => method.Invoke(this, new object[] { }) as SynchronizationClient;
 
             return m_GetSyncStatic?.Value;
         }
         
-        [NotNull] private static readonly Lazy<Func<ISynchronization>> m_GetSyncStatic =
-            new Lazy<Func<ISynchronization>>(() =>
+        [NotNull] private static readonly Lazy<Func<SynchronizationClient>> m_GetSyncStatic =
+            new Lazy<Func<SynchronizationClient>>(() =>
             {
                 foreach (var method in typeof(TSelf).GetMethods(BindingFlags.Static | BindingFlags.DeclaredOnly |
                                                                 BindingFlags.NonPublic))
                     if (Attribute.IsDefined(method, typeof(SyncFactoryAttribute)) &&
-                        method.ReturnType == typeof(ISynchronization))
-                        return () => method.Invoke(null, new object[] { }) as ISynchronization;
+                        typeof(SynchronizationClient).IsAssignableFrom(method.ReturnType))
+                        return () => method.Invoke(null, new object[] { }) as SynchronizationClient;
 
                 return CoopFramework.SynchronizationFactory;
             });
 
-        [CanBeNull] private static Func<ISynchronization> m_GlobalSyncFactory;
+        [CanBeNull] private static Func<SynchronizationClient> m_GlobalSyncFactory;
 
-        [NotNull] private readonly Lazy<Func<ISynchronization>> m_GetSync;
+        [NotNull] private readonly Lazy<Func<SynchronizationClient>> m_GetSync;
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 

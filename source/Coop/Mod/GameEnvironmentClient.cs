@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Coop.Mod.Patch;
+using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using RemoteAction;
@@ -49,6 +50,7 @@ namespace Coop.Mod
         }
 
         public IEnumerable<MobileParty> PlayerControlledParties => PlayerControlledMobileParties;
+        public MobilePartySync PartySync { get; } = CampaignMapMovement.GetSync();
 
         public RemoteStore Store =>
             CoopClient.Instance.SyncedObjectStore ??

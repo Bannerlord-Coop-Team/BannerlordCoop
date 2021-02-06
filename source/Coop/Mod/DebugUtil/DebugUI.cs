@@ -380,7 +380,7 @@ namespace Coop.Mod.DebugUtil
                 return;
             }
 
-            if (CoopClient.Instance?.Synchronization.BroadcastHistory == null)
+            if (CoopClient.Instance?.SynchronizationClient.BroadcastHistory == null)
             {
                 Imgui.Text("Coop client not connected.");
             }
@@ -400,7 +400,7 @@ namespace Coop.Mod.DebugUtil
                 }
 
 #if DEBUG
-                CallStatistics history = CoopClient.Instance?.Synchronization.BroadcastHistory;
+                CallStatistics history = CoopClient.Instance?.SynchronizationClient.BroadcastHistory;
                 Imgui.Columns(2);
                 
                 Imgui.Text("Tick");

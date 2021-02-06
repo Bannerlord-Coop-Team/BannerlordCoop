@@ -1,17 +1,30 @@
-﻿using CoopFramework;
+﻿using Coop.Mod.Persistence.Party;
+using CoopFramework;
 using JetBrains.Annotations;
 using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
-namespace Coop.Mod.Patch
+namespace Coop.Mod.Patch.MobilePartyPatches
 {
+    /// <summary>
+    ///     Intercepts changes to all movement data of a <see cref="MobileParty"/> instance. The synchronization
+    ///     of the intercepted data is handled through <see cref="MobilePartySync"/>.
+    /// </summary>
     public class CampaignMapMovement : CoopManaged<CampaignMapMovement, MobileParty>
     {
+        /// <summary>
+        ///     Condition that returns whether the <see cref="MobileParty"/> instance is controlled by the local
+        ///     game instance.
+        /// </summary>
         private static Condition PartyController = new Condition((eOriginator, instance) =>
         {
             return eOriginator == EOriginator.Game && Coop.IsController(instance as MobileParty);
         });
+        
+        /// <summary>
+        ///     Definition of the patch.
+        /// </summary>
         static CampaignMapMovement()
         {
             When(PartyController)
@@ -27,13 +40,28 @@ namespace Coop.Mod.Patch
                     Setter(nameof(MobileParty.TargetParty)),
                     Setter(nameof(MobileParty.TargetPosition)))
                 .Broadcast()
-                .Keep(); // Keep the changes as a preview
+                .Keep(); // Keep the local changes as a preview.
             
             AutoWrapAllInstances(party => new CampaignMapMovement(party));
+        }
+        
+        /// <summary>
+        ///     Returns the shared synchronization of all movement data.
+        /// </summary>
+        /// <returns></returns>
+        [SyncFactory]
+        public static MobilePartySync GetSync()
+        {
+            return Sync;
         }
 
         public CampaignMapMovement([NotNull] MobileParty instance) : base(instance)
         {
         }
+        
+        /// <summary>
+        ///     Synchronization instance for all movement data.
+        /// </summary>
+        private static MobilePartySync Sync { get; } = new MobilePartySync();
     }
 }

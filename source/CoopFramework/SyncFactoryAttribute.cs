@@ -3,7 +3,7 @@
 namespace CoopFramework
 {
     /// <summary>
-    ///     Marks a member method as a factory for an <see cref="ISynchronization" /> instance. The factory has a
+    ///     Marks a member method as a factory for an <see cref="SynchronizationClient" /> instance. The factory has a
     ///     signature of:
     ///     (void) -> ISynchronization
     ///     The factory can be either static or dynamic. The factory will be called on demand by

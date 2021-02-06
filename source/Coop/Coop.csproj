@@ -295,6 +295,7 @@
     <Compile Include="Mod\Managers\ClientManager.cs" />
     <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
+    <Compile Include="Mod\Patch\MobilePartyPatches\CampaignMapMovement.cs" />
     <Compile Include="Mod\Patch\Party\BanditsCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyFoodCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyHorseCampaignBehavior.cs" />
@@ -313,9 +314,11 @@
     <Compile Include="Mod\Persistence\Compression.cs" />
     <Compile Include="Mod\Persistence\IEnvironmentClient.cs" />
     <Compile Include="Mod\Persistence\IEnvironmentServer.cs" />
+    <Compile Include="Mod\Persistence\Party\IMovementHandler.cs" />
+    <Compile Include="Mod\Persistence\Party\MobilePartySync.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventFieldChange.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventActionBase.cs" />
-    <Compile Include="Mod\Persistence\RemoteAction\Synchronization.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\SynchronizationBase.cs" />
     <Compile Include="Mod\Persistence\Party\EventPartyMoveTo.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityClient.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityServer.cs" />
@@ -340,7 +343,6 @@
     <Compile Include="Mod\CoopClient.cs" />
     <Compile Include="Mod\CoopServer.cs" />
     <Compile Include="Mod\Extensions.cs" />
-    <Compile Include="Mod\Patch\Party\CampaignMapMovement.cs" />
     <Compile Include="Mod\Behaviour\GameLoadedBehaviour.cs" />
     <Compile Include="Mod\GameEnvironmentServer.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />

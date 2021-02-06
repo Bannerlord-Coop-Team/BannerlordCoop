@@ -10,11 +10,11 @@ namespace Coop.Tests.CoopFramework
     [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class CoopManaged_TestBroadcast
     {
-        private readonly Mock<ISynchronization> m_SyncMock;
+        private readonly Mock<SynchronizationClient> m_SyncMock;
 
         public CoopManaged_TestBroadcast()
         {
-            m_SyncMock = new Mock<ISynchronization>();
+            m_SyncMock = new Mock<SynchronizationClient>();
         }
 
         [Fact]
@@ -72,7 +72,7 @@ namespace Coop.Tests.CoopFramework
             public static readonly MethodAccess BarSetter = Setter(nameof(Foo.Bar));
             public static readonly MethodAccess BazSetter = Setter(nameof(Foo.Baz));
 
-            private readonly ISynchronization m_Sync;
+            private readonly SynchronizationClient m_Sync;
 
             static CoopManagedFoo()
             {
@@ -89,13 +89,13 @@ namespace Coop.Tests.CoopFramework
                     .Execute();
             }
 
-            public CoopManagedFoo(ISynchronization sync, [NotNull] Foo instance) : base(instance)
+            public CoopManagedFoo(SynchronizationClient sync, [NotNull] Foo instance) : base(instance)
             {
                 m_Sync = sync;
             }
 
             [SyncFactory]
-            private ISynchronization GetSynchronization()
+            private SynchronizationClient GetSynchronization()
             {
                 return m_Sync;
             }
