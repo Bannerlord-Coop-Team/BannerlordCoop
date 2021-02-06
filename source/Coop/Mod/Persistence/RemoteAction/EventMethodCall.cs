@@ -43,12 +43,23 @@ namespace Coop.Mod.Persistence.RemoteAction
         [EventData] public MethodCall Call { get; set; }
         public override IEnumerable<Argument> Arguments => Call.Arguments;
 
+        public override bool IsValid()
+        {
+            return Call.IsValid();
+        }
+
         protected override void Execute(RailRoom room, RailController sender)
         {
             if (Sync.Registry.IdToMethod.TryGetValue(Call.Id, out var method))
             {
                 if (room is RailServerRoom serverRoom)
                 {
+                    if (!IsValid())
+                    {
+                        Logger.Debug("[{eventId}] Broadcast SyncCall '{call}' rejected: invalid.", EventId, Call);
+                        return;
+                    }
+
                     Logger.Trace("[{eventId}] Broadcast SyncCall: {call}", EventId, Call);
                     m_EnvironmentServer.EventQueue.Add(serverRoom, this);
                 }

@@ -35,13 +35,24 @@ namespace Coop.Mod.Persistence.RemoteAction
 
         public override IEnumerable<Argument> Arguments => Field.Arguments;
 
+        public override bool IsValid()
+        {
+            return Field.IsValid();
+        }
+
         protected override void Execute(RailRoom room, RailController sender)
         {
             if (Sync.Registry.IdToField.TryGetValue(Field.Id, out var field))
             {
                 if (room is RailServerRoom serverRoom)
                 {
-                    Logger.Trace("[{eventId}] Broadcast FieldChange: {field}", EventId, field);
+                    if (!IsValid())
+                    {
+                        Logger.Debug("[{eventId}] Broadcast FieldChange '{field}' rejected: invalid.", EventId, Field);
+                        return;
+                    }
+
+                    Logger.Trace("[{eventId}] Broadcast FieldChange: {field}", EventId, Field);
                     m_EnvironmentServer.EventQueue.Add(serverRoom, this);
                 }
                 else if (room is RailClientRoom)

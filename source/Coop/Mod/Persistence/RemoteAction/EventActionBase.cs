@@ -5,7 +5,7 @@ using RemoteAction;
 namespace Coop.Mod.Persistence.RemoteAction
 {
     /// <summary>
-    ///     Base class for <see cref="RailEvent"/> that represent a remote action such as a
+    ///     Base class for <see cref="RailEvent" /> that represent a remote action such as a
     ///     method call or a field change.
     /// </summary>
     public abstract class EventActionBase : RailEvent, ISynchronizedAction
@@ -16,5 +16,11 @@ namespace Coop.Mod.Persistence.RemoteAction
         ///     For field changes:  The new value
         /// </summary>
         public abstract IEnumerable<Argument> Arguments { get; }
+
+        /// <summary>
+        ///     Returns whether action is valid or not.
+        /// </summary>
+        /// <returns></returns>
+        public abstract bool IsValid();
     }
 }

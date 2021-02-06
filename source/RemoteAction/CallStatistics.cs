@@ -10,10 +10,11 @@ namespace RemoteAction
         public MethodCall? Call { get; set; }
         public Tick Tick { get; set; }
     }
-    
+
     public class CallStatistics : DropoutStack<CallTrace>
     {
         private const int HistoryLength = 10;
+
         public CallStatistics() : base(HistoryLength)
         {
         }
@@ -21,7 +22,7 @@ namespace RemoteAction
         [Conditional("DEBUG")]
         public void Push(MethodCall call, Tick tick)
         {
-            Push(new CallTrace()
+            Push(new CallTrace
             {
                 Call = call,
                 Tick = tick
@@ -31,7 +32,7 @@ namespace RemoteAction
         [Conditional("DEBUG")]
         public void Push(FieldChange change, Tick tick)
         {
-            Push(new CallTrace()
+            Push(new CallTrace
             {
                 Change = change,
                 Tick = tick

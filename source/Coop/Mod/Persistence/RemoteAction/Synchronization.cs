@@ -49,7 +49,7 @@ namespace Coop.Mod.Persistence.RemoteAction
         {
             foreach (var change in buffer.FetchChanges())
             {
-                FieldAccess access = change.Key;
+                var access = change.Key;
                 foreach (var instanceChange in change.Value)
                 {
                     var argInstance = ArgumentFactory.Create(
@@ -64,7 +64,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                         access.Id,
                         argInstance,
                         argValue);
-                    
+
                     PendingRequests.Instance.Add(fieldChange);
                     m_ClientAccess.GetRoom()
                         ?.RaiseEvent<EventFieldChange>(
@@ -75,6 +75,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                             });
                 }
             }
+
             throw new NotImplementedException();
         }
 

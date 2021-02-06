@@ -42,18 +42,13 @@ namespace RemoteAction
                 case EventArgType.Float:
                     return arg.Float.Value;
                 case EventArgType.StoreObjectId:
-                    if (store == null)
-                    {
-                        throw new ArgumentException($"Cannot resolve ${arg}, no store provided.");
-                    }
+                    if (store == null) throw new ArgumentException($"Cannot resolve ${arg}, no store provided.");
 
                     if (!arg.StoreObjectId.HasValue ||
                         !store.Data.ContainsKey(arg.StoreObjectId.Value))
-                    {
                         throw new ArgumentException($"Cannot resolve ${arg}.");
-                    }
 
-                    object resolvedObject = store.Data[arg.StoreObjectId.Value];
+                    var resolvedObject = store.Data[arg.StoreObjectId.Value];
                     Logger.Debug(
                         "[{id}] Resolved store RPC arg: {object} [{type}]",
                         arg.StoreObjectId.Value,
@@ -76,7 +71,7 @@ namespace RemoteAction
         /// <returns>A list of the unwrapped arguments.</returns>
         public static object[] Resolve(IStore store, IEnumerable<Argument> args)
         {
-            return args.Select(arg => Resolve(store, (Argument) arg)).ToArray();
+            return args.Select(arg => Resolve(store, arg)).ToArray();
         }
 
         /// <summary>
@@ -109,14 +104,9 @@ namespace RemoteAction
                 case float f:
                     return new Argument(f);
                 case MBObjectBase mbObject:
-                    return bTransferByValue ?
-                        new Argument(store.Insert(obj)) :
-                        new Argument(mbObject.Id);
+                    return bTransferByValue ? new Argument(store.Insert(obj)) : new Argument(mbObject.Id);
                 case Campaign campaign:
-                    if (campaign == Campaign.Current)
-                    {
-                        return Argument.CurrentCampaign;
-                    }
+                    if (campaign == Campaign.Current) return Argument.CurrentCampaign;
                     // New campaign? Send by value
                     return new Argument(store.Insert(obj));
                 default:

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Sync;
+using Sync.Behaviour;
 
 namespace RemoteAction
 {
@@ -12,25 +13,26 @@ namespace RemoteAction
         public readonly FieldId Id;
         public readonly Argument Instance; // Instance of the object containing the field.
         public IEnumerable<Argument> Arguments { get; } // Length == 0. The new value of the field.
-        
+
+        public bool IsValid()
+        {
+            return ActionValidator.IsValid(Id);
+        }
+
         public FieldChange(FieldId id, Argument instance, Argument value)
         {
             Id = id;
             Instance = instance;
-            Arguments = new List<Argument>() { value };
+            Arguments = new List<Argument> {value};
         }
-        
+
         public override string ToString()
         {
-            string sRet = Instance.EventType == EventArgType.Null ? "static " : $"{Instance} ";
-            if (Registry.IdToField.TryGetValue(Id, out FieldAccess field))
-            {
+            var sRet = Instance.EventType == EventArgType.Null ? "static " : $"{Instance} ";
+            if (Registry.IdToField.TryGetValue(Id, out var field))
                 sRet += $"{field}";
-            }
             else
-            {
                 sRet += $"[UNREGISTERED] {Id.InternalValue}";
-            }
 
             sRet += " = " + Arguments.First();
             return sRet;
@@ -38,19 +40,20 @@ namespace RemoteAction
 
         public override bool Equals(object obj)
         {
-            return obj is FieldChange field && this.Equals(field);
+            return obj is FieldChange field && Equals(field);
         }
 
         private bool Equals(FieldChange other)
         {
-            return Equals(Arguments.First(), other.Arguments.First()) && Id.Equals(other.Id) && Instance.Equals(other.Instance);
+            return Equals(Arguments.First(), other.Arguments.First()) && Id.Equals(other.Id) &&
+                   Instance.Equals(other.Instance);
         }
 
         public override int GetHashCode()
         {
             unchecked
             {
-                int hashCode = Id.GetHashCode();
+                var hashCode = Id.GetHashCode();
                 hashCode = (hashCode * 397) ^ Arguments.First().GetHashCode();
                 hashCode = (hashCode * 397) ^ Instance.GetHashCode();
                 return hashCode;

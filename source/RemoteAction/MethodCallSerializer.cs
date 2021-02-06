@@ -18,16 +18,13 @@ namespace RemoteAction
         [Encoder]
         public static void WriteMethodCall(this RailBitBuffer buffer, MethodCall pack)
         {
-            int bufferSizeBefore = buffer.ByteSize;
+            var bufferSizeBefore = buffer.ByteSize;
             buffer.WriteInt(pack.Id.InternalValue);
-            ArgumentSerializer.EncodeEventArg(buffer, pack.Instance);
+            buffer.EncodeEventArg(pack.Instance);
             buffer.WriteInt(pack.Arguments.Count());
-            foreach (Argument arg in pack.Arguments)
-            {
-                ArgumentSerializer.EncodeEventArg(buffer, arg);
-            }
+            foreach (var arg in pack.Arguments) buffer.EncodeEventArg(arg);
 
-            int eventByteSize = buffer.ByteSize - bufferSizeBefore;
+            var eventByteSize = buffer.ByteSize - bufferSizeBefore;
             if (eventByteSize > RailConfig.MAXSIZE_EVENT)
             {
                 // Railgun will not be able to pack the event into a frame. This means the RPC will
@@ -52,15 +49,12 @@ namespace RemoteAction
         [Decoder]
         public static MethodCall ReadMethodCall(this RailBitBuffer buffer)
         {
-            MethodId id = new MethodId(buffer.ReadInt());
-            Argument instance = ArgumentSerializer.DecodeEventArg(buffer);
-            int iNumberOfArguments = buffer.ReadInt();
-            List<Argument> args = new List<Argument>();
-            for (int i = 0; i < iNumberOfArguments; ++i)
-            {
-                args.Add(ArgumentSerializer.DecodeEventArg(buffer));
-            }
-            
+            var id = new MethodId(buffer.ReadInt());
+            var instance = buffer.DecodeEventArg();
+            var iNumberOfArguments = buffer.ReadInt();
+            var args = new List<Argument>();
+            for (var i = 0; i < iNumberOfArguments; ++i) args.Add(buffer.DecodeEventArg());
+
             return new MethodCall(id, instance, args);
         }
     }

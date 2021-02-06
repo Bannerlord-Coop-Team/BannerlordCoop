@@ -7,14 +7,12 @@ namespace RemoteAction
 {
     /// <summary>
     ///     Wrapper for an argument used in a remote action.
-    /// 
     ///     ATTENTION: The used state transfer library, Railgun, is intended to reliably distribute
     ///     very small amount of data that is to be applied at a synchronized point in time on all clients.
     ///     Maximum payload data in a single event is tiny <see cref="RailgunNet.RailConfig.MAXSIZE_EVENT" />.
     ///     Larger objects need be transferred using a <see cref="Sync.Store.RemoteStore" /> and then referenced
     ///     in a <see cref="EventArgType.StoreObjectId" />. The <see cref="ArgumentFactory.Create" />
     ///     can take care of this.
-    /// 
     ///     To add a new argument type:
     ///     1. Add enum entry
     ///     2. Extended <see cref="Argument" /> to store the new type in some way
@@ -84,7 +82,7 @@ namespace RemoteAction
 
         public override int GetHashCode()
         {
-            int hash = (int) EventType;
+            var hash = (int) EventType;
             int? argHash = null;
             switch (EventType)
             {
@@ -110,11 +108,8 @@ namespace RemoteAction
                     throw new ArgumentOutOfRangeException();
             }
 
-            if (argHash.HasValue)
-            {
-                hash = (hash * 397) ^ argHash.Value;
-            }
-            
+            if (argHash.HasValue) hash = (hash * 397) ^ argHash.Value;
+
             return hash;
         }
 
@@ -129,12 +124,10 @@ namespace RemoteAction
                 case EventArgType.MBObject:
                     object obj = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject(MbGUID.Value);
                     if (obj is MobileParty party)
-                    {
-                        return String.Format(
+                        return string.Format(
                             "\"{0, 4}:{1}\"",
                             party.Party.Index,
-                            party.Party.Name.ToString());
-                    }
+                            party.Party.Name);
                     return $"\"{obj}\"";
                 case EventArgType.Int:
                     return Int.ToString();
@@ -148,6 +141,5 @@ namespace RemoteAction
                     throw new ArgumentOutOfRangeException();
             }
         }
-        
     }
 }

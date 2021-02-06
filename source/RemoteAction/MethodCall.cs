@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Sync;
+using Sync.Behaviour;
 
 namespace RemoteAction
 {
@@ -11,6 +12,12 @@ namespace RemoteAction
     public readonly struct MethodCall : ISynchronizedAction
     {
         public IEnumerable<Argument> Arguments { get; }
+
+        public bool IsValid()
+        {
+            return ActionValidator.IsValid(Id);
+        }
+
         public readonly MethodId Id;
         public readonly Argument Instance; // Instance to call the method on.
 
@@ -20,18 +27,14 @@ namespace RemoteAction
             Id = id;
             Instance = instance;
         }
-        
+
         public override string ToString()
         {
-            string sRet = Instance.EventType == EventArgType.Null ? "static " : $"{Instance} ";
-            if (Registry.IdToMethod.TryGetValue(Id, out MethodAccess method))
-            {
+            var sRet = Instance.EventType == EventArgType.Null ? "static " : $"{Instance} ";
+            if (Registry.IdToMethod.TryGetValue(Id, out var method))
                 sRet += $"{method}";
-            }
             else
-            {
                 sRet += $"[UNREGISTERED] {Id.InternalValue}";
-            }
 
             sRet += "(" + string.Join(", ", Arguments) + ")";
             return sRet;
@@ -39,7 +42,7 @@ namespace RemoteAction
 
         public override bool Equals(object obj)
         {
-            return obj is MethodCall call && this.Equals(call);
+            return obj is MethodCall call && Equals(call);
         }
 
         private bool Equals(MethodCall other)
@@ -51,11 +54,8 @@ namespace RemoteAction
         {
             unchecked
             {
-                int hashCode = Id.GetHashCode();
-                foreach (Argument argument in Arguments)
-                {
-                    hashCode = (hashCode * 397) ^ argument.GetHashCode();
-                }
+                var hashCode = Id.GetHashCode();
+                foreach (var argument in Arguments) hashCode = (hashCode * 397) ^ argument.GetHashCode();
                 hashCode = (hashCode * 397) ^ Instance.GetHashCode();
                 return hashCode;
             }

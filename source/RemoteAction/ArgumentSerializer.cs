@@ -14,7 +14,7 @@ namespace RemoteAction
 
         private static int GetNumberOfBitsForArgType()
         {
-            int numberOfValues = Enum.GetNames(typeof(EventArgType)).Length;
+            var numberOfValues = Enum.GetNames(typeof(EventArgType)).Length;
             return Convert.ToInt32(Math.Ceiling(Math.Log(numberOfValues, 2)));
         }
 
@@ -54,7 +54,7 @@ namespace RemoteAction
         [Decoder]
         public static Argument DecodeEventArg(this RailBitBuffer buffer)
         {
-            EventArgType eType = (EventArgType) buffer.Read(NumberOfBitsForArgType);
+            var eType = (EventArgType) buffer.Read(NumberOfBitsForArgType);
             switch (eType)
             {
                 case EventArgType.MBObject:
@@ -66,8 +66,8 @@ namespace RemoteAction
                 case EventArgType.Int:
                     return new Argument(buffer.ReadInt());
                 case EventArgType.Float:
-                    uint ui = buffer.ReadUInt();
-                    float f = BitConverter.ToSingle(BitConverter.GetBytes(ui), 0);
+                    var ui = buffer.ReadUInt();
+                    var f = BitConverter.ToSingle(BitConverter.GetBytes(ui), 0);
                     return new Argument(f);
                 case EventArgType.StoreObjectId:
                     return new Argument(new ObjectId(buffer.ReadUInt()));
