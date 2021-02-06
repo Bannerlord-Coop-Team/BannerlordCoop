@@ -1,0 +1,1507 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync.FieldAccessGroup`2
+  commentId: T:Sync.FieldAccessGroup`2
+  id: FieldAccessGroup`2
+  parent: Sync
+  children:
+  - Sync.FieldAccessGroup`2.#ctor
+  - Sync.FieldAccessGroup`2.AddField(Sync.FieldAccess)
+  - Sync.FieldAccessGroup`2.AddField``1(System.Reflection.FieldInfo)
+  - Sync.FieldAccessGroup`2.AddField``1(System.String)
+  - Sync.FieldAccessGroup`2.Get(System.Object)
+  - Sync.FieldAccessGroup`2.GetTyped(`0)
+  - Sync.FieldAccessGroup`2.m_Fields
+  - Sync.FieldAccessGroup`2.Set(System.Object,System.Object)
+  - Sync.FieldAccessGroup`2.SetTyped(`0,`1)
+  - Sync.FieldAccessGroup`2.VerifyConstructor
+  langs:
+  - csharp
+  - vb
+  name: FieldAccessGroup<TDeclaring, TValueObject>
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>
+  type: Class
+  source:
+    remote:
+      path: source/Sync/FieldAccessGroup.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: FieldAccessGroup
+    path: ../source/Sync/FieldAccessGroup.cs
+    startLine: 18
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nA collection of <xref href=\"Sync.FieldAccess\" data-throw-if-not-resolved=\"false\"></xref> that are declared in the same class. All fields of\nthe group are manipulated as a single unit. The value of each individual field is stored in an\n<code data-dev-comment-type=\"typeparamref\" class=\"typeparamref\">TValueObject</code> instance.\n"
+  example: []
+  syntax:
+    content: 'public class FieldAccessGroup<TDeclaring, TValueObject> : ValueAccess where TValueObject : class, IEnumerable<object>'
+    typeParameters:
+    - id: TDeclaring
+      description: Class that declares all fields contained in this group.
+    - id: TValueObject
+      description: "\nClass that can store the values for all fields.\n"
+    content.vb: >-
+      Public Class FieldAccessGroup(Of TDeclaring, TValueObject As {Class, IEnumerable(Of Object)})
+
+          Inherits ValueAccess
+  inheritance:
+  - System.Object
+  - Sync.Tracker
+  - Sync.ValueAccess
+  inheritedMembers:
+  - Sync.Tracker.m_InstanceSpecificHandlers
+  - Sync.Tracker.GlobalHandler
+  - Sync.Tracker.InstanceSpecificHandlers
+  - Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+  - Sync.Tracker.GetHandler(System.Object)
+  - Sync.Tracker.RemoveHandler(System.Object)
+  - Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+  - Sync.Tracker.RemoveGlobalHandler
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  extensionMethods:
+  - Sync.ValueAccess.Sync.FieldChangeBuffer.OnBeforeExpectedChange(System.Object)
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject)
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject)
+  name.vb: FieldAccessGroup(Of TDeclaring, TValueObject)
+- uid: Sync.FieldAccessGroup`2.m_Fields
+  commentId: F:Sync.FieldAccessGroup`2.m_Fields
+  id: m_Fields
+  parent: Sync.FieldAccessGroup`2
+  langs:
+  - csharp
+  - vb
+  name: m_Fields
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.m_Fields
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.m_Fields
+  type: Field
+  source:
+    remote:
+      path: source/Sync/FieldAccessGroup.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Fields
+    path: ../source/Sync/FieldAccessGroup.cs
+    startLine: 21
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: >-
+      [NotNull]
+
+      readonly List<FieldAccess> m_Fields
+    return:
+      type: System.Collections.Generic.List{Sync.FieldAccess}
+    content.vb: >-
+      <NotNull>
+
+      ReadOnly m_Fields As List(Of FieldAccess)
+  attributes:
+  - type: JetBrains.Annotations.NotNullAttribute
+    ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+    arguments: []
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).m_Fields
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).m_Fields
+- uid: Sync.FieldAccessGroup`2.#ctor
+  commentId: M:Sync.FieldAccessGroup`2.#ctor
+  id: '#ctor'
+  parent: Sync.FieldAccessGroup`2
+  langs:
+  - csharp
+  - vb
+  name: FieldAccessGroup()
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.FieldAccessGroup()
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.FieldAccessGroup()
+  type: Constructor
+  source:
+    remote:
+      path: source/Sync/FieldAccessGroup.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Sync/FieldAccessGroup.cs
+    startLine: 23
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: public FieldAccessGroup()
+    content.vb: Public Sub New
+  overload: Sync.FieldAccessGroup`2.#ctor*
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).FieldAccessGroup()
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).FieldAccessGroup()
+- uid: Sync.FieldAccessGroup`2.VerifyConstructor
+  commentId: M:Sync.FieldAccessGroup`2.VerifyConstructor
+  id: VerifyConstructor
+  parent: Sync.FieldAccessGroup`2
+  langs:
+  - csharp
+  - vb
+  name: VerifyConstructor()
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.VerifyConstructor()
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.VerifyConstructor()
+  type: Method
+  source:
+    remote:
+      path: source/Sync/FieldAccessGroup.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: VerifyConstructor
+    path: ../source/Sync/FieldAccessGroup.cs
+    startLine: 28
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: static void VerifyConstructor()
+    content.vb: Shared Sub VerifyConstructor
+  overload: Sync.FieldAccessGroup`2.VerifyConstructor*
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).VerifyConstructor()
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).VerifyConstructor()
+- uid: Sync.FieldAccessGroup`2.AddField``1(System.String)
+  commentId: M:Sync.FieldAccessGroup`2.AddField``1(System.String)
+  id: AddField``1(System.String)
+  parent: Sync.FieldAccessGroup`2
+  langs:
+  - csharp
+  - vb
+  name: AddField<TFieldType>(String)
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.AddField<TFieldType>(String)
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.AddField<TFieldType>(System.String)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/FieldAccessGroup.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: AddField
+    path: ../source/Sync/FieldAccessGroup.cs
+    startLine: 45
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nAdds a field to the collection.\n"
+  example: []
+  syntax:
+    content: public FieldAccessGroup<TDeclaring, TValueObject> AddField<TFieldType>(string sFieldName)
+    parameters:
+    - id: sFieldName
+      type: System.String
+      description: Name of the field.
+    typeParameters:
+    - id: TFieldType
+      description: Type of the field.
+    return:
+      type: Sync.FieldAccessGroup`2
+      description: this
+    content.vb: Public Function AddField(Of TFieldType)(sFieldName As String) As FieldAccessGroup(Of TDeclaring, TValueObject)
+  overload: Sync.FieldAccessGroup`2.AddField*
+  exceptions:
+  - type: System.Exception
+    commentId: T:System.Exception
+    description: If the field was not found.
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).AddField(Of TFieldType)(String)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).AddField(Of TFieldType)(System.String)
+  name.vb: AddField(Of TFieldType)(String)
+- uid: Sync.FieldAccessGroup`2.AddField``1(System.Reflection.FieldInfo)
+  commentId: M:Sync.FieldAccessGroup`2.AddField``1(System.Reflection.FieldInfo)
+  id: AddField``1(System.Reflection.FieldInfo)
+  parent: Sync.FieldAccessGroup`2
+  langs:
+  - csharp
+  - vb
+  name: AddField<TFieldType>(FieldInfo)
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.AddField<TFieldType>(FieldInfo)
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.AddField<TFieldType>(System.Reflection.FieldInfo)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/FieldAccessGroup.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: AddField
+    path: ../source/Sync/FieldAccessGroup.cs
+    startLine: 56
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: public FieldAccessGroup<TDeclaring, TValueObject> AddField<TFieldType>([NotNull] FieldInfo memberInfo)
+    parameters:
+    - id: memberInfo
+      type: System.Reflection.FieldInfo
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    typeParameters:
+    - id: TFieldType
+    return:
+      type: Sync.FieldAccessGroup`2
+    content.vb: Public Function AddField(Of TFieldType)(memberInfo As FieldInfo) As FieldAccessGroup(Of TDeclaring, TValueObject)
+  overload: Sync.FieldAccessGroup`2.AddField*
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).AddField(Of TFieldType)(FieldInfo)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).AddField(Of TFieldType)(System.Reflection.FieldInfo)
+  name.vb: AddField(Of TFieldType)(FieldInfo)
+- uid: Sync.FieldAccessGroup`2.AddField(Sync.FieldAccess)
+  commentId: M:Sync.FieldAccessGroup`2.AddField(Sync.FieldAccess)
+  id: AddField(Sync.FieldAccess)
+  parent: Sync.FieldAccessGroup`2
+  langs:
+  - csharp
+  - vb
+  name: AddField(FieldAccess)
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.AddField(FieldAccess)
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.AddField(Sync.FieldAccess)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/FieldAccessGroup.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: AddField
+    path: ../source/Sync/FieldAccessGroup.cs
+    startLine: 62
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: public FieldAccessGroup<TDeclaring, TValueObject> AddField([NotNull] FieldAccess fieldAccess)
+    parameters:
+    - id: fieldAccess
+      type: Sync.FieldAccess
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    return:
+      type: Sync.FieldAccessGroup`2
+    content.vb: Public Function AddField(fieldAccess As FieldAccess) As FieldAccessGroup(Of TDeclaring, TValueObject)
+  overload: Sync.FieldAccessGroup`2.AddField*
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).AddField(FieldAccess)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).AddField(Sync.FieldAccess)
+- uid: Sync.FieldAccessGroup`2.Get(System.Object)
+  commentId: M:Sync.FieldAccessGroup`2.Get(System.Object)
+  id: Get(System.Object)
+  parent: Sync.FieldAccessGroup`2
+  langs:
+  - csharp
+  - vb
+  name: Get(Object)
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.Get(Object)
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.Get(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/FieldAccessGroup.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Get
+    path: ../source/Sync/FieldAccessGroup.cs
+    startLine: 70
+  assemblies:
+  - Sync
+  namespace: Sync
+  example: []
+  syntax:
+    content: public override object Get(object target)
+    parameters:
+    - id: target
+      type: System.Object
+    return:
+      type: System.Object
+    content.vb: Public Overrides Function Get(target As Object) As Object
+  overridden: Sync.ValueAccess.Get(System.Object)
+  overload: Sync.FieldAccessGroup`2.Get*
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).Get(Object)
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).Get(System.Object)
+- uid: Sync.FieldAccessGroup`2.Set(System.Object,System.Object)
+  commentId: M:Sync.FieldAccessGroup`2.Set(System.Object,System.Object)
+  id: Set(System.Object,System.Object)
+  parent: Sync.FieldAccessGroup`2
+  langs:
+  - csharp
+  - vb
+  name: Set(Object, Object)
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.Set(Object, Object)
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.Set(System.Object, System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/FieldAccessGroup.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Set
+    path: ../source/Sync/FieldAccessGroup.cs
+    startLine: 83
+  assemblies:
+  - Sync
+  namespace: Sync
+  example: []
+  syntax:
+    content: public override void Set(object target, object value)
+    parameters:
+    - id: target
+      type: System.Object
+    - id: value
+      type: System.Object
+    content.vb: Public Overrides Sub Set(target As Object, value As Object)
+  overridden: Sync.ValueAccess.Set(System.Object,System.Object)
+  overload: Sync.FieldAccessGroup`2.Set*
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).Set(Object, Object)
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).Set(System.Object, System.Object)
+- uid: Sync.FieldAccessGroup`2.GetTyped(`0)
+  commentId: M:Sync.FieldAccessGroup`2.GetTyped(`0)
+  id: GetTyped(`0)
+  parent: Sync.FieldAccessGroup`2
+  langs:
+  - csharp
+  - vb
+  name: GetTyped(TDeclaring)
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.GetTyped(TDeclaring)
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.GetTyped(TDeclaring)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/FieldAccessGroup.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetTyped
+    path: ../source/Sync/FieldAccessGroup.cs
+    startLine: 101
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nGet the value object of this group.\n"
+  example: []
+  syntax:
+    content: public TValueObject GetTyped(TDeclaring target)
+    parameters:
+    - id: target
+      type: '{TDeclaring}'
+      description: Declaring class instance to get the field values from.
+    return:
+      type: '{TValueObject}'
+      description: Value object containing the values of all child fields of this collection
+    content.vb: Public Function GetTyped(target As TDeclaring) As TValueObject
+  overload: Sync.FieldAccessGroup`2.GetTyped*
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).GetTyped(TDeclaring)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).GetTyped(TDeclaring)
+- uid: Sync.FieldAccessGroup`2.SetTyped(`0,`1)
+  commentId: M:Sync.FieldAccessGroup`2.SetTyped(`0,`1)
+  id: SetTyped(`0,`1)
+  parent: Sync.FieldAccessGroup`2
+  langs:
+  - csharp
+  - vb
+  name: SetTyped(TDeclaring, TValueObject)
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.SetTyped(TDeclaring, TValueObject)
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.SetTyped(TDeclaring, TValueObject)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/FieldAccessGroup.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SetTyped
+    path: ../source/Sync/FieldAccessGroup.cs
+    startLine: 113
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nApplies the values in the <code data-dev-comment-type=\"paramref\" class=\"paramref\">valueObject</code> to every member of this group.\n"
+  example: []
+  syntax:
+    content: public void SetTyped(TDeclaring target, TValueObject valueObject)
+    parameters:
+    - id: target
+      type: '{TDeclaring}'
+      description: Declaring class instance to set the field values on.
+    - id: valueObject
+      type: '{TValueObject}'
+      description: Value object instance.
+    content.vb: Public Sub SetTyped(target As TDeclaring, valueObject As TValueObject)
+  overload: Sync.FieldAccessGroup`2.SetTyped*
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).SetTyped(TDeclaring, TValueObject)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).SetTyped(TDeclaring, TValueObject)
+references:
+- uid: Sync.FieldAccess
+  commentId: T:Sync.FieldAccess
+  parent: Sync
+  name: FieldAccess
+  nameWithType: FieldAccess
+  fullName: Sync.FieldAccess
+- uid: Sync
+  commentId: N:Sync
+  name: Sync
+  nameWithType: Sync
+  fullName: Sync
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Sync.Tracker
+  commentId: T:Sync.Tracker
+  parent: Sync
+  name: Tracker
+  nameWithType: Tracker
+  fullName: Sync.Tracker
+- uid: Sync.ValueAccess
+  commentId: T:Sync.ValueAccess
+  parent: Sync
+  name: ValueAccess
+  nameWithType: ValueAccess
+  fullName: Sync.ValueAccess
+- uid: Sync.Tracker.m_InstanceSpecificHandlers
+  commentId: F:Sync.Tracker.m_InstanceSpecificHandlers
+  parent: Sync.Tracker
+  name: m_InstanceSpecificHandlers
+  nameWithType: Tracker.m_InstanceSpecificHandlers
+  fullName: Sync.Tracker.m_InstanceSpecificHandlers
+- uid: Sync.Tracker.GlobalHandler
+  commentId: P:Sync.Tracker.GlobalHandler
+  parent: Sync.Tracker
+  name: GlobalHandler
+  nameWithType: Tracker.GlobalHandler
+  fullName: Sync.Tracker.GlobalHandler
+- uid: Sync.Tracker.InstanceSpecificHandlers
+  commentId: P:Sync.Tracker.InstanceSpecificHandlers
+  parent: Sync.Tracker
+  name: InstanceSpecificHandlers
+  nameWithType: Tracker.InstanceSpecificHandlers
+  fullName: Sync.Tracker.InstanceSpecificHandlers
+- uid: Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+  commentId: M:Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+  parent: Sync.Tracker
+  isExternal: true
+  name: SetHandler(Object, Action<Object>)
+  nameWithType: Tracker.SetHandler(Object, Action<Object>)
+  fullName: Sync.Tracker.SetHandler(System.Object, System.Action<System.Object>)
+  nameWithType.vb: Tracker.SetHandler(Object, Action(Of Object))
+  fullName.vb: Sync.Tracker.SetHandler(System.Object, System.Action(Of System.Object))
+  name.vb: SetHandler(Object, Action(Of Object))
+  spec.csharp:
+  - uid: Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+    name: SetHandler
+    nameWithType: Tracker.SetHandler
+    fullName: Sync.Tracker.SetHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+    name: SetHandler
+    nameWithType: Tracker.SetHandler
+    fullName: Sync.Tracker.SetHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Tracker.GetHandler(System.Object)
+  commentId: M:Sync.Tracker.GetHandler(System.Object)
+  parent: Sync.Tracker
+  isExternal: true
+  name: GetHandler(Object)
+  nameWithType: Tracker.GetHandler(Object)
+  fullName: Sync.Tracker.GetHandler(System.Object)
+  spec.csharp:
+  - uid: Sync.Tracker.GetHandler(System.Object)
+    name: GetHandler
+    nameWithType: Tracker.GetHandler
+    fullName: Sync.Tracker.GetHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Tracker.GetHandler(System.Object)
+    name: GetHandler
+    nameWithType: Tracker.GetHandler
+    fullName: Sync.Tracker.GetHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Tracker.RemoveHandler(System.Object)
+  commentId: M:Sync.Tracker.RemoveHandler(System.Object)
+  parent: Sync.Tracker
+  isExternal: true
+  name: RemoveHandler(Object)
+  nameWithType: Tracker.RemoveHandler(Object)
+  fullName: Sync.Tracker.RemoveHandler(System.Object)
+  spec.csharp:
+  - uid: Sync.Tracker.RemoveHandler(System.Object)
+    name: RemoveHandler
+    nameWithType: Tracker.RemoveHandler
+    fullName: Sync.Tracker.RemoveHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Tracker.RemoveHandler(System.Object)
+    name: RemoveHandler
+    nameWithType: Tracker.RemoveHandler
+    fullName: Sync.Tracker.RemoveHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+  commentId: M:Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+  parent: Sync.Tracker
+  isExternal: true
+  name: SetGlobalHandler(Action<Object, Object>)
+  nameWithType: Tracker.SetGlobalHandler(Action<Object, Object>)
+  fullName: Sync.Tracker.SetGlobalHandler(System.Action<System.Object, System.Object>)
+  nameWithType.vb: Tracker.SetGlobalHandler(Action(Of Object, Object))
+  fullName.vb: Sync.Tracker.SetGlobalHandler(System.Action(Of System.Object, System.Object))
+  name.vb: SetGlobalHandler(Action(Of Object, Object))
+  spec.csharp:
+  - uid: Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+    name: SetGlobalHandler
+    nameWithType: Tracker.SetGlobalHandler
+    fullName: Sync.Tracker.SetGlobalHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+    name: SetGlobalHandler
+    nameWithType: Tracker.SetGlobalHandler
+    fullName: Sync.Tracker.SetGlobalHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Tracker.RemoveGlobalHandler
+  commentId: M:Sync.Tracker.RemoveGlobalHandler
+  parent: Sync.Tracker
+  name: RemoveGlobalHandler()
+  nameWithType: Tracker.RemoveGlobalHandler()
+  fullName: Sync.Tracker.RemoveGlobalHandler()
+  spec.csharp:
+  - uid: Sync.Tracker.RemoveGlobalHandler
+    name: RemoveGlobalHandler
+    nameWithType: Tracker.RemoveGlobalHandler
+    fullName: Sync.Tracker.RemoveGlobalHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Tracker.RemoveGlobalHandler
+    name: RemoveGlobalHandler
+    nameWithType: Tracker.RemoveGlobalHandler
+    fullName: Sync.Tracker.RemoveGlobalHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.ValueAccess.Sync.FieldChangeBuffer.OnBeforeExpectedChange(System.Object)
+  commentId: M:Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+  parent: Sync.FieldChangeBuffer
+  definition: Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+  name: OnBeforeExpectedChange(Object)
+  nameWithType: FieldChangeBuffer.OnBeforeExpectedChange(Object)
+  fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange(System.Object)
+  spec.csharp:
+  - uid: Sync.FieldChangeBuffer.OnBeforeExpectedChange(System.Object)
+    name: OnBeforeExpectedChange
+    nameWithType: FieldChangeBuffer.OnBeforeExpectedChange
+    fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.FieldChangeBuffer.OnBeforeExpectedChange(System.Object)
+    name: OnBeforeExpectedChange
+    nameWithType: FieldChangeBuffer.OnBeforeExpectedChange
+    fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+  commentId: M:Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+  isExternal: true
+  name: OnBeforeExpectedChange(ValueAccess, Object)
+  nameWithType: FieldChangeBuffer.OnBeforeExpectedChange(ValueAccess, Object)
+  fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess, System.Object)
+  spec.csharp:
+  - uid: Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+    name: OnBeforeExpectedChange
+    nameWithType: FieldChangeBuffer.OnBeforeExpectedChange
+    fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Sync.ValueAccess
+    name: ValueAccess
+    nameWithType: ValueAccess
+    fullName: Sync.ValueAccess
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+    name: OnBeforeExpectedChange
+    nameWithType: FieldChangeBuffer.OnBeforeExpectedChange
+    fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Sync.ValueAccess
+    name: ValueAccess
+    nameWithType: ValueAccess
+    fullName: Sync.ValueAccess
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldChangeBuffer
+  commentId: T:Sync.FieldChangeBuffer
+  parent: Sync
+  name: FieldChangeBuffer
+  nameWithType: FieldChangeBuffer
+  fullName: Sync.FieldChangeBuffer
+- uid: System.Collections.Generic.List{Sync.FieldAccess}
+  commentId: T:System.Collections.Generic.List{Sync.FieldAccess}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  name: List<FieldAccess>
+  nameWithType: List<FieldAccess>
+  fullName: System.Collections.Generic.List<Sync.FieldAccess>
+  nameWithType.vb: List(Of FieldAccess)
+  fullName.vb: System.Collections.Generic.List(Of Sync.FieldAccess)
+  name.vb: List(Of FieldAccess)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.FieldAccess
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.FieldAccess
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: Sync.FieldAccessGroup`2.#ctor*
+  commentId: Overload:Sync.FieldAccessGroup`2.#ctor
+  name: FieldAccessGroup
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.FieldAccessGroup
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.FieldAccessGroup
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).FieldAccessGroup
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).FieldAccessGroup
+- uid: Sync.FieldAccessGroup`2.VerifyConstructor*
+  commentId: Overload:Sync.FieldAccessGroup`2.VerifyConstructor
+  name: VerifyConstructor
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.VerifyConstructor
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.VerifyConstructor
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).VerifyConstructor
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).VerifyConstructor
+- uid: System.Exception
+  commentId: T:System.Exception
+  parent: System
+  isExternal: true
+  name: Exception
+  nameWithType: Exception
+  fullName: System.Exception
+- uid: Sync.FieldAccessGroup`2.AddField*
+  commentId: Overload:Sync.FieldAccessGroup`2.AddField
+  name: AddField
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.AddField
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.AddField
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).AddField
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).AddField
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String
+- uid: Sync.FieldAccessGroup`2
+  commentId: T:Sync.FieldAccessGroup`2
+  parent: Sync
+  name: FieldAccessGroup<TDeclaring, TValueObject>
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject)
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject)
+  name.vb: FieldAccessGroup(Of TDeclaring, TValueObject)
+  spec.csharp:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValueObject
+    nameWithType: TValueObject
+    fullName: TValueObject
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValueObject
+    nameWithType: TValueObject
+    fullName: TValueObject
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Reflection.FieldInfo
+  commentId: T:System.Reflection.FieldInfo
+  parent: System.Reflection
+  isExternal: true
+  name: FieldInfo
+  nameWithType: FieldInfo
+  fullName: System.Reflection.FieldInfo
+- uid: System.Reflection
+  commentId: N:System.Reflection
+  isExternal: true
+  name: System.Reflection
+  nameWithType: System.Reflection
+  fullName: System.Reflection
+- uid: Sync.ValueAccess.Get(System.Object)
+  commentId: M:Sync.ValueAccess.Get(System.Object)
+  parent: Sync.ValueAccess
+  isExternal: true
+  name: Get(Object)
+  nameWithType: ValueAccess.Get(Object)
+  fullName: Sync.ValueAccess.Get(System.Object)
+  spec.csharp:
+  - uid: Sync.ValueAccess.Get(System.Object)
+    name: Get
+    nameWithType: ValueAccess.Get
+    fullName: Sync.ValueAccess.Get
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.ValueAccess.Get(System.Object)
+    name: Get
+    nameWithType: ValueAccess.Get
+    fullName: Sync.ValueAccess.Get
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldAccessGroup`2.Get*
+  commentId: Overload:Sync.FieldAccessGroup`2.Get
+  name: Get
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.Get
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.Get
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).Get
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).Get
+- uid: Sync.ValueAccess.Set(System.Object,System.Object)
+  commentId: M:Sync.ValueAccess.Set(System.Object,System.Object)
+  parent: Sync.ValueAccess
+  isExternal: true
+  name: Set(Object, Object)
+  nameWithType: ValueAccess.Set(Object, Object)
+  fullName: Sync.ValueAccess.Set(System.Object, System.Object)
+  spec.csharp:
+  - uid: Sync.ValueAccess.Set(System.Object,System.Object)
+    name: Set
+    nameWithType: ValueAccess.Set
+    fullName: Sync.ValueAccess.Set
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.ValueAccess.Set(System.Object,System.Object)
+    name: Set
+    nameWithType: ValueAccess.Set
+    fullName: Sync.ValueAccess.Set
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldAccessGroup`2.Set*
+  commentId: Overload:Sync.FieldAccessGroup`2.Set
+  name: Set
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.Set
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.Set
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).Set
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).Set
+- uid: Sync.FieldAccessGroup`2.GetTyped*
+  commentId: Overload:Sync.FieldAccessGroup`2.GetTyped
+  name: GetTyped
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.GetTyped
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.GetTyped
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).GetTyped
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).GetTyped
+- uid: '{TDeclaring}'
+  commentId: '!:TDeclaring'
+  definition: TDeclaring
+  name: TDeclaring
+  nameWithType: TDeclaring
+  fullName: TDeclaring
+- uid: '{TValueObject}'
+  commentId: '!:TValueObject'
+  definition: TValueObject
+  name: TValueObject
+  nameWithType: TValueObject
+  fullName: TValueObject
+- uid: TDeclaring
+  name: TDeclaring
+  nameWithType: TDeclaring
+  fullName: TDeclaring
+- uid: TValueObject
+  name: TValueObject
+  nameWithType: TValueObject
+  fullName: TValueObject
+- uid: Sync.FieldAccessGroup`2.SetTyped*
+  commentId: Overload:Sync.FieldAccessGroup`2.SetTyped
+  name: SetTyped
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>.SetTyped
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>.SetTyped
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject).SetTyped
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject).SetTyped

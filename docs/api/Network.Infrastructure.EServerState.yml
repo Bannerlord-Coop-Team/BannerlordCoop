@@ -1,0 +1,178 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.EServerState
+  commentId: T:Network.Infrastructure.EServerState
+  id: EServerState
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.EServerState.Inactive
+  - Network.Infrastructure.EServerState.Running
+  - Network.Infrastructure.EServerState.Starting
+  - Network.Infrastructure.EServerState.Stopping
+  langs:
+  - csharp
+  - vb
+  name: EServerState
+  nameWithType: EServerState
+  fullName: Network.Infrastructure.EServerState
+  type: Enum
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EServerState
+    path: ../source/Network/Infrastructure/ServerSM.cs
+    startLine: 6
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public enum EServerState
+    content.vb: Public Enum EServerState
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: Network.Infrastructure.EServerState.Inactive
+  commentId: F:Network.Infrastructure.EServerState.Inactive
+  id: Inactive
+  parent: Network.Infrastructure.EServerState
+  langs:
+  - csharp
+  - vb
+  name: Inactive
+  nameWithType: EServerState.Inactive
+  fullName: Network.Infrastructure.EServerState.Inactive
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Inactive
+    path: ../source/Network/Infrastructure/ServerSM.cs
+    startLine: 8
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Inactive = 0
+    return:
+      type: Network.Infrastructure.EServerState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EServerState.Starting
+  commentId: F:Network.Infrastructure.EServerState.Starting
+  id: Starting
+  parent: Network.Infrastructure.EServerState
+  langs:
+  - csharp
+  - vb
+  name: Starting
+  nameWithType: EServerState.Starting
+  fullName: Network.Infrastructure.EServerState.Starting
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Starting
+    path: ../source/Network/Infrastructure/ServerSM.cs
+    startLine: 9
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Starting = 1
+    return:
+      type: Network.Infrastructure.EServerState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EServerState.Running
+  commentId: F:Network.Infrastructure.EServerState.Running
+  id: Running
+  parent: Network.Infrastructure.EServerState
+  langs:
+  - csharp
+  - vb
+  name: Running
+  nameWithType: EServerState.Running
+  fullName: Network.Infrastructure.EServerState.Running
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Running
+    path: ../source/Network/Infrastructure/ServerSM.cs
+    startLine: 10
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Running = 2
+    return:
+      type: Network.Infrastructure.EServerState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EServerState.Stopping
+  commentId: F:Network.Infrastructure.EServerState.Stopping
+  id: Stopping
+  parent: Network.Infrastructure.EServerState
+  langs:
+  - csharp
+  - vb
+  name: Stopping
+  nameWithType: EServerState.Stopping
+  fullName: Network.Infrastructure.EServerState.Stopping
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Stopping
+    path: ../source/Network/Infrastructure/ServerSM.cs
+    startLine: 11
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Stopping = 3
+    return:
+      type: Network.Infrastructure.EServerState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: Network.Infrastructure.EServerState
+  commentId: T:Network.Infrastructure.EServerState
+  parent: Network.Infrastructure
+  name: EServerState
+  nameWithType: EServerState
+  fullName: Network.Infrastructure.EServerState

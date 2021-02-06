@@ -1,0 +1,112 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.EDeliveryMethod
+  commentId: T:Network.Infrastructure.EDeliveryMethod
+  id: EDeliveryMethod
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.EDeliveryMethod.Reliable
+  - Network.Infrastructure.EDeliveryMethod.Unreliable
+  langs:
+  - csharp
+  - vb
+  name: EDeliveryMethod
+  nameWithType: EDeliveryMethod
+  fullName: Network.Infrastructure.EDeliveryMethod
+  type: Enum
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EDeliveryMethod
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 19
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public enum EDeliveryMethod
+    content.vb: Public Enum EDeliveryMethod
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: Network.Infrastructure.EDeliveryMethod.Reliable
+  commentId: F:Network.Infrastructure.EDeliveryMethod.Reliable
+  id: Reliable
+  parent: Network.Infrastructure.EDeliveryMethod
+  langs:
+  - csharp
+  - vb
+  name: Reliable
+  nameWithType: EDeliveryMethod.Reliable
+  fullName: Network.Infrastructure.EDeliveryMethod.Reliable
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Reliable
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 21
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Reliable = 0
+    return:
+      type: Network.Infrastructure.EDeliveryMethod
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EDeliveryMethod.Unreliable
+  commentId: F:Network.Infrastructure.EDeliveryMethod.Unreliable
+  id: Unreliable
+  parent: Network.Infrastructure.EDeliveryMethod
+  langs:
+  - csharp
+  - vb
+  name: Unreliable
+  nameWithType: EDeliveryMethod.Unreliable
+  fullName: Network.Infrastructure.EDeliveryMethod.Unreliable
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Unreliable
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 22
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Unreliable = 1
+    return:
+      type: Network.Infrastructure.EDeliveryMethod
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: Network.Infrastructure.EDeliveryMethod
+  commentId: T:Network.Infrastructure.EDeliveryMethod
+  parent: Network.Infrastructure
+  name: EDeliveryMethod
+  nameWithType: EDeliveryMethod
+  fullName: Network.Infrastructure.EDeliveryMethod

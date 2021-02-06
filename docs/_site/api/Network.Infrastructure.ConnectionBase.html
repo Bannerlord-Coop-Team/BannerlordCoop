@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -120,8 +119,7 @@
   </span>
   <a id="Network_Infrastructure_ConnectionBase__ctor_" data-uid="Network.Infrastructure.ConnectionBase.#ctor*"></a>
   <h4 id="Network_Infrastructure_ConnectionBase__ctor_Network_Infrastructure_INetworkConnection_Network_Infrastructure_IGameStatePersistence_" data-uid="Network.Infrastructure.ConnectionBase.#ctor(Network.Infrastructure.INetworkConnection,Network.Infrastructure.IGameStatePersistence)">ConnectionBase(INetworkConnection, IGameStatePersistence)</h4>
-  <div class="markdown level1 summary">
-</div>
+  <div class="markdown level1 summary"></div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
@@ -140,12 +138,14 @@
       <tr>
         <td><a class="xref" href="Network.Infrastructure.INetworkConnection.html">INetworkConnection</a></td>
         <td><span class="parametername">network</span></td>
-        <td>Networking implementation.</td>
+        <td><p>Networking implementation.</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="Network.Infrastructure.IGameStatePersistence.html">IGameStatePersistence</a></td>
         <td><span class="parametername">persistence</span></td>
-        <td>Implementation to relay Persistance packets to.</td>
+        <td><p>Implementation to relay Persistance packets to.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -205,6 +205,64 @@
     <tbody>
       <tr>
         <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Network_Infrastructure_ConnectionBase_m_PackageReader.md&amp;value=---%0Auid%3A%20Network.Infrastructure.ConnectionBase.m_PackageReader%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Network/Infrastructure/ConnectionBase.cs/#L122">View Source</a>
+  </span>
+  <h4 id="Network_Infrastructure_ConnectionBase_m_PackageReader" data-uid="Network.Infrastructure.ConnectionBase.m_PackageReader">m_PackageReader</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">PacketReader m_PackageReader</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Network.Protocol.PacketReader.html">PacketReader</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Network_Infrastructure_ConnectionBase_m_Stream.md&amp;value=---%0Auid%3A%20Network.Infrastructure.ConnectionBase.m_Stream%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Network/Infrastructure/ConnectionBase.cs/#L121">View Source</a>
+  </span>
+  <h4 id="Network_Infrastructure_ConnectionBase_m_Stream" data-uid="Network.Infrastructure.ConnectionBase.m_Stream">m_Stream</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly MemoryStream m_Stream</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.IO.MemoryStream</span></td>
         <td></td>
       </tr>
     </tbody>
@@ -312,10 +370,9 @@
   </span>
   <a id="Network_Infrastructure_ConnectionBase_Disconnect_" data-uid="Network.Infrastructure.ConnectionBase.Disconnect*"></a>
   <h4 id="Network_Infrastructure_ConnectionBase_Disconnect_Network_Infrastructure_EDisconnectReason_" data-uid="Network.Infrastructure.ConnectionBase.Disconnect(Network.Infrastructure.EDisconnectReason)">Disconnect(EDisconnectReason)</h4>
-  <div class="markdown level1 summary">
-Closes the connection.
+  <div class="markdown level1 summary"><p>Closes the connection.
 Post condition: <a class="xref" href="Network.Infrastructure.ConnectionBase.html#Network_Infrastructure_ConnectionBase_State">State</a> is equal to <a class="xref" href="Network.Infrastructure.EClientConnectionState.html#Network_Infrastructure_EClientConnectionState_Disconnected">Disconnected</a>
-or <a class="xref" href="Network.Infrastructure.EServerConnectionState.html#Network_Infrastructure_EServerConnectionState_Terminated">Terminated</a>.
+or <a class="xref" href="Network.Infrastructure.EServerConnectionState.html#Network_Infrastructure_EServerConnectionState_Terminated">Terminated</a>.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -335,7 +392,8 @@ or <a class="xref" href="Network.Infrastructure.EServerConnectionState.html#Netw
       <tr>
         <td><a class="xref" href="Network.Infrastructure.EDisconnectReason.html">EDisconnectReason</a></td>
         <td><span class="parametername">eReason</span></td>
-        <td>Reason that caused the disconnect.</td>
+        <td><p>Reason that caused the disconnect.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -482,9 +540,22 @@ or <a class="xref" href="Network.Infrastructure.EServerConnectionState.html#Netw
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

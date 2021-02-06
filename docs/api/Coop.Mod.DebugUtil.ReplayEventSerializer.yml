@@ -1,0 +1,450 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.DebugUtil.ReplayEventSerializer
+  commentId: T:Coop.Mod.DebugUtil.ReplayEventSerializer
+  id: ReplayEventSerializer
+  parent: Coop.Mod.DebugUtil
+  children:
+  - Coop.Mod.DebugUtil.ReplayEventSerializer.ReadReplayEvent(RailBitBuffer)
+  - Coop.Mod.DebugUtil.ReplayEventSerializer.WriteReplayEvent(RailBitBuffer,Coop.Mod.DebugUtil.ReplayEvent)
+  langs:
+  - csharp
+  - vb
+  name: ReplayEventSerializer
+  nameWithType: ReplayEventSerializer
+  fullName: Coop.Mod.DebugUtil.ReplayEventSerializer
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/ReplayEvent.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ReplayEventSerializer
+    path: ../source/Coop/Mod/DebugUtil/ReplayEvent.cs
+    startLine: 38
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  summary: "\nSerializer for object ReplayEvent.\n"
+  example: []
+  syntax:
+    content: public static class ReplayEventSerializer
+    content.vb: Public Module ReplayEventSerializer
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - static
+  - class
+  modifiers.vb:
+  - Public
+  - Module
+- uid: Coop.Mod.DebugUtil.ReplayEventSerializer.WriteReplayEvent(RailBitBuffer,Coop.Mod.DebugUtil.ReplayEvent)
+  commentId: M:Coop.Mod.DebugUtil.ReplayEventSerializer.WriteReplayEvent(RailBitBuffer,Coop.Mod.DebugUtil.ReplayEvent)
+  id: WriteReplayEvent(RailBitBuffer,Coop.Mod.DebugUtil.ReplayEvent)
+  isExtensionMethod: true
+  parent: Coop.Mod.DebugUtil.ReplayEventSerializer
+  langs:
+  - csharp
+  - vb
+  name: WriteReplayEvent(RailBitBuffer, ReplayEvent)
+  nameWithType: ReplayEventSerializer.WriteReplayEvent(RailBitBuffer, ReplayEvent)
+  fullName: Coop.Mod.DebugUtil.ReplayEventSerializer.WriteReplayEvent(RailBitBuffer, Coop.Mod.DebugUtil.ReplayEvent)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/ReplayEvent.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: WriteReplayEvent
+    path: ../source/Coop/Mod/DebugUtil/ReplayEvent.cs
+    startLine: 40
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: public static void WriteReplayEvent(this RailBitBuffer buffer, ReplayEvent replay)
+    parameters:
+    - id: buffer
+      type: RailBitBuffer
+    - id: replay
+      type: Coop.Mod.DebugUtil.ReplayEvent
+    content.vb: >-
+      <ExtensionAttribute>
+
+      Public Shared Sub WriteReplayEvent(buffer As RailBitBuffer, replay As ReplayEvent)
+  overload: Coop.Mod.DebugUtil.ReplayEventSerializer.WriteReplayEvent*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Coop.Mod.DebugUtil.ReplayEventSerializer.ReadReplayEvent(RailBitBuffer)
+  commentId: M:Coop.Mod.DebugUtil.ReplayEventSerializer.ReadReplayEvent(RailBitBuffer)
+  id: ReadReplayEvent(RailBitBuffer)
+  isExtensionMethod: true
+  parent: Coop.Mod.DebugUtil.ReplayEventSerializer
+  langs:
+  - csharp
+  - vb
+  name: ReadReplayEvent(RailBitBuffer)
+  nameWithType: ReplayEventSerializer.ReadReplayEvent(RailBitBuffer)
+  fullName: Coop.Mod.DebugUtil.ReplayEventSerializer.ReadReplayEvent(RailBitBuffer)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/ReplayEvent.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ReadReplayEvent
+    path: ../source/Coop/Mod/DebugUtil/ReplayEvent.cs
+    startLine: 49
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: public static ReplayEvent ReadReplayEvent(this RailBitBuffer buffer)
+    parameters:
+    - id: buffer
+      type: RailBitBuffer
+    return:
+      type: Coop.Mod.DebugUtil.ReplayEvent
+    content.vb: >-
+      <ExtensionAttribute>
+
+      Public Shared Function ReadReplayEvent(buffer As RailBitBuffer) As ReplayEvent
+  overload: Coop.Mod.DebugUtil.ReplayEventSerializer.ReadReplayEvent*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+references:
+- uid: Coop.Mod.DebugUtil
+  commentId: N:Coop.Mod.DebugUtil
+  name: Coop.Mod.DebugUtil
+  nameWithType: Coop.Mod.DebugUtil
+  fullName: Coop.Mod.DebugUtil
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Coop.Mod.DebugUtil.ReplayEventSerializer.WriteReplayEvent*
+  commentId: Overload:Coop.Mod.DebugUtil.ReplayEventSerializer.WriteReplayEvent
+  name: WriteReplayEvent
+  nameWithType: ReplayEventSerializer.WriteReplayEvent
+  fullName: Coop.Mod.DebugUtil.ReplayEventSerializer.WriteReplayEvent
+- uid: RailBitBuffer
+  isExternal: true
+  name: RailBitBuffer
+  nameWithType: RailBitBuffer
+  fullName: RailBitBuffer
+- uid: Coop.Mod.DebugUtil.ReplayEvent
+  commentId: T:Coop.Mod.DebugUtil.ReplayEvent
+  parent: Coop.Mod.DebugUtil
+  name: ReplayEvent
+  nameWithType: ReplayEvent
+  fullName: Coop.Mod.DebugUtil.ReplayEvent
+- uid: Coop.Mod.DebugUtil.ReplayEventSerializer.ReadReplayEvent*
+  commentId: Overload:Coop.Mod.DebugUtil.ReplayEventSerializer.ReadReplayEvent
+  name: ReadReplayEvent
+  nameWithType: ReplayEventSerializer.ReadReplayEvent
+  fullName: Coop.Mod.DebugUtil.ReplayEventSerializer.ReadReplayEvent

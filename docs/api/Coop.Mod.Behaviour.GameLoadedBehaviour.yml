@@ -1,0 +1,609 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Behaviour.GameLoadedBehaviour
+  commentId: T:Coop.Mod.Behaviour.GameLoadedBehaviour
+  id: GameLoadedBehaviour
+  parent: Coop.Mod.Behaviour
+  children:
+  - Coop.Mod.Behaviour.GameLoadedBehaviour.GameLoaded(TaleWorlds.CampaignSystem.CampaignGameStarter)
+  - Coop.Mod.Behaviour.GameLoadedBehaviour.RegisterEvents
+  - Coop.Mod.Behaviour.GameLoadedBehaviour.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  langs:
+  - csharp
+  - vb
+  name: GameLoadedBehaviour
+  nameWithType: GameLoadedBehaviour
+  fullName: Coop.Mod.Behaviour.GameLoadedBehaviour
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Behaviour/GameLoadedBehaviour.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GameLoadedBehaviour
+    path: ../source/Coop/Mod/Behaviour/GameLoadedBehaviour.cs
+    startLine: 4
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Behaviour
+  syntax:
+    content: 'public class GameLoadedBehaviour : CampaignBehaviorBase, ICampaignBehavior'
+    content.vb: >-
+      Public Class GameLoadedBehaviour
+          Inherits CampaignBehaviorBase
+          Implements ICampaignBehavior
+  inheritance:
+  - System.Object
+  - TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  implements:
+  - TaleWorlds.CampaignSystem.ICampaignBehavior
+  inheritedMembers:
+  - TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior``1
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Behaviour.GameLoadedBehaviour.RegisterEvents
+  commentId: M:Coop.Mod.Behaviour.GameLoadedBehaviour.RegisterEvents
+  id: RegisterEvents
+  parent: Coop.Mod.Behaviour.GameLoadedBehaviour
+  langs:
+  - csharp
+  - vb
+  name: RegisterEvents()
+  nameWithType: GameLoadedBehaviour.RegisterEvents()
+  fullName: Coop.Mod.Behaviour.GameLoadedBehaviour.RegisterEvents()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Behaviour/GameLoadedBehaviour.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RegisterEvents
+    path: ../source/Coop/Mod/Behaviour/GameLoadedBehaviour.cs
+    startLine: 6
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Behaviour
+  syntax:
+    content: public override void RegisterEvents()
+    content.vb: Public Overrides Sub RegisterEvents
+  overridden: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+  overload: Coop.Mod.Behaviour.GameLoadedBehaviour.RegisterEvents*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Coop.Mod.Behaviour.GameLoadedBehaviour.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  commentId: M:Coop.Mod.Behaviour.GameLoadedBehaviour.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  id: SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  parent: Coop.Mod.Behaviour.GameLoadedBehaviour
+  langs:
+  - csharp
+  - vb
+  name: SyncData(IDataStore)
+  nameWithType: GameLoadedBehaviour.SyncData(IDataStore)
+  fullName: Coop.Mod.Behaviour.GameLoadedBehaviour.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Behaviour/GameLoadedBehaviour.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SyncData
+    path: ../source/Coop/Mod/Behaviour/GameLoadedBehaviour.cs
+    startLine: 11
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Behaviour
+  syntax:
+    content: public override void SyncData(IDataStore dataStore)
+    parameters:
+    - id: dataStore
+      type: TaleWorlds.CampaignSystem.IDataStore
+    content.vb: Public Overrides Sub SyncData(dataStore As IDataStore)
+  overridden: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  overload: Coop.Mod.Behaviour.GameLoadedBehaviour.SyncData*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Coop.Mod.Behaviour.GameLoadedBehaviour.GameLoaded(TaleWorlds.CampaignSystem.CampaignGameStarter)
+  commentId: M:Coop.Mod.Behaviour.GameLoadedBehaviour.GameLoaded(TaleWorlds.CampaignSystem.CampaignGameStarter)
+  id: GameLoaded(TaleWorlds.CampaignSystem.CampaignGameStarter)
+  parent: Coop.Mod.Behaviour.GameLoadedBehaviour
+  langs:
+  - csharp
+  - vb
+  name: GameLoaded(CampaignGameStarter)
+  nameWithType: GameLoadedBehaviour.GameLoaded(CampaignGameStarter)
+  fullName: Coop.Mod.Behaviour.GameLoadedBehaviour.GameLoaded(TaleWorlds.CampaignSystem.CampaignGameStarter)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Behaviour/GameLoadedBehaviour.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GameLoaded
+    path: ../source/Coop/Mod/Behaviour/GameLoadedBehaviour.cs
+    startLine: 15
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Behaviour
+  syntax:
+    content: static void GameLoaded(CampaignGameStarter gameStarter)
+    parameters:
+    - id: gameStarter
+      type: TaleWorlds.CampaignSystem.CampaignGameStarter
+    content.vb: Shared Sub GameLoaded(gameStarter As CampaignGameStarter)
+  overload: Coop.Mod.Behaviour.GameLoadedBehaviour.GameLoaded*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+references:
+- uid: Coop.Mod.Behaviour
+  commentId: N:Coop.Mod.Behaviour
+  name: Coop.Mod.Behaviour
+  nameWithType: Coop.Mod.Behaviour
+  fullName: Coop.Mod.Behaviour
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  commentId: T:TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: CampaignBehaviorBase
+  nameWithType: CampaignBehaviorBase
+  fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase
+- uid: TaleWorlds.CampaignSystem.ICampaignBehavior
+  commentId: T:TaleWorlds.CampaignSystem.ICampaignBehavior
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: ICampaignBehavior
+  nameWithType: ICampaignBehavior
+  fullName: TaleWorlds.CampaignSystem.ICampaignBehavior
+- uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior``1
+  commentId: M:TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior``1
+  parent: TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  isExternal: true
+  name: GetCampaignBehavior<T>()
+  nameWithType: CampaignBehaviorBase.GetCampaignBehavior<T>()
+  fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior<T>()
+  nameWithType.vb: CampaignBehaviorBase.GetCampaignBehavior(Of T)()
+  fullName.vb: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior(Of T)()
+  name.vb: GetCampaignBehavior(Of T)()
+  spec.csharp:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior``1
+    name: GetCampaignBehavior<T>
+    nameWithType: CampaignBehaviorBase.GetCampaignBehavior<T>
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior<T>
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior``1
+    name: GetCampaignBehavior(Of T)
+    nameWithType: CampaignBehaviorBase.GetCampaignBehavior(Of T)
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior(Of T)
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+  commentId: M:TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+  parent: TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  isExternal: true
+  name: RegisterEvents()
+  nameWithType: CampaignBehaviorBase.RegisterEvents()
+  fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents()
+  spec.csharp:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+    name: RegisterEvents
+    nameWithType: CampaignBehaviorBase.RegisterEvents
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+    name: RegisterEvents
+    nameWithType: CampaignBehaviorBase.RegisterEvents
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.Behaviour.GameLoadedBehaviour.RegisterEvents*
+  commentId: Overload:Coop.Mod.Behaviour.GameLoadedBehaviour.RegisterEvents
+  name: RegisterEvents
+  nameWithType: GameLoadedBehaviour.RegisterEvents
+  fullName: Coop.Mod.Behaviour.GameLoadedBehaviour.RegisterEvents
+- uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  commentId: M:TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  parent: TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  isExternal: true
+  name: SyncData(IDataStore)
+  nameWithType: CampaignBehaviorBase.SyncData(IDataStore)
+  fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  spec.csharp:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+    name: SyncData
+    nameWithType: CampaignBehaviorBase.SyncData
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.CampaignSystem.IDataStore
+    name: IDataStore
+    nameWithType: IDataStore
+    fullName: TaleWorlds.CampaignSystem.IDataStore
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+    name: SyncData
+    nameWithType: CampaignBehaviorBase.SyncData
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.CampaignSystem.IDataStore
+    name: IDataStore
+    nameWithType: IDataStore
+    fullName: TaleWorlds.CampaignSystem.IDataStore
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.Behaviour.GameLoadedBehaviour.SyncData*
+  commentId: Overload:Coop.Mod.Behaviour.GameLoadedBehaviour.SyncData
+  name: SyncData
+  nameWithType: GameLoadedBehaviour.SyncData
+  fullName: Coop.Mod.Behaviour.GameLoadedBehaviour.SyncData
+- uid: TaleWorlds.CampaignSystem.IDataStore
+  commentId: T:TaleWorlds.CampaignSystem.IDataStore
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: IDataStore
+  nameWithType: IDataStore
+  fullName: TaleWorlds.CampaignSystem.IDataStore
+- uid: Coop.Mod.Behaviour.GameLoadedBehaviour.GameLoaded*
+  commentId: Overload:Coop.Mod.Behaviour.GameLoadedBehaviour.GameLoaded
+  name: GameLoaded
+  nameWithType: GameLoadedBehaviour.GameLoaded
+  fullName: Coop.Mod.Behaviour.GameLoadedBehaviour.GameLoaded
+- uid: TaleWorlds.CampaignSystem.CampaignGameStarter
+  commentId: T:TaleWorlds.CampaignSystem.CampaignGameStarter
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: CampaignGameStarter
+  nameWithType: CampaignGameStarter
+  fullName: TaleWorlds.CampaignSystem.CampaignGameStarter

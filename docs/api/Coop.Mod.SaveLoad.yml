@@ -1,0 +1,833 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.SaveLoad
+  commentId: T:Coop.Mod.SaveLoad
+  id: SaveLoad
+  parent: Coop.Mod
+  children:
+  - Coop.Mod.SaveLoad.CheckModules(TaleWorlds.SaveSystem.MetaData,System.Collections.Generic.List{ModuleInfo})
+  - Coop.Mod.SaveLoad.GetMetaData
+  - Coop.Mod.SaveLoad.GetModules
+  - Coop.Mod.SaveLoad.LoadGame(TaleWorlds.SaveSystem.Load.LoadResult)
+  - Coop.Mod.SaveLoad.LoadSaveGameData(TaleWorlds.SaveSystem.ISaveDriver)
+  - Coop.Mod.SaveLoad.Logger
+  - Coop.Mod.SaveLoad.SaveGame(TaleWorlds.Core.Game,TaleWorlds.SaveSystem.ISaveDriver)
+  langs:
+  - csharp
+  - vb
+  name: SaveLoad
+  nameWithType: SaveLoad
+  fullName: Coop.Mod.SaveLoad
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/SaveLoad.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SaveLoad
+    path: ../source/Coop/Mod/SaveLoad.cs
+    startLine: 17
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public static class SaveLoad
+    content.vb: Public Module SaveLoad
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - static
+  - class
+  modifiers.vb:
+  - Public
+  - Module
+- uid: Coop.Mod.SaveLoad.Logger
+  commentId: F:Coop.Mod.SaveLoad.Logger
+  id: Logger
+  parent: Coop.Mod.SaveLoad
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: SaveLoad.Logger
+  fullName: Coop.Mod.SaveLoad.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/SaveLoad.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Coop/Mod/SaveLoad.cs
+    startLine: 19
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.SaveLoad.SaveGame(TaleWorlds.Core.Game,TaleWorlds.SaveSystem.ISaveDriver)
+  commentId: M:Coop.Mod.SaveLoad.SaveGame(TaleWorlds.Core.Game,TaleWorlds.SaveSystem.ISaveDriver)
+  id: SaveGame(TaleWorlds.Core.Game,TaleWorlds.SaveSystem.ISaveDriver)
+  parent: Coop.Mod.SaveLoad
+  langs:
+  - csharp
+  - vb
+  name: SaveGame(Game, ISaveDriver)
+  nameWithType: SaveLoad.SaveGame(Game, ISaveDriver)
+  fullName: Coop.Mod.SaveLoad.SaveGame(TaleWorlds.Core.Game, TaleWorlds.SaveSystem.ISaveDriver)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/SaveLoad.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SaveGame
+    path: ../source/Coop/Mod/SaveLoad.cs
+    startLine: 21
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public static SaveGameData SaveGame(Game game, ISaveDriver driver)
+    parameters:
+    - id: game
+      type: TaleWorlds.Core.Game
+    - id: driver
+      type: TaleWorlds.SaveSystem.ISaveDriver
+    return:
+      type: Coop.Mod.SaveGameData
+    content.vb: Public Shared Function SaveGame(game As Game, driver As ISaveDriver) As SaveGameData
+  overload: Coop.Mod.SaveLoad.SaveGame*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Coop.Mod.SaveLoad.LoadGame(TaleWorlds.SaveSystem.Load.LoadResult)
+  commentId: M:Coop.Mod.SaveLoad.LoadGame(TaleWorlds.SaveSystem.Load.LoadResult)
+  id: LoadGame(TaleWorlds.SaveSystem.Load.LoadResult)
+  parent: Coop.Mod.SaveLoad
+  langs:
+  - csharp
+  - vb
+  name: LoadGame(LoadResult)
+  nameWithType: SaveLoad.LoadGame(LoadResult)
+  fullName: Coop.Mod.SaveLoad.LoadGame(TaleWorlds.SaveSystem.Load.LoadResult)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/SaveLoad.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: LoadGame
+    path: ../source/Coop/Mod/SaveLoad.cs
+    startLine: 45
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public static void LoadGame(LoadResult loadResult)
+    parameters:
+    - id: loadResult
+      type: TaleWorlds.SaveSystem.Load.LoadResult
+    content.vb: Public Shared Sub LoadGame(loadResult As LoadResult)
+  overload: Coop.Mod.SaveLoad.LoadGame*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Coop.Mod.SaveLoad.LoadSaveGameData(TaleWorlds.SaveSystem.ISaveDriver)
+  commentId: M:Coop.Mod.SaveLoad.LoadSaveGameData(TaleWorlds.SaveSystem.ISaveDriver)
+  id: LoadSaveGameData(TaleWorlds.SaveSystem.ISaveDriver)
+  parent: Coop.Mod.SaveLoad
+  langs:
+  - csharp
+  - vb
+  name: LoadSaveGameData(ISaveDriver)
+  nameWithType: SaveLoad.LoadSaveGameData(ISaveDriver)
+  fullName: Coop.Mod.SaveLoad.LoadSaveGameData(TaleWorlds.SaveSystem.ISaveDriver)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/SaveLoad.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: LoadSaveGameData
+    path: ../source/Coop/Mod/SaveLoad.cs
+    startLine: 56
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public static LoadGameResult LoadSaveGameData(ISaveDriver driver)
+    parameters:
+    - id: driver
+      type: TaleWorlds.SaveSystem.ISaveDriver
+    return:
+      type: TaleWorlds.Core.LoadGameResult
+    content.vb: Public Shared Function LoadSaveGameData(driver As ISaveDriver) As LoadGameResult
+  overload: Coop.Mod.SaveLoad.LoadSaveGameData*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Coop.Mod.SaveLoad.CheckModules(TaleWorlds.SaveSystem.MetaData,System.Collections.Generic.List{ModuleInfo})
+  commentId: M:Coop.Mod.SaveLoad.CheckModules(TaleWorlds.SaveSystem.MetaData,System.Collections.Generic.List{ModuleInfo})
+  id: CheckModules(TaleWorlds.SaveSystem.MetaData,System.Collections.Generic.List{ModuleInfo})
+  parent: Coop.Mod.SaveLoad
+  langs:
+  - csharp
+  - vb
+  name: CheckModules(MetaData, List<ModuleInfo>)
+  nameWithType: SaveLoad.CheckModules(MetaData, List<ModuleInfo>)
+  fullName: Coop.Mod.SaveLoad.CheckModules(TaleWorlds.SaveSystem.MetaData, System.Collections.Generic.List<ModuleInfo>)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/SaveLoad.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CheckModules
+    path: ../source/Coop/Mod/SaveLoad.cs
+    startLine: 72
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: static List<ModuleCheckResult> CheckModules(MetaData fileMetaData, List<ModuleInfo> loadedModules)
+    parameters:
+    - id: fileMetaData
+      type: TaleWorlds.SaveSystem.MetaData
+    - id: loadedModules
+      type: System.Collections.Generic.List{ModuleInfo}
+    return:
+      type: System.Collections.Generic.List{TaleWorlds.Core.ModuleCheckResult}
+    content.vb: Shared Function CheckModules(fileMetaData As MetaData, loadedModules As List(Of ModuleInfo)) As List(Of ModuleCheckResult)
+  overload: Coop.Mod.SaveLoad.CheckModules*
+  nameWithType.vb: SaveLoad.CheckModules(MetaData, List(Of ModuleInfo))
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+  fullName.vb: Coop.Mod.SaveLoad.CheckModules(TaleWorlds.SaveSystem.MetaData, System.Collections.Generic.List(Of ModuleInfo))
+  name.vb: CheckModules(MetaData, List(Of ModuleInfo))
+- uid: Coop.Mod.SaveLoad.GetModules
+  commentId: M:Coop.Mod.SaveLoad.GetModules
+  id: GetModules
+  parent: Coop.Mod.SaveLoad
+  langs:
+  - csharp
+  - vb
+  name: GetModules()
+  nameWithType: SaveLoad.GetModules()
+  fullName: Coop.Mod.SaveLoad.GetModules()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/SaveLoad.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetModules
+    path: ../source/Coop/Mod/SaveLoad.cs
+    startLine: 83
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: static List<ModuleInfo> GetModules()
+    return:
+      type: System.Collections.Generic.List{ModuleInfo}
+    content.vb: Shared Function GetModules As List(Of ModuleInfo)
+  overload: Coop.Mod.SaveLoad.GetModules*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Coop.Mod.SaveLoad.GetMetaData
+  commentId: M:Coop.Mod.SaveLoad.GetMetaData
+  id: GetMetaData
+  parent: Coop.Mod.SaveLoad
+  langs:
+  - csharp
+  - vb
+  name: GetMetaData()
+  nameWithType: SaveLoad.GetMetaData()
+  fullName: Coop.Mod.SaveLoad.GetMetaData()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/SaveLoad.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetMetaData
+    path: ../source/Coop/Mod/SaveLoad.cs
+    startLine: 96
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: static MetaData GetMetaData()
+    return:
+      type: TaleWorlds.SaveSystem.MetaData
+    content.vb: Shared Function GetMetaData As MetaData
+  overload: Coop.Mod.SaveLoad.GetMetaData*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+references:
+- uid: Coop.Mod
+  commentId: N:Coop.Mod
+  name: Coop.Mod
+  nameWithType: Coop.Mod
+  fullName: Coop.Mod
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: Coop.Mod.SaveLoad.SaveGame*
+  commentId: Overload:Coop.Mod.SaveLoad.SaveGame
+  name: SaveGame
+  nameWithType: SaveLoad.SaveGame
+  fullName: Coop.Mod.SaveLoad.SaveGame
+- uid: TaleWorlds.Core.Game
+  commentId: T:TaleWorlds.Core.Game
+  parent: TaleWorlds.Core
+  isExternal: true
+  name: Game
+  nameWithType: Game
+  fullName: TaleWorlds.Core.Game
+- uid: TaleWorlds.SaveSystem.ISaveDriver
+  commentId: T:TaleWorlds.SaveSystem.ISaveDriver
+  parent: TaleWorlds.SaveSystem
+  isExternal: true
+  name: ISaveDriver
+  nameWithType: ISaveDriver
+  fullName: TaleWorlds.SaveSystem.ISaveDriver
+- uid: Coop.Mod.SaveGameData
+  commentId: T:Coop.Mod.SaveGameData
+  parent: Coop.Mod
+  name: SaveGameData
+  nameWithType: SaveGameData
+  fullName: Coop.Mod.SaveGameData
+- uid: TaleWorlds.Core
+  commentId: N:TaleWorlds.Core
+  isExternal: true
+  name: TaleWorlds.Core
+  nameWithType: TaleWorlds.Core
+  fullName: TaleWorlds.Core
+- uid: TaleWorlds.SaveSystem
+  commentId: N:TaleWorlds.SaveSystem
+  isExternal: true
+  name: TaleWorlds.SaveSystem
+  nameWithType: TaleWorlds.SaveSystem
+  fullName: TaleWorlds.SaveSystem
+- uid: Coop.Mod.SaveLoad.LoadGame*
+  commentId: Overload:Coop.Mod.SaveLoad.LoadGame
+  name: LoadGame
+  nameWithType: SaveLoad.LoadGame
+  fullName: Coop.Mod.SaveLoad.LoadGame
+- uid: TaleWorlds.SaveSystem.Load.LoadResult
+  commentId: T:TaleWorlds.SaveSystem.Load.LoadResult
+  parent: TaleWorlds.SaveSystem.Load
+  isExternal: true
+  name: LoadResult
+  nameWithType: LoadResult
+  fullName: TaleWorlds.SaveSystem.Load.LoadResult
+- uid: TaleWorlds.SaveSystem.Load
+  commentId: N:TaleWorlds.SaveSystem.Load
+  isExternal: true
+  name: TaleWorlds.SaveSystem.Load
+  nameWithType: TaleWorlds.SaveSystem.Load
+  fullName: TaleWorlds.SaveSystem.Load
+- uid: Coop.Mod.SaveLoad.LoadSaveGameData*
+  commentId: Overload:Coop.Mod.SaveLoad.LoadSaveGameData
+  name: LoadSaveGameData
+  nameWithType: SaveLoad.LoadSaveGameData
+  fullName: Coop.Mod.SaveLoad.LoadSaveGameData
+- uid: TaleWorlds.Core.LoadGameResult
+  commentId: T:TaleWorlds.Core.LoadGameResult
+  parent: TaleWorlds.Core
+  isExternal: true
+  name: LoadGameResult
+  nameWithType: LoadGameResult
+  fullName: TaleWorlds.Core.LoadGameResult
+- uid: Coop.Mod.SaveLoad.CheckModules*
+  commentId: Overload:Coop.Mod.SaveLoad.CheckModules
+  name: CheckModules
+  nameWithType: SaveLoad.CheckModules
+  fullName: Coop.Mod.SaveLoad.CheckModules
+- uid: TaleWorlds.SaveSystem.MetaData
+  commentId: T:TaleWorlds.SaveSystem.MetaData
+  parent: TaleWorlds.SaveSystem
+  isExternal: true
+  name: MetaData
+  nameWithType: MetaData
+  fullName: TaleWorlds.SaveSystem.MetaData
+- uid: System.Collections.Generic.List{ModuleInfo}
+  commentId: T:System.Collections.Generic.List{ModuleInfo}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  name: List<ModuleInfo>
+  nameWithType: List<ModuleInfo>
+  fullName: System.Collections.Generic.List<ModuleInfo>
+  nameWithType.vb: List(Of ModuleInfo)
+  fullName.vb: System.Collections.Generic.List(Of ModuleInfo)
+  name.vb: List(Of ModuleInfo)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: ModuleInfo
+    name: ModuleInfo
+    nameWithType: ModuleInfo
+    fullName: ModuleInfo
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: ModuleInfo
+    name: ModuleInfo
+    nameWithType: ModuleInfo
+    fullName: ModuleInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.List{TaleWorlds.Core.ModuleCheckResult}
+  commentId: T:System.Collections.Generic.List{TaleWorlds.Core.ModuleCheckResult}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  name: List<ModuleCheckResult>
+  nameWithType: List<ModuleCheckResult>
+  fullName: System.Collections.Generic.List<TaleWorlds.Core.ModuleCheckResult>
+  nameWithType.vb: List(Of ModuleCheckResult)
+  fullName.vb: System.Collections.Generic.List(Of TaleWorlds.Core.ModuleCheckResult)
+  name.vb: List(Of ModuleCheckResult)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.Core.ModuleCheckResult
+    name: ModuleCheckResult
+    nameWithType: ModuleCheckResult
+    fullName: TaleWorlds.Core.ModuleCheckResult
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.Core.ModuleCheckResult
+    name: ModuleCheckResult
+    nameWithType: ModuleCheckResult
+    fullName: TaleWorlds.Core.ModuleCheckResult
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: Coop.Mod.SaveLoad.GetModules*
+  commentId: Overload:Coop.Mod.SaveLoad.GetModules
+  name: GetModules
+  nameWithType: SaveLoad.GetModules
+  fullName: Coop.Mod.SaveLoad.GetModules
+- uid: Coop.Mod.SaveLoad.GetMetaData*
+  commentId: Overload:Coop.Mod.SaveLoad.GetMetaData
+  name: GetMetaData
+  nameWithType: SaveLoad.GetMetaData
+  fullName: Coop.Mod.SaveLoad.GetMetaData

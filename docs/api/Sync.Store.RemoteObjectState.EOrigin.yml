@@ -1,0 +1,112 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync.Store.RemoteObjectState.EOrigin
+  commentId: T:Sync.Store.RemoteObjectState.EOrigin
+  id: RemoteObjectState.EOrigin
+  parent: Sync.Store
+  children:
+  - Sync.Store.RemoteObjectState.EOrigin.Local
+  - Sync.Store.RemoteObjectState.EOrigin.Remote
+  langs:
+  - csharp
+  - vb
+  name: RemoteObjectState.EOrigin
+  nameWithType: RemoteObjectState.EOrigin
+  fullName: Sync.Store.RemoteObjectState.EOrigin
+  type: Enum
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EOrigin
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 14
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public enum EOrigin
+    content.vb: Public Enum EOrigin
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: Sync.Store.RemoteObjectState.EOrigin.Local
+  commentId: F:Sync.Store.RemoteObjectState.EOrigin.Local
+  id: Local
+  parent: Sync.Store.RemoteObjectState.EOrigin
+  langs:
+  - csharp
+  - vb
+  name: Local
+  nameWithType: RemoteObjectState.EOrigin.Local
+  fullName: Sync.Store.RemoteObjectState.EOrigin.Local
+  type: Field
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Local
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 16
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: Local = 0
+    return:
+      type: Sync.Store.RemoteObjectState.EOrigin
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Sync.Store.RemoteObjectState.EOrigin.Remote
+  commentId: F:Sync.Store.RemoteObjectState.EOrigin.Remote
+  id: Remote
+  parent: Sync.Store.RemoteObjectState.EOrigin
+  langs:
+  - csharp
+  - vb
+  name: Remote
+  nameWithType: RemoteObjectState.EOrigin.Remote
+  fullName: Sync.Store.RemoteObjectState.EOrigin.Remote
+  type: Field
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Remote
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 17
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: Remote = 1
+    return:
+      type: Sync.Store.RemoteObjectState.EOrigin
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Sync.Store
+  commentId: N:Sync.Store
+  name: Sync.Store
+  nameWithType: Sync.Store
+  fullName: Sync.Store
+- uid: Sync.Store.RemoteObjectState.EOrigin
+  commentId: T:Sync.Store.RemoteObjectState.EOrigin
+  parent: Sync.Store
+  name: RemoteObjectState.EOrigin
+  nameWithType: RemoteObjectState.EOrigin
+  fullName: Sync.Store.RemoteObjectState.EOrigin

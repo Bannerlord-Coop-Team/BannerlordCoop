@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -73,8 +72,7 @@
   
   <h1 id="Sync_Store_SharedRemoteStore" data-uid="Sync.Store.SharedRemoteStore" class="text-break">Class SharedRemoteStore
   </h1>
-  <div class="markdown level0 summary">
-Implements a store that is synchronized to multiple remote stores trough different connections.
+  <div class="markdown level0 summary"><p>Implements a store that is synchronized to multiple remote stores trough different connections.</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -154,14 +152,158 @@ Implements a store that is synchronized to multiple remote stores trough differe
   </h3>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Store_SharedRemoteStore_Logger.md&amp;value=---%0Auid%3A%20Sync.Store.SharedRemoteStore.Logger%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Store/SharedRemoteStore.cs/#L16">View Source</a>
+  </span>
+  <h4 id="Sync_Store_SharedRemoteStore_Logger" data-uid="Sync.Store.SharedRemoteStore.Logger">Logger</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static readonly Logger Logger</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">NLog.Logger</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Store_SharedRemoteStore_m_Data.md&amp;value=---%0Auid%3A%20Sync.Store.SharedRemoteStore.m_Data%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Store/SharedRemoteStore.cs/#L17">View Source</a>
+  </span>
+  <h4 id="Sync_Store_SharedRemoteStore_m_Data" data-uid="Sync.Store.SharedRemoteStore.m_Data">m_Data</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly Dictionary&lt;ObjectId, object&gt; m_Data</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Dictionary</span>&lt;<a class="xref" href="Sync.Store.ObjectId.html">ObjectId</a>, <span class="xref">System.Object</span>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Store_SharedRemoteStore_m_PendingAcks.md&amp;value=---%0Auid%3A%20Sync.Store.SharedRemoteStore.m_PendingAcks%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Store/SharedRemoteStore.cs/#L19">View Source</a>
+  </span>
+  <h4 id="Sync_Store_SharedRemoteStore_m_PendingAcks" data-uid="Sync.Store.SharedRemoteStore.m_PendingAcks">m_PendingAcks</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly Dictionary&lt;ObjectId, SharedRemoteStore.PendingResponse&gt; m_PendingAcks</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Dictionary</span>&lt;<a class="xref" href="Sync.Store.ObjectId.html">ObjectId</a>, <a class="xref" href="Sync.Store.SharedRemoteStore.PendingResponse.html">SharedRemoteStore.PendingResponse</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Store_SharedRemoteStore_m_Serializer.md&amp;value=---%0Auid%3A%20Sync.Store.SharedRemoteStore.m_Serializer%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Store/SharedRemoteStore.cs/#L22">View Source</a>
+  </span>
+  <h4 id="Sync_Store_SharedRemoteStore_m_Serializer" data-uid="Sync.Store.SharedRemoteStore.m_Serializer">m_Serializer</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly StoreSerializer m_Serializer</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Store.StoreSerializer.html">StoreSerializer</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Store_SharedRemoteStore_m_Stores.md&amp;value=---%0Auid%3A%20Sync.Store.SharedRemoteStore.m_Stores%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Store/SharedRemoteStore.cs/#L24">View Source</a>
+  </span>
+  <h4 id="Sync_Store_SharedRemoteStore_m_Stores" data-uid="Sync.Store.SharedRemoteStore.m_Stores">m_Stores</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly Dictionary&lt;ConnectionBase, RemoteStore&gt; m_Stores</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Dictionary</span>&lt;<a class="xref" href="Network.Infrastructure.ConnectionBase.html">ConnectionBase</a>, <a class="xref" href="Sync.Store.RemoteStore.html">RemoteStore</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Store_SharedRemoteStore_OnObjectDistributed.md&amp;value=---%0Auid%3A%20Sync.Store.SharedRemoteStore.OnObjectDistributed%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Store/SharedRemoteStore.cs/#L30">View Source</a>
   </span>
   <h4 id="Sync_Store_SharedRemoteStore_OnObjectDistributed" data-uid="Sync.Store.SharedRemoteStore.OnObjectDistributed">OnObjectDistributed</h4>
-  <div class="markdown level1 summary">
-Triggered when an object has been distributed to all clients.
+  <div class="markdown level1 summary"><p>Triggered when an object has been distributed to all clients.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -298,6 +440,105 @@ Triggered when an object has been distributed to all clients.
   </table>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Store_SharedRemoteStore_ObjectAcknowledged_Network_Infrastructure_ConnectionBase_Sync_Store_ObjectId_.md&amp;value=---%0Auid%3A%20Sync.Store.SharedRemoteStore.ObjectAcknowledged(Network.Infrastructure.ConnectionBase%2CSync.Store.ObjectId)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Store/SharedRemoteStore.cs/#L83">View Source</a>
+  </span>
+  <a id="Sync_Store_SharedRemoteStore_ObjectAcknowledged_" data-uid="Sync.Store.SharedRemoteStore.ObjectAcknowledged*"></a>
+  <h4 id="Sync_Store_SharedRemoteStore_ObjectAcknowledged_Network_Infrastructure_ConnectionBase_Sync_Store_ObjectId_" data-uid="Sync.Store.SharedRemoteStore.ObjectAcknowledged(Network.Infrastructure.ConnectionBase,Sync.Store.ObjectId)">ObjectAcknowledged(ConnectionBase, ObjectId)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void ObjectAcknowledged(ConnectionBase sender, ObjectId id)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Network.Infrastructure.ConnectionBase.html">ConnectionBase</a></td>
+        <td><span class="parametername">sender</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="Sync.Store.ObjectId.html">ObjectId</a></td>
+        <td><span class="parametername">id</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Store_SharedRemoteStore_RemoteObjectAdded_Network_Infrastructure_ConnectionBase_Sync_Store_ObjectId_System_Byte___System_Object_.md&amp;value=---%0Auid%3A%20Sync.Store.SharedRemoteStore.RemoteObjectAdded(Network.Infrastructure.ConnectionBase%2CSync.Store.ObjectId%2CSystem.Byte%5B%5D%2CSystem.Object)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Store/SharedRemoteStore.cs/#L111">View Source</a>
+  </span>
+  <a id="Sync_Store_SharedRemoteStore_RemoteObjectAdded_" data-uid="Sync.Store.SharedRemoteStore.RemoteObjectAdded*"></a>
+  <h4 id="Sync_Store_SharedRemoteStore_RemoteObjectAdded_Network_Infrastructure_ConnectionBase_Sync_Store_ObjectId_System_Byte___System_Object_" data-uid="Sync.Store.SharedRemoteStore.RemoteObjectAdded(Network.Infrastructure.ConnectionBase,Sync.Store.ObjectId,System.Byte[],System.Object)">RemoteObjectAdded(ConnectionBase, ObjectId, Byte[], Object)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool RemoteObjectAdded(ConnectionBase sender, ObjectId id, byte[] payload, object obj)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Network.Infrastructure.ConnectionBase.html">ConnectionBase</a></td>
+        <td><span class="parametername">sender</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="Sync.Store.ObjectId.html">ObjectId</a></td>
+        <td><span class="parametername">id</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Byte</span>[]</td>
+        <td><span class="parametername">payload</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span></td>
+        <td><span class="parametername">obj</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Store_SharedRemoteStore_Remove_Sync_Store_ObjectId_.md&amp;value=---%0Auid%3A%20Sync.Store.SharedRemoteStore.Remove(Sync.Store.ObjectId)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
@@ -394,9 +635,22 @@ Triggered when an object has been distributed to all clients.
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

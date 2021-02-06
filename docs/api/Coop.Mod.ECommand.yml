@@ -1,0 +1,77 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.ECommand
+  commentId: T:Coop.Mod.ECommand
+  id: ECommand
+  parent: Coop.Mod
+  children:
+  - Coop.Mod.ECommand.InitialWorldState
+  langs:
+  - csharp
+  - vb
+  name: ECommand
+  nameWithType: ECommand
+  fullName: Coop.Mod.ECommand
+  type: Enum
+  source:
+    remote:
+      path: source/Coop/Mod/GameData.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ECommand
+    path: ../source/Coop/Mod/GameData.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: enum ECommand
+    content.vb: Enum ECommand
+  modifiers.csharp:
+  - enum
+  modifiers.vb:
+  - Enum
+- uid: Coop.Mod.ECommand.InitialWorldState
+  commentId: F:Coop.Mod.ECommand.InitialWorldState
+  id: InitialWorldState
+  parent: Coop.Mod.ECommand
+  langs:
+  - csharp
+  - vb
+  name: InitialWorldState
+  nameWithType: ECommand.InitialWorldState
+  fullName: Coop.Mod.ECommand.InitialWorldState
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/GameData.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: InitialWorldState
+    path: ../source/Coop/Mod/GameData.cs
+    startLine: 14
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: InitialWorldState = 0
+    return:
+      type: Coop.Mod.ECommand
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Coop.Mod
+  commentId: N:Coop.Mod
+  name: Coop.Mod
+  nameWithType: Coop.Mod
+  fullName: Coop.Mod
+- uid: Coop.Mod.ECommand
+  commentId: T:Coop.Mod.ECommand
+  parent: Coop.Mod
+  name: ECommand
+  nameWithType: ECommand
+  fullName: Coop.Mod.ECommand

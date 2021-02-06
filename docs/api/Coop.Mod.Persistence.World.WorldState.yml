@@ -1,0 +1,320 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Persistence.World.WorldState
+  commentId: T:Coop.Mod.Persistence.World.WorldState
+  id: WorldState
+  parent: Coop.Mod.Persistence.World
+  children:
+  - Coop.Mod.Persistence.World.WorldState.CampaignTimeTicks
+  - Coop.Mod.Persistence.World.WorldState.PropertyChanged
+  - Coop.Mod.Persistence.World.WorldState.TimeControl
+  - Coop.Mod.Persistence.World.WorldState.TimeControlLock
+  - Coop.Mod.Persistence.World.WorldState.ToString
+  langs:
+  - csharp
+  - vb
+  name: WorldState
+  nameWithType: WorldState
+  fullName: Coop.Mod.Persistence.World.WorldState
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: WorldState
+    path: ../source/Coop/Mod/Persistence/World/WorldState.cs
+    startLine: 9
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  summary: "\nGlobal world state.\n"
+  example: []
+  syntax:
+    content: 'public class WorldState : RailState, INotifyPropertyChanged'
+    content.vb: >-
+      Public Class WorldState
+          Inherits RailState
+          Implements INotifyPropertyChanged
+  inheritance:
+  - System.Object
+  implements:
+  - System.ComponentModel.INotifyPropertyChanged
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Persistence.World.WorldState.PropertyChanged
+  commentId: E:Coop.Mod.Persistence.World.WorldState.PropertyChanged
+  id: PropertyChanged
+  parent: Coop.Mod.Persistence.World.WorldState
+  langs:
+  - csharp
+  - vb
+  name: PropertyChanged
+  nameWithType: WorldState.PropertyChanged
+  fullName: Coop.Mod.Persistence.World.WorldState.PropertyChanged
+  type: Event
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: PropertyChanged
+    path: ../source/Coop/Mod/Persistence/World/WorldState.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  syntax:
+    content: public event PropertyChangedEventHandler PropertyChanged
+    return:
+      type: System.ComponentModel.PropertyChangedEventHandler
+    content.vb: Public Event PropertyChanged As PropertyChangedEventHandler
+  implements:
+  - System.ComponentModel.INotifyPropertyChanged.PropertyChanged
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.World.WorldState.ToString
+  commentId: M:Coop.Mod.Persistence.World.WorldState.ToString
+  id: ToString
+  parent: Coop.Mod.Persistence.World.WorldState
+  langs:
+  - csharp
+  - vb
+  name: ToString()
+  nameWithType: WorldState.ToString()
+  fullName: Coop.Mod.Persistence.World.WorldState.ToString()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ToString
+    path: ../source/Coop/Mod/Persistence/World/WorldState.cs
+    startLine: 14
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  syntax:
+    content: public override string ToString()
+    return:
+      type: System.String
+    content.vb: Public Overrides Function ToString As String
+  overload: Coop.Mod.Persistence.World.WorldState.ToString*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Coop.Mod.Persistence.World.WorldState.TimeControl
+  commentId: P:Coop.Mod.Persistence.World.WorldState.TimeControl
+  id: TimeControl
+  parent: Coop.Mod.Persistence.World.WorldState
+  langs:
+  - csharp
+  - vb
+  name: TimeControl
+  nameWithType: WorldState.TimeControl
+  fullName: Coop.Mod.Persistence.World.WorldState.TimeControl
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TimeControl
+    path: ../source/Coop/Mod/Persistence/World/WorldState.cs
+    startLine: 20
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  syntax:
+    content: public CampaignTimeControlMode TimeControl { get; set; }
+    parameters: []
+    return:
+      type: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    content.vb: Public Property TimeControl As CampaignTimeControlMode
+  overload: Coop.Mod.Persistence.World.WorldState.TimeControl*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.World.WorldState.TimeControlLock
+  commentId: P:Coop.Mod.Persistence.World.WorldState.TimeControlLock
+  id: TimeControlLock
+  parent: Coop.Mod.Persistence.World.WorldState
+  langs:
+  - csharp
+  - vb
+  name: TimeControlLock
+  nameWithType: WorldState.TimeControlLock
+  fullName: Coop.Mod.Persistence.World.WorldState.TimeControlLock
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TimeControlLock
+    path: ../source/Coop/Mod/Persistence/World/WorldState.cs
+    startLine: 22
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  syntax:
+    content: public bool TimeControlLock { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property TimeControlLock As Boolean
+  overload: Coop.Mod.Persistence.World.WorldState.TimeControlLock*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.World.WorldState.CampaignTimeTicks
+  commentId: P:Coop.Mod.Persistence.World.WorldState.CampaignTimeTicks
+  id: CampaignTimeTicks
+  parent: Coop.Mod.Persistence.World.WorldState
+  langs:
+  - csharp
+  - vb
+  name: CampaignTimeTicks
+  nameWithType: WorldState.CampaignTimeTicks
+  fullName: Coop.Mod.Persistence.World.WorldState.CampaignTimeTicks
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CampaignTimeTicks
+    path: ../source/Coop/Mod/Persistence/World/WorldState.cs
+    startLine: 24
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  syntax:
+    content: public long CampaignTimeTicks { get; set; }
+    parameters: []
+    return:
+      type: System.Int64
+    content.vb: Public Property CampaignTimeTicks As Long
+  overload: Coop.Mod.Persistence.World.WorldState.CampaignTimeTicks*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.Mod.Persistence.World
+  commentId: N:Coop.Mod.Persistence.World
+  name: Coop.Mod.Persistence.World
+  nameWithType: Coop.Mod.Persistence.World
+  fullName: Coop.Mod.Persistence.World
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.ComponentModel.INotifyPropertyChanged
+  commentId: T:System.ComponentModel.INotifyPropertyChanged
+  parent: System.ComponentModel
+  isExternal: true
+  name: INotifyPropertyChanged
+  nameWithType: INotifyPropertyChanged
+  fullName: System.ComponentModel.INotifyPropertyChanged
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.ComponentModel
+  commentId: N:System.ComponentModel
+  isExternal: true
+  name: System.ComponentModel
+  nameWithType: System.ComponentModel
+  fullName: System.ComponentModel
+- uid: System.ComponentModel.INotifyPropertyChanged.PropertyChanged
+  commentId: E:System.ComponentModel.INotifyPropertyChanged.PropertyChanged
+  parent: System.ComponentModel.INotifyPropertyChanged
+  isExternal: true
+  name: PropertyChanged
+  nameWithType: INotifyPropertyChanged.PropertyChanged
+  fullName: System.ComponentModel.INotifyPropertyChanged.PropertyChanged
+- uid: System.ComponentModel.PropertyChangedEventHandler
+  commentId: T:System.ComponentModel.PropertyChangedEventHandler
+  parent: System.ComponentModel
+  isExternal: true
+  name: PropertyChangedEventHandler
+  nameWithType: PropertyChangedEventHandler
+  fullName: System.ComponentModel.PropertyChangedEventHandler
+- uid: Coop.Mod.Persistence.World.WorldState.ToString*
+  commentId: Overload:Coop.Mod.Persistence.World.WorldState.ToString
+  name: ToString
+  nameWithType: WorldState.ToString
+  fullName: Coop.Mod.Persistence.World.WorldState.ToString
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String
+- uid: Coop.Mod.Persistence.World.WorldState.TimeControl*
+  commentId: Overload:Coop.Mod.Persistence.World.WorldState.TimeControl
+  name: TimeControl
+  nameWithType: WorldState.TimeControl
+  fullName: Coop.Mod.Persistence.World.WorldState.TimeControl
+- uid: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+  commentId: T:TaleWorlds.CampaignSystem.CampaignTimeControlMode
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: CampaignTimeControlMode
+  nameWithType: CampaignTimeControlMode
+  fullName: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: Coop.Mod.Persistence.World.WorldState.TimeControlLock*
+  commentId: Overload:Coop.Mod.Persistence.World.WorldState.TimeControlLock
+  name: TimeControlLock
+  nameWithType: WorldState.TimeControlLock
+  fullName: Coop.Mod.Persistence.World.WorldState.TimeControlLock
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.Mod.Persistence.World.WorldState.CampaignTimeTicks*
+  commentId: Overload:Coop.Mod.Persistence.World.WorldState.CampaignTimeTicks
+  name: CampaignTimeTicks
+  nameWithType: WorldState.CampaignTimeTicks
+  fullName: Coop.Mod.Persistence.World.WorldState.CampaignTimeTicks
+- uid: System.Int64
+  commentId: T:System.Int64
+  parent: System
+  isExternal: true
+  name: Int64
+  nameWithType: Int64
+  fullName: System.Int64

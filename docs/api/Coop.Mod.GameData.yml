@@ -1,0 +1,892 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.GameData
+  commentId: T:Coop.Mod.GameData
+  id: GameData
+  parent: Coop.Mod
+  children:
+  - Coop.Mod.GameData.DeserializeWorldState(System.ArraySegment{System.Byte})
+  - Coop.Mod.GameData.LoadResult
+  - Coop.Mod.GameData.Logger
+  - Coop.Mod.GameData.Receive(System.ArraySegment{System.Byte})
+  - Coop.Mod.GameData.ReceiveWorldState(System.ArraySegment{System.Byte})
+  - Coop.Mod.GameData.RequiresCharacterCreation
+  - Coop.Mod.GameData.SerializeInitialWorldState
+  langs:
+  - csharp
+  - vb
+  name: GameData
+  nameWithType: GameData
+  fullName: Coop.Mod.GameData
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/GameData.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GameData
+    path: ../source/Coop/Mod/GameData.cs
+    startLine: 18
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: 'class GameData : ISaveData'
+    content.vb: >-
+      Class GameData
+          Implements ISaveData
+  inheritance:
+  - System.Object
+  implements:
+  - Network.Infrastructure.ISaveData
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - class
+  modifiers.vb:
+  - Class
+- uid: Coop.Mod.GameData.Logger
+  commentId: F:Coop.Mod.GameData.Logger
+  id: Logger
+  parent: Coop.Mod.GameData
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: GameData.Logger
+  fullName: Coop.Mod.GameData.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/GameData.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Coop/Mod/GameData.cs
+    startLine: 20
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.GameData.RequiresCharacterCreation
+  commentId: P:Coop.Mod.GameData.RequiresCharacterCreation
+  id: RequiresCharacterCreation
+  parent: Coop.Mod.GameData
+  langs:
+  - csharp
+  - vb
+  name: RequiresCharacterCreation
+  nameWithType: GameData.RequiresCharacterCreation
+  fullName: Coop.Mod.GameData.RequiresCharacterCreation
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameData.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RequiresCharacterCreation
+    path: ../source/Coop/Mod/GameData.cs
+    startLine: 22
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public bool RequiresCharacterCreation { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public ReadOnly Property RequiresCharacterCreation As Boolean
+  overload: Coop.Mod.GameData.RequiresCharacterCreation*
+  implements:
+  - Network.Infrastructure.ISaveData.RequiresCharacterCreation
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameData.LoadResult
+  commentId: P:Coop.Mod.GameData.LoadResult
+  id: LoadResult
+  parent: Coop.Mod.GameData
+  langs:
+  - csharp
+  - vb
+  name: LoadResult
+  nameWithType: GameData.LoadResult
+  fullName: Coop.Mod.GameData.LoadResult
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameData.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: LoadResult
+    path: ../source/Coop/Mod/GameData.cs
+    startLine: 24
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public LoadResult LoadResult { get; }
+    parameters: []
+    return:
+      type: TaleWorlds.SaveSystem.Load.LoadResult
+    content.vb: Public ReadOnly Property LoadResult As LoadResult
+  overload: Coop.Mod.GameData.LoadResult*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameData.Receive(System.ArraySegment{System.Byte})
+  commentId: M:Coop.Mod.GameData.Receive(System.ArraySegment{System.Byte})
+  id: Receive(System.ArraySegment{System.Byte})
+  parent: Coop.Mod.GameData
+  langs:
+  - csharp
+  - vb
+  name: Receive(ArraySegment<Byte>)
+  nameWithType: GameData.Receive(ArraySegment<Byte>)
+  fullName: Coop.Mod.GameData.Receive(System.ArraySegment<System.Byte>)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/GameData.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Receive
+    path: ../source/Coop/Mod/GameData.cs
+    startLine: 26
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public bool Receive(ArraySegment<byte> rawData)
+    parameters:
+    - id: rawData
+      type: System.ArraySegment{System.Byte}
+    return:
+      type: System.Boolean
+    content.vb: Public Function Receive(rawData As ArraySegment(Of Byte)) As Boolean
+  overload: Coop.Mod.GameData.Receive*
+  implements:
+  - Network.Infrastructure.ISaveData.Receive(System.ArraySegment{System.Byte})
+  nameWithType.vb: GameData.Receive(ArraySegment(Of Byte))
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Coop.Mod.GameData.Receive(System.ArraySegment(Of System.Byte))
+  name.vb: Receive(ArraySegment(Of Byte))
+- uid: Coop.Mod.GameData.SerializeInitialWorldState
+  commentId: M:Coop.Mod.GameData.SerializeInitialWorldState
+  id: SerializeInitialWorldState
+  parent: Coop.Mod.GameData
+  langs:
+  - csharp
+  - vb
+  name: SerializeInitialWorldState()
+  nameWithType: GameData.SerializeInitialWorldState()
+  fullName: Coop.Mod.GameData.SerializeInitialWorldState()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/GameData.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SerializeInitialWorldState
+    path: ../source/Coop/Mod/GameData.cs
+    startLine: 48
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public byte[] SerializeInitialWorldState()
+    return:
+      type: System.Byte[]
+    content.vb: Public Function SerializeInitialWorldState As Byte()
+  overload: Coop.Mod.GameData.SerializeInitialWorldState*
+  implements:
+  - Network.Infrastructure.ISaveData.SerializeInitialWorldState
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.GameData.ReceiveWorldState(System.ArraySegment{System.Byte})
+  commentId: M:Coop.Mod.GameData.ReceiveWorldState(System.ArraySegment{System.Byte})
+  id: ReceiveWorldState(System.ArraySegment{System.Byte})
+  parent: Coop.Mod.GameData
+  langs:
+  - csharp
+  - vb
+  name: ReceiveWorldState(ArraySegment<Byte>)
+  nameWithType: GameData.ReceiveWorldState(ArraySegment<Byte>)
+  fullName: Coop.Mod.GameData.ReceiveWorldState(System.ArraySegment<System.Byte>)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/GameData.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ReceiveWorldState
+    path: ../source/Coop/Mod/GameData.cs
+    startLine: 70
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: bool ReceiveWorldState(ArraySegment<byte> rawData)
+    parameters:
+    - id: rawData
+      type: System.ArraySegment{System.Byte}
+    return:
+      type: System.Boolean
+    content.vb: Function ReceiveWorldState(rawData As ArraySegment(Of Byte)) As Boolean
+  overload: Coop.Mod.GameData.ReceiveWorldState*
+  nameWithType.vb: GameData.ReceiveWorldState(ArraySegment(Of Byte))
+  fullName.vb: Coop.Mod.GameData.ReceiveWorldState(System.ArraySegment(Of System.Byte))
+  name.vb: ReceiveWorldState(ArraySegment(Of Byte))
+- uid: Coop.Mod.GameData.DeserializeWorldState(System.ArraySegment{System.Byte})
+  commentId: M:Coop.Mod.GameData.DeserializeWorldState(System.ArraySegment{System.Byte})
+  id: DeserializeWorldState(System.ArraySegment{System.Byte})
+  parent: Coop.Mod.GameData
+  langs:
+  - csharp
+  - vb
+  name: DeserializeWorldState(ArraySegment<Byte>)
+  nameWithType: GameData.DeserializeWorldState(ArraySegment<Byte>)
+  fullName: Coop.Mod.GameData.DeserializeWorldState(System.ArraySegment<System.Byte>)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/GameData.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DeserializeWorldState
+    path: ../source/Coop/Mod/GameData.cs
+    startLine: 100
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: InMemDriver DeserializeWorldState(ArraySegment<byte> rawData)
+    parameters:
+    - id: rawData
+      type: System.ArraySegment{System.Byte}
+    return:
+      type: TaleWorlds.SaveSystem.InMemDriver
+    content.vb: Function DeserializeWorldState(rawData As ArraySegment(Of Byte)) As InMemDriver
+  overload: Coop.Mod.GameData.DeserializeWorldState*
+  nameWithType.vb: GameData.DeserializeWorldState(ArraySegment(Of Byte))
+  fullName.vb: Coop.Mod.GameData.DeserializeWorldState(System.ArraySegment(Of System.Byte))
+  name.vb: DeserializeWorldState(ArraySegment(Of Byte))
+references:
+- uid: Coop.Mod
+  commentId: N:Coop.Mod
+  name: Coop.Mod
+  nameWithType: Coop.Mod
+  fullName: Coop.Mod
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Network.Infrastructure.ISaveData
+  commentId: T:Network.Infrastructure.ISaveData
+  parent: Network.Infrastructure
+  name: ISaveData
+  nameWithType: ISaveData
+  fullName: Network.Infrastructure.ISaveData
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: Coop.Mod.GameData.RequiresCharacterCreation*
+  commentId: Overload:Coop.Mod.GameData.RequiresCharacterCreation
+  name: RequiresCharacterCreation
+  nameWithType: GameData.RequiresCharacterCreation
+  fullName: Coop.Mod.GameData.RequiresCharacterCreation
+- uid: Network.Infrastructure.ISaveData.RequiresCharacterCreation
+  commentId: P:Network.Infrastructure.ISaveData.RequiresCharacterCreation
+  parent: Network.Infrastructure.ISaveData
+  name: RequiresCharacterCreation
+  nameWithType: ISaveData.RequiresCharacterCreation
+  fullName: Network.Infrastructure.ISaveData.RequiresCharacterCreation
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.Mod.GameData.LoadResult*
+  commentId: Overload:Coop.Mod.GameData.LoadResult
+  name: LoadResult
+  nameWithType: GameData.LoadResult
+  fullName: Coop.Mod.GameData.LoadResult
+- uid: TaleWorlds.SaveSystem.Load.LoadResult
+  commentId: T:TaleWorlds.SaveSystem.Load.LoadResult
+  parent: TaleWorlds.SaveSystem.Load
+  isExternal: true
+  name: LoadResult
+  nameWithType: LoadResult
+  fullName: TaleWorlds.SaveSystem.Load.LoadResult
+- uid: TaleWorlds.SaveSystem.Load
+  commentId: N:TaleWorlds.SaveSystem.Load
+  isExternal: true
+  name: TaleWorlds.SaveSystem.Load
+  nameWithType: TaleWorlds.SaveSystem.Load
+  fullName: TaleWorlds.SaveSystem.Load
+- uid: Coop.Mod.GameData.Receive*
+  commentId: Overload:Coop.Mod.GameData.Receive
+  name: Receive
+  nameWithType: GameData.Receive
+  fullName: Coop.Mod.GameData.Receive
+- uid: Network.Infrastructure.ISaveData.Receive(System.ArraySegment{System.Byte})
+  commentId: M:Network.Infrastructure.ISaveData.Receive(System.ArraySegment{System.Byte})
+  parent: Network.Infrastructure.ISaveData
+  isExternal: true
+  name: Receive(ArraySegment<Byte>)
+  nameWithType: ISaveData.Receive(ArraySegment<Byte>)
+  fullName: Network.Infrastructure.ISaveData.Receive(System.ArraySegment<System.Byte>)
+  nameWithType.vb: ISaveData.Receive(ArraySegment(Of Byte))
+  fullName.vb: Network.Infrastructure.ISaveData.Receive(System.ArraySegment(Of System.Byte))
+  name.vb: Receive(ArraySegment(Of Byte))
+  spec.csharp:
+  - uid: Network.Infrastructure.ISaveData.Receive(System.ArraySegment{System.Byte})
+    name: Receive
+    nameWithType: ISaveData.Receive
+    fullName: Network.Infrastructure.ISaveData.Receive
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Network.Infrastructure.ISaveData.Receive(System.ArraySegment{System.Byte})
+    name: Receive
+    nameWithType: ISaveData.Receive
+    fullName: Network.Infrastructure.ISaveData.Receive
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ArraySegment{System.Byte}
+  commentId: T:System.ArraySegment{System.Byte}
+  parent: System
+  definition: System.ArraySegment`1
+  name: ArraySegment<Byte>
+  nameWithType: ArraySegment<Byte>
+  fullName: System.ArraySegment<System.Byte>
+  nameWithType.vb: ArraySegment(Of Byte)
+  fullName.vb: System.ArraySegment(Of System.Byte)
+  name.vb: ArraySegment(Of Byte)
+  spec.csharp:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ArraySegment`1
+  commentId: T:System.ArraySegment`1
+  isExternal: true
+  name: ArraySegment<T>
+  nameWithType: ArraySegment<T>
+  fullName: System.ArraySegment<T>
+  nameWithType.vb: ArraySegment(Of T)
+  fullName.vb: System.ArraySegment(Of T)
+  name.vb: ArraySegment(Of T)
+  spec.csharp:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.GameData.SerializeInitialWorldState*
+  commentId: Overload:Coop.Mod.GameData.SerializeInitialWorldState
+  name: SerializeInitialWorldState
+  nameWithType: GameData.SerializeInitialWorldState
+  fullName: Coop.Mod.GameData.SerializeInitialWorldState
+- uid: Network.Infrastructure.ISaveData.SerializeInitialWorldState
+  commentId: M:Network.Infrastructure.ISaveData.SerializeInitialWorldState
+  parent: Network.Infrastructure.ISaveData
+  name: SerializeInitialWorldState()
+  nameWithType: ISaveData.SerializeInitialWorldState()
+  fullName: Network.Infrastructure.ISaveData.SerializeInitialWorldState()
+  spec.csharp:
+  - uid: Network.Infrastructure.ISaveData.SerializeInitialWorldState
+    name: SerializeInitialWorldState
+    nameWithType: ISaveData.SerializeInitialWorldState
+    fullName: Network.Infrastructure.ISaveData.SerializeInitialWorldState
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Network.Infrastructure.ISaveData.SerializeInitialWorldState
+    name: SerializeInitialWorldState
+    nameWithType: ISaveData.SerializeInitialWorldState
+    fullName: Network.Infrastructure.ISaveData.SerializeInitialWorldState
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Byte[]
+  isExternal: true
+  name: Byte[]
+  nameWithType: Byte[]
+  fullName: System.Byte[]
+  nameWithType.vb: Byte()
+  fullName.vb: System.Byte()
+  name.vb: Byte()
+  spec.csharp:
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  spec.vb:
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+- uid: Coop.Mod.GameData.ReceiveWorldState*
+  commentId: Overload:Coop.Mod.GameData.ReceiveWorldState
+  name: ReceiveWorldState
+  nameWithType: GameData.ReceiveWorldState
+  fullName: Coop.Mod.GameData.ReceiveWorldState
+- uid: Coop.Mod.GameData.DeserializeWorldState*
+  commentId: Overload:Coop.Mod.GameData.DeserializeWorldState
+  name: DeserializeWorldState
+  nameWithType: GameData.DeserializeWorldState
+  fullName: Coop.Mod.GameData.DeserializeWorldState
+- uid: TaleWorlds.SaveSystem.InMemDriver
+  commentId: T:TaleWorlds.SaveSystem.InMemDriver
+  parent: TaleWorlds.SaveSystem
+  isExternal: true
+  name: InMemDriver
+  nameWithType: InMemDriver
+  fullName: TaleWorlds.SaveSystem.InMemDriver
+- uid: TaleWorlds.SaveSystem
+  commentId: N:TaleWorlds.SaveSystem
+  isExternal: true
+  name: TaleWorlds.SaveSystem
+  nameWithType: TaleWorlds.SaveSystem
+  fullName: TaleWorlds.SaveSystem

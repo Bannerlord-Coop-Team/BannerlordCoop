@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -78,68 +77,60 @@
     <h3 id="classes">Classes
   </h3>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.ArgumentFactory.html">ArgumentFactory</a></h4>
-      <section>
-Factory to create the transfer wrapper for an argument in a RPC call.
+      <section><p>Factory to create the transfer wrapper for an argument in a RPC call.</p>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.ArgumentSerializer.html">ArgumentSerializer</a></h4>
-      <section>
-Serializer for <a class="xref" href="Coop.Mod.Persistence.RPC.Argument.html">Argument</a>. It&apos;s important to keep in mind, that the
-serialized payload may never exceed <see cref="!:RailgunNet.RailConfig.MAXSIZE_EVENT"></see>!
+      <section><p>Serializer for <a class="xref" href="Coop.Mod.Persistence.RPC.Argument.html">Argument</a>. It&apos;s important to keep in mind, that the
+serialized payload may never exceed <see cref="!:RailgunNet.RailConfig.MAXSIZE_EVENT"></see>!</p>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.EventBroadcastingQueue.html">EventBroadcastingQueue</a></h4>
-      <section>
-Queue to broadcast events. Sends all events in order and makes sure, that all event
+      <section><p>Queue to broadcast events. Sends all events in order and makes sure, that all event
 arguments can be resolved on the clients. This includes waiting for any pending
-large object transfers.
+large object transfers.</p>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Call.html">EventBroadcastingQueue.Call</a></h4>
       <section></section>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.EventMethodCall.html">EventMethodCall</a></h4>
-      <section>
-RailEvent used to initiate remote procedure calls. The way this event is processed
-differs between client and server:
-- The server acts as a broadcasting relay station. Effectively receiving the event
+      <section><p>RailEvent used to initiate remote procedure calls. The way this event is processed
+differs between client and server:</p>
+<ul>
+<li>The server acts as a broadcasting relay station. Effectively receiving the event
 and forwarding it to all clients (INCLUDING the client that sent the event!).
 Note that the server will delay event execution until all arguments have been
-transferred to all clients.
-- Clients will resolve the call and arguments locally and execute it.
+transferred to all clients.</li>
+<li>Clients will resolve the call and arguments locally and execute it.</li>
+</ul>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSerializer.html">MethodCallSerializer</a></h4>
-      <section>
-Railgun encoders and decoders for the remote procedure calls.
+      <section><p>Railgun encoders and decoders for the remote procedure calls.</p>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.html">MethodCallSyncHandler</a></h4>
-      <section>
-Registers a global call handler for a <a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.html#Coop_Mod_Persistence_RPC_MethodCallSyncHandler_MethodAccess">MethodAccess</a> that sends an
-<a class="xref" href="Coop.Mod.Persistence.RPC.EventMethodCall.html">EventMethodCall</a> to the server.
+      <section><p>Registers a global call handler for a <a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.html#Coop_Mod_Persistence_RPC_MethodCallSyncHandler_MethodAccess">MethodAccess</a> that sends an
+<a class="xref" href="Coop.Mod.Persistence.RPC.EventMethodCall.html">EventMethodCall</a> to the server.</p>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.html">MethodCallSyncHandler.Statistics</a></h4>
       <section></section>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.PendingRequests.html">PendingRequests</a></h4>
       <section></section>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.RPCSyncHandlers.html">RPCSyncHandlers</a></h4>
-      <section>
-Manages a collection of <a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.html">MethodCallSyncHandler</a>.
+      <section><p>Manages a collection of <a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.html">MethodCallSyncHandler</a>.</p>
 </section>
     <h3 id="structs">Structs
   </h3>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.Argument.html">Argument</a></h4>
-      <section>
-Type union for arguments to a RPC.
+      <section><p>Type union for arguments to a RPC.</p>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.MethodCall.html">MethodCall</a></h4>
-      <section>
-Represents a serializable call to a method including all invocation arguments. Method
+      <section><p>Represents a serializable call to a method including all invocation arguments. Method
 pointer, instance and arguments have to resolved before execution. In order to resolve
-a method call refer to <a class="xref" href="Sync.MethodRegistry.html">MethodRegistry</a> and <a class="xref" href="Coop.Mod.Persistence.RPC.ArgumentFactory.html">ArgumentFactory</a>.
+a method call refer to <a class="xref" href="Sync.MethodRegistry.html">MethodRegistry</a> and <a class="xref" href="Coop.Mod.Persistence.RPC.ArgumentFactory.html">ArgumentFactory</a>.</p>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.Trace.html">MethodCallSyncHandler.Statistics.Trace</a></h4>
       <section></section>
     <h3 id="interfaces">Interfaces
   </h3>
       <h4><a class="xref" href="Coop.Mod.Persistence.RPC.IClientAccess.html">IClientAccess</a></h4>
-      <section>
-Interface to access a clients persistence state. 
+      <section><p>Interface to access a clients persistence state. </p>
 </section>
     <h3 id="enums">Enums
   </h3>
@@ -154,9 +145,22 @@ Interface to access a clients persistence state.
                 <ul class="nav">
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

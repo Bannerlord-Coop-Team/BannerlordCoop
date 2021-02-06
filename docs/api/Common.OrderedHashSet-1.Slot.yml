@@ -1,0 +1,515 @@
+### YamlMime:ManagedReference
+items:
+- uid: Common.OrderedHashSet`1.Slot
+  commentId: T:Common.OrderedHashSet`1.Slot
+  id: OrderedHashSet`1.Slot
+  parent: Common
+  children:
+  - Common.OrderedHashSet`1.Slot.hashCode
+  - Common.OrderedHashSet`1.Slot.next
+  - Common.OrderedHashSet`1.Slot.nextOrder
+  - Common.OrderedHashSet`1.Slot.previousOrder
+  - Common.OrderedHashSet`1.Slot.value
+  langs:
+  - csharp
+  - vb
+  name: OrderedHashSet<T>.Slot
+  nameWithType: OrderedHashSet<T>.Slot
+  fullName: Common.OrderedHashSet<T>.Slot
+  type: Struct
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Slot
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 173
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: struct Slot
+    content.vb: Structure Slot
+  inheritedMembers:
+  - System.ValueType.Equals(System.Object)
+  - System.ValueType.GetHashCode
+  - System.ValueType.ToString
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  nameWithType.vb: OrderedHashSet(Of T).Slot
+  modifiers.csharp:
+  - struct
+  modifiers.vb:
+  - Structure
+  fullName.vb: Common.OrderedHashSet(Of T).Slot
+  name.vb: OrderedHashSet(Of T).Slot
+- uid: Common.OrderedHashSet`1.Slot.hashCode
+  commentId: F:Common.OrderedHashSet`1.Slot.hashCode
+  id: hashCode
+  parent: Common.OrderedHashSet`1.Slot
+  langs:
+  - csharp
+  - vb
+  name: hashCode
+  nameWithType: OrderedHashSet<T>.Slot.hashCode
+  fullName: Common.OrderedHashSet<T>.Slot.hashCode
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: hashCode
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 175
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: int hashCode
+    return:
+      type: System.Int32
+    content.vb: hashCode As Integer
+  nameWithType.vb: OrderedHashSet(Of T).Slot.hashCode
+  fullName.vb: Common.OrderedHashSet(Of T).Slot.hashCode
+- uid: Common.OrderedHashSet`1.Slot.value
+  commentId: F:Common.OrderedHashSet`1.Slot.value
+  id: value
+  parent: Common.OrderedHashSet`1.Slot
+  langs:
+  - csharp
+  - vb
+  name: value
+  nameWithType: OrderedHashSet<T>.Slot.value
+  fullName: Common.OrderedHashSet<T>.Slot.value
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: value
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 176
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: T value
+    return:
+      type: '{T}'
+    content.vb: value As T
+  nameWithType.vb: OrderedHashSet(Of T).Slot.value
+  fullName.vb: Common.OrderedHashSet(Of T).Slot.value
+- uid: Common.OrderedHashSet`1.Slot.next
+  commentId: F:Common.OrderedHashSet`1.Slot.next
+  id: next
+  parent: Common.OrderedHashSet`1.Slot
+  langs:
+  - csharp
+  - vb
+  name: next
+  nameWithType: OrderedHashSet<T>.Slot.next
+  fullName: Common.OrderedHashSet<T>.Slot.next
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: next
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 177
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: int next
+    return:
+      type: System.Int32
+    content.vb: next As Integer
+  nameWithType.vb: OrderedHashSet(Of T).Slot.next
+  fullName.vb: Common.OrderedHashSet(Of T).Slot.next
+- uid: Common.OrderedHashSet`1.Slot.nextOrder
+  commentId: F:Common.OrderedHashSet`1.Slot.nextOrder
+  id: nextOrder
+  parent: Common.OrderedHashSet`1.Slot
+  langs:
+  - csharp
+  - vb
+  name: nextOrder
+  nameWithType: OrderedHashSet<T>.Slot.nextOrder
+  fullName: Common.OrderedHashSet<T>.Slot.nextOrder
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: nextOrder
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 178
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: int nextOrder
+    return:
+      type: System.Int32
+    content.vb: nextOrder As Integer
+  nameWithType.vb: OrderedHashSet(Of T).Slot.nextOrder
+  fullName.vb: Common.OrderedHashSet(Of T).Slot.nextOrder
+- uid: Common.OrderedHashSet`1.Slot.previousOrder
+  commentId: F:Common.OrderedHashSet`1.Slot.previousOrder
+  id: previousOrder
+  parent: Common.OrderedHashSet`1.Slot
+  langs:
+  - csharp
+  - vb
+  name: previousOrder
+  nameWithType: OrderedHashSet<T>.Slot.previousOrder
+  fullName: Common.OrderedHashSet<T>.Slot.previousOrder
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: previousOrder
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 179
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: int previousOrder
+    return:
+      type: System.Int32
+    content.vb: previousOrder As Integer
+  nameWithType.vb: OrderedHashSet(Of T).Slot.previousOrder
+  fullName.vb: Common.OrderedHashSet(Of T).Slot.previousOrder
+references:
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: System.ValueType.Equals(System.Object)
+  commentId: M:System.ValueType.Equals(System.Object)
+  parent: System.ValueType
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: ValueType.Equals(Object)
+  fullName: System.ValueType.Equals(System.Object)
+  spec.csharp:
+  - uid: System.ValueType.Equals(System.Object)
+    name: Equals
+    nameWithType: ValueType.Equals
+    fullName: System.ValueType.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.ValueType.Equals(System.Object)
+    name: Equals
+    nameWithType: ValueType.Equals
+    fullName: System.ValueType.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ValueType.GetHashCode
+  commentId: M:System.ValueType.GetHashCode
+  parent: System.ValueType
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: ValueType.GetHashCode()
+  fullName: System.ValueType.GetHashCode()
+  spec.csharp:
+  - uid: System.ValueType.GetHashCode
+    name: GetHashCode
+    nameWithType: ValueType.GetHashCode
+    fullName: System.ValueType.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.ValueType.GetHashCode
+    name: GetHashCode
+    nameWithType: ValueType.GetHashCode
+    fullName: System.ValueType.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ValueType.ToString
+  commentId: M:System.ValueType.ToString
+  parent: System.ValueType
+  isExternal: true
+  name: ToString()
+  nameWithType: ValueType.ToString()
+  fullName: System.ValueType.ToString()
+  spec.csharp:
+  - uid: System.ValueType.ToString
+    name: ToString
+    nameWithType: ValueType.ToString
+    fullName: System.ValueType.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.ValueType.ToString
+    name: ToString
+    nameWithType: ValueType.ToString
+    fullName: System.ValueType.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ValueType
+  commentId: T:System.ValueType
+  parent: System
+  isExternal: true
+  name: ValueType
+  nameWithType: ValueType
+  fullName: System.ValueType
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: '{T}'
+  commentId: '!:T'
+  definition: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: T
+  name: T
+  nameWithType: T
+  fullName: T

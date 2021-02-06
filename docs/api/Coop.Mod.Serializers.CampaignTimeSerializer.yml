@@ -1,0 +1,551 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Serializers.CampaignTimeSerializer
+  commentId: T:Coop.Mod.Serializers.CampaignTimeSerializer
+  id: CampaignTimeSerializer
+  parent: Coop.Mod.Serializers
+  children:
+  - Coop.Mod.Serializers.CampaignTimeSerializer.#ctor(TaleWorlds.CampaignSystem.CampaignTime)
+  - Coop.Mod.Serializers.CampaignTimeSerializer.Deserialize
+  - Coop.Mod.Serializers.CampaignTimeSerializer.numTicks
+  - Coop.Mod.Serializers.CampaignTimeSerializer.numTicksExists
+  langs:
+  - csharp
+  - vb
+  name: CampaignTimeSerializer
+  nameWithType: CampaignTimeSerializer
+  fullName: Coop.Mod.Serializers.CampaignTimeSerializer
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/CampaignTimeSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CampaignTimeSerializer
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/CampaignTimeSerializer.cs
+    startLine: 10
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: >-
+      [Serializable]
+
+      public class CampaignTimeSerializer : ICustomSerializer
+    content.vb: >-
+      <Serializable>
+
+      Public Class CampaignTimeSerializer
+          Implements ICustomSerializer
+  inheritance:
+  - System.Object
+  implements:
+  - Coop.Mod.Serializers.ICustomSerializer
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  attributes:
+  - type: System.SerializableAttribute
+    ctor: System.SerializableAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Serializers.CampaignTimeSerializer.numTicks
+  commentId: F:Coop.Mod.Serializers.CampaignTimeSerializer.numTicks
+  id: numTicks
+  parent: Coop.Mod.Serializers.CampaignTimeSerializer
+  langs:
+  - csharp
+  - vb
+  name: numTicks
+  nameWithType: CampaignTimeSerializer.numTicks
+  fullName: Coop.Mod.Serializers.CampaignTimeSerializer.numTicks
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/CampaignTimeSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: numTicks
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/CampaignTimeSerializer.cs
+    startLine: 13
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: long numTicks
+    return:
+      type: System.Int64
+    content.vb: numTicks As Long
+- uid: Coop.Mod.Serializers.CampaignTimeSerializer.numTicksExists
+  commentId: F:Coop.Mod.Serializers.CampaignTimeSerializer.numTicksExists
+  id: numTicksExists
+  parent: Coop.Mod.Serializers.CampaignTimeSerializer
+  langs:
+  - csharp
+  - vb
+  name: numTicksExists
+  nameWithType: CampaignTimeSerializer.numTicksExists
+  fullName: Coop.Mod.Serializers.CampaignTimeSerializer.numTicksExists
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/CampaignTimeSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: numTicksExists
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/CampaignTimeSerializer.cs
+    startLine: 14
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: bool numTicksExists
+    return:
+      type: System.Boolean
+    content.vb: numTicksExists As Boolean
+- uid: Coop.Mod.Serializers.CampaignTimeSerializer.#ctor(TaleWorlds.CampaignSystem.CampaignTime)
+  commentId: M:Coop.Mod.Serializers.CampaignTimeSerializer.#ctor(TaleWorlds.CampaignSystem.CampaignTime)
+  id: '#ctor(TaleWorlds.CampaignSystem.CampaignTime)'
+  parent: Coop.Mod.Serializers.CampaignTimeSerializer
+  langs:
+  - csharp
+  - vb
+  name: CampaignTimeSerializer(CampaignTime)
+  nameWithType: CampaignTimeSerializer.CampaignTimeSerializer(CampaignTime)
+  fullName: Coop.Mod.Serializers.CampaignTimeSerializer.CampaignTimeSerializer(TaleWorlds.CampaignSystem.CampaignTime)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/CampaignTimeSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/CampaignTimeSerializer.cs
+    startLine: 15
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: public CampaignTimeSerializer(CampaignTime campaignTime)
+    parameters:
+    - id: campaignTime
+      type: TaleWorlds.CampaignSystem.CampaignTime
+    content.vb: Public Sub New(campaignTime As CampaignTime)
+  overload: Coop.Mod.Serializers.CampaignTimeSerializer.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Serializers.CampaignTimeSerializer.Deserialize
+  commentId: M:Coop.Mod.Serializers.CampaignTimeSerializer.Deserialize
+  id: Deserialize
+  parent: Coop.Mod.Serializers.CampaignTimeSerializer
+  langs:
+  - csharp
+  - vb
+  name: Deserialize()
+  nameWithType: CampaignTimeSerializer.Deserialize()
+  fullName: Coop.Mod.Serializers.CampaignTimeSerializer.Deserialize()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/CampaignTimeSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Deserialize
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/CampaignTimeSerializer.cs
+    startLine: 25
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: public object Deserialize()
+    return:
+      type: System.Object
+    content.vb: Public Function Deserialize As Object
+  overload: Coop.Mod.Serializers.CampaignTimeSerializer.Deserialize*
+  implements:
+  - Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.Mod.Serializers
+  commentId: N:Coop.Mod.Serializers
+  name: Coop.Mod.Serializers
+  nameWithType: Coop.Mod.Serializers
+  fullName: Coop.Mod.Serializers
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Coop.Mod.Serializers.ICustomSerializer
+  commentId: T:Coop.Mod.Serializers.ICustomSerializer
+  parent: Coop.Mod.Serializers
+  name: ICustomSerializer
+  nameWithType: ICustomSerializer
+  fullName: Coop.Mod.Serializers.ICustomSerializer
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Int64
+  commentId: T:System.Int64
+  parent: System
+  isExternal: true
+  name: Int64
+  nameWithType: Int64
+  fullName: System.Int64
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.Mod.Serializers.CampaignTimeSerializer.#ctor*
+  commentId: Overload:Coop.Mod.Serializers.CampaignTimeSerializer.#ctor
+  name: CampaignTimeSerializer
+  nameWithType: CampaignTimeSerializer.CampaignTimeSerializer
+  fullName: Coop.Mod.Serializers.CampaignTimeSerializer.CampaignTimeSerializer
+- uid: TaleWorlds.CampaignSystem.CampaignTime
+  commentId: T:TaleWorlds.CampaignSystem.CampaignTime
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: CampaignTime
+  nameWithType: CampaignTime
+  fullName: TaleWorlds.CampaignSystem.CampaignTime
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: Coop.Mod.Serializers.CampaignTimeSerializer.Deserialize*
+  commentId: Overload:Coop.Mod.Serializers.CampaignTimeSerializer.Deserialize
+  name: Deserialize
+  nameWithType: CampaignTimeSerializer.Deserialize
+  fullName: Coop.Mod.Serializers.CampaignTimeSerializer.Deserialize
+- uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  commentId: M:Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  parent: Coop.Mod.Serializers.ICustomSerializer
+  name: Deserialize()
+  nameWithType: ICustomSerializer.Deserialize()
+  fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize()
+  spec.csharp:
+  - uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+    name: Deserialize
+    nameWithType: ICustomSerializer.Deserialize
+    fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+    name: Deserialize
+    nameWithType: ICustomSerializer.Deserialize
+    fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )

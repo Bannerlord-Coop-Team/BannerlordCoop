@@ -1,0 +1,167 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.IGameStatePersistence
+  commentId: T:Network.Infrastructure.IGameStatePersistence
+  id: IGameStatePersistence
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment{System.Byte})
+  langs:
+  - csharp
+  - vb
+  name: IGameStatePersistence
+  nameWithType: IGameStatePersistence
+  fullName: Network.Infrastructure.IGameStatePersistence
+  type: Interface
+  source:
+    remote:
+      path: source/Network/Infrastructure/IGameStatePersistence.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IGameStatePersistence
+    path: ../source/Network/Infrastructure/IGameStatePersistence.cs
+    startLine: 4
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public interface IGameStatePersistence
+    content.vb: Public Interface IGameStatePersistence
+  modifiers.csharp:
+  - public
+  - interface
+  modifiers.vb:
+  - Public
+  - Interface
+- uid: Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment{System.Byte})
+  commentId: M:Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment{System.Byte})
+  id: Receive(System.ArraySegment{System.Byte})
+  parent: Network.Infrastructure.IGameStatePersistence
+  langs:
+  - csharp
+  - vb
+  name: Receive(ArraySegment<Byte>)
+  nameWithType: IGameStatePersistence.Receive(ArraySegment<Byte>)
+  fullName: Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment<System.Byte>)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/IGameStatePersistence.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Receive
+    path: ../source/Network/Infrastructure/IGameStatePersistence.cs
+    startLine: 6
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: void Receive(ArraySegment<byte> buffer)
+    parameters:
+    - id: buffer
+      type: System.ArraySegment{System.Byte}
+    content.vb: Sub Receive(buffer As ArraySegment(Of Byte))
+  overload: Network.Infrastructure.IGameStatePersistence.Receive*
+  nameWithType.vb: IGameStatePersistence.Receive(ArraySegment(Of Byte))
+  fullName.vb: Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment(Of System.Byte))
+  name.vb: Receive(ArraySegment(Of Byte))
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: Network.Infrastructure.IGameStatePersistence.Receive*
+  commentId: Overload:Network.Infrastructure.IGameStatePersistence.Receive
+  name: Receive
+  nameWithType: IGameStatePersistence.Receive
+  fullName: Network.Infrastructure.IGameStatePersistence.Receive
+- uid: System.ArraySegment{System.Byte}
+  commentId: T:System.ArraySegment{System.Byte}
+  parent: System
+  definition: System.ArraySegment`1
+  name: ArraySegment<Byte>
+  nameWithType: ArraySegment<Byte>
+  fullName: System.ArraySegment<System.Byte>
+  nameWithType.vb: ArraySegment(Of Byte)
+  fullName.vb: System.ArraySegment(Of System.Byte)
+  name.vb: ArraySegment(Of Byte)
+  spec.csharp:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ArraySegment`1
+  commentId: T:System.ArraySegment`1
+  isExternal: true
+  name: ArraySegment<T>
+  nameWithType: ArraySegment<T>
+  fullName: System.ArraySegment<T>
+  nameWithType.vb: ArraySegment(Of T)
+  fullName.vb: System.ArraySegment(Of T)
+  name.vb: ArraySegment(Of T)
+  spec.csharp:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System

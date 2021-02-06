@@ -1,0 +1,508 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Persistence.World.WorldEntityServer
+  commentId: T:Coop.Mod.Persistence.World.WorldEntityServer
+  id: WorldEntityServer
+  parent: Coop.Mod.Persistence.World
+  children:
+  - Coop.Mod.Persistence.World.WorldEntityServer.#ctor(Coop.Mod.Persistence.IEnvironmentServer)
+  - Coop.Mod.Persistence.World.WorldEntityServer.Logger
+  - Coop.Mod.Persistence.World.WorldEntityServer.m_Environment
+  - Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlMode
+  - Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlModeLock
+  - Coop.Mod.Persistence.World.WorldEntityServer.ToString
+  - Coop.Mod.Persistence.World.WorldEntityServer.UpdateAuthoritative
+  langs:
+  - csharp
+  - vb
+  name: WorldEntityServer
+  nameWithType: WorldEntityServer
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: WorldEntityServer
+    path: ../source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+    startLine: 11
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  summary: "\nSingular instance representing global world state.\n"
+  example: []
+  syntax:
+    content: 'public class WorldEntityServer : RailEntityServer<WorldState>'
+    content.vb: >-
+      Public Class WorldEntityServer
+          Inherits RailEntityServer(Of WorldState)
+  inheritance:
+  - System.Object
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.Logger
+  commentId: F:Coop.Mod.Persistence.World.WorldEntityServer.Logger
+  id: Logger
+  parent: Coop.Mod.Persistence.World.WorldEntityServer
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: WorldEntityServer.Logger
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+    startLine: 13
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.m_Environment
+  commentId: F:Coop.Mod.Persistence.World.WorldEntityServer.m_Environment
+  id: m_Environment
+  parent: Coop.Mod.Persistence.World.WorldEntityServer
+  langs:
+  - csharp
+  - vb
+  name: m_Environment
+  nameWithType: WorldEntityServer.m_Environment
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.m_Environment
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Environment
+    path: ../source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+    startLine: 15
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  syntax:
+    content: readonly IEnvironmentServer m_Environment
+    return:
+      type: Coop.Mod.Persistence.IEnvironmentServer
+    content.vb: ReadOnly m_Environment As IEnvironmentServer
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.#ctor(Coop.Mod.Persistence.IEnvironmentServer)
+  commentId: M:Coop.Mod.Persistence.World.WorldEntityServer.#ctor(Coop.Mod.Persistence.IEnvironmentServer)
+  id: '#ctor(Coop.Mod.Persistence.IEnvironmentServer)'
+  parent: Coop.Mod.Persistence.World.WorldEntityServer
+  langs:
+  - csharp
+  - vb
+  name: WorldEntityServer(IEnvironmentServer)
+  nameWithType: WorldEntityServer.WorldEntityServer(IEnvironmentServer)
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.WorldEntityServer(Coop.Mod.Persistence.IEnvironmentServer)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+    startLine: 17
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  syntax:
+    content: public WorldEntityServer(IEnvironmentServer environment)
+    parameters:
+    - id: environment
+      type: Coop.Mod.Persistence.IEnvironmentServer
+    content.vb: Public Sub New(environment As IEnvironmentServer)
+  overload: Coop.Mod.Persistence.World.WorldEntityServer.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlMode
+  commentId: P:Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlMode
+  id: RequestedTimeControlMode
+  parent: Coop.Mod.Persistence.World.WorldEntityServer
+  langs:
+  - csharp
+  - vb
+  name: RequestedTimeControlMode
+  nameWithType: WorldEntityServer.RequestedTimeControlMode
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlMode
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RequestedTimeControlMode
+    path: ../source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+    startLine: 25
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  summary: "\nWritten when the server received change requests. Null when the server processed the requests.\n"
+  example: []
+  syntax:
+    content: >-
+      [CanBeNull]
+
+      public CampaignTimeControlMode? RequestedTimeControlMode { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{TaleWorlds.CampaignSystem.CampaignTimeControlMode}
+    content.vb: >-
+      <CanBeNull>
+
+      Public Property RequestedTimeControlMode As CampaignTimeControlMode?
+  overload: Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlMode*
+  attributes:
+  - type: JetBrains.Annotations.CanBeNullAttribute
+    ctor: JetBrains.Annotations.CanBeNullAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlModeLock
+  commentId: P:Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlModeLock
+  id: RequestedTimeControlModeLock
+  parent: Coop.Mod.Persistence.World.WorldEntityServer
+  langs:
+  - csharp
+  - vb
+  name: RequestedTimeControlModeLock
+  nameWithType: WorldEntityServer.RequestedTimeControlModeLock
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlModeLock
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RequestedTimeControlModeLock
+    path: ../source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+    startLine: 30
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  summary: "\nWritten when the server received change requests. Null when the server processed the requests.\n"
+  example: []
+  syntax:
+    content: >-
+      [CanBeNull]
+
+      public bool? RequestedTimeControlModeLock { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Boolean}
+    content.vb: >-
+      <CanBeNull>
+
+      Public Property RequestedTimeControlModeLock As Boolean?
+  overload: Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlModeLock*
+  attributes:
+  - type: JetBrains.Annotations.CanBeNullAttribute
+    ctor: JetBrains.Annotations.CanBeNullAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.UpdateAuthoritative
+  commentId: M:Coop.Mod.Persistence.World.WorldEntityServer.UpdateAuthoritative
+  id: UpdateAuthoritative
+  parent: Coop.Mod.Persistence.World.WorldEntityServer
+  langs:
+  - csharp
+  - vb
+  name: UpdateAuthoritative()
+  nameWithType: WorldEntityServer.UpdateAuthoritative()
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.UpdateAuthoritative()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: UpdateAuthoritative
+    path: ../source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+    startLine: 35
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  summary: "\nUpdates the authoritative world state\n"
+  example: []
+  syntax:
+    content: protected override void UpdateAuthoritative()
+    content.vb: Protected Overrides Sub UpdateAuthoritative
+  overload: Coop.Mod.Persistence.World.WorldEntityServer.UpdateAuthoritative*
+  modifiers.csharp:
+  - protected
+  - override
+  modifiers.vb:
+  - Protected
+  - Overrides
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.ToString
+  commentId: M:Coop.Mod.Persistence.World.WorldEntityServer.ToString
+  id: ToString
+  parent: Coop.Mod.Persistence.World.WorldEntityServer
+  langs:
+  - csharp
+  - vb
+  name: ToString()
+  nameWithType: WorldEntityServer.ToString()
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.ToString()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ToString
+    path: ../source/Coop/Mod/Persistence/World/WorldEntityServer.cs
+    startLine: 61
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.World
+  syntax:
+    content: public override string ToString()
+    return:
+      type: System.String
+    content.vb: Public Overrides Function ToString As String
+  overload: Coop.Mod.Persistence.World.WorldEntityServer.ToString*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+references:
+- uid: Coop.Mod.Persistence.World
+  commentId: N:Coop.Mod.Persistence.World
+  name: Coop.Mod.Persistence.World
+  nameWithType: Coop.Mod.Persistence.World
+  fullName: Coop.Mod.Persistence.World
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: Coop.Mod.Persistence.IEnvironmentServer
+  commentId: T:Coop.Mod.Persistence.IEnvironmentServer
+  parent: Coop.Mod.Persistence
+  name: IEnvironmentServer
+  nameWithType: IEnvironmentServer
+  fullName: Coop.Mod.Persistence.IEnvironmentServer
+- uid: Coop.Mod.Persistence
+  commentId: N:Coop.Mod.Persistence
+  name: Coop.Mod.Persistence
+  nameWithType: Coop.Mod.Persistence
+  fullName: Coop.Mod.Persistence
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.#ctor*
+  commentId: Overload:Coop.Mod.Persistence.World.WorldEntityServer.#ctor
+  name: WorldEntityServer
+  nameWithType: WorldEntityServer.WorldEntityServer
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.WorldEntityServer
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlMode*
+  commentId: Overload:Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlMode
+  name: RequestedTimeControlMode
+  nameWithType: WorldEntityServer.RequestedTimeControlMode
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlMode
+- uid: System.Nullable{TaleWorlds.CampaignSystem.CampaignTimeControlMode}
+  commentId: T:System.Nullable{TaleWorlds.CampaignSystem.CampaignTimeControlMode}
+  parent: System
+  definition: System.Nullable`1
+  name: Nullable<CampaignTimeControlMode>
+  nameWithType: Nullable<CampaignTimeControlMode>
+  fullName: System.Nullable<TaleWorlds.CampaignSystem.CampaignTimeControlMode>
+  nameWithType.vb: Nullable(Of CampaignTimeControlMode)
+  fullName.vb: System.Nullable(Of TaleWorlds.CampaignSystem.CampaignTimeControlMode)
+  name.vb: Nullable(Of CampaignTimeControlMode)
+  spec.csharp:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    name: CampaignTimeControlMode
+    nameWithType: CampaignTimeControlMode
+    fullName: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    name: CampaignTimeControlMode
+    nameWithType: CampaignTimeControlMode
+    fullName: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Nullable`1
+  commentId: T:System.Nullable`1
+  isExternal: true
+  name: Nullable<T>
+  nameWithType: Nullable<T>
+  fullName: System.Nullable<T>
+  nameWithType.vb: Nullable(Of T)
+  fullName.vb: System.Nullable(Of T)
+  name.vb: Nullable(Of T)
+  spec.csharp:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlModeLock*
+  commentId: Overload:Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlModeLock
+  name: RequestedTimeControlModeLock
+  nameWithType: WorldEntityServer.RequestedTimeControlModeLock
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.RequestedTimeControlModeLock
+- uid: System.Nullable{System.Boolean}
+  commentId: T:System.Nullable{System.Boolean}
+  parent: System
+  definition: System.Nullable`1
+  name: Nullable<Boolean>
+  nameWithType: Nullable<Boolean>
+  fullName: System.Nullable<System.Boolean>
+  nameWithType.vb: Nullable(Of Boolean)
+  fullName.vb: System.Nullable(Of System.Boolean)
+  name.vb: Nullable(Of Boolean)
+  spec.csharp:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.UpdateAuthoritative*
+  commentId: Overload:Coop.Mod.Persistence.World.WorldEntityServer.UpdateAuthoritative
+  name: UpdateAuthoritative
+  nameWithType: WorldEntityServer.UpdateAuthoritative
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.UpdateAuthoritative
+- uid: Coop.Mod.Persistence.World.WorldEntityServer.ToString*
+  commentId: Overload:Coop.Mod.Persistence.World.WorldEntityServer.ToString
+  name: ToString
+  nameWithType: WorldEntityServer.ToString
+  fullName: Coop.Mod.Persistence.World.WorldEntityServer.ToString
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String

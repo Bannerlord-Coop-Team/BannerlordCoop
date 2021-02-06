@@ -1,0 +1,1899 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync.Store.RemoteStore
+  commentId: T:Sync.Store.RemoteStore
+  id: RemoteStore
+  parent: Sync.Store
+  children:
+  - Sync.Store.RemoteStore.#ctor(System.Collections.Generic.Dictionary{Sync.Store.ObjectId,System.Object},Network.Infrastructure.ConnectionBase,Sync.Store.ISerializableFactory)
+  - Sync.Store.RemoteStore.Data
+  - Sync.Store.RemoteStore.Finalize
+  - Sync.Store.RemoteStore.Insert(System.Object)
+  - Sync.Store.RemoteStore.Logger
+  - Sync.Store.RemoteStore.m_Connection
+  - Sync.Store.RemoteStore.m_Data
+  - Sync.Store.RemoteStore.m_Serializer
+  - Sync.Store.RemoteStore.m_State
+  - Sync.Store.RemoteStore.OnObjectAcknowledged
+  - Sync.Store.RemoteStore.OnObjectReceived
+  - Sync.Store.RemoteStore.OnPacketAddDeserialized
+  - Sync.Store.RemoteStore.ReceiveAck(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  - Sync.Store.RemoteStore.ReceiveAdd(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  - Sync.Store.RemoteStore.Remove(Sync.Store.ObjectId)
+  - Sync.Store.RemoteStore.SendACK(Sync.Store.ObjectId)
+  - Sync.Store.RemoteStore.SendAdd(Sync.Store.ObjectId,System.Byte[])
+  - Sync.Store.RemoteStore.State
+  langs:
+  - csharp
+  - vb
+  name: RemoteStore
+  nameWithType: RemoteStore
+  fullName: Sync.Store.RemoteStore
+  type: Class
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RemoteStore
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 35
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  summary: "\nStores arbitrary data that is synchronized to a remote instance of a store.\nAttention: Data added to the store will not be automatically removed! It will be kept\nuntil it is explicitly removed.\n"
+  example: []
+  syntax:
+    content: 'public class RemoteStore : IStore'
+    content.vb: >-
+      Public Class RemoteStore
+
+          Implements IStore
+  inheritance:
+  - System.Object
+  implements:
+  - Sync.Store.IStore
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Sync.Store.RemoteStore.Logger
+  commentId: F:Sync.Store.RemoteStore.Logger
+  id: Logger
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: RemoteStore.Logger
+  fullName: Sync.Store.RemoteStore.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 37
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Sync.Store.RemoteStore.m_Connection
+  commentId: F:Sync.Store.RemoteStore.m_Connection
+  id: m_Connection
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: m_Connection
+  nameWithType: RemoteStore.m_Connection
+  fullName: Sync.Store.RemoteStore.m_Connection
+  type: Field
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Connection
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 38
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: readonly ConnectionBase m_Connection
+    return:
+      type: Network.Infrastructure.ConnectionBase
+    content.vb: ReadOnly m_Connection As ConnectionBase
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Sync.Store.RemoteStore.m_Data
+  commentId: F:Sync.Store.RemoteStore.m_Data
+  id: m_Data
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: m_Data
+  nameWithType: RemoteStore.m_Data
+  fullName: Sync.Store.RemoteStore.m_Data
+  type: Field
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Data
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 39
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: readonly Dictionary<ObjectId, object> m_Data
+    return:
+      type: System.Collections.Generic.Dictionary{Sync.Store.ObjectId,System.Object}
+    content.vb: ReadOnly m_Data As Dictionary(Of ObjectId, Object)
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Sync.Store.RemoteStore.m_Serializer
+  commentId: F:Sync.Store.RemoteStore.m_Serializer
+  id: m_Serializer
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: m_Serializer
+  nameWithType: RemoteStore.m_Serializer
+  fullName: Sync.Store.RemoteStore.m_Serializer
+  type: Field
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Serializer
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 40
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: readonly StoreSerializer m_Serializer
+    return:
+      type: Sync.Store.StoreSerializer
+    content.vb: ReadOnly m_Serializer As StoreSerializer
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Sync.Store.RemoteStore.m_State
+  commentId: F:Sync.Store.RemoteStore.m_State
+  id: m_State
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: m_State
+  nameWithType: RemoteStore.m_State
+  fullName: Sync.Store.RemoteStore.m_State
+  type: Field
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_State
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 42
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: readonly Dictionary<ObjectId, RemoteObjectState> m_State
+    return:
+      type: System.Collections.Generic.Dictionary{Sync.Store.ObjectId,Sync.Store.RemoteObjectState}
+    content.vb: ReadOnly m_State As Dictionary(Of ObjectId, RemoteObjectState)
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Sync.Store.RemoteStore.OnObjectAcknowledged
+  commentId: F:Sync.Store.RemoteStore.OnObjectAcknowledged
+  id: OnObjectAcknowledged
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: OnObjectAcknowledged
+  nameWithType: RemoteStore.OnObjectAcknowledged
+  fullName: Sync.Store.RemoteStore.OnObjectAcknowledged
+  type: Field
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnObjectAcknowledged
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 48
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  summary: "\nTriggered when the remote instance confirmed the reception of a sent object.\n"
+  example: []
+  syntax:
+    content: public Action<ObjectId, object> OnObjectAcknowledged
+    return:
+      type: System.Action{Sync.Store.ObjectId,System.Object}
+    content.vb: Public OnObjectAcknowledged As Action(Of ObjectId, Object)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Sync.Store.RemoteStore.OnObjectReceived
+  commentId: F:Sync.Store.RemoteStore.OnObjectReceived
+  id: OnObjectReceived
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: OnObjectReceived
+  nameWithType: RemoteStore.OnObjectReceived
+  fullName: Sync.Store.RemoteStore.OnObjectReceived
+  type: Field
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnObjectReceived
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 54
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  summary: "\nTriggered when the local instance received an object from the remote instance and\nan acknowledge has been sent back.\n"
+  example: []
+  syntax:
+    content: public Action<ObjectId, object> OnObjectReceived
+    return:
+      type: System.Action{Sync.Store.ObjectId,System.Object}
+    content.vb: Public OnObjectReceived As Action(Of ObjectId, Object)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Sync.Store.RemoteStore.OnPacketAddDeserialized
+  commentId: F:Sync.Store.RemoteStore.OnPacketAddDeserialized
+  id: OnPacketAddDeserialized
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: OnPacketAddDeserialized
+  nameWithType: RemoteStore.OnPacketAddDeserialized
+  fullName: Sync.Store.RemoteStore.OnPacketAddDeserialized
+  type: Field
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnPacketAddDeserialized
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 60
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  summary: "\nTriggered when the local instance deserialized an added object from the remote store.\nThe return value determines if an ACK is sent back.\n"
+  example: []
+  syntax:
+    content: public Func<ObjectId, byte[], object, bool> OnPacketAddDeserialized
+    return:
+      type: System.Func{Sync.Store.ObjectId,System.Byte[],System.Object,System.Boolean}
+    content.vb: Public OnPacketAddDeserialized As Func(Of ObjectId, Byte(), Object, Boolean)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Sync.Store.RemoteStore.#ctor(System.Collections.Generic.Dictionary{Sync.Store.ObjectId,System.Object},Network.Infrastructure.ConnectionBase,Sync.Store.ISerializableFactory)
+  commentId: M:Sync.Store.RemoteStore.#ctor(System.Collections.Generic.Dictionary{Sync.Store.ObjectId,System.Object},Network.Infrastructure.ConnectionBase,Sync.Store.ISerializableFactory)
+  id: '#ctor(System.Collections.Generic.Dictionary{Sync.Store.ObjectId,System.Object},Network.Infrastructure.ConnectionBase,Sync.Store.ISerializableFactory)'
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: RemoteStore(Dictionary<ObjectId, Object>, ConnectionBase, ISerializableFactory)
+  nameWithType: RemoteStore.RemoteStore(Dictionary<ObjectId, Object>, ConnectionBase, ISerializableFactory)
+  fullName: Sync.Store.RemoteStore.RemoteStore(System.Collections.Generic.Dictionary<Sync.Store.ObjectId, System.Object>, Network.Infrastructure.ConnectionBase, Sync.Store.ISerializableFactory)
+  type: Constructor
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 67
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  summary: "\nCreates a new store.\n"
+  example: []
+  syntax:
+    content: public RemoteStore([NotNull] Dictionary<ObjectId, object> data, [NotNull] ConnectionBase connection, [NotNull] ISerializableFactory serializableFactory)
+    parameters:
+    - id: data
+      type: System.Collections.Generic.Dictionary{Sync.Store.ObjectId,System.Object}
+      description: data storage for all objects in this store.
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    - id: connection
+      type: Network.Infrastructure.ConnectionBase
+      description: connection to be used to communicate with the remote store
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    - id: serializableFactory
+      type: Sync.Store.ISerializableFactory
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    content.vb: Public Sub New(data As Dictionary(Of ObjectId, Object), connection As ConnectionBase, serializableFactory As ISerializableFactory)
+  overload: Sync.Store.RemoteStore.#ctor*
+  nameWithType.vb: RemoteStore.RemoteStore(Dictionary(Of ObjectId, Object), ConnectionBase, ISerializableFactory)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Sync.Store.RemoteStore.RemoteStore(System.Collections.Generic.Dictionary(Of Sync.Store.ObjectId, System.Object), Network.Infrastructure.ConnectionBase, Sync.Store.ISerializableFactory)
+  name.vb: RemoteStore(Dictionary(Of ObjectId, Object), ConnectionBase, ISerializableFactory)
+- uid: Sync.Store.RemoteStore.State
+  commentId: P:Sync.Store.RemoteStore.State
+  id: State
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: State
+  nameWithType: RemoteStore.State
+  fullName: Sync.Store.RemoteStore.State
+  type: Property
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: State
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 79
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public IReadOnlyDictionary<ObjectId, RemoteObjectState> State { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{Sync.Store.ObjectId,Sync.Store.RemoteObjectState}
+    content.vb: Public ReadOnly Property State As IReadOnlyDictionary(Of ObjectId, RemoteObjectState)
+  overload: Sync.Store.RemoteStore.State*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Sync.Store.RemoteStore.Insert(System.Object)
+  commentId: M:Sync.Store.RemoteStore.Insert(System.Object)
+  id: Insert(System.Object)
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: Insert(Object)
+  nameWithType: RemoteStore.Insert(Object)
+  fullName: Sync.Store.RemoteStore.Insert(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Insert
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 81
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public ObjectId Insert(object obj)
+    parameters:
+    - id: obj
+      type: System.Object
+    return:
+      type: Sync.Store.ObjectId
+    content.vb: Public Function Insert(obj As Object) As ObjectId
+  overload: Sync.Store.RemoteStore.Insert*
+  implements:
+  - Sync.Store.IStore.Insert(System.Object)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Sync.Store.RemoteStore.Remove(Sync.Store.ObjectId)
+  commentId: M:Sync.Store.RemoteStore.Remove(Sync.Store.ObjectId)
+  id: Remove(Sync.Store.ObjectId)
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: Remove(ObjectId)
+  nameWithType: RemoteStore.Remove(ObjectId)
+  fullName: Sync.Store.RemoteStore.Remove(Sync.Store.ObjectId)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Remove
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 91
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public bool Remove(ObjectId id)
+    parameters:
+    - id: id
+      type: Sync.Store.ObjectId
+    return:
+      type: System.Boolean
+    content.vb: Public Function Remove(id As ObjectId) As Boolean
+  overload: Sync.Store.RemoteStore.Remove*
+  implements:
+  - Sync.Store.IStore.Remove(Sync.Store.ObjectId)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Sync.Store.RemoteStore.Data
+  commentId: P:Sync.Store.RemoteStore.Data
+  id: Data
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: Data
+  nameWithType: RemoteStore.Data
+  fullName: Sync.Store.RemoteStore.Data
+  type: Property
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Data
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 98
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public IReadOnlyDictionary<ObjectId, object> Data { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{Sync.Store.ObjectId,System.Object}
+    content.vb: Public ReadOnly Property Data As IReadOnlyDictionary(Of ObjectId, Object)
+  overload: Sync.Store.RemoteStore.Data*
+  implements:
+  - Sync.Store.IStore.Data
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Sync.Store.RemoteStore.Finalize
+  commentId: M:Sync.Store.RemoteStore.Finalize
+  id: Finalize
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: Finalize()
+  nameWithType: RemoteStore.Finalize()
+  fullName: Sync.Store.RemoteStore.Finalize()
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Finalize
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 100
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: protected void Finalize()
+    content.vb: Protected Sub Finalize
+  overload: Sync.Store.RemoteStore.Finalize*
+  modifiers.csharp:
+  - protected
+  modifiers.vb:
+  - Protected
+- uid: Sync.Store.RemoteStore.ReceiveAdd(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  commentId: M:Sync.Store.RemoteStore.ReceiveAdd(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  id: ReceiveAdd(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: ReceiveAdd(ConnectionBase, Packet)
+  nameWithType: RemoteStore.ReceiveAdd(ConnectionBase, Packet)
+  fullName: Sync.Store.RemoteStore.ReceiveAdd(Network.Infrastructure.ConnectionBase, Network.Protocol.Packet)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ReceiveAdd
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 105
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: >-
+      [ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.StoreAdd)]
+
+      [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.StoreAdd)]
+
+      [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.StoreAdd)]
+
+      void ReceiveAdd(ConnectionBase connection, Packet packet)
+    parameters:
+    - id: connection
+      type: Network.Infrastructure.ConnectionBase
+    - id: packet
+      type: Network.Protocol.Packet
+    content.vb: >-
+      <ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.StoreAdd)>
+
+      <ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.StoreAdd)>
+
+      <ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.StoreAdd)>
+
+      Sub ReceiveAdd(connection As ConnectionBase, packet As Packet)
+  overload: Sync.Store.RemoteStore.ReceiveAdd*
+  attributes:
+  - type: Network.Infrastructure.ConnectionClientPacketHandlerAttribute
+    ctor: Network.Infrastructure.ConnectionClientPacketHandlerAttribute.#ctor(Network.Infrastructure.EClientConnectionState,Network.Protocol.EPacket)
+    arguments:
+    - type: Network.Infrastructure.EClientConnectionState
+      value: 1
+    - type: Network.Protocol.EPacket
+      value: 10
+  - type: Network.Infrastructure.ConnectionServerPacketHandlerAttribute
+    ctor: Network.Infrastructure.ConnectionServerPacketHandlerAttribute.#ctor(Network.Infrastructure.EServerConnectionState,Network.Protocol.EPacket)
+    arguments:
+    - type: Network.Infrastructure.EServerConnectionState
+      value: 2
+    - type: Network.Protocol.EPacket
+      value: 10
+  - type: Network.Infrastructure.ConnectionServerPacketHandlerAttribute
+    ctor: Network.Infrastructure.ConnectionServerPacketHandlerAttribute.#ctor(Network.Infrastructure.EServerConnectionState,Network.Protocol.EPacket)
+    arguments:
+    - type: Network.Infrastructure.EServerConnectionState
+      value: 1
+    - type: Network.Protocol.EPacket
+      value: 10
+- uid: Sync.Store.RemoteStore.SendACK(Sync.Store.ObjectId)
+  commentId: M:Sync.Store.RemoteStore.SendACK(Sync.Store.ObjectId)
+  id: SendACK(Sync.Store.ObjectId)
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: SendACK(ObjectId)
+  nameWithType: RemoteStore.SendACK(ObjectId)
+  fullName: Sync.Store.RemoteStore.SendACK(Sync.Store.ObjectId)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SendACK
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 148
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public void SendACK(ObjectId id)
+    parameters:
+    - id: id
+      type: Sync.Store.ObjectId
+    content.vb: Public Sub SendACK(id As ObjectId)
+  overload: Sync.Store.RemoteStore.SendACK*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Sync.Store.RemoteStore.ReceiveAck(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  commentId: M:Sync.Store.RemoteStore.ReceiveAck(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  id: ReceiveAck(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: ReceiveAck(ConnectionBase, Packet)
+  nameWithType: RemoteStore.ReceiveAck(ConnectionBase, Packet)
+  fullName: Sync.Store.RemoteStore.ReceiveAck(Network.Infrastructure.ConnectionBase, Network.Protocol.Packet)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ReceiveAck
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 168
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: >-
+      [ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.StoreAck)]
+
+      [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.StoreAck)]
+
+      [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.StoreAck)]
+
+      void ReceiveAck(ConnectionBase connection, Packet packet)
+    parameters:
+    - id: connection
+      type: Network.Infrastructure.ConnectionBase
+    - id: packet
+      type: Network.Protocol.Packet
+    content.vb: >-
+      <ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.StoreAck)>
+
+      <ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.StoreAck)>
+
+      <ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.StoreAck)>
+
+      Sub ReceiveAck(connection As ConnectionBase, packet As Packet)
+  overload: Sync.Store.RemoteStore.ReceiveAck*
+  attributes:
+  - type: Network.Infrastructure.ConnectionClientPacketHandlerAttribute
+    ctor: Network.Infrastructure.ConnectionClientPacketHandlerAttribute.#ctor(Network.Infrastructure.EClientConnectionState,Network.Protocol.EPacket)
+    arguments:
+    - type: Network.Infrastructure.EClientConnectionState
+      value: 1
+    - type: Network.Protocol.EPacket
+      value: 11
+  - type: Network.Infrastructure.ConnectionServerPacketHandlerAttribute
+    ctor: Network.Infrastructure.ConnectionServerPacketHandlerAttribute.#ctor(Network.Infrastructure.EServerConnectionState,Network.Protocol.EPacket)
+    arguments:
+    - type: Network.Infrastructure.EServerConnectionState
+      value: 2
+    - type: Network.Protocol.EPacket
+      value: 11
+  - type: Network.Infrastructure.ConnectionServerPacketHandlerAttribute
+    ctor: Network.Infrastructure.ConnectionServerPacketHandlerAttribute.#ctor(Network.Infrastructure.EServerConnectionState,Network.Protocol.EPacket)
+    arguments:
+    - type: Network.Infrastructure.EServerConnectionState
+      value: 1
+    - type: Network.Protocol.EPacket
+      value: 11
+- uid: Sync.Store.RemoteStore.SendAdd(Sync.Store.ObjectId,System.Byte[])
+  commentId: M:Sync.Store.RemoteStore.SendAdd(Sync.Store.ObjectId,System.Byte[])
+  id: SendAdd(Sync.Store.ObjectId,System.Byte[])
+  parent: Sync.Store.RemoteStore
+  langs:
+  - csharp
+  - vb
+  name: SendAdd(ObjectId, Byte[])
+  nameWithType: RemoteStore.SendAdd(ObjectId, Byte[])
+  fullName: Sync.Store.RemoteStore.SendAdd(Sync.Store.ObjectId, System.Byte[])
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SendAdd
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 188
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public void SendAdd(ObjectId id, byte[] raw)
+    parameters:
+    - id: id
+      type: Sync.Store.ObjectId
+    - id: raw
+      type: System.Byte[]
+    content.vb: Public Sub SendAdd(id As ObjectId, raw As Byte())
+  overload: Sync.Store.RemoteStore.SendAdd*
+  nameWithType.vb: RemoteStore.SendAdd(ObjectId, Byte())
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Sync.Store.RemoteStore.SendAdd(Sync.Store.ObjectId, System.Byte())
+  name.vb: SendAdd(ObjectId, Byte())
+references:
+- uid: Sync.Store
+  commentId: N:Sync.Store
+  name: Sync.Store
+  nameWithType: Sync.Store
+  fullName: Sync.Store
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Sync.Store.IStore
+  commentId: T:Sync.Store.IStore
+  parent: Sync.Store
+  name: IStore
+  nameWithType: IStore
+  fullName: Sync.Store.IStore
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: Network.Infrastructure.ConnectionBase
+  commentId: T:Network.Infrastructure.ConnectionBase
+  parent: Network.Infrastructure
+  name: ConnectionBase
+  nameWithType: ConnectionBase
+  fullName: Network.Infrastructure.ConnectionBase
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: System.Collections.Generic.Dictionary{Sync.Store.ObjectId,System.Object}
+  commentId: T:System.Collections.Generic.Dictionary{Sync.Store.ObjectId,System.Object}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  name: Dictionary<ObjectId, Object>
+  nameWithType: Dictionary<ObjectId, Object>
+  fullName: System.Collections.Generic.Dictionary<Sync.Store.ObjectId, System.Object>
+  nameWithType.vb: Dictionary(Of ObjectId, Object)
+  fullName.vb: System.Collections.Generic.Dictionary(Of Sync.Store.ObjectId, System.Object)
+  name.vb: Dictionary(Of ObjectId, Object)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.Dictionary`2
+  commentId: T:System.Collections.Generic.Dictionary`2
+  isExternal: true
+  name: Dictionary<TKey, TValue>
+  nameWithType: Dictionary<TKey, TValue>
+  fullName: System.Collections.Generic.Dictionary<TKey, TValue>
+  nameWithType.vb: Dictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.Dictionary(Of TKey, TValue)
+  name.vb: Dictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: Sync.Store.StoreSerializer
+  commentId: T:Sync.Store.StoreSerializer
+  parent: Sync.Store
+  name: StoreSerializer
+  nameWithType: StoreSerializer
+  fullName: Sync.Store.StoreSerializer
+- uid: System.Collections.Generic.Dictionary{Sync.Store.ObjectId,Sync.Store.RemoteObjectState}
+  commentId: T:System.Collections.Generic.Dictionary{Sync.Store.ObjectId,Sync.Store.RemoteObjectState}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  name: Dictionary<ObjectId, RemoteObjectState>
+  nameWithType: Dictionary<ObjectId, RemoteObjectState>
+  fullName: System.Collections.Generic.Dictionary<Sync.Store.ObjectId, Sync.Store.RemoteObjectState>
+  nameWithType.vb: Dictionary(Of ObjectId, RemoteObjectState)
+  fullName.vb: System.Collections.Generic.Dictionary(Of Sync.Store.ObjectId, Sync.Store.RemoteObjectState)
+  name.vb: Dictionary(Of ObjectId, RemoteObjectState)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.Store.RemoteObjectState
+    name: RemoteObjectState
+    nameWithType: RemoteObjectState
+    fullName: Sync.Store.RemoteObjectState
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.Store.RemoteObjectState
+    name: RemoteObjectState
+    nameWithType: RemoteObjectState
+    fullName: Sync.Store.RemoteObjectState
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Action{Sync.Store.ObjectId,System.Object}
+  commentId: T:System.Action{Sync.Store.ObjectId,System.Object}
+  parent: System
+  definition: System.Action`2
+  name: Action<ObjectId, Object>
+  nameWithType: Action<ObjectId, Object>
+  fullName: System.Action<Sync.Store.ObjectId, System.Object>
+  nameWithType.vb: Action(Of ObjectId, Object)
+  fullName.vb: System.Action(Of Sync.Store.ObjectId, System.Object)
+  name.vb: Action(Of ObjectId, Object)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Action`2
+  commentId: T:System.Action`2
+  isExternal: true
+  name: Action<T1, T2>
+  nameWithType: Action<T1, T2>
+  fullName: System.Action<T1, T2>
+  nameWithType.vb: Action(Of T1, T2)
+  fullName.vb: System.Action(Of T1, T2)
+  name.vb: Action(Of T1, T2)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Func{Sync.Store.ObjectId,System.Byte[],System.Object,System.Boolean}
+  commentId: T:System.Func{Sync.Store.ObjectId,System.Byte[],System.Object,System.Boolean}
+  parent: System
+  definition: System.Func`4
+  name: Func<ObjectId, Byte[], Object, Boolean>
+  nameWithType: Func<ObjectId, Byte[], Object, Boolean>
+  fullName: System.Func<Sync.Store.ObjectId, System.Byte[], System.Object, System.Boolean>
+  nameWithType.vb: Func(Of ObjectId, Byte(), Object, Boolean)
+  fullName.vb: System.Func(Of Sync.Store.ObjectId, System.Byte(), System.Object, System.Boolean)
+  name.vb: Func(Of ObjectId, Byte(), Object, Boolean)
+  spec.csharp:
+  - uid: System.Func`4
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Func`4
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Func`4
+  commentId: T:System.Func`4
+  isExternal: true
+  name: Func<T1, T2, T3, TResult>
+  nameWithType: Func<T1, T2, T3, TResult>
+  fullName: System.Func<T1, T2, T3, TResult>
+  nameWithType.vb: Func(Of T1, T2, T3, TResult)
+  fullName.vb: System.Func(Of T1, T2, T3, TResult)
+  name.vb: Func(Of T1, T2, T3, TResult)
+  spec.csharp:
+  - uid: System.Func`4
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T3
+    nameWithType: T3
+    fullName: T3
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TResult
+    nameWithType: TResult
+    fullName: TResult
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Func`4
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T3
+    nameWithType: T3
+    fullName: T3
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TResult
+    nameWithType: TResult
+    fullName: TResult
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Store.RemoteStore.#ctor*
+  commentId: Overload:Sync.Store.RemoteStore.#ctor
+  name: RemoteStore
+  nameWithType: RemoteStore.RemoteStore
+  fullName: Sync.Store.RemoteStore.RemoteStore
+- uid: Sync.Store.ISerializableFactory
+  commentId: T:Sync.Store.ISerializableFactory
+  parent: Sync.Store
+  name: ISerializableFactory
+  nameWithType: ISerializableFactory
+  fullName: Sync.Store.ISerializableFactory
+- uid: Sync.Store.RemoteStore.State*
+  commentId: Overload:Sync.Store.RemoteStore.State
+  name: State
+  nameWithType: RemoteStore.State
+  fullName: Sync.Store.RemoteStore.State
+- uid: System.Collections.Generic.IReadOnlyDictionary{Sync.Store.ObjectId,Sync.Store.RemoteObjectState}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{Sync.Store.ObjectId,Sync.Store.RemoteObjectState}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  name: IReadOnlyDictionary<ObjectId, RemoteObjectState>
+  nameWithType: IReadOnlyDictionary<ObjectId, RemoteObjectState>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<Sync.Store.ObjectId, Sync.Store.RemoteObjectState>
+  nameWithType.vb: IReadOnlyDictionary(Of ObjectId, RemoteObjectState)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of Sync.Store.ObjectId, Sync.Store.RemoteObjectState)
+  name.vb: IReadOnlyDictionary(Of ObjectId, RemoteObjectState)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.Store.RemoteObjectState
+    name: RemoteObjectState
+    nameWithType: RemoteObjectState
+    fullName: Sync.Store.RemoteObjectState
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.Store.RemoteObjectState
+    name: RemoteObjectState
+    nameWithType: RemoteObjectState
+    fullName: Sync.Store.RemoteObjectState
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.IReadOnlyDictionary`2
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary`2
+  isExternal: true
+  name: IReadOnlyDictionary<TKey, TValue>
+  nameWithType: IReadOnlyDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>
+  nameWithType.vb: IReadOnlyDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of TKey, TValue)
+  name.vb: IReadOnlyDictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Store.RemoteStore.Insert*
+  commentId: Overload:Sync.Store.RemoteStore.Insert
+  name: Insert
+  nameWithType: RemoteStore.Insert
+  fullName: Sync.Store.RemoteStore.Insert
+- uid: Sync.Store.IStore.Insert(System.Object)
+  commentId: M:Sync.Store.IStore.Insert(System.Object)
+  parent: Sync.Store.IStore
+  isExternal: true
+  name: Insert(Object)
+  nameWithType: IStore.Insert(Object)
+  fullName: Sync.Store.IStore.Insert(System.Object)
+  spec.csharp:
+  - uid: Sync.Store.IStore.Insert(System.Object)
+    name: Insert
+    nameWithType: IStore.Insert
+    fullName: Sync.Store.IStore.Insert
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Store.IStore.Insert(System.Object)
+    name: Insert
+    nameWithType: IStore.Insert
+    fullName: Sync.Store.IStore.Insert
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Store.ObjectId
+  commentId: T:Sync.Store.ObjectId
+  parent: Sync.Store
+  name: ObjectId
+  nameWithType: ObjectId
+  fullName: Sync.Store.ObjectId
+- uid: Sync.Store.RemoteStore.Remove*
+  commentId: Overload:Sync.Store.RemoteStore.Remove
+  name: Remove
+  nameWithType: RemoteStore.Remove
+  fullName: Sync.Store.RemoteStore.Remove
+- uid: Sync.Store.IStore.Remove(Sync.Store.ObjectId)
+  commentId: M:Sync.Store.IStore.Remove(Sync.Store.ObjectId)
+  parent: Sync.Store.IStore
+  name: Remove(ObjectId)
+  nameWithType: IStore.Remove(ObjectId)
+  fullName: Sync.Store.IStore.Remove(Sync.Store.ObjectId)
+  spec.csharp:
+  - uid: Sync.Store.IStore.Remove(Sync.Store.ObjectId)
+    name: Remove
+    nameWithType: IStore.Remove
+    fullName: Sync.Store.IStore.Remove
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Store.IStore.Remove(Sync.Store.ObjectId)
+    name: Remove
+    nameWithType: IStore.Remove
+    fullName: Sync.Store.IStore.Remove
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Sync.Store.RemoteStore.Data*
+  commentId: Overload:Sync.Store.RemoteStore.Data
+  name: Data
+  nameWithType: RemoteStore.Data
+  fullName: Sync.Store.RemoteStore.Data
+- uid: Sync.Store.IStore.Data
+  commentId: P:Sync.Store.IStore.Data
+  parent: Sync.Store.IStore
+  name: Data
+  nameWithType: IStore.Data
+  fullName: Sync.Store.IStore.Data
+- uid: System.Collections.Generic.IReadOnlyDictionary{Sync.Store.ObjectId,System.Object}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{Sync.Store.ObjectId,System.Object}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  name: IReadOnlyDictionary<ObjectId, Object>
+  nameWithType: IReadOnlyDictionary<ObjectId, Object>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<Sync.Store.ObjectId, System.Object>
+  nameWithType.vb: IReadOnlyDictionary(Of ObjectId, Object)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of Sync.Store.ObjectId, System.Object)
+  name.vb: IReadOnlyDictionary(Of ObjectId, Object)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Store.RemoteStore.Finalize*
+  commentId: Overload:Sync.Store.RemoteStore.Finalize
+  name: Finalize
+  nameWithType: RemoteStore.Finalize
+  fullName: Sync.Store.RemoteStore.Finalize
+- uid: Sync.Store.RemoteStore.ReceiveAdd*
+  commentId: Overload:Sync.Store.RemoteStore.ReceiveAdd
+  name: ReceiveAdd
+  nameWithType: RemoteStore.ReceiveAdd
+  fullName: Sync.Store.RemoteStore.ReceiveAdd
+- uid: Network.Protocol.Packet
+  commentId: T:Network.Protocol.Packet
+  parent: Network.Protocol
+  name: Packet
+  nameWithType: Packet
+  fullName: Network.Protocol.Packet
+- uid: Network.Protocol
+  commentId: N:Network.Protocol
+  name: Network.Protocol
+  nameWithType: Network.Protocol
+  fullName: Network.Protocol
+- uid: Sync.Store.RemoteStore.SendACK*
+  commentId: Overload:Sync.Store.RemoteStore.SendACK
+  name: SendACK
+  nameWithType: RemoteStore.SendACK
+  fullName: Sync.Store.RemoteStore.SendACK
+- uid: Sync.Store.RemoteStore.ReceiveAck*
+  commentId: Overload:Sync.Store.RemoteStore.ReceiveAck
+  name: ReceiveAck
+  nameWithType: RemoteStore.ReceiveAck
+  fullName: Sync.Store.RemoteStore.ReceiveAck
+- uid: Sync.Store.RemoteStore.SendAdd*
+  commentId: Overload:Sync.Store.RemoteStore.SendAdd
+  name: SendAdd
+  nameWithType: RemoteStore.SendAdd
+  fullName: Sync.Store.RemoteStore.SendAdd
+- uid: System.Byte[]
+  isExternal: true
+  name: Byte[]
+  nameWithType: Byte[]
+  fullName: System.Byte[]
+  nameWithType.vb: Byte()
+  fullName.vb: System.Byte()
+  name.vb: Byte()
+  spec.csharp:
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  spec.vb:
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()

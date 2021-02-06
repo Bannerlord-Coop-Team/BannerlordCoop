@@ -1,0 +1,22 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Patch.MobilePartyPatches
+  commentId: N:Coop.Mod.Patch.MobilePartyPatches
+  id: Coop.Mod.Patch.MobilePartyPatches
+  children:
+  - Coop.Mod.Patch.MobilePartyPatches.ComputeIsWaitingPatch
+  langs:
+  - csharp
+  - vb
+  name: Coop.Mod.Patch.MobilePartyPatches
+  nameWithType: Coop.Mod.Patch.MobilePartyPatches
+  fullName: Coop.Mod.Patch.MobilePartyPatches
+  type: Namespace
+  assemblies:
+  - Coop
+references:
+- uid: Coop.Mod.Patch.MobilePartyPatches.ComputeIsWaitingPatch
+  commentId: T:Coop.Mod.Patch.MobilePartyPatches.ComputeIsWaitingPatch
+  name: ComputeIsWaitingPatch
+  nameWithType: ComputeIsWaitingPatch
+  fullName: Coop.Mod.Patch.MobilePartyPatches.ComputeIsWaitingPatch

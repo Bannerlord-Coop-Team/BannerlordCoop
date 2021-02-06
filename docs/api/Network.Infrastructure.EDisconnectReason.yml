@@ -1,0 +1,409 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.EDisconnectReason
+  commentId: T:Network.Infrastructure.EDisconnectReason
+  id: EDisconnectReason
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.EDisconnectReason.ClientJoinedAnotherServer
+  - Network.Infrastructure.EDisconnectReason.ClientLeft
+  - Network.Infrastructure.EDisconnectReason.ClientUnreachable
+  - Network.Infrastructure.EDisconnectReason.ConnectionRejected
+  - Network.Infrastructure.EDisconnectReason.ServerIsFull
+  - Network.Infrastructure.EDisconnectReason.ServerShutDown
+  - Network.Infrastructure.EDisconnectReason.Timeout
+  - Network.Infrastructure.EDisconnectReason.Unknown
+  - Network.Infrastructure.EDisconnectReason.Unreachable
+  - Network.Infrastructure.EDisconnectReason.WorldDataTransferIssue
+  - Network.Infrastructure.EDisconnectReason.WrongProtocolVersion
+  langs:
+  - csharp
+  - vb
+  name: EDisconnectReason
+  nameWithType: EDisconnectReason
+  fullName: Network.Infrastructure.EDisconnectReason
+  type: Enum
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EDisconnectReason
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 4
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: 'public enum EDisconnectReason : byte'
+    content.vb: Public Enum EDisconnectReason As Byte
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: Network.Infrastructure.EDisconnectReason.ConnectionRejected
+  commentId: F:Network.Infrastructure.EDisconnectReason.ConnectionRejected
+  id: ConnectionRejected
+  parent: Network.Infrastructure.EDisconnectReason
+  langs:
+  - csharp
+  - vb
+  name: ConnectionRejected
+  nameWithType: EDisconnectReason.ConnectionRejected
+  fullName: Network.Infrastructure.EDisconnectReason.ConnectionRejected
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ConnectionRejected
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 6
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: ConnectionRejected = 0
+    return:
+      type: Network.Infrastructure.EDisconnectReason
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EDisconnectReason.ClientUnreachable
+  commentId: F:Network.Infrastructure.EDisconnectReason.ClientUnreachable
+  id: ClientUnreachable
+  parent: Network.Infrastructure.EDisconnectReason
+  langs:
+  - csharp
+  - vb
+  name: ClientUnreachable
+  nameWithType: EDisconnectReason.ClientUnreachable
+  fullName: Network.Infrastructure.EDisconnectReason.ClientUnreachable
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ClientUnreachable
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 7
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: ClientUnreachable = 1
+    return:
+      type: Network.Infrastructure.EDisconnectReason
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EDisconnectReason.ClientLeft
+  commentId: F:Network.Infrastructure.EDisconnectReason.ClientLeft
+  id: ClientLeft
+  parent: Network.Infrastructure.EDisconnectReason
+  langs:
+  - csharp
+  - vb
+  name: ClientLeft
+  nameWithType: EDisconnectReason.ClientLeft
+  fullName: Network.Infrastructure.EDisconnectReason.ClientLeft
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ClientLeft
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 8
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: ClientLeft = 2
+    return:
+      type: Network.Infrastructure.EDisconnectReason
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EDisconnectReason.ClientJoinedAnotherServer
+  commentId: F:Network.Infrastructure.EDisconnectReason.ClientJoinedAnotherServer
+  id: ClientJoinedAnotherServer
+  parent: Network.Infrastructure.EDisconnectReason
+  langs:
+  - csharp
+  - vb
+  name: ClientJoinedAnotherServer
+  nameWithType: EDisconnectReason.ClientJoinedAnotherServer
+  fullName: Network.Infrastructure.EDisconnectReason.ClientJoinedAnotherServer
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ClientJoinedAnotherServer
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 9
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: ClientJoinedAnotherServer = 3
+    return:
+      type: Network.Infrastructure.EDisconnectReason
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EDisconnectReason.ServerIsFull
+  commentId: F:Network.Infrastructure.EDisconnectReason.ServerIsFull
+  id: ServerIsFull
+  parent: Network.Infrastructure.EDisconnectReason
+  langs:
+  - csharp
+  - vb
+  name: ServerIsFull
+  nameWithType: EDisconnectReason.ServerIsFull
+  fullName: Network.Infrastructure.EDisconnectReason.ServerIsFull
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ServerIsFull
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 10
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: ServerIsFull = 4
+    return:
+      type: Network.Infrastructure.EDisconnectReason
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EDisconnectReason.Timeout
+  commentId: F:Network.Infrastructure.EDisconnectReason.Timeout
+  id: Timeout
+  parent: Network.Infrastructure.EDisconnectReason
+  langs:
+  - csharp
+  - vb
+  name: Timeout
+  nameWithType: EDisconnectReason.Timeout
+  fullName: Network.Infrastructure.EDisconnectReason.Timeout
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Timeout
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 11
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Timeout = 5
+    return:
+      type: Network.Infrastructure.EDisconnectReason
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EDisconnectReason.Unknown
+  commentId: F:Network.Infrastructure.EDisconnectReason.Unknown
+  id: Unknown
+  parent: Network.Infrastructure.EDisconnectReason
+  langs:
+  - csharp
+  - vb
+  name: Unknown
+  nameWithType: EDisconnectReason.Unknown
+  fullName: Network.Infrastructure.EDisconnectReason.Unknown
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Unknown
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 12
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Unknown = 6
+    return:
+      type: Network.Infrastructure.EDisconnectReason
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EDisconnectReason.Unreachable
+  commentId: F:Network.Infrastructure.EDisconnectReason.Unreachable
+  id: Unreachable
+  parent: Network.Infrastructure.EDisconnectReason
+  langs:
+  - csharp
+  - vb
+  name: Unreachable
+  nameWithType: EDisconnectReason.Unreachable
+  fullName: Network.Infrastructure.EDisconnectReason.Unreachable
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Unreachable
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 13
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Unreachable = 7
+    return:
+      type: Network.Infrastructure.EDisconnectReason
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EDisconnectReason.WrongProtocolVersion
+  commentId: F:Network.Infrastructure.EDisconnectReason.WrongProtocolVersion
+  id: WrongProtocolVersion
+  parent: Network.Infrastructure.EDisconnectReason
+  langs:
+  - csharp
+  - vb
+  name: WrongProtocolVersion
+  nameWithType: EDisconnectReason.WrongProtocolVersion
+  fullName: Network.Infrastructure.EDisconnectReason.WrongProtocolVersion
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: WrongProtocolVersion
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 14
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: WrongProtocolVersion = 8
+    return:
+      type: Network.Infrastructure.EDisconnectReason
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EDisconnectReason.WorldDataTransferIssue
+  commentId: F:Network.Infrastructure.EDisconnectReason.WorldDataTransferIssue
+  id: WorldDataTransferIssue
+  parent: Network.Infrastructure.EDisconnectReason
+  langs:
+  - csharp
+  - vb
+  name: WorldDataTransferIssue
+  nameWithType: EDisconnectReason.WorldDataTransferIssue
+  fullName: Network.Infrastructure.EDisconnectReason.WorldDataTransferIssue
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: WorldDataTransferIssue
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 15
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: WorldDataTransferIssue = 9
+    return:
+      type: Network.Infrastructure.EDisconnectReason
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EDisconnectReason.ServerShutDown
+  commentId: F:Network.Infrastructure.EDisconnectReason.ServerShutDown
+  id: ServerShutDown
+  parent: Network.Infrastructure.EDisconnectReason
+  langs:
+  - csharp
+  - vb
+  name: ServerShutDown
+  nameWithType: EDisconnectReason.ServerShutDown
+  fullName: Network.Infrastructure.EDisconnectReason.ServerShutDown
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/INetworkConnection.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ServerShutDown
+    path: ../source/Network/Infrastructure/INetworkConnection.cs
+    startLine: 16
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: ServerShutDown = 10
+    return:
+      type: Network.Infrastructure.EDisconnectReason
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: Network.Infrastructure.EDisconnectReason
+  commentId: T:Network.Infrastructure.EDisconnectReason
+  parent: Network.Infrastructure
+  name: EDisconnectReason
+  nameWithType: EDisconnectReason
+  fullName: Network.Infrastructure.EDisconnectReason

@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -110,6 +109,66 @@
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public class PacketReader</code></pre>
   </div>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Network_Protocol_PacketReader_m_FragmentedBuffer.md&amp;value=---%0Auid%3A%20Network.Protocol.PacketReader.m_FragmentedBuffer%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Network/Protocol/Packet.cs/#L140">View Source</a>
+  </span>
+  <h4 id="Network_Protocol_PacketReader_m_FragmentedBuffer" data-uid="Network.Protocol.PacketReader.m_FragmentedBuffer">m_FragmentedBuffer</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">BinaryWriter m_FragmentedBuffer</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.IO.BinaryWriter</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Network_Protocol_PacketReader_m_FragmentedStream.md&amp;value=---%0Auid%3A%20Network.Protocol.PacketReader.m_FragmentedStream%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Network/Protocol/Packet.cs/#L142">View Source</a>
+  </span>
+  <h4 id="Network_Protocol_PacketReader_m_FragmentedStream" data-uid="Network.Protocol.PacketReader.m_FragmentedStream">m_FragmentedStream</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">MemoryStream m_FragmentedStream</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.IO.MemoryStream</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h3 id="properties">Properties
   </h3>
   <span class="small pull-right mobile-hide">
@@ -121,8 +180,7 @@
   </span>
   <a id="Network_Protocol_PacketReader_Done_" data-uid="Network.Protocol.PacketReader.Done*"></a>
   <h4 id="Network_Protocol_PacketReader_Done" data-uid="Network.Protocol.PacketReader.Done">Done</h4>
-  <div class="markdown level1 summary">
-Was the whole payload of the package serialized?
+  <div class="markdown level1 summary"><p>Was the whole payload of the package serialized?</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -202,9 +260,8 @@ Was the whole payload of the package serialized?
   </span>
   <a id="Network_Protocol_PacketReader_Read_" data-uid="Network.Protocol.PacketReader.Read*"></a>
   <h4 id="Network_Protocol_PacketReader_Read_Network_ByteReader_" data-uid="Network.Protocol.PacketReader.Read(Network.ByteReader)">Read(ByteReader)</h4>
-  <div class="markdown level1 summary">
-Reads a <a class="xref" href="Network.Protocol.Packet.html">Packet</a> from the given reader. Returns null if the packet is fragmented and
-parts are still missing.
+  <div class="markdown level1 summary"><p>Reads a <a class="xref" href="Network.Protocol.Packet.html">Packet</a> from the given reader. Returns null if the packet is fragmented and
+parts are still missing.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -239,7 +296,8 @@ parts are still missing.
     <tbody>
       <tr>
         <td><a class="xref" href="Network.Protocol.Packet.html">Packet</a></td>
-        <td>Serialized packet or null if the packet is fragmented and not yet complete.</td>
+        <td><p>Serialized packet or null if the packet is fragmented and not yet complete.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -258,9 +316,22 @@ parts are still missing.
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

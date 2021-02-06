@@ -1,0 +1,252 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Persistence.Party.EventPartyMoveTo
+  commentId: T:Coop.Mod.Persistence.Party.EventPartyMoveTo
+  id: EventPartyMoveTo
+  parent: Coop.Mod.Persistence.Party
+  children:
+  - Coop.Mod.Persistence.Party.EventPartyMoveTo.EntityId
+  - Coop.Mod.Persistence.Party.EventPartyMoveTo.Execute(RailRoom,RailController)
+  - Coop.Mod.Persistence.Party.EventPartyMoveTo.Logger
+  - Coop.Mod.Persistence.Party.EventPartyMoveTo.Movement
+  langs:
+  - csharp
+  - vb
+  name: EventPartyMoveTo
+  nameWithType: EventPartyMoveTo
+  fullName: Coop.Mod.Persistence.Party.EventPartyMoveTo
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/EventPartyMoveTo.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EventPartyMoveTo
+    path: ../source/Coop/Mod/Persistence/Party/EventPartyMoveTo.cs
+    startLine: 11
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nEvent raised by clients if they want to move a party. The client may only send this\nevent for parties that are under its control.\n"
+  example: []
+  syntax:
+    content: 'public class EventPartyMoveTo : RailEvent'
+    content.vb: >-
+      Public Class EventPartyMoveTo
+          Inherits RailEvent
+  inheritance:
+  - System.Object
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Persistence.Party.EventPartyMoveTo.Logger
+  commentId: F:Coop.Mod.Persistence.Party.EventPartyMoveTo.Logger
+  id: Logger
+  parent: Coop.Mod.Persistence.Party.EventPartyMoveTo
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: EventPartyMoveTo.Logger
+  fullName: Coop.Mod.Persistence.Party.EventPartyMoveTo.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/EventPartyMoveTo.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Coop/Mod/Persistence/Party/EventPartyMoveTo.cs
+    startLine: 13
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Persistence.Party.EventPartyMoveTo.EntityId
+  commentId: P:Coop.Mod.Persistence.Party.EventPartyMoveTo.EntityId
+  id: EntityId
+  parent: Coop.Mod.Persistence.Party.EventPartyMoveTo
+  langs:
+  - csharp
+  - vb
+  name: EntityId
+  nameWithType: EventPartyMoveTo.EntityId
+  fullName: Coop.Mod.Persistence.Party.EventPartyMoveTo.EntityId
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/EventPartyMoveTo.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EntityId
+    path: ../source/Coop/Mod/Persistence/Party/EventPartyMoveTo.cs
+    startLine: 14
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: public EntityId EntityId { get; set; }
+    parameters: []
+    return:
+      type: EntityId
+    content.vb: Public Property EntityId As EntityId
+  overload: Coop.Mod.Persistence.Party.EventPartyMoveTo.EntityId*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.Party.EventPartyMoveTo.Movement
+  commentId: P:Coop.Mod.Persistence.Party.EventPartyMoveTo.Movement
+  id: Movement
+  parent: Coop.Mod.Persistence.Party.EventPartyMoveTo
+  langs:
+  - csharp
+  - vb
+  name: Movement
+  nameWithType: EventPartyMoveTo.Movement
+  fullName: Coop.Mod.Persistence.Party.EventPartyMoveTo.Movement
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/EventPartyMoveTo.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Movement
+    path: ../source/Coop/Mod/Persistence/Party/EventPartyMoveTo.cs
+    startLine: 16
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: public MovementState Movement { get; set; }
+    parameters: []
+    return:
+      type: Coop.Mod.Persistence.Party.MovementState
+    content.vb: Public Property Movement As MovementState
+  overload: Coop.Mod.Persistence.Party.EventPartyMoveTo.Movement*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.Party.EventPartyMoveTo.Execute(RailRoom,RailController)
+  commentId: M:Coop.Mod.Persistence.Party.EventPartyMoveTo.Execute(RailRoom,RailController)
+  id: Execute(RailRoom,RailController)
+  parent: Coop.Mod.Persistence.Party.EventPartyMoveTo
+  langs:
+  - csharp
+  - vb
+  name: Execute(RailRoom, RailController)
+  nameWithType: EventPartyMoveTo.Execute(RailRoom, RailController)
+  fullName: Coop.Mod.Persistence.Party.EventPartyMoveTo.Execute(RailRoom, RailController)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/EventPartyMoveTo.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Execute
+    path: ../source/Coop/Mod/Persistence/Party/EventPartyMoveTo.cs
+    startLine: 18
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: protected override void Execute(RailRoom room, RailController sender)
+    parameters:
+    - id: room
+      type: RailRoom
+    - id: sender
+      type: RailController
+    content.vb: Protected Overrides Sub Execute(room As RailRoom, sender As RailController)
+  overload: Coop.Mod.Persistence.Party.EventPartyMoveTo.Execute*
+  modifiers.csharp:
+  - protected
+  - override
+  modifiers.vb:
+  - Protected
+  - Overrides
+references:
+- uid: Coop.Mod.Persistence.Party
+  commentId: N:Coop.Mod.Persistence.Party
+  name: Coop.Mod.Persistence.Party
+  nameWithType: Coop.Mod.Persistence.Party
+  fullName: Coop.Mod.Persistence.Party
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: Coop.Mod.Persistence.Party.EventPartyMoveTo.EntityId*
+  commentId: Overload:Coop.Mod.Persistence.Party.EventPartyMoveTo.EntityId
+  name: EntityId
+  nameWithType: EventPartyMoveTo.EntityId
+  fullName: Coop.Mod.Persistence.Party.EventPartyMoveTo.EntityId
+- uid: EntityId
+  isExternal: true
+  name: EntityId
+  nameWithType: EntityId
+  fullName: EntityId
+- uid: Coop.Mod.Persistence.Party.EventPartyMoveTo.Movement*
+  commentId: Overload:Coop.Mod.Persistence.Party.EventPartyMoveTo.Movement
+  name: Movement
+  nameWithType: EventPartyMoveTo.Movement
+  fullName: Coop.Mod.Persistence.Party.EventPartyMoveTo.Movement
+- uid: Coop.Mod.Persistence.Party.MovementState
+  commentId: T:Coop.Mod.Persistence.Party.MovementState
+  parent: Coop.Mod.Persistence.Party
+  name: MovementState
+  nameWithType: MovementState
+  fullName: Coop.Mod.Persistence.Party.MovementState
+- uid: Coop.Mod.Persistence.Party.EventPartyMoveTo.Execute*
+  commentId: Overload:Coop.Mod.Persistence.Party.EventPartyMoveTo.Execute
+  name: Execute
+  nameWithType: EventPartyMoveTo.Execute
+  fullName: Coop.Mod.Persistence.Party.EventPartyMoveTo.Execute
+- uid: RailRoom
+  isExternal: true
+  name: RailRoom
+  nameWithType: RailRoom
+  fullName: RailRoom
+- uid: RailController
+  isExternal: true
+  name: RailController
+  nameWithType: RailController
+  fullName: RailController

@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -93,6 +92,27 @@
       <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.RefreshValues()</span>
     </div>
     <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.ExecuteDone()</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.ExecuteLoadSave()</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.DeleteSelectedSave()</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.OnFinalize()</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.SetDoneInputKey(TaleWorlds.InputSystem.HotKey)</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.SetCancelInputKey(TaleWorlds.InputSystem.HotKey)</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.SetDeleteInputKey(TaleWorlds.InputSystem.HotKey)</span>
+    </div>
+    <div>
       <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.SaveGroups</span>
     </div>
     <div>
@@ -115,6 +135,15 @@
     </div>
     <div>
       <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.SaveLoadText</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.DoneInputKey</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.CancelInputKey</span>
+    </div>
+    <div>
+      <span class="xref">SandBox.ViewModelCollection.SaveLoad.SaveLoadVM.DeleteInputKey</span>
     </div>
     <div>
       <span class="xref">TaleWorlds.Library.ViewModel.UIDebugMode</span>
@@ -145,9 +174,6 @@
     </div>
     <div>
       <span class="xref">TaleWorlds.Library.ViewModel.SetPropertyValue(System.String, System.Object)</span>
-    </div>
-    <div>
-      <span class="xref">TaleWorlds.Library.ViewModel.OnFinalize()</span>
     </div>
     <div>
       <span class="xref">TaleWorlds.Library.ViewModel.ExecuteCommand(System.String, System.Object[])</span>
@@ -196,7 +222,7 @@
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_CoopLoadUI__ctor.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.CoopLoadUI.%23ctor%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L72">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L62">View Source</a>
   </span>
   <a id="Coop_Mod_UI_CoopLoadUI__ctor_" data-uid="Coop.Mod.UI.CoopLoadUI.#ctor*"></a>
   <h4 id="Coop_Mod_UI_CoopLoadUI__ctor" data-uid="Coop.Mod.UI.CoopLoadUI.#ctor">CoopLoadUI()</h4>
@@ -213,7 +239,7 @@
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_CoopLoadUI_CurrentSelectedSave.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.CoopLoadUI.CurrentSelectedSave%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L71">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L61">View Source</a>
   </span>
   <h4 id="Coop_Mod_UI_CoopLoadUI_CurrentSelectedSave" data-uid="Coop.Mod.UI.CoopLoadUI.CurrentSelectedSave">CurrentSelectedSave</h4>
   <div class="markdown level1 summary"></div>
@@ -241,40 +267,10 @@
   </h3>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_CoopLoadUI_ExecuteDone.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.CoopLoadUI.ExecuteDone%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
-  </span>
-  <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L113">View Source</a>
-  </span>
-  <a id="Coop_Mod_UI_CoopLoadUI_ExecuteDone_" data-uid="Coop.Mod.UI.CoopLoadUI.ExecuteDone*"></a>
-  <h4 id="Coop_Mod_UI_CoopLoadUI_ExecuteDone" data-uid="Coop.Mod.UI.CoopLoadUI.ExecuteDone">ExecuteDone()</h4>
-  <div class="markdown level1 summary"></div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">void ExecuteDone()</code></pre>
-  </div>
-  <span class="small pull-right mobile-hide">
-    <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_CoopLoadUI_ExecuteLoadSave.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.CoopLoadUI.ExecuteLoadSave%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
-  </span>
-  <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L103">View Source</a>
-  </span>
-  <a id="Coop_Mod_UI_CoopLoadUI_ExecuteLoadSave_" data-uid="Coop.Mod.UI.CoopLoadUI.ExecuteLoadSave*"></a>
-  <h4 id="Coop_Mod_UI_CoopLoadUI_ExecuteLoadSave" data-uid="Coop.Mod.UI.CoopLoadUI.ExecuteLoadSave">ExecuteLoadSave()</h4>
-  <div class="markdown level1 summary"></div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">void ExecuteLoadSave()</code></pre>
-  </div>
-  <span class="small pull-right mobile-hide">
-    <span class="divider">|</span>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_CoopLoadUI_GetSavedGames.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.CoopLoadUI.GetSavedGames%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L134">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L109">View Source</a>
   </span>
   <a id="Coop_Mod_UI_CoopLoadUI_GetSavedGames_" data-uid="Coop.Mod.UI.CoopLoadUI.GetSavedGames*"></a>
   <h4 id="Coop_Mod_UI_CoopLoadUI_GetSavedGames" data-uid="Coop.Mod.UI.CoopLoadUI.GetSavedGames">GetSavedGames()</h4>
@@ -304,7 +300,7 @@
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_CoopLoadUI_OnCancelLoadSave.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.CoopLoadUI.OnCancelLoadSave%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L118">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L93">View Source</a>
   </span>
   <a id="Coop_Mod_UI_CoopLoadUI_OnCancelLoadSave_" data-uid="Coop.Mod.UI.CoopLoadUI.OnCancelLoadSave*"></a>
   <h4 id="Coop_Mod_UI_CoopLoadUI_OnCancelLoadSave" data-uid="Coop.Mod.UI.CoopLoadUI.OnCancelLoadSave">OnCancelLoadSave()</h4>
@@ -319,7 +315,7 @@
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_CoopLoadUI_OnDeleteSavedGame_SandBox_ViewModelCollection_SaveLoad_SavedGameVM_.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.CoopLoadUI.OnDeleteSavedGame(SandBox.ViewModelCollection.SaveLoad.SavedGameVM)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L122">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L97">View Source</a>
   </span>
   <a id="Coop_Mod_UI_CoopLoadUI_OnDeleteSavedGame_" data-uid="Coop.Mod.UI.CoopLoadUI.OnDeleteSavedGame*"></a>
   <h4 id="Coop_Mod_UI_CoopLoadUI_OnDeleteSavedGame_SandBox_ViewModelCollection_SaveLoad_SavedGameVM_" data-uid="Coop.Mod.UI.CoopLoadUI.OnDeleteSavedGame(SandBox.ViewModelCollection.SaveLoad.SavedGameVM)">OnDeleteSavedGame(SavedGameVM)</h4>
@@ -351,7 +347,7 @@
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_CoopLoadUI_OnSaveSelection_SandBox_ViewModelCollection_SaveLoad_SavedGameVM_.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.CoopLoadUI.OnSaveSelection(SandBox.ViewModelCollection.SaveLoad.SavedGameVM)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L85">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L75">View Source</a>
   </span>
   <a id="Coop_Mod_UI_CoopLoadUI_OnSaveSelection_" data-uid="Coop.Mod.UI.CoopLoadUI.OnSaveSelection*"></a>
   <h4 id="Coop_Mod_UI_CoopLoadUI_OnSaveSelection_SandBox_ViewModelCollection_SaveLoad_SavedGameVM_" data-uid="Coop.Mod.UI.CoopLoadUI.OnSaveSelection(SandBox.ViewModelCollection.SaveLoad.SavedGameVM)">OnSaveSelection(SavedGameVM)</h4>
@@ -396,13 +392,26 @@
                     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_UI_CoopLoadUI.md&amp;value=---%0Auid%3A%20Coop.Mod.UI.CoopLoadUI%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
                   </li>
                   <li>
-                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L69" class="contribution-link">View Source</a>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/LoadGameUI/CoopLoadUI.cs/#L59" class="contribution-link">View Source</a>
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

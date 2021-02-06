@@ -1,0 +1,455 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics
+  commentId: T:Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics
+  id: MethodCallSyncHandler.Statistics
+  parent: Coop.Mod.Persistence.RPC
+  children:
+  - Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.History
+  langs:
+  - csharp
+  - vb
+  name: MethodCallSyncHandler.Statistics
+  nameWithType: MethodCallSyncHandler.Statistics
+  fullName: Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/MethodCallSyncHandler.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Statistics
+    path: ../source/Coop/Mod/Persistence/RPC/MethodCallSyncHandler.cs
+    startLine: 123
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: public class Statistics
+    content.vb: Public Class Statistics
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.History
+  commentId: F:Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.History
+  id: History
+  parent: Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics
+  langs:
+  - csharp
+  - vb
+  name: History
+  nameWithType: MethodCallSyncHandler.Statistics.History
+  fullName: Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.History
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/MethodCallSyncHandler.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: History
+    path: ../source/Coop/Mod/Persistence/RPC/MethodCallSyncHandler.cs
+    startLine: 125
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: public DropoutStack<MethodCallSyncHandler.Statistics.Trace> History
+    return:
+      type: Common.DropoutStack{Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.Trace}
+    content.vb: Public History As DropoutStack(Of MethodCallSyncHandler.Statistics.Trace)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.Mod.Persistence.RPC
+  commentId: N:Coop.Mod.Persistence.RPC
+  name: Coop.Mod.Persistence.RPC
+  nameWithType: Coop.Mod.Persistence.RPC
+  fullName: Coop.Mod.Persistence.RPC
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Common.DropoutStack{Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.Trace}
+  commentId: T:Common.DropoutStack{Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.Trace}
+  parent: Common
+  definition: Common.DropoutStack`1
+  name: DropoutStack<MethodCallSyncHandler.Statistics.Trace>
+  nameWithType: DropoutStack<MethodCallSyncHandler.Statistics.Trace>
+  fullName: Common.DropoutStack<Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.Trace>
+  nameWithType.vb: DropoutStack(Of MethodCallSyncHandler.Statistics.Trace)
+  fullName.vb: Common.DropoutStack(Of Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.Trace)
+  name.vb: DropoutStack(Of MethodCallSyncHandler.Statistics.Trace)
+  spec.csharp:
+  - uid: Common.DropoutStack`1
+    name: DropoutStack
+    nameWithType: DropoutStack
+    fullName: Common.DropoutStack
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.Trace
+    name: MethodCallSyncHandler.Statistics.Trace
+    nameWithType: MethodCallSyncHandler.Statistics.Trace
+    fullName: Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.Trace
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.DropoutStack`1
+    name: DropoutStack
+    nameWithType: DropoutStack
+    fullName: Common.DropoutStack
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.Trace
+    name: MethodCallSyncHandler.Statistics.Trace
+    nameWithType: MethodCallSyncHandler.Statistics.Trace
+    fullName: Coop.Mod.Persistence.RPC.MethodCallSyncHandler.Statistics.Trace
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.DropoutStack`1
+  commentId: T:Common.DropoutStack`1
+  name: DropoutStack<T>
+  nameWithType: DropoutStack<T>
+  fullName: Common.DropoutStack<T>
+  nameWithType.vb: DropoutStack(Of T)
+  fullName.vb: Common.DropoutStack(Of T)
+  name.vb: DropoutStack(Of T)
+  spec.csharp:
+  - uid: Common.DropoutStack`1
+    name: DropoutStack
+    nameWithType: DropoutStack
+    fullName: Common.DropoutStack
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.DropoutStack`1
+    name: DropoutStack
+    nameWithType: DropoutStack
+    fullName: Common.DropoutStack
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common

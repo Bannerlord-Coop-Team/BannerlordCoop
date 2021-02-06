@@ -1,0 +1,583 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch
+  commentId: T:Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch
+  id: BanditsCampaignBehaviorPatch
+  parent: Coop.Mod.Patch.Party
+  children:
+  - Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.OnBanditAdded
+  - Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.Prefix(TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.BanditsCampaignBehavior,TaleWorlds.CampaignSystem.MobileParty@,TaleWorlds.Localization.TextObject@,TaleWorlds.CampaignSystem.Clan@,TaleWorlds.CampaignSystem.Settlement@)
+  langs:
+  - csharp
+  - vb
+  name: BanditsCampaignBehaviorPatch
+  nameWithType: BanditsCampaignBehaviorPatch
+  fullName: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Party/BanditsCampaignBehavior.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: BanditsCampaignBehaviorPatch
+    path: ../source/Coop/Mod/Patch/Party/BanditsCampaignBehavior.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch.Party
+  syntax:
+    content: >-
+      [HarmonyPatch(typeof(BanditsCampaignBehavior), "InitBanditParty")]
+
+      class BanditsCampaignBehaviorPatch
+    content.vb: >-
+      <HarmonyPatch(GetType(BanditsCampaignBehavior), "InitBanditParty")>
+
+      Class BanditsCampaignBehaviorPatch
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  attributes:
+  - type: HarmonyLib.HarmonyPatch
+    ctor: HarmonyLib.HarmonyPatch.#ctor(System.Type,System.String)
+    arguments:
+    - type: System.Type
+      value: TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.BanditsCampaignBehavior
+    - type: System.String
+      value: InitBanditParty
+  modifiers.csharp:
+  - class
+  modifiers.vb:
+  - Class
+- uid: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.OnBanditAdded
+  commentId: F:Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.OnBanditAdded
+  id: OnBanditAdded
+  parent: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch
+  langs:
+  - csharp
+  - vb
+  name: OnBanditAdded
+  nameWithType: BanditsCampaignBehaviorPatch.OnBanditAdded
+  fullName: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.OnBanditAdded
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Party/BanditsCampaignBehavior.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnBanditAdded
+    path: ../source/Coop/Mod/Patch/Party/BanditsCampaignBehavior.cs
+    startLine: 15
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch.Party
+  syntax:
+    content: public static EventHandler<MobileParty> OnBanditAdded
+    return:
+      type: System.EventHandler{TaleWorlds.CampaignSystem.MobileParty}
+    content.vb: Public Shared OnBanditAdded As EventHandler(Of MobileParty)
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.Prefix(TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.BanditsCampaignBehavior,TaleWorlds.CampaignSystem.MobileParty@,TaleWorlds.Localization.TextObject@,TaleWorlds.CampaignSystem.Clan@,TaleWorlds.CampaignSystem.Settlement@)
+  commentId: M:Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.Prefix(TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.BanditsCampaignBehavior,TaleWorlds.CampaignSystem.MobileParty@,TaleWorlds.Localization.TextObject@,TaleWorlds.CampaignSystem.Clan@,TaleWorlds.CampaignSystem.Settlement@)
+  id: Prefix(TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.BanditsCampaignBehavior,TaleWorlds.CampaignSystem.MobileParty@,TaleWorlds.Localization.TextObject@,TaleWorlds.CampaignSystem.Clan@,TaleWorlds.CampaignSystem.Settlement@)
+  parent: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch
+  langs:
+  - csharp
+  - vb
+  name: Prefix(BanditsCampaignBehavior, ref MobileParty, ref TextObject, ref Clan, ref Settlement)
+  nameWithType: BanditsCampaignBehaviorPatch.Prefix(BanditsCampaignBehavior, ref MobileParty, ref TextObject, ref Clan, ref Settlement)
+  fullName: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.Prefix(TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.BanditsCampaignBehavior, ref TaleWorlds.CampaignSystem.MobileParty, ref TaleWorlds.Localization.TextObject, ref TaleWorlds.CampaignSystem.Clan, ref TaleWorlds.CampaignSystem.Settlement)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Party/BanditsCampaignBehavior.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Prefix
+    path: ../source/Coop/Mod/Patch/Party/BanditsCampaignBehavior.cs
+    startLine: 17
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch.Party
+  syntax:
+    content: static bool Prefix(BanditsCampaignBehavior __instance, ref MobileParty banditParty, ref TextObject name, ref Clan faction, ref Settlement homeSettlement)
+    parameters:
+    - id: __instance
+      type: TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.BanditsCampaignBehavior
+    - id: banditParty
+      type: TaleWorlds.CampaignSystem.MobileParty
+    - id: name
+      type: TaleWorlds.Localization.TextObject
+    - id: faction
+      type: TaleWorlds.CampaignSystem.Clan
+    - id: homeSettlement
+      type: TaleWorlds.CampaignSystem.Settlement
+    return:
+      type: System.Boolean
+    content.vb: Shared Function Prefix(__instance As BanditsCampaignBehavior, ByRef banditParty As MobileParty, ByRef name As TextObject, ByRef faction As Clan, ByRef homeSettlement As Settlement) As Boolean
+  overload: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.Prefix*
+  nameWithType.vb: BanditsCampaignBehaviorPatch.Prefix(BanditsCampaignBehavior, ByRef MobileParty, ByRef TextObject, ByRef Clan, ByRef Settlement)
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+  fullName.vb: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.Prefix(TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.BanditsCampaignBehavior, ByRef TaleWorlds.CampaignSystem.MobileParty, ByRef TaleWorlds.Localization.TextObject, ByRef TaleWorlds.CampaignSystem.Clan, ByRef TaleWorlds.CampaignSystem.Settlement)
+  name.vb: Prefix(BanditsCampaignBehavior, ByRef MobileParty, ByRef TextObject, ByRef Clan, ByRef Settlement)
+references:
+- uid: Coop.Mod.Patch.Party
+  commentId: N:Coop.Mod.Patch.Party
+  name: Coop.Mod.Patch.Party
+  nameWithType: Coop.Mod.Patch.Party
+  fullName: Coop.Mod.Patch.Party
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.EventHandler{TaleWorlds.CampaignSystem.MobileParty}
+  commentId: T:System.EventHandler{TaleWorlds.CampaignSystem.MobileParty}
+  parent: System
+  definition: System.EventHandler`1
+  name: EventHandler<MobileParty>
+  nameWithType: EventHandler<MobileParty>
+  fullName: System.EventHandler<TaleWorlds.CampaignSystem.MobileParty>
+  nameWithType.vb: EventHandler(Of MobileParty)
+  fullName.vb: System.EventHandler(Of TaleWorlds.CampaignSystem.MobileParty)
+  name.vb: EventHandler(Of MobileParty)
+  spec.csharp:
+  - uid: System.EventHandler`1
+    name: EventHandler
+    nameWithType: EventHandler
+    fullName: System.EventHandler
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.EventHandler`1
+    name: EventHandler
+    nameWithType: EventHandler
+    fullName: System.EventHandler
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.EventHandler`1
+  commentId: T:System.EventHandler`1
+  isExternal: true
+  name: EventHandler<TEventArgs>
+  nameWithType: EventHandler<TEventArgs>
+  fullName: System.EventHandler<TEventArgs>
+  nameWithType.vb: EventHandler(Of TEventArgs)
+  fullName.vb: System.EventHandler(Of TEventArgs)
+  name.vb: EventHandler(Of TEventArgs)
+  spec.csharp:
+  - uid: System.EventHandler`1
+    name: EventHandler
+    nameWithType: EventHandler
+    fullName: System.EventHandler
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TEventArgs
+    nameWithType: TEventArgs
+    fullName: TEventArgs
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.EventHandler`1
+    name: EventHandler
+    nameWithType: EventHandler
+    fullName: System.EventHandler
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TEventArgs
+    nameWithType: TEventArgs
+    fullName: TEventArgs
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.Prefix*
+  commentId: Overload:Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.Prefix
+  name: Prefix
+  nameWithType: BanditsCampaignBehaviorPatch.Prefix
+  fullName: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch.Prefix
+- uid: TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.BanditsCampaignBehavior
+  commentId: T:TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.BanditsCampaignBehavior
+  parent: TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors
+  isExternal: true
+  name: BanditsCampaignBehavior
+  nameWithType: BanditsCampaignBehavior
+  fullName: TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.BanditsCampaignBehavior
+- uid: TaleWorlds.CampaignSystem.MobileParty
+  commentId: T:TaleWorlds.CampaignSystem.MobileParty
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: MobileParty
+  nameWithType: MobileParty
+  fullName: TaleWorlds.CampaignSystem.MobileParty
+- uid: TaleWorlds.Localization.TextObject
+  commentId: T:TaleWorlds.Localization.TextObject
+  parent: TaleWorlds.Localization
+  isExternal: true
+  name: TextObject
+  nameWithType: TextObject
+  fullName: TaleWorlds.Localization.TextObject
+- uid: TaleWorlds.CampaignSystem.Clan
+  commentId: T:TaleWorlds.CampaignSystem.Clan
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: Clan
+  nameWithType: Clan
+  fullName: TaleWorlds.CampaignSystem.Clan
+- uid: TaleWorlds.CampaignSystem.Settlement
+  commentId: T:TaleWorlds.CampaignSystem.Settlement
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: Settlement
+  nameWithType: Settlement
+  fullName: TaleWorlds.CampaignSystem.Settlement
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors
+  commentId: N:TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors
+  isExternal: true
+  name: TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors
+  nameWithType: TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors
+  fullName: TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: TaleWorlds.Localization
+  commentId: N:TaleWorlds.Localization
+  isExternal: true
+  name: TaleWorlds.Localization
+  nameWithType: TaleWorlds.Localization
+  fullName: TaleWorlds.Localization

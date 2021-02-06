@@ -1,0 +1,546 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Protocol.Client_Hello
+  commentId: T:Network.Protocol.Client_Hello
+  id: Client_Hello
+  parent: Network.Protocol
+  children:
+  - Network.Protocol.Client_Hello.#ctor(System.Int32)
+  - Network.Protocol.Client_Hello.Deserialize(Network.ByteReader)
+  - Network.Protocol.Client_Hello.m_Version
+  - Network.Protocol.Client_Hello.Serialize
+  langs:
+  - csharp
+  - vb
+  name: Client_Hello
+  nameWithType: Client_Hello
+  fullName: Network.Protocol.Client_Hello
+  type: Class
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Client_Hello
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 53
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public class Client_Hello
+    content.vb: Public Class Client_Hello
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Network.Protocol.Client_Hello.m_Version
+  commentId: F:Network.Protocol.Client_Hello.m_Version
+  id: m_Version
+  parent: Network.Protocol.Client_Hello
+  langs:
+  - csharp
+  - vb
+  name: m_Version
+  nameWithType: Client_Hello.m_Version
+  fullName: Network.Protocol.Client_Hello.m_Version
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Version
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 55
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public readonly int m_Version
+    return:
+      type: System.Int32
+    content.vb: Public ReadOnly m_Version As Integer
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Protocol.Client_Hello.#ctor(System.Int32)
+  commentId: M:Network.Protocol.Client_Hello.#ctor(System.Int32)
+  id: '#ctor(System.Int32)'
+  parent: Network.Protocol.Client_Hello
+  langs:
+  - csharp
+  - vb
+  name: Client_Hello(Int32)
+  nameWithType: Client_Hello.Client_Hello(Int32)
+  fullName: Network.Protocol.Client_Hello.Client_Hello(System.Int32)
+  type: Constructor
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 57
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public Client_Hello(int version)
+    parameters:
+    - id: version
+      type: System.Int32
+    content.vb: Public Sub New(version As Integer)
+  overload: Network.Protocol.Client_Hello.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Protocol.Client_Hello.Serialize
+  commentId: M:Network.Protocol.Client_Hello.Serialize
+  id: Serialize
+  parent: Network.Protocol.Client_Hello
+  langs:
+  - csharp
+  - vb
+  name: Serialize()
+  nameWithType: Client_Hello.Serialize()
+  fullName: Network.Protocol.Client_Hello.Serialize()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Serialize
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 62
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public byte[] Serialize()
+    return:
+      type: System.Byte[]
+    content.vb: Public Function Serialize As Byte()
+  overload: Network.Protocol.Client_Hello.Serialize*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Protocol.Client_Hello.Deserialize(Network.ByteReader)
+  commentId: M:Network.Protocol.Client_Hello.Deserialize(Network.ByteReader)
+  id: Deserialize(Network.ByteReader)
+  parent: Network.Protocol.Client_Hello
+  langs:
+  - csharp
+  - vb
+  name: Deserialize(ByteReader)
+  nameWithType: Client_Hello.Deserialize(ByteReader)
+  fullName: Network.Protocol.Client_Hello.Deserialize(Network.ByteReader)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Deserialize
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 69
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public static Client_Hello Deserialize(ByteReader reader)
+    parameters:
+    - id: reader
+      type: Network.ByteReader
+    return:
+      type: Network.Protocol.Client_Hello
+    content.vb: Public Shared Function Deserialize(reader As ByteReader) As Client_Hello
+  overload: Network.Protocol.Client_Hello.Deserialize*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+references:
+- uid: Network.Protocol
+  commentId: N:Network.Protocol
+  name: Network.Protocol
+  nameWithType: Network.Protocol
+  fullName: Network.Protocol
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: Network.Protocol.Client_Hello.#ctor*
+  commentId: Overload:Network.Protocol.Client_Hello.#ctor
+  name: Client_Hello
+  nameWithType: Client_Hello.Client_Hello
+  fullName: Network.Protocol.Client_Hello.Client_Hello
+- uid: Network.Protocol.Client_Hello.Serialize*
+  commentId: Overload:Network.Protocol.Client_Hello.Serialize
+  name: Serialize
+  nameWithType: Client_Hello.Serialize
+  fullName: Network.Protocol.Client_Hello.Serialize
+- uid: System.Byte[]
+  isExternal: true
+  name: Byte[]
+  nameWithType: Byte[]
+  fullName: System.Byte[]
+  nameWithType.vb: Byte()
+  fullName.vb: System.Byte()
+  name.vb: Byte()
+  spec.csharp:
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  spec.vb:
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+- uid: Network.Protocol.Client_Hello.Deserialize*
+  commentId: Overload:Network.Protocol.Client_Hello.Deserialize
+  name: Deserialize
+  nameWithType: Client_Hello.Deserialize
+  fullName: Network.Protocol.Client_Hello.Deserialize
+- uid: Network.ByteReader
+  commentId: T:Network.ByteReader
+  parent: Network
+  name: ByteReader
+  nameWithType: ByteReader
+  fullName: Network.ByteReader
+- uid: Network.Protocol.Client_Hello
+  commentId: T:Network.Protocol.Client_Hello
+  parent: Network.Protocol
+  name: Client_Hello
+  nameWithType: Client_Hello
+  fullName: Network.Protocol.Client_Hello
+- uid: Network
+  commentId: N:Network
+  name: Network
+  nameWithType: Network
+  fullName: Network

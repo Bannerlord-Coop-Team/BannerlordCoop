@@ -1,0 +1,53 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Managers
+  commentId: N:Coop.Mod.Managers
+  id: Coop.Mod.Managers
+  children:
+  - Coop.Mod.Managers.ClientCharacterCreatorManager
+  - Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  - Coop.Mod.Managers.ClientManager
+  - Coop.Mod.Managers.HeroEventArgs
+  - Coop.Mod.Managers.ServerGameManager
+  langs:
+  - csharp
+  - vb
+  name: Coop.Mod.Managers
+  nameWithType: Coop.Mod.Managers
+  fullName: Coop.Mod.Managers
+  type: Namespace
+  assemblies:
+  - Coop
+references:
+- uid: Coop.Mod.Managers.HeroEventArgs
+  commentId: T:Coop.Mod.Managers.HeroEventArgs
+  name: HeroEventArgs
+  nameWithType: HeroEventArgs
+  fullName: Coop.Mod.Managers.HeroEventArgs
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager
+  commentId: T:Coop.Mod.Managers.ClientCharacterCreatorManager
+  name: ClientCharacterCreatorManager
+  nameWithType: ClientCharacterCreatorManager
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  commentId: T:Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  parent: Coop.Mod.Managers
+  name: ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  nameWithType: ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+- uid: Coop.Mod.Managers.ClientManager
+  commentId: T:Coop.Mod.Managers.ClientManager
+  name: ClientManager
+  nameWithType: ClientManager
+  fullName: Coop.Mod.Managers.ClientManager
+- uid: Coop.Mod.Managers.ServerGameManager
+  commentId: T:Coop.Mod.Managers.ServerGameManager
+  parent: Coop.Mod.Managers
+  name: ServerGameManager
+  nameWithType: ServerGameManager
+  fullName: Coop.Mod.Managers.ServerGameManager
+- uid: Coop.Mod.Managers
+  commentId: N:Coop.Mod.Managers
+  name: Coop.Mod.Managers
+  nameWithType: Coop.Mod.Managers
+  fullName: Coop.Mod.Managers

@@ -1,0 +1,741 @@
+### YamlMime:ManagedReference
+items:
+- uid: BannerlordSystemTestingLibrary.ProtocolRegistry
+  commentId: T:BannerlordSystemTestingLibrary.ProtocolRegistry
+  id: ProtocolRegistry
+  parent: BannerlordSystemTestingLibrary
+  children:
+  - BannerlordSystemTestingLibrary.ProtocolRegistry.InvokeCommand(System.Net.Sockets.TcpClient,System.String,System.String[])
+  - BannerlordSystemTestingLibrary.ProtocolRegistry.ParseAndRegisterCommand(SimpleTCP.Message)
+  - BannerlordSystemTestingLibrary.ProtocolRegistry.REGISTER_COMMAND
+  - BannerlordSystemTestingLibrary.ProtocolRegistry.RegisterCommand(System.Net.Sockets.TcpClient,System.String)
+  - BannerlordSystemTestingLibrary.ProtocolRegistry.registeredCommands
+  langs:
+  - csharp
+  - vb
+  name: ProtocolRegistry
+  nameWithType: ProtocolRegistry
+  fullName: BannerlordSystemTestingLibrary.ProtocolRegistry
+  type: Class
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: ProtocolRegistry
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+    startLine: 17
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: class ProtocolRegistry
+    content.vb: Class ProtocolRegistry
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - class
+  modifiers.vb:
+  - Class
+- uid: BannerlordSystemTestingLibrary.ProtocolRegistry.registeredCommands
+  commentId: F:BannerlordSystemTestingLibrary.ProtocolRegistry.registeredCommands
+  id: registeredCommands
+  parent: BannerlordSystemTestingLibrary.ProtocolRegistry
+  langs:
+  - csharp
+  - vb
+  name: registeredCommands
+  nameWithType: ProtocolRegistry.registeredCommands
+  fullName: BannerlordSystemTestingLibrary.ProtocolRegistry.registeredCommands
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: registeredCommands
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+    startLine: 19
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: protected readonly Dictionary<TcpClient, List<string>> registeredCommands
+    return:
+      type: System.Collections.Generic.Dictionary{System.Net.Sockets.TcpClient,System.Collections.Generic.List{System.String}}
+    content.vb: Protected ReadOnly registeredCommands As Dictionary(Of TcpClient, List(Of String))
+  modifiers.csharp:
+  - protected
+  - readonly
+  modifiers.vb:
+  - Protected
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.ProtocolRegistry.REGISTER_COMMAND
+  commentId: F:BannerlordSystemTestingLibrary.ProtocolRegistry.REGISTER_COMMAND
+  id: REGISTER_COMMAND
+  parent: BannerlordSystemTestingLibrary.ProtocolRegistry
+  langs:
+  - csharp
+  - vb
+  name: REGISTER_COMMAND
+  nameWithType: ProtocolRegistry.REGISTER_COMMAND
+  fullName: BannerlordSystemTestingLibrary.ProtocolRegistry.REGISTER_COMMAND
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: REGISTER_COMMAND
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+    startLine: 20
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: protected readonly string REGISTER_COMMAND
+    return:
+      type: System.String
+    content.vb: Protected ReadOnly REGISTER_COMMAND As String
+  modifiers.csharp:
+  - protected
+  - readonly
+  modifiers.vb:
+  - Protected
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.ProtocolRegistry.ParseAndRegisterCommand(SimpleTCP.Message)
+  commentId: M:BannerlordSystemTestingLibrary.ProtocolRegistry.ParseAndRegisterCommand(SimpleTCP.Message)
+  id: ParseAndRegisterCommand(SimpleTCP.Message)
+  parent: BannerlordSystemTestingLibrary.ProtocolRegistry
+  langs:
+  - csharp
+  - vb
+  name: ParseAndRegisterCommand(Message)
+  nameWithType: ProtocolRegistry.ParseAndRegisterCommand(Message)
+  fullName: BannerlordSystemTestingLibrary.ProtocolRegistry.ParseAndRegisterCommand(SimpleTCP.Message)
+  type: Method
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: ParseAndRegisterCommand
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+    startLine: 21
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public void ParseAndRegisterCommand(Message message)
+    parameters:
+    - id: message
+      type: SimpleTCP.Message
+    content.vb: Public Sub ParseAndRegisterCommand(message As Message)
+  overload: BannerlordSystemTestingLibrary.ProtocolRegistry.ParseAndRegisterCommand*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: BannerlordSystemTestingLibrary.ProtocolRegistry.RegisterCommand(System.Net.Sockets.TcpClient,System.String)
+  commentId: M:BannerlordSystemTestingLibrary.ProtocolRegistry.RegisterCommand(System.Net.Sockets.TcpClient,System.String)
+  id: RegisterCommand(System.Net.Sockets.TcpClient,System.String)
+  parent: BannerlordSystemTestingLibrary.ProtocolRegistry
+  langs:
+  - csharp
+  - vb
+  name: RegisterCommand(TcpClient, String)
+  nameWithType: ProtocolRegistry.RegisterCommand(TcpClient, String)
+  fullName: BannerlordSystemTestingLibrary.ProtocolRegistry.RegisterCommand(System.Net.Sockets.TcpClient, System.String)
+  type: Method
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: RegisterCommand
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+    startLine: 38
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public void RegisterCommand(TcpClient user, string command)
+    parameters:
+    - id: user
+      type: System.Net.Sockets.TcpClient
+    - id: command
+      type: System.String
+    content.vb: Public Sub RegisterCommand(user As TcpClient, command As String)
+  overload: BannerlordSystemTestingLibrary.ProtocolRegistry.RegisterCommand*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: BannerlordSystemTestingLibrary.ProtocolRegistry.InvokeCommand(System.Net.Sockets.TcpClient,System.String,System.String[])
+  commentId: M:BannerlordSystemTestingLibrary.ProtocolRegistry.InvokeCommand(System.Net.Sockets.TcpClient,System.String,System.String[])
+  id: InvokeCommand(System.Net.Sockets.TcpClient,System.String,System.String[])
+  parent: BannerlordSystemTestingLibrary.ProtocolRegistry
+  langs:
+  - csharp
+  - vb
+  name: InvokeCommand(TcpClient, String, String[])
+  nameWithType: ProtocolRegistry.InvokeCommand(TcpClient, String, String[])
+  fullName: BannerlordSystemTestingLibrary.ProtocolRegistry.InvokeCommand(System.Net.Sockets.TcpClient, System.String, System.String[])
+  type: Method
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: InvokeCommand
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/ProtocolRegistry.cs
+    startLine: 57
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public bool InvokeCommand(TcpClient user, string command, string[] args = null)
+    parameters:
+    - id: user
+      type: System.Net.Sockets.TcpClient
+    - id: command
+      type: System.String
+    - id: args
+      type: System.String[]
+    return:
+      type: System.Boolean
+    content.vb: Public Function InvokeCommand(user As TcpClient, command As String, args As String() = Nothing) As Boolean
+  overload: BannerlordSystemTestingLibrary.ProtocolRegistry.InvokeCommand*
+  nameWithType.vb: ProtocolRegistry.InvokeCommand(TcpClient, String, String())
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: BannerlordSystemTestingLibrary.ProtocolRegistry.InvokeCommand(System.Net.Sockets.TcpClient, System.String, System.String())
+  name.vb: InvokeCommand(TcpClient, String, String())
+references:
+- uid: BannerlordSystemTestingLibrary
+  commentId: N:BannerlordSystemTestingLibrary
+  name: BannerlordSystemTestingLibrary
+  nameWithType: BannerlordSystemTestingLibrary
+  fullName: BannerlordSystemTestingLibrary
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Collections.Generic.Dictionary{System.Net.Sockets.TcpClient,System.Collections.Generic.List{System.String}}
+  commentId: T:System.Collections.Generic.Dictionary{System.Net.Sockets.TcpClient,System.Collections.Generic.List{System.String}}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  name: Dictionary<TcpClient, List<String>>
+  nameWithType: Dictionary<TcpClient, List<String>>
+  fullName: System.Collections.Generic.Dictionary<System.Net.Sockets.TcpClient, System.Collections.Generic.List<System.String>>
+  nameWithType.vb: Dictionary(Of TcpClient, List(Of String))
+  fullName.vb: System.Collections.Generic.Dictionary(Of System.Net.Sockets.TcpClient, System.Collections.Generic.List(Of System.String))
+  name.vb: Dictionary(Of TcpClient, List(Of String))
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Net.Sockets.TcpClient
+    name: TcpClient
+    nameWithType: TcpClient
+    fullName: System.Net.Sockets.TcpClient
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Net.Sockets.TcpClient
+    name: TcpClient
+    nameWithType: TcpClient
+    fullName: System.Net.Sockets.TcpClient
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.Dictionary`2
+  commentId: T:System.Collections.Generic.Dictionary`2
+  isExternal: true
+  name: Dictionary<TKey, TValue>
+  nameWithType: Dictionary<TKey, TValue>
+  fullName: System.Collections.Generic.Dictionary<TKey, TValue>
+  nameWithType.vb: Dictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.Dictionary(Of TKey, TValue)
+  name.vb: Dictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String
+- uid: BannerlordSystemTestingLibrary.ProtocolRegistry.ParseAndRegisterCommand*
+  commentId: Overload:BannerlordSystemTestingLibrary.ProtocolRegistry.ParseAndRegisterCommand
+  name: ParseAndRegisterCommand
+  nameWithType: ProtocolRegistry.ParseAndRegisterCommand
+  fullName: BannerlordSystemTestingLibrary.ProtocolRegistry.ParseAndRegisterCommand
+- uid: SimpleTCP.Message
+  commentId: T:SimpleTCP.Message
+  parent: SimpleTCP
+  isExternal: true
+  name: Message
+  nameWithType: Message
+  fullName: SimpleTCP.Message
+- uid: SimpleTCP
+  commentId: N:SimpleTCP
+  isExternal: true
+  name: SimpleTCP
+  nameWithType: SimpleTCP
+  fullName: SimpleTCP
+- uid: BannerlordSystemTestingLibrary.ProtocolRegistry.RegisterCommand*
+  commentId: Overload:BannerlordSystemTestingLibrary.ProtocolRegistry.RegisterCommand
+  name: RegisterCommand
+  nameWithType: ProtocolRegistry.RegisterCommand
+  fullName: BannerlordSystemTestingLibrary.ProtocolRegistry.RegisterCommand
+- uid: System.Net.Sockets.TcpClient
+  commentId: T:System.Net.Sockets.TcpClient
+  parent: System.Net.Sockets
+  isExternal: true
+  name: TcpClient
+  nameWithType: TcpClient
+  fullName: System.Net.Sockets.TcpClient
+- uid: System.Net.Sockets
+  commentId: N:System.Net.Sockets
+  isExternal: true
+  name: System.Net.Sockets
+  nameWithType: System.Net.Sockets
+  fullName: System.Net.Sockets
+- uid: BannerlordSystemTestingLibrary.ProtocolRegistry.InvokeCommand*
+  commentId: Overload:BannerlordSystemTestingLibrary.ProtocolRegistry.InvokeCommand
+  name: InvokeCommand
+  nameWithType: ProtocolRegistry.InvokeCommand
+  fullName: BannerlordSystemTestingLibrary.ProtocolRegistry.InvokeCommand
+- uid: System.String[]
+  isExternal: true
+  name: String[]
+  nameWithType: String[]
+  fullName: System.String[]
+  nameWithType.vb: String()
+  fullName.vb: System.String()
+  name.vb: String()
+  spec.csharp:
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  spec.vb:
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean

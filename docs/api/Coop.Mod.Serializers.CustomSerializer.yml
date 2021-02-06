@@ -1,0 +1,1179 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Serializers.CustomSerializer
+  commentId: T:Coop.Mod.Serializers.CustomSerializer
+  id: CustomSerializer
+  parent: Coop.Mod.Serializers
+  children:
+  - Coop.Mod.Serializers.CustomSerializer.#ctor
+  - Coop.Mod.Serializers.CustomSerializer.#ctor(System.Object)
+  - Coop.Mod.Serializers.CustomSerializer.Collections
+  - Coop.Mod.Serializers.CustomSerializer.Deserialize
+  - Coop.Mod.Serializers.CustomSerializer.Deserialize(System.Object)
+  - Coop.Mod.Serializers.CustomSerializer.GetFields
+  - Coop.Mod.Serializers.CustomSerializer.IsCollectionSerializableRecursive(System.Type)
+  - Coop.Mod.Serializers.CustomSerializer.NonSerializableCollections
+  - Coop.Mod.Serializers.CustomSerializer.NonSerializableObjects
+  - Coop.Mod.Serializers.CustomSerializer.ObjectType
+  - Coop.Mod.Serializers.CustomSerializer.SerializableObjects
+  langs:
+  - csharp
+  - vb
+  name: CustomSerializer
+  nameWithType: CustomSerializer
+  fullName: Coop.Mod.Serializers.CustomSerializer
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CustomSerializer
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 16
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: >-
+      [Serializable]
+
+      public abstract class CustomSerializer : ICustomSerializer
+    content.vb: >-
+      <Serializable>
+
+      Public MustInherit Class CustomSerializer
+          Implements ICustomSerializer
+  inheritance:
+  - System.Object
+  derivedClasses:
+  - Coop.Mod.Serializers.CharacterObjectSerializer
+  - Coop.Mod.Serializers.ClanSerializer
+  - Coop.Mod.Serializers.DeterministicRandomSerializer
+  - Coop.Mod.Serializers.MobilePartySerializer
+  - Coop.Mod.Serializers.PartyBaseSerializer
+  - Coop.Mod.Serializers.PlayerHeroSerializer
+  - Coop.Mod.Serializers.TraitObjectSerializer
+  implements:
+  - Coop.Mod.Serializers.ICustomSerializer
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  attributes:
+  - type: System.SerializableAttribute
+    ctor: System.SerializableAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - public
+  - abstract
+  - class
+  modifiers.vb:
+  - Public
+  - MustInherit
+  - Class
+- uid: Coop.Mod.Serializers.CustomSerializer.ObjectType
+  commentId: P:Coop.Mod.Serializers.CustomSerializer.ObjectType
+  id: ObjectType
+  parent: Coop.Mod.Serializers.CustomSerializer
+  langs:
+  - csharp
+  - vb
+  name: ObjectType
+  nameWithType: CustomSerializer.ObjectType
+  fullName: Coop.Mod.Serializers.CustomSerializer.ObjectType
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ObjectType
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 19
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: public Type ObjectType { get; }
+    parameters: []
+    return:
+      type: System.Type
+    content.vb: Public ReadOnly Property ObjectType As Type
+  overload: Coop.Mod.Serializers.CustomSerializer.ObjectType*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.Serializers.CustomSerializer.SerializableObjects
+  commentId: F:Coop.Mod.Serializers.CustomSerializer.SerializableObjects
+  id: SerializableObjects
+  parent: Coop.Mod.Serializers.CustomSerializer
+  langs:
+  - csharp
+  - vb
+  name: SerializableObjects
+  nameWithType: CustomSerializer.SerializableObjects
+  fullName: Coop.Mod.Serializers.CustomSerializer.SerializableObjects
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SerializableObjects
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 20
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: public readonly Dictionary<FieldInfo, object> SerializableObjects
+    return:
+      type: System.Collections.Generic.Dictionary{System.Reflection.FieldInfo,System.Object}
+    content.vb: Public ReadOnly SerializableObjects As Dictionary(Of FieldInfo, Object)
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.Serializers.CustomSerializer.Collections
+  commentId: F:Coop.Mod.Serializers.CustomSerializer.Collections
+  id: Collections
+  parent: Coop.Mod.Serializers.CustomSerializer
+  langs:
+  - csharp
+  - vb
+  name: Collections
+  nameWithType: CustomSerializer.Collections
+  fullName: Coop.Mod.Serializers.CustomSerializer.Collections
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Collections
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 21
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: public readonly Dictionary<FieldInfo, ICollection> Collections
+    return:
+      type: System.Collections.Generic.Dictionary{System.Reflection.FieldInfo,System.Collections.ICollection}
+    content.vb: Public ReadOnly Collections As Dictionary(Of FieldInfo, ICollection)
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.Serializers.CustomSerializer.NonSerializableObjects
+  commentId: F:Coop.Mod.Serializers.CustomSerializer.NonSerializableObjects
+  id: NonSerializableObjects
+  parent: Coop.Mod.Serializers.CustomSerializer
+  langs:
+  - csharp
+  - vb
+  name: NonSerializableObjects
+  nameWithType: CustomSerializer.NonSerializableObjects
+  fullName: Coop.Mod.Serializers.CustomSerializer.NonSerializableObjects
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: NonSerializableObjects
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 24
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: >-
+      [NonSerialized]
+
+      public readonly List<FieldInfo> NonSerializableObjects
+    return:
+      type: System.Collections.Generic.List{System.Reflection.FieldInfo}
+    content.vb: >-
+      <NonSerialized>
+
+      Public ReadOnly NonSerializableObjects As List(Of FieldInfo)
+  attributes:
+  - type: System.NonSerializedAttribute
+    ctor: System.NonSerializedAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.Serializers.CustomSerializer.NonSerializableCollections
+  commentId: F:Coop.Mod.Serializers.CustomSerializer.NonSerializableCollections
+  id: NonSerializableCollections
+  parent: Coop.Mod.Serializers.CustomSerializer
+  langs:
+  - csharp
+  - vb
+  name: NonSerializableCollections
+  nameWithType: CustomSerializer.NonSerializableCollections
+  fullName: Coop.Mod.Serializers.CustomSerializer.NonSerializableCollections
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: NonSerializableCollections
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 26
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: >-
+      [NonSerialized]
+
+      public readonly List<ICollection> NonSerializableCollections
+    return:
+      type: System.Collections.Generic.List{System.Collections.ICollection}
+    content.vb: >-
+      <NonSerialized>
+
+      Public ReadOnly NonSerializableCollections As List(Of ICollection)
+  attributes:
+  - type: System.NonSerializedAttribute
+    ctor: System.NonSerializedAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.Serializers.CustomSerializer.#ctor
+  commentId: M:Coop.Mod.Serializers.CustomSerializer.#ctor
+  id: '#ctor'
+  parent: Coop.Mod.Serializers.CustomSerializer
+  langs:
+  - csharp
+  - vb
+  name: CustomSerializer()
+  nameWithType: CustomSerializer.CustomSerializer()
+  fullName: Coop.Mod.Serializers.CustomSerializer.CustomSerializer()
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 28
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: protected CustomSerializer()
+    content.vb: Protected Sub New
+  overload: Coop.Mod.Serializers.CustomSerializer.#ctor*
+  modifiers.csharp:
+  - protected
+  modifiers.vb:
+  - Protected
+- uid: Coop.Mod.Serializers.CustomSerializer.#ctor(System.Object)
+  commentId: M:Coop.Mod.Serializers.CustomSerializer.#ctor(System.Object)
+  id: '#ctor(System.Object)'
+  parent: Coop.Mod.Serializers.CustomSerializer
+  langs:
+  - csharp
+  - vb
+  name: CustomSerializer(Object)
+  nameWithType: CustomSerializer.CustomSerializer(Object)
+  fullName: Coop.Mod.Serializers.CustomSerializer.CustomSerializer(System.Object)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 30
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: protected CustomSerializer(object obj)
+    parameters:
+    - id: obj
+      type: System.Object
+    content.vb: Protected Sub New(obj As Object)
+  overload: Coop.Mod.Serializers.CustomSerializer.#ctor*
+  modifiers.csharp:
+  - protected
+  modifiers.vb:
+  - Protected
+- uid: Coop.Mod.Serializers.CustomSerializer.Deserialize
+  commentId: M:Coop.Mod.Serializers.CustomSerializer.Deserialize
+  id: Deserialize
+  parent: Coop.Mod.Serializers.CustomSerializer
+  langs:
+  - csharp
+  - vb
+  name: Deserialize()
+  nameWithType: CustomSerializer.Deserialize()
+  fullName: Coop.Mod.Serializers.CustomSerializer.Deserialize()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Deserialize
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 73
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  summary: "\nDeserialized object\n"
+  example: []
+  syntax:
+    content: public abstract object Deserialize()
+    return:
+      type: System.Object
+      description: New instantiated object
+    content.vb: Public MustOverride Function Deserialize As Object
+  overload: Coop.Mod.Serializers.CustomSerializer.Deserialize*
+  implements:
+  - Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  modifiers.csharp:
+  - public
+  - abstract
+  modifiers.vb:
+  - Public
+  - MustOverride
+- uid: Coop.Mod.Serializers.CustomSerializer.Deserialize(System.Object)
+  commentId: M:Coop.Mod.Serializers.CustomSerializer.Deserialize(System.Object)
+  id: Deserialize(System.Object)
+  parent: Coop.Mod.Serializers.CustomSerializer
+  langs:
+  - csharp
+  - vb
+  name: Deserialize(Object)
+  nameWithType: CustomSerializer.Deserialize(Object)
+  fullName: Coop.Mod.Serializers.CustomSerializer.Deserialize(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Deserialize
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 80
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  summary: "\nAssigns natively serializable fields\n"
+  example: []
+  syntax:
+    content: protected virtual object Deserialize(object newObj)
+    parameters:
+    - id: newObj
+      type: System.Object
+      description: Object to assign values
+    return:
+      type: System.Object
+      description: Object
+    content.vb: Protected Overridable Function Deserialize(newObj As Object) As Object
+  overload: Coop.Mod.Serializers.CustomSerializer.Deserialize*
+  modifiers.csharp:
+  - protected
+  - virtual
+  modifiers.vb:
+  - Protected
+  - Overridable
+- uid: Coop.Mod.Serializers.CustomSerializer.GetFields
+  commentId: M:Coop.Mod.Serializers.CustomSerializer.GetFields
+  id: GetFields
+  parent: Coop.Mod.Serializers.CustomSerializer
+  langs:
+  - csharp
+  - vb
+  name: GetFields()
+  nameWithType: CustomSerializer.GetFields()
+  fullName: Coop.Mod.Serializers.CustomSerializer.GetFields()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetFields
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 93
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  summary: "\nGet all fields from type\n"
+  example: []
+  syntax:
+    content: protected FieldInfo[] GetFields()
+    return:
+      type: System.Reflection.FieldInfo[]
+      description: FieldInfo[]
+    content.vb: Protected Function GetFields As FieldInfo()
+  overload: Coop.Mod.Serializers.CustomSerializer.GetFields*
+  modifiers.csharp:
+  - protected
+  modifiers.vb:
+  - Protected
+- uid: Coop.Mod.Serializers.CustomSerializer.IsCollectionSerializableRecursive(System.Type)
+  commentId: M:Coop.Mod.Serializers.CustomSerializer.IsCollectionSerializableRecursive(System.Type)
+  id: IsCollectionSerializableRecursive(System.Type)
+  parent: Coop.Mod.Serializers.CustomSerializer
+  langs:
+  - csharp
+  - vb
+  name: IsCollectionSerializableRecursive(Type)
+  nameWithType: CustomSerializer.IsCollectionSerializableRecursive(Type)
+  fullName: Coop.Mod.Serializers.CustomSerializer.IsCollectionSerializableRecursive(System.Type)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IsCollectionSerializableRecursive
+    path: ../source/Coop/Mod/Serializers/CustomSerializer.cs
+    startLine: 103
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  summary: "\nChecks if collection has serializable elements\n"
+  example: []
+  syntax:
+    content: bool IsCollectionSerializableRecursive(Type type)
+    parameters:
+    - id: type
+      type: System.Type
+      description: Type from collection
+    return:
+      type: System.Boolean
+      description: If collection is completely serializable
+    content.vb: Function IsCollectionSerializableRecursive(type As Type) As Boolean
+  overload: Coop.Mod.Serializers.CustomSerializer.IsCollectionSerializableRecursive*
+references:
+- uid: Coop.Mod.Serializers
+  commentId: N:Coop.Mod.Serializers
+  name: Coop.Mod.Serializers
+  nameWithType: Coop.Mod.Serializers
+  fullName: Coop.Mod.Serializers
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Coop.Mod.Serializers.ICustomSerializer
+  commentId: T:Coop.Mod.Serializers.ICustomSerializer
+  parent: Coop.Mod.Serializers
+  name: ICustomSerializer
+  nameWithType: ICustomSerializer
+  fullName: Coop.Mod.Serializers.ICustomSerializer
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Coop.Mod.Serializers.CustomSerializer.ObjectType*
+  commentId: Overload:Coop.Mod.Serializers.CustomSerializer.ObjectType
+  name: ObjectType
+  nameWithType: CustomSerializer.ObjectType
+  fullName: Coop.Mod.Serializers.CustomSerializer.ObjectType
+- uid: System.Type
+  commentId: T:System.Type
+  parent: System
+  isExternal: true
+  name: Type
+  nameWithType: Type
+  fullName: System.Type
+- uid: System.Collections.Generic.Dictionary{System.Reflection.FieldInfo,System.Object}
+  commentId: T:System.Collections.Generic.Dictionary{System.Reflection.FieldInfo,System.Object}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  name: Dictionary<FieldInfo, Object>
+  nameWithType: Dictionary<FieldInfo, Object>
+  fullName: System.Collections.Generic.Dictionary<System.Reflection.FieldInfo, System.Object>
+  nameWithType.vb: Dictionary(Of FieldInfo, Object)
+  fullName.vb: System.Collections.Generic.Dictionary(Of System.Reflection.FieldInfo, System.Object)
+  name.vb: Dictionary(Of FieldInfo, Object)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Reflection.FieldInfo
+    name: FieldInfo
+    nameWithType: FieldInfo
+    fullName: System.Reflection.FieldInfo
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Reflection.FieldInfo
+    name: FieldInfo
+    nameWithType: FieldInfo
+    fullName: System.Reflection.FieldInfo
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.Dictionary`2
+  commentId: T:System.Collections.Generic.Dictionary`2
+  isExternal: true
+  name: Dictionary<TKey, TValue>
+  nameWithType: Dictionary<TKey, TValue>
+  fullName: System.Collections.Generic.Dictionary<TKey, TValue>
+  nameWithType.vb: Dictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.Dictionary(Of TKey, TValue)
+  name.vb: Dictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: System.Collections.Generic.Dictionary{System.Reflection.FieldInfo,System.Collections.ICollection}
+  commentId: T:System.Collections.Generic.Dictionary{System.Reflection.FieldInfo,System.Collections.ICollection}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  name: Dictionary<FieldInfo, ICollection>
+  nameWithType: Dictionary<FieldInfo, ICollection>
+  fullName: System.Collections.Generic.Dictionary<System.Reflection.FieldInfo, System.Collections.ICollection>
+  nameWithType.vb: Dictionary(Of FieldInfo, ICollection)
+  fullName.vb: System.Collections.Generic.Dictionary(Of System.Reflection.FieldInfo, System.Collections.ICollection)
+  name.vb: Dictionary(Of FieldInfo, ICollection)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Reflection.FieldInfo
+    name: FieldInfo
+    nameWithType: FieldInfo
+    fullName: System.Reflection.FieldInfo
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Collections.ICollection
+    name: ICollection
+    nameWithType: ICollection
+    fullName: System.Collections.ICollection
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Reflection.FieldInfo
+    name: FieldInfo
+    nameWithType: FieldInfo
+    fullName: System.Reflection.FieldInfo
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Collections.ICollection
+    name: ICollection
+    nameWithType: ICollection
+    fullName: System.Collections.ICollection
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.List{System.Reflection.FieldInfo}
+  commentId: T:System.Collections.Generic.List{System.Reflection.FieldInfo}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  name: List<FieldInfo>
+  nameWithType: List<FieldInfo>
+  fullName: System.Collections.Generic.List<System.Reflection.FieldInfo>
+  nameWithType.vb: List(Of FieldInfo)
+  fullName.vb: System.Collections.Generic.List(Of System.Reflection.FieldInfo)
+  name.vb: List(Of FieldInfo)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Reflection.FieldInfo
+    name: FieldInfo
+    nameWithType: FieldInfo
+    fullName: System.Reflection.FieldInfo
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Reflection.FieldInfo
+    name: FieldInfo
+    nameWithType: FieldInfo
+    fullName: System.Reflection.FieldInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.List{System.Collections.ICollection}
+  commentId: T:System.Collections.Generic.List{System.Collections.ICollection}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  name: List<ICollection>
+  nameWithType: List<ICollection>
+  fullName: System.Collections.Generic.List<System.Collections.ICollection>
+  nameWithType.vb: List(Of ICollection)
+  fullName.vb: System.Collections.Generic.List(Of System.Collections.ICollection)
+  name.vb: List(Of ICollection)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Collections.ICollection
+    name: ICollection
+    nameWithType: ICollection
+    fullName: System.Collections.ICollection
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Collections.ICollection
+    name: ICollection
+    nameWithType: ICollection
+    fullName: System.Collections.ICollection
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.Serializers.CustomSerializer.#ctor*
+  commentId: Overload:Coop.Mod.Serializers.CustomSerializer.#ctor
+  name: CustomSerializer
+  nameWithType: CustomSerializer.CustomSerializer
+  fullName: Coop.Mod.Serializers.CustomSerializer.CustomSerializer
+- uid: Coop.Mod.Serializers.CustomSerializer.Deserialize*
+  commentId: Overload:Coop.Mod.Serializers.CustomSerializer.Deserialize
+  name: Deserialize
+  nameWithType: CustomSerializer.Deserialize
+  fullName: Coop.Mod.Serializers.CustomSerializer.Deserialize
+- uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  commentId: M:Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  parent: Coop.Mod.Serializers.ICustomSerializer
+  name: Deserialize()
+  nameWithType: ICustomSerializer.Deserialize()
+  fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize()
+  spec.csharp:
+  - uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+    name: Deserialize
+    nameWithType: ICustomSerializer.Deserialize
+    fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+    name: Deserialize
+    nameWithType: ICustomSerializer.Deserialize
+    fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.Serializers.CustomSerializer.GetFields*
+  commentId: Overload:Coop.Mod.Serializers.CustomSerializer.GetFields
+  name: GetFields
+  nameWithType: CustomSerializer.GetFields
+  fullName: Coop.Mod.Serializers.CustomSerializer.GetFields
+- uid: System.Reflection.FieldInfo[]
+  isExternal: true
+  name: FieldInfo[]
+  nameWithType: FieldInfo[]
+  fullName: System.Reflection.FieldInfo[]
+  nameWithType.vb: FieldInfo()
+  fullName.vb: System.Reflection.FieldInfo()
+  name.vb: FieldInfo()
+  spec.csharp:
+  - uid: System.Reflection.FieldInfo
+    name: FieldInfo
+    nameWithType: FieldInfo
+    fullName: System.Reflection.FieldInfo
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  spec.vb:
+  - uid: System.Reflection.FieldInfo
+    name: FieldInfo
+    nameWithType: FieldInfo
+    fullName: System.Reflection.FieldInfo
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+- uid: Coop.Mod.Serializers.CustomSerializer.IsCollectionSerializableRecursive*
+  commentId: Overload:Coop.Mod.Serializers.CustomSerializer.IsCollectionSerializableRecursive
+  name: IsCollectionSerializableRecursive
+  nameWithType: CustomSerializer.IsCollectionSerializableRecursive
+  fullName: Coop.Mod.Serializers.CustomSerializer.IsCollectionSerializableRecursive
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean

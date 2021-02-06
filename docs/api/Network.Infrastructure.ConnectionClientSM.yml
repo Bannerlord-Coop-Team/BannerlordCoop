@@ -1,0 +1,827 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.ConnectionClientSM
+  commentId: T:Network.Infrastructure.ConnectionClientSM
+  id: ConnectionClientSM
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.ConnectionClientSM.#ctor
+  - Network.Infrastructure.ConnectionClientSM.ConnectedState
+  - Network.Infrastructure.ConnectionClientSM.DisconnectState
+  - Network.Infrastructure.ConnectionClientSM.DisconnectTrigger
+  - Network.Infrastructure.ConnectionClientSM.JoinRequestingState
+  langs:
+  - csharp
+  - vb
+  name: ConnectionClientSM
+  nameWithType: ConnectionClientSM
+  fullName: Network.Infrastructure.ConnectionClientSM
+  type: Class
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClientSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ConnectionClientSM
+    path: ../source/Network/Infrastructure/ConnectionClientSM.cs
+    startLine: 42
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: 'public class ConnectionClientSM : CoopStateMachine<EClientConnectionState, EClientConnectionTrigger>'
+    content.vb: >-
+      Public Class ConnectionClientSM
+
+          Inherits CoopStateMachine(Of EClientConnectionState, EClientConnectionTrigger)
+  inheritance:
+  - System.Object
+  - Common.CoopStateMachine
+  - Common.CoopStateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}
+  inheritedMembers:
+  - Common.CoopStateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.Logger
+  - Common.CoopStateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.StateMachine
+  - Common.CoopStateMachine.State
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Network.Infrastructure.ConnectionClientSM.DisconnectState
+  commentId: F:Network.Infrastructure.ConnectionClientSM.DisconnectState
+  id: DisconnectState
+  parent: Network.Infrastructure.ConnectionClientSM
+  langs:
+  - csharp
+  - vb
+  name: DisconnectState
+  nameWithType: ConnectionClientSM.DisconnectState
+  fullName: Network.Infrastructure.ConnectionClientSM.DisconnectState
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClientSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DisconnectState
+    path: ../source/Network/Infrastructure/ConnectionClientSM.cs
+    startLine: 44
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public readonly StateMachine<EClientConnectionState, EClientConnectionTrigger>.StateConfiguration DisconnectState
+    return:
+      type: Stateless.StateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.StateConfiguration
+    content.vb: Public ReadOnly DisconnectState As StateMachine(Of EClientConnectionState, EClientConnectionTrigger).StateConfiguration
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.ConnectionClientSM.JoinRequestingState
+  commentId: F:Network.Infrastructure.ConnectionClientSM.JoinRequestingState
+  id: JoinRequestingState
+  parent: Network.Infrastructure.ConnectionClientSM
+  langs:
+  - csharp
+  - vb
+  name: JoinRequestingState
+  nameWithType: ConnectionClientSM.JoinRequestingState
+  fullName: Network.Infrastructure.ConnectionClientSM.JoinRequestingState
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClientSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: JoinRequestingState
+    path: ../source/Network/Infrastructure/ConnectionClientSM.cs
+    startLine: 45
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public readonly StateMachine<EClientConnectionState, EClientConnectionTrigger>.StateConfiguration JoinRequestingState
+    return:
+      type: Stateless.StateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.StateConfiguration
+    content.vb: Public ReadOnly JoinRequestingState As StateMachine(Of EClientConnectionState, EClientConnectionTrigger).StateConfiguration
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.ConnectionClientSM.ConnectedState
+  commentId: F:Network.Infrastructure.ConnectionClientSM.ConnectedState
+  id: ConnectedState
+  parent: Network.Infrastructure.ConnectionClientSM
+  langs:
+  - csharp
+  - vb
+  name: ConnectedState
+  nameWithType: ConnectionClientSM.ConnectedState
+  fullName: Network.Infrastructure.ConnectionClientSM.ConnectedState
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClientSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ConnectedState
+    path: ../source/Network/Infrastructure/ConnectionClientSM.cs
+    startLine: 46
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public readonly StateMachine<EClientConnectionState, EClientConnectionTrigger>.StateConfiguration ConnectedState
+    return:
+      type: Stateless.StateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.StateConfiguration
+    content.vb: Public ReadOnly ConnectedState As StateMachine(Of EClientConnectionState, EClientConnectionTrigger).StateConfiguration
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.ConnectionClientSM.DisconnectTrigger
+  commentId: F:Network.Infrastructure.ConnectionClientSM.DisconnectTrigger
+  id: DisconnectTrigger
+  parent: Network.Infrastructure.ConnectionClientSM
+  langs:
+  - csharp
+  - vb
+  name: DisconnectTrigger
+  nameWithType: ConnectionClientSM.DisconnectTrigger
+  fullName: Network.Infrastructure.ConnectionClientSM.DisconnectTrigger
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClientSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DisconnectTrigger
+    path: ../source/Network/Infrastructure/ConnectionClientSM.cs
+    startLine: 48
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public readonly StateMachine<EClientConnectionState, EClientConnectionTrigger>.TriggerWithParameters<EDisconnectReason> DisconnectTrigger
+    return:
+      type: Stateless.StateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.TriggerWithParameters{Network.Infrastructure.EDisconnectReason}
+    content.vb: Public ReadOnly DisconnectTrigger As StateMachine(Of EClientConnectionState, EClientConnectionTrigger).TriggerWithParameters(Of EDisconnectReason)
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.ConnectionClientSM.#ctor
+  commentId: M:Network.Infrastructure.ConnectionClientSM.#ctor
+  id: '#ctor'
+  parent: Network.Infrastructure.ConnectionClientSM
+  langs:
+  - csharp
+  - vb
+  name: ConnectionClientSM()
+  nameWithType: ConnectionClientSM.ConnectionClientSM()
+  fullName: Network.Infrastructure.ConnectionClientSM.ConnectionClientSM()
+  type: Constructor
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClientSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Network/Infrastructure/ConnectionClientSM.cs
+    startLine: 49
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public ConnectionClientSM()
+    content.vb: Public Sub New
+  overload: Network.Infrastructure.ConnectionClientSM.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Common.CoopStateMachine
+  commentId: T:Common.CoopStateMachine
+  parent: Common
+  name: CoopStateMachine
+  nameWithType: CoopStateMachine
+  fullName: Common.CoopStateMachine
+- uid: Common.CoopStateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}
+  commentId: T:Common.CoopStateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}
+  parent: Common
+  definition: Common.CoopStateMachine`2
+  name: CoopStateMachine<EClientConnectionState, EClientConnectionTrigger>
+  nameWithType: CoopStateMachine<EClientConnectionState, EClientConnectionTrigger>
+  fullName: Common.CoopStateMachine<Network.Infrastructure.EClientConnectionState, Network.Infrastructure.EClientConnectionTrigger>
+  nameWithType.vb: CoopStateMachine(Of EClientConnectionState, EClientConnectionTrigger)
+  fullName.vb: Common.CoopStateMachine(Of Network.Infrastructure.EClientConnectionState, Network.Infrastructure.EClientConnectionTrigger)
+  name.vb: CoopStateMachine(Of EClientConnectionState, EClientConnectionTrigger)
+  spec.csharp:
+  - uid: Common.CoopStateMachine`2
+    name: CoopStateMachine
+    nameWithType: CoopStateMachine
+    fullName: Common.CoopStateMachine
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Network.Infrastructure.EClientConnectionState
+    name: EClientConnectionState
+    nameWithType: EClientConnectionState
+    fullName: Network.Infrastructure.EClientConnectionState
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Network.Infrastructure.EClientConnectionTrigger
+    name: EClientConnectionTrigger
+    nameWithType: EClientConnectionTrigger
+    fullName: Network.Infrastructure.EClientConnectionTrigger
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.CoopStateMachine`2
+    name: CoopStateMachine
+    nameWithType: CoopStateMachine
+    fullName: Common.CoopStateMachine
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Network.Infrastructure.EClientConnectionState
+    name: EClientConnectionState
+    nameWithType: EClientConnectionState
+    fullName: Network.Infrastructure.EClientConnectionState
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Network.Infrastructure.EClientConnectionTrigger
+    name: EClientConnectionTrigger
+    nameWithType: EClientConnectionTrigger
+    fullName: Network.Infrastructure.EClientConnectionTrigger
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.CoopStateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.Logger
+  commentId: F:Common.CoopStateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.Logger
+  parent: Common.CoopStateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}
+  definition: Common.CoopStateMachine`2.Logger
+  name: Logger
+  nameWithType: CoopStateMachine<EClientConnectionState, EClientConnectionTrigger>.Logger
+  fullName: Common.CoopStateMachine<Network.Infrastructure.EClientConnectionState, Network.Infrastructure.EClientConnectionTrigger>.Logger
+  nameWithType.vb: CoopStateMachine(Of EClientConnectionState, EClientConnectionTrigger).Logger
+  fullName.vb: Common.CoopStateMachine(Of Network.Infrastructure.EClientConnectionState, Network.Infrastructure.EClientConnectionTrigger).Logger
+- uid: Common.CoopStateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.StateMachine
+  commentId: F:Common.CoopStateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.StateMachine
+  parent: Common.CoopStateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}
+  definition: Common.CoopStateMachine`2.StateMachine
+  name: StateMachine
+  nameWithType: CoopStateMachine<EClientConnectionState, EClientConnectionTrigger>.StateMachine
+  fullName: Common.CoopStateMachine<Network.Infrastructure.EClientConnectionState, Network.Infrastructure.EClientConnectionTrigger>.StateMachine
+  nameWithType.vb: CoopStateMachine(Of EClientConnectionState, EClientConnectionTrigger).StateMachine
+  fullName.vb: Common.CoopStateMachine(Of Network.Infrastructure.EClientConnectionState, Network.Infrastructure.EClientConnectionTrigger).StateMachine
+- uid: Common.CoopStateMachine.State
+  commentId: P:Common.CoopStateMachine.State
+  parent: Common.CoopStateMachine
+  name: State
+  nameWithType: CoopStateMachine.State
+  fullName: Common.CoopStateMachine.State
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: Common.CoopStateMachine`2
+  commentId: T:Common.CoopStateMachine`2
+  name: CoopStateMachine<T, U>
+  nameWithType: CoopStateMachine<T, U>
+  fullName: Common.CoopStateMachine<T, U>
+  nameWithType.vb: CoopStateMachine(Of T, U)
+  fullName.vb: Common.CoopStateMachine(Of T, U)
+  name.vb: CoopStateMachine(Of T, U)
+  spec.csharp:
+  - uid: Common.CoopStateMachine`2
+    name: CoopStateMachine
+    nameWithType: CoopStateMachine
+    fullName: Common.CoopStateMachine
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: U
+    nameWithType: U
+    fullName: U
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.CoopStateMachine`2
+    name: CoopStateMachine
+    nameWithType: CoopStateMachine
+    fullName: Common.CoopStateMachine
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: U
+    nameWithType: U
+    fullName: U
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.CoopStateMachine`2.Logger
+  commentId: F:Common.CoopStateMachine`2.Logger
+  name: Logger
+  nameWithType: CoopStateMachine<T, U>.Logger
+  fullName: Common.CoopStateMachine<T, U>.Logger
+  nameWithType.vb: CoopStateMachine(Of T, U).Logger
+  fullName.vb: Common.CoopStateMachine(Of T, U).Logger
+- uid: Common.CoopStateMachine`2.StateMachine
+  commentId: F:Common.CoopStateMachine`2.StateMachine
+  name: StateMachine
+  nameWithType: CoopStateMachine<T, U>.StateMachine
+  fullName: Common.CoopStateMachine<T, U>.StateMachine
+  nameWithType.vb: CoopStateMachine(Of T, U).StateMachine
+  fullName.vb: Common.CoopStateMachine(Of T, U).StateMachine
+- uid: Stateless.StateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.StateConfiguration
+  commentId: T:Stateless.StateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.StateConfiguration
+  parent: Stateless
+  definition: Stateless.StateMachine`2.StateConfiguration
+  name: StateMachine.StateConfiguration<>
+  nameWithType: StateMachine.StateConfiguration<>
+  fullName: Stateless.StateMachine.StateConfiguration<>
+  nameWithType.vb: StateMachine.StateConfiguration(Of )
+  fullName.vb: Stateless.StateMachine.StateConfiguration(Of )
+  name.vb: StateMachine.StateConfiguration(Of )
+  spec.csharp:
+  - uid: Stateless.StateMachine`2.StateConfiguration
+    name: StateMachine.StateConfiguration
+    nameWithType: StateMachine.StateConfiguration
+    fullName: Stateless.StateMachine.StateConfiguration
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Stateless.StateMachine`2.StateConfiguration
+    name: StateMachine.StateConfiguration
+    nameWithType: StateMachine.StateConfiguration
+    fullName: Stateless.StateMachine.StateConfiguration
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Stateless.StateMachine`2.StateConfiguration
+  commentId: T:Stateless.StateMachine`2.StateConfiguration
+  isExternal: true
+  name: StateMachine.StateConfiguration<>
+  nameWithType: StateMachine.StateConfiguration<>
+  fullName: Stateless.StateMachine.StateConfiguration<>
+  nameWithType.vb: StateMachine.StateConfiguration(Of )
+  fullName.vb: Stateless.StateMachine.StateConfiguration(Of )
+  name.vb: StateMachine.StateConfiguration(Of )
+  spec.csharp:
+  - uid: Stateless.StateMachine`2.StateConfiguration
+    name: StateMachine.StateConfiguration
+    nameWithType: StateMachine.StateConfiguration
+    fullName: Stateless.StateMachine.StateConfiguration
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Stateless.StateMachine`2.StateConfiguration
+    name: StateMachine.StateConfiguration
+    nameWithType: StateMachine.StateConfiguration
+    fullName: Stateless.StateMachine.StateConfiguration
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Stateless
+  commentId: N:Stateless
+  isExternal: true
+  name: Stateless
+  nameWithType: Stateless
+  fullName: Stateless
+- uid: Stateless.StateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.TriggerWithParameters{Network.Infrastructure.EDisconnectReason}
+  commentId: T:Stateless.StateMachine{Network.Infrastructure.EClientConnectionState,Network.Infrastructure.EClientConnectionTrigger}.TriggerWithParameters{Network.Infrastructure.EDisconnectReason}
+  parent: Stateless
+  definition: Stateless.StateMachine`2.TriggerWithParameters`1
+  name: StateMachine.TriggerWithParameters<EDisconnectReason>
+  nameWithType: StateMachine.TriggerWithParameters<EDisconnectReason>
+  fullName: Stateless.StateMachine.TriggerWithParameters<Network.Infrastructure.EDisconnectReason>
+  nameWithType.vb: StateMachine.TriggerWithParameters(Of EDisconnectReason)
+  fullName.vb: Stateless.StateMachine.TriggerWithParameters(Of Network.Infrastructure.EDisconnectReason)
+  name.vb: StateMachine.TriggerWithParameters(Of EDisconnectReason)
+  spec.csharp:
+  - uid: Stateless.StateMachine`2.TriggerWithParameters`1
+    name: StateMachine.TriggerWithParameters
+    nameWithType: StateMachine.TriggerWithParameters
+    fullName: Stateless.StateMachine.TriggerWithParameters
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Network.Infrastructure.EDisconnectReason
+    name: EDisconnectReason
+    nameWithType: EDisconnectReason
+    fullName: Network.Infrastructure.EDisconnectReason
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Stateless.StateMachine`2.TriggerWithParameters`1
+    name: StateMachine.TriggerWithParameters
+    nameWithType: StateMachine.TriggerWithParameters
+    fullName: Stateless.StateMachine.TriggerWithParameters
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Network.Infrastructure.EDisconnectReason
+    name: EDisconnectReason
+    nameWithType: EDisconnectReason
+    fullName: Network.Infrastructure.EDisconnectReason
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Stateless.StateMachine`2.TriggerWithParameters`1
+  commentId: T:Stateless.StateMachine`2.TriggerWithParameters`1
+  isExternal: true
+  name: StateMachine.TriggerWithParameters<TArg0>
+  nameWithType: StateMachine.TriggerWithParameters<TArg0>
+  fullName: Stateless.StateMachine.TriggerWithParameters<TArg0>
+  nameWithType.vb: StateMachine.TriggerWithParameters(Of TArg0)
+  fullName.vb: Stateless.StateMachine.TriggerWithParameters(Of TArg0)
+  name.vb: StateMachine.TriggerWithParameters(Of TArg0)
+  spec.csharp:
+  - uid: Stateless.StateMachine`2.TriggerWithParameters`1
+    name: StateMachine.TriggerWithParameters
+    nameWithType: StateMachine.TriggerWithParameters
+    fullName: Stateless.StateMachine.TriggerWithParameters
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TArg0
+    nameWithType: TArg0
+    fullName: TArg0
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Stateless.StateMachine`2.TriggerWithParameters`1
+    name: StateMachine.TriggerWithParameters
+    nameWithType: StateMachine.TriggerWithParameters
+    fullName: Stateless.StateMachine.TriggerWithParameters
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TArg0
+    nameWithType: TArg0
+    fullName: TArg0
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.ConnectionClientSM.#ctor*
+  commentId: Overload:Network.Infrastructure.ConnectionClientSM.#ctor
+  name: ConnectionClientSM
+  nameWithType: ConnectionClientSM.ConnectionClientSM
+  fullName: Network.Infrastructure.ConnectionClientSM.ConnectionClientSM

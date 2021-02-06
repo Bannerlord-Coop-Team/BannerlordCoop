@@ -1,0 +1,517 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync.Store.RemoteObjectState
+  commentId: T:Sync.Store.RemoteObjectState
+  id: RemoteObjectState
+  parent: Sync.Store
+  children:
+  - Sync.Store.RemoteObjectState.#ctor(Sync.Store.RemoteObjectState.EOrigin)
+  - Sync.Store.RemoteObjectState.Acknowledged
+  - Sync.Store.RemoteObjectState.Origin
+  - Sync.Store.RemoteObjectState.Sent
+  langs:
+  - csharp
+  - vb
+  name: RemoteObjectState
+  nameWithType: RemoteObjectState
+  fullName: Sync.Store.RemoteObjectState
+  type: Class
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RemoteObjectState
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 12
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public class RemoteObjectState
+    content.vb: Public Class RemoteObjectState
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Sync.Store.RemoteObjectState.#ctor(Sync.Store.RemoteObjectState.EOrigin)
+  commentId: M:Sync.Store.RemoteObjectState.#ctor(Sync.Store.RemoteObjectState.EOrigin)
+  id: '#ctor(Sync.Store.RemoteObjectState.EOrigin)'
+  parent: Sync.Store.RemoteObjectState
+  langs:
+  - csharp
+  - vb
+  name: RemoteObjectState(RemoteObjectState.EOrigin)
+  nameWithType: RemoteObjectState.RemoteObjectState(RemoteObjectState.EOrigin)
+  fullName: Sync.Store.RemoteObjectState.RemoteObjectState(Sync.Store.RemoteObjectState.EOrigin)
+  type: Constructor
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 20
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public RemoteObjectState(RemoteObjectState.EOrigin eOrigin)
+    parameters:
+    - id: eOrigin
+      type: Sync.Store.RemoteObjectState.EOrigin
+    content.vb: Public Sub New(eOrigin As RemoteObjectState.EOrigin)
+  overload: Sync.Store.RemoteObjectState.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Sync.Store.RemoteObjectState.Origin
+  commentId: P:Sync.Store.RemoteObjectState.Origin
+  id: Origin
+  parent: Sync.Store.RemoteObjectState
+  langs:
+  - csharp
+  - vb
+  name: Origin
+  nameWithType: RemoteObjectState.Origin
+  fullName: Sync.Store.RemoteObjectState.Origin
+  type: Property
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Origin
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 25
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public RemoteObjectState.EOrigin Origin { get; }
+    parameters: []
+    return:
+      type: Sync.Store.RemoteObjectState.EOrigin
+    content.vb: Public ReadOnly Property Origin As RemoteObjectState.EOrigin
+  overload: Sync.Store.RemoteObjectState.Origin*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Sync.Store.RemoteObjectState.Sent
+  commentId: P:Sync.Store.RemoteObjectState.Sent
+  id: Sent
+  parent: Sync.Store.RemoteObjectState
+  langs:
+  - csharp
+  - vb
+  name: Sent
+  nameWithType: RemoteObjectState.Sent
+  fullName: Sync.Store.RemoteObjectState.Sent
+  type: Property
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Sent
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 26
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public bool Sent { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property Sent As Boolean
+  overload: Sync.Store.RemoteObjectState.Sent*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Sync.Store.RemoteObjectState.Acknowledged
+  commentId: P:Sync.Store.RemoteObjectState.Acknowledged
+  id: Acknowledged
+  parent: Sync.Store.RemoteObjectState
+  langs:
+  - csharp
+  - vb
+  name: Acknowledged
+  nameWithType: RemoteObjectState.Acknowledged
+  fullName: Sync.Store.RemoteObjectState.Acknowledged
+  type: Property
+  source:
+    remote:
+      path: source/Sync/Store/RemoteStore.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Acknowledged
+    path: ../source/Sync/Store/RemoteStore.cs
+    startLine: 27
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public bool Acknowledged { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property Acknowledged As Boolean
+  overload: Sync.Store.RemoteObjectState.Acknowledged*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+references:
+- uid: Sync.Store
+  commentId: N:Sync.Store
+  name: Sync.Store
+  nameWithType: Sync.Store
+  fullName: Sync.Store
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Sync.Store.RemoteObjectState.#ctor*
+  commentId: Overload:Sync.Store.RemoteObjectState.#ctor
+  name: RemoteObjectState
+  nameWithType: RemoteObjectState.RemoteObjectState
+  fullName: Sync.Store.RemoteObjectState.RemoteObjectState
+- uid: Sync.Store.RemoteObjectState.EOrigin
+  commentId: T:Sync.Store.RemoteObjectState.EOrigin
+  parent: Sync.Store
+  name: RemoteObjectState.EOrigin
+  nameWithType: RemoteObjectState.EOrigin
+  fullName: Sync.Store.RemoteObjectState.EOrigin
+- uid: Sync.Store.RemoteObjectState.Origin*
+  commentId: Overload:Sync.Store.RemoteObjectState.Origin
+  name: Origin
+  nameWithType: RemoteObjectState.Origin
+  fullName: Sync.Store.RemoteObjectState.Origin
+- uid: Sync.Store.RemoteObjectState.Sent*
+  commentId: Overload:Sync.Store.RemoteObjectState.Sent
+  name: Sent
+  nameWithType: RemoteObjectState.Sent
+  fullName: Sync.Store.RemoteObjectState.Sent
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Sync.Store.RemoteObjectState.Acknowledged*
+  commentId: Overload:Sync.Store.RemoteObjectState.Acknowledged
+  name: Acknowledged
+  nameWithType: RemoteObjectState.Acknowledged
+  fullName: Sync.Store.RemoteObjectState.Acknowledged

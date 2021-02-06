@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -110,6 +109,37 @@
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static class MethodPatchFactory</code></pre>
   </div>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_MethodPatchFactory_Prefixes.md&amp;value=---%0Auid%3A%20Sync.MethodPatchFactory.Prefixes%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/MethodPatchFactory.cs/#L14">View Source</a>
+  </span>
+  <h4 id="Sync_MethodPatchFactory_Prefixes" data-uid="Sync.MethodPatchFactory.Prefixes">Prefixes</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static readonly Dictionary&lt;MethodBase, DynamicMethod&gt; Prefixes</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Dictionary</span>&lt;<span class="xref">System.Reflection.MethodBase</span>, <span class="xref">System.Reflection.Emit.DynamicMethod</span>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h3 id="methods">Methods
   </h3>
   <span class="small pull-right mobile-hide">
@@ -220,14 +250,13 @@
   </span>
   <a id="Sync_MethodPatchFactory_GeneratePrefix_" data-uid="Sync.MethodPatchFactory.GeneratePrefix*"></a>
   <h4 id="Sync_MethodPatchFactory_GeneratePrefix_Sync_MethodAccess_System_Reflection_MethodInfo_Sync_EPatchBehaviour_" data-uid="Sync.MethodPatchFactory.GeneratePrefix(Sync.MethodAccess,System.Reflection.MethodInfo,Sync.EPatchBehaviour)">GeneratePrefix(MethodAccess, MethodInfo, EPatchBehaviour)</h4>
-  <div class="markdown level1 summary">
-Generates a <span class="xref">System.Reflection.Emit.DynamicMethod</span> to be used as a harmony prefix. The method
+  <div class="markdown level1 summary"><p>Generates a <span class="xref">System.Reflection.Emit.DynamicMethod</span> to be used as a harmony prefix. The method
 signature exactly matches the original method with an additional and automatically
 captures the instance for non-static functions.
 The generated Prefix captures the <code data-dev-comment-type="paramref" class="paramref">method</code> and calls the
 <code data-dev-comment-type="paramref" class="paramref">dispatcher</code> with the following arguments:
-`dispatcher(MethodAccess access, object instance, object [] args)`.
-With `args` containing the original method arguments (excluding __instance).
+<code>dispatcher(MethodAccess access, object instance, object [] args)</code>.
+With <code>args</code> containing the original method arguments (excluding __instance).</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -247,17 +276,20 @@ With `args` containing the original method arguments (excluding __instance).
       <tr>
         <td><a class="xref" href="Sync.MethodAccess.html">MethodAccess</a></td>
         <td><span class="parametername">methodAccess</span></td>
-        <td>Method that is to be prefixed.</td>
+        <td><p>Method that is to be prefixed.</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">System.Reflection.MethodInfo</span></td>
         <td><span class="parametername">dispatcher</span></td>
-        <td>Dispatcher to be called in the prefix.</td>
+        <td><p>Dispatcher to be called in the prefix.</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="Sync.EPatchBehaviour.html">EPatchBehaviour</a></td>
         <td><span class="parametername">eBehaviour</span></td>
-        <td>Return value behaviour of the generated prefix.</td>
+        <td><p>Return value behaviour of the generated prefix.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -404,9 +436,22 @@ With `args` containing the original method arguments (excluding __instance).
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

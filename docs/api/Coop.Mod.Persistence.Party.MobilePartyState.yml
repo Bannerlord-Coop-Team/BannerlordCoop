@@ -1,0 +1,371 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Persistence.Party.MobilePartyState
+  commentId: T:Coop.Mod.Persistence.Party.MobilePartyState
+  id: MobilePartyState
+  parent: Coop.Mod.Persistence.Party
+  children:
+  - Coop.Mod.Persistence.Party.MobilePartyState.InvalidPartyId
+  - Coop.Mod.Persistence.Party.MobilePartyState.IsPlayerControlled
+  - Coop.Mod.Persistence.Party.MobilePartyState.m_IsPlayerControlled
+  - Coop.Mod.Persistence.Party.MobilePartyState.m_Movement
+  - Coop.Mod.Persistence.Party.MobilePartyState.Movement
+  - Coop.Mod.Persistence.Party.MobilePartyState.OnMovementChanged
+  - Coop.Mod.Persistence.Party.MobilePartyState.OnPlayerControlledChanged
+  - Coop.Mod.Persistence.Party.MobilePartyState.PartyId
+  langs:
+  - csharp
+  - vb
+  name: MobilePartyState
+  nameWithType: MobilePartyState
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MobilePartyState
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nState for a mobile party entity.\n"
+  example: []
+  syntax:
+    content: 'public class MobilePartyState : RailState'
+    content.vb: >-
+      Public Class MobilePartyState
+          Inherits RailState
+  inheritance:
+  - System.Object
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Persistence.Party.MobilePartyState.InvalidPartyId
+  commentId: F:Coop.Mod.Persistence.Party.MobilePartyState.InvalidPartyId
+  id: InvalidPartyId
+  parent: Coop.Mod.Persistence.Party.MobilePartyState
+  langs:
+  - csharp
+  - vb
+  name: InvalidPartyId
+  nameWithType: MobilePartyState.InvalidPartyId
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState.InvalidPartyId
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: InvalidPartyId
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+    startLine: 14
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: public static readonly int InvalidPartyId
+    return:
+      type: System.Int32
+    content.vb: Public Shared ReadOnly InvalidPartyId As Integer
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Persistence.Party.MobilePartyState.m_IsPlayerControlled
+  commentId: F:Coop.Mod.Persistence.Party.MobilePartyState.m_IsPlayerControlled
+  id: m_IsPlayerControlled
+  parent: Coop.Mod.Persistence.Party.MobilePartyState
+  langs:
+  - csharp
+  - vb
+  name: m_IsPlayerControlled
+  nameWithType: MobilePartyState.m_IsPlayerControlled
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState.m_IsPlayerControlled
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_IsPlayerControlled
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+    startLine: 15
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: bool m_IsPlayerControlled
+    return:
+      type: System.Boolean
+    content.vb: m_IsPlayerControlled As Boolean
+- uid: Coop.Mod.Persistence.Party.MobilePartyState.m_Movement
+  commentId: F:Coop.Mod.Persistence.Party.MobilePartyState.m_Movement
+  id: m_Movement
+  parent: Coop.Mod.Persistence.Party.MobilePartyState
+  langs:
+  - csharp
+  - vb
+  name: m_Movement
+  nameWithType: MobilePartyState.m_Movement
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState.m_Movement
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Movement
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+    startLine: 16
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: MovementState m_Movement
+    return:
+      type: Coop.Mod.Persistence.Party.MovementState
+    content.vb: m_Movement As MovementState
+- uid: Coop.Mod.Persistence.Party.MobilePartyState.PartyId
+  commentId: P:Coop.Mod.Persistence.Party.MobilePartyState.PartyId
+  id: PartyId
+  parent: Coop.Mod.Persistence.Party.MobilePartyState
+  langs:
+  - csharp
+  - vb
+  name: PartyId
+  nameWithType: MobilePartyState.PartyId
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState.PartyId
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: PartyId
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+    startLine: 21
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nParty ID as found in <see cref=\"!:TaleWorlds.CampaignSystem.MobileParty.Party.Index\"></see>.\n"
+  example: []
+  syntax:
+    content: public int PartyId { get; set; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public Property PartyId As Integer
+  overload: Coop.Mod.Persistence.Party.MobilePartyState.PartyId*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.Party.MobilePartyState.IsPlayerControlled
+  commentId: P:Coop.Mod.Persistence.Party.MobilePartyState.IsPlayerControlled
+  id: IsPlayerControlled
+  parent: Coop.Mod.Persistence.Party.MobilePartyState
+  langs:
+  - csharp
+  - vb
+  name: IsPlayerControlled
+  nameWithType: MobilePartyState.IsPlayerControlled
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState.IsPlayerControlled
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IsPlayerControlled
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+    startLine: 27
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nIs the party controlled by any player?\n"
+  example: []
+  syntax:
+    content: public bool IsPlayerControlled { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsPlayerControlled As Boolean
+  overload: Coop.Mod.Persistence.Party.MobilePartyState.IsPlayerControlled*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.Party.MobilePartyState.Movement
+  commentId: P:Coop.Mod.Persistence.Party.MobilePartyState.Movement
+  id: Movement
+  parent: Coop.Mod.Persistence.Party.MobilePartyState
+  langs:
+  - csharp
+  - vb
+  name: Movement
+  nameWithType: MobilePartyState.Movement
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState.Movement
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Movement
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+    startLine: 44
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nMovement data for the party.\n"
+  example: []
+  syntax:
+    content: public MovementState Movement { get; set; }
+    parameters: []
+    return:
+      type: Coop.Mod.Persistence.Party.MovementState
+    content.vb: Public Property Movement As MovementState
+  overload: Coop.Mod.Persistence.Party.MobilePartyState.Movement*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.Party.MobilePartyState.OnMovementChanged
+  commentId: E:Coop.Mod.Persistence.Party.MobilePartyState.OnMovementChanged
+  id: OnMovementChanged
+  parent: Coop.Mod.Persistence.Party.MobilePartyState
+  langs:
+  - csharp
+  - vb
+  name: OnMovementChanged
+  nameWithType: MobilePartyState.OnMovementChanged
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState.OnMovementChanged
+  type: Event
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnMovementChanged
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+    startLine: 58
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: public event Action OnMovementChanged
+    return:
+      type: System.Action
+    content.vb: Public Event OnMovementChanged As Action
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.Party.MobilePartyState.OnPlayerControlledChanged
+  commentId: E:Coop.Mod.Persistence.Party.MobilePartyState.OnPlayerControlledChanged
+  id: OnPlayerControlledChanged
+  parent: Coop.Mod.Persistence.Party.MobilePartyState
+  langs:
+  - csharp
+  - vb
+  name: OnPlayerControlledChanged
+  nameWithType: MobilePartyState.OnPlayerControlledChanged
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState.OnPlayerControlledChanged
+  type: Event
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnPlayerControlledChanged
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyState.cs
+    startLine: 59
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: public event Action OnPlayerControlledChanged
+    return:
+      type: System.Action
+    content.vb: Public Event OnPlayerControlledChanged As Action
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.Mod.Persistence.Party
+  commentId: N:Coop.Mod.Persistence.Party
+  name: Coop.Mod.Persistence.Party
+  nameWithType: Coop.Mod.Persistence.Party
+  fullName: Coop.Mod.Persistence.Party
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.Mod.Persistence.Party.MovementState
+  commentId: T:Coop.Mod.Persistence.Party.MovementState
+  parent: Coop.Mod.Persistence.Party
+  name: MovementState
+  nameWithType: MovementState
+  fullName: Coop.Mod.Persistence.Party.MovementState
+- uid: Coop.Mod.Persistence.Party.MobilePartyState.PartyId*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyState.PartyId
+  name: PartyId
+  nameWithType: MobilePartyState.PartyId
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState.PartyId
+- uid: Coop.Mod.Persistence.Party.MobilePartyState.IsPlayerControlled*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyState.IsPlayerControlled
+  name: IsPlayerControlled
+  nameWithType: MobilePartyState.IsPlayerControlled
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState.IsPlayerControlled
+- uid: Coop.Mod.Persistence.Party.MobilePartyState.Movement*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyState.Movement
+  name: Movement
+  nameWithType: MobilePartyState.Movement
+  fullName: Coop.Mod.Persistence.Party.MobilePartyState.Movement
+- uid: System.Action
+  commentId: T:System.Action
+  parent: System
+  isExternal: true
+  name: Action
+  nameWithType: Action
+  fullName: System.Action

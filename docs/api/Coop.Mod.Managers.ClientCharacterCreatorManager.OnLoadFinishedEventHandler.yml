@@ -1,0 +1,65 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  commentId: T:Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  id: ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  parent: Coop.Mod.Managers
+  children: []
+  langs:
+  - csharp
+  - vb
+  name: ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  nameWithType: ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  type: Delegate
+  source:
+    remote:
+      path: source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnLoadFinishedEventHandler
+    path: ../source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+    startLine: 46
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Managers
+  syntax:
+    content: public delegate void OnLoadFinishedEventHandler(object source, EventArgs e);
+    parameters:
+    - id: source
+      type: System.Object
+    - id: e
+      type: System.EventArgs
+    content.vb: Public Delegate Sub OnLoadFinishedEventHandler(source As Object, e As EventArgs)
+  modifiers.csharp:
+  - public
+  - delegate
+  modifiers.vb:
+  - Public
+  - Delegate
+references:
+- uid: Coop.Mod.Managers
+  commentId: N:Coop.Mod.Managers
+  name: Coop.Mod.Managers
+  nameWithType: Coop.Mod.Managers
+  fullName: Coop.Mod.Managers
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.EventArgs
+  commentId: T:System.EventArgs
+  parent: System
+  isExternal: true
+  name: EventArgs
+  nameWithType: EventArgs
+  fullName: System.EventArgs
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System

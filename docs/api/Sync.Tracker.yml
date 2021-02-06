@@ -1,0 +1,1159 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync.Tracker
+  commentId: T:Sync.Tracker
+  id: Tracker
+  parent: Sync
+  children:
+  - Sync.Tracker.GetHandler(System.Object)
+  - Sync.Tracker.GlobalHandler
+  - Sync.Tracker.InstanceSpecificHandlers
+  - Sync.Tracker.m_InstanceSpecificHandlers
+  - Sync.Tracker.RemoveGlobalHandler
+  - Sync.Tracker.RemoveHandler(System.Object)
+  - Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+  - Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+  langs:
+  - csharp
+  - vb
+  name: Tracker
+  nameWithType: Tracker
+  fullName: Sync.Tracker
+  type: Class
+  source:
+    remote:
+      path: source/Sync/Tracker.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Tracker
+    path: ../source/Sync/Tracker.cs
+    startLine: 10
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nBase class for class wrappers that notify when specific instances of the wrapped class\nchange internal state.\n"
+  example: []
+  syntax:
+    content: public abstract class Tracker
+    content.vb: Public MustInherit Class Tracker
+  inheritance:
+  - System.Object
+  derivedClasses:
+  - Sync.MethodAccess
+  - Sync.ValueAccess
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - abstract
+  - class
+  modifiers.vb:
+  - Public
+  - MustInherit
+  - Class
+- uid: Sync.Tracker.m_InstanceSpecificHandlers
+  commentId: F:Sync.Tracker.m_InstanceSpecificHandlers
+  id: m_InstanceSpecificHandlers
+  parent: Sync.Tracker
+  langs:
+  - csharp
+  - vb
+  name: m_InstanceSpecificHandlers
+  nameWithType: Tracker.m_InstanceSpecificHandlers
+  fullName: Sync.Tracker.m_InstanceSpecificHandlers
+  type: Field
+  source:
+    remote:
+      path: source/Sync/Tracker.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_InstanceSpecificHandlers
+    path: ../source/Sync/Tracker.cs
+    startLine: 12
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: readonly Dictionary<object, Action<object>> m_InstanceSpecificHandlers
+    return:
+      type: System.Collections.Generic.Dictionary{System.Object,System.Action{System.Object}}
+    content.vb: ReadOnly m_InstanceSpecificHandlers As Dictionary(Of Object, Action(Of Object))
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Sync.Tracker.GlobalHandler
+  commentId: P:Sync.Tracker.GlobalHandler
+  id: GlobalHandler
+  parent: Sync.Tracker
+  langs:
+  - csharp
+  - vb
+  name: GlobalHandler
+  nameWithType: Tracker.GlobalHandler
+  fullName: Sync.Tracker.GlobalHandler
+  type: Property
+  source:
+    remote:
+      path: source/Sync/Tracker.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GlobalHandler
+    path: ../source/Sync/Tracker.cs
+    startLine: 15
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: public Action<object, object> GlobalHandler { get; }
+    parameters: []
+    return:
+      type: System.Action{System.Object,System.Object}
+    content.vb: Public ReadOnly Property GlobalHandler As Action(Of Object, Object)
+  overload: Sync.Tracker.GlobalHandler*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Sync.Tracker.InstanceSpecificHandlers
+  commentId: P:Sync.Tracker.InstanceSpecificHandlers
+  id: InstanceSpecificHandlers
+  parent: Sync.Tracker
+  langs:
+  - csharp
+  - vb
+  name: InstanceSpecificHandlers
+  nameWithType: Tracker.InstanceSpecificHandlers
+  fullName: Sync.Tracker.InstanceSpecificHandlers
+  type: Property
+  source:
+    remote:
+      path: source/Sync/Tracker.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: InstanceSpecificHandlers
+    path: ../source/Sync/Tracker.cs
+    startLine: 17
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: public IReadOnlyDictionary<object, Action<object>> InstanceSpecificHandlers { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{System.Object,System.Action{System.Object}}
+    content.vb: Public ReadOnly Property InstanceSpecificHandlers As IReadOnlyDictionary(Of Object, Action(Of Object))
+  overload: Sync.Tracker.InstanceSpecificHandlers*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+  commentId: M:Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+  id: SetHandler(System.Object,System.Action{System.Object})
+  parent: Sync.Tracker
+  langs:
+  - csharp
+  - vb
+  name: SetHandler(Object, Action<Object>)
+  nameWithType: Tracker.SetHandler(Object, Action<Object>)
+  fullName: Sync.Tracker.SetHandler(System.Object, System.Action<System.Object>)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Tracker.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SetHandler
+    path: ../source/Sync/Tracker.cs
+    startLine: 27
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nSets the handler to be called when a specific instance of the <xref href=\"Sync.Tracker\" data-throw-if-not-resolved=\"false\"></xref>\nrequested a change. Multiple instance specific handlers are not supported.\nThe argument passed to the action are the arguments, not the instance!\n"
+  example: []
+  syntax:
+    content: public void SetHandler([NotNull] object instance, [NotNull] Action<object> action)
+    parameters:
+    - id: instance
+      type: System.Object
+      description: ''
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    - id: action
+      type: System.Action{System.Object}
+      description: ''
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    content.vb: Public Sub SetHandler(instance As Object, action As Action(Of Object))
+  overload: Sync.Tracker.SetHandler*
+  nameWithType.vb: Tracker.SetHandler(Object, Action(Of Object))
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Sync.Tracker.SetHandler(System.Object, System.Action(Of System.Object))
+  name.vb: SetHandler(Object, Action(Of Object))
+- uid: Sync.Tracker.GetHandler(System.Object)
+  commentId: M:Sync.Tracker.GetHandler(System.Object)
+  id: GetHandler(System.Object)
+  parent: Sync.Tracker
+  langs:
+  - csharp
+  - vb
+  name: GetHandler(Object)
+  nameWithType: Tracker.GetHandler(Object)
+  fullName: Sync.Tracker.GetHandler(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Tracker.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetHandler
+    path: ../source/Sync/Tracker.cs
+    startLine: 42
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nGets the handler to be called when the given instance changes.\n"
+  example: []
+  syntax:
+    content: public Action<object> GetHandler(object instance)
+    parameters:
+    - id: instance
+      type: System.Object
+      description: ''
+    return:
+      type: System.Action{System.Object}
+      description: Handler or null
+    content.vb: Public Function GetHandler(instance As Object) As Action(Of Object)
+  overload: Sync.Tracker.GetHandler*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Sync.Tracker.RemoveHandler(System.Object)
+  commentId: M:Sync.Tracker.RemoveHandler(System.Object)
+  id: RemoveHandler(System.Object)
+  parent: Sync.Tracker
+  langs:
+  - csharp
+  - vb
+  name: RemoveHandler(Object)
+  nameWithType: Tracker.RemoveHandler(Object)
+  fullName: Sync.Tracker.RemoveHandler(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Tracker.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RemoveHandler
+    path: ../source/Sync/Tracker.cs
+    startLine: 74
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nRemoves an instance specific handler.\n"
+  example: []
+  syntax:
+    content: public void RemoveHandler(object instance)
+    parameters:
+    - id: instance
+      type: System.Object
+      description: ''
+    content.vb: Public Sub RemoveHandler(instance As Object)
+  overload: Sync.Tracker.RemoveHandler*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+  commentId: M:Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+  id: SetGlobalHandler(System.Action{System.Object,System.Object})
+  parent: Sync.Tracker
+  langs:
+  - csharp
+  - vb
+  name: SetGlobalHandler(Action<Object, Object>)
+  nameWithType: Tracker.SetGlobalHandler(Action<Object, Object>)
+  fullName: Sync.Tracker.SetGlobalHandler(System.Action<System.Object, System.Object>)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Tracker.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SetGlobalHandler
+    path: ../source/Sync/Tracker.cs
+    startLine: 84
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nSets the handler to be called when no instance specific handler is registered.\nThe action arguments are the instance followed by the arguments.\n"
+  example: []
+  syntax:
+    content: public void SetGlobalHandler(Action<object, object> action)
+    parameters:
+    - id: action
+      type: System.Action{System.Object,System.Object}
+      description: ''
+    content.vb: Public Sub SetGlobalHandler(action As Action(Of Object, Object))
+  overload: Sync.Tracker.SetGlobalHandler*
+  nameWithType.vb: Tracker.SetGlobalHandler(Action(Of Object, Object))
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Sync.Tracker.SetGlobalHandler(System.Action(Of System.Object, System.Object))
+  name.vb: SetGlobalHandler(Action(Of Object, Object))
+- uid: Sync.Tracker.RemoveGlobalHandler
+  commentId: M:Sync.Tracker.RemoveGlobalHandler
+  id: RemoveGlobalHandler
+  parent: Sync.Tracker
+  langs:
+  - csharp
+  - vb
+  name: RemoveGlobalHandler()
+  nameWithType: Tracker.RemoveGlobalHandler()
+  fullName: Sync.Tracker.RemoveGlobalHandler()
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Tracker.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RemoveGlobalHandler
+    path: ../source/Sync/Tracker.cs
+    startLine: 94
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: public void RemoveGlobalHandler()
+    content.vb: Public Sub RemoveGlobalHandler
+  overload: Sync.Tracker.RemoveGlobalHandler*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Sync
+  commentId: N:Sync
+  name: Sync
+  nameWithType: Sync
+  fullName: Sync
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Collections.Generic.Dictionary{System.Object,System.Action{System.Object}}
+  commentId: T:System.Collections.Generic.Dictionary{System.Object,System.Action{System.Object}}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  name: Dictionary<Object, Action<Object>>
+  nameWithType: Dictionary<Object, Action<Object>>
+  fullName: System.Collections.Generic.Dictionary<System.Object, System.Action<System.Object>>
+  nameWithType.vb: Dictionary(Of Object, Action(Of Object))
+  fullName.vb: System.Collections.Generic.Dictionary(Of System.Object, System.Action(Of System.Object))
+  name.vb: Dictionary(Of Object, Action(Of Object))
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.Dictionary`2
+  commentId: T:System.Collections.Generic.Dictionary`2
+  isExternal: true
+  name: Dictionary<TKey, TValue>
+  nameWithType: Dictionary<TKey, TValue>
+  fullName: System.Collections.Generic.Dictionary<TKey, TValue>
+  nameWithType.vb: Dictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.Dictionary(Of TKey, TValue)
+  name.vb: Dictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: Sync.Tracker.GlobalHandler*
+  commentId: Overload:Sync.Tracker.GlobalHandler
+  name: GlobalHandler
+  nameWithType: Tracker.GlobalHandler
+  fullName: Sync.Tracker.GlobalHandler
+- uid: System.Action{System.Object,System.Object}
+  commentId: T:System.Action{System.Object,System.Object}
+  parent: System
+  definition: System.Action`2
+  name: Action<Object, Object>
+  nameWithType: Action<Object, Object>
+  fullName: System.Action<System.Object, System.Object>
+  nameWithType.vb: Action(Of Object, Object)
+  fullName.vb: System.Action(Of System.Object, System.Object)
+  name.vb: Action(Of Object, Object)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Action`2
+  commentId: T:System.Action`2
+  isExternal: true
+  name: Action<T1, T2>
+  nameWithType: Action<T1, T2>
+  fullName: System.Action<T1, T2>
+  nameWithType.vb: Action(Of T1, T2)
+  fullName.vb: System.Action(Of T1, T2)
+  name.vb: Action(Of T1, T2)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Tracker.InstanceSpecificHandlers*
+  commentId: Overload:Sync.Tracker.InstanceSpecificHandlers
+  name: InstanceSpecificHandlers
+  nameWithType: Tracker.InstanceSpecificHandlers
+  fullName: Sync.Tracker.InstanceSpecificHandlers
+- uid: System.Collections.Generic.IReadOnlyDictionary{System.Object,System.Action{System.Object}}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.Object,System.Action{System.Object}}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  name: IReadOnlyDictionary<Object, Action<Object>>
+  nameWithType: IReadOnlyDictionary<Object, Action<Object>>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<System.Object, System.Action<System.Object>>
+  nameWithType.vb: IReadOnlyDictionary(Of Object, Action(Of Object))
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of System.Object, System.Action(Of System.Object))
+  name.vb: IReadOnlyDictionary(Of Object, Action(Of Object))
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.IReadOnlyDictionary`2
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary`2
+  isExternal: true
+  name: IReadOnlyDictionary<TKey, TValue>
+  nameWithType: IReadOnlyDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>
+  nameWithType.vb: IReadOnlyDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of TKey, TValue)
+  name.vb: IReadOnlyDictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Tracker
+  commentId: T:Sync.Tracker
+  parent: Sync
+  name: Tracker
+  nameWithType: Tracker
+  fullName: Sync.Tracker
+- uid: Sync.Tracker.SetHandler*
+  commentId: Overload:Sync.Tracker.SetHandler
+  name: SetHandler
+  nameWithType: Tracker.SetHandler
+  fullName: Sync.Tracker.SetHandler
+- uid: System.Action{System.Object}
+  commentId: T:System.Action{System.Object}
+  parent: System
+  definition: System.Action`1
+  name: Action<Object>
+  nameWithType: Action<Object>
+  fullName: System.Action<System.Object>
+  nameWithType.vb: Action(Of Object)
+  fullName.vb: System.Action(Of System.Object)
+  name.vb: Action(Of Object)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Action`1
+  commentId: T:System.Action`1
+  isExternal: true
+  name: Action<T>
+  nameWithType: Action<T>
+  fullName: System.Action<T>
+  nameWithType.vb: Action(Of T)
+  fullName.vb: System.Action(Of T)
+  name.vb: Action(Of T)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Tracker.GetHandler*
+  commentId: Overload:Sync.Tracker.GetHandler
+  name: GetHandler
+  nameWithType: Tracker.GetHandler
+  fullName: Sync.Tracker.GetHandler
+- uid: Sync.Tracker.RemoveHandler*
+  commentId: Overload:Sync.Tracker.RemoveHandler
+  name: RemoveHandler
+  nameWithType: Tracker.RemoveHandler
+  fullName: Sync.Tracker.RemoveHandler
+- uid: Sync.Tracker.SetGlobalHandler*
+  commentId: Overload:Sync.Tracker.SetGlobalHandler
+  name: SetGlobalHandler
+  nameWithType: Tracker.SetGlobalHandler
+  fullName: Sync.Tracker.SetGlobalHandler
+- uid: Sync.Tracker.RemoveGlobalHandler*
+  commentId: Overload:Sync.Tracker.RemoveGlobalHandler
+  name: RemoveGlobalHandler
+  nameWithType: Tracker.RemoveGlobalHandler
+  fullName: Sync.Tracker.RemoveGlobalHandler

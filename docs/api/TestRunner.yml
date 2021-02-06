@@ -1,0 +1,41 @@
+### YamlMime:ManagedReference
+items:
+- uid: TestRunner
+  commentId: N:TestRunner
+  id: TestRunner
+  children:
+  - TestRunner.TestRunner
+  - TestRunner.TestRunner.CtrlType
+  - TestRunner.TestRunner.EventHandler
+  langs:
+  - csharp
+  - vb
+  name: TestRunner
+  nameWithType: TestRunner
+  fullName: TestRunner
+  type: Namespace
+  assemblies:
+  - TestRunner
+references:
+- uid: TestRunner.TestRunner
+  commentId: T:TestRunner.TestRunner
+  name: TestRunner
+  nameWithType: TestRunner
+  fullName: TestRunner.TestRunner
+- uid: TestRunner.TestRunner.EventHandler
+  commentId: T:TestRunner.TestRunner.EventHandler
+  parent: TestRunner
+  name: TestRunner.EventHandler
+  nameWithType: TestRunner.EventHandler
+  fullName: TestRunner.TestRunner.EventHandler
+- uid: TestRunner.TestRunner.CtrlType
+  commentId: T:TestRunner.TestRunner.CtrlType
+  parent: TestRunner
+  name: TestRunner.CtrlType
+  nameWithType: TestRunner.CtrlType
+  fullName: TestRunner.TestRunner.CtrlType
+- uid: TestRunner
+  commentId: N:TestRunner
+  name: TestRunner
+  nameWithType: TestRunner
+  fullName: TestRunner

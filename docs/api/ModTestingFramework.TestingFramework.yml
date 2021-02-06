@@ -1,0 +1,596 @@
+### YamlMime:ManagedReference
+items:
+- uid: ModTestingFramework.TestingFramework
+  commentId: T:ModTestingFramework.TestingFramework
+  id: TestingFramework
+  parent: ModTestingFramework
+  children:
+  - ModTestingFramework.TestingFramework.#ctor
+  - ModTestingFramework.TestingFramework.communicator
+  - ModTestingFramework.TestingFramework.Communicator_OnMessageReceived(System.Object,SimpleTCP.Message)
+  - ModTestingFramework.TestingFramework.Instance
+  - ModTestingFramework.TestingFramework.ParseCommandAndActivate(SimpleTCP.Message)
+  - ModTestingFramework.TestingFramework.SendMessage(System.String)
+  langs:
+  - csharp
+  - vb
+  name: TestingFramework
+  nameWithType: TestingFramework
+  fullName: ModTestingFramework.TestingFramework
+  type: Class
+  source:
+    remote:
+      path: BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: TestingFramework
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+    startLine: 10
+  assemblies:
+  - BannerlordSystemTestingFramework
+  namespace: ModTestingFramework
+  syntax:
+    content: public class TestingFramework
+    content.vb: Public Class TestingFramework
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: ModTestingFramework.TestingFramework.#ctor
+  commentId: M:ModTestingFramework.TestingFramework.#ctor
+  id: '#ctor'
+  parent: ModTestingFramework.TestingFramework
+  langs:
+  - csharp
+  - vb
+  name: TestingFramework()
+  nameWithType: TestingFramework.TestingFramework()
+  fullName: ModTestingFramework.TestingFramework.TestingFramework()
+  type: Constructor
+  source:
+    remote:
+      path: BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: .ctor
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+    startLine: 12
+  assemblies:
+  - BannerlordSystemTestingFramework
+  namespace: ModTestingFramework
+  syntax:
+    content: public TestingFramework()
+    content.vb: Public Sub New
+  overload: ModTestingFramework.TestingFramework.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: ModTestingFramework.TestingFramework.SendMessage(System.String)
+  commentId: M:ModTestingFramework.TestingFramework.SendMessage(System.String)
+  id: SendMessage(System.String)
+  parent: ModTestingFramework.TestingFramework
+  langs:
+  - csharp
+  - vb
+  name: SendMessage(String)
+  nameWithType: TestingFramework.SendMessage(String)
+  fullName: ModTestingFramework.TestingFramework.SendMessage(System.String)
+  type: Method
+  source:
+    remote:
+      path: BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: SendMessage
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+    startLine: 36
+  assemblies:
+  - BannerlordSystemTestingFramework
+  namespace: ModTestingFramework
+  syntax:
+    content: public void SendMessage(string message)
+    parameters:
+    - id: message
+      type: System.String
+    content.vb: Public Sub SendMessage(message As String)
+  overload: ModTestingFramework.TestingFramework.SendMessage*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: ModTestingFramework.TestingFramework.Communicator_OnMessageReceived(System.Object,SimpleTCP.Message)
+  commentId: M:ModTestingFramework.TestingFramework.Communicator_OnMessageReceived(System.Object,SimpleTCP.Message)
+  id: Communicator_OnMessageReceived(System.Object,SimpleTCP.Message)
+  parent: ModTestingFramework.TestingFramework
+  langs:
+  - csharp
+  - vb
+  name: Communicator_OnMessageReceived(Object, Message)
+  nameWithType: TestingFramework.Communicator_OnMessageReceived(Object, Message)
+  fullName: ModTestingFramework.TestingFramework.Communicator_OnMessageReceived(System.Object, SimpleTCP.Message)
+  type: Method
+  source:
+    remote:
+      path: BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Communicator_OnMessageReceived
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+    startLine: 44
+  assemblies:
+  - BannerlordSystemTestingFramework
+  namespace: ModTestingFramework
+  syntax:
+    content: void Communicator_OnMessageReceived(object sender, Message msg)
+    parameters:
+    - id: sender
+      type: System.Object
+    - id: msg
+      type: SimpleTCP.Message
+    content.vb: Sub Communicator_OnMessageReceived(sender As Object, msg As Message)
+  overload: ModTestingFramework.TestingFramework.Communicator_OnMessageReceived*
+- uid: ModTestingFramework.TestingFramework.ParseCommandAndActivate(SimpleTCP.Message)
+  commentId: M:ModTestingFramework.TestingFramework.ParseCommandAndActivate(SimpleTCP.Message)
+  id: ParseCommandAndActivate(SimpleTCP.Message)
+  parent: ModTestingFramework.TestingFramework
+  langs:
+  - csharp
+  - vb
+  name: ParseCommandAndActivate(Message)
+  nameWithType: TestingFramework.ParseCommandAndActivate(Message)
+  fullName: ModTestingFramework.TestingFramework.ParseCommandAndActivate(SimpleTCP.Message)
+  type: Method
+  source:
+    remote:
+      path: BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: ParseCommandAndActivate
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+    startLine: 52
+  assemblies:
+  - BannerlordSystemTestingFramework
+  namespace: ModTestingFramework
+  syntax:
+    content: void ParseCommandAndActivate(Message message)
+    parameters:
+    - id: message
+      type: SimpleTCP.Message
+    content.vb: Sub ParseCommandAndActivate(message As Message)
+  overload: ModTestingFramework.TestingFramework.ParseCommandAndActivate*
+- uid: ModTestingFramework.TestingFramework.communicator
+  commentId: F:ModTestingFramework.TestingFramework.communicator
+  id: communicator
+  parent: ModTestingFramework.TestingFramework
+  langs:
+  - csharp
+  - vb
+  name: communicator
+  nameWithType: TestingFramework.communicator
+  fullName: ModTestingFramework.TestingFramework.communicator
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: communicator
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+    startLine: 92
+  assemblies:
+  - BannerlordSystemTestingFramework
+  namespace: ModTestingFramework
+  syntax:
+    content: static RunnerCommunicator communicator
+    return:
+      type: ModTestingFramework.RunnerCommunicator
+    content.vb: Shared communicator As RunnerCommunicator
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: ModTestingFramework.TestingFramework.Instance
+  commentId: P:ModTestingFramework.TestingFramework.Instance
+  id: Instance
+  parent: ModTestingFramework.TestingFramework
+  langs:
+  - csharp
+  - vb
+  name: Instance
+  nameWithType: TestingFramework.Instance
+  fullName: ModTestingFramework.TestingFramework.Instance
+  type: Property
+  source:
+    remote:
+      path: BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Instance
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingFramework/ModuleTestingFramework.cs
+    startLine: 96
+  assemblies:
+  - BannerlordSystemTestingFramework
+  namespace: ModTestingFramework
+  syntax:
+    content: public static TestingFramework Instance { get; }
+    parameters: []
+    return:
+      type: ModTestingFramework.TestingFramework
+    content.vb: Public Shared ReadOnly Property Instance As TestingFramework
+  overload: ModTestingFramework.TestingFramework.Instance*
+  modifiers.csharp:
+  - public
+  - static
+  - get
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+references:
+- uid: ModTestingFramework
+  commentId: N:ModTestingFramework
+  name: ModTestingFramework
+  nameWithType: ModTestingFramework
+  fullName: ModTestingFramework
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: ModTestingFramework.TestingFramework.#ctor*
+  commentId: Overload:ModTestingFramework.TestingFramework.#ctor
+  name: TestingFramework
+  nameWithType: TestingFramework.TestingFramework
+  fullName: ModTestingFramework.TestingFramework.TestingFramework
+- uid: ModTestingFramework.TestingFramework.SendMessage*
+  commentId: Overload:ModTestingFramework.TestingFramework.SendMessage
+  name: SendMessage
+  nameWithType: TestingFramework.SendMessage
+  fullName: ModTestingFramework.TestingFramework.SendMessage
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String
+- uid: ModTestingFramework.TestingFramework.Communicator_OnMessageReceived*
+  commentId: Overload:ModTestingFramework.TestingFramework.Communicator_OnMessageReceived
+  name: Communicator_OnMessageReceived
+  nameWithType: TestingFramework.Communicator_OnMessageReceived
+  fullName: ModTestingFramework.TestingFramework.Communicator_OnMessageReceived
+- uid: SimpleTCP.Message
+  commentId: T:SimpleTCP.Message
+  parent: SimpleTCP
+  isExternal: true
+  name: Message
+  nameWithType: Message
+  fullName: SimpleTCP.Message
+- uid: SimpleTCP
+  commentId: N:SimpleTCP
+  isExternal: true
+  name: SimpleTCP
+  nameWithType: SimpleTCP
+  fullName: SimpleTCP
+- uid: ModTestingFramework.TestingFramework.ParseCommandAndActivate*
+  commentId: Overload:ModTestingFramework.TestingFramework.ParseCommandAndActivate
+  name: ParseCommandAndActivate
+  nameWithType: TestingFramework.ParseCommandAndActivate
+  fullName: ModTestingFramework.TestingFramework.ParseCommandAndActivate
+- uid: ModTestingFramework.RunnerCommunicator
+  commentId: T:ModTestingFramework.RunnerCommunicator
+  parent: ModTestingFramework
+  name: RunnerCommunicator
+  nameWithType: RunnerCommunicator
+  fullName: ModTestingFramework.RunnerCommunicator
+- uid: ModTestingFramework.TestingFramework.Instance*
+  commentId: Overload:ModTestingFramework.TestingFramework.Instance
+  name: Instance
+  nameWithType: TestingFramework.Instance
+  fullName: ModTestingFramework.TestingFramework.Instance
+- uid: ModTestingFramework.TestingFramework
+  commentId: T:ModTestingFramework.TestingFramework
+  parent: ModTestingFramework
+  name: TestingFramework
+  nameWithType: TestingFramework
+  fullName: ModTestingFramework.TestingFramework

@@ -1,0 +1,452 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Patch.Debugging.PatchPrint
+  commentId: T:Coop.Mod.Patch.Debugging.PatchPrint
+  id: Debugging.PatchPrint
+  parent: Coop.Mod.Patch
+  children:
+  - Coop.Mod.Patch.Debugging.PatchPrint.Prefix(System.String@,System.Int32,TaleWorlds.Library.Debug.DebugColor,System.UInt64)
+  langs:
+  - csharp
+  - vb
+  name: Debugging.PatchPrint
+  nameWithType: Debugging.PatchPrint
+  fullName: Coop.Mod.Patch.Debugging.PatchPrint
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Debugging.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: PatchPrint
+    path: ../source/Coop/Mod/Patch/Debugging.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: >-
+      [HarmonyPatch(typeof(MBDebug))]
+
+      [HarmonyPatch("Print")]
+
+      class PatchPrint
+    content.vb: >-
+      <HarmonyPatch(GetType(MBDebug))>
+
+      <HarmonyPatch("Print")>
+
+      Class PatchPrint
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  attributes:
+  - type: HarmonyLib.HarmonyPatch
+    ctor: HarmonyLib.HarmonyPatch.#ctor(System.Type)
+    arguments:
+    - type: System.Type
+      value: TaleWorlds.Engine.MBDebug
+  - type: HarmonyLib.HarmonyPatch
+    ctor: HarmonyLib.HarmonyPatch.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Print
+  modifiers.csharp:
+  - class
+  modifiers.vb:
+  - Class
+- uid: Coop.Mod.Patch.Debugging.PatchPrint.Prefix(System.String@,System.Int32,TaleWorlds.Library.Debug.DebugColor,System.UInt64)
+  commentId: M:Coop.Mod.Patch.Debugging.PatchPrint.Prefix(System.String@,System.Int32,TaleWorlds.Library.Debug.DebugColor,System.UInt64)
+  id: Prefix(System.String@,System.Int32,TaleWorlds.Library.Debug.DebugColor,System.UInt64)
+  parent: Coop.Mod.Patch.Debugging.PatchPrint
+  langs:
+  - csharp
+  - vb
+  name: Prefix(ref String, Int32, Debug.DebugColor, UInt64)
+  nameWithType: Debugging.PatchPrint.Prefix(ref String, Int32, Debug.DebugColor, UInt64)
+  fullName: Coop.Mod.Patch.Debugging.PatchPrint.Prefix(ref System.String, System.Int32, TaleWorlds.Library.Debug.DebugColor, System.UInt64)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Debugging.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Prefix
+    path: ../source/Coop/Mod/Patch/Debugging.cs
+    startLine: 16
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: static bool Prefix(ref string message, int logLevel, Debug.DebugColor color, ulong debugFilter)
+    parameters:
+    - id: message
+      type: System.String
+    - id: logLevel
+      type: System.Int32
+    - id: color
+      type: TaleWorlds.Library.Debug.DebugColor
+    - id: debugFilter
+      type: System.UInt64
+    return:
+      type: System.Boolean
+    content.vb: Shared Function Prefix(ByRef message As String, logLevel As Integer, color As Debug.DebugColor, debugFilter As ULong) As Boolean
+  overload: Coop.Mod.Patch.Debugging.PatchPrint.Prefix*
+  nameWithType.vb: Debugging.PatchPrint.Prefix(ByRef String, Int32, Debug.DebugColor, UInt64)
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+  fullName.vb: Coop.Mod.Patch.Debugging.PatchPrint.Prefix(ByRef System.String, System.Int32, TaleWorlds.Library.Debug.DebugColor, System.UInt64)
+  name.vb: Prefix(ByRef String, Int32, Debug.DebugColor, UInt64)
+references:
+- uid: Coop.Mod.Patch
+  commentId: N:Coop.Mod.Patch
+  name: Coop.Mod.Patch
+  nameWithType: Coop.Mod.Patch
+  fullName: Coop.Mod.Patch
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Coop.Mod.Patch.Debugging.PatchPrint.Prefix*
+  commentId: Overload:Coop.Mod.Patch.Debugging.PatchPrint.Prefix
+  name: Prefix
+  nameWithType: Debugging.PatchPrint.Prefix
+  fullName: Coop.Mod.Patch.Debugging.PatchPrint.Prefix
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: TaleWorlds.Library.Debug.DebugColor
+  commentId: T:TaleWorlds.Library.Debug.DebugColor
+  parent: TaleWorlds.Library
+  isExternal: true
+  name: Debug.DebugColor
+  nameWithType: Debug.DebugColor
+  fullName: TaleWorlds.Library.Debug.DebugColor
+- uid: System.UInt64
+  commentId: T:System.UInt64
+  parent: System
+  isExternal: true
+  name: UInt64
+  nameWithType: UInt64
+  fullName: System.UInt64
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: TaleWorlds.Library
+  commentId: N:TaleWorlds.Library
+  isExternal: true
+  name: TaleWorlds.Library
+  nameWithType: TaleWorlds.Library
+  fullName: TaleWorlds.Library

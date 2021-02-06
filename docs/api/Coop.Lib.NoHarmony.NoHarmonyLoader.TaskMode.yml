@@ -1,0 +1,211 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  commentId: T:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  id: NoHarmonyLoader.TaskMode
+  parent: Coop.Lib.NoHarmony
+  children:
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Add
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Remove
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.RemoveAndAdd
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Replace
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.ReplaceOrAdd
+  langs:
+  - csharp
+  - vb
+  name: NoHarmonyLoader.TaskMode
+  nameWithType: NoHarmonyLoader.TaskMode
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  type: Enum
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TaskMode
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 21
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: public enum TaskMode
+    content.vb: Public Enum TaskMode
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Add
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Add
+  id: Add
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  langs:
+  - csharp
+  - vb
+  name: Add
+  nameWithType: NoHarmonyLoader.TaskMode.Add
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Add
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Add
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 23
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: Add = 0
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Replace
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Replace
+  id: Replace
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  langs:
+  - csharp
+  - vb
+  name: Replace
+  nameWithType: NoHarmonyLoader.TaskMode.Replace
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Replace
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Replace
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 24
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: Replace = 1
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.ReplaceOrAdd
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.ReplaceOrAdd
+  id: ReplaceOrAdd
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  langs:
+  - csharp
+  - vb
+  name: ReplaceOrAdd
+  nameWithType: NoHarmonyLoader.TaskMode.ReplaceOrAdd
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.ReplaceOrAdd
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ReplaceOrAdd
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 25
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: ReplaceOrAdd = 2
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.RemoveAndAdd
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.RemoveAndAdd
+  id: RemoveAndAdd
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  langs:
+  - csharp
+  - vb
+  name: RemoveAndAdd
+  nameWithType: NoHarmonyLoader.TaskMode.RemoveAndAdd
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.RemoveAndAdd
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RemoveAndAdd
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 26
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: RemoveAndAdd = 3
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Remove
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Remove
+  id: Remove
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  langs:
+  - csharp
+  - vb
+  name: Remove
+  nameWithType: NoHarmonyLoader.TaskMode.Remove
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.Remove
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Remove
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 27
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: Remove = 4
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Coop.Lib.NoHarmony
+  commentId: N:Coop.Lib.NoHarmony
+  name: Coop.Lib.NoHarmony
+  nameWithType: Coop.Lib.NoHarmony
+  fullName: Coop.Lib.NoHarmony
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  commentId: T:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  parent: Coop.Lib.NoHarmony
+  name: NoHarmonyLoader.TaskMode
+  nameWithType: NoHarmonyLoader.TaskMode
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode

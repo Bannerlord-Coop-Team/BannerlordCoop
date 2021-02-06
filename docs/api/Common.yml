@@ -1,0 +1,409 @@
+### YamlMime:ManagedReference
+items:
+- uid: Common
+  commentId: N:Common
+  id: Common
+  children:
+  - Common.CoopStateMachine
+  - Common.CoopStateMachine`2
+  - Common.DropoutStack`1
+  - Common.FrameLimiter
+  - Common.HashHelpers
+  - Common.IUpdateable
+  - Common.MovingAverage
+  - Common.OrderedHashSet`1
+  - Common.OrderedHashSet`1.Enumerator
+  - Common.OrderedHashSet`1.Range
+  - Common.OrderedHashSet`1.Reader
+  - Common.OrderedHashSet`1.ReverseEnumerator
+  - Common.OrderedHashSet`1.ReverseRange
+  - Common.OrderedHashSet`1.ReverseReader
+  - Common.OrderedHashSet`1.Slot
+  - Common.UpdateableList
+  langs:
+  - csharp
+  - vb
+  name: Common
+  nameWithType: Common
+  fullName: Common
+  type: Namespace
+  assemblies:
+  - Common
+references:
+- uid: Common.CoopStateMachine
+  commentId: T:Common.CoopStateMachine
+  parent: Common
+  name: CoopStateMachine
+  nameWithType: CoopStateMachine
+  fullName: Common.CoopStateMachine
+- uid: Common.CoopStateMachine`2
+  commentId: T:Common.CoopStateMachine`2
+  name: CoopStateMachine<T, U>
+  nameWithType: CoopStateMachine<T, U>
+  fullName: Common.CoopStateMachine<T, U>
+  nameWithType.vb: CoopStateMachine(Of T, U)
+  fullName.vb: Common.CoopStateMachine(Of T, U)
+  name.vb: CoopStateMachine(Of T, U)
+  spec.csharp:
+  - uid: Common.CoopStateMachine`2
+    name: CoopStateMachine
+    nameWithType: CoopStateMachine
+    fullName: Common.CoopStateMachine
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: U
+    nameWithType: U
+    fullName: U
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.CoopStateMachine`2
+    name: CoopStateMachine
+    nameWithType: CoopStateMachine
+    fullName: Common.CoopStateMachine
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: U
+    nameWithType: U
+    fullName: U
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.DropoutStack`1
+  commentId: T:Common.DropoutStack`1
+  name: DropoutStack<T>
+  nameWithType: DropoutStack<T>
+  fullName: Common.DropoutStack<T>
+  nameWithType.vb: DropoutStack(Of T)
+  fullName.vb: Common.DropoutStack(Of T)
+  name.vb: DropoutStack(Of T)
+  spec.csharp:
+  - uid: Common.DropoutStack`1
+    name: DropoutStack
+    nameWithType: DropoutStack
+    fullName: Common.DropoutStack
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.DropoutStack`1
+    name: DropoutStack
+    nameWithType: DropoutStack
+    fullName: Common.DropoutStack
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.FrameLimiter
+  commentId: T:Common.FrameLimiter
+  parent: Common
+  name: FrameLimiter
+  nameWithType: FrameLimiter
+  fullName: Common.FrameLimiter
+- uid: Common.IUpdateable
+  commentId: T:Common.IUpdateable
+  parent: Common
+  name: IUpdateable
+  nameWithType: IUpdateable
+  fullName: Common.IUpdateable
+- uid: Common.MovingAverage
+  commentId: T:Common.MovingAverage
+  parent: Common
+  name: MovingAverage
+  nameWithType: MovingAverage
+  fullName: Common.MovingAverage
+- uid: Common.OrderedHashSet`1
+  commentId: T:Common.OrderedHashSet`1
+  parent: Common
+  name: OrderedHashSet<T>
+  nameWithType: OrderedHashSet<T>
+  fullName: Common.OrderedHashSet<T>
+  nameWithType.vb: OrderedHashSet(Of T)
+  fullName.vb: Common.OrderedHashSet(Of T)
+  name.vb: OrderedHashSet(Of T)
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1
+    name: OrderedHashSet
+    nameWithType: OrderedHashSet
+    fullName: Common.OrderedHashSet
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1
+    name: OrderedHashSet
+    nameWithType: OrderedHashSet
+    fullName: Common.OrderedHashSet
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.OrderedHashSet`1.Slot
+  commentId: T:Common.OrderedHashSet`1.Slot
+  name: OrderedHashSet.Slot<>
+  nameWithType: OrderedHashSet.Slot<>
+  fullName: Common.OrderedHashSet.Slot<>
+  nameWithType.vb: OrderedHashSet.Slot(Of )
+  fullName.vb: Common.OrderedHashSet.Slot(Of )
+  name.vb: OrderedHashSet.Slot(Of )
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1.Slot
+    name: OrderedHashSet.Slot
+    nameWithType: OrderedHashSet.Slot
+    fullName: Common.OrderedHashSet.Slot
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1.Slot
+    name: OrderedHashSet.Slot
+    nameWithType: OrderedHashSet.Slot
+    fullName: Common.OrderedHashSet.Slot
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.OrderedHashSet`1.Reader
+  commentId: T:Common.OrderedHashSet`1.Reader
+  parent: Common
+  name: OrderedHashSet.Reader<>
+  nameWithType: OrderedHashSet.Reader<>
+  fullName: Common.OrderedHashSet.Reader<>
+  nameWithType.vb: OrderedHashSet.Reader(Of )
+  fullName.vb: Common.OrderedHashSet.Reader(Of )
+  name.vb: OrderedHashSet.Reader(Of )
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1.Reader
+    name: OrderedHashSet.Reader
+    nameWithType: OrderedHashSet.Reader
+    fullName: Common.OrderedHashSet.Reader
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1.Reader
+    name: OrderedHashSet.Reader
+    nameWithType: OrderedHashSet.Reader
+    fullName: Common.OrderedHashSet.Reader
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.OrderedHashSet`1.ReverseReader
+  commentId: T:Common.OrderedHashSet`1.ReverseReader
+  parent: Common
+  name: OrderedHashSet.ReverseReader<>
+  nameWithType: OrderedHashSet.ReverseReader<>
+  fullName: Common.OrderedHashSet.ReverseReader<>
+  nameWithType.vb: OrderedHashSet.ReverseReader(Of )
+  fullName.vb: Common.OrderedHashSet.ReverseReader(Of )
+  name.vb: OrderedHashSet.ReverseReader(Of )
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1.ReverseReader
+    name: OrderedHashSet.ReverseReader
+    nameWithType: OrderedHashSet.ReverseReader
+    fullName: Common.OrderedHashSet.ReverseReader
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1.ReverseReader
+    name: OrderedHashSet.ReverseReader
+    nameWithType: OrderedHashSet.ReverseReader
+    fullName: Common.OrderedHashSet.ReverseReader
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.OrderedHashSet`1.Range
+  commentId: T:Common.OrderedHashSet`1.Range
+  parent: Common
+  name: OrderedHashSet.Range<>
+  nameWithType: OrderedHashSet.Range<>
+  fullName: Common.OrderedHashSet.Range<>
+  nameWithType.vb: OrderedHashSet.Range(Of )
+  fullName.vb: Common.OrderedHashSet.Range(Of )
+  name.vb: OrderedHashSet.Range(Of )
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1.Range
+    name: OrderedHashSet.Range
+    nameWithType: OrderedHashSet.Range
+    fullName: Common.OrderedHashSet.Range
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1.Range
+    name: OrderedHashSet.Range
+    nameWithType: OrderedHashSet.Range
+    fullName: Common.OrderedHashSet.Range
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.OrderedHashSet`1.ReverseRange
+  commentId: T:Common.OrderedHashSet`1.ReverseRange
+  parent: Common
+  name: OrderedHashSet.ReverseRange<>
+  nameWithType: OrderedHashSet.ReverseRange<>
+  fullName: Common.OrderedHashSet.ReverseRange<>
+  nameWithType.vb: OrderedHashSet.ReverseRange(Of )
+  fullName.vb: Common.OrderedHashSet.ReverseRange(Of )
+  name.vb: OrderedHashSet.ReverseRange(Of )
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1.ReverseRange
+    name: OrderedHashSet.ReverseRange
+    nameWithType: OrderedHashSet.ReverseRange
+    fullName: Common.OrderedHashSet.ReverseRange
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1.ReverseRange
+    name: OrderedHashSet.ReverseRange
+    nameWithType: OrderedHashSet.ReverseRange
+    fullName: Common.OrderedHashSet.ReverseRange
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.OrderedHashSet`1.Enumerator
+  commentId: T:Common.OrderedHashSet`1.Enumerator
+  parent: Common
+  name: OrderedHashSet.Enumerator<>
+  nameWithType: OrderedHashSet.Enumerator<>
+  fullName: Common.OrderedHashSet.Enumerator<>
+  nameWithType.vb: OrderedHashSet.Enumerator(Of )
+  fullName.vb: Common.OrderedHashSet.Enumerator(Of )
+  name.vb: OrderedHashSet.Enumerator(Of )
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1.Enumerator
+    name: OrderedHashSet.Enumerator
+    nameWithType: OrderedHashSet.Enumerator
+    fullName: Common.OrderedHashSet.Enumerator
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1.Enumerator
+    name: OrderedHashSet.Enumerator
+    nameWithType: OrderedHashSet.Enumerator
+    fullName: Common.OrderedHashSet.Enumerator
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.OrderedHashSet`1.ReverseEnumerator
+  commentId: T:Common.OrderedHashSet`1.ReverseEnumerator
+  parent: Common
+  name: OrderedHashSet.ReverseEnumerator<>
+  nameWithType: OrderedHashSet.ReverseEnumerator<>
+  fullName: Common.OrderedHashSet.ReverseEnumerator<>
+  nameWithType.vb: OrderedHashSet.ReverseEnumerator(Of )
+  fullName.vb: Common.OrderedHashSet.ReverseEnumerator(Of )
+  name.vb: OrderedHashSet.ReverseEnumerator(Of )
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1.ReverseEnumerator
+    name: OrderedHashSet.ReverseEnumerator
+    nameWithType: OrderedHashSet.ReverseEnumerator
+    fullName: Common.OrderedHashSet.ReverseEnumerator
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1.ReverseEnumerator
+    name: OrderedHashSet.ReverseEnumerator
+    nameWithType: OrderedHashSet.ReverseEnumerator
+    fullName: Common.OrderedHashSet.ReverseEnumerator
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.HashHelpers
+  commentId: T:Common.HashHelpers
+  name: HashHelpers
+  nameWithType: HashHelpers
+  fullName: Common.HashHelpers
+- uid: Common.UpdateableList
+  commentId: T:Common.UpdateableList
+  parent: Common
+  name: UpdateableList
+  nameWithType: UpdateableList
+  fullName: Common.UpdateableList
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common

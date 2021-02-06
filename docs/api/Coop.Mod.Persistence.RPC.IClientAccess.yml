@@ -1,0 +1,146 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Persistence.RPC.IClientAccess
+  commentId: T:Coop.Mod.Persistence.RPC.IClientAccess
+  id: IClientAccess
+  parent: Coop.Mod.Persistence.RPC
+  children:
+  - Coop.Mod.Persistence.RPC.IClientAccess.GetRoom
+  - Coop.Mod.Persistence.RPC.IClientAccess.GetStore
+  langs:
+  - csharp
+  - vb
+  name: IClientAccess
+  nameWithType: IClientAccess
+  fullName: Coop.Mod.Persistence.RPC.IClientAccess
+  type: Interface
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/IClientAccess.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IClientAccess
+    path: ../source/Coop/Mod/Persistence/RPC/IClientAccess.cs
+    startLine: 9
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  summary: "\nInterface to access a clients persistence state. \n"
+  example: []
+  syntax:
+    content: public interface IClientAccess
+    content.vb: Public Interface IClientAccess
+  modifiers.csharp:
+  - public
+  - interface
+  modifiers.vb:
+  - Public
+  - Interface
+- uid: Coop.Mod.Persistence.RPC.IClientAccess.GetStore
+  commentId: M:Coop.Mod.Persistence.RPC.IClientAccess.GetStore
+  id: GetStore
+  parent: Coop.Mod.Persistence.RPC.IClientAccess
+  langs:
+  - csharp
+  - vb
+  name: GetStore()
+  nameWithType: IClientAccess.GetStore()
+  fullName: Coop.Mod.Persistence.RPC.IClientAccess.GetStore()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/IClientAccess.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetStore
+    path: ../source/Coop/Mod/Persistence/RPC/IClientAccess.cs
+    startLine: 11
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: >-
+      [CanBeNull]
+
+      RemoteStore GetStore()
+    return:
+      type: Sync.Store.RemoteStore
+    content.vb: >-
+      <CanBeNull>
+
+      Function GetStore As RemoteStore
+  overload: Coop.Mod.Persistence.RPC.IClientAccess.GetStore*
+  attributes:
+  - type: JetBrains.Annotations.CanBeNullAttribute
+    ctor: JetBrains.Annotations.CanBeNullAttribute.#ctor
+    arguments: []
+- uid: Coop.Mod.Persistence.RPC.IClientAccess.GetRoom
+  commentId: M:Coop.Mod.Persistence.RPC.IClientAccess.GetRoom
+  id: GetRoom
+  parent: Coop.Mod.Persistence.RPC.IClientAccess
+  langs:
+  - csharp
+  - vb
+  name: GetRoom()
+  nameWithType: IClientAccess.GetRoom()
+  fullName: Coop.Mod.Persistence.RPC.IClientAccess.GetRoom()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/IClientAccess.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetRoom
+    path: ../source/Coop/Mod/Persistence/RPC/IClientAccess.cs
+    startLine: 14
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: >-
+      [CanBeNull]
+
+      RailClientRoom GetRoom()
+    return:
+      type: RailClientRoom
+    content.vb: >-
+      <CanBeNull>
+
+      Function GetRoom As RailClientRoom
+  overload: Coop.Mod.Persistence.RPC.IClientAccess.GetRoom*
+  attributes:
+  - type: JetBrains.Annotations.CanBeNullAttribute
+    ctor: JetBrains.Annotations.CanBeNullAttribute.#ctor
+    arguments: []
+references:
+- uid: Coop.Mod.Persistence.RPC
+  commentId: N:Coop.Mod.Persistence.RPC
+  name: Coop.Mod.Persistence.RPC
+  nameWithType: Coop.Mod.Persistence.RPC
+  fullName: Coop.Mod.Persistence.RPC
+- uid: Coop.Mod.Persistence.RPC.IClientAccess.GetStore*
+  commentId: Overload:Coop.Mod.Persistence.RPC.IClientAccess.GetStore
+  name: GetStore
+  nameWithType: IClientAccess.GetStore
+  fullName: Coop.Mod.Persistence.RPC.IClientAccess.GetStore
+- uid: Sync.Store.RemoteStore
+  commentId: T:Sync.Store.RemoteStore
+  parent: Sync.Store
+  name: RemoteStore
+  nameWithType: RemoteStore
+  fullName: Sync.Store.RemoteStore
+- uid: Sync.Store
+  commentId: N:Sync.Store
+  name: Sync.Store
+  nameWithType: Sync.Store
+  fullName: Sync.Store
+- uid: Coop.Mod.Persistence.RPC.IClientAccess.GetRoom*
+  commentId: Overload:Coop.Mod.Persistence.RPC.IClientAccess.GetRoom
+  name: GetRoom
+  nameWithType: IClientAccess.GetRoom
+  fullName: Coop.Mod.Persistence.RPC.IClientAccess.GetRoom
+- uid: RailClientRoom
+  isExternal: true
+  name: RailClientRoom
+  nameWithType: RailClientRoom
+  fullName: RailClientRoom

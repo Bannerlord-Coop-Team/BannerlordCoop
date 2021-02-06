@@ -1,0 +1,545 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.CoopEvents
+  commentId: T:Coop.Mod.CoopEvents
+  id: CoopEvents
+  parent: Coop.Mod
+  children:
+  - Coop.Mod.CoopEvents.OnBeforePlayerPartySpawned
+  - Coop.Mod.CoopEvents.OnGameLoaded
+  - Coop.Mod.CoopEvents.RemoveListeners(System.Object)
+  langs:
+  - csharp
+  - vb
+  name: CoopEvents
+  nameWithType: CoopEvents
+  fullName: Coop.Mod.CoopEvents
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/CoopEvents.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CoopEvents
+    path: ../source/Coop/Mod/CoopEvents.cs
+    startLine: 4
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public class CoopEvents
+    content.vb: Public Class CoopEvents
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.CoopEvents.OnBeforePlayerPartySpawned
+  commentId: F:Coop.Mod.CoopEvents.OnBeforePlayerPartySpawned
+  id: OnBeforePlayerPartySpawned
+  parent: Coop.Mod.CoopEvents
+  langs:
+  - csharp
+  - vb
+  name: OnBeforePlayerPartySpawned
+  nameWithType: CoopEvents.OnBeforePlayerPartySpawned
+  fullName: Coop.Mod.CoopEvents.OnBeforePlayerPartySpawned
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/CoopEvents.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnBeforePlayerPartySpawned
+    path: ../source/Coop/Mod/CoopEvents.cs
+    startLine: 7
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public readonly MbEvent<MobileParty> OnBeforePlayerPartySpawned
+    return:
+      type: TaleWorlds.CampaignSystem.MbEvent{TaleWorlds.CampaignSystem.MobileParty}
+    content.vb: Public ReadOnly OnBeforePlayerPartySpawned As MbEvent(Of MobileParty)
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.CoopEvents.OnGameLoaded
+  commentId: F:Coop.Mod.CoopEvents.OnGameLoaded
+  id: OnGameLoaded
+  parent: Coop.Mod.CoopEvents
+  langs:
+  - csharp
+  - vb
+  name: OnGameLoaded
+  nameWithType: CoopEvents.OnGameLoaded
+  fullName: Coop.Mod.CoopEvents.OnGameLoaded
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/CoopEvents.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnGameLoaded
+    path: ../source/Coop/Mod/CoopEvents.cs
+    startLine: 9
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public readonly MbEvent OnGameLoaded
+    return:
+      type: TaleWorlds.CampaignSystem.MbEvent
+    content.vb: Public ReadOnly OnGameLoaded As MbEvent
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.CoopEvents.RemoveListeners(System.Object)
+  commentId: M:Coop.Mod.CoopEvents.RemoveListeners(System.Object)
+  id: RemoveListeners(System.Object)
+  parent: Coop.Mod.CoopEvents
+  langs:
+  - csharp
+  - vb
+  name: RemoveListeners(Object)
+  nameWithType: CoopEvents.RemoveListeners(Object)
+  fullName: Coop.Mod.CoopEvents.RemoveListeners(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/CoopEvents.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RemoveListeners
+    path: ../source/Coop/Mod/CoopEvents.cs
+    startLine: 11
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public void RemoveListeners(object obj)
+    parameters:
+    - id: obj
+      type: System.Object
+    content.vb: Public Sub RemoveListeners(obj As Object)
+  overload: Coop.Mod.CoopEvents.RemoveListeners*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.Mod
+  commentId: N:Coop.Mod
+  name: Coop.Mod
+  nameWithType: Coop.Mod
+  fullName: Coop.Mod
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: TaleWorlds.CampaignSystem.MbEvent{TaleWorlds.CampaignSystem.MobileParty}
+  commentId: T:TaleWorlds.CampaignSystem.MbEvent{TaleWorlds.CampaignSystem.MobileParty}
+  parent: TaleWorlds.CampaignSystem
+  definition: TaleWorlds.CampaignSystem.MbEvent`1
+  name: MbEvent<MobileParty>
+  nameWithType: MbEvent<MobileParty>
+  fullName: TaleWorlds.CampaignSystem.MbEvent<TaleWorlds.CampaignSystem.MobileParty>
+  nameWithType.vb: MbEvent(Of MobileParty)
+  fullName.vb: TaleWorlds.CampaignSystem.MbEvent(Of TaleWorlds.CampaignSystem.MobileParty)
+  name.vb: MbEvent(Of MobileParty)
+  spec.csharp:
+  - uid: TaleWorlds.CampaignSystem.MbEvent`1
+    name: MbEvent
+    nameWithType: MbEvent
+    fullName: TaleWorlds.CampaignSystem.MbEvent
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: TaleWorlds.CampaignSystem.MbEvent`1
+    name: MbEvent
+    nameWithType: MbEvent
+    fullName: TaleWorlds.CampaignSystem.MbEvent
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.CampaignSystem.MbEvent`1
+  commentId: T:TaleWorlds.CampaignSystem.MbEvent`1
+  isExternal: true
+  name: MbEvent<T>
+  nameWithType: MbEvent<T>
+  fullName: TaleWorlds.CampaignSystem.MbEvent<T>
+  nameWithType.vb: MbEvent(Of T)
+  fullName.vb: TaleWorlds.CampaignSystem.MbEvent(Of T)
+  name.vb: MbEvent(Of T)
+  spec.csharp:
+  - uid: TaleWorlds.CampaignSystem.MbEvent`1
+    name: MbEvent
+    nameWithType: MbEvent
+    fullName: TaleWorlds.CampaignSystem.MbEvent
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: TaleWorlds.CampaignSystem.MbEvent`1
+    name: MbEvent
+    nameWithType: MbEvent
+    fullName: TaleWorlds.CampaignSystem.MbEvent
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: TaleWorlds.CampaignSystem.MbEvent
+  commentId: T:TaleWorlds.CampaignSystem.MbEvent
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: MbEvent
+  nameWithType: MbEvent
+  fullName: TaleWorlds.CampaignSystem.MbEvent
+- uid: Coop.Mod.CoopEvents.RemoveListeners*
+  commentId: Overload:Coop.Mod.CoopEvents.RemoveListeners
+  name: RemoveListeners
+  nameWithType: CoopEvents.RemoveListeners
+  fullName: Coop.Mod.CoopEvents.RemoveListeners

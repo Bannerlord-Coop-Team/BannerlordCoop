@@ -1,0 +1,713 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  commentId: T:Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  id: RailNetPeerWrapper
+  parent: Coop.NetImpl.LiteNet
+  children:
+  - Coop.NetImpl.LiteNet.RailNetPeerWrapper.#ctor(Network.Infrastructure.INetworkConnection)
+  - Coop.NetImpl.LiteNet.RailNetPeerWrapper.AssertIsPersistencePayload(System.ArraySegment{System.Byte})
+  - Coop.NetImpl.LiteNet.RailNetPeerWrapper.Disconnect
+  - Coop.NetImpl.LiteNet.RailNetPeerWrapper.m_Connection
+  - Coop.NetImpl.LiteNet.RailNetPeerWrapper.OnDisconnected
+  - Coop.NetImpl.LiteNet.RailNetPeerWrapper.PayloadReceived
+  - Coop.NetImpl.LiteNet.RailNetPeerWrapper.Ping
+  - Coop.NetImpl.LiteNet.RailNetPeerWrapper.PlayerData
+  - Coop.NetImpl.LiteNet.RailNetPeerWrapper.Receive(System.ArraySegment{System.Byte})
+  - Coop.NetImpl.LiteNet.RailNetPeerWrapper.SendPayload(System.ArraySegment{System.Byte})
+  langs:
+  - csharp
+  - vb
+  name: RailNetPeerWrapper
+  nameWithType: RailNetPeerWrapper
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  type: Class
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RailNetPeerWrapper
+    path: ../source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+    startLine: 8
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: 'public class RailNetPeerWrapper : IRailNetPeer, IGameStatePersistence'
+    content.vb: >-
+      Public Class RailNetPeerWrapper
+          Inherits IRailNetPeer
+          Implements IGameStatePersistence
+  inheritance:
+  - System.Object
+  implements:
+  - Network.Infrastructure.IGameStatePersistence
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.m_Connection
+  commentId: F:Coop.NetImpl.LiteNet.RailNetPeerWrapper.m_Connection
+  id: m_Connection
+  parent: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  langs:
+  - csharp
+  - vb
+  name: m_Connection
+  nameWithType: RailNetPeerWrapper.m_Connection
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.m_Connection
+  type: Field
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Connection
+    path: ../source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+    startLine: 10
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: readonly INetworkConnection m_Connection
+    return:
+      type: Network.Infrastructure.INetworkConnection
+    content.vb: ReadOnly m_Connection As INetworkConnection
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.#ctor(Network.Infrastructure.INetworkConnection)
+  commentId: M:Coop.NetImpl.LiteNet.RailNetPeerWrapper.#ctor(Network.Infrastructure.INetworkConnection)
+  id: '#ctor(Network.Infrastructure.INetworkConnection)'
+  parent: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  langs:
+  - csharp
+  - vb
+  name: RailNetPeerWrapper(INetworkConnection)
+  nameWithType: RailNetPeerWrapper.RailNetPeerWrapper(INetworkConnection)
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.RailNetPeerWrapper(Network.Infrastructure.INetworkConnection)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public RailNetPeerWrapper(INetworkConnection connection)
+    parameters:
+    - id: connection
+      type: Network.Infrastructure.INetworkConnection
+    content.vb: Public Sub New(connection As INetworkConnection)
+  overload: Coop.NetImpl.LiteNet.RailNetPeerWrapper.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Receive(System.ArraySegment{System.Byte})
+  commentId: M:Coop.NetImpl.LiteNet.RailNetPeerWrapper.Receive(System.ArraySegment{System.Byte})
+  id: Receive(System.ArraySegment{System.Byte})
+  parent: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  langs:
+  - csharp
+  - vb
+  name: Receive(ArraySegment<Byte>)
+  nameWithType: RailNetPeerWrapper.Receive(ArraySegment<Byte>)
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Receive(System.ArraySegment<System.Byte>)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Receive
+    path: ../source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+    startLine: 17
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void Receive(ArraySegment<byte> buffer)
+    parameters:
+    - id: buffer
+      type: System.ArraySegment{System.Byte}
+    content.vb: Public Sub Receive(buffer As ArraySegment(Of Byte))
+  overload: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Receive*
+  implements:
+  - Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment{System.Byte})
+  nameWithType.vb: RailNetPeerWrapper.Receive(ArraySegment(Of Byte))
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Receive(System.ArraySegment(Of System.Byte))
+  name.vb: Receive(ArraySegment(Of Byte))
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.OnDisconnected
+  commentId: E:Coop.NetImpl.LiteNet.RailNetPeerWrapper.OnDisconnected
+  id: OnDisconnected
+  parent: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  langs:
+  - csharp
+  - vb
+  name: OnDisconnected
+  nameWithType: RailNetPeerWrapper.OnDisconnected
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.OnDisconnected
+  type: Event
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnDisconnected
+    path: ../source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+    startLine: 25
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public event EventHandler OnDisconnected
+    return:
+      type: System.EventHandler
+    content.vb: Public Event OnDisconnected As EventHandler
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.AssertIsPersistencePayload(System.ArraySegment{System.Byte})
+  commentId: M:Coop.NetImpl.LiteNet.RailNetPeerWrapper.AssertIsPersistencePayload(System.ArraySegment{System.Byte})
+  id: AssertIsPersistencePayload(System.ArraySegment{System.Byte})
+  parent: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  langs:
+  - csharp
+  - vb
+  name: AssertIsPersistencePayload(ArraySegment<Byte>)
+  nameWithType: RailNetPeerWrapper.AssertIsPersistencePayload(ArraySegment<Byte>)
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.AssertIsPersistencePayload(System.ArraySegment<System.Byte>)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: AssertIsPersistencePayload
+    path: ../source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+    startLine: 27
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: >-
+      [Conditional("DEBUG")]
+
+      static void AssertIsPersistencePayload(ArraySegment<byte> buffer)
+    parameters:
+    - id: buffer
+      type: System.ArraySegment{System.Byte}
+    content.vb: >-
+      <Conditional("DEBUG")>
+
+      Shared Sub AssertIsPersistencePayload(buffer As ArraySegment(Of Byte))
+  overload: Coop.NetImpl.LiteNet.RailNetPeerWrapper.AssertIsPersistencePayload*
+  attributes:
+  - type: System.Diagnostics.ConditionalAttribute
+    ctor: System.Diagnostics.ConditionalAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: DEBUG
+  nameWithType.vb: RailNetPeerWrapper.AssertIsPersistencePayload(ArraySegment(Of Byte))
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+  fullName.vb: Coop.NetImpl.LiteNet.RailNetPeerWrapper.AssertIsPersistencePayload(System.ArraySegment(Of System.Byte))
+  name.vb: AssertIsPersistencePayload(ArraySegment(Of Byte))
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Disconnect
+  commentId: M:Coop.NetImpl.LiteNet.RailNetPeerWrapper.Disconnect
+  id: Disconnect
+  parent: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  langs:
+  - csharp
+  - vb
+  name: Disconnect()
+  nameWithType: RailNetPeerWrapper.Disconnect()
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Disconnect()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Disconnect
+    path: ../source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+    startLine: 42
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void Disconnect()
+    content.vb: Public Sub Disconnect
+  overload: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Disconnect*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.PlayerData
+  commentId: P:Coop.NetImpl.LiteNet.RailNetPeerWrapper.PlayerData
+  id: PlayerData
+  parent: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  langs:
+  - csharp
+  - vb
+  name: PlayerData
+  nameWithType: RailNetPeerWrapper.PlayerData
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.PlayerData
+  type: Property
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: PlayerData
+    path: ../source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+    startLine: 48
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public object PlayerData { get; set; }
+    parameters: []
+    return:
+      type: System.Object
+    content.vb: Public Property PlayerData As Object
+  overload: Coop.NetImpl.LiteNet.RailNetPeerWrapper.PlayerData*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Ping
+  commentId: P:Coop.NetImpl.LiteNet.RailNetPeerWrapper.Ping
+  id: Ping
+  parent: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  langs:
+  - csharp
+  - vb
+  name: Ping
+  nameWithType: RailNetPeerWrapper.Ping
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Ping
+  type: Property
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Ping
+    path: ../source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+    startLine: 50
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public float? Ping { get; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Single}
+    content.vb: Public ReadOnly Property Ping As Single?
+  overload: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Ping*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.PayloadReceived
+  commentId: E:Coop.NetImpl.LiteNet.RailNetPeerWrapper.PayloadReceived
+  id: PayloadReceived
+  parent: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  langs:
+  - csharp
+  - vb
+  name: PayloadReceived
+  nameWithType: RailNetPeerWrapper.PayloadReceived
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.PayloadReceived
+  type: Event
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: PayloadReceived
+    path: ../source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+    startLine: 52
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public event RailNetPeerEvent PayloadReceived
+    return:
+      type: RailNetPeerEvent
+    content.vb: Public Event PayloadReceived As RailNetPeerEvent
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.SendPayload(System.ArraySegment{System.Byte})
+  commentId: M:Coop.NetImpl.LiteNet.RailNetPeerWrapper.SendPayload(System.ArraySegment{System.Byte})
+  id: SendPayload(System.ArraySegment{System.Byte})
+  parent: Coop.NetImpl.LiteNet.RailNetPeerWrapper
+  langs:
+  - csharp
+  - vb
+  name: SendPayload(ArraySegment<Byte>)
+  nameWithType: RailNetPeerWrapper.SendPayload(ArraySegment<Byte>)
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.SendPayload(System.ArraySegment<System.Byte>)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SendPayload
+    path: ../source/Coop/NetImpl/LiteNet/RailNetPeerWrapper.cs
+    startLine: 54
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void SendPayload(ArraySegment<byte> buffer)
+    parameters:
+    - id: buffer
+      type: System.ArraySegment{System.Byte}
+    content.vb: Public Sub SendPayload(buffer As ArraySegment(Of Byte))
+  overload: Coop.NetImpl.LiteNet.RailNetPeerWrapper.SendPayload*
+  nameWithType.vb: RailNetPeerWrapper.SendPayload(ArraySegment(Of Byte))
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Coop.NetImpl.LiteNet.RailNetPeerWrapper.SendPayload(System.ArraySegment(Of System.Byte))
+  name.vb: SendPayload(ArraySegment(Of Byte))
+references:
+- uid: Coop.NetImpl.LiteNet
+  commentId: N:Coop.NetImpl.LiteNet
+  name: Coop.NetImpl.LiteNet
+  nameWithType: Coop.NetImpl.LiteNet
+  fullName: Coop.NetImpl.LiteNet
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Network.Infrastructure.IGameStatePersistence
+  commentId: T:Network.Infrastructure.IGameStatePersistence
+  parent: Network.Infrastructure
+  name: IGameStatePersistence
+  nameWithType: IGameStatePersistence
+  fullName: Network.Infrastructure.IGameStatePersistence
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: Network.Infrastructure.INetworkConnection
+  commentId: T:Network.Infrastructure.INetworkConnection
+  parent: Network.Infrastructure
+  name: INetworkConnection
+  nameWithType: INetworkConnection
+  fullName: Network.Infrastructure.INetworkConnection
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.#ctor*
+  commentId: Overload:Coop.NetImpl.LiteNet.RailNetPeerWrapper.#ctor
+  name: RailNetPeerWrapper
+  nameWithType: RailNetPeerWrapper.RailNetPeerWrapper
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.RailNetPeerWrapper
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Receive*
+  commentId: Overload:Coop.NetImpl.LiteNet.RailNetPeerWrapper.Receive
+  name: Receive
+  nameWithType: RailNetPeerWrapper.Receive
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Receive
+- uid: Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment{System.Byte})
+  commentId: M:Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment{System.Byte})
+  parent: Network.Infrastructure.IGameStatePersistence
+  isExternal: true
+  name: Receive(ArraySegment<Byte>)
+  nameWithType: IGameStatePersistence.Receive(ArraySegment<Byte>)
+  fullName: Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment<System.Byte>)
+  nameWithType.vb: IGameStatePersistence.Receive(ArraySegment(Of Byte))
+  fullName.vb: Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment(Of System.Byte))
+  name.vb: Receive(ArraySegment(Of Byte))
+  spec.csharp:
+  - uid: Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment{System.Byte})
+    name: Receive
+    nameWithType: IGameStatePersistence.Receive
+    fullName: Network.Infrastructure.IGameStatePersistence.Receive
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Network.Infrastructure.IGameStatePersistence.Receive(System.ArraySegment{System.Byte})
+    name: Receive
+    nameWithType: IGameStatePersistence.Receive
+    fullName: Network.Infrastructure.IGameStatePersistence.Receive
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ArraySegment{System.Byte}
+  commentId: T:System.ArraySegment{System.Byte}
+  parent: System
+  definition: System.ArraySegment`1
+  name: ArraySegment<Byte>
+  nameWithType: ArraySegment<Byte>
+  fullName: System.ArraySegment<System.Byte>
+  nameWithType.vb: ArraySegment(Of Byte)
+  fullName.vb: System.ArraySegment(Of System.Byte)
+  name.vb: ArraySegment(Of Byte)
+  spec.csharp:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ArraySegment`1
+  commentId: T:System.ArraySegment`1
+  isExternal: true
+  name: ArraySegment<T>
+  nameWithType: ArraySegment<T>
+  fullName: System.ArraySegment<T>
+  nameWithType.vb: ArraySegment(Of T)
+  fullName.vb: System.ArraySegment(Of T)
+  name.vb: ArraySegment(Of T)
+  spec.csharp:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.EventHandler
+  commentId: T:System.EventHandler
+  parent: System
+  isExternal: true
+  name: EventHandler
+  nameWithType: EventHandler
+  fullName: System.EventHandler
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.AssertIsPersistencePayload*
+  commentId: Overload:Coop.NetImpl.LiteNet.RailNetPeerWrapper.AssertIsPersistencePayload
+  name: AssertIsPersistencePayload
+  nameWithType: RailNetPeerWrapper.AssertIsPersistencePayload
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.AssertIsPersistencePayload
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Disconnect*
+  commentId: Overload:Coop.NetImpl.LiteNet.RailNetPeerWrapper.Disconnect
+  name: Disconnect
+  nameWithType: RailNetPeerWrapper.Disconnect
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Disconnect
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.PlayerData*
+  commentId: Overload:Coop.NetImpl.LiteNet.RailNetPeerWrapper.PlayerData
+  name: PlayerData
+  nameWithType: RailNetPeerWrapper.PlayerData
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.PlayerData
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Ping*
+  commentId: Overload:Coop.NetImpl.LiteNet.RailNetPeerWrapper.Ping
+  name: Ping
+  nameWithType: RailNetPeerWrapper.Ping
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.Ping
+- uid: System.Nullable{System.Single}
+  commentId: T:System.Nullable{System.Single}
+  parent: System
+  definition: System.Nullable`1
+  name: Nullable<Single>
+  nameWithType: Nullable<Single>
+  fullName: System.Nullable<System.Single>
+  nameWithType.vb: Nullable(Of Single)
+  fullName.vb: System.Nullable(Of System.Single)
+  name.vb: Nullable(Of Single)
+  spec.csharp:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Single
+    name: Single
+    nameWithType: Single
+    fullName: System.Single
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Single
+    name: Single
+    nameWithType: Single
+    fullName: System.Single
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Nullable`1
+  commentId: T:System.Nullable`1
+  isExternal: true
+  name: Nullable<T>
+  nameWithType: Nullable<T>
+  fullName: System.Nullable<T>
+  nameWithType.vb: Nullable(Of T)
+  fullName.vb: System.Nullable(Of T)
+  name.vb: Nullable(Of T)
+  spec.csharp:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: RailNetPeerEvent
+  commentId: '!:RailNetPeerEvent'
+  isExternal: true
+  name: RailNetPeerEvent
+  nameWithType: RailNetPeerEvent
+  fullName: RailNetPeerEvent
+- uid: Coop.NetImpl.LiteNet.RailNetPeerWrapper.SendPayload*
+  commentId: Overload:Coop.NetImpl.LiteNet.RailNetPeerWrapper.SendPayload
+  name: SendPayload
+  nameWithType: RailNetPeerWrapper.SendPayload
+  fullName: Coop.NetImpl.LiteNet.RailNetPeerWrapper.SendPayload

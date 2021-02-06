@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -73,10 +72,9 @@
   
   <h1 id="Sync_FieldAccessGroup_2" data-uid="Sync.FieldAccessGroup`2" class="text-break">Class FieldAccessGroup&lt;TDeclaring, TValueObject&gt;
   </h1>
-  <div class="markdown level0 summary">
-A collection of <a class="xref" href="Sync.FieldAccess.html">FieldAccess</a> that are declared in the same class. All fields of
+  <div class="markdown level0 summary"><p>A collection of <a class="xref" href="Sync.FieldAccess.html">FieldAccess</a> that are declared in the same class. All fields of
 the group are manipulated as a single unit. The value of each individual field is stored in an
-<code data-dev-comment-type="typeparamref" class="typeparamref">TValueObject</code> instance.
+<code data-dev-comment-type="typeparamref" class="typeparamref">TValueObject</code> instance.</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -88,6 +86,9 @@ the group are manipulated as a single unit. The value of each individual field i
   </div>
   <div class="inheritedMembers">
     <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="Sync.Tracker.html#Sync_Tracker_m_InstanceSpecificHandlers">Tracker.m_InstanceSpecificHandlers</a>
+    </div>
     <div>
       <a class="xref" href="Sync.Tracker.html#Sync_Tracker_GlobalHandler">Tracker.GlobalHandler</a>
     </div>
@@ -148,12 +149,12 @@ the group are manipulated as a single unit. The value of each individual field i
     <tbody>
       <tr>
         <td><span class="parametername">TDeclaring</span></td>
-        <td>Class that declares all fields contained in this group.</td>
+        <td><p>Class that declares all fields contained in this group.</p>
+</td>
       </tr>
       <tr>
         <td><span class="parametername">TValueObject</span></td>
-        <td>
-Class that can store the values for all fields.
+        <td><p>Class that can store the values for all fields.</p>
 </td>
       </tr>
     </tbody>
@@ -175,6 +176,38 @@ Class that can store the values for all fields.
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public FieldAccessGroup()</code></pre>
   </div>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_FieldAccessGroup_2_m_Fields.md&amp;value=---%0Auid%3A%20Sync.FieldAccessGroup%602.m_Fields%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/FieldAccessGroup.cs/#L22">View Source</a>
+  </span>
+  <h4 id="Sync_FieldAccessGroup_2_m_Fields" data-uid="Sync.FieldAccessGroup`2.m_Fields">m_Fields</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[NotNull]
+readonly List&lt;FieldAccess&gt; m_Fields</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.List</span>&lt;<a class="xref" href="Sync.FieldAccess.html">FieldAccess</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h3 id="methods">Methods
   </h3>
   <span class="small pull-right mobile-hide">
@@ -295,8 +328,7 @@ Class that can store the values for all fields.
   </span>
   <a id="Sync_FieldAccessGroup_2_AddField_" data-uid="Sync.FieldAccessGroup`2.AddField*"></a>
   <h4 id="Sync_FieldAccessGroup_2_AddField__1_System_String_" data-uid="Sync.FieldAccessGroup`2.AddField``1(System.String)">AddField&lt;TFieldType&gt;(String)</h4>
-  <div class="markdown level1 summary">
-Adds a field to the collection.
+  <div class="markdown level1 summary"><p>Adds a field to the collection.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -316,7 +348,8 @@ Adds a field to the collection.
       <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">sFieldName</span></td>
-        <td>Name of the field.</td>
+        <td><p>Name of the field.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -331,7 +364,8 @@ Adds a field to the collection.
     <tbody>
       <tr>
         <td><a class="xref" href="Sync.FieldAccessGroup-2.html">FieldAccessGroup</a>&lt;TDeclaring, TValueObject&gt;</td>
-        <td>this</td>
+        <td><p>this</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -346,7 +380,8 @@ Adds a field to the collection.
     <tbody>
       <tr>
         <td><span class="parametername">TFieldType</span></td>
-        <td>Type of the field.</td>
+        <td><p>Type of the field.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -361,7 +396,8 @@ Adds a field to the collection.
     <tbody>
       <tr>
         <td><span class="xref">System.Exception</span></td>
-        <td>If the field was not found.</td>
+        <td><p>If the field was not found.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -423,8 +459,7 @@ Adds a field to the collection.
   </span>
   <a id="Sync_FieldAccessGroup_2_GetTyped_" data-uid="Sync.FieldAccessGroup`2.GetTyped*"></a>
   <h4 id="Sync_FieldAccessGroup_2_GetTyped__0_" data-uid="Sync.FieldAccessGroup`2.GetTyped(`0)">GetTyped(TDeclaring)</h4>
-  <div class="markdown level1 summary">
-Get the value object of this group.
+  <div class="markdown level1 summary"><p>Get the value object of this group.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -444,7 +479,8 @@ Get the value object of this group.
       <tr>
         <td><span class="xref">TDeclaring</span></td>
         <td><span class="parametername">target</span></td>
-        <td>Declaring class instance to get the field values from.</td>
+        <td><p>Declaring class instance to get the field values from.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -459,7 +495,8 @@ Get the value object of this group.
     <tbody>
       <tr>
         <td><span class="xref">TValueObject</span></td>
-        <td>Value object containing the values of all child fields of this collection</td>
+        <td><p>Value object containing the values of all child fields of this collection</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -511,8 +548,7 @@ Get the value object of this group.
   </span>
   <a id="Sync_FieldAccessGroup_2_SetTyped_" data-uid="Sync.FieldAccessGroup`2.SetTyped*"></a>
   <h4 id="Sync_FieldAccessGroup_2_SetTyped__0__1_" data-uid="Sync.FieldAccessGroup`2.SetTyped(`0,`1)">SetTyped(TDeclaring, TValueObject)</h4>
-  <div class="markdown level1 summary">
-Applies the values in the <code data-dev-comment-type="paramref" class="paramref">valueObject</code> to every member of this group.
+  <div class="markdown level1 summary"><p>Applies the values in the <code data-dev-comment-type="paramref" class="paramref">valueObject</code> to every member of this group.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -532,15 +568,36 @@ Applies the values in the <code data-dev-comment-type="paramref" class="paramref
       <tr>
         <td><span class="xref">TDeclaring</span></td>
         <td><span class="parametername">target</span></td>
-        <td>Declaring class instance to set the field values on.</td>
+        <td><p>Declaring class instance to set the field values on.</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">TValueObject</span></td>
         <td><span class="parametername">valueObject</span></td>
-        <td>Value object instance.</td>
+        <td><p>Value object instance.</p>
+</td>
       </tr>
     </tbody>
   </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_FieldAccessGroup_2_VerifyConstructor.md&amp;value=---%0Auid%3A%20Sync.FieldAccessGroup%602.VerifyConstructor%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/FieldAccessGroup.cs/#L29">View Source</a>
+  </span>
+  <a id="Sync_FieldAccessGroup_2_VerifyConstructor_" data-uid="Sync.FieldAccessGroup`2.VerifyConstructor*"></a>
+  <h4 id="Sync_FieldAccessGroup_2_VerifyConstructor" data-uid="Sync.FieldAccessGroup`2.VerifyConstructor">VerifyConstructor()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static void VerifyConstructor()</code></pre>
+  </div>
+  <h3 id="extensionmethods">Extension Methods</h3>
+  <div>
+      <a class="xref" href="Sync.FieldChangeBuffer.html#Sync_FieldChangeBuffer_OnBeforeExpectedChange_Sync_ValueAccess_System_Object_">FieldChangeBuffer.OnBeforeExpectedChange(ValueAccess, Object)</a>
+  </div>
 </article>
           </div>
           
@@ -556,9 +613,22 @@ Applies the values in the <code data-dev-comment-type="paramref" class="paramref
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

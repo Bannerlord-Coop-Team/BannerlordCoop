@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -73,8 +72,7 @@
   
   <h1 id="Common_OrderedHashSet_1" data-uid="Common.OrderedHashSet`1" class="text-break">Class OrderedHashSet&lt;T&gt;
   </h1>
-  <div class="markdown level0 summary">
-Represents an ordered set of values.
+  <div class="markdown level0 summary"><p>Represents an ordered set of values.</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -137,10 +135,9 @@ public class OrderedHashSet&lt;T&gt; : ICollection&lt;T&gt;, IEnumerable&lt;T&gt
     </tbody>
   </table>
   <h5 id="Common_OrderedHashSet_1_remarks"><strong>Remarks</strong></h5>
-  <div class="markdown level0 remarks">
-Values are kept in order in which they are added.
+  <div class="markdown level0 remarks"><p>Values are kept in order in which they are added.
 Order can be modified by <a class="xref" href="Common.OrderedHashSet-1.html#Common_OrderedHashSet_1_MoveFirst__0_">MoveFirst(T)</a>, <a class="xref" href="Common.OrderedHashSet-1.html#Common_OrderedHashSet_1_MoveLast__0_">MoveLast(T)</a>,
-<a class="xref" href="Common.OrderedHashSet-1.html#Common_OrderedHashSet_1_MoveBefore__0__0_">MoveBefore(T, T)</a>, <a class="xref" href="Common.OrderedHashSet-1.html#Common_OrderedHashSet_1_MoveAfter__0__0_">MoveAfter(T, T)</a>.
+<a class="xref" href="Common.OrderedHashSet-1.html#Common_OrderedHashSet_1_MoveBefore__0__0_">MoveBefore(T, T)</a>, <a class="xref" href="Common.OrderedHashSet-1.html#Common_OrderedHashSet_1_MoveAfter__0__0_">MoveAfter(T, T)</a>.</p>
 </div>
   <h3 id="constructors">Constructors
   </h3>
@@ -200,10 +197,9 @@ Order can be modified by <a class="xref" href="Common.OrderedHashSet-1.html#Comm
   </span>
   <a id="Common_OrderedHashSet_1__ctor_" data-uid="Common.OrderedHashSet`1.#ctor*"></a>
   <h4 id="Common_OrderedHashSet_1__ctor_System_Collections_Generic_IEnumerable__0__System_Collections_Generic_IEqualityComparer__0__" data-uid="Common.OrderedHashSet`1.#ctor(System.Collections.Generic.IEnumerable{`0},System.Collections.Generic.IEqualityComparer{`0})">OrderedHashSet(IEnumerable&lt;T&gt;, IEqualityComparer&lt;T&gt;)</h4>
-  <div class="markdown level1 summary">
-Implementation Notes:
+  <div class="markdown level1 summary"><p>Implementation Notes:
 Since resizes are relatively expensive (require rehashing), this attempts to minimize
-the need to resize by setting the initial capacity based on size of collection.
+the need to resize by setting the initial capacity based on size of collection.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -370,6 +366,501 @@ the need to resize by setting the initial capacity based on size of collection.
       </tr>
     </tbody>
   </table>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_CapacityName.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.CapacityName%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L69">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_CapacityName" data-uid="Common.OrderedHashSet`1.CapacityName">CapacityName</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">const string CapacityName = &quot;Capacity&quot;</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_ComparerName.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.ComparerName%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L71">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_ComparerName" data-uid="Common.OrderedHashSet`1.ComparerName">ComparerName</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">const string ComparerName = &quot;Comparer&quot;</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_ElementsName.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.ElementsName%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L70">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_ElementsName" data-uid="Common.OrderedHashSet`1.ElementsName">ElementsName</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">const string ElementsName = &quot;Elements&quot;</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_GrowthFactor.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.GrowthFactor%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L59">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_GrowthFactor" data-uid="Common.OrderedHashSet`1.GrowthFactor">GrowthFactor</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">const int GrowthFactor = 2</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_IsNullable.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.IsNullable%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L75">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_IsNullable" data-uid="Common.OrderedHashSet`1.IsNullable">IsNullable</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static bool IsNullable</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_IsValueType.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.IsValueType%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L73">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_IsValueType" data-uid="Common.OrderedHashSet`1.IsValueType">IsValueType</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static bool IsValueType</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_Lower31BitMask.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.Lower31BitMask%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L56">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_Lower31BitMask" data-uid="Common.OrderedHashSet`1.Lower31BitMask">Lower31BitMask</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">const int Lower31BitMask = 2147483647</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_m_buckets.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.m_buckets%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L79">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_m_buckets" data-uid="Common.OrderedHashSet`1.m_buckets">m_buckets</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">int[] m_buckets</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span>[]</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_m_firstOrderIndex.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.m_firstOrderIndex%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L80">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_m_firstOrderIndex" data-uid="Common.OrderedHashSet`1.m_firstOrderIndex">m_firstOrderIndex</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">int m_firstOrderIndex</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_m_freeList.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.m_freeList%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L81">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_m_freeList" data-uid="Common.OrderedHashSet`1.m_freeList">m_freeList</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">int m_freeList</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_m_lastIndex.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.m_lastIndex%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L82">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_m_lastIndex" data-uid="Common.OrderedHashSet`1.m_lastIndex">m_lastIndex</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">int m_lastIndex</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_m_lastOrderIndex.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.m_lastOrderIndex%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L83">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_m_lastOrderIndex" data-uid="Common.OrderedHashSet`1.m_lastOrderIndex">m_lastOrderIndex</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">int m_lastOrderIndex</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_m_siInfo.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.m_siInfo%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L86">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_m_siInfo" data-uid="Common.OrderedHashSet`1.m_siInfo">m_siInfo</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">SerializationInfo m_siInfo</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Runtime.Serialization.SerializationInfo</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_m_slots.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.m_slots%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L87">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_m_slots" data-uid="Common.OrderedHashSet`1.m_slots">m_slots</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">OrderedHashSet&lt;T&gt;.Slot[] m_slots</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Common.OrderedHashSet-1.Slot.html">OrderedHashSet.Slot</a>&lt;&gt;[]</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_m_version.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.m_version%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L88">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_m_version" data-uid="Common.OrderedHashSet`1.m_version">m_version</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">int m_version</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_ShrinkThreshold.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.ShrinkThreshold%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L66">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_ShrinkThreshold" data-uid="Common.OrderedHashSet`1.ShrinkThreshold">ShrinkThreshold</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">const int ShrinkThreshold = 3</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_VersionName.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.VersionName%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L72">View Source</a>
+  </span>
+  <h4 id="Common_OrderedHashSet_1_VersionName" data-uid="Common.OrderedHashSet`1.VersionName">VersionName</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">const string VersionName = &quot;Version&quot;</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h3 id="properties">Properties
   </h3>
   <span class="small pull-right mobile-hide">
@@ -381,9 +872,8 @@ the need to resize by setting the initial capacity based on size of collection.
   </span>
   <a id="Common_OrderedHashSet_1_Comparer_" data-uid="Common.OrderedHashSet`1.Comparer*"></a>
   <h4 id="Common_OrderedHashSet_1_Comparer" data-uid="Common.OrderedHashSet`1.Comparer">Comparer</h4>
-  <div class="markdown level1 summary">
-Gets the IEqualityComparer that is used to determine equality of keys for
-the HashSet.
+  <div class="markdown level1 summary"><p>Gets the IEqualityComparer that is used to determine equality of keys for
+the HashSet.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -414,8 +904,7 @@ the HashSet.
   </span>
   <a id="Common_OrderedHashSet_1_Count_" data-uid="Common.OrderedHashSet`1.Count*"></a>
   <h4 id="Common_OrderedHashSet_1_Count" data-uid="Common.OrderedHashSet`1.Count">Count</h4>
-  <div class="markdown level1 summary">
-Number of elements in this hashset
+  <div class="markdown level1 summary"><p>Number of elements in this hashset</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -446,8 +935,7 @@ Number of elements in this hashset
   </span>
   <a id="Common_OrderedHashSet_1_Items_" data-uid="Common.OrderedHashSet`1.Items*"></a>
   <h4 id="Common_OrderedHashSet_1_Items" data-uid="Common.OrderedHashSet`1.Items">Items</h4>
-  <div class="markdown level1 summary">
-Gets collection reader.
+  <div class="markdown level1 summary"><p>Gets collection reader.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -478,8 +966,7 @@ Gets collection reader.
   </span>
   <a id="Common_OrderedHashSet_1_Reversed_" data-uid="Common.OrderedHashSet`1.Reversed*"></a>
   <h4 id="Common_OrderedHashSet_1_Reversed" data-uid="Common.OrderedHashSet`1.Reversed">Reversed</h4>
-  <div class="markdown level1 summary">
-Gets reversed collection reader.
+  <div class="markdown level1 summary"><p>Gets reversed collection reader.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -512,9 +999,8 @@ Gets reversed collection reader.
   </span>
   <a id="Common_OrderedHashSet_1_Add_" data-uid="Common.OrderedHashSet`1.Add*"></a>
   <h4 id="Common_OrderedHashSet_1_Add__0_" data-uid="Common.OrderedHashSet`1.Add(`0)">Add(T)</h4>
-  <div class="markdown level1 summary">
-Add item to this HashSet. Returns bool indicating whether item was added (won&apos;t be
-added if already present)
+  <div class="markdown level1 summary"><p>Add item to this HashSet. Returns bool indicating whether item was added (won&apos;t be
+added if already present)</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -549,7 +1035,8 @@ added if already present)
     <tbody>
       <tr>
         <td><span class="xref">System.Boolean</span></td>
-        <td>true if added, false if already present</td>
+        <td><p>true if added, false if already present</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -562,9 +1049,8 @@ added if already present)
   </span>
   <a id="Common_OrderedHashSet_1_Clear_" data-uid="Common.OrderedHashSet`1.Clear*"></a>
   <h4 id="Common_OrderedHashSet_1_Clear" data-uid="Common.OrderedHashSet`1.Clear">Clear()</h4>
-  <div class="markdown level1 summary">
-Remove all items from this set. This clears the elements but not the underlying
-buckets and slots array. Follow this call by TrimExcess to release these.
+  <div class="markdown level1 summary"><p>Remove all items from this set. This clears the elements but not the underlying
+buckets and slots array. Follow this call by TrimExcess to release these.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -580,8 +1066,7 @@ buckets and slots array. Follow this call by TrimExcess to release these.
   </span>
   <a id="Common_OrderedHashSet_1_Contains_" data-uid="Common.OrderedHashSet`1.Contains*"></a>
   <h4 id="Common_OrderedHashSet_1_Contains__0_" data-uid="Common.OrderedHashSet`1.Contains(`0)">Contains(T)</h4>
-  <div class="markdown level1 summary">
-Checks if this hashset contains the item
+  <div class="markdown level1 summary"><p>Checks if this hashset contains the item</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -601,7 +1086,8 @@ Checks if this hashset contains the item
       <tr>
         <td><span class="xref">T</span></td>
         <td><span class="parametername">item</span></td>
-        <td>item to check for containment</td>
+        <td><p>item to check for containment</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -616,7 +1102,8 @@ Checks if this hashset contains the item
     <tbody>
       <tr>
         <td><span class="xref">System.Boolean</span></td>
-        <td>true if item contained; false if not</td>
+        <td><p>true if item contained; false if not</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -629,8 +1116,7 @@ Checks if this hashset contains the item
   </span>
   <a id="Common_OrderedHashSet_1_CopyTo_" data-uid="Common.OrderedHashSet`1.CopyTo*"></a>
   <h4 id="Common_OrderedHashSet_1_CopyTo__0___" data-uid="Common.OrderedHashSet`1.CopyTo(`0[])">CopyTo(T[])</h4>
-  <div class="markdown level1 summary">
-Copies the elements to an array.
+  <div class="markdown level1 summary"><p>Copies the elements to an array.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -663,8 +1149,7 @@ Copies the elements to an array.
   </span>
   <a id="Common_OrderedHashSet_1_CopyTo_" data-uid="Common.OrderedHashSet`1.CopyTo*"></a>
   <h4 id="Common_OrderedHashSet_1_CopyTo__0___System_Int32_" data-uid="Common.OrderedHashSet`1.CopyTo(`0[],System.Int32)">CopyTo(T[], Int32)</h4>
-  <div class="markdown level1 summary">
-Copy items in this hashset to array, starting at arrayIndex
+  <div class="markdown level1 summary"><p>Copy items in this hashset to array, starting at arrayIndex</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -684,12 +1169,14 @@ Copy items in this hashset to array, starting at arrayIndex
       <tr>
         <td>T[]</td>
         <td><span class="parametername">array</span></td>
-        <td>array to add items to</td>
+        <td><p>array to add items to</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">System.Int32</span></td>
         <td><span class="parametername">arrayIndex</span></td>
-        <td>index to start at</td>
+        <td><p>index to start at</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -702,8 +1189,7 @@ Copy items in this hashset to array, starting at arrayIndex
   </span>
   <a id="Common_OrderedHashSet_1_CopyTo_" data-uid="Common.OrderedHashSet`1.CopyTo*"></a>
   <h4 id="Common_OrderedHashSet_1_CopyTo__0___System_Int32_System_Int32_" data-uid="Common.OrderedHashSet`1.CopyTo(`0[],System.Int32,System.Int32)">CopyTo(T[], Int32, Int32)</h4>
-  <div class="markdown level1 summary">
-Copies the specified number of elements to an array, starting at the specified array index.
+  <div class="markdown level1 summary"><p>Copies the specified number of elements to an array, starting at the specified array index.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -800,6 +1286,155 @@ Copies the specified number of elements to an array, starting at the specified a
       <tr>
         <td><span class="xref">System.Runtime.Serialization.StreamingContext</span></td>
         <td><span class="parametername">context</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_IncreaseCapacity.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.IncreaseCapacity%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L1137">View Source</a>
+  </span>
+  <a id="Common_OrderedHashSet_1_IncreaseCapacity_" data-uid="Common.OrderedHashSet`1.IncreaseCapacity*"></a>
+  <h4 id="Common_OrderedHashSet_1_IncreaseCapacity" data-uid="Common.OrderedHashSet`1.IncreaseCapacity">IncreaseCapacity()</h4>
+  <div class="markdown level1 summary"><p>Expand to new capacity. New capacity is next prime greater than or equal to suggested
+size. This is called when the underlying array is filled. This performs no
+defragmentation, allowing faster execution; note that this is reasonable since
+AddIfNotPresent attempts to insert new elements in re-opened spots.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void IncreaseCapacity()</code></pre>
+  </div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_Initialize_System_Int32_.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.Initialize(System.Int32)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L1121">View Source</a>
+  </span>
+  <a id="Common_OrderedHashSet_1_Initialize_" data-uid="Common.OrderedHashSet`1.Initialize*"></a>
+  <h4 id="Common_OrderedHashSet_1_Initialize_System_Int32_" data-uid="Common.OrderedHashSet`1.Initialize(System.Int32)">Initialize(Int32)</h4>
+  <div class="markdown level1 summary"><p>Initializes buckets and slots arrays. Uses suggested capacity by finding next prime
+greater than or equal to capacity.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void Initialize(int capacity)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><span class="parametername">capacity</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_InternalGetHashCode__0_.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.InternalGetHashCode(%600)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L1248">View Source</a>
+  </span>
+  <a id="Common_OrderedHashSet_1_InternalGetHashCode_" data-uid="Common.OrderedHashSet`1.InternalGetHashCode*"></a>
+  <h4 id="Common_OrderedHashSet_1_InternalGetHashCode__0_" data-uid="Common.OrderedHashSet`1.InternalGetHashCode(`0)">InternalGetHashCode(T)</h4>
+  <div class="markdown level1 summary"><p>Workaround Comparers that throw ArgumentNullException for GetHashCode(null).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">int InternalGetHashCode(T item)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">item</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td><p>hash code</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_OrderedHashSet_1_InternalIndexOf__0_.md&amp;value=---%0Auid%3A%20Common.OrderedHashSet%601.InternalIndexOf(%600)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/OrderedHashSet.cs/#L627">View Source</a>
+  </span>
+  <a id="Common_OrderedHashSet_1_InternalIndexOf_" data-uid="Common.OrderedHashSet`1.InternalIndexOf*"></a>
+  <h4 id="Common_OrderedHashSet_1_InternalIndexOf__0_" data-uid="Common.OrderedHashSet`1.InternalIndexOf(`0)">InternalIndexOf(T)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">int InternalIndexOf(T item)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">item</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
         <td></td>
       </tr>
     </tbody>
@@ -1043,8 +1678,7 @@ Copies the specified number of elements to an array, starting at the specified a
   </span>
   <a id="Common_OrderedHashSet_1_Remove_" data-uid="Common.OrderedHashSet`1.Remove*"></a>
   <h4 id="Common_OrderedHashSet_1_Remove__0_" data-uid="Common.OrderedHashSet`1.Remove(`0)">Remove(T)</h4>
-  <div class="markdown level1 summary">
-Remove item from this hashset
+  <div class="markdown level1 summary"><p>Remove item from this hashset</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -1064,7 +1698,8 @@ Remove item from this hashset
       <tr>
         <td><span class="xref">T</span></td>
         <td><span class="parametername">item</span></td>
-        <td>item to remove</td>
+        <td><p>item to remove</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1079,7 +1714,8 @@ Remove item from this hashset
     <tbody>
       <tr>
         <td><span class="xref">System.Boolean</span></td>
-        <td>true if removed; false if not (i.e. if the item wasn&apos;t in the HashSet)</td>
+        <td><p>true if removed; false if not (i.e. if the item wasn&apos;t in the HashSet)</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1129,8 +1765,7 @@ Remove item from this hashset
   </span>
   <a id="Common_OrderedHashSet_1_RemoveWhere_" data-uid="Common.OrderedHashSet`1.RemoveWhere*"></a>
   <h4 id="Common_OrderedHashSet_1_RemoveWhere_System_Predicate__0__" data-uid="Common.OrderedHashSet`1.RemoveWhere(System.Predicate{`0})">RemoveWhere(Predicate&lt;T&gt;)</h4>
-  <div class="markdown level1 summary">
-Remove elements that match specified predicate. Returns the number of elements removed
+  <div class="markdown level1 summary"><p>Remove elements that match specified predicate. Returns the number of elements removed</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -1178,10 +1813,9 @@ Remove elements that match specified predicate. Returns the number of elements r
   </span>
   <a id="Common_OrderedHashSet_1_StartWith_" data-uid="Common.OrderedHashSet`1.StartWith*"></a>
   <h4 id="Common_OrderedHashSet_1_StartWith__0_" data-uid="Common.OrderedHashSet`1.StartWith(`0)">StartWith(T)</h4>
-  <div class="markdown level1 summary">
-Returns enumeration which goes from <code data-dev-comment-type="paramref" class="paramref">item</code> to last element in the set
+  <div class="markdown level1 summary"><p>Returns enumeration which goes from <code data-dev-comment-type="paramref" class="paramref">item</code> to last element in the set
 (including both).
-When <code data-dev-comment-type="paramref" class="paramref">item</code> is not found, returns empty enumeration.
+When <code data-dev-comment-type="paramref" class="paramref">item</code> is not found, returns empty enumeration.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -1229,10 +1863,9 @@ When <code data-dev-comment-type="paramref" class="paramref">item</code> is not 
   </span>
   <a id="Common_OrderedHashSet_1_StartWithReversed_" data-uid="Common.OrderedHashSet`1.StartWithReversed*"></a>
   <h4 id="Common_OrderedHashSet_1_StartWithReversed__0_" data-uid="Common.OrderedHashSet`1.StartWithReversed(`0)">StartWithReversed(T)</h4>
-  <div class="markdown level1 summary">
-Returns enumeration which goes from <code data-dev-comment-type="paramref" class="paramref">item</code> to first element in the set
+  <div class="markdown level1 summary"><p>Returns enumeration which goes from <code data-dev-comment-type="paramref" class="paramref">item</code> to first element in the set
 (including both).
-When <code data-dev-comment-type="paramref" class="paramref">item</code> is not found, returns empty enumeration.
+When <code data-dev-comment-type="paramref" class="paramref">item</code> is not found, returns empty enumeration.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -1280,14 +1913,13 @@ When <code data-dev-comment-type="paramref" class="paramref">item</code> is not 
   </span>
   <a id="Common_OrderedHashSet_1_TrimExcess_" data-uid="Common.OrderedHashSet`1.TrimExcess*"></a>
   <h4 id="Common_OrderedHashSet_1_TrimExcess" data-uid="Common.OrderedHashSet`1.TrimExcess">TrimExcess()</h4>
-  <div class="markdown level1 summary">
-Sets the capacity of this list to the size of the list (rounded up to nearest prime),
+  <div class="markdown level1 summary"><p>Sets the capacity of this list to the size of the list (rounded up to nearest prime),
 unless count is 0, in which case we release references.
 This method can be used to minimize a list&apos;s memory overhead once it is known that no
 new elements will be added to the list. To completely clear a list and release all
 memory referenced by the list, execute the following statements:
 Clear();
-TrimExcess();
+TrimExcess();</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -1303,11 +1935,10 @@ TrimExcess();
   </span>
   <a id="Common_OrderedHashSet_1_UnionWith_" data-uid="Common.OrderedHashSet`1.UnionWith*"></a>
   <h4 id="Common_OrderedHashSet_1_UnionWith_System_Collections_Generic_IEnumerable__0__" data-uid="Common.OrderedHashSet`1.UnionWith(System.Collections.Generic.IEnumerable{`0})">UnionWith(IEnumerable&lt;T&gt;)</h4>
-  <div class="markdown level1 summary">
-Take the union of this HashSet with other. Modifies this set.
+  <div class="markdown level1 summary"><p>Take the union of this HashSet with other. Modifies this set.
 Implementation note: GetSuggestedCapacity (to increase capacity in advance avoiding
 multiple resizes ended up not being useful in practice; quickly gets to the
-point where it&apos;s a wasteful check.
+point where it&apos;s a wasteful check.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -1327,7 +1958,8 @@ point where it&apos;s a wasteful check.
       <tr>
         <td><span class="xref">System.Collections.Generic.IEnumerable</span>&lt;T&gt;</td>
         <td><span class="parametername">other</span></td>
-        <td>enumerable with items to add</td>
+        <td><p>enumerable with items to add</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1374,8 +2006,7 @@ point where it&apos;s a wasteful check.
   </span>
   <a id="Common_OrderedHashSet_1_System_Collections_Generic_ICollection_T__IsReadOnly_" data-uid="Common.OrderedHashSet`1.System#Collections#Generic#ICollection{T}#IsReadOnly*"></a>
   <h4 id="Common_OrderedHashSet_1_System_Collections_Generic_ICollection_T__IsReadOnly" data-uid="Common.OrderedHashSet`1.System#Collections#Generic#ICollection{T}#IsReadOnly">ICollection&lt;T&gt;.IsReadOnly</h4>
-  <div class="markdown level1 summary">
-Whether this is readonly
+  <div class="markdown level1 summary"><p>Whether this is readonly</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -1488,9 +2119,22 @@ Whether this is readonly
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

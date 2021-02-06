@@ -1,0 +1,913 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.GameEnvironmentServer
+  commentId: T:Coop.Mod.GameEnvironmentServer
+  id: GameEnvironmentServer
+  parent: Coop.Mod
+  children:
+  - Coop.Mod.GameEnvironmentServer.CanChangeTimeControlMode
+  - Coop.Mod.GameEnvironmentServer.EventQueue
+  - Coop.Mod.GameEnvironmentServer.GetMobilePartyByIndex(System.Int32)
+  - Coop.Mod.GameEnvironmentServer.LockTimeControlStopped
+  - Coop.Mod.GameEnvironmentServer.Logger
+  - Coop.Mod.GameEnvironmentServer.Store
+  - Coop.Mod.GameEnvironmentServer.TargetPosition
+  - Coop.Mod.GameEnvironmentServer.UnlockTimeControl
+  langs:
+  - csharp
+  - vb
+  name: GameEnvironmentServer
+  nameWithType: GameEnvironmentServer
+  fullName: Coop.Mod.GameEnvironmentServer
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GameEnvironmentServer
+    path: ../source/Coop/Mod/GameEnvironmentServer.cs
+    startLine: 13
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: 'public class GameEnvironmentServer : IEnvironmentServer'
+    content.vb: >-
+      Public Class GameEnvironmentServer
+          Implements IEnvironmentServer
+  inheritance:
+  - System.Object
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentServer
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.GameEnvironmentServer.Logger
+  commentId: F:Coop.Mod.GameEnvironmentServer.Logger
+  id: Logger
+  parent: Coop.Mod.GameEnvironmentServer
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: GameEnvironmentServer.Logger
+  fullName: Coop.Mod.GameEnvironmentServer.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Coop/Mod/GameEnvironmentServer.cs
+    startLine: 15
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.GameEnvironmentServer.TargetPosition
+  commentId: P:Coop.Mod.GameEnvironmentServer.TargetPosition
+  id: TargetPosition
+  parent: Coop.Mod.GameEnvironmentServer
+  langs:
+  - csharp
+  - vb
+  name: TargetPosition
+  nameWithType: GameEnvironmentServer.TargetPosition
+  fullName: Coop.Mod.GameEnvironmentServer.TargetPosition
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TargetPosition
+    path: ../source/Coop/Mod/GameEnvironmentServer.cs
+    startLine: 17
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
+    parameters: []
+    return:
+      type: Sync.FieldAccessGroup{TaleWorlds.CampaignSystem.MobileParty,Coop.Mod.Persistence.Party.MovementData}
+    content.vb: Public ReadOnly Property TargetPosition As FieldAccessGroup(Of MobileParty, MovementData)
+  overload: Coop.Mod.GameEnvironmentServer.TargetPosition*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentServer.TargetPosition
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameEnvironmentServer.CanChangeTimeControlMode
+  commentId: P:Coop.Mod.GameEnvironmentServer.CanChangeTimeControlMode
+  id: CanChangeTimeControlMode
+  parent: Coop.Mod.GameEnvironmentServer
+  langs:
+  - csharp
+  - vb
+  name: CanChangeTimeControlMode
+  nameWithType: GameEnvironmentServer.CanChangeTimeControlMode
+  fullName: Coop.Mod.GameEnvironmentServer.CanChangeTimeControlMode
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CanChangeTimeControlMode
+    path: ../source/Coop/Mod/GameEnvironmentServer.cs
+    startLine: 20
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public bool CanChangeTimeControlMode { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public ReadOnly Property CanChangeTimeControlMode As Boolean
+  overload: Coop.Mod.GameEnvironmentServer.CanChangeTimeControlMode*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentServer.CanChangeTimeControlMode
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameEnvironmentServer.EventQueue
+  commentId: P:Coop.Mod.GameEnvironmentServer.EventQueue
+  id: EventQueue
+  parent: Coop.Mod.GameEnvironmentServer
+  langs:
+  - csharp
+  - vb
+  name: EventQueue
+  nameWithType: GameEnvironmentServer.EventQueue
+  fullName: Coop.Mod.GameEnvironmentServer.EventQueue
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EventQueue
+    path: ../source/Coop/Mod/GameEnvironmentServer.cs
+    startLine: 22
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public EventBroadcastingQueue EventQueue { get; }
+    parameters: []
+    return:
+      type: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+    content.vb: Public ReadOnly Property EventQueue As EventBroadcastingQueue
+  overload: Coop.Mod.GameEnvironmentServer.EventQueue*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentServer.EventQueue
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameEnvironmentServer.GetMobilePartyByIndex(System.Int32)
+  commentId: M:Coop.Mod.GameEnvironmentServer.GetMobilePartyByIndex(System.Int32)
+  id: GetMobilePartyByIndex(System.Int32)
+  parent: Coop.Mod.GameEnvironmentServer
+  langs:
+  - csharp
+  - vb
+  name: GetMobilePartyByIndex(Int32)
+  nameWithType: GameEnvironmentServer.GetMobilePartyByIndex(Int32)
+  fullName: Coop.Mod.GameEnvironmentServer.GetMobilePartyByIndex(System.Int32)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetMobilePartyByIndex
+    path: ../source/Coop/Mod/GameEnvironmentServer.cs
+    startLine: 24
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public MobileParty GetMobilePartyByIndex(int iPartyIndex)
+    parameters:
+    - id: iPartyIndex
+      type: System.Int32
+    return:
+      type: TaleWorlds.CampaignSystem.MobileParty
+    content.vb: Public Function GetMobilePartyByIndex(iPartyIndex As Integer) As MobileParty
+  overload: Coop.Mod.GameEnvironmentServer.GetMobilePartyByIndex*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentServer.GetMobilePartyByIndex(System.Int32)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.GameEnvironmentServer.Store
+  commentId: P:Coop.Mod.GameEnvironmentServer.Store
+  id: Store
+  parent: Coop.Mod.GameEnvironmentServer
+  langs:
+  - csharp
+  - vb
+  name: Store
+  nameWithType: GameEnvironmentServer.Store
+  fullName: Coop.Mod.GameEnvironmentServer.Store
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Store
+    path: ../source/Coop/Mod/GameEnvironmentServer.cs
+    startLine: 35
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public SharedRemoteStore Store { get; }
+    parameters: []
+    return:
+      type: Sync.Store.SharedRemoteStore
+    content.vb: Public ReadOnly Property Store As SharedRemoteStore
+  overload: Coop.Mod.GameEnvironmentServer.Store*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentServer.Store
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameEnvironmentServer.LockTimeControlStopped
+  commentId: M:Coop.Mod.GameEnvironmentServer.LockTimeControlStopped
+  id: LockTimeControlStopped
+  parent: Coop.Mod.GameEnvironmentServer
+  langs:
+  - csharp
+  - vb
+  name: LockTimeControlStopped()
+  nameWithType: GameEnvironmentServer.LockTimeControlStopped()
+  fullName: Coop.Mod.GameEnvironmentServer.LockTimeControlStopped()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: LockTimeControlStopped
+    path: ../source/Coop/Mod/GameEnvironmentServer.cs
+    startLine: 39
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public void LockTimeControlStopped()
+    content.vb: Public Sub LockTimeControlStopped
+  overload: Coop.Mod.GameEnvironmentServer.LockTimeControlStopped*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.GameEnvironmentServer.UnlockTimeControl
+  commentId: M:Coop.Mod.GameEnvironmentServer.UnlockTimeControl
+  id: UnlockTimeControl
+  parent: Coop.Mod.GameEnvironmentServer
+  langs:
+  - csharp
+  - vb
+  name: UnlockTimeControl()
+  nameWithType: GameEnvironmentServer.UnlockTimeControl()
+  fullName: Coop.Mod.GameEnvironmentServer.UnlockTimeControl()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentServer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: UnlockTimeControl
+    path: ../source/Coop/Mod/GameEnvironmentServer.cs
+    startLine: 45
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public void UnlockTimeControl()
+    content.vb: Public Sub UnlockTimeControl
+  overload: Coop.Mod.GameEnvironmentServer.UnlockTimeControl*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.Mod
+  commentId: N:Coop.Mod
+  name: Coop.Mod
+  nameWithType: Coop.Mod
+  fullName: Coop.Mod
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Coop.Mod.Persistence.IEnvironmentServer
+  commentId: T:Coop.Mod.Persistence.IEnvironmentServer
+  parent: Coop.Mod.Persistence
+  name: IEnvironmentServer
+  nameWithType: IEnvironmentServer
+  fullName: Coop.Mod.Persistence.IEnvironmentServer
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Coop.Mod.Persistence
+  commentId: N:Coop.Mod.Persistence
+  name: Coop.Mod.Persistence
+  nameWithType: Coop.Mod.Persistence
+  fullName: Coop.Mod.Persistence
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: Coop.Mod.GameEnvironmentServer.TargetPosition*
+  commentId: Overload:Coop.Mod.GameEnvironmentServer.TargetPosition
+  name: TargetPosition
+  nameWithType: GameEnvironmentServer.TargetPosition
+  fullName: Coop.Mod.GameEnvironmentServer.TargetPosition
+- uid: Coop.Mod.Persistence.IEnvironmentServer.TargetPosition
+  commentId: P:Coop.Mod.Persistence.IEnvironmentServer.TargetPosition
+  parent: Coop.Mod.Persistence.IEnvironmentServer
+  name: TargetPosition
+  nameWithType: IEnvironmentServer.TargetPosition
+  fullName: Coop.Mod.Persistence.IEnvironmentServer.TargetPosition
+- uid: Sync.FieldAccessGroup{TaleWorlds.CampaignSystem.MobileParty,Coop.Mod.Persistence.Party.MovementData}
+  commentId: T:Sync.FieldAccessGroup{TaleWorlds.CampaignSystem.MobileParty,Coop.Mod.Persistence.Party.MovementData}
+  parent: Sync
+  definition: Sync.FieldAccessGroup`2
+  name: FieldAccessGroup<MobileParty, MovementData>
+  nameWithType: FieldAccessGroup<MobileParty, MovementData>
+  fullName: Sync.FieldAccessGroup<TaleWorlds.CampaignSystem.MobileParty, Coop.Mod.Persistence.Party.MovementData>
+  nameWithType.vb: FieldAccessGroup(Of MobileParty, MovementData)
+  fullName.vb: Sync.FieldAccessGroup(Of TaleWorlds.CampaignSystem.MobileParty, Coop.Mod.Persistence.Party.MovementData)
+  name.vb: FieldAccessGroup(Of MobileParty, MovementData)
+  spec.csharp:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Coop.Mod.Persistence.Party.MovementData
+    name: MovementData
+    nameWithType: MovementData
+    fullName: Coop.Mod.Persistence.Party.MovementData
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Coop.Mod.Persistence.Party.MovementData
+    name: MovementData
+    nameWithType: MovementData
+    fullName: Coop.Mod.Persistence.Party.MovementData
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldAccessGroup`2
+  commentId: T:Sync.FieldAccessGroup`2
+  parent: Sync
+  name: FieldAccessGroup<TDeclaring, TValueObject>
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject)
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject)
+  name.vb: FieldAccessGroup(Of TDeclaring, TValueObject)
+  spec.csharp:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValueObject
+    nameWithType: TValueObject
+    fullName: TValueObject
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValueObject
+    nameWithType: TValueObject
+    fullName: TValueObject
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync
+  commentId: N:Sync
+  name: Sync
+  nameWithType: Sync
+  fullName: Sync
+- uid: Coop.Mod.GameEnvironmentServer.CanChangeTimeControlMode*
+  commentId: Overload:Coop.Mod.GameEnvironmentServer.CanChangeTimeControlMode
+  name: CanChangeTimeControlMode
+  nameWithType: GameEnvironmentServer.CanChangeTimeControlMode
+  fullName: Coop.Mod.GameEnvironmentServer.CanChangeTimeControlMode
+- uid: Coop.Mod.Persistence.IEnvironmentServer.CanChangeTimeControlMode
+  commentId: P:Coop.Mod.Persistence.IEnvironmentServer.CanChangeTimeControlMode
+  parent: Coop.Mod.Persistence.IEnvironmentServer
+  name: CanChangeTimeControlMode
+  nameWithType: IEnvironmentServer.CanChangeTimeControlMode
+  fullName: Coop.Mod.Persistence.IEnvironmentServer.CanChangeTimeControlMode
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.Mod.GameEnvironmentServer.EventQueue*
+  commentId: Overload:Coop.Mod.GameEnvironmentServer.EventQueue
+  name: EventQueue
+  nameWithType: GameEnvironmentServer.EventQueue
+  fullName: Coop.Mod.GameEnvironmentServer.EventQueue
+- uid: Coop.Mod.Persistence.IEnvironmentServer.EventQueue
+  commentId: P:Coop.Mod.Persistence.IEnvironmentServer.EventQueue
+  parent: Coop.Mod.Persistence.IEnvironmentServer
+  name: EventQueue
+  nameWithType: IEnvironmentServer.EventQueue
+  fullName: Coop.Mod.Persistence.IEnvironmentServer.EventQueue
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  commentId: T:Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  parent: Coop.Mod.Persistence.RPC
+  name: EventBroadcastingQueue
+  nameWithType: EventBroadcastingQueue
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+- uid: Coop.Mod.Persistence.RPC
+  commentId: N:Coop.Mod.Persistence.RPC
+  name: Coop.Mod.Persistence.RPC
+  nameWithType: Coop.Mod.Persistence.RPC
+  fullName: Coop.Mod.Persistence.RPC
+- uid: Coop.Mod.GameEnvironmentServer.GetMobilePartyByIndex*
+  commentId: Overload:Coop.Mod.GameEnvironmentServer.GetMobilePartyByIndex
+  name: GetMobilePartyByIndex
+  nameWithType: GameEnvironmentServer.GetMobilePartyByIndex
+  fullName: Coop.Mod.GameEnvironmentServer.GetMobilePartyByIndex
+- uid: Coop.Mod.Persistence.IEnvironmentServer.GetMobilePartyByIndex(System.Int32)
+  commentId: M:Coop.Mod.Persistence.IEnvironmentServer.GetMobilePartyByIndex(System.Int32)
+  parent: Coop.Mod.Persistence.IEnvironmentServer
+  isExternal: true
+  name: GetMobilePartyByIndex(Int32)
+  nameWithType: IEnvironmentServer.GetMobilePartyByIndex(Int32)
+  fullName: Coop.Mod.Persistence.IEnvironmentServer.GetMobilePartyByIndex(System.Int32)
+  spec.csharp:
+  - uid: Coop.Mod.Persistence.IEnvironmentServer.GetMobilePartyByIndex(System.Int32)
+    name: GetMobilePartyByIndex
+    nameWithType: IEnvironmentServer.GetMobilePartyByIndex
+    fullName: Coop.Mod.Persistence.IEnvironmentServer.GetMobilePartyByIndex
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Coop.Mod.Persistence.IEnvironmentServer.GetMobilePartyByIndex(System.Int32)
+    name: GetMobilePartyByIndex
+    nameWithType: IEnvironmentServer.GetMobilePartyByIndex
+    fullName: Coop.Mod.Persistence.IEnvironmentServer.GetMobilePartyByIndex
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: TaleWorlds.CampaignSystem.MobileParty
+  commentId: T:TaleWorlds.CampaignSystem.MobileParty
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: MobileParty
+  nameWithType: MobileParty
+  fullName: TaleWorlds.CampaignSystem.MobileParty
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: Coop.Mod.GameEnvironmentServer.Store*
+  commentId: Overload:Coop.Mod.GameEnvironmentServer.Store
+  name: Store
+  nameWithType: GameEnvironmentServer.Store
+  fullName: Coop.Mod.GameEnvironmentServer.Store
+- uid: Coop.Mod.Persistence.IEnvironmentServer.Store
+  commentId: P:Coop.Mod.Persistence.IEnvironmentServer.Store
+  parent: Coop.Mod.Persistence.IEnvironmentServer
+  name: Store
+  nameWithType: IEnvironmentServer.Store
+  fullName: Coop.Mod.Persistence.IEnvironmentServer.Store
+- uid: Sync.Store.SharedRemoteStore
+  commentId: T:Sync.Store.SharedRemoteStore
+  parent: Sync.Store
+  name: SharedRemoteStore
+  nameWithType: SharedRemoteStore
+  fullName: Sync.Store.SharedRemoteStore
+- uid: Sync.Store
+  commentId: N:Sync.Store
+  name: Sync.Store
+  nameWithType: Sync.Store
+  fullName: Sync.Store
+- uid: Coop.Mod.GameEnvironmentServer.LockTimeControlStopped*
+  commentId: Overload:Coop.Mod.GameEnvironmentServer.LockTimeControlStopped
+  name: LockTimeControlStopped
+  nameWithType: GameEnvironmentServer.LockTimeControlStopped
+  fullName: Coop.Mod.GameEnvironmentServer.LockTimeControlStopped
+- uid: Coop.Mod.GameEnvironmentServer.UnlockTimeControl*
+  commentId: Overload:Coop.Mod.GameEnvironmentServer.UnlockTimeControl
+  name: UnlockTimeControl
+  nameWithType: GameEnvironmentServer.UnlockTimeControl
+  fullName: Coop.Mod.GameEnvironmentServer.UnlockTimeControl

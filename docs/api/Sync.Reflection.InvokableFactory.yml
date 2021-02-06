@@ -1,0 +1,1478 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync.Reflection.InvokableFactory
+  commentId: T:Sync.Reflection.InvokableFactory
+  id: InvokableFactory
+  parent: Sync.Reflection
+  children:
+  - Sync.Reflection.InvokableFactory.CreateCall``1(System.Reflection.MethodInfo,System.Object)
+  - Sync.Reflection.InvokableFactory.CreateCall``2(System.Reflection.MethodInfo)
+  - Sync.Reflection.InvokableFactory.CreateCallWithReturn``1(System.Reflection.MethodInfo)
+  - Sync.Reflection.InvokableFactory.CreateCallWithReturn``1(System.Reflection.MethodInfo,System.Object)
+  - Sync.Reflection.InvokableFactory.CreateGetter``1(System.Reflection.MemberInfo,System.Object)
+  - Sync.Reflection.InvokableFactory.CreateGetter``2(System.Reflection.MemberInfo)
+  - Sync.Reflection.InvokableFactory.CreateStandIn(Sync.MethodAccess)
+  - Sync.Reflection.InvokableFactory.CreateStandInCaller(System.Reflection.MethodInfo)
+  - Sync.Reflection.InvokableFactory.CreateStaticStandInCaller(System.Reflection.MethodInfo)
+  - Sync.Reflection.InvokableFactory.CreateUntypedGetter``1(System.Reflection.MemberInfo)
+  - Sync.Reflection.InvokableFactory.CreateUntypedSetter``1(System.Reflection.MemberInfo)
+  langs:
+  - csharp
+  - vb
+  name: InvokableFactory
+  nameWithType: InvokableFactory
+  fullName: Sync.Reflection.InvokableFactory
+  type: Class
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: InvokableFactory
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 11
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  syntax:
+    content: public static class InvokableFactory
+    content.vb: Public Module InvokableFactory
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - static
+  - class
+  modifiers.vb:
+  - Public
+  - Module
+- uid: Sync.Reflection.InvokableFactory.CreateUntypedGetter``1(System.Reflection.MemberInfo)
+  commentId: M:Sync.Reflection.InvokableFactory.CreateUntypedGetter``1(System.Reflection.MemberInfo)
+  id: CreateUntypedGetter``1(System.Reflection.MemberInfo)
+  parent: Sync.Reflection.InvokableFactory
+  langs:
+  - csharp
+  - vb
+  name: CreateUntypedGetter<TDeclaring>(MemberInfo)
+  nameWithType: InvokableFactory.CreateUntypedGetter<TDeclaring>(MemberInfo)
+  fullName: Sync.Reflection.InvokableFactory.CreateUntypedGetter<TDeclaring>(System.Reflection.MemberInfo)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CreateUntypedGetter
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 19
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  summary: "\nReturns an untyped getter for a property or field in an instance.\n"
+  example: []
+  syntax:
+    content: public static Func<TDeclaring, object> CreateUntypedGetter<TDeclaring>(MemberInfo memberInfo)
+    parameters:
+    - id: memberInfo
+      type: System.Reflection.MemberInfo
+      description: ''
+    typeParameters:
+    - id: TDeclaring
+      description: Type of the instance containing the member.
+    return:
+      type: System.Func{{TDeclaring},System.Object}
+      description: ''
+    content.vb: Public Shared Function CreateUntypedGetter(Of TDeclaring)(memberInfo As MemberInfo) As Func(Of TDeclaring, Object)
+  overload: Sync.Reflection.InvokableFactory.CreateUntypedGetter*
+  nameWithType.vb: InvokableFactory.CreateUntypedGetter(Of TDeclaring)(MemberInfo)
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Sync.Reflection.InvokableFactory.CreateUntypedGetter(Of TDeclaring)(System.Reflection.MemberInfo)
+  name.vb: CreateUntypedGetter(Of TDeclaring)(MemberInfo)
+- uid: Sync.Reflection.InvokableFactory.CreateUntypedSetter``1(System.Reflection.MemberInfo)
+  commentId: M:Sync.Reflection.InvokableFactory.CreateUntypedSetter``1(System.Reflection.MemberInfo)
+  id: CreateUntypedSetter``1(System.Reflection.MemberInfo)
+  parent: Sync.Reflection.InvokableFactory
+  langs:
+  - csharp
+  - vb
+  name: CreateUntypedSetter<TDeclaring>(MemberInfo)
+  nameWithType: InvokableFactory.CreateUntypedSetter<TDeclaring>(MemberInfo)
+  fullName: Sync.Reflection.InvokableFactory.CreateUntypedSetter<TDeclaring>(System.Reflection.MemberInfo)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CreateUntypedSetter
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 55
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  summary: "\nReturns an untyped setter for a property or field in an instance.\n"
+  example: []
+  syntax:
+    content: public static Action<TDeclaring, object> CreateUntypedSetter<TDeclaring>(MemberInfo memberInfo)
+    parameters:
+    - id: memberInfo
+      type: System.Reflection.MemberInfo
+      description: ''
+    typeParameters:
+    - id: TDeclaring
+      description: Type of the instance containing the member.
+    return:
+      type: System.Action{{TDeclaring},System.Object}
+      description: ''
+    content.vb: Public Shared Function CreateUntypedSetter(Of TDeclaring)(memberInfo As MemberInfo) As Action(Of TDeclaring, Object)
+  overload: Sync.Reflection.InvokableFactory.CreateUntypedSetter*
+  nameWithType.vb: InvokableFactory.CreateUntypedSetter(Of TDeclaring)(MemberInfo)
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Sync.Reflection.InvokableFactory.CreateUntypedSetter(Of TDeclaring)(System.Reflection.MemberInfo)
+  name.vb: CreateUntypedSetter(Of TDeclaring)(MemberInfo)
+- uid: Sync.Reflection.InvokableFactory.CreateCallWithReturn``1(System.Reflection.MethodInfo)
+  commentId: M:Sync.Reflection.InvokableFactory.CreateCallWithReturn``1(System.Reflection.MethodInfo)
+  id: CreateCallWithReturn``1(System.Reflection.MethodInfo)
+  parent: Sync.Reflection.InvokableFactory
+  langs:
+  - csharp
+  - vb
+  name: CreateCallWithReturn<TDeclaring>(MethodInfo)
+  nameWithType: InvokableFactory.CreateCallWithReturn<TDeclaring>(MethodInfo)
+  fullName: Sync.Reflection.InvokableFactory.CreateCallWithReturn<TDeclaring>(System.Reflection.MethodInfo)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CreateCallWithReturn
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 95
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  summary: "\nReturns an member method call of the form `object Method(TDeclaring)`.\n"
+  example: []
+  syntax:
+    content: public static Func<TDeclaring, object> CreateCallWithReturn<TDeclaring>(MethodInfo method)
+    parameters:
+    - id: method
+      type: System.Reflection.MethodInfo
+      description: ''
+    typeParameters:
+    - id: TDeclaring
+      description: Type of the instance containing the member.
+    return:
+      type: System.Func{{TDeclaring},System.Object}
+      description: ''
+    content.vb: Public Shared Function CreateCallWithReturn(Of TDeclaring)(method As MethodInfo) As Func(Of TDeclaring, Object)
+  overload: Sync.Reflection.InvokableFactory.CreateCallWithReturn*
+  nameWithType.vb: InvokableFactory.CreateCallWithReturn(Of TDeclaring)(MethodInfo)
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Sync.Reflection.InvokableFactory.CreateCallWithReturn(Of TDeclaring)(System.Reflection.MethodInfo)
+  name.vb: CreateCallWithReturn(Of TDeclaring)(MethodInfo)
+- uid: Sync.Reflection.InvokableFactory.CreateCall``2(System.Reflection.MethodInfo)
+  commentId: M:Sync.Reflection.InvokableFactory.CreateCall``2(System.Reflection.MethodInfo)
+  id: CreateCall``2(System.Reflection.MethodInfo)
+  parent: Sync.Reflection.InvokableFactory
+  langs:
+  - csharp
+  - vb
+  name: CreateCall<TDeclaring, TParam>(MethodInfo)
+  nameWithType: InvokableFactory.CreateCall<TDeclaring, TParam>(MethodInfo)
+  fullName: Sync.Reflection.InvokableFactory.CreateCall<TDeclaring, TParam>(System.Reflection.MethodInfo)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CreateCall
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 131
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  summary: "\nReturns a member method call of the form `void Method(TDeclaring, TParam)`.\n"
+  example: []
+  syntax:
+    content: public static Action<TDeclaring, TParam> CreateCall<TDeclaring, TParam>(MethodInfo method)
+    parameters:
+    - id: method
+      type: System.Reflection.MethodInfo
+      description: ''
+    typeParameters:
+    - id: TDeclaring
+      description: Type of the instance containing the member.
+    - id: TParam
+      description: Type of the parameter for the call.
+    return:
+      type: System.Action{{TDeclaring},{TParam}}
+      description: ''
+    content.vb: Public Shared Function CreateCall(Of TDeclaring, TParam)(method As MethodInfo) As Action(Of TDeclaring, TParam)
+  overload: Sync.Reflection.InvokableFactory.CreateCall*
+  nameWithType.vb: InvokableFactory.CreateCall(Of TDeclaring, TParam)(MethodInfo)
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Sync.Reflection.InvokableFactory.CreateCall(Of TDeclaring, TParam)(System.Reflection.MethodInfo)
+  name.vb: CreateCall(Of TDeclaring, TParam)(MethodInfo)
+- uid: Sync.Reflection.InvokableFactory.CreateCallWithReturn``1(System.Reflection.MethodInfo,System.Object)
+  commentId: M:Sync.Reflection.InvokableFactory.CreateCallWithReturn``1(System.Reflection.MethodInfo,System.Object)
+  id: CreateCallWithReturn``1(System.Reflection.MethodInfo,System.Object)
+  parent: Sync.Reflection.InvokableFactory
+  langs:
+  - csharp
+  - vb
+  name: CreateCallWithReturn<TDeclaring>(MethodInfo, Object)
+  nameWithType: InvokableFactory.CreateCallWithReturn<TDeclaring>(MethodInfo, Object)
+  fullName: Sync.Reflection.InvokableFactory.CreateCallWithReturn<TDeclaring>(System.Reflection.MethodInfo, System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CreateCallWithReturn
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 173
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  summary: "\nReturns a member method call on `instance` of the form `object Method(TDeclaring)`.\n"
+  example: []
+  syntax:
+    content: public static Func<TDeclaring, object> CreateCallWithReturn<TDeclaring>(MethodInfo method, object instance)
+    parameters:
+    - id: method
+      type: System.Reflection.MethodInfo
+      description: ''
+    - id: instance
+      type: System.Object
+      description: ''
+    typeParameters:
+    - id: TDeclaring
+      description: Type of the instance containing the member.
+    return:
+      type: System.Func{{TDeclaring},System.Object}
+      description: ''
+    content.vb: Public Shared Function CreateCallWithReturn(Of TDeclaring)(method As MethodInfo, instance As Object) As Func(Of TDeclaring, Object)
+  overload: Sync.Reflection.InvokableFactory.CreateCallWithReturn*
+  nameWithType.vb: InvokableFactory.CreateCallWithReturn(Of TDeclaring)(MethodInfo, Object)
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Sync.Reflection.InvokableFactory.CreateCallWithReturn(Of TDeclaring)(System.Reflection.MethodInfo, System.Object)
+  name.vb: CreateCallWithReturn(Of TDeclaring)(MethodInfo, Object)
+- uid: Sync.Reflection.InvokableFactory.CreateCall``1(System.Reflection.MethodInfo,System.Object)
+  commentId: M:Sync.Reflection.InvokableFactory.CreateCall``1(System.Reflection.MethodInfo,System.Object)
+  id: CreateCall``1(System.Reflection.MethodInfo,System.Object)
+  parent: Sync.Reflection.InvokableFactory
+  langs:
+  - csharp
+  - vb
+  name: CreateCall<TDeclaring>(MethodInfo, Object)
+  nameWithType: InvokableFactory.CreateCall<TDeclaring>(MethodInfo, Object)
+  fullName: Sync.Reflection.InvokableFactory.CreateCall<TDeclaring>(System.Reflection.MethodInfo, System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CreateCall
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 195
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  summary: "\nReturns a member method call on `instance`of the form `void Method(TDeclaring, object)`.\n"
+  example: []
+  syntax:
+    content: public static Action<TDeclaring, object> CreateCall<TDeclaring>(MethodInfo method, object instance)
+    parameters:
+    - id: method
+      type: System.Reflection.MethodInfo
+      description: ''
+    - id: instance
+      type: System.Object
+      description: ''
+    typeParameters:
+    - id: TDeclaring
+      description: Type of the instance containing the member.
+    return:
+      type: System.Action{{TDeclaring},System.Object}
+      description: ''
+    content.vb: Public Shared Function CreateCall(Of TDeclaring)(method As MethodInfo, instance As Object) As Action(Of TDeclaring, Object)
+  overload: Sync.Reflection.InvokableFactory.CreateCall*
+  nameWithType.vb: InvokableFactory.CreateCall(Of TDeclaring)(MethodInfo, Object)
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Sync.Reflection.InvokableFactory.CreateCall(Of TDeclaring)(System.Reflection.MethodInfo, System.Object)
+  name.vb: CreateCall(Of TDeclaring)(MethodInfo, Object)
+- uid: Sync.Reflection.InvokableFactory.CreateGetter``1(System.Reflection.MemberInfo,System.Object)
+  commentId: M:Sync.Reflection.InvokableFactory.CreateGetter``1(System.Reflection.MemberInfo,System.Object)
+  id: CreateGetter``1(System.Reflection.MemberInfo,System.Object)
+  parent: Sync.Reflection.InvokableFactory
+  langs:
+  - csharp
+  - vb
+  name: CreateGetter<TValue>(MemberInfo, Object)
+  nameWithType: InvokableFactory.CreateGetter<TValue>(MemberInfo, Object)
+  fullName: Sync.Reflection.InvokableFactory.CreateGetter<TValue>(System.Reflection.MemberInfo, System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CreateGetter
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 215
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  syntax:
+    content: public static Func<TValue> CreateGetter<TValue>(MemberInfo memberInfo, object instance)
+    parameters:
+    - id: memberInfo
+      type: System.Reflection.MemberInfo
+    - id: instance
+      type: System.Object
+    typeParameters:
+    - id: TValue
+    return:
+      type: System.Func{{TValue}}
+    content.vb: Public Shared Function CreateGetter(Of TValue)(memberInfo As MemberInfo, instance As Object) As Func(Of TValue)
+  overload: Sync.Reflection.InvokableFactory.CreateGetter*
+  nameWithType.vb: InvokableFactory.CreateGetter(Of TValue)(MemberInfo, Object)
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Sync.Reflection.InvokableFactory.CreateGetter(Of TValue)(System.Reflection.MemberInfo, System.Object)
+  name.vb: CreateGetter(Of TValue)(MemberInfo, Object)
+- uid: Sync.Reflection.InvokableFactory.CreateGetter``2(System.Reflection.MemberInfo)
+  commentId: M:Sync.Reflection.InvokableFactory.CreateGetter``2(System.Reflection.MemberInfo)
+  id: CreateGetter``2(System.Reflection.MemberInfo)
+  parent: Sync.Reflection.InvokableFactory
+  langs:
+  - csharp
+  - vb
+  name: CreateGetter<TDeclaring, TValue>(MemberInfo)
+  nameWithType: InvokableFactory.CreateGetter<TDeclaring, TValue>(MemberInfo)
+  fullName: Sync.Reflection.InvokableFactory.CreateGetter<TDeclaring, TValue>(System.Reflection.MemberInfo)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CreateGetter
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 223
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  syntax:
+    content: public static Func<TDeclaring, TValue> CreateGetter<TDeclaring, TValue>(MemberInfo memberInfo)
+    parameters:
+    - id: memberInfo
+      type: System.Reflection.MemberInfo
+    typeParameters:
+    - id: TDeclaring
+    - id: TValue
+    return:
+      type: System.Func{{TDeclaring},{TValue}}
+    content.vb: Public Shared Function CreateGetter(Of TDeclaring, TValue)(memberInfo As MemberInfo) As Func(Of TDeclaring, TValue)
+  overload: Sync.Reflection.InvokableFactory.CreateGetter*
+  nameWithType.vb: InvokableFactory.CreateGetter(Of TDeclaring, TValue)(MemberInfo)
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Sync.Reflection.InvokableFactory.CreateGetter(Of TDeclaring, TValue)(System.Reflection.MemberInfo)
+  name.vb: CreateGetter(Of TDeclaring, TValue)(MemberInfo)
+- uid: Sync.Reflection.InvokableFactory.CreateStandInCaller(System.Reflection.MethodInfo)
+  commentId: M:Sync.Reflection.InvokableFactory.CreateStandInCaller(System.Reflection.MethodInfo)
+  id: CreateStandInCaller(System.Reflection.MethodInfo)
+  parent: Sync.Reflection.InvokableFactory
+  langs:
+  - csharp
+  - vb
+  name: CreateStandInCaller(MethodInfo)
+  nameWithType: InvokableFactory.CreateStandInCaller(MethodInfo)
+  fullName: Sync.Reflection.InvokableFactory.CreateStandInCaller(System.Reflection.MethodInfo)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CreateStandInCaller
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 232
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  syntax:
+    content: public static Action<object, object[]> CreateStandInCaller(MethodInfo method)
+    parameters:
+    - id: method
+      type: System.Reflection.MethodInfo
+    return:
+      type: System.Action{System.Object,System.Object[]}
+    content.vb: Public Shared Function CreateStandInCaller(method As MethodInfo) As Action(Of Object, Object())
+  overload: Sync.Reflection.InvokableFactory.CreateStandInCaller*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Sync.Reflection.InvokableFactory.CreateStaticStandInCaller(System.Reflection.MethodInfo)
+  commentId: M:Sync.Reflection.InvokableFactory.CreateStaticStandInCaller(System.Reflection.MethodInfo)
+  id: CreateStaticStandInCaller(System.Reflection.MethodInfo)
+  parent: Sync.Reflection.InvokableFactory
+  langs:
+  - csharp
+  - vb
+  name: CreateStaticStandInCaller(MethodInfo)
+  nameWithType: InvokableFactory.CreateStaticStandInCaller(MethodInfo)
+  fullName: Sync.Reflection.InvokableFactory.CreateStaticStandInCaller(System.Reflection.MethodInfo)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CreateStaticStandInCaller
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 265
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  syntax:
+    content: public static Action<object[]> CreateStaticStandInCaller(MethodInfo method)
+    parameters:
+    - id: method
+      type: System.Reflection.MethodInfo
+    return:
+      type: System.Action{System.Object[]}
+    content.vb: Public Shared Function CreateStaticStandInCaller(method As MethodInfo) As Action(Of Object())
+  overload: Sync.Reflection.InvokableFactory.CreateStaticStandInCaller*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Sync.Reflection.InvokableFactory.CreateStandIn(Sync.MethodAccess)
+  commentId: M:Sync.Reflection.InvokableFactory.CreateStandIn(Sync.MethodAccess)
+  id: CreateStandIn(Sync.MethodAccess)
+  parent: Sync.Reflection.InvokableFactory
+  langs:
+  - csharp
+  - vb
+  name: CreateStandIn(MethodAccess)
+  nameWithType: InvokableFactory.CreateStandIn(MethodAccess)
+  fullName: Sync.Reflection.InvokableFactory.CreateStandIn(Sync.MethodAccess)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/InvokableFactory.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CreateStandIn
+    path: ../source/Sync/Reflection/InvokableFactory.cs
+    startLine: 287
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  syntax:
+    content: public static DynamicMethod CreateStandIn(MethodAccess methodAccess)
+    parameters:
+    - id: methodAccess
+      type: Sync.MethodAccess
+    return:
+      type: System.Reflection.Emit.DynamicMethod
+    content.vb: Public Shared Function CreateStandIn(methodAccess As MethodAccess) As DynamicMethod
+  overload: Sync.Reflection.InvokableFactory.CreateStandIn*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+references:
+- uid: Sync.Reflection
+  commentId: N:Sync.Reflection
+  name: Sync.Reflection
+  nameWithType: Sync.Reflection
+  fullName: Sync.Reflection
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Sync.Reflection.InvokableFactory.CreateUntypedGetter*
+  commentId: Overload:Sync.Reflection.InvokableFactory.CreateUntypedGetter
+  name: CreateUntypedGetter
+  nameWithType: InvokableFactory.CreateUntypedGetter
+  fullName: Sync.Reflection.InvokableFactory.CreateUntypedGetter
+- uid: System.Reflection.MemberInfo
+  commentId: T:System.Reflection.MemberInfo
+  parent: System.Reflection
+  isExternal: true
+  name: MemberInfo
+  nameWithType: MemberInfo
+  fullName: System.Reflection.MemberInfo
+- uid: System.Func{{TDeclaring},System.Object}
+  commentId: T:System.Func{``0,System.Object}
+  parent: System
+  definition: System.Func`2
+  name: Func<TDeclaring, Object>
+  nameWithType: Func<TDeclaring, Object>
+  fullName: System.Func<TDeclaring, System.Object>
+  nameWithType.vb: Func(Of TDeclaring, Object)
+  fullName.vb: System.Func(Of TDeclaring, System.Object)
+  name.vb: Func(Of TDeclaring, Object)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Reflection
+  commentId: N:System.Reflection
+  isExternal: true
+  name: System.Reflection
+  nameWithType: System.Reflection
+  fullName: System.Reflection
+- uid: System.Func`2
+  commentId: T:System.Func`2
+  isExternal: true
+  name: Func<T, TResult>
+  nameWithType: Func<T, TResult>
+  fullName: System.Func<T, TResult>
+  nameWithType.vb: Func(Of T, TResult)
+  fullName.vb: System.Func(Of T, TResult)
+  name.vb: Func(Of T, TResult)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TResult
+    nameWithType: TResult
+    fullName: TResult
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TResult
+    nameWithType: TResult
+    fullName: TResult
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Reflection.InvokableFactory.CreateUntypedSetter*
+  commentId: Overload:Sync.Reflection.InvokableFactory.CreateUntypedSetter
+  name: CreateUntypedSetter
+  nameWithType: InvokableFactory.CreateUntypedSetter
+  fullName: Sync.Reflection.InvokableFactory.CreateUntypedSetter
+- uid: System.Action{{TDeclaring},System.Object}
+  commentId: T:System.Action{``0,System.Object}
+  parent: System
+  definition: System.Action`2
+  name: Action<TDeclaring, Object>
+  nameWithType: Action<TDeclaring, Object>
+  fullName: System.Action<TDeclaring, System.Object>
+  nameWithType.vb: Action(Of TDeclaring, Object)
+  fullName.vb: System.Action(Of TDeclaring, System.Object)
+  name.vb: Action(Of TDeclaring, Object)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Action`2
+  commentId: T:System.Action`2
+  isExternal: true
+  name: Action<T1, T2>
+  nameWithType: Action<T1, T2>
+  fullName: System.Action<T1, T2>
+  nameWithType.vb: Action(Of T1, T2)
+  fullName.vb: System.Action(Of T1, T2)
+  name.vb: Action(Of T1, T2)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Reflection.InvokableFactory.CreateCallWithReturn*
+  commentId: Overload:Sync.Reflection.InvokableFactory.CreateCallWithReturn
+  name: CreateCallWithReturn
+  nameWithType: InvokableFactory.CreateCallWithReturn
+  fullName: Sync.Reflection.InvokableFactory.CreateCallWithReturn
+- uid: System.Reflection.MethodInfo
+  commentId: T:System.Reflection.MethodInfo
+  parent: System.Reflection
+  isExternal: true
+  name: MethodInfo
+  nameWithType: MethodInfo
+  fullName: System.Reflection.MethodInfo
+- uid: Sync.Reflection.InvokableFactory.CreateCall*
+  commentId: Overload:Sync.Reflection.InvokableFactory.CreateCall
+  name: CreateCall
+  nameWithType: InvokableFactory.CreateCall
+  fullName: Sync.Reflection.InvokableFactory.CreateCall
+- uid: System.Action{{TDeclaring},{TParam}}
+  commentId: T:System.Action{``0,``1}
+  parent: System
+  definition: System.Action`2
+  name: Action<TDeclaring, TParam>
+  nameWithType: Action<TDeclaring, TParam>
+  fullName: System.Action<TDeclaring, TParam>
+  nameWithType.vb: Action(Of TDeclaring, TParam)
+  fullName.vb: System.Action(Of TDeclaring, TParam)
+  name.vb: Action(Of TDeclaring, TParam)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TParam
+    nameWithType: TParam
+    fullName: TParam
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TParam
+    nameWithType: TParam
+    fullName: TParam
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Reflection.InvokableFactory.CreateGetter*
+  commentId: Overload:Sync.Reflection.InvokableFactory.CreateGetter
+  name: CreateGetter
+  nameWithType: InvokableFactory.CreateGetter
+  fullName: Sync.Reflection.InvokableFactory.CreateGetter
+- uid: System.Func{{TValue}}
+  commentId: T:System.Func{``0}
+  parent: System
+  definition: System.Func`1
+  name: Func<TValue>
+  nameWithType: Func<TValue>
+  fullName: System.Func<TValue>
+  nameWithType.vb: Func(Of TValue)
+  fullName.vb: System.Func(Of TValue)
+  name.vb: Func(Of TValue)
+  spec.csharp:
+  - uid: System.Func`1
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Func`1
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Func`1
+  commentId: T:System.Func`1
+  isExternal: true
+  name: Func<TResult>
+  nameWithType: Func<TResult>
+  fullName: System.Func<TResult>
+  nameWithType.vb: Func(Of TResult)
+  fullName.vb: System.Func(Of TResult)
+  name.vb: Func(Of TResult)
+  spec.csharp:
+  - uid: System.Func`1
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TResult
+    nameWithType: TResult
+    fullName: TResult
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Func`1
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TResult
+    nameWithType: TResult
+    fullName: TResult
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Func{{TDeclaring},{TValue}}
+  commentId: T:System.Func{``0,``1}
+  parent: System
+  definition: System.Func`2
+  name: Func<TDeclaring, TValue>
+  nameWithType: Func<TDeclaring, TValue>
+  fullName: System.Func<TDeclaring, TValue>
+  nameWithType.vb: Func(Of TDeclaring, TValue)
+  fullName.vb: System.Func(Of TDeclaring, TValue)
+  name.vb: Func(Of TDeclaring, TValue)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Reflection.InvokableFactory.CreateStandInCaller*
+  commentId: Overload:Sync.Reflection.InvokableFactory.CreateStandInCaller
+  name: CreateStandInCaller
+  nameWithType: InvokableFactory.CreateStandInCaller
+  fullName: Sync.Reflection.InvokableFactory.CreateStandInCaller
+- uid: System.Action{System.Object,System.Object[]}
+  commentId: T:System.Action{System.Object,System.Object[]}
+  parent: System
+  definition: System.Action`2
+  name: Action<Object, Object[]>
+  nameWithType: Action<Object, Object[]>
+  fullName: System.Action<System.Object, System.Object[]>
+  nameWithType.vb: Action(Of Object, Object())
+  fullName.vb: System.Action(Of System.Object, System.Object())
+  name.vb: Action(Of Object, Object())
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Reflection.InvokableFactory.CreateStaticStandInCaller*
+  commentId: Overload:Sync.Reflection.InvokableFactory.CreateStaticStandInCaller
+  name: CreateStaticStandInCaller
+  nameWithType: InvokableFactory.CreateStaticStandInCaller
+  fullName: Sync.Reflection.InvokableFactory.CreateStaticStandInCaller
+- uid: System.Action{System.Object[]}
+  commentId: T:System.Action{System.Object[]}
+  parent: System
+  definition: System.Action`1
+  name: Action<Object[]>
+  nameWithType: Action<Object[]>
+  fullName: System.Action<System.Object[]>
+  nameWithType.vb: Action(Of Object())
+  fullName.vb: System.Action(Of System.Object())
+  name.vb: Action(Of Object())
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Action`1
+  commentId: T:System.Action`1
+  isExternal: true
+  name: Action<T>
+  nameWithType: Action<T>
+  fullName: System.Action<T>
+  nameWithType.vb: Action(Of T)
+  fullName.vb: System.Action(Of T)
+  name.vb: Action(Of T)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Reflection.InvokableFactory.CreateStandIn*
+  commentId: Overload:Sync.Reflection.InvokableFactory.CreateStandIn
+  name: CreateStandIn
+  nameWithType: InvokableFactory.CreateStandIn
+  fullName: Sync.Reflection.InvokableFactory.CreateStandIn
+- uid: Sync.MethodAccess
+  commentId: T:Sync.MethodAccess
+  parent: Sync
+  name: MethodAccess
+  nameWithType: MethodAccess
+  fullName: Sync.MethodAccess
+- uid: System.Reflection.Emit.DynamicMethod
+  commentId: T:System.Reflection.Emit.DynamicMethod
+  parent: System.Reflection.Emit
+  isExternal: true
+  name: DynamicMethod
+  nameWithType: DynamicMethod
+  fullName: System.Reflection.Emit.DynamicMethod
+- uid: Sync
+  commentId: N:Sync
+  name: Sync
+  nameWithType: Sync
+  fullName: Sync
+- uid: System.Reflection.Emit
+  commentId: N:System.Reflection.Emit
+  isExternal: true
+  name: System.Reflection.Emit
+  nameWithType: System.Reflection.Emit
+  fullName: System.Reflection.Emit

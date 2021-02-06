@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -73,14 +72,15 @@
   
   <h1 id="Coop_Mod_Persistence_RPC_EventMethodCall" data-uid="Coop.Mod.Persistence.RPC.EventMethodCall" class="text-break">Class EventMethodCall
   </h1>
-  <div class="markdown level0 summary">
-RailEvent used to initiate remote procedure calls. The way this event is processed
-differs between client and server:
-- The server acts as a broadcasting relay station. Effectively receiving the event
+  <div class="markdown level0 summary"><p>RailEvent used to initiate remote procedure calls. The way this event is processed
+differs between client and server:</p>
+<ul>
+<li>The server acts as a broadcasting relay station. Effectively receiving the event
 and forwarding it to all clients (INCLUDING the client that sent the event!).
 Note that the server will delay event execution until all arguments have been
-transferred to all clients.
-- Clients will resolve the call and arguments locally and execute it.
+transferred to all clients.</li>
+<li>Clients will resolve the call and arguments locally and execute it.</li>
+</ul>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -337,9 +337,22 @@ readonly IEnvironmentServer m_EnvironmentServer</code></pre>
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

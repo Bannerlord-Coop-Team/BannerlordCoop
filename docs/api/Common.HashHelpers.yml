@@ -1,0 +1,768 @@
+### YamlMime:ManagedReference
+items:
+- uid: Common.HashHelpers
+  commentId: T:Common.HashHelpers
+  id: HashHelpers
+  parent: Common
+  children:
+  - Common.HashHelpers.ExpandPrime(System.Int32)
+  - Common.HashHelpers.GetEqualityComparerForSerialization(System.Object)
+  - Common.HashHelpers.GetPrime(System.Int32)
+  - Common.HashHelpers.MaxPrimeArrayLength
+  - Common.HashHelpers.primes
+  - Common.HashHelpers.s_serializationInfoTable
+  - Common.HashHelpers.SerializationInfoTable
+  langs:
+  - csharp
+  - vb
+  name: HashHelpers
+  nameWithType: HashHelpers
+  fullName: Common.HashHelpers
+  type: Class
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: HashHelpers
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 1264
+  assemblies:
+  - Common
+  namespace: Common
+  summary: "\nPurpose: Hash table implementation\n"
+  example: []
+  syntax:
+    content: public static class HashHelpers
+    content.vb: Public Module HashHelpers
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - static
+  - class
+  modifiers.vb:
+  - Public
+  - Module
+- uid: Common.HashHelpers.MaxPrimeArrayLength
+  commentId: F:Common.HashHelpers.MaxPrimeArrayLength
+  id: MaxPrimeArrayLength
+  parent: Common.HashHelpers
+  langs:
+  - csharp
+  - vb
+  name: MaxPrimeArrayLength
+  nameWithType: HashHelpers.MaxPrimeArrayLength
+  fullName: Common.HashHelpers.MaxPrimeArrayLength
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MaxPrimeArrayLength
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 1267
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public const int MaxPrimeArrayLength = 2146435069
+    return:
+      type: System.Int32
+    content.vb: Public Const MaxPrimeArrayLength As Integer = 2146435069
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Common.HashHelpers.primes
+  commentId: F:Common.HashHelpers.primes
+  id: primes
+  parent: Common.HashHelpers
+  langs:
+  - csharp
+  - vb
+  name: primes
+  nameWithType: HashHelpers.primes
+  fullName: Common.HashHelpers.primes
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: primes
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 1280
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: static readonly int[] primes
+    return:
+      type: System.Int32[]
+    content.vb: Shared ReadOnly primes As Integer()
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Common.HashHelpers.s_serializationInfoTable
+  commentId: F:Common.HashHelpers.s_serializationInfoTable
+  id: s_serializationInfoTable
+  parent: Common.HashHelpers
+  langs:
+  - csharp
+  - vb
+  name: s_serializationInfoTable
+  nameWithType: HashHelpers.s_serializationInfoTable
+  fullName: Common.HashHelpers.s_serializationInfoTable
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: s_serializationInfoTable
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 1388
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: static ConditionalWeakTable<object, SerializationInfo> s_serializationInfoTable
+    return:
+      type: System.Runtime.CompilerServices.ConditionalWeakTable{System.Object,System.Runtime.Serialization.SerializationInfo}
+    content.vb: Shared s_serializationInfoTable As ConditionalWeakTable(Of Object, SerializationInfo)
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Common.HashHelpers.SerializationInfoTable
+  commentId: P:Common.HashHelpers.SerializationInfoTable
+  id: SerializationInfoTable
+  parent: Common.HashHelpers
+  langs:
+  - csharp
+  - vb
+  name: SerializationInfoTable
+  nameWithType: HashHelpers.SerializationInfoTable
+  fullName: Common.HashHelpers.SerializationInfoTable
+  type: Property
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SerializationInfoTable
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 1390
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: >-
+      static ConditionalWeakTable<object, SerializationInfo> SerializationInfoTable
+
+      {
+
+      }
+    parameters: []
+    return:
+      type: System.Runtime.CompilerServices.ConditionalWeakTable{System.Object,System.Runtime.Serialization.SerializationInfo}
+    content.vb: Shared ReadOnly WriteOnly Property SerializationInfoTable As ConditionalWeakTable(Of Object, SerializationInfo)
+  overload: Common.HashHelpers.SerializationInfoTable*
+  modifiers.csharp:
+  - static
+  - get
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Common.HashHelpers.GetPrime(System.Int32)
+  commentId: M:Common.HashHelpers.GetPrime(System.Int32)
+  id: GetPrime(System.Int32)
+  parent: Common.HashHelpers
+  langs:
+  - csharp
+  - vb
+  name: GetPrime(Int32)
+  nameWithType: HashHelpers.GetPrime(Int32)
+  fullName: Common.HashHelpers.GetPrime(System.Int32)
+  type: Method
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetPrime
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 1393
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public static int GetPrime(int min)
+    parameters:
+    - id: min
+      type: System.Int32
+    return:
+      type: System.Int32
+    content.vb: Public Shared Function GetPrime(min As Integer) As Integer
+  overload: Common.HashHelpers.GetPrime*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Common.HashHelpers.ExpandPrime(System.Int32)
+  commentId: M:Common.HashHelpers.ExpandPrime(System.Int32)
+  id: ExpandPrime(System.Int32)
+  parent: Common.HashHelpers
+  langs:
+  - csharp
+  - vb
+  name: ExpandPrime(Int32)
+  nameWithType: HashHelpers.ExpandPrime(Int32)
+  fullName: Common.HashHelpers.ExpandPrime(System.Int32)
+  type: Method
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ExpandPrime
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 1412
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public static int ExpandPrime(int oldSize)
+    parameters:
+    - id: oldSize
+      type: System.Int32
+    return:
+      type: System.Int32
+    content.vb: Public Shared Function ExpandPrime(oldSize As Integer) As Integer
+  overload: Common.HashHelpers.ExpandPrime*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Common.HashHelpers.GetEqualityComparerForSerialization(System.Object)
+  commentId: M:Common.HashHelpers.GetEqualityComparerForSerialization(System.Object)
+  id: GetEqualityComparerForSerialization(System.Object)
+  parent: Common.HashHelpers
+  langs:
+  - csharp
+  - vb
+  name: GetEqualityComparerForSerialization(Object)
+  nameWithType: HashHelpers.GetEqualityComparerForSerialization(Object)
+  fullName: Common.HashHelpers.GetEqualityComparerForSerialization(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetEqualityComparerForSerialization
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 1429
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: static object GetEqualityComparerForSerialization(object comparer)
+    parameters:
+    - id: comparer
+      type: System.Object
+    return:
+      type: System.Object
+    content.vb: Shared Function GetEqualityComparerForSerialization(comparer As Object) As Object
+  overload: Common.HashHelpers.GetEqualityComparerForSerialization*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+references:
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: System.Int32[]
+  isExternal: true
+  name: Int32[]
+  nameWithType: Int32[]
+  fullName: System.Int32[]
+  nameWithType.vb: Int32()
+  fullName.vb: System.Int32()
+  name.vb: Int32()
+  spec.csharp:
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  spec.vb:
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+- uid: System.Runtime.CompilerServices.ConditionalWeakTable{System.Object,System.Runtime.Serialization.SerializationInfo}
+  commentId: T:System.Runtime.CompilerServices.ConditionalWeakTable{System.Object,System.Runtime.Serialization.SerializationInfo}
+  parent: System.Runtime.CompilerServices
+  definition: System.Runtime.CompilerServices.ConditionalWeakTable`2
+  name: ConditionalWeakTable<Object, SerializationInfo>
+  nameWithType: ConditionalWeakTable<Object, SerializationInfo>
+  fullName: System.Runtime.CompilerServices.ConditionalWeakTable<System.Object, System.Runtime.Serialization.SerializationInfo>
+  nameWithType.vb: ConditionalWeakTable(Of Object, SerializationInfo)
+  fullName.vb: System.Runtime.CompilerServices.ConditionalWeakTable(Of System.Object, System.Runtime.Serialization.SerializationInfo)
+  name.vb: ConditionalWeakTable(Of Object, SerializationInfo)
+  spec.csharp:
+  - uid: System.Runtime.CompilerServices.ConditionalWeakTable`2
+    name: ConditionalWeakTable
+    nameWithType: ConditionalWeakTable
+    fullName: System.Runtime.CompilerServices.ConditionalWeakTable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Runtime.Serialization.SerializationInfo
+    name: SerializationInfo
+    nameWithType: SerializationInfo
+    fullName: System.Runtime.Serialization.SerializationInfo
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Runtime.CompilerServices.ConditionalWeakTable`2
+    name: ConditionalWeakTable
+    nameWithType: ConditionalWeakTable
+    fullName: System.Runtime.CompilerServices.ConditionalWeakTable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Runtime.Serialization.SerializationInfo
+    name: SerializationInfo
+    nameWithType: SerializationInfo
+    fullName: System.Runtime.Serialization.SerializationInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Runtime.CompilerServices.ConditionalWeakTable`2
+  commentId: T:System.Runtime.CompilerServices.ConditionalWeakTable`2
+  isExternal: true
+  name: ConditionalWeakTable<TKey, TValue>
+  nameWithType: ConditionalWeakTable<TKey, TValue>
+  fullName: System.Runtime.CompilerServices.ConditionalWeakTable<TKey, TValue>
+  nameWithType.vb: ConditionalWeakTable(Of TKey, TValue)
+  fullName.vb: System.Runtime.CompilerServices.ConditionalWeakTable(Of TKey, TValue)
+  name.vb: ConditionalWeakTable(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Runtime.CompilerServices.ConditionalWeakTable`2
+    name: ConditionalWeakTable
+    nameWithType: ConditionalWeakTable
+    fullName: System.Runtime.CompilerServices.ConditionalWeakTable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Runtime.CompilerServices.ConditionalWeakTable`2
+    name: ConditionalWeakTable
+    nameWithType: ConditionalWeakTable
+    fullName: System.Runtime.CompilerServices.ConditionalWeakTable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Runtime.CompilerServices
+  commentId: N:System.Runtime.CompilerServices
+  isExternal: true
+  name: System.Runtime.CompilerServices
+  nameWithType: System.Runtime.CompilerServices
+  fullName: System.Runtime.CompilerServices
+- uid: Common.HashHelpers.SerializationInfoTable*
+  commentId: Overload:Common.HashHelpers.SerializationInfoTable
+  name: SerializationInfoTable
+  nameWithType: HashHelpers.SerializationInfoTable
+  fullName: Common.HashHelpers.SerializationInfoTable
+- uid: Common.HashHelpers.GetPrime*
+  commentId: Overload:Common.HashHelpers.GetPrime
+  name: GetPrime
+  nameWithType: HashHelpers.GetPrime
+  fullName: Common.HashHelpers.GetPrime
+- uid: Common.HashHelpers.ExpandPrime*
+  commentId: Overload:Common.HashHelpers.ExpandPrime
+  name: ExpandPrime
+  nameWithType: HashHelpers.ExpandPrime
+  fullName: Common.HashHelpers.ExpandPrime
+- uid: Common.HashHelpers.GetEqualityComparerForSerialization*
+  commentId: Overload:Common.HashHelpers.GetEqualityComparerForSerialization
+  name: GetEqualityComparerForSerialization
+  nameWithType: HashHelpers.GetEqualityComparerForSerialization
+  fullName: Common.HashHelpers.GetEqualityComparerForSerialization

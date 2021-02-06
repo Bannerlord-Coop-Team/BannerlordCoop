@@ -1,0 +1,487 @@
+### YamlMime:ManagedReference
+items:
+- uid: TestRunner.TestRunner
+  commentId: T:TestRunner.TestRunner
+  id: TestRunner
+  parent: TestRunner
+  children:
+  - TestRunner.TestRunner._handler
+  - TestRunner.TestRunner.client
+  - TestRunner.TestRunner.environment
+  - TestRunner.TestRunner.Handler(TestRunner.TestRunner.CtrlType)
+  - TestRunner.TestRunner.host
+  - TestRunner.TestRunner.instances
+  - TestRunner.TestRunner.Main(System.String[])
+  - TestRunner.TestRunner.SetConsoleCtrlHandler(TestRunner.TestRunner.EventHandler,System.Boolean)
+  langs:
+  - csharp
+  - vb
+  name: TestRunner
+  nameWithType: TestRunner
+  fullName: TestRunner.TestRunner
+  type: Class
+  source:
+    remote:
+      path: source/TestRunner/Program.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TestRunner
+    path: ../source/TestRunner/Program.cs
+    startLine: 18
+  assemblies:
+  - TestRunner
+  namespace: TestRunner
+  summary: "\nRunner that works similar to running a test but as an application\n"
+  example: []
+  syntax:
+    content: 'static class TestRunner : object'
+    content.vb: >-
+      Module TestRunner
+
+          Inherits Object
+  inheritance:
+  - System.Object
+  modifiers.csharp:
+  - static
+  - class
+  modifiers.vb:
+  - Module
+- uid: TestRunner.TestRunner.SetConsoleCtrlHandler(TestRunner.TestRunner.EventHandler,System.Boolean)
+  commentId: M:TestRunner.TestRunner.SetConsoleCtrlHandler(TestRunner.TestRunner.EventHandler,System.Boolean)
+  id: SetConsoleCtrlHandler(TestRunner.TestRunner.EventHandler,System.Boolean)
+  parent: TestRunner.TestRunner
+  langs:
+  - csharp
+  - vb
+  name: SetConsoleCtrlHandler(TestRunner.EventHandler, Boolean)
+  nameWithType: TestRunner.SetConsoleCtrlHandler(TestRunner.EventHandler, Boolean)
+  fullName: TestRunner.TestRunner.SetConsoleCtrlHandler(TestRunner.TestRunner.EventHandler, System.Boolean)
+  type: Method
+  source:
+    path: TestRunner
+    isExternal: true
+  assemblies:
+  - TestRunner
+  namespace: TestRunner
+  syntax:
+    content: static bool SetConsoleCtrlHandler(TestRunner.EventHandler handler, bool add)
+    parameters:
+    - id: handler
+      type: TestRunner.TestRunner.EventHandler
+    - id: add
+      type: System.Boolean
+    return:
+      type: System.Boolean
+    content.vb: Shared Function SetConsoleCtrlHandler(handler As TestRunner.EventHandler, add As Boolean) As Boolean
+  overload: TestRunner.TestRunner.SetConsoleCtrlHandler*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: TestRunner.TestRunner._handler
+  commentId: F:TestRunner.TestRunner._handler
+  id: _handler
+  parent: TestRunner.TestRunner
+  langs:
+  - csharp
+  - vb
+  name: _handler
+  nameWithType: TestRunner._handler
+  fullName: TestRunner.TestRunner._handler
+  type: Field
+  source:
+    remote:
+      path: source/TestRunner/Program.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: _handler
+    path: ../source/TestRunner/Program.cs
+    startLine: 23
+  assemblies:
+  - TestRunner
+  namespace: TestRunner
+  syntax:
+    content: static TestRunner.EventHandler _handler
+    return:
+      type: TestRunner.TestRunner.EventHandler
+    content.vb: Shared _handler As TestRunner.EventHandler
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: TestRunner.TestRunner.host
+  commentId: F:TestRunner.TestRunner.host
+  id: host
+  parent: TestRunner.TestRunner
+  langs:
+  - csharp
+  - vb
+  name: host
+  nameWithType: TestRunner.host
+  fullName: TestRunner.TestRunner.host
+  type: Field
+  source:
+    remote:
+      path: source/TestRunner/Program.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: host
+    path: ../source/TestRunner/Program.cs
+    startLine: 25
+  assemblies:
+  - TestRunner
+  namespace: TestRunner
+  syntax:
+    content: static GameInstance host
+    return:
+      type: BannerlordSystemTestingLibrary.GameInstance
+    content.vb: Shared host As GameInstance
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: TestRunner.TestRunner.client
+  commentId: F:TestRunner.TestRunner.client
+  id: client
+  parent: TestRunner.TestRunner
+  langs:
+  - csharp
+  - vb
+  name: client
+  nameWithType: TestRunner.client
+  fullName: TestRunner.TestRunner.client
+  type: Field
+  source:
+    remote:
+      path: source/TestRunner/Program.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: client
+    path: ../source/TestRunner/Program.cs
+    startLine: 26
+  assemblies:
+  - TestRunner
+  namespace: TestRunner
+  syntax:
+    content: static GameInstance client
+    return:
+      type: BannerlordSystemTestingLibrary.GameInstance
+    content.vb: Shared client As GameInstance
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: TestRunner.TestRunner.instances
+  commentId: F:TestRunner.TestRunner.instances
+  id: instances
+  parent: TestRunner.TestRunner
+  langs:
+  - csharp
+  - vb
+  name: instances
+  nameWithType: TestRunner.instances
+  fullName: TestRunner.TestRunner.instances
+  type: Field
+  source:
+    remote:
+      path: source/TestRunner/Program.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: instances
+    path: ../source/TestRunner/Program.cs
+    startLine: 28
+  assemblies:
+  - TestRunner
+  namespace: TestRunner
+  syntax:
+    content: static List<GameInstance> instances
+    return:
+      type: List{BannerlordSystemTestingLibrary.GameInstance}
+    content.vb: Shared instances As List(Of GameInstance)
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: TestRunner.TestRunner.environment
+  commentId: F:TestRunner.TestRunner.environment
+  id: environment
+  parent: TestRunner.TestRunner
+  langs:
+  - csharp
+  - vb
+  name: environment
+  nameWithType: TestRunner.environment
+  fullName: TestRunner.TestRunner.environment
+  type: Field
+  source:
+    remote:
+      path: source/TestRunner/Program.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: environment
+    path: ../source/TestRunner/Program.cs
+    startLine: 34
+  assemblies:
+  - TestRunner
+  namespace: TestRunner
+  syntax:
+    content: static TestEnvironment environment
+    return:
+      type: BannerlordSystemTestingLibrary.TestEnvironment
+    content.vb: Shared environment As TestEnvironment
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: TestRunner.TestRunner.Main(System.String[])
+  commentId: M:TestRunner.TestRunner.Main(System.String[])
+  id: Main(System.String[])
+  parent: TestRunner.TestRunner
+  langs:
+  - csharp
+  - vb
+  name: Main(String[])
+  nameWithType: TestRunner.Main(String[])
+  fullName: TestRunner.TestRunner.Main(System.String[])
+  type: Method
+  source:
+    remote:
+      path: source/TestRunner/Program.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Main
+    path: ../source/TestRunner/Program.cs
+    startLine: 36
+  assemblies:
+  - TestRunner
+  namespace: TestRunner
+  syntax:
+    content: static void Main(string[] args)
+    parameters:
+    - id: args
+      type: System.String[]
+    content.vb: Shared Sub Main(args As String())
+  overload: TestRunner.TestRunner.Main*
+  nameWithType.vb: TestRunner.Main(String())
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+  fullName.vb: TestRunner.TestRunner.Main(System.String())
+  name.vb: Main(String())
+- uid: TestRunner.TestRunner.Handler(TestRunner.TestRunner.CtrlType)
+  commentId: M:TestRunner.TestRunner.Handler(TestRunner.TestRunner.CtrlType)
+  id: Handler(TestRunner.TestRunner.CtrlType)
+  parent: TestRunner.TestRunner
+  langs:
+  - csharp
+  - vb
+  name: Handler(TestRunner.CtrlType)
+  nameWithType: TestRunner.Handler(TestRunner.CtrlType)
+  fullName: TestRunner.TestRunner.Handler(TestRunner.TestRunner.CtrlType)
+  type: Method
+  source:
+    remote:
+      path: source/TestRunner/Program.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Handler
+    path: ../source/TestRunner/Program.cs
+    startLine: 95
+  assemblies:
+  - TestRunner
+  namespace: TestRunner
+  summary: "\nHandler for command window events\n"
+  example: []
+  syntax:
+    content: static bool Handler(TestRunner.CtrlType sig)
+    parameters:
+    - id: sig
+      type: TestRunner.TestRunner.CtrlType
+      description: Control signal
+    return:
+      type: System.Boolean
+      description: True if signal is valid else false
+    content.vb: Shared Function Handler(sig As TestRunner.CtrlType) As Boolean
+  overload: TestRunner.TestRunner.Handler*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+references:
+- uid: TestRunner
+  commentId: N:TestRunner
+  name: TestRunner
+  nameWithType: TestRunner
+  fullName: TestRunner
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: TestRunner.TestRunner.SetConsoleCtrlHandler*
+  commentId: Overload:TestRunner.TestRunner.SetConsoleCtrlHandler
+  isExternal: true
+  name: SetConsoleCtrlHandler
+  nameWithType: TestRunner.SetConsoleCtrlHandler
+  fullName: TestRunner.TestRunner.SetConsoleCtrlHandler
+- uid: TestRunner.TestRunner.EventHandler
+  commentId: T:TestRunner.TestRunner.EventHandler
+  parent: TestRunner
+  name: TestRunner.EventHandler
+  nameWithType: TestRunner.EventHandler
+  fullName: TestRunner.TestRunner.EventHandler
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: BannerlordSystemTestingLibrary.GameInstance
+  commentId: T:BannerlordSystemTestingLibrary.GameInstance
+  parent: BannerlordSystemTestingLibrary
+  name: GameInstance
+  nameWithType: GameInstance
+  fullName: BannerlordSystemTestingLibrary.GameInstance
+- uid: BannerlordSystemTestingLibrary
+  commentId: N:BannerlordSystemTestingLibrary
+  name: BannerlordSystemTestingLibrary
+  nameWithType: BannerlordSystemTestingLibrary
+  fullName: BannerlordSystemTestingLibrary
+- uid: List{BannerlordSystemTestingLibrary.GameInstance}
+  commentId: '!:List{BannerlordSystemTestingLibrary.GameInstance}'
+  definition: List`1
+  name: List<GameInstance>
+  nameWithType: List<GameInstance>
+  fullName: List<BannerlordSystemTestingLibrary.GameInstance>
+  nameWithType.vb: List(Of GameInstance)
+  fullName.vb: List(Of BannerlordSystemTestingLibrary.GameInstance)
+  name.vb: List(Of GameInstance)
+  spec.csharp:
+  - uid: List`1
+    name: List
+    nameWithType: List
+    fullName: List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: BannerlordSystemTestingLibrary.GameInstance
+    name: GameInstance
+    nameWithType: GameInstance
+    fullName: BannerlordSystemTestingLibrary.GameInstance
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: List`1
+    name: List
+    nameWithType: List
+    fullName: List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: BannerlordSystemTestingLibrary.GameInstance
+    name: GameInstance
+    nameWithType: GameInstance
+    fullName: BannerlordSystemTestingLibrary.GameInstance
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: List`1
+  commentId: '!:List`1'
+  isExternal: true
+  name: List<>
+  nameWithType: List<>
+  fullName: List<>
+  nameWithType.vb: List(Of )
+  fullName.vb: List(Of )
+  name.vb: List(Of )
+  spec.csharp:
+  - uid: List`1
+    name: List
+    nameWithType: List
+    fullName: List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: ''
+    nameWithType: ''
+    fullName: ''
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: List`1
+    name: List
+    nameWithType: List
+    fullName: List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: ''
+    nameWithType: ''
+    fullName: ''
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: BannerlordSystemTestingLibrary.TestEnvironment
+  commentId: T:BannerlordSystemTestingLibrary.TestEnvironment
+  parent: BannerlordSystemTestingLibrary
+  name: TestEnvironment
+  nameWithType: TestEnvironment
+  fullName: BannerlordSystemTestingLibrary.TestEnvironment
+- uid: TestRunner.TestRunner.Main*
+  commentId: Overload:TestRunner.TestRunner.Main
+  name: Main
+  nameWithType: TestRunner.Main
+  fullName: TestRunner.TestRunner.Main
+- uid: System.String[]
+  isExternal: true
+  name: String[]
+  nameWithType: String[]
+  fullName: System.String[]
+  nameWithType.vb: String()
+  fullName.vb: System.String()
+  name.vb: String()
+  spec.csharp:
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  spec.vb:
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+- uid: TestRunner.TestRunner.Handler*
+  commentId: Overload:TestRunner.TestRunner.Handler
+  name: Handler
+  nameWithType: TestRunner.Handler
+  fullName: TestRunner.TestRunner.Handler
+- uid: TestRunner.TestRunner.CtrlType
+  commentId: T:TestRunner.TestRunner.CtrlType
+  parent: TestRunner
+  name: TestRunner.CtrlType
+  nameWithType: TestRunner.CtrlType
+  fullName: TestRunner.TestRunner.CtrlType

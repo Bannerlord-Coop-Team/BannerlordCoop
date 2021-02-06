@@ -1,0 +1,1071 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.DebugUtil.DebugUI
+  commentId: T:Coop.Mod.DebugUtil.DebugUI
+  id: DebugUI
+  parent: Coop.Mod.DebugUtil
+  children:
+  - Coop.Mod.DebugUtil.DebugUI.AddButtons
+  - Coop.Mod.DebugUtil.DebugUI.Begin
+  - Coop.Mod.DebugUtil.DebugUI.DisplayClientRpcInfo
+  - Coop.Mod.DebugUtil.DebugUI.DisplayConnectionInfo
+  - Coop.Mod.DebugUtil.DebugUI.DisplayDebugDisabledText
+  - Coop.Mod.DebugUtil.DebugUI.DisplayDiscovery
+  - Coop.Mod.DebugUtil.DebugUI.DisplayEntities
+  - Coop.Mod.DebugUtil.DebugUI.DisplayMethodRegistry
+  - Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceInfo
+  - Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceMenu
+  - Coop.Mod.DebugUtil.DebugUI.End
+  - Coop.Mod.DebugUtil.DebugUI.Logger
+  - Coop.Mod.DebugUtil.DebugUI.m_AverageEventsInQueue
+  - Coop.Mod.DebugUtil.DebugUI.m_discoveryThread
+  - Coop.Mod.DebugUtil.DebugUI.m_WindowTitle
+  - Coop.Mod.DebugUtil.DebugUI.Update(System.TimeSpan)
+  - Coop.Mod.DebugUtil.DebugUI.Visible
+  langs:
+  - csharp
+  - vb
+  name: DebugUI
+  nameWithType: DebugUI
+  fullName: Coop.Mod.DebugUtil.DebugUI
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DebugUI
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 22
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: 'public class DebugUI : IUpdateable'
+    content.vb: >-
+      Public Class DebugUI
+          Implements IUpdateable
+  inheritance:
+  - System.Object
+  implements:
+  - Common.IUpdateable
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.DebugUtil.DebugUI.Logger
+  commentId: F:Coop.Mod.DebugUtil.DebugUI.Logger
+  id: Logger
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: DebugUI.Logger
+  fullName: Coop.Mod.DebugUtil.DebugUI.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 24
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.DebugUtil.DebugUI.m_WindowTitle
+  commentId: F:Coop.Mod.DebugUtil.DebugUI.m_WindowTitle
+  id: m_WindowTitle
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: m_WindowTitle
+  nameWithType: DebugUI.m_WindowTitle
+  fullName: Coop.Mod.DebugUtil.DebugUI.m_WindowTitle
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_WindowTitle
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 25
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: readonly string m_WindowTitle
+    return:
+      type: System.String
+    content.vb: ReadOnly m_WindowTitle As String
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.Mod.DebugUtil.DebugUI.Visible
+  commentId: P:Coop.Mod.DebugUtil.DebugUI.Visible
+  id: Visible
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: Visible
+  nameWithType: DebugUI.Visible
+  fullName: Coop.Mod.DebugUtil.DebugUI.Visible
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Visible
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 27
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: public bool Visible { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property Visible As Boolean
+  overload: Coop.Mod.DebugUtil.DebugUI.Visible*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.DebugUtil.DebugUI.Update(System.TimeSpan)
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.Update(System.TimeSpan)
+  id: Update(System.TimeSpan)
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: Update(TimeSpan)
+  nameWithType: DebugUI.Update(TimeSpan)
+  fullName: Coop.Mod.DebugUtil.DebugUI.Update(System.TimeSpan)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Update
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 29
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: public void Update(TimeSpan frameTime)
+    parameters:
+    - id: frameTime
+      type: System.TimeSpan
+    content.vb: Public Sub Update(frameTime As TimeSpan)
+  overload: Coop.Mod.DebugUtil.DebugUI.Update*
+  implements:
+  - Common.IUpdateable.Update(System.TimeSpan)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceMenu
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceMenu
+  id: DisplayPersistenceMenu
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: DisplayPersistenceMenu()
+  nameWithType: DebugUI.DisplayPersistenceMenu()
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceMenu()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DisplayPersistenceMenu
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 43
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: static void DisplayPersistenceMenu()
+    content.vb: Shared Sub DisplayPersistenceMenu
+  overload: Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceMenu*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceInfo
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceInfo
+  id: DisplayPersistenceInfo
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: DisplayPersistenceInfo()
+  nameWithType: DebugUI.DisplayPersistenceInfo()
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceInfo()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DisplayPersistenceInfo
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 57
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: static void DisplayPersistenceInfo()
+    content.vb: Shared Sub DisplayPersistenceInfo
+  overload: Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceInfo*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayMethodRegistry
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.DisplayMethodRegistry
+  id: DisplayMethodRegistry
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: DisplayMethodRegistry()
+  nameWithType: DebugUI.DisplayMethodRegistry()
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayMethodRegistry()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DisplayMethodRegistry
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 107
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: static void DisplayMethodRegistry()
+    content.vb: Shared Sub DisplayMethodRegistry
+  overload: Coop.Mod.DebugUtil.DebugUI.DisplayMethodRegistry*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Coop.Mod.DebugUtil.DebugUI.Begin
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.Begin
+  id: Begin
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: Begin()
+  nameWithType: DebugUI.Begin()
+  fullName: Coop.Mod.DebugUtil.DebugUI.Begin()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Begin
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 165
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: void Begin()
+    content.vb: Sub Begin
+  overload: Coop.Mod.DebugUtil.DebugUI.Begin*
+- uid: Coop.Mod.DebugUtil.DebugUI.AddButtons
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.AddButtons
+  id: AddButtons
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: AddButtons()
+  nameWithType: DebugUI.AddButtons()
+  fullName: Coop.Mod.DebugUtil.DebugUI.AddButtons()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: AddButtons
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 172
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: void AddButtons()
+    content.vb: Sub AddButtons
+  overload: Coop.Mod.DebugUtil.DebugUI.AddButtons*
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayEntities
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.DisplayEntities
+  id: DisplayEntities
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: DisplayEntities()
+  nameWithType: DebugUI.DisplayEntities()
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayEntities()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DisplayEntities
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 235
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: static void DisplayEntities()
+    content.vb: Shared Sub DisplayEntities
+  overload: Coop.Mod.DebugUtil.DebugUI.DisplayEntities*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Coop.Mod.DebugUtil.DebugUI.m_discoveryThread
+  commentId: F:Coop.Mod.DebugUtil.DebugUI.m_discoveryThread
+  id: m_discoveryThread
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: m_discoveryThread
+  nameWithType: DebugUI.m_discoveryThread
+  fullName: Coop.Mod.DebugUtil.DebugUI.m_discoveryThread
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_discoveryThread
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 271
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: >-
+      [CanBeNull]
+
+      static DiscoveryThread m_discoveryThread
+    return:
+      type: Coop.NetImpl.LiteNet.DiscoveryThread
+    content.vb: >-
+      <CanBeNull>
+
+      Shared m_discoveryThread As DiscoveryThread
+  attributes:
+  - type: JetBrains.Annotations.CanBeNullAttribute
+    ctor: JetBrains.Annotations.CanBeNullAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayDiscovery
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.DisplayDiscovery
+  id: DisplayDiscovery
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: DisplayDiscovery()
+  nameWithType: DebugUI.DisplayDiscovery()
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayDiscovery()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DisplayDiscovery
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 272
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: static void DisplayDiscovery()
+    content.vb: Shared Sub DisplayDiscovery
+  overload: Coop.Mod.DebugUtil.DebugUI.DisplayDiscovery*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayConnectionInfo
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.DisplayConnectionInfo
+  id: DisplayConnectionInfo
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: DisplayConnectionInfo()
+  nameWithType: DebugUI.DisplayConnectionInfo()
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayConnectionInfo()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DisplayConnectionInfo
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 298
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: static void DisplayConnectionInfo()
+    content.vb: Shared Sub DisplayConnectionInfo
+  overload: Coop.Mod.DebugUtil.DebugUI.DisplayConnectionInfo*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Coop.Mod.DebugUtil.DebugUI.m_AverageEventsInQueue
+  commentId: F:Coop.Mod.DebugUtil.DebugUI.m_AverageEventsInQueue
+  id: m_AverageEventsInQueue
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: m_AverageEventsInQueue
+  nameWithType: DebugUI.m_AverageEventsInQueue
+  fullName: Coop.Mod.DebugUtil.DebugUI.m_AverageEventsInQueue
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_AverageEventsInQueue
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 372
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: static readonly MovingAverage m_AverageEventsInQueue
+    return:
+      type: Common.MovingAverage
+    content.vb: Shared ReadOnly m_AverageEventsInQueue As MovingAverage
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayClientRpcInfo
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.DisplayClientRpcInfo
+  id: DisplayClientRpcInfo
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: DisplayClientRpcInfo()
+  nameWithType: DebugUI.DisplayClientRpcInfo()
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayClientRpcInfo()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DisplayClientRpcInfo
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 374
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: static void DisplayClientRpcInfo()
+    content.vb: Shared Sub DisplayClientRpcInfo
+  overload: Coop.Mod.DebugUtil.DebugUI.DisplayClientRpcInfo*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayDebugDisabledText
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.DisplayDebugDisabledText
+  id: DisplayDebugDisabledText
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: DisplayDebugDisabledText()
+  nameWithType: DebugUI.DisplayDebugDisabledText()
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayDebugDisabledText()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DisplayDebugDisabledText
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 437
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: >-
+      [Conditional("DEBUG")]
+
+      static void DisplayDebugDisabledText()
+    content.vb: >-
+      <Conditional("DEBUG")>
+
+      Shared Sub DisplayDebugDisabledText
+  overload: Coop.Mod.DebugUtil.DebugUI.DisplayDebugDisabledText*
+  attributes:
+  - type: System.Diagnostics.ConditionalAttribute
+    ctor: System.Diagnostics.ConditionalAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: DEBUG
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Coop.Mod.DebugUtil.DebugUI.End
+  commentId: M:Coop.Mod.DebugUtil.DebugUI.End
+  id: End
+  parent: Coop.Mod.DebugUtil.DebugUI
+  langs:
+  - csharp
+  - vb
+  name: End()
+  nameWithType: DebugUI.End()
+  fullName: Coop.Mod.DebugUtil.DebugUI.End()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/DebugUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: End
+    path: ../source/Coop/Mod/DebugUtil/DebugUI.cs
+    startLine: 443
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: static void End()
+    content.vb: Shared Sub
+  overload: Coop.Mod.DebugUtil.DebugUI.End*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+references:
+- uid: Coop.Mod.DebugUtil
+  commentId: N:Coop.Mod.DebugUtil
+  name: Coop.Mod.DebugUtil
+  nameWithType: Coop.Mod.DebugUtil
+  fullName: Coop.Mod.DebugUtil
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Common.IUpdateable
+  commentId: T:Common.IUpdateable
+  parent: Common
+  name: IUpdateable
+  nameWithType: IUpdateable
+  fullName: Common.IUpdateable
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String
+- uid: Coop.Mod.DebugUtil.DebugUI.Visible*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.Visible
+  name: Visible
+  nameWithType: DebugUI.Visible
+  fullName: Coop.Mod.DebugUtil.DebugUI.Visible
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.Mod.DebugUtil.DebugUI.Update*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.Update
+  name: Update
+  nameWithType: DebugUI.Update
+  fullName: Coop.Mod.DebugUtil.DebugUI.Update
+- uid: Common.IUpdateable.Update(System.TimeSpan)
+  commentId: M:Common.IUpdateable.Update(System.TimeSpan)
+  parent: Common.IUpdateable
+  isExternal: true
+  name: Update(TimeSpan)
+  nameWithType: IUpdateable.Update(TimeSpan)
+  fullName: Common.IUpdateable.Update(System.TimeSpan)
+  spec.csharp:
+  - uid: Common.IUpdateable.Update(System.TimeSpan)
+    name: Update
+    nameWithType: IUpdateable.Update
+    fullName: Common.IUpdateable.Update
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.TimeSpan
+    name: TimeSpan
+    nameWithType: TimeSpan
+    fullName: System.TimeSpan
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Common.IUpdateable.Update(System.TimeSpan)
+    name: Update
+    nameWithType: IUpdateable.Update
+    fullName: Common.IUpdateable.Update
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.TimeSpan
+    name: TimeSpan
+    nameWithType: TimeSpan
+    fullName: System.TimeSpan
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceMenu*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceMenu
+  name: DisplayPersistenceMenu
+  nameWithType: DebugUI.DisplayPersistenceMenu
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceMenu
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceInfo*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceInfo
+  name: DisplayPersistenceInfo
+  nameWithType: DebugUI.DisplayPersistenceInfo
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayPersistenceInfo
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayMethodRegistry*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.DisplayMethodRegistry
+  name: DisplayMethodRegistry
+  nameWithType: DebugUI.DisplayMethodRegistry
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayMethodRegistry
+- uid: Coop.Mod.DebugUtil.DebugUI.Begin*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.Begin
+  name: Begin
+  nameWithType: DebugUI.Begin
+  fullName: Coop.Mod.DebugUtil.DebugUI.Begin
+- uid: Coop.Mod.DebugUtil.DebugUI.AddButtons*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.AddButtons
+  name: AddButtons
+  nameWithType: DebugUI.AddButtons
+  fullName: Coop.Mod.DebugUtil.DebugUI.AddButtons
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayEntities*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.DisplayEntities
+  name: DisplayEntities
+  nameWithType: DebugUI.DisplayEntities
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayEntities
+- uid: Coop.NetImpl.LiteNet.DiscoveryThread
+  commentId: T:Coop.NetImpl.LiteNet.DiscoveryThread
+  parent: Coop.NetImpl.LiteNet
+  name: DiscoveryThread
+  nameWithType: DiscoveryThread
+  fullName: Coop.NetImpl.LiteNet.DiscoveryThread
+- uid: Coop.NetImpl.LiteNet
+  commentId: N:Coop.NetImpl.LiteNet
+  name: Coop.NetImpl.LiteNet
+  nameWithType: Coop.NetImpl.LiteNet
+  fullName: Coop.NetImpl.LiteNet
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayDiscovery*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.DisplayDiscovery
+  name: DisplayDiscovery
+  nameWithType: DebugUI.DisplayDiscovery
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayDiscovery
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayConnectionInfo*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.DisplayConnectionInfo
+  name: DisplayConnectionInfo
+  nameWithType: DebugUI.DisplayConnectionInfo
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayConnectionInfo
+- uid: Common.MovingAverage
+  commentId: T:Common.MovingAverage
+  parent: Common
+  name: MovingAverage
+  nameWithType: MovingAverage
+  fullName: Common.MovingAverage
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayClientRpcInfo*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.DisplayClientRpcInfo
+  name: DisplayClientRpcInfo
+  nameWithType: DebugUI.DisplayClientRpcInfo
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayClientRpcInfo
+- uid: Coop.Mod.DebugUtil.DebugUI.DisplayDebugDisabledText*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.DisplayDebugDisabledText
+  name: DisplayDebugDisabledText
+  nameWithType: DebugUI.DisplayDebugDisabledText
+  fullName: Coop.Mod.DebugUtil.DebugUI.DisplayDebugDisabledText
+- uid: Coop.Mod.DebugUtil.DebugUI.End*
+  commentId: Overload:Coop.Mod.DebugUtil.DebugUI.End
+  name: End
+  nameWithType: DebugUI.End
+  fullName: Coop.Mod.DebugUtil.DebugUI.End

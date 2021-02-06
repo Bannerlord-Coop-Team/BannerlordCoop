@@ -1,0 +1,536 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  commentId: T:Coop.NetImpl.LiteNet.LiteNetListenerClient
+  id: LiteNetListenerClient
+  parent: Coop.NetImpl.LiteNet
+  children:
+  - Coop.NetImpl.LiteNet.LiteNetListenerClient.#ctor(Network.Infrastructure.GameSession)
+  - Coop.NetImpl.LiteNet.LiteNetListenerClient.Logger
+  - Coop.NetImpl.LiteNet.LiteNetListenerClient.m_Session
+  - Coop.NetImpl.LiteNet.LiteNetListenerClient.OnConnectionRequest(ConnectionRequest)
+  - Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkError(System.Net.IPEndPoint,System.Net.Sockets.SocketError)
+  - Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkLatencyUpdate(NetPeer,System.Int32)
+  - Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceive(NetPeer,NetPacketReader,DeliveryMethod)
+  - Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceiveUnconnected(System.Net.IPEndPoint,NetPacketReader,UnconnectedMessageType)
+  - Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerConnected(NetPeer)
+  - Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerDisconnected(NetPeer,DisconnectInfo)
+  langs:
+  - csharp
+  - vb
+  name: LiteNetListenerClient
+  nameWithType: LiteNetListenerClient
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  type: Class
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: LiteNetListenerClient
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+    startLine: 10
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: 'public class LiteNetListenerClient : INetEventListener'
+    content.vb: >-
+      Public Class LiteNetListenerClient
+          Inherits INetEventListener
+  inheritance:
+  - System.Object
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.Logger
+  commentId: F:Coop.NetImpl.LiteNet.LiteNetListenerClient.Logger
+  id: Logger
+  parent: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: LiteNetListenerClient.Logger
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.m_Session
+  commentId: F:Coop.NetImpl.LiteNet.LiteNetListenerClient.m_Session
+  id: m_Session
+  parent: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  langs:
+  - csharp
+  - vb
+  name: m_Session
+  nameWithType: LiteNetListenerClient.m_Session
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.m_Session
+  type: Field
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Session
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+    startLine: 13
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: readonly GameSession m_Session
+    return:
+      type: Network.Infrastructure.GameSession
+    content.vb: ReadOnly m_Session As GameSession
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.#ctor(Network.Infrastructure.GameSession)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetListenerClient.#ctor(Network.Infrastructure.GameSession)
+  id: '#ctor(Network.Infrastructure.GameSession)'
+  parent: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  langs:
+  - csharp
+  - vb
+  name: LiteNetListenerClient(GameSession)
+  nameWithType: LiteNetListenerClient.LiteNetListenerClient(GameSession)
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.LiteNetListenerClient(Network.Infrastructure.GameSession)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+    startLine: 15
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public LiteNetListenerClient(GameSession session)
+    parameters:
+    - id: session
+      type: Network.Infrastructure.GameSession
+    content.vb: Public Sub New(session As GameSession)
+  overload: Coop.NetImpl.LiteNet.LiteNetListenerClient.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerConnected(NetPeer)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerConnected(NetPeer)
+  id: OnPeerConnected(NetPeer)
+  parent: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  langs:
+  - csharp
+  - vb
+  name: OnPeerConnected(NetPeer)
+  nameWithType: LiteNetListenerClient.OnPeerConnected(NetPeer)
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerConnected(NetPeer)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnPeerConnected
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+    startLine: 20
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void OnPeerConnected(NetPeer peer)
+    parameters:
+    - id: peer
+      type: NetPeer
+    content.vb: Public Sub OnPeerConnected(peer As NetPeer)
+  overload: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerConnected*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerDisconnected(NetPeer,DisconnectInfo)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerDisconnected(NetPeer,DisconnectInfo)
+  id: OnPeerDisconnected(NetPeer,DisconnectInfo)
+  parent: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  langs:
+  - csharp
+  - vb
+  name: OnPeerDisconnected(NetPeer, DisconnectInfo)
+  nameWithType: LiteNetListenerClient.OnPeerDisconnected(NetPeer, DisconnectInfo)
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerDisconnected(NetPeer, DisconnectInfo)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnPeerDisconnected
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+    startLine: 31
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
+    parameters:
+    - id: peer
+      type: NetPeer
+    - id: disconnectInfo
+      type: DisconnectInfo
+    content.vb: Public Sub OnPeerDisconnected(peer As NetPeer, disconnectInfo As DisconnectInfo)
+  overload: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerDisconnected*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceive(NetPeer,NetPacketReader,DeliveryMethod)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceive(NetPeer,NetPacketReader,DeliveryMethod)
+  id: OnNetworkReceive(NetPeer,NetPacketReader,DeliveryMethod)
+  parent: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  langs:
+  - csharp
+  - vb
+  name: OnNetworkReceive(NetPeer, NetPacketReader, DeliveryMethod)
+  nameWithType: LiteNetListenerClient.OnNetworkReceive(NetPeer, NetPacketReader, DeliveryMethod)
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceive(NetPeer, NetPacketReader, DeliveryMethod)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnNetworkReceive
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+    startLine: 40
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
+    parameters:
+    - id: peer
+      type: NetPeer
+    - id: reader
+      type: NetPacketReader
+    - id: deliveryMethod
+      type: DeliveryMethod
+    content.vb: Public Sub OnNetworkReceive(peer As NetPeer, reader As NetPacketReader, deliveryMethod As DeliveryMethod)
+  overload: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceive*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkError(System.Net.IPEndPoint,System.Net.Sockets.SocketError)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkError(System.Net.IPEndPoint,System.Net.Sockets.SocketError)
+  id: OnNetworkError(System.Net.IPEndPoint,System.Net.Sockets.SocketError)
+  parent: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  langs:
+  - csharp
+  - vb
+  name: OnNetworkError(IPEndPoint, SocketError)
+  nameWithType: LiteNetListenerClient.OnNetworkError(IPEndPoint, SocketError)
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkError(System.Net.IPEndPoint, System.Net.Sockets.SocketError)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnNetworkError
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+    startLine: 53
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
+    parameters:
+    - id: endPoint
+      type: System.Net.IPEndPoint
+    - id: socketError
+      type: System.Net.Sockets.SocketError
+    content.vb: Public Sub OnNetworkError(endPoint As IPEndPoint, socketError As SocketError)
+  overload: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkError*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceiveUnconnected(System.Net.IPEndPoint,NetPacketReader,UnconnectedMessageType)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceiveUnconnected(System.Net.IPEndPoint,NetPacketReader,UnconnectedMessageType)
+  id: OnNetworkReceiveUnconnected(System.Net.IPEndPoint,NetPacketReader,UnconnectedMessageType)
+  parent: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  langs:
+  - csharp
+  - vb
+  name: OnNetworkReceiveUnconnected(IPEndPoint, NetPacketReader, UnconnectedMessageType)
+  nameWithType: LiteNetListenerClient.OnNetworkReceiveUnconnected(IPEndPoint, NetPacketReader, UnconnectedMessageType)
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceiveUnconnected(System.Net.IPEndPoint, NetPacketReader, UnconnectedMessageType)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnNetworkReceiveUnconnected
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+    startLine: 65
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
+    parameters:
+    - id: remoteEndPoint
+      type: System.Net.IPEndPoint
+    - id: reader
+      type: NetPacketReader
+    - id: messageType
+      type: UnconnectedMessageType
+    content.vb: Public Sub OnNetworkReceiveUnconnected(remoteEndPoint As IPEndPoint, reader As NetPacketReader, messageType As UnconnectedMessageType)
+  overload: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceiveUnconnected*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnConnectionRequest(ConnectionRequest)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnConnectionRequest(ConnectionRequest)
+  id: OnConnectionRequest(ConnectionRequest)
+  parent: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  langs:
+  - csharp
+  - vb
+  name: OnConnectionRequest(ConnectionRequest)
+  nameWithType: LiteNetListenerClient.OnConnectionRequest(ConnectionRequest)
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnConnectionRequest(ConnectionRequest)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnConnectionRequest
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+    startLine: 90
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void OnConnectionRequest(ConnectionRequest request)
+    parameters:
+    - id: request
+      type: ConnectionRequest
+    content.vb: Public Sub OnConnectionRequest(request As ConnectionRequest)
+  overload: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnConnectionRequest*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkLatencyUpdate(NetPeer,System.Int32)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkLatencyUpdate(NetPeer,System.Int32)
+  id: OnNetworkLatencyUpdate(NetPeer,System.Int32)
+  parent: Coop.NetImpl.LiteNet.LiteNetListenerClient
+  langs:
+  - csharp
+  - vb
+  name: OnNetworkLatencyUpdate(NetPeer, Int32)
+  nameWithType: LiteNetListenerClient.OnNetworkLatencyUpdate(NetPeer, Int32)
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkLatencyUpdate(NetPeer, System.Int32)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnNetworkLatencyUpdate
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetListenerClient.cs
+    startLine: 94
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
+    parameters:
+    - id: peer
+      type: NetPeer
+    - id: latency
+      type: System.Int32
+    content.vb: Public Sub OnNetworkLatencyUpdate(peer As NetPeer, latency As Integer)
+  overload: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkLatencyUpdate*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.NetImpl.LiteNet
+  commentId: N:Coop.NetImpl.LiteNet
+  name: Coop.NetImpl.LiteNet
+  nameWithType: Coop.NetImpl.LiteNet
+  fullName: Coop.NetImpl.LiteNet
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: Network.Infrastructure.GameSession
+  commentId: T:Network.Infrastructure.GameSession
+  parent: Network.Infrastructure
+  name: GameSession
+  nameWithType: GameSession
+  fullName: Network.Infrastructure.GameSession
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.#ctor*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetListenerClient.#ctor
+  name: LiteNetListenerClient
+  nameWithType: LiteNetListenerClient.LiteNetListenerClient
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.LiteNetListenerClient
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerConnected*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerConnected
+  name: OnPeerConnected
+  nameWithType: LiteNetListenerClient.OnPeerConnected
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerConnected
+- uid: NetPeer
+  isExternal: true
+  name: NetPeer
+  nameWithType: NetPeer
+  fullName: NetPeer
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerDisconnected*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerDisconnected
+  name: OnPeerDisconnected
+  nameWithType: LiteNetListenerClient.OnPeerDisconnected
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnPeerDisconnected
+- uid: DisconnectInfo
+  isExternal: true
+  name: DisconnectInfo
+  nameWithType: DisconnectInfo
+  fullName: DisconnectInfo
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceive*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceive
+  name: OnNetworkReceive
+  nameWithType: LiteNetListenerClient.OnNetworkReceive
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceive
+- uid: NetPacketReader
+  isExternal: true
+  name: NetPacketReader
+  nameWithType: NetPacketReader
+  fullName: NetPacketReader
+- uid: DeliveryMethod
+  isExternal: true
+  name: DeliveryMethod
+  nameWithType: DeliveryMethod
+  fullName: DeliveryMethod
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkError*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkError
+  name: OnNetworkError
+  nameWithType: LiteNetListenerClient.OnNetworkError
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkError
+- uid: System.Net.IPEndPoint
+  commentId: T:System.Net.IPEndPoint
+  parent: System.Net
+  isExternal: true
+  name: IPEndPoint
+  nameWithType: IPEndPoint
+  fullName: System.Net.IPEndPoint
+- uid: System.Net.Sockets.SocketError
+  commentId: T:System.Net.Sockets.SocketError
+  parent: System.Net.Sockets
+  isExternal: true
+  name: SocketError
+  nameWithType: SocketError
+  fullName: System.Net.Sockets.SocketError
+- uid: System.Net
+  commentId: N:System.Net
+  isExternal: true
+  name: System.Net
+  nameWithType: System.Net
+  fullName: System.Net
+- uid: System.Net.Sockets
+  commentId: N:System.Net.Sockets
+  isExternal: true
+  name: System.Net.Sockets
+  nameWithType: System.Net.Sockets
+  fullName: System.Net.Sockets
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceiveUnconnected*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceiveUnconnected
+  name: OnNetworkReceiveUnconnected
+  nameWithType: LiteNetListenerClient.OnNetworkReceiveUnconnected
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkReceiveUnconnected
+- uid: UnconnectedMessageType
+  isExternal: true
+  name: UnconnectedMessageType
+  nameWithType: UnconnectedMessageType
+  fullName: UnconnectedMessageType
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnConnectionRequest*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnConnectionRequest
+  name: OnConnectionRequest
+  nameWithType: LiteNetListenerClient.OnConnectionRequest
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnConnectionRequest
+- uid: ConnectionRequest
+  isExternal: true
+  name: ConnectionRequest
+  nameWithType: ConnectionRequest
+  fullName: ConnectionRequest
+- uid: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkLatencyUpdate*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkLatencyUpdate
+  name: OnNetworkLatencyUpdate
+  nameWithType: LiteNetListenerClient.OnNetworkLatencyUpdate
+  fullName: Coop.NetImpl.LiteNet.LiteNetListenerClient.OnNetworkLatencyUpdate
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32

@@ -1,0 +1,598 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer
+  commentId: T:Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer
+  id: MobilePartiesAroundPositionListSerializer
+  parent: Coop.Mod.Serializers
+  children:
+  - Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.#ctor(TaleWorlds.CampaignSystem.MobilePartiesAroundPositionList)
+  - Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.Deserialize
+  - Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.partyNames
+  langs:
+  - csharp
+  - vb
+  name: MobilePartiesAroundPositionListSerializer
+  nameWithType: MobilePartiesAroundPositionListSerializer
+  fullName: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/MobilePartiesAroundPositionListSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MobilePartiesAroundPositionListSerializer
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/MobilePartiesAroundPositionListSerializer.cs
+    startLine: 7
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: >-
+      [Serializable]
+
+      public class MobilePartiesAroundPositionListSerializer : ICustomSerializer
+    content.vb: >-
+      <Serializable>
+
+      Public Class MobilePartiesAroundPositionListSerializer
+          Implements ICustomSerializer
+  inheritance:
+  - System.Object
+  implements:
+  - Coop.Mod.Serializers.ICustomSerializer
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  attributes:
+  - type: System.SerializableAttribute
+    ctor: System.SerializableAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.partyNames
+  commentId: F:Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.partyNames
+  id: partyNames
+  parent: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer
+  langs:
+  - csharp
+  - vb
+  name: partyNames
+  nameWithType: MobilePartiesAroundPositionListSerializer.partyNames
+  fullName: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.partyNames
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/MobilePartiesAroundPositionListSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: partyNames
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/MobilePartiesAroundPositionListSerializer.cs
+    startLine: 10
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: List<string> partyNames
+    return:
+      type: System.Collections.Generic.List{System.String}
+    content.vb: partyNames As List(Of String)
+- uid: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.#ctor(TaleWorlds.CampaignSystem.MobilePartiesAroundPositionList)
+  commentId: M:Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.#ctor(TaleWorlds.CampaignSystem.MobilePartiesAroundPositionList)
+  id: '#ctor(TaleWorlds.CampaignSystem.MobilePartiesAroundPositionList)'
+  parent: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer
+  langs:
+  - csharp
+  - vb
+  name: MobilePartiesAroundPositionListSerializer(MobilePartiesAroundPositionList)
+  nameWithType: MobilePartiesAroundPositionListSerializer.MobilePartiesAroundPositionListSerializer(MobilePartiesAroundPositionList)
+  fullName: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.MobilePartiesAroundPositionListSerializer(TaleWorlds.CampaignSystem.MobilePartiesAroundPositionList)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/MobilePartiesAroundPositionListSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/MobilePartiesAroundPositionListSerializer.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: public MobilePartiesAroundPositionListSerializer(MobilePartiesAroundPositionList mobilePartiesAroundPositionList)
+    parameters:
+    - id: mobilePartiesAroundPositionList
+      type: TaleWorlds.CampaignSystem.MobilePartiesAroundPositionList
+    content.vb: Public Sub New(mobilePartiesAroundPositionList As MobilePartiesAroundPositionList)
+  overload: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.Deserialize
+  commentId: M:Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.Deserialize
+  id: Deserialize
+  parent: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer
+  langs:
+  - csharp
+  - vb
+  name: Deserialize()
+  nameWithType: MobilePartiesAroundPositionListSerializer.Deserialize()
+  fullName: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.Deserialize()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/MobilePartiesAroundPositionListSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Deserialize
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/MobilePartiesAroundPositionListSerializer.cs
+    startLine: 24
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: public object Deserialize()
+    return:
+      type: System.Object
+    content.vb: Public Function Deserialize As Object
+  overload: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.Deserialize*
+  implements:
+  - Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.Mod.Serializers
+  commentId: N:Coop.Mod.Serializers
+  name: Coop.Mod.Serializers
+  nameWithType: Coop.Mod.Serializers
+  fullName: Coop.Mod.Serializers
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Coop.Mod.Serializers.ICustomSerializer
+  commentId: T:Coop.Mod.Serializers.ICustomSerializer
+  parent: Coop.Mod.Serializers
+  name: ICustomSerializer
+  nameWithType: ICustomSerializer
+  fullName: Coop.Mod.Serializers.ICustomSerializer
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Collections.Generic.List{System.String}
+  commentId: T:System.Collections.Generic.List{System.String}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  name: List<String>
+  nameWithType: List<String>
+  fullName: System.Collections.Generic.List<System.String>
+  nameWithType.vb: List(Of String)
+  fullName.vb: System.Collections.Generic.List(Of System.String)
+  name.vb: List(Of String)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.#ctor*
+  commentId: Overload:Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.#ctor
+  name: MobilePartiesAroundPositionListSerializer
+  nameWithType: MobilePartiesAroundPositionListSerializer.MobilePartiesAroundPositionListSerializer
+  fullName: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.MobilePartiesAroundPositionListSerializer
+- uid: TaleWorlds.CampaignSystem.MobilePartiesAroundPositionList
+  commentId: T:TaleWorlds.CampaignSystem.MobilePartiesAroundPositionList
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: MobilePartiesAroundPositionList
+  nameWithType: MobilePartiesAroundPositionList
+  fullName: TaleWorlds.CampaignSystem.MobilePartiesAroundPositionList
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.Deserialize*
+  commentId: Overload:Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.Deserialize
+  name: Deserialize
+  nameWithType: MobilePartiesAroundPositionListSerializer.Deserialize
+  fullName: Coop.Mod.Serializers.MobilePartiesAroundPositionListSerializer.Deserialize
+- uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  commentId: M:Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  parent: Coop.Mod.Serializers.ICustomSerializer
+  name: Deserialize()
+  nameWithType: ICustomSerializer.Deserialize()
+  fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize()
+  spec.csharp:
+  - uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+    name: Deserialize
+    nameWithType: ICustomSerializer.Deserialize
+    fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+    name: Deserialize
+    nameWithType: ICustomSerializer.Deserialize
+    fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )

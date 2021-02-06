@@ -1,0 +1,178 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  commentId: T:Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  id: NoHarmonyLoader.TypeLog
+  parent: Coop.Lib.NoHarmony
+  children:
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.All
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.Behaviors
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.Models
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.None
+  langs:
+  - csharp
+  - vb
+  name: NoHarmonyLoader.TypeLog
+  nameWithType: NoHarmonyLoader.TypeLog
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  type: Enum
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TypeLog
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 38
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: public enum TypeLog
+    content.vb: Public Enum TypeLog
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.None
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.None
+  id: None
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  langs:
+  - csharp
+  - vb
+  name: None
+  nameWithType: NoHarmonyLoader.TypeLog.None
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.None
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: None
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 40
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: None = 0
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.Models
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.Models
+  id: Models
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  langs:
+  - csharp
+  - vb
+  name: Models
+  nameWithType: NoHarmonyLoader.TypeLog.Models
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.Models
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Models
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 41
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: Models = 1
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.Behaviors
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.Behaviors
+  id: Behaviors
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  langs:
+  - csharp
+  - vb
+  name: Behaviors
+  nameWithType: NoHarmonyLoader.TypeLog.Behaviors
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.Behaviors
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Behaviors
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 42
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: Behaviors = 2
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.All
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.All
+  id: All
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  langs:
+  - csharp
+  - vb
+  name: All
+  nameWithType: NoHarmonyLoader.TypeLog.All
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog.All
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: All
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 43
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: All = 3
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Coop.Lib.NoHarmony
+  commentId: N:Coop.Lib.NoHarmony
+  name: Coop.Lib.NoHarmony
+  nameWithType: Coop.Lib.NoHarmony
+  fullName: Coop.Lib.NoHarmony
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  commentId: T:Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog
+  parent: Coop.Lib.NoHarmony
+  name: NoHarmonyLoader.TypeLog
+  nameWithType: NoHarmonyLoader.TypeLog
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TypeLog

@@ -1,0 +1,149 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.ECoopServerState
+  commentId: T:Coop.Mod.ECoopServerState
+  id: ECoopServerState
+  parent: Coop.Mod
+  children:
+  - Coop.Mod.ECoopServerState.Playing
+  - Coop.Mod.ECoopServerState.Preparing
+  - Coop.Mod.ECoopServerState.SendingWorldData
+  langs:
+  - csharp
+  - vb
+  name: ECoopServerState
+  nameWithType: ECoopServerState
+  fullName: Coop.Mod.ECoopServerState
+  type: Enum
+  source:
+    remote:
+      path: source/Coop/Mod/CoopServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ECoopServerState
+    path: ../source/Coop/Mod/CoopServerSM.cs
+    startLine: 7
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: enum ECoopServerState
+    content.vb: Enum ECoopServerState
+  modifiers.csharp:
+  - enum
+  modifiers.vb:
+  - Enum
+- uid: Coop.Mod.ECoopServerState.Preparing
+  commentId: F:Coop.Mod.ECoopServerState.Preparing
+  id: Preparing
+  parent: Coop.Mod.ECoopServerState
+  langs:
+  - csharp
+  - vb
+  name: Preparing
+  nameWithType: ECoopServerState.Preparing
+  fullName: Coop.Mod.ECoopServerState.Preparing
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/CoopServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Preparing
+    path: ../source/Coop/Mod/CoopServerSM.cs
+    startLine: 11
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  summary: "\nA client is awaiting world data.\n"
+  example: []
+  syntax:
+    content: Preparing = 0
+    return:
+      type: Coop.Mod.ECoopServerState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Mod.ECoopServerState.SendingWorldData
+  commentId: F:Coop.Mod.ECoopServerState.SendingWorldData
+  id: SendingWorldData
+  parent: Coop.Mod.ECoopServerState
+  langs:
+  - csharp
+  - vb
+  name: SendingWorldData
+  nameWithType: ECoopServerState.SendingWorldData
+  fullName: Coop.Mod.ECoopServerState.SendingWorldData
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/CoopServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SendingWorldData
+    path: ../source/Coop/Mod/CoopServerSM.cs
+    startLine: 16
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  summary: "\nA client is receiving world data.\n"
+  example: []
+  syntax:
+    content: SendingWorldData = 1
+    return:
+      type: Coop.Mod.ECoopServerState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Mod.ECoopServerState.Playing
+  commentId: F:Coop.Mod.ECoopServerState.Playing
+  id: Playing
+  parent: Coop.Mod.ECoopServerState
+  langs:
+  - csharp
+  - vb
+  name: Playing
+  nameWithType: ECoopServerState.Playing
+  fullName: Coop.Mod.ECoopServerState.Playing
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/CoopServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Playing
+    path: ../source/Coop/Mod/CoopServerSM.cs
+    startLine: 21
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  summary: "\nA client is playing.\n"
+  example: []
+  syntax:
+    content: Playing = 2
+    return:
+      type: Coop.Mod.ECoopServerState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Coop.Mod
+  commentId: N:Coop.Mod
+  name: Coop.Mod
+  nameWithType: Coop.Mod
+  fullName: Coop.Mod
+- uid: Coop.Mod.ECoopServerState
+  commentId: T:Coop.Mod.ECoopServerState
+  parent: Coop.Mod
+  name: ECoopServerState
+  nameWithType: ECoopServerState
+  fullName: Coop.Mod.ECoopServerState

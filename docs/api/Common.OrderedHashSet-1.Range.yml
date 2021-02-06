@@ -1,0 +1,958 @@
+### YamlMime:ManagedReference
+items:
+- uid: Common.OrderedHashSet`1.Range
+  commentId: T:Common.OrderedHashSet`1.Range
+  id: OrderedHashSet`1.Range
+  parent: Common
+  children:
+  - Common.OrderedHashSet`1.Range.#ctor(Common.OrderedHashSet{`0},`0)
+  - Common.OrderedHashSet`1.Range.GetEnumerator
+  - Common.OrderedHashSet`1.Range.m_set
+  - Common.OrderedHashSet`1.Range.m_startingItem
+  - Common.OrderedHashSet`1.Range.System#Collections#Generic#IEnumerable{T}#GetEnumerator
+  - Common.OrderedHashSet`1.Range.System#Collections#IEnumerable#GetEnumerator
+  langs:
+  - csharp
+  - vb
+  name: OrderedHashSet<T>.Range
+  nameWithType: OrderedHashSet<T>.Range
+  fullName: Common.OrderedHashSet<T>.Range
+  type: Struct
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Range
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 261
+  assemblies:
+  - Common
+  namespace: Common
+  summary: "\nPart of <xref href=\"Common.OrderedHashSet%601\" data-throw-if-not-resolved=\"false\"></xref> starting with specified element.\nEnumeration goes from specified element to last element in collection.\nReturns empty enumeration when specified item is not in collection.\n"
+  example: []
+  syntax:
+    content: 'public struct Range : IEnumerable<T>, IEnumerable'
+    content.vb: >-
+      Public Structure Range
+
+          Implements IEnumerable(Of T), IEnumerable
+  implements:
+  - System.Collections.Generic.IEnumerable{{T}}
+  - System.Collections.IEnumerable
+  inheritedMembers:
+  - System.ValueType.Equals(System.Object)
+  - System.ValueType.GetHashCode
+  - System.ValueType.ToString
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  nameWithType.vb: OrderedHashSet(Of T).Range
+  modifiers.csharp:
+  - public
+  - struct
+  modifiers.vb:
+  - Public
+  - Structure
+  fullName.vb: Common.OrderedHashSet(Of T).Range
+  name.vb: OrderedHashSet(Of T).Range
+- uid: Common.OrderedHashSet`1.Range.m_set
+  commentId: F:Common.OrderedHashSet`1.Range.m_set
+  id: m_set
+  parent: Common.OrderedHashSet`1.Range
+  langs:
+  - csharp
+  - vb
+  name: m_set
+  nameWithType: OrderedHashSet<T>.Range.m_set
+  fullName: Common.OrderedHashSet<T>.Range.m_set
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_set
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 263
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: readonly OrderedHashSet<T> m_set
+    return:
+      type: Common.OrderedHashSet`1
+    content.vb: ReadOnly m_set As OrderedHashSet(Of T)
+  nameWithType.vb: OrderedHashSet(Of T).Range.m_set
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+  fullName.vb: Common.OrderedHashSet(Of T).Range.m_set
+- uid: Common.OrderedHashSet`1.Range.m_startingItem
+  commentId: F:Common.OrderedHashSet`1.Range.m_startingItem
+  id: m_startingItem
+  parent: Common.OrderedHashSet`1.Range
+  langs:
+  - csharp
+  - vb
+  name: m_startingItem
+  nameWithType: OrderedHashSet<T>.Range.m_startingItem
+  fullName: Common.OrderedHashSet<T>.Range.m_startingItem
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_startingItem
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 264
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: readonly T m_startingItem
+    return:
+      type: '{T}'
+    content.vb: ReadOnly m_startingItem As T
+  nameWithType.vb: OrderedHashSet(Of T).Range.m_startingItem
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+  fullName.vb: Common.OrderedHashSet(Of T).Range.m_startingItem
+- uid: Common.OrderedHashSet`1.Range.#ctor(Common.OrderedHashSet{`0},`0)
+  commentId: M:Common.OrderedHashSet`1.Range.#ctor(Common.OrderedHashSet{`0},`0)
+  id: '#ctor(Common.OrderedHashSet{`0},`0)'
+  parent: Common.OrderedHashSet`1.Range
+  langs:
+  - csharp
+  - vb
+  name: Range(OrderedHashSet<T>, T)
+  nameWithType: OrderedHashSet<T>.Range.Range(OrderedHashSet<T>, T)
+  fullName: Common.OrderedHashSet<T>.Range.Range(Common.OrderedHashSet<T>, T)
+  type: Constructor
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 266
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public Range(OrderedHashSet<T> set, T startingItem)
+    parameters:
+    - id: set
+      type: Common.OrderedHashSet`1
+    - id: startingItem
+      type: '{T}'
+    content.vb: Public Sub New(set As OrderedHashSet(Of T), startingItem As T)
+  overload: Common.OrderedHashSet`1.Range.#ctor*
+  nameWithType.vb: OrderedHashSet(Of T).Range.Range(OrderedHashSet(Of T), T)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Common.OrderedHashSet(Of T).Range.Range(Common.OrderedHashSet(Of T), T)
+  name.vb: Range(OrderedHashSet(Of T), T)
+- uid: Common.OrderedHashSet`1.Range.GetEnumerator
+  commentId: M:Common.OrderedHashSet`1.Range.GetEnumerator
+  id: GetEnumerator
+  parent: Common.OrderedHashSet`1.Range
+  langs:
+  - csharp
+  - vb
+  name: GetEnumerator()
+  nameWithType: OrderedHashSet<T>.Range.GetEnumerator()
+  fullName: Common.OrderedHashSet<T>.Range.GetEnumerator()
+  type: Method
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetEnumerator
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 272
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public OrderedHashSet<T>.Enumerator GetEnumerator()
+    return:
+      type: Common.OrderedHashSet`1.Enumerator
+    content.vb: Public Function GetEnumerator As OrderedHashSet(Of T).Enumerator
+  overload: Common.OrderedHashSet`1.Range.GetEnumerator*
+  nameWithType.vb: OrderedHashSet(Of T).Range.GetEnumerator()
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Common.OrderedHashSet(Of T).Range.GetEnumerator()
+- uid: Common.OrderedHashSet`1.Range.System#Collections#IEnumerable#GetEnumerator
+  commentId: M:Common.OrderedHashSet`1.Range.System#Collections#IEnumerable#GetEnumerator
+  id: System#Collections#IEnumerable#GetEnumerator
+  isEii: true
+  parent: Common.OrderedHashSet`1.Range
+  langs:
+  - csharp
+  - vb
+  name: IEnumerable.GetEnumerator()
+  nameWithType: OrderedHashSet<T>.Range.IEnumerable.GetEnumerator()
+  fullName: Common.OrderedHashSet<T>.Range.System.Collections.IEnumerable.GetEnumerator()
+  type: Method
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: System.Collections.IEnumerable.GetEnumerator
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 277
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: IEnumerator IEnumerable.GetEnumerator()
+    return:
+      type: System.Collections.IEnumerator
+    content.vb: Function System.Collections.IEnumerable.GetEnumerator As IEnumerator Implements IEnumerable.GetEnumerator
+  overload: Common.OrderedHashSet`1.Range.System#Collections#IEnumerable#GetEnumerator*
+  implements:
+  - System.Collections.IEnumerable.GetEnumerator
+  nameWithType.vb: OrderedHashSet(Of T).Range.System.Collections.IEnumerable.GetEnumerator()
+  fullName.vb: Common.OrderedHashSet(Of T).Range.System.Collections.IEnumerable.GetEnumerator()
+  name.vb: System.Collections.IEnumerable.GetEnumerator()
+- uid: Common.OrderedHashSet`1.Range.System#Collections#Generic#IEnumerable{T}#GetEnumerator
+  commentId: M:Common.OrderedHashSet`1.Range.System#Collections#Generic#IEnumerable{T}#GetEnumerator
+  id: System#Collections#Generic#IEnumerable{T}#GetEnumerator
+  isEii: true
+  parent: Common.OrderedHashSet`1.Range
+  langs:
+  - csharp
+  - vb
+  name: IEnumerable<T>.GetEnumerator()
+  nameWithType: OrderedHashSet<T>.Range.IEnumerable<T>.GetEnumerator()
+  fullName: Common.OrderedHashSet<T>.Range.System.Collections.Generic.IEnumerable<T>.GetEnumerator()
+  type: Method
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: System.Collections.Generic.IEnumerable<T>.GetEnumerator
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 282
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: IEnumerator<T> IEnumerable<T>.GetEnumerator()
+    return:
+      type: System.Collections.Generic.IEnumerator{{T}}
+    content.vb: Function System.Collections.Generic.IEnumerable<T>.GetEnumerator As IEnumerator(Of T) Implements IEnumerable(Of T).GetEnumerator
+  overload: Common.OrderedHashSet`1.Range.System#Collections#Generic#IEnumerable{T}#GetEnumerator*
+  implements:
+  - System.Collections.Generic.IEnumerable{{T}}.GetEnumerator
+  nameWithType.vb: OrderedHashSet(Of T).Range.System.Collections.Generic.IEnumerable<T>.GetEnumerator()
+  fullName.vb: Common.OrderedHashSet(Of T).Range.System.Collections.Generic.IEnumerable<T>.GetEnumerator()
+  name.vb: System.Collections.Generic.IEnumerable<T>.GetEnumerator()
+references:
+- uid: Common.OrderedHashSet`1
+  commentId: T:Common.OrderedHashSet`1
+  parent: Common
+  name: OrderedHashSet<T>
+  nameWithType: OrderedHashSet<T>
+  fullName: Common.OrderedHashSet<T>
+  nameWithType.vb: OrderedHashSet(Of T)
+  fullName.vb: Common.OrderedHashSet(Of T)
+  name.vb: OrderedHashSet(Of T)
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1
+    name: OrderedHashSet
+    nameWithType: OrderedHashSet
+    fullName: Common.OrderedHashSet
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1
+    name: OrderedHashSet
+    nameWithType: OrderedHashSet
+    fullName: Common.OrderedHashSet
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: System.Collections.Generic.IEnumerable{{T}}
+  commentId: T:System.Collections.Generic.IEnumerable{`0}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IEnumerable`1
+  name: IEnumerable<T>
+  nameWithType: IEnumerable<T>
+  fullName: System.Collections.Generic.IEnumerable<T>
+  nameWithType.vb: IEnumerable(Of T)
+  fullName.vb: System.Collections.Generic.IEnumerable(Of T)
+  name.vb: IEnumerable(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    nameWithType: IEnumerable
+    fullName: System.Collections.Generic.IEnumerable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    nameWithType: IEnumerable
+    fullName: System.Collections.Generic.IEnumerable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.IEnumerable
+  commentId: T:System.Collections.IEnumerable
+  parent: System.Collections
+  isExternal: true
+  name: IEnumerable
+  nameWithType: IEnumerable
+  fullName: System.Collections.IEnumerable
+- uid: System.ValueType.Equals(System.Object)
+  commentId: M:System.ValueType.Equals(System.Object)
+  parent: System.ValueType
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: ValueType.Equals(Object)
+  fullName: System.ValueType.Equals(System.Object)
+  spec.csharp:
+  - uid: System.ValueType.Equals(System.Object)
+    name: Equals
+    nameWithType: ValueType.Equals
+    fullName: System.ValueType.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.ValueType.Equals(System.Object)
+    name: Equals
+    nameWithType: ValueType.Equals
+    fullName: System.ValueType.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ValueType.GetHashCode
+  commentId: M:System.ValueType.GetHashCode
+  parent: System.ValueType
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: ValueType.GetHashCode()
+  fullName: System.ValueType.GetHashCode()
+  spec.csharp:
+  - uid: System.ValueType.GetHashCode
+    name: GetHashCode
+    nameWithType: ValueType.GetHashCode
+    fullName: System.ValueType.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.ValueType.GetHashCode
+    name: GetHashCode
+    nameWithType: ValueType.GetHashCode
+    fullName: System.ValueType.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ValueType.ToString
+  commentId: M:System.ValueType.ToString
+  parent: System.ValueType
+  isExternal: true
+  name: ToString()
+  nameWithType: ValueType.ToString()
+  fullName: System.ValueType.ToString()
+  spec.csharp:
+  - uid: System.ValueType.ToString
+    name: ToString
+    nameWithType: ValueType.ToString
+    fullName: System.ValueType.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.ValueType.ToString
+    name: ToString
+    nameWithType: ValueType.ToString
+    fullName: System.ValueType.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.IEnumerable`1
+  commentId: T:System.Collections.Generic.IEnumerable`1
+  isExternal: true
+  name: IEnumerable<T>
+  nameWithType: IEnumerable<T>
+  fullName: System.Collections.Generic.IEnumerable<T>
+  nameWithType.vb: IEnumerable(Of T)
+  fullName.vb: System.Collections.Generic.IEnumerable(Of T)
+  name.vb: IEnumerable(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    nameWithType: IEnumerable
+    fullName: System.Collections.Generic.IEnumerable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    nameWithType: IEnumerable
+    fullName: System.Collections.Generic.IEnumerable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: System.Collections
+  commentId: N:System.Collections
+  isExternal: true
+  name: System.Collections
+  nameWithType: System.Collections
+  fullName: System.Collections
+- uid: System.ValueType
+  commentId: T:System.ValueType
+  parent: System
+  isExternal: true
+  name: ValueType
+  nameWithType: ValueType
+  fullName: System.ValueType
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: '{T}'
+  commentId: '!:T'
+  definition: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: Common.OrderedHashSet`1.Range.#ctor*
+  commentId: Overload:Common.OrderedHashSet`1.Range.#ctor
+  name: Range
+  nameWithType: OrderedHashSet<T>.Range.Range
+  fullName: Common.OrderedHashSet<T>.Range.Range
+  nameWithType.vb: OrderedHashSet(Of T).Range.Range
+  fullName.vb: Common.OrderedHashSet(Of T).Range.Range
+- uid: Common.OrderedHashSet`1.Range.GetEnumerator*
+  commentId: Overload:Common.OrderedHashSet`1.Range.GetEnumerator
+  name: GetEnumerator
+  nameWithType: OrderedHashSet<T>.Range.GetEnumerator
+  fullName: Common.OrderedHashSet<T>.Range.GetEnumerator
+  nameWithType.vb: OrderedHashSet(Of T).Range.GetEnumerator
+  fullName.vb: Common.OrderedHashSet(Of T).Range.GetEnumerator
+- uid: Common.OrderedHashSet`1.Enumerator
+  commentId: T:Common.OrderedHashSet`1.Enumerator
+  parent: Common
+  name: OrderedHashSet.Enumerator<>
+  nameWithType: OrderedHashSet.Enumerator<>
+  fullName: Common.OrderedHashSet.Enumerator<>
+  nameWithType.vb: OrderedHashSet.Enumerator(Of )
+  fullName.vb: Common.OrderedHashSet.Enumerator(Of )
+  name.vb: OrderedHashSet.Enumerator(Of )
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1.Enumerator
+    name: OrderedHashSet.Enumerator
+    nameWithType: OrderedHashSet.Enumerator
+    fullName: Common.OrderedHashSet.Enumerator
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1.Enumerator
+    name: OrderedHashSet.Enumerator
+    nameWithType: OrderedHashSet.Enumerator
+    fullName: Common.OrderedHashSet.Enumerator
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.OrderedHashSet`1.Range.System#Collections#IEnumerable#GetEnumerator*
+  commentId: Overload:Common.OrderedHashSet`1.Range.System#Collections#IEnumerable#GetEnumerator
+  name: IEnumerable.GetEnumerator
+  nameWithType: OrderedHashSet<T>.Range.IEnumerable.GetEnumerator
+  fullName: Common.OrderedHashSet<T>.Range.System.Collections.IEnumerable.GetEnumerator
+  nameWithType.vb: OrderedHashSet(Of T).Range.System.Collections.IEnumerable.GetEnumerator
+  fullName.vb: Common.OrderedHashSet(Of T).Range.System.Collections.IEnumerable.GetEnumerator
+  name.vb: System.Collections.IEnumerable.GetEnumerator
+- uid: System.Collections.IEnumerable.GetEnumerator
+  commentId: M:System.Collections.IEnumerable.GetEnumerator
+  parent: System.Collections.IEnumerable
+  isExternal: true
+  name: GetEnumerator()
+  nameWithType: IEnumerable.GetEnumerator()
+  fullName: System.Collections.IEnumerable.GetEnumerator()
+  spec.csharp:
+  - uid: System.Collections.IEnumerable.GetEnumerator
+    name: GetEnumerator
+    nameWithType: IEnumerable.GetEnumerator
+    fullName: System.Collections.IEnumerable.GetEnumerator
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Collections.IEnumerable.GetEnumerator
+    name: GetEnumerator
+    nameWithType: IEnumerable.GetEnumerator
+    fullName: System.Collections.IEnumerable.GetEnumerator
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.IEnumerator
+  commentId: T:System.Collections.IEnumerator
+  parent: System.Collections
+  isExternal: true
+  name: IEnumerator
+  nameWithType: IEnumerator
+  fullName: System.Collections.IEnumerator
+- uid: Common.OrderedHashSet`1.Range.System#Collections#Generic#IEnumerable{T}#GetEnumerator*
+  commentId: Overload:Common.OrderedHashSet`1.Range.System#Collections#Generic#IEnumerable{T}#GetEnumerator
+  name: IEnumerable<T>.GetEnumerator
+  nameWithType: OrderedHashSet<T>.Range.IEnumerable<T>.GetEnumerator
+  fullName: Common.OrderedHashSet<T>.Range.System.Collections.Generic.IEnumerable<T>.GetEnumerator
+  nameWithType.vb: OrderedHashSet(Of T).Range.System.Collections.Generic.IEnumerable<T>.GetEnumerator
+  fullName.vb: Common.OrderedHashSet(Of T).Range.System.Collections.Generic.IEnumerable<T>.GetEnumerator
+  name.vb: System.Collections.Generic.IEnumerable<T>.GetEnumerator
+- uid: System.Collections.Generic.IEnumerable{{T}}.GetEnumerator
+  commentId: M:System.Collections.Generic.IEnumerable{`0}.GetEnumerator
+  parent: System.Collections.Generic.IEnumerable{{T}}
+  definition: System.Collections.Generic.IEnumerable`1.GetEnumerator
+  name: GetEnumerator()
+  nameWithType: IEnumerable<T>.GetEnumerator()
+  fullName: System.Collections.Generic.IEnumerable<T>.GetEnumerator()
+  nameWithType.vb: IEnumerable(Of T).GetEnumerator()
+  fullName.vb: System.Collections.Generic.IEnumerable(Of T).GetEnumerator()
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerable`1.GetEnumerator
+    name: GetEnumerator
+    nameWithType: IEnumerable<T>.GetEnumerator
+    fullName: System.Collections.Generic.IEnumerable<T>.GetEnumerator
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerable`1.GetEnumerator
+    name: GetEnumerator
+    nameWithType: IEnumerable(Of T).GetEnumerator
+    fullName: System.Collections.Generic.IEnumerable(Of T).GetEnumerator
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.IEnumerator{{T}}
+  commentId: T:System.Collections.Generic.IEnumerator{`0}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IEnumerator`1
+  name: IEnumerator<T>
+  nameWithType: IEnumerator<T>
+  fullName: System.Collections.Generic.IEnumerator<T>
+  nameWithType.vb: IEnumerator(Of T)
+  fullName.vb: System.Collections.Generic.IEnumerator(Of T)
+  name.vb: IEnumerator(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerator`1
+    name: IEnumerator
+    nameWithType: IEnumerator
+    fullName: System.Collections.Generic.IEnumerator
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerator`1
+    name: IEnumerator
+    nameWithType: IEnumerator
+    fullName: System.Collections.Generic.IEnumerator
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.IEnumerable`1.GetEnumerator
+  commentId: M:System.Collections.Generic.IEnumerable`1.GetEnumerator
+  isExternal: true
+  name: GetEnumerator()
+  nameWithType: IEnumerable<T>.GetEnumerator()
+  fullName: System.Collections.Generic.IEnumerable<T>.GetEnumerator()
+  nameWithType.vb: IEnumerable(Of T).GetEnumerator()
+  fullName.vb: System.Collections.Generic.IEnumerable(Of T).GetEnumerator()
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerable`1.GetEnumerator
+    name: GetEnumerator
+    nameWithType: IEnumerable<T>.GetEnumerator
+    fullName: System.Collections.Generic.IEnumerable<T>.GetEnumerator
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerable`1.GetEnumerator
+    name: GetEnumerator
+    nameWithType: IEnumerable(Of T).GetEnumerator
+    fullName: System.Collections.Generic.IEnumerable(Of T).GetEnumerator
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.IEnumerator`1
+  commentId: T:System.Collections.Generic.IEnumerator`1
+  isExternal: true
+  name: IEnumerator<T>
+  nameWithType: IEnumerator<T>
+  fullName: System.Collections.Generic.IEnumerator<T>
+  nameWithType.vb: IEnumerator(Of T)
+  fullName.vb: System.Collections.Generic.IEnumerator(Of T)
+  name.vb: IEnumerator(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerator`1
+    name: IEnumerator
+    nameWithType: IEnumerator
+    fullName: System.Collections.Generic.IEnumerator
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerator`1
+    name: IEnumerator
+    nameWithType: IEnumerator
+    fullName: System.Collections.Generic.IEnumerator
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )

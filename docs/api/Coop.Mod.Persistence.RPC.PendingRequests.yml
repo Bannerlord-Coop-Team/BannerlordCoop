@@ -1,0 +1,830 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Persistence.RPC.PendingRequests
+  commentId: T:Coop.Mod.Persistence.RPC.PendingRequests
+  id: PendingRequests
+  parent: Coop.Mod.Persistence.RPC
+  children:
+  - Coop.Mod.Persistence.RPC.PendingRequests.Add(Coop.Mod.Persistence.RPC.MethodCall)
+  - Coop.Mod.Persistence.RPC.PendingRequests.Instance
+  - Coop.Mod.Persistence.RPC.PendingRequests.IsPending(Coop.Mod.Persistence.RPC.MethodCall)
+  - Coop.Mod.Persistence.RPC.PendingRequests.m_Instance
+  - Coop.Mod.Persistence.RPC.PendingRequests.m_Pending
+  - Coop.Mod.Persistence.RPC.PendingRequests.PendingRequestCount
+  - Coop.Mod.Persistence.RPC.PendingRequests.Remove(Coop.Mod.Persistence.RPC.MethodCall)
+  langs:
+  - csharp
+  - vb
+  name: PendingRequests
+  nameWithType: PendingRequests
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: PendingRequests
+    path: ../source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+    startLine: 5
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: public class PendingRequests
+    content.vb: Public Class PendingRequests
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.m_Instance
+  commentId: F:Coop.Mod.Persistence.RPC.PendingRequests.m_Instance
+  id: m_Instance
+  parent: Coop.Mod.Persistence.RPC.PendingRequests
+  langs:
+  - csharp
+  - vb
+  name: m_Instance
+  nameWithType: PendingRequests.m_Instance
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.m_Instance
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Instance
+    path: ../source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+    startLine: 7
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: static readonly Lazy<PendingRequests> m_Instance
+    return:
+      type: System.Lazy{Coop.Mod.Persistence.RPC.PendingRequests}
+    content.vb: Shared ReadOnly m_Instance As Lazy(Of PendingRequests)
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.Instance
+  commentId: P:Coop.Mod.Persistence.RPC.PendingRequests.Instance
+  id: Instance
+  parent: Coop.Mod.Persistence.RPC.PendingRequests
+  langs:
+  - csharp
+  - vb
+  name: Instance
+  nameWithType: PendingRequests.Instance
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.Instance
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Instance
+    path: ../source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+    startLine: 9
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: public static PendingRequests Instance { get; }
+    parameters: []
+    return:
+      type: Coop.Mod.Persistence.RPC.PendingRequests
+    content.vb: Public Shared ReadOnly Property Instance As PendingRequests
+  overload: Coop.Mod.Persistence.RPC.PendingRequests.Instance*
+  modifiers.csharp:
+  - public
+  - static
+  - get
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.m_Pending
+  commentId: F:Coop.Mod.Persistence.RPC.PendingRequests.m_Pending
+  id: m_Pending
+  parent: Coop.Mod.Persistence.RPC.PendingRequests
+  langs:
+  - csharp
+  - vb
+  name: m_Pending
+  nameWithType: PendingRequests.m_Pending
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.m_Pending
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Pending
+    path: ../source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+    startLine: 11
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: readonly Dictionary<int, MethodCall> m_Pending
+    return:
+      type: System.Collections.Generic.Dictionary{System.Int32,Coop.Mod.Persistence.RPC.MethodCall}
+    content.vb: ReadOnly m_Pending As Dictionary(Of Integer, MethodCall)
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.Add(Coop.Mod.Persistence.RPC.MethodCall)
+  commentId: M:Coop.Mod.Persistence.RPC.PendingRequests.Add(Coop.Mod.Persistence.RPC.MethodCall)
+  id: Add(Coop.Mod.Persistence.RPC.MethodCall)
+  parent: Coop.Mod.Persistence.RPC.PendingRequests
+  langs:
+  - csharp
+  - vb
+  name: Add(MethodCall)
+  nameWithType: PendingRequests.Add(MethodCall)
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.Add(Coop.Mod.Persistence.RPC.MethodCall)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Add
+    path: ../source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+    startLine: 13
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: public void Add(MethodCall call)
+    parameters:
+    - id: call
+      type: Coop.Mod.Persistence.RPC.MethodCall
+    content.vb: Public Sub Add(call As MethodCall)
+  overload: Coop.Mod.Persistence.RPC.PendingRequests.Add*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.IsPending(Coop.Mod.Persistence.RPC.MethodCall)
+  commentId: M:Coop.Mod.Persistence.RPC.PendingRequests.IsPending(Coop.Mod.Persistence.RPC.MethodCall)
+  id: IsPending(Coop.Mod.Persistence.RPC.MethodCall)
+  parent: Coop.Mod.Persistence.RPC.PendingRequests
+  langs:
+  - csharp
+  - vb
+  name: IsPending(MethodCall)
+  nameWithType: PendingRequests.IsPending(MethodCall)
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.IsPending(Coop.Mod.Persistence.RPC.MethodCall)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IsPending
+    path: ../source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+    startLine: 18
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: public bool IsPending(MethodCall call)
+    parameters:
+    - id: call
+      type: Coop.Mod.Persistence.RPC.MethodCall
+    return:
+      type: System.Boolean
+    content.vb: Public Function IsPending(call As MethodCall) As Boolean
+  overload: Coop.Mod.Persistence.RPC.PendingRequests.IsPending*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.Remove(Coop.Mod.Persistence.RPC.MethodCall)
+  commentId: M:Coop.Mod.Persistence.RPC.PendingRequests.Remove(Coop.Mod.Persistence.RPC.MethodCall)
+  id: Remove(Coop.Mod.Persistence.RPC.MethodCall)
+  parent: Coop.Mod.Persistence.RPC.PendingRequests
+  langs:
+  - csharp
+  - vb
+  name: Remove(MethodCall)
+  nameWithType: PendingRequests.Remove(MethodCall)
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.Remove(Coop.Mod.Persistence.RPC.MethodCall)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Remove
+    path: ../source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+    startLine: 23
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: public void Remove(MethodCall call)
+    parameters:
+    - id: call
+      type: Coop.Mod.Persistence.RPC.MethodCall
+    content.vb: Public Sub Remove(call As MethodCall)
+  overload: Coop.Mod.Persistence.RPC.PendingRequests.Remove*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.PendingRequestCount
+  commentId: M:Coop.Mod.Persistence.RPC.PendingRequests.PendingRequestCount
+  id: PendingRequestCount
+  parent: Coop.Mod.Persistence.RPC.PendingRequests
+  langs:
+  - csharp
+  - vb
+  name: PendingRequestCount()
+  nameWithType: PendingRequests.PendingRequestCount()
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.PendingRequestCount()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: PendingRequestCount
+    path: ../source/Coop/Mod/Persistence/RPC/PendingRequests.cs
+    startLine: 28
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: public int PendingRequestCount()
+    return:
+      type: System.Int32
+    content.vb: Public Function PendingRequestCount As Integer
+  overload: Coop.Mod.Persistence.RPC.PendingRequests.PendingRequestCount*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.Mod.Persistence.RPC
+  commentId: N:Coop.Mod.Persistence.RPC
+  name: Coop.Mod.Persistence.RPC
+  nameWithType: Coop.Mod.Persistence.RPC
+  fullName: Coop.Mod.Persistence.RPC
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Lazy{Coop.Mod.Persistence.RPC.PendingRequests}
+  commentId: T:System.Lazy{Coop.Mod.Persistence.RPC.PendingRequests}
+  parent: System
+  definition: System.Lazy`1
+  name: Lazy<PendingRequests>
+  nameWithType: Lazy<PendingRequests>
+  fullName: System.Lazy<Coop.Mod.Persistence.RPC.PendingRequests>
+  nameWithType.vb: Lazy(Of PendingRequests)
+  fullName.vb: System.Lazy(Of Coop.Mod.Persistence.RPC.PendingRequests)
+  name.vb: Lazy(Of PendingRequests)
+  spec.csharp:
+  - uid: System.Lazy`1
+    name: Lazy
+    nameWithType: Lazy
+    fullName: System.Lazy
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Coop.Mod.Persistence.RPC.PendingRequests
+    name: PendingRequests
+    nameWithType: PendingRequests
+    fullName: Coop.Mod.Persistence.RPC.PendingRequests
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Lazy`1
+    name: Lazy
+    nameWithType: Lazy
+    fullName: System.Lazy
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Coop.Mod.Persistence.RPC.PendingRequests
+    name: PendingRequests
+    nameWithType: PendingRequests
+    fullName: Coop.Mod.Persistence.RPC.PendingRequests
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Lazy`1
+  commentId: T:System.Lazy`1
+  isExternal: true
+  name: Lazy<T>
+  nameWithType: Lazy<T>
+  fullName: System.Lazy<T>
+  nameWithType.vb: Lazy(Of T)
+  fullName.vb: System.Lazy(Of T)
+  name.vb: Lazy(Of T)
+  spec.csharp:
+  - uid: System.Lazy`1
+    name: Lazy
+    nameWithType: Lazy
+    fullName: System.Lazy
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Lazy`1
+    name: Lazy
+    nameWithType: Lazy
+    fullName: System.Lazy
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.Instance*
+  commentId: Overload:Coop.Mod.Persistence.RPC.PendingRequests.Instance
+  name: Instance
+  nameWithType: PendingRequests.Instance
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.Instance
+- uid: Coop.Mod.Persistence.RPC.PendingRequests
+  commentId: T:Coop.Mod.Persistence.RPC.PendingRequests
+  parent: Coop.Mod.Persistence.RPC
+  name: PendingRequests
+  nameWithType: PendingRequests
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests
+- uid: System.Collections.Generic.Dictionary{System.Int32,Coop.Mod.Persistence.RPC.MethodCall}
+  commentId: T:System.Collections.Generic.Dictionary{System.Int32,Coop.Mod.Persistence.RPC.MethodCall}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  name: Dictionary<Int32, MethodCall>
+  nameWithType: Dictionary<Int32, MethodCall>
+  fullName: System.Collections.Generic.Dictionary<System.Int32, Coop.Mod.Persistence.RPC.MethodCall>
+  nameWithType.vb: Dictionary(Of Int32, MethodCall)
+  fullName.vb: System.Collections.Generic.Dictionary(Of System.Int32, Coop.Mod.Persistence.RPC.MethodCall)
+  name.vb: Dictionary(Of Int32, MethodCall)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Coop.Mod.Persistence.RPC.MethodCall
+    name: MethodCall
+    nameWithType: MethodCall
+    fullName: Coop.Mod.Persistence.RPC.MethodCall
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Coop.Mod.Persistence.RPC.MethodCall
+    name: MethodCall
+    nameWithType: MethodCall
+    fullName: Coop.Mod.Persistence.RPC.MethodCall
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.Dictionary`2
+  commentId: T:System.Collections.Generic.Dictionary`2
+  isExternal: true
+  name: Dictionary<TKey, TValue>
+  nameWithType: Dictionary<TKey, TValue>
+  fullName: System.Collections.Generic.Dictionary<TKey, TValue>
+  nameWithType.vb: Dictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.Dictionary(Of TKey, TValue)
+  name.vb: Dictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.Add*
+  commentId: Overload:Coop.Mod.Persistence.RPC.PendingRequests.Add
+  name: Add
+  nameWithType: PendingRequests.Add
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.Add
+- uid: Coop.Mod.Persistence.RPC.MethodCall
+  commentId: T:Coop.Mod.Persistence.RPC.MethodCall
+  parent: Coop.Mod.Persistence.RPC
+  name: MethodCall
+  nameWithType: MethodCall
+  fullName: Coop.Mod.Persistence.RPC.MethodCall
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.IsPending*
+  commentId: Overload:Coop.Mod.Persistence.RPC.PendingRequests.IsPending
+  name: IsPending
+  nameWithType: PendingRequests.IsPending
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.IsPending
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.Remove*
+  commentId: Overload:Coop.Mod.Persistence.RPC.PendingRequests.Remove
+  name: Remove
+  nameWithType: PendingRequests.Remove
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.Remove
+- uid: Coop.Mod.Persistence.RPC.PendingRequests.PendingRequestCount*
+  commentId: Overload:Coop.Mod.Persistence.RPC.PendingRequests.PendingRequestCount
+  name: PendingRequestCount
+  nameWithType: PendingRequests.PendingRequestCount
+  fullName: Coop.Mod.Persistence.RPC.PendingRequests.PendingRequestCount
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32

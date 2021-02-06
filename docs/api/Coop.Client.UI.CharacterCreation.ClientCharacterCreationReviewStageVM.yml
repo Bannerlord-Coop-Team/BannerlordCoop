@@ -1,0 +1,1570 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM
+  commentId: T:Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM
+  id: ClientCharacterCreationReviewStageVM
+  parent: Coop.Client.UI.CharacterCreation
+  children:
+  - Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.#ctor(StoryMode.CharacterCreationSystem.CharacterCreation,System.Action,TaleWorlds.Localization.TextObject,System.Action,TaleWorlds.Localization.TextObject,System.Int32,System.Int32,System.Int32,System.Action{System.Int32})
+  langs:
+  - csharp
+  - vb
+  name: ClientCharacterCreationReviewStageVM
+  nameWithType: ClientCharacterCreationReviewStageVM
+  fullName: Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ClientCharacterCreationReviewStageVM
+    path: ../source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.Client.UI.CharacterCreation
+  syntax:
+    content: 'class ClientCharacterCreationReviewStageVM : CharacterCreationReviewStageVM, IViewModel, INotifyPropertyChanged'
+    content.vb: >-
+      Class ClientCharacterCreationReviewStageVM
+          Inherits CharacterCreationReviewStageVM
+          Implements IViewModel, INotifyPropertyChanged
+  inheritance:
+  - System.Object
+  - TaleWorlds.Library.ViewModel
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  - StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM
+  implements:
+  - TaleWorlds.Library.IViewModel
+  - System.ComponentModel.INotifyPropertyChanged
+  inheritedMembers:
+  - StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnNextStage
+  - StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnPreviousStage
+  - StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.CanAdvanceToNextStage
+  - StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.Name
+  - StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.NameTextQuestion
+  - StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.ReviewList
+  - StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.GainedPropertiesController
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._characterCreation
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._affirmativeAction
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._negativeAction
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._affirmativeActionText
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._negativeActionText
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.ExecuteGoToIndex(System.Int32)
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.CanAdvance
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.NextStageText
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.PreviousStageText
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.Title
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.Description
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.SelectionText
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.TotalStageCount
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.FurthestIndex
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.CurrentStageIndex
+  - StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.AnyItemSelected
+  - TaleWorlds.Library.ViewModel.UIDebugMode
+  - TaleWorlds.Library.ViewModel.SetField``1({T}@,{T},System.String)
+  - TaleWorlds.Library.ViewModel.OnPropertyChanged(System.String)
+  - TaleWorlds.Library.ViewModel.OnPropertyChangedWithValue(System.Object,System.String)
+  - TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath,System.Boolean)
+  - TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath)
+  - TaleWorlds.Library.ViewModel.GetPropertyValue(System.String,TaleWorlds.Library.PropertyTypeFeeder)
+  - TaleWorlds.Library.ViewModel.GetPropertyValue(System.String)
+  - TaleWorlds.Library.ViewModel.GetPropertyType(System.String)
+  - TaleWorlds.Library.ViewModel.SetPropertyValue(System.String,System.Object)
+  - TaleWorlds.Library.ViewModel.OnFinalize
+  - TaleWorlds.Library.ViewModel.ExecuteCommand(System.String,System.Object[])
+  - TaleWorlds.Library.ViewModel.RefreshValues
+  - TaleWorlds.Library.ViewModel.Properties
+  - TaleWorlds.Library.ViewModel.PropertyChanged
+  - TaleWorlds.Library.ViewModel.PropertyChangedWithValue
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - class
+  modifiers.vb:
+  - Class
+- uid: Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.#ctor(StoryMode.CharacterCreationSystem.CharacterCreation,System.Action,TaleWorlds.Localization.TextObject,System.Action,TaleWorlds.Localization.TextObject,System.Int32,System.Int32,System.Int32,System.Action{System.Int32})
+  commentId: M:Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.#ctor(StoryMode.CharacterCreationSystem.CharacterCreation,System.Action,TaleWorlds.Localization.TextObject,System.Action,TaleWorlds.Localization.TextObject,System.Int32,System.Int32,System.Int32,System.Action{System.Int32})
+  id: '#ctor(StoryMode.CharacterCreationSystem.CharacterCreation,System.Action,TaleWorlds.Localization.TextObject,System.Action,TaleWorlds.Localization.TextObject,System.Int32,System.Int32,System.Int32,System.Action{System.Int32})'
+  parent: Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM
+  langs:
+  - csharp
+  - vb
+  name: ClientCharacterCreationReviewStageVM(CharacterCreationSystem.CharacterCreation, Action, TextObject, Action, TextObject, Int32, Int32, Int32, Action<Int32>)
+  nameWithType: ClientCharacterCreationReviewStageVM.ClientCharacterCreationReviewStageVM(CharacterCreationSystem.CharacterCreation, Action, TextObject, Action, TextObject, Int32, Int32, Int32, Action<Int32>)
+  fullName: Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.ClientCharacterCreationReviewStageVM(StoryMode.CharacterCreationSystem.CharacterCreation, System.Action, TaleWorlds.Localization.TextObject, System.Action, TaleWorlds.Localization.TextObject, System.Int32, System.Int32, System.Int32, System.Action<System.Int32>)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs
+    startLine: 14
+  assemblies:
+  - Coop
+  namespace: Coop.Client.UI.CharacterCreation
+  syntax:
+    content: public ClientCharacterCreationReviewStageVM(CharacterCreationSystem.CharacterCreation characterCreation, Action affirmativeAction, TextObject affirmativeActionText, Action negativeAction, TextObject negativeActionText, int currentStageIndex, int totalStagesCount, int furthestIndex, Action<int> goToIndex)
+    parameters:
+    - id: characterCreation
+      type: StoryMode.CharacterCreationSystem.CharacterCreation
+    - id: affirmativeAction
+      type: System.Action
+    - id: affirmativeActionText
+      type: TaleWorlds.Localization.TextObject
+    - id: negativeAction
+      type: System.Action
+    - id: negativeActionText
+      type: TaleWorlds.Localization.TextObject
+    - id: currentStageIndex
+      type: System.Int32
+    - id: totalStagesCount
+      type: System.Int32
+    - id: furthestIndex
+      type: System.Int32
+    - id: goToIndex
+      type: System.Action{System.Int32}
+    content.vb: Public Sub New(characterCreation As CharacterCreationSystem.CharacterCreation, affirmativeAction As Action, affirmativeActionText As TextObject, negativeAction As Action, negativeActionText As TextObject, currentStageIndex As Integer, totalStagesCount As Integer, furthestIndex As Integer, goToIndex As Action(Of Integer))
+  overload: Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.#ctor*
+  nameWithType.vb: ClientCharacterCreationReviewStageVM.ClientCharacterCreationReviewStageVM(CharacterCreationSystem.CharacterCreation, Action, TextObject, Action, TextObject, Int32, Int32, Int32, Action(Of Int32))
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.ClientCharacterCreationReviewStageVM(StoryMode.CharacterCreationSystem.CharacterCreation, System.Action, TaleWorlds.Localization.TextObject, System.Action, TaleWorlds.Localization.TextObject, System.Int32, System.Int32, System.Int32, System.Action(Of System.Int32))
+  name.vb: ClientCharacterCreationReviewStageVM(CharacterCreationSystem.CharacterCreation, Action, TextObject, Action, TextObject, Int32, Int32, Int32, Action(Of Int32))
+references:
+- uid: Coop.Client.UI.CharacterCreation
+  commentId: N:Coop.Client.UI.CharacterCreation
+  name: Coop.Client.UI.CharacterCreation
+  nameWithType: Coop.Client.UI.CharacterCreation
+  fullName: Coop.Client.UI.CharacterCreation
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: TaleWorlds.Library.ViewModel
+  commentId: T:TaleWorlds.Library.ViewModel
+  parent: TaleWorlds.Library
+  isExternal: true
+  name: ViewModel
+  nameWithType: ViewModel
+  fullName: TaleWorlds.Library.ViewModel
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  commentId: T:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent
+  isExternal: true
+  name: CharacterCreationStageBaseVM
+  nameWithType: CharacterCreationStageBaseVM
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+- uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM
+  commentId: T:StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM
+  parent: StoryMode.ViewModelCollection.CharacterCreationSystem
+  isExternal: true
+  name: CharacterCreationReviewStageVM
+  nameWithType: CharacterCreationReviewStageVM
+  fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM
+- uid: TaleWorlds.Library.IViewModel
+  commentId: T:TaleWorlds.Library.IViewModel
+  parent: TaleWorlds.Library
+  isExternal: true
+  name: IViewModel
+  nameWithType: IViewModel
+  fullName: TaleWorlds.Library.IViewModel
+- uid: System.ComponentModel.INotifyPropertyChanged
+  commentId: T:System.ComponentModel.INotifyPropertyChanged
+  parent: System.ComponentModel
+  isExternal: true
+  name: INotifyPropertyChanged
+  nameWithType: INotifyPropertyChanged
+  fullName: System.ComponentModel.INotifyPropertyChanged
+- uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnNextStage
+  commentId: M:StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnNextStage
+  parent: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM
+  isExternal: true
+  name: OnNextStage()
+  nameWithType: CharacterCreationReviewStageVM.OnNextStage()
+  fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnNextStage()
+  spec.csharp:
+  - uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnNextStage
+    name: OnNextStage
+    nameWithType: CharacterCreationReviewStageVM.OnNextStage
+    fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnNextStage
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnNextStage
+    name: OnNextStage
+    nameWithType: CharacterCreationReviewStageVM.OnNextStage
+    fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnNextStage
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnPreviousStage
+  commentId: M:StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnPreviousStage
+  parent: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM
+  isExternal: true
+  name: OnPreviousStage()
+  nameWithType: CharacterCreationReviewStageVM.OnPreviousStage()
+  fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnPreviousStage()
+  spec.csharp:
+  - uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnPreviousStage
+    name: OnPreviousStage
+    nameWithType: CharacterCreationReviewStageVM.OnPreviousStage
+    fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnPreviousStage
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnPreviousStage
+    name: OnPreviousStage
+    nameWithType: CharacterCreationReviewStageVM.OnPreviousStage
+    fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.OnPreviousStage
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.CanAdvanceToNextStage
+  commentId: M:StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.CanAdvanceToNextStage
+  parent: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM
+  isExternal: true
+  name: CanAdvanceToNextStage()
+  nameWithType: CharacterCreationReviewStageVM.CanAdvanceToNextStage()
+  fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.CanAdvanceToNextStage()
+  spec.csharp:
+  - uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.CanAdvanceToNextStage
+    name: CanAdvanceToNextStage
+    nameWithType: CharacterCreationReviewStageVM.CanAdvanceToNextStage
+    fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.CanAdvanceToNextStage
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.CanAdvanceToNextStage
+    name: CanAdvanceToNextStage
+    nameWithType: CharacterCreationReviewStageVM.CanAdvanceToNextStage
+    fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.CanAdvanceToNextStage
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.Name
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.Name
+  parent: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM
+  isExternal: true
+  name: Name
+  nameWithType: CharacterCreationReviewStageVM.Name
+  fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.Name
+- uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.NameTextQuestion
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.NameTextQuestion
+  parent: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM
+  isExternal: true
+  name: NameTextQuestion
+  nameWithType: CharacterCreationReviewStageVM.NameTextQuestion
+  fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.NameTextQuestion
+- uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.ReviewList
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.ReviewList
+  parent: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM
+  isExternal: true
+  name: ReviewList
+  nameWithType: CharacterCreationReviewStageVM.ReviewList
+  fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.ReviewList
+- uid: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.GainedPropertiesController
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.GainedPropertiesController
+  parent: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM
+  isExternal: true
+  name: GainedPropertiesController
+  nameWithType: CharacterCreationReviewStageVM.GainedPropertiesController
+  fullName: StoryMode.ViewModelCollection.CharacterCreationSystem.CharacterCreationReviewStageVM.GainedPropertiesController
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._characterCreation
+  commentId: F:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._characterCreation
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: _characterCreation
+  nameWithType: CharacterCreationStageBaseVM._characterCreation
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._characterCreation
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._affirmativeAction
+  commentId: F:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._affirmativeAction
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: _affirmativeAction
+  nameWithType: CharacterCreationStageBaseVM._affirmativeAction
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._affirmativeAction
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._negativeAction
+  commentId: F:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._negativeAction
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: _negativeAction
+  nameWithType: CharacterCreationStageBaseVM._negativeAction
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._negativeAction
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._affirmativeActionText
+  commentId: F:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._affirmativeActionText
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: _affirmativeActionText
+  nameWithType: CharacterCreationStageBaseVM._affirmativeActionText
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._affirmativeActionText
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._negativeActionText
+  commentId: F:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._negativeActionText
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: _negativeActionText
+  nameWithType: CharacterCreationStageBaseVM._negativeActionText
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM._negativeActionText
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.ExecuteGoToIndex(System.Int32)
+  commentId: M:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.ExecuteGoToIndex(System.Int32)
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: ExecuteGoToIndex(Int32)
+  nameWithType: CharacterCreationStageBaseVM.ExecuteGoToIndex(Int32)
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.ExecuteGoToIndex(System.Int32)
+  spec.csharp:
+  - uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.ExecuteGoToIndex(System.Int32)
+    name: ExecuteGoToIndex
+    nameWithType: CharacterCreationStageBaseVM.ExecuteGoToIndex
+    fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.ExecuteGoToIndex
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.ExecuteGoToIndex(System.Int32)
+    name: ExecuteGoToIndex
+    nameWithType: CharacterCreationStageBaseVM.ExecuteGoToIndex
+    fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.ExecuteGoToIndex
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.CanAdvance
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.CanAdvance
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: CanAdvance
+  nameWithType: CharacterCreationStageBaseVM.CanAdvance
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.CanAdvance
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.NextStageText
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.NextStageText
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: NextStageText
+  nameWithType: CharacterCreationStageBaseVM.NextStageText
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.NextStageText
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.PreviousStageText
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.PreviousStageText
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: PreviousStageText
+  nameWithType: CharacterCreationStageBaseVM.PreviousStageText
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.PreviousStageText
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.Title
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.Title
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: Title
+  nameWithType: CharacterCreationStageBaseVM.Title
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.Title
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.Description
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.Description
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: Description
+  nameWithType: CharacterCreationStageBaseVM.Description
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.Description
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.SelectionText
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.SelectionText
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: SelectionText
+  nameWithType: CharacterCreationStageBaseVM.SelectionText
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.SelectionText
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.TotalStageCount
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.TotalStageCount
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: TotalStageCount
+  nameWithType: CharacterCreationStageBaseVM.TotalStageCount
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.TotalStageCount
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.FurthestIndex
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.FurthestIndex
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: FurthestIndex
+  nameWithType: CharacterCreationStageBaseVM.FurthestIndex
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.FurthestIndex
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.CurrentStageIndex
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.CurrentStageIndex
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: CurrentStageIndex
+  nameWithType: CharacterCreationStageBaseVM.CurrentStageIndex
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.CurrentStageIndex
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.AnyItemSelected
+  commentId: P:StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.AnyItemSelected
+  parent: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM
+  isExternal: true
+  name: AnyItemSelected
+  nameWithType: CharacterCreationStageBaseVM.AnyItemSelected
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent.CharacterCreationStageBaseVM.AnyItemSelected
+- uid: TaleWorlds.Library.ViewModel.UIDebugMode
+  commentId: F:TaleWorlds.Library.ViewModel.UIDebugMode
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: UIDebugMode
+  nameWithType: ViewModel.UIDebugMode
+  fullName: TaleWorlds.Library.ViewModel.UIDebugMode
+- uid: TaleWorlds.Library.ViewModel.SetField``1({T}@,{T},System.String)
+  commentId: M:TaleWorlds.Library.ViewModel.SetField``1(``0@,``0,System.String)
+  parent: TaleWorlds.Library.ViewModel
+  definition: TaleWorlds.Library.ViewModel.SetField``1(``0@,``0,System.String)
+  name: SetField<T>(T, T, String)
+  nameWithType: ViewModel.SetField<T>(T, T, String)
+  fullName: TaleWorlds.Library.ViewModel.SetField<T>(T, T, System.String)
+  nameWithType.vb: ViewModel.SetField(Of T)(T, T, String)
+  fullName.vb: TaleWorlds.Library.ViewModel.SetField(Of T)(T, T, System.String)
+  name.vb: SetField(Of T)(T, T, String)
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.SetField``1(``0@,``0,System.String)
+    name: SetField<T>
+    nameWithType: ViewModel.SetField<T>
+    fullName: TaleWorlds.Library.ViewModel.SetField<T>
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.SetField``1(``0@,``0,System.String)
+    name: SetField(Of T)
+    nameWithType: ViewModel.SetField(Of T)
+    fullName: TaleWorlds.Library.ViewModel.SetField(Of T)
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.OnPropertyChanged(System.String)
+  commentId: M:TaleWorlds.Library.ViewModel.OnPropertyChanged(System.String)
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: OnPropertyChanged(String)
+  nameWithType: ViewModel.OnPropertyChanged(String)
+  fullName: TaleWorlds.Library.ViewModel.OnPropertyChanged(System.String)
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.OnPropertyChanged(System.String)
+    name: OnPropertyChanged
+    nameWithType: ViewModel.OnPropertyChanged
+    fullName: TaleWorlds.Library.ViewModel.OnPropertyChanged
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.OnPropertyChanged(System.String)
+    name: OnPropertyChanged
+    nameWithType: ViewModel.OnPropertyChanged
+    fullName: TaleWorlds.Library.ViewModel.OnPropertyChanged
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.OnPropertyChangedWithValue(System.Object,System.String)
+  commentId: M:TaleWorlds.Library.ViewModel.OnPropertyChangedWithValue(System.Object,System.String)
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: OnPropertyChangedWithValue(Object, String)
+  nameWithType: ViewModel.OnPropertyChangedWithValue(Object, String)
+  fullName: TaleWorlds.Library.ViewModel.OnPropertyChangedWithValue(System.Object, System.String)
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.OnPropertyChangedWithValue(System.Object,System.String)
+    name: OnPropertyChangedWithValue
+    nameWithType: ViewModel.OnPropertyChangedWithValue
+    fullName: TaleWorlds.Library.ViewModel.OnPropertyChangedWithValue
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.OnPropertyChangedWithValue(System.Object,System.String)
+    name: OnPropertyChangedWithValue
+    nameWithType: ViewModel.OnPropertyChangedWithValue
+    fullName: TaleWorlds.Library.ViewModel.OnPropertyChangedWithValue
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath,System.Boolean)
+  commentId: M:TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath,System.Boolean)
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: GetViewModelAtPath(BindingPath, Boolean)
+  nameWithType: ViewModel.GetViewModelAtPath(BindingPath, Boolean)
+  fullName: TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath, System.Boolean)
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath,System.Boolean)
+    name: GetViewModelAtPath
+    nameWithType: ViewModel.GetViewModelAtPath
+    fullName: TaleWorlds.Library.ViewModel.GetViewModelAtPath
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Library.BindingPath
+    name: BindingPath
+    nameWithType: BindingPath
+    fullName: TaleWorlds.Library.BindingPath
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath,System.Boolean)
+    name: GetViewModelAtPath
+    nameWithType: ViewModel.GetViewModelAtPath
+    fullName: TaleWorlds.Library.ViewModel.GetViewModelAtPath
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Library.BindingPath
+    name: BindingPath
+    nameWithType: BindingPath
+    fullName: TaleWorlds.Library.BindingPath
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath)
+  commentId: M:TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath)
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: GetViewModelAtPath(BindingPath)
+  nameWithType: ViewModel.GetViewModelAtPath(BindingPath)
+  fullName: TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath)
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath)
+    name: GetViewModelAtPath
+    nameWithType: ViewModel.GetViewModelAtPath
+    fullName: TaleWorlds.Library.ViewModel.GetViewModelAtPath
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Library.BindingPath
+    name: BindingPath
+    nameWithType: BindingPath
+    fullName: TaleWorlds.Library.BindingPath
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.GetViewModelAtPath(TaleWorlds.Library.BindingPath)
+    name: GetViewModelAtPath
+    nameWithType: ViewModel.GetViewModelAtPath
+    fullName: TaleWorlds.Library.ViewModel.GetViewModelAtPath
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Library.BindingPath
+    name: BindingPath
+    nameWithType: BindingPath
+    fullName: TaleWorlds.Library.BindingPath
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.GetPropertyValue(System.String,TaleWorlds.Library.PropertyTypeFeeder)
+  commentId: M:TaleWorlds.Library.ViewModel.GetPropertyValue(System.String,TaleWorlds.Library.PropertyTypeFeeder)
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: GetPropertyValue(String, PropertyTypeFeeder)
+  nameWithType: ViewModel.GetPropertyValue(String, PropertyTypeFeeder)
+  fullName: TaleWorlds.Library.ViewModel.GetPropertyValue(System.String, TaleWorlds.Library.PropertyTypeFeeder)
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.GetPropertyValue(System.String,TaleWorlds.Library.PropertyTypeFeeder)
+    name: GetPropertyValue
+    nameWithType: ViewModel.GetPropertyValue
+    fullName: TaleWorlds.Library.ViewModel.GetPropertyValue
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: TaleWorlds.Library.PropertyTypeFeeder
+    name: PropertyTypeFeeder
+    nameWithType: PropertyTypeFeeder
+    fullName: TaleWorlds.Library.PropertyTypeFeeder
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.GetPropertyValue(System.String,TaleWorlds.Library.PropertyTypeFeeder)
+    name: GetPropertyValue
+    nameWithType: ViewModel.GetPropertyValue
+    fullName: TaleWorlds.Library.ViewModel.GetPropertyValue
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: TaleWorlds.Library.PropertyTypeFeeder
+    name: PropertyTypeFeeder
+    nameWithType: PropertyTypeFeeder
+    fullName: TaleWorlds.Library.PropertyTypeFeeder
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.GetPropertyValue(System.String)
+  commentId: M:TaleWorlds.Library.ViewModel.GetPropertyValue(System.String)
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: GetPropertyValue(String)
+  nameWithType: ViewModel.GetPropertyValue(String)
+  fullName: TaleWorlds.Library.ViewModel.GetPropertyValue(System.String)
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.GetPropertyValue(System.String)
+    name: GetPropertyValue
+    nameWithType: ViewModel.GetPropertyValue
+    fullName: TaleWorlds.Library.ViewModel.GetPropertyValue
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.GetPropertyValue(System.String)
+    name: GetPropertyValue
+    nameWithType: ViewModel.GetPropertyValue
+    fullName: TaleWorlds.Library.ViewModel.GetPropertyValue
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.GetPropertyType(System.String)
+  commentId: M:TaleWorlds.Library.ViewModel.GetPropertyType(System.String)
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: GetPropertyType(String)
+  nameWithType: ViewModel.GetPropertyType(String)
+  fullName: TaleWorlds.Library.ViewModel.GetPropertyType(System.String)
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.GetPropertyType(System.String)
+    name: GetPropertyType
+    nameWithType: ViewModel.GetPropertyType
+    fullName: TaleWorlds.Library.ViewModel.GetPropertyType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.GetPropertyType(System.String)
+    name: GetPropertyType
+    nameWithType: ViewModel.GetPropertyType
+    fullName: TaleWorlds.Library.ViewModel.GetPropertyType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.SetPropertyValue(System.String,System.Object)
+  commentId: M:TaleWorlds.Library.ViewModel.SetPropertyValue(System.String,System.Object)
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: SetPropertyValue(String, Object)
+  nameWithType: ViewModel.SetPropertyValue(String, Object)
+  fullName: TaleWorlds.Library.ViewModel.SetPropertyValue(System.String, System.Object)
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.SetPropertyValue(System.String,System.Object)
+    name: SetPropertyValue
+    nameWithType: ViewModel.SetPropertyValue
+    fullName: TaleWorlds.Library.ViewModel.SetPropertyValue
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.SetPropertyValue(System.String,System.Object)
+    name: SetPropertyValue
+    nameWithType: ViewModel.SetPropertyValue
+    fullName: TaleWorlds.Library.ViewModel.SetPropertyValue
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.OnFinalize
+  commentId: M:TaleWorlds.Library.ViewModel.OnFinalize
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: OnFinalize()
+  nameWithType: ViewModel.OnFinalize()
+  fullName: TaleWorlds.Library.ViewModel.OnFinalize()
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.OnFinalize
+    name: OnFinalize
+    nameWithType: ViewModel.OnFinalize
+    fullName: TaleWorlds.Library.ViewModel.OnFinalize
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.OnFinalize
+    name: OnFinalize
+    nameWithType: ViewModel.OnFinalize
+    fullName: TaleWorlds.Library.ViewModel.OnFinalize
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.ExecuteCommand(System.String,System.Object[])
+  commentId: M:TaleWorlds.Library.ViewModel.ExecuteCommand(System.String,System.Object[])
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: ExecuteCommand(String, Object[])
+  nameWithType: ViewModel.ExecuteCommand(String, Object[])
+  fullName: TaleWorlds.Library.ViewModel.ExecuteCommand(System.String, System.Object[])
+  nameWithType.vb: ViewModel.ExecuteCommand(String, Object())
+  fullName.vb: TaleWorlds.Library.ViewModel.ExecuteCommand(System.String, System.Object())
+  name.vb: ExecuteCommand(String, Object())
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.ExecuteCommand(System.String,System.Object[])
+    name: ExecuteCommand
+    nameWithType: ViewModel.ExecuteCommand
+    fullName: TaleWorlds.Library.ViewModel.ExecuteCommand
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.ExecuteCommand(System.String,System.Object[])
+    name: ExecuteCommand
+    nameWithType: ViewModel.ExecuteCommand
+    fullName: TaleWorlds.Library.ViewModel.ExecuteCommand
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.RefreshValues
+  commentId: M:TaleWorlds.Library.ViewModel.RefreshValues
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: RefreshValues()
+  nameWithType: ViewModel.RefreshValues()
+  fullName: TaleWorlds.Library.ViewModel.RefreshValues()
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.RefreshValues
+    name: RefreshValues
+    nameWithType: ViewModel.RefreshValues
+    fullName: TaleWorlds.Library.ViewModel.RefreshValues
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.RefreshValues
+    name: RefreshValues
+    nameWithType: ViewModel.RefreshValues
+    fullName: TaleWorlds.Library.ViewModel.RefreshValues
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Library.ViewModel.Properties
+  commentId: P:TaleWorlds.Library.ViewModel.Properties
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: Properties
+  nameWithType: ViewModel.Properties
+  fullName: TaleWorlds.Library.ViewModel.Properties
+- uid: TaleWorlds.Library.ViewModel.PropertyChanged
+  commentId: E:TaleWorlds.Library.ViewModel.PropertyChanged
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: PropertyChanged
+  nameWithType: ViewModel.PropertyChanged
+  fullName: TaleWorlds.Library.ViewModel.PropertyChanged
+- uid: TaleWorlds.Library.ViewModel.PropertyChangedWithValue
+  commentId: E:TaleWorlds.Library.ViewModel.PropertyChangedWithValue
+  parent: TaleWorlds.Library.ViewModel
+  isExternal: true
+  name: PropertyChangedWithValue
+  nameWithType: ViewModel.PropertyChangedWithValue
+  fullName: TaleWorlds.Library.ViewModel.PropertyChangedWithValue
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: TaleWorlds.Library
+  commentId: N:TaleWorlds.Library
+  isExternal: true
+  name: TaleWorlds.Library
+  nameWithType: TaleWorlds.Library
+  fullName: TaleWorlds.Library
+- uid: StoryMode.ViewModelCollection.CharacterCreationContent
+  commentId: N:StoryMode.ViewModelCollection.CharacterCreationContent
+  isExternal: true
+  name: StoryMode.ViewModelCollection.CharacterCreationContent
+  nameWithType: StoryMode.ViewModelCollection.CharacterCreationContent
+  fullName: StoryMode.ViewModelCollection.CharacterCreationContent
+- uid: StoryMode.ViewModelCollection.CharacterCreationSystem
+  commentId: N:StoryMode.ViewModelCollection.CharacterCreationSystem
+  isExternal: true
+  name: StoryMode.ViewModelCollection.CharacterCreationSystem
+  nameWithType: StoryMode.ViewModelCollection.CharacterCreationSystem
+  fullName: StoryMode.ViewModelCollection.CharacterCreationSystem
+- uid: System.ComponentModel
+  commentId: N:System.ComponentModel
+  isExternal: true
+  name: System.ComponentModel
+  nameWithType: System.ComponentModel
+  fullName: System.ComponentModel
+- uid: TaleWorlds.Library.ViewModel.SetField``1(``0@,``0,System.String)
+  commentId: M:TaleWorlds.Library.ViewModel.SetField``1(``0@,``0,System.String)
+  isExternal: true
+  name: SetField<T>(T, T, String)
+  nameWithType: ViewModel.SetField<T>(T, T, String)
+  fullName: TaleWorlds.Library.ViewModel.SetField<T>(T, T, System.String)
+  nameWithType.vb: ViewModel.SetField(Of T)(T, T, String)
+  fullName.vb: TaleWorlds.Library.ViewModel.SetField(Of T)(T, T, System.String)
+  name.vb: SetField(Of T)(T, T, String)
+  spec.csharp:
+  - uid: TaleWorlds.Library.ViewModel.SetField``1(``0@,``0,System.String)
+    name: SetField<T>
+    nameWithType: ViewModel.SetField<T>
+    fullName: TaleWorlds.Library.ViewModel.SetField<T>
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Library.ViewModel.SetField``1(``0@,``0,System.String)
+    name: SetField(Of T)
+    nameWithType: ViewModel.SetField(Of T)
+    fullName: TaleWorlds.Library.ViewModel.SetField(Of T)
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.#ctor*
+  commentId: Overload:Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.#ctor
+  name: ClientCharacterCreationReviewStageVM
+  nameWithType: ClientCharacterCreationReviewStageVM.ClientCharacterCreationReviewStageVM
+  fullName: Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageVM.ClientCharacterCreationReviewStageVM
+- uid: StoryMode.CharacterCreationSystem.CharacterCreation
+  isExternal: true
+  name: CharacterCreationSystem.CharacterCreation
+  nameWithType: CharacterCreationSystem.CharacterCreation
+  fullName: StoryMode.CharacterCreationSystem.CharacterCreation
+- uid: System.Action
+  commentId: T:System.Action
+  parent: System
+  isExternal: true
+  name: Action
+  nameWithType: Action
+  fullName: System.Action
+- uid: TaleWorlds.Localization.TextObject
+  commentId: T:TaleWorlds.Localization.TextObject
+  parent: TaleWorlds.Localization
+  isExternal: true
+  name: TextObject
+  nameWithType: TextObject
+  fullName: TaleWorlds.Localization.TextObject
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: System.Action{System.Int32}
+  commentId: T:System.Action{System.Int32}
+  parent: System
+  definition: System.Action`1
+  name: Action<Int32>
+  nameWithType: Action<Int32>
+  fullName: System.Action<System.Int32>
+  nameWithType.vb: Action(Of Int32)
+  fullName.vb: System.Action(Of System.Int32)
+  name.vb: Action(Of Int32)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Localization
+  commentId: N:TaleWorlds.Localization
+  isExternal: true
+  name: TaleWorlds.Localization
+  nameWithType: TaleWorlds.Localization
+  fullName: TaleWorlds.Localization
+- uid: System.Action`1
+  commentId: T:System.Action`1
+  isExternal: true
+  name: Action<T>
+  nameWithType: Action<T>
+  fullName: System.Action<T>
+  nameWithType.vb: Action(Of T)
+  fullName.vb: System.Action(Of T)
+  name.vb: Action(Of T)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )

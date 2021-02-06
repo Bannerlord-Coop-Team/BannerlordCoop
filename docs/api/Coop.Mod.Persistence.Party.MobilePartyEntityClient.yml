@@ -1,0 +1,648 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  commentId: T:Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  id: MobilePartyEntityClient
+  parent: Coop.Mod.Persistence.Party
+  children:
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.#ctor(Coop.Mod.Persistence.IEnvironmentClient)
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.Logger
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.m_Environment
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.m_Instance
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnAdded
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnControllerChanged
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnPlayerControlledChanged
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnRemoved
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.Register
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.SendMoveRequest(System.Object)
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.SetDefaultBehaviourNeedsUpdate(TaleWorlds.CampaignSystem.MobileParty)
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.ToString
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.Unregister
+  - Coop.Mod.Persistence.Party.MobilePartyEntityClient.UpdateLocalMovement
+  langs:
+  - csharp
+  - vb
+  name: MobilePartyEntityClient
+  nameWithType: MobilePartyEntityClient
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MobilePartyEntityClient
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 15
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nRailgun: Mobile party implementation for clients. One instance for each mobile party\nthat is registered in the Railgun room.\n"
+  example: []
+  syntax:
+    content: 'public class MobilePartyEntityClient : RailEntityClient<MobilePartyState>'
+    content.vb: >-
+      Public Class MobilePartyEntityClient
+          Inherits RailEntityClient(Of MobilePartyState)
+  inheritance:
+  - System.Object
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Logger
+  commentId: F:Coop.Mod.Persistence.Party.MobilePartyEntityClient.Logger
+  id: Logger
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: MobilePartyEntityClient.Logger
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 17
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.m_Environment
+  commentId: F:Coop.Mod.Persistence.Party.MobilePartyEntityClient.m_Environment
+  id: m_Environment
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: m_Environment
+  nameWithType: MobilePartyEntityClient.m_Environment
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.m_Environment
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Environment
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 19
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: >-
+      [NotNull]
+
+      readonly IEnvironmentClient m_Environment
+    return:
+      type: Coop.Mod.Persistence.IEnvironmentClient
+    content.vb: >-
+      <NotNull>
+
+      ReadOnly m_Environment As IEnvironmentClient
+  attributes:
+  - type: JetBrains.Annotations.NotNullAttribute
+    ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.m_Instance
+  commentId: F:Coop.Mod.Persistence.Party.MobilePartyEntityClient.m_Instance
+  id: m_Instance
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: m_Instance
+  nameWithType: MobilePartyEntityClient.m_Instance
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.m_Instance
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Instance
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 20
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: >-
+      [CanBeNull]
+
+      MobileParty m_Instance
+    return:
+      type: TaleWorlds.CampaignSystem.MobileParty
+    content.vb: >-
+      <CanBeNull>
+
+      m_Instance As MobileParty
+  attributes:
+  - type: JetBrains.Annotations.CanBeNullAttribute
+    ctor: JetBrains.Annotations.CanBeNullAttribute.#ctor
+    arguments: []
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.#ctor(Coop.Mod.Persistence.IEnvironmentClient)
+  commentId: M:Coop.Mod.Persistence.Party.MobilePartyEntityClient.#ctor(Coop.Mod.Persistence.IEnvironmentClient)
+  id: '#ctor(Coop.Mod.Persistence.IEnvironmentClient)'
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: MobilePartyEntityClient(IEnvironmentClient)
+  nameWithType: MobilePartyEntityClient.MobilePartyEntityClient(IEnvironmentClient)
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.MobilePartyEntityClient(Coop.Mod.Persistence.IEnvironmentClient)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 22
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: public MobilePartyEntityClient([NotNull] IEnvironmentClient environment)
+    parameters:
+    - id: environment
+      type: Coop.Mod.Persistence.IEnvironmentClient
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    content.vb: Public Sub New(environment As IEnvironmentClient)
+  overload: Coop.Mod.Persistence.Party.MobilePartyEntityClient.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.SendMoveRequest(System.Object)
+  commentId: M:Coop.Mod.Persistence.Party.MobilePartyEntityClient.SendMoveRequest(System.Object)
+  id: SendMoveRequest(System.Object)
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: SendMoveRequest(Object)
+  nameWithType: MobilePartyEntityClient.SendMoveRequest(Object)
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.SendMoveRequest(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SendMoveRequest
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 32
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nHandler to issue a move command for this party to the server.\n"
+  example: []
+  syntax:
+    content: void SendMoveRequest(object val)
+    parameters:
+    - id: val
+      type: System.Object
+      description: MovementData
+    content.vb: Sub SendMoveRequest(val As Object)
+  overload: Coop.Mod.Persistence.Party.MobilePartyEntityClient.SendMoveRequest*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.UpdateLocalMovement
+  commentId: M:Coop.Mod.Persistence.Party.MobilePartyEntityClient.UpdateLocalMovement
+  id: UpdateLocalMovement
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: UpdateLocalMovement()
+  nameWithType: MobilePartyEntityClient.UpdateLocalMovement()
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.UpdateLocalMovement()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: UpdateLocalMovement
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 59
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nHandler to apply a received move command for this party.\n"
+  example: []
+  syntax:
+    content: void UpdateLocalMovement()
+    content.vb: Sub UpdateLocalMovement
+  overload: Coop.Mod.Persistence.Party.MobilePartyEntityClient.UpdateLocalMovement*
+  exceptions:
+  - type: System.Exception
+    commentId: T:System.Exception
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.SetDefaultBehaviourNeedsUpdate(TaleWorlds.CampaignSystem.MobileParty)
+  commentId: M:Coop.Mod.Persistence.Party.MobilePartyEntityClient.SetDefaultBehaviourNeedsUpdate(TaleWorlds.CampaignSystem.MobileParty)
+  id: SetDefaultBehaviourNeedsUpdate(TaleWorlds.CampaignSystem.MobileParty)
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: SetDefaultBehaviourNeedsUpdate(MobileParty)
+  nameWithType: MobilePartyEntityClient.SetDefaultBehaviourNeedsUpdate(MobileParty)
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.SetDefaultBehaviourNeedsUpdate(TaleWorlds.CampaignSystem.MobileParty)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SetDefaultBehaviourNeedsUpdate
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 101
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: void SetDefaultBehaviourNeedsUpdate(MobileParty party)
+    parameters:
+    - id: party
+      type: TaleWorlds.CampaignSystem.MobileParty
+    content.vb: Sub SetDefaultBehaviourNeedsUpdate(party As MobileParty)
+  overload: Coop.Mod.Persistence.Party.MobilePartyEntityClient.SetDefaultBehaviourNeedsUpdate*
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnControllerChanged
+  commentId: M:Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnControllerChanged
+  id: OnControllerChanged
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: OnControllerChanged()
+  nameWithType: MobilePartyEntityClient.OnControllerChanged()
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnControllerChanged()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnControllerChanged
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 112
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nCalled when the controller of this party changes.\n"
+  example: []
+  syntax:
+    content: protected override void OnControllerChanged()
+    content.vb: Protected Overrides Sub OnControllerChanged
+  overload: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnControllerChanged*
+  modifiers.csharp:
+  - protected
+  - override
+  modifiers.vb:
+  - Protected
+  - Overrides
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnPlayerControlledChanged
+  commentId: M:Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnPlayerControlledChanged
+  id: OnPlayerControlledChanged
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: OnPlayerControlledChanged()
+  nameWithType: MobilePartyEntityClient.OnPlayerControlledChanged()
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnPlayerControlledChanged()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnPlayerControlledChanged
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 128
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nHandler to be called when the control of this party changes to or from any player.\n"
+  example: []
+  syntax:
+    content: void OnPlayerControlledChanged()
+    content.vb: Sub OnPlayerControlledChanged
+  overload: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnPlayerControlledChanged*
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnAdded
+  commentId: M:Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnAdded
+  id: OnAdded
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: OnAdded()
+  nameWithType: MobilePartyEntityClient.OnAdded()
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnAdded()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnAdded
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 136
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nCalled when this party is added to the Railgun room.\n"
+  example: []
+  syntax:
+    content: protected override void OnAdded()
+    content.vb: Protected Overrides Sub OnAdded
+  overload: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnAdded*
+  modifiers.csharp:
+  - protected
+  - override
+  modifiers.vb:
+  - Protected
+  - Overrides
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnRemoved
+  commentId: M:Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnRemoved
+  id: OnRemoved
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: OnRemoved()
+  nameWithType: MobilePartyEntityClient.OnRemoved()
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnRemoved()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnRemoved
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 145
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nCalled when this party is removed from the Railgun room.\n"
+  example: []
+  syntax:
+    content: protected override void OnRemoved()
+    content.vb: Protected Overrides Sub OnRemoved
+  overload: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnRemoved*
+  modifiers.csharp:
+  - protected
+  - override
+  modifiers.vb:
+  - Protected
+  - Overrides
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Register
+  commentId: M:Coop.Mod.Persistence.Party.MobilePartyEntityClient.Register
+  id: Register
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: Register()
+  nameWithType: MobilePartyEntityClient.Register()
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Register()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Register
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 157
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nRegisters handlers to intercept issued movement commands to this party and send\nthem to the server. Should only be called for parties that are controlled by\nthis client.\n"
+  example: []
+  syntax:
+    content: void Register()
+    content.vb: Sub Register
+  overload: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Register*
+  exceptions:
+  - type: System.Exception
+    commentId: T:System.Exception
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Unregister
+  commentId: M:Coop.Mod.Persistence.Party.MobilePartyEntityClient.Unregister
+  id: Unregister
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: Unregister()
+  nameWithType: MobilePartyEntityClient.Unregister()
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Unregister()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Unregister
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 174
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  summary: "\nUnregisters all handlers.\n"
+  example: []
+  syntax:
+    content: void Unregister()
+    content.vb: Sub Unregister
+  overload: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Unregister*
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.ToString
+  commentId: M:Coop.Mod.Persistence.Party.MobilePartyEntityClient.ToString
+  id: ToString
+  parent: Coop.Mod.Persistence.Party.MobilePartyEntityClient
+  langs:
+  - csharp
+  - vb
+  name: ToString()
+  nameWithType: MobilePartyEntityClient.ToString()
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.ToString()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ToString
+    path: ../source/Coop/Mod/Persistence/Party/MobilePartyEntityClient.cs
+    startLine: 183
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.Party
+  syntax:
+    content: public override string ToString()
+    return:
+      type: System.String
+    content.vb: Public Overrides Function ToString As String
+  overload: Coop.Mod.Persistence.Party.MobilePartyEntityClient.ToString*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+references:
+- uid: Coop.Mod.Persistence.Party
+  commentId: N:Coop.Mod.Persistence.Party
+  name: Coop.Mod.Persistence.Party
+  nameWithType: Coop.Mod.Persistence.Party
+  fullName: Coop.Mod.Persistence.Party
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: Coop.Mod.Persistence.IEnvironmentClient
+  commentId: T:Coop.Mod.Persistence.IEnvironmentClient
+  parent: Coop.Mod.Persistence
+  name: IEnvironmentClient
+  nameWithType: IEnvironmentClient
+  fullName: Coop.Mod.Persistence.IEnvironmentClient
+- uid: Coop.Mod.Persistence
+  commentId: N:Coop.Mod.Persistence
+  name: Coop.Mod.Persistence
+  nameWithType: Coop.Mod.Persistence
+  fullName: Coop.Mod.Persistence
+- uid: TaleWorlds.CampaignSystem.MobileParty
+  commentId: T:TaleWorlds.CampaignSystem.MobileParty
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: MobileParty
+  nameWithType: MobileParty
+  fullName: TaleWorlds.CampaignSystem.MobileParty
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.#ctor*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyEntityClient.#ctor
+  name: MobilePartyEntityClient
+  nameWithType: MobilePartyEntityClient.MobilePartyEntityClient
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.MobilePartyEntityClient
+- uid: System.ArgumentException
+  commentId: T:System.ArgumentException
+  isExternal: true
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.SendMoveRequest*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyEntityClient.SendMoveRequest
+  name: SendMoveRequest
+  nameWithType: MobilePartyEntityClient.SendMoveRequest
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.SendMoveRequest
+- uid: System.Exception
+  commentId: T:System.Exception
+  parent: System
+  isExternal: true
+  name: Exception
+  nameWithType: Exception
+  fullName: System.Exception
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.UpdateLocalMovement*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyEntityClient.UpdateLocalMovement
+  name: UpdateLocalMovement
+  nameWithType: MobilePartyEntityClient.UpdateLocalMovement
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.UpdateLocalMovement
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.SetDefaultBehaviourNeedsUpdate*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyEntityClient.SetDefaultBehaviourNeedsUpdate
+  name: SetDefaultBehaviourNeedsUpdate
+  nameWithType: MobilePartyEntityClient.SetDefaultBehaviourNeedsUpdate
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.SetDefaultBehaviourNeedsUpdate
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnControllerChanged*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnControllerChanged
+  name: OnControllerChanged
+  nameWithType: MobilePartyEntityClient.OnControllerChanged
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnControllerChanged
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnPlayerControlledChanged*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnPlayerControlledChanged
+  name: OnPlayerControlledChanged
+  nameWithType: MobilePartyEntityClient.OnPlayerControlledChanged
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnPlayerControlledChanged
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnAdded*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnAdded
+  name: OnAdded
+  nameWithType: MobilePartyEntityClient.OnAdded
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnAdded
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnRemoved*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnRemoved
+  name: OnRemoved
+  nameWithType: MobilePartyEntityClient.OnRemoved
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.OnRemoved
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Register*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyEntityClient.Register
+  name: Register
+  nameWithType: MobilePartyEntityClient.Register
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Register
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Unregister*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyEntityClient.Unregister
+  name: Unregister
+  nameWithType: MobilePartyEntityClient.Unregister
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.Unregister
+- uid: Coop.Mod.Persistence.Party.MobilePartyEntityClient.ToString*
+  commentId: Overload:Coop.Mod.Persistence.Party.MobilePartyEntityClient.ToString
+  name: ToString
+  nameWithType: MobilePartyEntityClient.ToString
+  fullName: Coop.Mod.Persistence.Party.MobilePartyEntityClient.ToString
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String

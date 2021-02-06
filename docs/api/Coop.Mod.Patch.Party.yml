@@ -1,0 +1,52 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Patch.Party
+  commentId: N:Coop.Mod.Patch.Party
+  id: Coop.Mod.Patch.Party
+  children:
+  - Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch
+  - Coop.Mod.Patch.Party.PartiesBuyFoodCampaignBehaviorPatch
+  - Coop.Mod.Patch.Party.PartiesBuyHorseCampaignBehaviorPatch
+  - Coop.Mod.Patch.Party.PartiesSellLootCampaignBehaviorPatch
+  - Coop.Mod.Patch.Party.PartiesSellPrisonerCampaignBehaviorPatch
+  - Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch
+  langs:
+  - csharp
+  - vb
+  name: Coop.Mod.Patch.Party
+  nameWithType: Coop.Mod.Patch.Party
+  fullName: Coop.Mod.Patch.Party
+  type: Namespace
+  assemblies:
+  - Coop
+references:
+- uid: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch
+  commentId: T:Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch
+  name: BanditsCampaignBehaviorPatch
+  nameWithType: BanditsCampaignBehaviorPatch
+  fullName: Coop.Mod.Patch.Party.BanditsCampaignBehaviorPatch
+- uid: Coop.Mod.Patch.Party.PartiesBuyFoodCampaignBehaviorPatch
+  commentId: T:Coop.Mod.Patch.Party.PartiesBuyFoodCampaignBehaviorPatch
+  name: PartiesBuyFoodCampaignBehaviorPatch
+  nameWithType: PartiesBuyFoodCampaignBehaviorPatch
+  fullName: Coop.Mod.Patch.Party.PartiesBuyFoodCampaignBehaviorPatch
+- uid: Coop.Mod.Patch.Party.PartiesBuyHorseCampaignBehaviorPatch
+  commentId: T:Coop.Mod.Patch.Party.PartiesBuyHorseCampaignBehaviorPatch
+  name: PartiesBuyHorseCampaignBehaviorPatch
+  nameWithType: PartiesBuyHorseCampaignBehaviorPatch
+  fullName: Coop.Mod.Patch.Party.PartiesBuyHorseCampaignBehaviorPatch
+- uid: Coop.Mod.Patch.Party.PartiesSellLootCampaignBehaviorPatch
+  commentId: T:Coop.Mod.Patch.Party.PartiesSellLootCampaignBehaviorPatch
+  name: PartiesSellLootCampaignBehaviorPatch
+  nameWithType: PartiesSellLootCampaignBehaviorPatch
+  fullName: Coop.Mod.Patch.Party.PartiesSellLootCampaignBehaviorPatch
+- uid: Coop.Mod.Patch.Party.PartiesSellPrisonerCampaignBehaviorPatch
+  commentId: T:Coop.Mod.Patch.Party.PartiesSellPrisonerCampaignBehaviorPatch
+  name: PartiesSellPrisonerCampaignBehaviorPatch
+  nameWithType: PartiesSellPrisonerCampaignBehaviorPatch
+  fullName: Coop.Mod.Patch.Party.PartiesSellPrisonerCampaignBehaviorPatch
+- uid: Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch
+  commentId: T:Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch
+  name: RecruitmentCampaignBehaviorPatch
+  nameWithType: RecruitmentCampaignBehaviorPatch
+  fullName: Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch

@@ -1,0 +1,172 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync.EMethodPatchFlag
+  commentId: T:Sync.EMethodPatchFlag
+  id: EMethodPatchFlag
+  parent: Sync
+  children:
+  - Sync.EMethodPatchFlag.DebounceCalls
+  - Sync.EMethodPatchFlag.None
+  - Sync.EMethodPatchFlag.TransferArgumentsByValue
+  langs:
+  - csharp
+  - vb
+  name: EMethodPatchFlag
+  nameWithType: EMethodPatchFlag
+  fullName: Sync.EMethodPatchFlag
+  type: Enum
+  source:
+    remote:
+      path: source/Sync/EMethodPatchFlag.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EMethodPatchFlag
+    path: ../source/Sync/EMethodPatchFlag.cs
+    startLine: 7
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nFlags indicating the desired behaviour of a generated patch for a method.\n"
+  example: []
+  syntax:
+    content: >-
+      [Flags]
+
+      public enum EMethodPatchFlag : byte
+    content.vb: >-
+      <Flags>
+
+      Public Enum EMethodPatchFlag As Byte
+  attributes:
+  - type: System.FlagsAttribute
+    ctor: System.FlagsAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: Sync.EMethodPatchFlag.None
+  commentId: F:Sync.EMethodPatchFlag.None
+  id: None
+  parent: Sync.EMethodPatchFlag
+  langs:
+  - csharp
+  - vb
+  name: None
+  nameWithType: EMethodPatchFlag.None
+  fullName: Sync.EMethodPatchFlag.None
+  type: Field
+  source:
+    remote:
+      path: source/Sync/EMethodPatchFlag.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: None
+    path: ../source/Sync/EMethodPatchFlag.cs
+    startLine: 10
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: None = 0
+    return:
+      type: Sync.EMethodPatchFlag
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Sync.EMethodPatchFlag.TransferArgumentsByValue
+  commentId: F:Sync.EMethodPatchFlag.TransferArgumentsByValue
+  id: TransferArgumentsByValue
+  parent: Sync.EMethodPatchFlag
+  langs:
+  - csharp
+  - vb
+  name: TransferArgumentsByValue
+  nameWithType: EMethodPatchFlag.TransferArgumentsByValue
+  fullName: Sync.EMethodPatchFlag.TransferArgumentsByValue
+  type: Field
+  source:
+    remote:
+      path: source/Sync/EMethodPatchFlag.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TransferArgumentsByValue
+    path: ../source/Sync/EMethodPatchFlag.cs
+    startLine: 18
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nBit 1: Set if the arguments to the method should be preferably sent by value. This\nmeans it will either be serialized directly into the event or transferred\nusing the <xref href=\"Sync.Store.RemoteStore\" data-throw-if-not-resolved=\"false\"></xref>.\nUnset if by-reference should be preferred.\n"
+  example: []
+  syntax:
+    content: TransferArgumentsByValue = 2
+    return:
+      type: Sync.EMethodPatchFlag
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Sync.EMethodPatchFlag.DebounceCalls
+  commentId: F:Sync.EMethodPatchFlag.DebounceCalls
+  id: DebounceCalls
+  parent: Sync.EMethodPatchFlag
+  langs:
+  - csharp
+  - vb
+  name: DebounceCalls
+  nameWithType: EMethodPatchFlag.DebounceCalls
+  fullName: Sync.EMethodPatchFlag.DebounceCalls
+  type: Field
+  source:
+    remote:
+      path: source/Sync/EMethodPatchFlag.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DebounceCalls
+    path: ../source/Sync/EMethodPatchFlag.cs
+    startLine: 23
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nBit 2: If set, multiple calls to this function with the same arguments are ignored.\n"
+  example: []
+  syntax:
+    content: DebounceCalls = 4
+    return:
+      type: Sync.EMethodPatchFlag
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Sync
+  commentId: N:Sync
+  name: Sync
+  nameWithType: Sync
+  fullName: Sync
+- uid: Sync.EMethodPatchFlag
+  commentId: T:Sync.EMethodPatchFlag
+  parent: Sync
+  name: EMethodPatchFlag
+  nameWithType: EMethodPatchFlag
+  fullName: Sync.EMethodPatchFlag
+- uid: Sync.Store.RemoteStore
+  commentId: T:Sync.Store.RemoteStore
+  parent: Sync.Store
+  name: RemoteStore
+  nameWithType: RemoteStore
+  fullName: Sync.Store.RemoteStore
+- uid: Sync.Store
+  commentId: N:Sync.Store
+  name: Sync.Store
+  nameWithType: Sync.Store
+  fullName: Sync.Store

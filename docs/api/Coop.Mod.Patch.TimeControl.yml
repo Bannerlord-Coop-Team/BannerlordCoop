@@ -1,0 +1,866 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Patch.TimeControl
+  commentId: T:Coop.Mod.Patch.TimeControl
+  id: TimeControl
+  parent: Coop.Mod.Patch
+  children:
+  - Coop.Mod.Patch.TimeControl.CanSyncTimeControlMode
+  - Coop.Mod.Patch.TimeControl.DoSyncTimeControl
+  - Coop.Mod.Patch.TimeControl.Init
+  - Coop.Mod.Patch.TimeControl.IsMainPartyWaitingPatch
+  - Coop.Mod.Patch.TimeControl.SetIsMainPartyWaiting(System.Object,System.Object)
+  - Coop.Mod.Patch.TimeControl.TimeControlLockPatch
+  - Coop.Mod.Patch.TimeControl.TimeControlMode
+  - Coop.Mod.Patch.TimeControl.TimeControlModeLock
+  - Coop.Mod.Patch.TimeControl.TimeControlPatch
+  langs:
+  - csharp
+  - vb
+  name: TimeControl
+  nameWithType: TimeControl
+  fullName: Coop.Mod.Patch.TimeControl
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/World/TimeControl.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TimeControl
+    path: ../source/Coop/Mod/Patch/World/TimeControl.cs
+    startLine: 10
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: public static class TimeControl
+    content.vb: Public Module TimeControl
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - static
+  - class
+  modifiers.vb:
+  - Public
+  - Module
+- uid: Coop.Mod.Patch.TimeControl.TimeControlPatch
+  commentId: F:Coop.Mod.Patch.TimeControl.TimeControlPatch
+  id: TimeControlPatch
+  parent: Coop.Mod.Patch.TimeControl
+  langs:
+  - csharp
+  - vb
+  name: TimeControlPatch
+  nameWithType: TimeControl.TimeControlPatch
+  fullName: Coop.Mod.Patch.TimeControl.TimeControlPatch
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/World/TimeControl.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TimeControlPatch
+    path: ../source/Coop/Mod/Patch/World/TimeControl.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: static readonly PropertyPatch TimeControlPatch
+    return:
+      type: Sync.PropertyPatch
+    content.vb: Shared ReadOnly TimeControlPatch As PropertyPatch
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Patch.TimeControl.TimeControlLockPatch
+  commentId: F:Coop.Mod.Patch.TimeControl.TimeControlLockPatch
+  id: TimeControlLockPatch
+  parent: Coop.Mod.Patch.TimeControl
+  langs:
+  - csharp
+  - vb
+  name: TimeControlLockPatch
+  nameWithType: TimeControl.TimeControlLockPatch
+  fullName: Coop.Mod.Patch.TimeControl.TimeControlLockPatch
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/World/TimeControl.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TimeControlLockPatch
+    path: ../source/Coop/Mod/Patch/World/TimeControl.cs
+    startLine: 15
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: static readonly PropertyPatch TimeControlLockPatch
+    return:
+      type: Sync.PropertyPatch
+    content.vb: Shared ReadOnly TimeControlLockPatch As PropertyPatch
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Patch.TimeControl.IsMainPartyWaitingPatch
+  commentId: F:Coop.Mod.Patch.TimeControl.IsMainPartyWaitingPatch
+  id: IsMainPartyWaitingPatch
+  parent: Coop.Mod.Patch.TimeControl
+  langs:
+  - csharp
+  - vb
+  name: IsMainPartyWaitingPatch
+  nameWithType: TimeControl.IsMainPartyWaitingPatch
+  fullName: Coop.Mod.Patch.TimeControl.IsMainPartyWaitingPatch
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/World/TimeControl.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IsMainPartyWaitingPatch
+    path: ../source/Coop/Mod/Patch/World/TimeControl.cs
+    startLine: 19
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: static readonly PropertyPatch IsMainPartyWaitingPatch
+    return:
+      type: Sync.PropertyPatch
+    content.vb: Shared ReadOnly IsMainPartyWaitingPatch As PropertyPatch
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Patch.TimeControl.TimeControlMode
+  commentId: P:Coop.Mod.Patch.TimeControl.TimeControlMode
+  id: TimeControlMode
+  parent: Coop.Mod.Patch.TimeControl
+  langs:
+  - csharp
+  - vb
+  name: TimeControlMode
+  nameWithType: TimeControl.TimeControlMode
+  fullName: Coop.Mod.Patch.TimeControl.TimeControlMode
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/World/TimeControl.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TimeControlMode
+    path: ../source/Coop/Mod/Patch/World/TimeControl.cs
+    startLine: 23
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: public static FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; }
+    parameters: []
+    return:
+      type: Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,TaleWorlds.CampaignSystem.CampaignTimeControlMode}
+    content.vb: Public Shared ReadOnly Property TimeControlMode As FieldAccess(Of Campaign, CampaignTimeControlMode)
+  overload: Coop.Mod.Patch.TimeControl.TimeControlMode*
+  modifiers.csharp:
+  - public
+  - static
+  - get
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Patch.TimeControl.TimeControlModeLock
+  commentId: P:Coop.Mod.Patch.TimeControl.TimeControlModeLock
+  id: TimeControlModeLock
+  parent: Coop.Mod.Patch.TimeControl
+  langs:
+  - csharp
+  - vb
+  name: TimeControlModeLock
+  nameWithType: TimeControl.TimeControlModeLock
+  fullName: Coop.Mod.Patch.TimeControl.TimeControlModeLock
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/World/TimeControl.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TimeControlModeLock
+    path: ../source/Coop/Mod/Patch/World/TimeControl.cs
+    startLine: 28
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: public static FieldAccess<Campaign, bool> TimeControlModeLock { get; }
+    parameters: []
+    return:
+      type: Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,System.Boolean}
+    content.vb: Public Shared ReadOnly Property TimeControlModeLock As FieldAccess(Of Campaign, Boolean)
+  overload: Coop.Mod.Patch.TimeControl.TimeControlModeLock*
+  modifiers.csharp:
+  - public
+  - static
+  - get
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Patch.TimeControl.CanSyncTimeControlMode
+  commentId: F:Coop.Mod.Patch.TimeControl.CanSyncTimeControlMode
+  id: CanSyncTimeControlMode
+  parent: Coop.Mod.Patch.TimeControl
+  langs:
+  - csharp
+  - vb
+  name: CanSyncTimeControlMode
+  nameWithType: TimeControl.CanSyncTimeControlMode
+  fullName: Coop.Mod.Patch.TimeControl.CanSyncTimeControlMode
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/World/TimeControl.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CanSyncTimeControlMode
+    path: ../source/Coop/Mod/Patch/World/TimeControl.cs
+    startLine: 33
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: public static bool CanSyncTimeControlMode
+    return:
+      type: System.Boolean
+    content.vb: Public Shared CanSyncTimeControlMode As Boolean
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Coop.Mod.Patch.TimeControl.Init
+  commentId: M:Coop.Mod.Patch.TimeControl.Init
+  id: Init
+  parent: Coop.Mod.Patch.TimeControl
+  langs:
+  - csharp
+  - vb
+  name: Init()
+  nameWithType: TimeControl.Init()
+  fullName: Coop.Mod.Patch.TimeControl.Init()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/World/TimeControl.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Init
+    path: ../source/Coop/Mod/Patch/World/TimeControl.cs
+    startLine: 35
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: public static void Init()
+    content.vb: Public Shared Sub Init
+  overload: Coop.Mod.Patch.TimeControl.Init*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Coop.Mod.Patch.TimeControl.SetIsMainPartyWaiting(System.Object,System.Object)
+  commentId: M:Coop.Mod.Patch.TimeControl.SetIsMainPartyWaiting(System.Object,System.Object)
+  id: SetIsMainPartyWaiting(System.Object,System.Object)
+  parent: Coop.Mod.Patch.TimeControl
+  langs:
+  - csharp
+  - vb
+  name: SetIsMainPartyWaiting(Object, Object)
+  nameWithType: TimeControl.SetIsMainPartyWaiting(Object, Object)
+  fullName: Coop.Mod.Patch.TimeControl.SetIsMainPartyWaiting(System.Object, System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/World/TimeControl.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SetIsMainPartyWaiting
+    path: ../source/Coop/Mod/Patch/World/TimeControl.cs
+    startLine: 49
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: static void SetIsMainPartyWaiting(object instance, object value)
+    parameters:
+    - id: instance
+      type: System.Object
+    - id: value
+      type: System.Object
+    content.vb: Shared Sub SetIsMainPartyWaiting(instance As Object, value As Object)
+  overload: Coop.Mod.Patch.TimeControl.SetIsMainPartyWaiting*
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+- uid: Coop.Mod.Patch.TimeControl.DoSyncTimeControl
+  commentId: M:Coop.Mod.Patch.TimeControl.DoSyncTimeControl
+  id: DoSyncTimeControl
+  parent: Coop.Mod.Patch.TimeControl
+  langs:
+  - csharp
+  - vb
+  name: DoSyncTimeControl()
+  nameWithType: TimeControl.DoSyncTimeControl()
+  fullName: Coop.Mod.Patch.TimeControl.DoSyncTimeControl()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/World/TimeControl.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DoSyncTimeControl
+    path: ../source/Coop/Mod/Patch/World/TimeControl.cs
+    startLine: 68
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: public static bool DoSyncTimeControl()
+    return:
+      type: System.Boolean
+    content.vb: Public Shared Function DoSyncTimeControl As Boolean
+  overload: Coop.Mod.Patch.TimeControl.DoSyncTimeControl*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+references:
+- uid: Coop.Mod.Patch
+  commentId: N:Coop.Mod.Patch
+  name: Coop.Mod.Patch
+  nameWithType: Coop.Mod.Patch
+  fullName: Coop.Mod.Patch
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Sync.PropertyPatch
+  commentId: T:Sync.PropertyPatch
+  parent: Sync
+  name: PropertyPatch
+  nameWithType: PropertyPatch
+  fullName: Sync.PropertyPatch
+- uid: Sync
+  commentId: N:Sync
+  name: Sync
+  nameWithType: Sync
+  fullName: Sync
+- uid: Coop.Mod.Patch.TimeControl.TimeControlMode*
+  commentId: Overload:Coop.Mod.Patch.TimeControl.TimeControlMode
+  name: TimeControlMode
+  nameWithType: TimeControl.TimeControlMode
+  fullName: Coop.Mod.Patch.TimeControl.TimeControlMode
+- uid: Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,TaleWorlds.CampaignSystem.CampaignTimeControlMode}
+  commentId: T:Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,TaleWorlds.CampaignSystem.CampaignTimeControlMode}
+  parent: Sync
+  definition: Sync.FieldAccess`2
+  name: FieldAccess<Campaign, CampaignTimeControlMode>
+  nameWithType: FieldAccess<Campaign, CampaignTimeControlMode>
+  fullName: Sync.FieldAccess<TaleWorlds.CampaignSystem.Campaign, TaleWorlds.CampaignSystem.CampaignTimeControlMode>
+  nameWithType.vb: FieldAccess(Of Campaign, CampaignTimeControlMode)
+  fullName.vb: Sync.FieldAccess(Of TaleWorlds.CampaignSystem.Campaign, TaleWorlds.CampaignSystem.CampaignTimeControlMode)
+  name.vb: FieldAccess(Of Campaign, CampaignTimeControlMode)
+  spec.csharp:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.CampaignSystem.Campaign
+    name: Campaign
+    nameWithType: Campaign
+    fullName: TaleWorlds.CampaignSystem.Campaign
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    name: CampaignTimeControlMode
+    nameWithType: CampaignTimeControlMode
+    fullName: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.CampaignSystem.Campaign
+    name: Campaign
+    nameWithType: Campaign
+    fullName: TaleWorlds.CampaignSystem.Campaign
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    name: CampaignTimeControlMode
+    nameWithType: CampaignTimeControlMode
+    fullName: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldAccess`2
+  commentId: T:Sync.FieldAccess`2
+  name: FieldAccess<TDeclaring, TFieldType>
+  nameWithType: FieldAccess<TDeclaring, TFieldType>
+  fullName: Sync.FieldAccess<TDeclaring, TFieldType>
+  nameWithType.vb: FieldAccess(Of TDeclaring, TFieldType)
+  fullName.vb: Sync.FieldAccess(Of TDeclaring, TFieldType)
+  name.vb: FieldAccess(Of TDeclaring, TFieldType)
+  spec.csharp:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TFieldType
+    nameWithType: TFieldType
+    fullName: TFieldType
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TFieldType
+    nameWithType: TFieldType
+    fullName: TFieldType
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.Patch.TimeControl.TimeControlModeLock*
+  commentId: Overload:Coop.Mod.Patch.TimeControl.TimeControlModeLock
+  name: TimeControlModeLock
+  nameWithType: TimeControl.TimeControlModeLock
+  fullName: Coop.Mod.Patch.TimeControl.TimeControlModeLock
+- uid: Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,System.Boolean}
+  commentId: T:Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,System.Boolean}
+  parent: Sync
+  definition: Sync.FieldAccess`2
+  name: FieldAccess<Campaign, Boolean>
+  nameWithType: FieldAccess<Campaign, Boolean>
+  fullName: Sync.FieldAccess<TaleWorlds.CampaignSystem.Campaign, System.Boolean>
+  nameWithType.vb: FieldAccess(Of Campaign, Boolean)
+  fullName.vb: Sync.FieldAccess(Of TaleWorlds.CampaignSystem.Campaign, System.Boolean)
+  name.vb: FieldAccess(Of Campaign, Boolean)
+  spec.csharp:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.CampaignSystem.Campaign
+    name: Campaign
+    nameWithType: Campaign
+    fullName: TaleWorlds.CampaignSystem.Campaign
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.CampaignSystem.Campaign
+    name: Campaign
+    nameWithType: Campaign
+    fullName: TaleWorlds.CampaignSystem.Campaign
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.Mod.Patch.TimeControl.Init*
+  commentId: Overload:Coop.Mod.Patch.TimeControl.Init
+  name: Init
+  nameWithType: TimeControl.Init
+  fullName: Coop.Mod.Patch.TimeControl.Init
+- uid: Coop.Mod.Patch.TimeControl.SetIsMainPartyWaiting*
+  commentId: Overload:Coop.Mod.Patch.TimeControl.SetIsMainPartyWaiting
+  name: SetIsMainPartyWaiting
+  nameWithType: TimeControl.SetIsMainPartyWaiting
+  fullName: Coop.Mod.Patch.TimeControl.SetIsMainPartyWaiting
+- uid: Coop.Mod.Patch.TimeControl.DoSyncTimeControl*
+  commentId: Overload:Coop.Mod.Patch.TimeControl.DoSyncTimeControl
+  name: DoSyncTimeControl
+  nameWithType: TimeControl.DoSyncTimeControl
+  fullName: Coop.Mod.Patch.TimeControl.DoSyncTimeControl

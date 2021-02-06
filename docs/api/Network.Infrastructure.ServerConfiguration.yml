@@ -1,0 +1,555 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.ServerConfiguration
+  commentId: T:Network.Infrastructure.ServerConfiguration
+  id: ServerConfiguration
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.ServerConfiguration.#ctor
+  - Network.Infrastructure.ServerConfiguration.EventBroadcastTimeout
+  - Network.Infrastructure.ServerConfiguration.MaxPlayerCount
+  - Network.Infrastructure.ServerConfiguration.NetworkConfiguration
+  - Network.Infrastructure.ServerConfiguration.TickRate
+  langs:
+  - csharp
+  - vb
+  name: ServerConfiguration
+  nameWithType: ServerConfiguration
+  fullName: Network.Infrastructure.ServerConfiguration
+  type: Class
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerConfiguration.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ServerConfiguration
+    path: ../source/Network/Infrastructure/ServerConfiguration.cs
+    startLine: 4
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public class ServerConfiguration
+    content.vb: Public Class ServerConfiguration
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Network.Infrastructure.ServerConfiguration.#ctor
+  commentId: M:Network.Infrastructure.ServerConfiguration.#ctor
+  id: '#ctor'
+  parent: Network.Infrastructure.ServerConfiguration
+  langs:
+  - csharp
+  - vb
+  name: ServerConfiguration()
+  nameWithType: ServerConfiguration.ServerConfiguration()
+  fullName: Network.Infrastructure.ServerConfiguration.ServerConfiguration()
+  type: Constructor
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerConfiguration.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Network/Infrastructure/ServerConfiguration.cs
+    startLine: 6
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public ServerConfiguration()
+    content.vb: Public Sub New
+  overload: Network.Infrastructure.ServerConfiguration.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ServerConfiguration.MaxPlayerCount
+  commentId: P:Network.Infrastructure.ServerConfiguration.MaxPlayerCount
+  id: MaxPlayerCount
+  parent: Network.Infrastructure.ServerConfiguration
+  langs:
+  - csharp
+  - vb
+  name: MaxPlayerCount
+  nameWithType: ServerConfiguration.MaxPlayerCount
+  fullName: Network.Infrastructure.ServerConfiguration.MaxPlayerCount
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerConfiguration.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MaxPlayerCount
+    path: ../source/Network/Infrastructure/ServerConfiguration.cs
+    startLine: 14
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public uint MaxPlayerCount { get; set; }
+    parameters: []
+    return:
+      type: System.UInt32
+    content.vb: Public Property MaxPlayerCount As UInteger
+  overload: Network.Infrastructure.ServerConfiguration.MaxPlayerCount*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ServerConfiguration.TickRate
+  commentId: P:Network.Infrastructure.ServerConfiguration.TickRate
+  id: TickRate
+  parent: Network.Infrastructure.ServerConfiguration
+  langs:
+  - csharp
+  - vb
+  name: TickRate
+  nameWithType: ServerConfiguration.TickRate
+  fullName: Network.Infrastructure.ServerConfiguration.TickRate
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerConfiguration.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TickRate
+    path: ../source/Network/Infrastructure/ServerConfiguration.cs
+    startLine: 15
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public uint TickRate { get; set; }
+    parameters: []
+    return:
+      type: System.UInt32
+    content.vb: Public Property TickRate As UInteger
+  overload: Network.Infrastructure.ServerConfiguration.TickRate*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ServerConfiguration.NetworkConfiguration
+  commentId: P:Network.Infrastructure.ServerConfiguration.NetworkConfiguration
+  id: NetworkConfiguration
+  parent: Network.Infrastructure.ServerConfiguration
+  langs:
+  - csharp
+  - vb
+  name: NetworkConfiguration
+  nameWithType: ServerConfiguration.NetworkConfiguration
+  fullName: Network.Infrastructure.ServerConfiguration.NetworkConfiguration
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerConfiguration.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: NetworkConfiguration
+    path: ../source/Network/Infrastructure/ServerConfiguration.cs
+    startLine: 17
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public NetworkConfiguration NetworkConfiguration { get; set; }
+    parameters: []
+    return:
+      type: Network.Infrastructure.NetworkConfiguration
+    content.vb: Public Property NetworkConfiguration As NetworkConfiguration
+  overload: Network.Infrastructure.ServerConfiguration.NetworkConfiguration*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ServerConfiguration.EventBroadcastTimeout
+  commentId: F:Network.Infrastructure.ServerConfiguration.EventBroadcastTimeout
+  id: EventBroadcastTimeout
+  parent: Network.Infrastructure.ServerConfiguration
+  langs:
+  - csharp
+  - vb
+  name: EventBroadcastTimeout
+  nameWithType: ServerConfiguration.EventBroadcastTimeout
+  fullName: Network.Infrastructure.ServerConfiguration.EventBroadcastTimeout
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerConfiguration.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EventBroadcastTimeout
+    path: ../source/Network/Infrastructure/ServerConfiguration.cs
+    startLine: 24
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  summary: "\nDefines the maximum amount of time after which an event will be dropped if it was not yet\ndelivered successfully. Do not set this too low, as the time it takes to transfer any arguments\nis included in this.\n"
+  example: []
+  syntax:
+    content: public TimeSpan EventBroadcastTimeout
+    return:
+      type: System.TimeSpan
+    content.vb: Public EventBroadcastTimeout As TimeSpan
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Network.Infrastructure.ServerConfiguration.#ctor*
+  commentId: Overload:Network.Infrastructure.ServerConfiguration.#ctor
+  name: ServerConfiguration
+  nameWithType: ServerConfiguration.ServerConfiguration
+  fullName: Network.Infrastructure.ServerConfiguration.ServerConfiguration
+- uid: Network.Infrastructure.ServerConfiguration.MaxPlayerCount*
+  commentId: Overload:Network.Infrastructure.ServerConfiguration.MaxPlayerCount
+  name: MaxPlayerCount
+  nameWithType: ServerConfiguration.MaxPlayerCount
+  fullName: Network.Infrastructure.ServerConfiguration.MaxPlayerCount
+- uid: System.UInt32
+  commentId: T:System.UInt32
+  parent: System
+  isExternal: true
+  name: UInt32
+  nameWithType: UInt32
+  fullName: System.UInt32
+- uid: Network.Infrastructure.ServerConfiguration.TickRate*
+  commentId: Overload:Network.Infrastructure.ServerConfiguration.TickRate
+  name: TickRate
+  nameWithType: ServerConfiguration.TickRate
+  fullName: Network.Infrastructure.ServerConfiguration.TickRate
+- uid: Network.Infrastructure.ServerConfiguration.NetworkConfiguration*
+  commentId: Overload:Network.Infrastructure.ServerConfiguration.NetworkConfiguration
+  name: NetworkConfiguration
+  nameWithType: ServerConfiguration.NetworkConfiguration
+  fullName: Network.Infrastructure.ServerConfiguration.NetworkConfiguration
+- uid: Network.Infrastructure.NetworkConfiguration
+  commentId: T:Network.Infrastructure.NetworkConfiguration
+  parent: Network.Infrastructure
+  name: NetworkConfiguration
+  nameWithType: NetworkConfiguration
+  fullName: Network.Infrastructure.NetworkConfiguration
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan

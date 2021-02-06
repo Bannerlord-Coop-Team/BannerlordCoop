@@ -1,0 +1,55 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Client.UI.CharacterCreation.ClientCharacterCreationState
+  commentId: T:Coop.Client.UI.CharacterCreation.ClientCharacterCreationState
+  id: ClientCharacterCreationState
+  parent: Coop.Client.UI.CharacterCreation
+  children: []
+  langs:
+  - csharp
+  - vb
+  name: ClientCharacterCreationState
+  nameWithType: ClientCharacterCreationState
+  fullName: Coop.Client.UI.CharacterCreation.ClientCharacterCreationState
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ClientCharacterCreationState
+    path: ../source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs
+    startLine: 36
+  assemblies:
+  - Coop
+  namespace: Coop.Client.UI.CharacterCreation
+  syntax:
+    content: 'class ClientCharacterCreationState : CharacterCreationState'
+    content.vb: >-
+      Class ClientCharacterCreationState
+          Inherits CharacterCreationState
+  inheritance:
+  - System.Object
+  modifiers.csharp:
+  - class
+  modifiers.vb:
+  - Class
+references:
+- uid: Coop.Client.UI.CharacterCreation
+  commentId: N:Coop.Client.UI.CharacterCreation
+  name: Coop.Client.UI.CharacterCreation
+  nameWithType: Coop.Client.UI.CharacterCreation
+  fullName: Coop.Client.UI.CharacterCreation
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System

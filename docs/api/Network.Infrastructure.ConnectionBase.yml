@@ -1,0 +1,1031 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.ConnectionBase
+  commentId: T:Network.Infrastructure.ConnectionBase
+  id: ConnectionBase
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.ConnectionBase.#ctor(Network.Infrastructure.INetworkConnection,Network.Infrastructure.IGameStatePersistence)
+  - Network.Infrastructure.ConnectionBase.Disconnect(Network.Infrastructure.EDisconnectReason)
+  - Network.Infrastructure.ConnectionBase.Dispatcher
+  - Network.Infrastructure.ConnectionBase.GameStatePersistence
+  - Network.Infrastructure.ConnectionBase.Latency
+  - Network.Infrastructure.ConnectionBase.m_PackageReader
+  - Network.Infrastructure.ConnectionBase.m_Stream
+  - Network.Infrastructure.ConnectionBase.Network
+  - Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment{System.Byte})
+  - Network.Infrastructure.ConnectionBase.Send(Network.Protocol.Packet)
+  - Network.Infrastructure.ConnectionBase.SendFragmented(Network.Protocol.Packet)
+  - Network.Infrastructure.ConnectionBase.State
+  - Network.Infrastructure.ConnectionBase.ToString
+  langs:
+  - csharp
+  - vb
+  name: ConnectionBase
+  nameWithType: ConnectionBase
+  fullName: Network.Infrastructure.ConnectionBase
+  type: Class
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ConnectionBase
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 12
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public abstract class ConnectionBase
+    content.vb: Public MustInherit Class ConnectionBase
+  inheritance:
+  - System.Object
+  derivedClasses:
+  - Network.Infrastructure.ConnectionClient
+  - Network.Infrastructure.ConnectionServer
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - abstract
+  - class
+  modifiers.vb:
+  - Public
+  - MustInherit
+  - Class
+- uid: Network.Infrastructure.ConnectionBase.Dispatcher
+  commentId: F:Network.Infrastructure.ConnectionBase.Dispatcher
+  id: Dispatcher
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: Dispatcher
+  nameWithType: ConnectionBase.Dispatcher
+  fullName: Network.Infrastructure.ConnectionBase.Dispatcher
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Dispatcher
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 14
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public readonly PacketDispatcher Dispatcher
+    return:
+      type: Network.Protocol.PacketDispatcher
+    content.vb: Public ReadOnly Dispatcher As PacketDispatcher
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.ConnectionBase.#ctor(Network.Infrastructure.INetworkConnection,Network.Infrastructure.IGameStatePersistence)
+  commentId: M:Network.Infrastructure.ConnectionBase.#ctor(Network.Infrastructure.INetworkConnection,Network.Infrastructure.IGameStatePersistence)
+  id: '#ctor(Network.Infrastructure.INetworkConnection,Network.Infrastructure.IGameStatePersistence)'
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: ConnectionBase(INetworkConnection, IGameStatePersistence)
+  nameWithType: ConnectionBase.ConnectionBase(INetworkConnection, IGameStatePersistence)
+  fullName: Network.Infrastructure.ConnectionBase.ConnectionBase(Network.Infrastructure.INetworkConnection, Network.Infrastructure.IGameStatePersistence)
+  type: Constructor
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 20
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  summary: "\n"
+  example: []
+  syntax:
+    content: protected ConnectionBase([NotNull] INetworkConnection network, [NotNull] IGameStatePersistence persistence)
+    parameters:
+    - id: network
+      type: Network.Infrastructure.INetworkConnection
+      description: Networking implementation.
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    - id: persistence
+      type: Network.Infrastructure.IGameStatePersistence
+      description: Implementation to relay Persistance packets to.
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    content.vb: Protected Sub New(network As INetworkConnection, persistence As IGameStatePersistence)
+  overload: Network.Infrastructure.ConnectionBase.#ctor*
+  modifiers.csharp:
+  - protected
+  modifiers.vb:
+  - Protected
+- uid: Network.Infrastructure.ConnectionBase.GameStatePersistence
+  commentId: P:Network.Infrastructure.ConnectionBase.GameStatePersistence
+  id: GameStatePersistence
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: GameStatePersistence
+  nameWithType: ConnectionBase.GameStatePersistence
+  fullName: Network.Infrastructure.ConnectionBase.GameStatePersistence
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GameStatePersistence
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 31
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public IGameStatePersistence GameStatePersistence { get; }
+    parameters: []
+    return:
+      type: Network.Infrastructure.IGameStatePersistence
+    content.vb: Public ReadOnly Property GameStatePersistence As IGameStatePersistence
+  overload: Network.Infrastructure.ConnectionBase.GameStatePersistence*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.ConnectionBase.Send(Network.Protocol.Packet)
+  commentId: M:Network.Infrastructure.ConnectionBase.Send(Network.Protocol.Packet)
+  id: Send(Network.Protocol.Packet)
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: Send(Packet)
+  nameWithType: ConnectionBase.Send(Packet)
+  fullName: Network.Infrastructure.ConnectionBase.Send(Network.Protocol.Packet)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Send
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 33
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public void Send(Packet packet)
+    parameters:
+    - id: packet
+      type: Network.Protocol.Packet
+    content.vb: Public Sub Send(packet As Packet)
+  overload: Network.Infrastructure.ConnectionBase.Send*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ConnectionBase.SendFragmented(Network.Protocol.Packet)
+  commentId: M:Network.Infrastructure.ConnectionBase.SendFragmented(Network.Protocol.Packet)
+  id: SendFragmented(Network.Protocol.Packet)
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: SendFragmented(Packet)
+  nameWithType: ConnectionBase.SendFragmented(Packet)
+  fullName: Network.Infrastructure.ConnectionBase.SendFragmented(Network.Protocol.Packet)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SendFragmented
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 51
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public void SendFragmented(Packet packet)
+    parameters:
+    - id: packet
+      type: Network.Protocol.Packet
+    content.vb: Public Sub SendFragmented(packet As Packet)
+  overload: Network.Infrastructure.ConnectionBase.SendFragmented*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment{System.Byte})
+  commentId: M:Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment{System.Byte})
+  id: Receive(System.ArraySegment{System.Byte})
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: Receive(ArraySegment<Byte>)
+  nameWithType: ConnectionBase.Receive(ArraySegment<Byte>)
+  fullName: Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment<System.Byte>)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Receive
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 74
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public void Receive(ArraySegment<byte> buffer)
+    parameters:
+    - id: buffer
+      type: System.ArraySegment{System.Byte}
+    content.vb: Public Sub Receive(buffer As ArraySegment(Of Byte))
+  overload: Network.Infrastructure.ConnectionBase.Receive*
+  nameWithType.vb: ConnectionBase.Receive(ArraySegment(Of Byte))
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment(Of System.Byte))
+  name.vb: Receive(ArraySegment(Of Byte))
+- uid: Network.Infrastructure.ConnectionBase.Network
+  commentId: P:Network.Infrastructure.ConnectionBase.Network
+  id: Network
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: Network
+  nameWithType: ConnectionBase.Network
+  fullName: Network.Infrastructure.ConnectionBase.Network
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Network
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 101
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public INetworkConnection Network { get; }
+    parameters: []
+    return:
+      type: Network.Infrastructure.INetworkConnection
+    content.vb: Public ReadOnly Property Network As INetworkConnection
+  overload: Network.Infrastructure.ConnectionBase.Network*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.ConnectionBase.State
+  commentId: P:Network.Infrastructure.ConnectionBase.State
+  id: State
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: State
+  nameWithType: ConnectionBase.State
+  fullName: Network.Infrastructure.ConnectionBase.State
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: State
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 102
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public abstract Enum State { get; }
+    parameters: []
+    return:
+      type: System.Enum
+    content.vb: 'Public MustOverride ReadOnly Property State As '
+  overload: Network.Infrastructure.ConnectionBase.State*
+  modifiers.csharp:
+  - public
+  - abstract
+  - get
+  modifiers.vb:
+  - Public
+  - MustOverride
+  - ReadOnly
+- uid: Network.Infrastructure.ConnectionBase.Latency
+  commentId: F:Network.Infrastructure.ConnectionBase.Latency
+  id: Latency
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: Latency
+  nameWithType: ConnectionBase.Latency
+  fullName: Network.Infrastructure.ConnectionBase.Latency
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Latency
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 103
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public int Latency
+    return:
+      type: System.Int32
+    content.vb: Public Latency As Integer
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ConnectionBase.Disconnect(Network.Infrastructure.EDisconnectReason)
+  commentId: M:Network.Infrastructure.ConnectionBase.Disconnect(Network.Infrastructure.EDisconnectReason)
+  id: Disconnect(Network.Infrastructure.EDisconnectReason)
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: Disconnect(EDisconnectReason)
+  nameWithType: ConnectionBase.Disconnect(EDisconnectReason)
+  fullName: Network.Infrastructure.ConnectionBase.Disconnect(Network.Infrastructure.EDisconnectReason)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Disconnect
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 111
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  summary: "\nCloses the connection.\nPost condition: <xref href=\"Network.Infrastructure.ConnectionBase.State\" data-throw-if-not-resolved=\"false\"></xref> is equal to <xref href=\"Network.Infrastructure.EClientConnectionState.Disconnected\" data-throw-if-not-resolved=\"false\"></xref>\nor <xref href=\"Network.Infrastructure.EServerConnectionState.Terminated\" data-throw-if-not-resolved=\"false\"></xref>.\n"
+  example: []
+  syntax:
+    content: public abstract void Disconnect(EDisconnectReason eReason)
+    parameters:
+    - id: eReason
+      type: Network.Infrastructure.EDisconnectReason
+      description: Reason that caused the disconnect.
+    content.vb: Public MustOverride Sub Disconnect(eReason As EDisconnectReason)
+  overload: Network.Infrastructure.ConnectionBase.Disconnect*
+  modifiers.csharp:
+  - public
+  - abstract
+  modifiers.vb:
+  - Public
+  - MustOverride
+- uid: Network.Infrastructure.ConnectionBase.ToString
+  commentId: M:Network.Infrastructure.ConnectionBase.ToString
+  id: ToString
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: ToString()
+  nameWithType: ConnectionBase.ToString()
+  fullName: Network.Infrastructure.ConnectionBase.ToString()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ToString
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 113
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public override string ToString()
+    return:
+      type: System.String
+    content.vb: Public Overrides Function ToString As String
+  overridden: System.Object.ToString
+  overload: Network.Infrastructure.ConnectionBase.ToString*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Network.Infrastructure.ConnectionBase.m_Stream
+  commentId: F:Network.Infrastructure.ConnectionBase.m_Stream
+  id: m_Stream
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: m_Stream
+  nameWithType: ConnectionBase.m_Stream
+  fullName: Network.Infrastructure.ConnectionBase.m_Stream
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Stream
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 120
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: readonly MemoryStream m_Stream
+    return:
+      type: System.IO.MemoryStream
+    content.vb: ReadOnly m_Stream As MemoryStream
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Network.Infrastructure.ConnectionBase.m_PackageReader
+  commentId: F:Network.Infrastructure.ConnectionBase.m_PackageReader
+  id: m_PackageReader
+  parent: Network.Infrastructure.ConnectionBase
+  langs:
+  - csharp
+  - vb
+  name: m_PackageReader
+  nameWithType: ConnectionBase.m_PackageReader
+  fullName: Network.Infrastructure.ConnectionBase.m_PackageReader
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionBase.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_PackageReader
+    path: ../source/Network/Infrastructure/ConnectionBase.cs
+    startLine: 121
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: PacketReader m_PackageReader
+    return:
+      type: Network.Protocol.PacketReader
+    content.vb: m_PackageReader As PacketReader
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Network.Protocol.PacketDispatcher
+  commentId: T:Network.Protocol.PacketDispatcher
+  parent: Network.Protocol
+  name: PacketDispatcher
+  nameWithType: PacketDispatcher
+  fullName: Network.Protocol.PacketDispatcher
+- uid: Network.Protocol
+  commentId: N:Network.Protocol
+  name: Network.Protocol
+  nameWithType: Network.Protocol
+  fullName: Network.Protocol
+- uid: Network.Infrastructure.ConnectionBase.#ctor*
+  commentId: Overload:Network.Infrastructure.ConnectionBase.#ctor
+  name: ConnectionBase
+  nameWithType: ConnectionBase.ConnectionBase
+  fullName: Network.Infrastructure.ConnectionBase.ConnectionBase
+- uid: Network.Infrastructure.INetworkConnection
+  commentId: T:Network.Infrastructure.INetworkConnection
+  parent: Network.Infrastructure
+  name: INetworkConnection
+  nameWithType: INetworkConnection
+  fullName: Network.Infrastructure.INetworkConnection
+- uid: Network.Infrastructure.IGameStatePersistence
+  commentId: T:Network.Infrastructure.IGameStatePersistence
+  parent: Network.Infrastructure
+  name: IGameStatePersistence
+  nameWithType: IGameStatePersistence
+  fullName: Network.Infrastructure.IGameStatePersistence
+- uid: Network.Infrastructure.ConnectionBase.GameStatePersistence*
+  commentId: Overload:Network.Infrastructure.ConnectionBase.GameStatePersistence
+  name: GameStatePersistence
+  nameWithType: ConnectionBase.GameStatePersistence
+  fullName: Network.Infrastructure.ConnectionBase.GameStatePersistence
+- uid: Network.Infrastructure.ConnectionBase.Send*
+  commentId: Overload:Network.Infrastructure.ConnectionBase.Send
+  name: Send
+  nameWithType: ConnectionBase.Send
+  fullName: Network.Infrastructure.ConnectionBase.Send
+- uid: Network.Protocol.Packet
+  commentId: T:Network.Protocol.Packet
+  parent: Network.Protocol
+  name: Packet
+  nameWithType: Packet
+  fullName: Network.Protocol.Packet
+- uid: Network.Infrastructure.ConnectionBase.SendFragmented*
+  commentId: Overload:Network.Infrastructure.ConnectionBase.SendFragmented
+  name: SendFragmented
+  nameWithType: ConnectionBase.SendFragmented
+  fullName: Network.Infrastructure.ConnectionBase.SendFragmented
+- uid: Network.Infrastructure.ConnectionBase.Receive*
+  commentId: Overload:Network.Infrastructure.ConnectionBase.Receive
+  name: Receive
+  nameWithType: ConnectionBase.Receive
+  fullName: Network.Infrastructure.ConnectionBase.Receive
+- uid: System.ArraySegment{System.Byte}
+  commentId: T:System.ArraySegment{System.Byte}
+  parent: System
+  definition: System.ArraySegment`1
+  name: ArraySegment<Byte>
+  nameWithType: ArraySegment<Byte>
+  fullName: System.ArraySegment<System.Byte>
+  nameWithType.vb: ArraySegment(Of Byte)
+  fullName.vb: System.ArraySegment(Of System.Byte)
+  name.vb: ArraySegment(Of Byte)
+  spec.csharp:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ArraySegment`1
+  commentId: T:System.ArraySegment`1
+  isExternal: true
+  name: ArraySegment<T>
+  nameWithType: ArraySegment<T>
+  fullName: System.ArraySegment<T>
+  nameWithType.vb: ArraySegment(Of T)
+  fullName.vb: System.ArraySegment(Of T)
+  name.vb: ArraySegment(Of T)
+  spec.csharp:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.ConnectionBase.Network*
+  commentId: Overload:Network.Infrastructure.ConnectionBase.Network
+  name: Network
+  nameWithType: ConnectionBase.Network
+  fullName: Network.Infrastructure.ConnectionBase.Network
+- uid: Network.Infrastructure.ConnectionBase.State*
+  commentId: Overload:Network.Infrastructure.ConnectionBase.State
+  name: State
+  nameWithType: ConnectionBase.State
+  fullName: Network.Infrastructure.ConnectionBase.State
+- uid: System.Enum
+  commentId: T:System.Enum
+  parent: System
+  isExternal: true
+  name: Enum
+  nameWithType: Enum
+  fullName: System.Enum
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: Network.Infrastructure.ConnectionBase.State
+  commentId: P:Network.Infrastructure.ConnectionBase.State
+  parent: Network.Infrastructure.ConnectionBase
+  name: State
+  nameWithType: ConnectionBase.State
+  fullName: Network.Infrastructure.ConnectionBase.State
+- uid: Network.Infrastructure.EClientConnectionState.Disconnected
+  commentId: F:Network.Infrastructure.EClientConnectionState.Disconnected
+  isExternal: true
+- uid: Network.Infrastructure.EServerConnectionState.Terminated
+  commentId: F:Network.Infrastructure.EServerConnectionState.Terminated
+  isExternal: true
+- uid: Network.Infrastructure.ConnectionBase.Disconnect*
+  commentId: Overload:Network.Infrastructure.ConnectionBase.Disconnect
+  name: Disconnect
+  nameWithType: ConnectionBase.Disconnect
+  fullName: Network.Infrastructure.ConnectionBase.Disconnect
+- uid: Network.Infrastructure.EDisconnectReason
+  commentId: T:Network.Infrastructure.EDisconnectReason
+  parent: Network.Infrastructure
+  name: EDisconnectReason
+  nameWithType: EDisconnectReason
+  fullName: Network.Infrastructure.EDisconnectReason
+- uid: Network.Infrastructure.ConnectionBase
+  commentId: T:Network.Infrastructure.ConnectionBase
+  parent: Network.Infrastructure
+  name: ConnectionBase
+  nameWithType: ConnectionBase
+  fullName: Network.Infrastructure.ConnectionBase
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.ConnectionBase.ToString*
+  commentId: Overload:Network.Infrastructure.ConnectionBase.ToString
+  name: ToString
+  nameWithType: ConnectionBase.ToString
+  fullName: Network.Infrastructure.ConnectionBase.ToString
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String
+- uid: System.IO.MemoryStream
+  commentId: T:System.IO.MemoryStream
+  parent: System.IO
+  isExternal: true
+  name: MemoryStream
+  nameWithType: MemoryStream
+  fullName: System.IO.MemoryStream
+- uid: System.IO
+  commentId: N:System.IO
+  isExternal: true
+  name: System.IO
+  nameWithType: System.IO
+  fullName: System.IO
+- uid: Network.Protocol.PacketReader
+  commentId: T:Network.Protocol.PacketReader
+  parent: Network.Protocol
+  name: PacketReader
+  nameWithType: PacketReader
+  fullName: Network.Protocol.PacketReader

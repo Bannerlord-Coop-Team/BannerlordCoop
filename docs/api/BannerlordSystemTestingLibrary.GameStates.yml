@@ -1,0 +1,1069 @@
+### YamlMime:ManagedReference
+items:
+- uid: BannerlordSystemTestingLibrary.GameStates
+  commentId: T:BannerlordSystemTestingLibrary.GameStates
+  id: GameStates
+  parent: BannerlordSystemTestingLibrary
+  children:
+  - BannerlordSystemTestingLibrary.GameStates.BannerEditorState
+  - BannerlordSystemTestingLibrary.GameStates.BarberState
+  - BannerlordSystemTestingLibrary.GameStates.CharacterCreationState
+  - BannerlordSystemTestingLibrary.GameStates.CharacterDeveloperState
+  - BannerlordSystemTestingLibrary.GameStates.ClanState
+  - BannerlordSystemTestingLibrary.GameStates.CraftingState
+  - BannerlordSystemTestingLibrary.GameStates.EditorState
+  - BannerlordSystemTestingLibrary.GameStates.GameLoadingState
+  - BannerlordSystemTestingLibrary.GameStates.InitialState
+  - BannerlordSystemTestingLibrary.GameStates.KingdomState
+  - BannerlordSystemTestingLibrary.GameStates.LobbyGameState
+  - BannerlordSystemTestingLibrary.GameStates.LobbyState
+  - BannerlordSystemTestingLibrary.GameStates.MainMenuReadyState
+  - BannerlordSystemTestingLibrary.GameStates.MapState
+  - BannerlordSystemTestingLibrary.GameStates.MissionState
+  - BannerlordSystemTestingLibrary.GameStates.PlayerGameState
+  - BannerlordSystemTestingLibrary.GameStates.QuestsState
+  - BannerlordSystemTestingLibrary.GameStates.TutorialState
+  - BannerlordSystemTestingLibrary.GameStates.UnspecifiedDedicatedServerState
+  - BannerlordSystemTestingLibrary.GameStates.VideoPlaybackState
+  langs:
+  - csharp
+  - vb
+  name: GameStates
+  nameWithType: GameStates
+  fullName: BannerlordSystemTestingLibrary.GameStates
+  type: Class
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: GameStates
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 8
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public class GameStates
+    content.vb: Public Class GameStates
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: BannerlordSystemTestingLibrary.GameStates.MainMenuReadyState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.MainMenuReadyState
+  id: MainMenuReadyState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: MainMenuReadyState
+  nameWithType: GameStates.MainMenuReadyState
+  fullName: BannerlordSystemTestingLibrary.GameStates.MainMenuReadyState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: MainMenuReadyState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 11
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string MainMenuReadyState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly MainMenuReadyState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.CharacterCreationState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.CharacterCreationState
+  id: CharacterCreationState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: CharacterCreationState
+  nameWithType: GameStates.CharacterCreationState
+  fullName: BannerlordSystemTestingLibrary.GameStates.CharacterCreationState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: CharacterCreationState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 12
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string CharacterCreationState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly CharacterCreationState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.InitialState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.InitialState
+  id: InitialState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: InitialState
+  nameWithType: GameStates.InitialState
+  fullName: BannerlordSystemTestingLibrary.GameStates.InitialState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: InitialState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 15
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string InitialState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly InitialState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.BannerEditorState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.BannerEditorState
+  id: BannerEditorState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: BannerEditorState
+  nameWithType: GameStates.BannerEditorState
+  fullName: BannerlordSystemTestingLibrary.GameStates.BannerEditorState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: BannerEditorState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 16
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string BannerEditorState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly BannerEditorState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.BarberState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.BarberState
+  id: BarberState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: BarberState
+  nameWithType: GameStates.BarberState
+  fullName: BannerlordSystemTestingLibrary.GameStates.BarberState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: BarberState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 17
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string BarberState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly BarberState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.CharacterDeveloperState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.CharacterDeveloperState
+  id: CharacterDeveloperState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: CharacterDeveloperState
+  nameWithType: GameStates.CharacterDeveloperState
+  fullName: BannerlordSystemTestingLibrary.GameStates.CharacterDeveloperState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: CharacterDeveloperState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 18
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string CharacterDeveloperState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly CharacterDeveloperState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.ClanState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.ClanState
+  id: ClanState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: ClanState
+  nameWithType: GameStates.ClanState
+  fullName: BannerlordSystemTestingLibrary.GameStates.ClanState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: ClanState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 19
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string ClanState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly ClanState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.CraftingState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.CraftingState
+  id: CraftingState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: CraftingState
+  nameWithType: GameStates.CraftingState
+  fullName: BannerlordSystemTestingLibrary.GameStates.CraftingState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: CraftingState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 20
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string CraftingState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly CraftingState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.EditorState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.EditorState
+  id: EditorState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: EditorState
+  nameWithType: GameStates.EditorState
+  fullName: BannerlordSystemTestingLibrary.GameStates.EditorState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: EditorState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 21
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string EditorState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly EditorState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.GameLoadingState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.GameLoadingState
+  id: GameLoadingState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: GameLoadingState
+  nameWithType: GameStates.GameLoadingState
+  fullName: BannerlordSystemTestingLibrary.GameStates.GameLoadingState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: GameLoadingState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 22
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string GameLoadingState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly GameLoadingState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.KingdomState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.KingdomState
+  id: KingdomState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: KingdomState
+  nameWithType: GameStates.KingdomState
+  fullName: BannerlordSystemTestingLibrary.GameStates.KingdomState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: KingdomState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 23
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string KingdomState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly KingdomState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.LobbyGameState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.LobbyGameState
+  id: LobbyGameState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: LobbyGameState
+  nameWithType: GameStates.LobbyGameState
+  fullName: BannerlordSystemTestingLibrary.GameStates.LobbyGameState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: LobbyGameState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 24
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string LobbyGameState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly LobbyGameState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.LobbyState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.LobbyState
+  id: LobbyState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: LobbyState
+  nameWithType: GameStates.LobbyState
+  fullName: BannerlordSystemTestingLibrary.GameStates.LobbyState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: LobbyState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 25
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string LobbyState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly LobbyState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.MapState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.MapState
+  id: MapState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: MapState
+  nameWithType: GameStates.MapState
+  fullName: BannerlordSystemTestingLibrary.GameStates.MapState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: MapState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 26
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string MapState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly MapState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.MissionState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.MissionState
+  id: MissionState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: MissionState
+  nameWithType: GameStates.MissionState
+  fullName: BannerlordSystemTestingLibrary.GameStates.MissionState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: MissionState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 27
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string MissionState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly MissionState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.PlayerGameState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.PlayerGameState
+  id: PlayerGameState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: PlayerGameState
+  nameWithType: GameStates.PlayerGameState
+  fullName: BannerlordSystemTestingLibrary.GameStates.PlayerGameState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: PlayerGameState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 28
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string PlayerGameState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly PlayerGameState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.QuestsState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.QuestsState
+  id: QuestsState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: QuestsState
+  nameWithType: GameStates.QuestsState
+  fullName: BannerlordSystemTestingLibrary.GameStates.QuestsState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: QuestsState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 29
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string QuestsState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly QuestsState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.TutorialState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.TutorialState
+  id: TutorialState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: TutorialState
+  nameWithType: GameStates.TutorialState
+  fullName: BannerlordSystemTestingLibrary.GameStates.TutorialState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: TutorialState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 30
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string TutorialState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly TutorialState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.UnspecifiedDedicatedServerState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.UnspecifiedDedicatedServerState
+  id: UnspecifiedDedicatedServerState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: UnspecifiedDedicatedServerState
+  nameWithType: GameStates.UnspecifiedDedicatedServerState
+  fullName: BannerlordSystemTestingLibrary.GameStates.UnspecifiedDedicatedServerState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: UnspecifiedDedicatedServerState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 31
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string UnspecifiedDedicatedServerState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly UnspecifiedDedicatedServerState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: BannerlordSystemTestingLibrary.GameStates.VideoPlaybackState
+  commentId: F:BannerlordSystemTestingLibrary.GameStates.VideoPlaybackState
+  id: VideoPlaybackState
+  parent: BannerlordSystemTestingLibrary.GameStates
+  langs:
+  - csharp
+  - vb
+  name: VideoPlaybackState
+  nameWithType: GameStates.VideoPlaybackState
+  fullName: BannerlordSystemTestingLibrary.GameStates.VideoPlaybackState
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/GameStates.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: VideoPlaybackState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/GameStates.cs
+    startLine: 32
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary
+  syntax:
+    content: public static readonly string VideoPlaybackState
+    return:
+      type: System.String
+    content.vb: Public Shared ReadOnly VideoPlaybackState As String
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+references:
+- uid: BannerlordSystemTestingLibrary
+  commentId: N:BannerlordSystemTestingLibrary
+  name: BannerlordSystemTestingLibrary
+  nameWithType: BannerlordSystemTestingLibrary
+  fullName: BannerlordSystemTestingLibrary
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String

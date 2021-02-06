@@ -1,0 +1,582 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Serializers.HeroLastSeenInformationSerializer
+  commentId: T:Coop.Mod.Serializers.HeroLastSeenInformationSerializer
+  id: HeroLastSeenInformationSerializer
+  parent: Coop.Mod.Serializers
+  children:
+  - Coop.Mod.Serializers.HeroLastSeenInformationSerializer.#ctor(TaleWorlds.CampaignSystem.Hero.HeroLastSeenInformation)
+  - Coop.Mod.Serializers.HeroLastSeenInformationSerializer.Deserialize
+  - Coop.Mod.Serializers.HeroLastSeenInformationSerializer.isSettlementNearby
+  - Coop.Mod.Serializers.HeroLastSeenInformationSerializer.lastSeenDate
+  - Coop.Mod.Serializers.HeroLastSeenInformationSerializer.lastSeenPlace
+  langs:
+  - csharp
+  - vb
+  name: HeroLastSeenInformationSerializer
+  nameWithType: HeroLastSeenInformationSerializer
+  fullName: Coop.Mod.Serializers.HeroLastSeenInformationSerializer
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: HeroLastSeenInformationSerializer
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+    startLine: 5
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: >-
+      [Serializable]
+
+      class HeroLastSeenInformationSerializer : ICustomSerializer
+    content.vb: >-
+      <Serializable>
+
+      Class HeroLastSeenInformationSerializer
+          Implements ICustomSerializer
+  inheritance:
+  - System.Object
+  implements:
+  - Coop.Mod.Serializers.ICustomSerializer
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  attributes:
+  - type: System.SerializableAttribute
+    ctor: System.SerializableAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - class
+  modifiers.vb:
+  - Class
+- uid: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.lastSeenPlace
+  commentId: F:Coop.Mod.Serializers.HeroLastSeenInformationSerializer.lastSeenPlace
+  id: lastSeenPlace
+  parent: Coop.Mod.Serializers.HeroLastSeenInformationSerializer
+  langs:
+  - csharp
+  - vb
+  name: lastSeenPlace
+  nameWithType: HeroLastSeenInformationSerializer.lastSeenPlace
+  fullName: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.lastSeenPlace
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: lastSeenPlace
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+    startLine: 8
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: SettlementSerializer lastSeenPlace
+    return:
+      type: Coop.Mod.Serializers.SettlementSerializer
+    content.vb: lastSeenPlace As SettlementSerializer
+- uid: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.lastSeenDate
+  commentId: F:Coop.Mod.Serializers.HeroLastSeenInformationSerializer.lastSeenDate
+  id: lastSeenDate
+  parent: Coop.Mod.Serializers.HeroLastSeenInformationSerializer
+  langs:
+  - csharp
+  - vb
+  name: lastSeenDate
+  nameWithType: HeroLastSeenInformationSerializer.lastSeenDate
+  fullName: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.lastSeenDate
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: lastSeenDate
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+    startLine: 9
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: CampaignTimeSerializer lastSeenDate
+    return:
+      type: Coop.Mod.Serializers.CampaignTimeSerializer
+    content.vb: lastSeenDate As CampaignTimeSerializer
+- uid: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.isSettlementNearby
+  commentId: F:Coop.Mod.Serializers.HeroLastSeenInformationSerializer.isSettlementNearby
+  id: isSettlementNearby
+  parent: Coop.Mod.Serializers.HeroLastSeenInformationSerializer
+  langs:
+  - csharp
+  - vb
+  name: isSettlementNearby
+  nameWithType: HeroLastSeenInformationSerializer.isSettlementNearby
+  fullName: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.isSettlementNearby
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: isSettlementNearby
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+    startLine: 10
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: bool isSettlementNearby
+    return:
+      type: System.Boolean
+    content.vb: isSettlementNearby As Boolean
+- uid: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.#ctor(TaleWorlds.CampaignSystem.Hero.HeroLastSeenInformation)
+  commentId: M:Coop.Mod.Serializers.HeroLastSeenInformationSerializer.#ctor(TaleWorlds.CampaignSystem.Hero.HeroLastSeenInformation)
+  id: '#ctor(TaleWorlds.CampaignSystem.Hero.HeroLastSeenInformation)'
+  parent: Coop.Mod.Serializers.HeroLastSeenInformationSerializer
+  langs:
+  - csharp
+  - vb
+  name: HeroLastSeenInformationSerializer(Hero.HeroLastSeenInformation)
+  nameWithType: HeroLastSeenInformationSerializer.HeroLastSeenInformationSerializer(Hero.HeroLastSeenInformation)
+  fullName: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.HeroLastSeenInformationSerializer(TaleWorlds.CampaignSystem.Hero.HeroLastSeenInformation)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: public HeroLastSeenInformationSerializer(Hero.HeroLastSeenInformation heroLastSeenInformation)
+    parameters:
+    - id: heroLastSeenInformation
+      type: TaleWorlds.CampaignSystem.Hero.HeroLastSeenInformation
+    content.vb: Public Sub New(heroLastSeenInformation As Hero.HeroLastSeenInformation)
+  overload: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.Deserialize
+  commentId: M:Coop.Mod.Serializers.HeroLastSeenInformationSerializer.Deserialize
+  id: Deserialize
+  parent: Coop.Mod.Serializers.HeroLastSeenInformationSerializer
+  langs:
+  - csharp
+  - vb
+  name: Deserialize()
+  nameWithType: HeroLastSeenInformationSerializer.Deserialize()
+  fullName: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.Deserialize()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Deserialize
+    path: ../source/Coop/Mod/Serializers/CustomSerializers/HeroLastSeenInformationSerializer.cs
+    startLine: 19
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Serializers
+  syntax:
+    content: public object Deserialize()
+    return:
+      type: System.Object
+    content.vb: Public Function Deserialize As Object
+  overload: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.Deserialize*
+  implements:
+  - Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.Mod.Serializers
+  commentId: N:Coop.Mod.Serializers
+  name: Coop.Mod.Serializers
+  nameWithType: Coop.Mod.Serializers
+  fullName: Coop.Mod.Serializers
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Coop.Mod.Serializers.ICustomSerializer
+  commentId: T:Coop.Mod.Serializers.ICustomSerializer
+  parent: Coop.Mod.Serializers
+  name: ICustomSerializer
+  nameWithType: ICustomSerializer
+  fullName: Coop.Mod.Serializers.ICustomSerializer
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Coop.Mod.Serializers.SettlementSerializer
+  commentId: T:Coop.Mod.Serializers.SettlementSerializer
+  parent: Coop.Mod.Serializers
+  name: SettlementSerializer
+  nameWithType: SettlementSerializer
+  fullName: Coop.Mod.Serializers.SettlementSerializer
+- uid: Coop.Mod.Serializers.CampaignTimeSerializer
+  commentId: T:Coop.Mod.Serializers.CampaignTimeSerializer
+  parent: Coop.Mod.Serializers
+  name: CampaignTimeSerializer
+  nameWithType: CampaignTimeSerializer
+  fullName: Coop.Mod.Serializers.CampaignTimeSerializer
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.#ctor*
+  commentId: Overload:Coop.Mod.Serializers.HeroLastSeenInformationSerializer.#ctor
+  name: HeroLastSeenInformationSerializer
+  nameWithType: HeroLastSeenInformationSerializer.HeroLastSeenInformationSerializer
+  fullName: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.HeroLastSeenInformationSerializer
+- uid: TaleWorlds.CampaignSystem.Hero.HeroLastSeenInformation
+  commentId: T:TaleWorlds.CampaignSystem.Hero.HeroLastSeenInformation
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: Hero.HeroLastSeenInformation
+  nameWithType: Hero.HeroLastSeenInformation
+  fullName: TaleWorlds.CampaignSystem.Hero.HeroLastSeenInformation
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.Deserialize*
+  commentId: Overload:Coop.Mod.Serializers.HeroLastSeenInformationSerializer.Deserialize
+  name: Deserialize
+  nameWithType: HeroLastSeenInformationSerializer.Deserialize
+  fullName: Coop.Mod.Serializers.HeroLastSeenInformationSerializer.Deserialize
+- uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  commentId: M:Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  parent: Coop.Mod.Serializers.ICustomSerializer
+  name: Deserialize()
+  nameWithType: ICustomSerializer.Deserialize()
+  fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize()
+  spec.csharp:
+  - uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+    name: Deserialize
+    nameWithType: ICustomSerializer.Deserialize
+    fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+    name: Deserialize
+    nameWithType: ICustomSerializer.Deserialize
+    fullName: Coop.Mod.Serializers.ICustomSerializer.Deserialize
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )

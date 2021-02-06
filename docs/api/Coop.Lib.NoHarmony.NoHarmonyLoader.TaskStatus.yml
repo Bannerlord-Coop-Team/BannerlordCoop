@@ -1,0 +1,178 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  commentId: T:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  id: NoHarmonyLoader.TaskStatus
+  parent: Coop.Lib.NoHarmony
+  children:
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Completed
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Error
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Pending
+  - Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Warning
+  langs:
+  - csharp
+  - vb
+  name: NoHarmonyLoader.TaskStatus
+  nameWithType: NoHarmonyLoader.TaskStatus
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  type: Enum
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TaskStatus
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 30
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: public enum TaskStatus
+    content.vb: Public Enum TaskStatus
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Pending
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Pending
+  id: Pending
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  langs:
+  - csharp
+  - vb
+  name: Pending
+  nameWithType: NoHarmonyLoader.TaskStatus.Pending
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Pending
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Pending
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 32
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: Pending = 0
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Completed
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Completed
+  id: Completed
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  langs:
+  - csharp
+  - vb
+  name: Completed
+  nameWithType: NoHarmonyLoader.TaskStatus.Completed
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Completed
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Completed
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 33
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: Completed = 1
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Warning
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Warning
+  id: Warning
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  langs:
+  - csharp
+  - vb
+  name: Warning
+  nameWithType: NoHarmonyLoader.TaskStatus.Warning
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Warning
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Warning
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 34
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: Warning = 2
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Error
+  commentId: F:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Error
+  id: Error
+  parent: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  langs:
+  - csharp
+  - vb
+  name: Error
+  nameWithType: NoHarmonyLoader.TaskStatus.Error
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus.Error
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Error
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 35
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: Error = 3
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Coop.Lib.NoHarmony
+  commentId: N:Coop.Lib.NoHarmony
+  name: Coop.Lib.NoHarmony
+  nameWithType: Coop.Lib.NoHarmony
+  fullName: Coop.Lib.NoHarmony
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  commentId: T:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  parent: Coop.Lib.NoHarmony
+  name: NoHarmonyLoader.TaskStatus
+  nameWithType: NoHarmonyLoader.TaskStatus
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus

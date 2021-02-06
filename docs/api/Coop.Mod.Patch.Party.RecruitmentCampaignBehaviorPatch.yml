@@ -1,0 +1,427 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch
+  commentId: T:Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch
+  id: RecruitmentCampaignBehaviorPatch
+  parent: Coop.Mod.Patch.Party
+  children:
+  - Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch.Prefix(TaleWorlds.CampaignSystem.MobileParty@,TaleWorlds.CampaignSystem.Settlement@)
+  langs:
+  - csharp
+  - vb
+  name: RecruitmentCampaignBehaviorPatch
+  nameWithType: RecruitmentCampaignBehaviorPatch
+  fullName: Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Party/RecruitmentCampaignBehavior.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RecruitmentCampaignBehaviorPatch
+    path: ../source/Coop/Mod/Patch/Party/RecruitmentCampaignBehavior.cs
+    startLine: 11
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch.Party
+  syntax:
+    content: >-
+      [HarmonyPatch(typeof(RecruitmentCampaignBehavior), "CheckRecruiting")]
+
+      class RecruitmentCampaignBehaviorPatch
+    content.vb: >-
+      <HarmonyPatch(GetType(RecruitmentCampaignBehavior), "CheckRecruiting")>
+
+      Class RecruitmentCampaignBehaviorPatch
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  attributes:
+  - type: HarmonyLib.HarmonyPatch
+    ctor: HarmonyLib.HarmonyPatch.#ctor(System.Type,System.String)
+    arguments:
+    - type: System.Type
+      value: TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors.RecruitmentCampaignBehavior
+    - type: System.String
+      value: CheckRecruiting
+  modifiers.csharp:
+  - class
+  modifiers.vb:
+  - Class
+- uid: Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch.Prefix(TaleWorlds.CampaignSystem.MobileParty@,TaleWorlds.CampaignSystem.Settlement@)
+  commentId: M:Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch.Prefix(TaleWorlds.CampaignSystem.MobileParty@,TaleWorlds.CampaignSystem.Settlement@)
+  id: Prefix(TaleWorlds.CampaignSystem.MobileParty@,TaleWorlds.CampaignSystem.Settlement@)
+  parent: Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch
+  langs:
+  - csharp
+  - vb
+  name: Prefix(ref MobileParty, ref Settlement)
+  nameWithType: RecruitmentCampaignBehaviorPatch.Prefix(ref MobileParty, ref Settlement)
+  fullName: Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch.Prefix(ref TaleWorlds.CampaignSystem.MobileParty, ref TaleWorlds.CampaignSystem.Settlement)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Party/RecruitmentCampaignBehavior.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Prefix
+    path: ../source/Coop/Mod/Patch/Party/RecruitmentCampaignBehavior.cs
+    startLine: 14
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch.Party
+  syntax:
+    content: static bool Prefix(ref MobileParty mobileParty, ref Settlement settlement)
+    parameters:
+    - id: mobileParty
+      type: TaleWorlds.CampaignSystem.MobileParty
+    - id: settlement
+      type: TaleWorlds.CampaignSystem.Settlement
+    return:
+      type: System.Boolean
+    content.vb: Shared Function Prefix(ByRef mobileParty As MobileParty, ByRef settlement As Settlement) As Boolean
+  overload: Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch.Prefix*
+  nameWithType.vb: RecruitmentCampaignBehaviorPatch.Prefix(ByRef MobileParty, ByRef Settlement)
+  modifiers.csharp:
+  - static
+  modifiers.vb:
+  - Shared
+  fullName.vb: Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch.Prefix(ByRef TaleWorlds.CampaignSystem.MobileParty, ByRef TaleWorlds.CampaignSystem.Settlement)
+  name.vb: Prefix(ByRef MobileParty, ByRef Settlement)
+references:
+- uid: Coop.Mod.Patch.Party
+  commentId: N:Coop.Mod.Patch.Party
+  name: Coop.Mod.Patch.Party
+  nameWithType: Coop.Mod.Patch.Party
+  fullName: Coop.Mod.Patch.Party
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch.Prefix*
+  commentId: Overload:Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch.Prefix
+  name: Prefix
+  nameWithType: RecruitmentCampaignBehaviorPatch.Prefix
+  fullName: Coop.Mod.Patch.Party.RecruitmentCampaignBehaviorPatch.Prefix
+- uid: TaleWorlds.CampaignSystem.MobileParty
+  commentId: T:TaleWorlds.CampaignSystem.MobileParty
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: MobileParty
+  nameWithType: MobileParty
+  fullName: TaleWorlds.CampaignSystem.MobileParty
+- uid: TaleWorlds.CampaignSystem.Settlement
+  commentId: T:TaleWorlds.CampaignSystem.Settlement
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: Settlement
+  nameWithType: Settlement
+  fullName: TaleWorlds.CampaignSystem.Settlement
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem

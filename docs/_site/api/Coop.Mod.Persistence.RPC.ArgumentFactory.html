@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -73,8 +72,7 @@
   
   <h1 id="Coop_Mod_Persistence_RPC_ArgumentFactory" data-uid="Coop.Mod.Persistence.RPC.ArgumentFactory" class="text-break">Class ArgumentFactory
   </h1>
-  <div class="markdown level0 summary">
-Factory to create the transfer wrapper for an argument in a RPC call.
+  <div class="markdown level0 summary"><p>Factory to create the transfer wrapper for an argument in a RPC call.</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -154,8 +152,7 @@ Factory to create the transfer wrapper for an argument in a RPC call.
   </span>
   <a id="Coop_Mod_Persistence_RPC_ArgumentFactory_Create_" data-uid="Coop.Mod.Persistence.RPC.ArgumentFactory.Create*"></a>
   <h4 id="Coop_Mod_Persistence_RPC_ArgumentFactory_Create_Sync_Store_IStore_System_Object_System_Boolean_" data-uid="Coop.Mod.Persistence.RPC.ArgumentFactory.Create(Sync.Store.IStore,System.Object,System.Boolean)">Create(IStore, Object, Boolean)</h4>
-  <div class="markdown level1 summary">
-Creates a RPC transfer wrapper for a function call argument.
+  <div class="markdown level1 summary"><p>Creates a RPC transfer wrapper for a function call argument.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -175,21 +172,22 @@ Creates a RPC transfer wrapper for a function call argument.
       <tr>
         <td><a class="xref" href="Sync.Store.IStore.html">IStore</a></td>
         <td><span class="parametername">store</span></td>
-        <td>Clients remote store instance.</td>
+        <td><p>Clients remote store instance.</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">System.Object</span></td>
         <td><span class="parametername">obj</span></td>
-        <td>The object to be wrapped.</td>
+        <td><p>The object to be wrapped.</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">System.Boolean</span></td>
         <td><span class="parametername">bTransferByValue</span></td>
-        <td>
-If true, the object will always be transferred by
+        <td><p>If true, the object will always be transferred by
 value. If the argument is too large to fit in an <see cref="!:RailEvent"></see>,
 the argument will be shared to all receivers using the <code data-dev-comment-type="paramref" class="paramref">store</code>.
-If false, the argument may be, depending on the type, transferred by reference.
+If false, the argument may be, depending on the type, transferred by reference.</p>
 </td>
       </tr>
     </tbody>
@@ -205,7 +203,8 @@ If false, the argument may be, depending on the type, transferred by reference.
     <tbody>
       <tr>
         <td><a class="xref" href="Coop.Mod.Persistence.RPC.Argument.html">Argument</a></td>
-        <td>The wrapped argument.</td>
+        <td><p>The wrapped argument.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -218,8 +217,7 @@ If false, the argument may be, depending on the type, transferred by reference.
   </span>
   <a id="Coop_Mod_Persistence_RPC_ArgumentFactory_Resolve_" data-uid="Coop.Mod.Persistence.RPC.ArgumentFactory.Resolve*"></a>
   <h4 id="Coop_Mod_Persistence_RPC_ArgumentFactory_Resolve_Sync_Store_IStore_Coop_Mod_Persistence_RPC_Argument_" data-uid="Coop.Mod.Persistence.RPC.ArgumentFactory.Resolve(Sync.Store.IStore,Coop.Mod.Persistence.RPC.Argument)">Resolve(IStore, Argument)</h4>
-  <div class="markdown level1 summary">
-Resolves the transferred RPC argument to be used in the local function call.
+  <div class="markdown level1 summary"><p>Resolves the transferred RPC argument to be used in the local function call.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -239,12 +237,14 @@ Resolves the transferred RPC argument to be used in the local function call.
       <tr>
         <td><a class="xref" href="Sync.Store.IStore.html">IStore</a></td>
         <td><span class="parametername">store</span></td>
-        <td>Clients remote store instance.</td>
+        <td><p>Clients remote store instance.</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="Coop.Mod.Persistence.RPC.Argument.html">Argument</a></td>
         <td><span class="parametername">arg</span></td>
-        <td>Argument to be resolved.</td>
+        <td><p>Argument to be resolved.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -259,7 +259,8 @@ Resolves the transferred RPC argument to be used in the local function call.
     <tbody>
       <tr>
         <td><span class="xref">System.Object</span></td>
-        <td>The unwrapped argument.</td>
+        <td><p>The unwrapped argument.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -274,14 +275,14 @@ Resolves the transferred RPC argument to be used in the local function call.
     <tbody>
       <tr>
         <td><span class="xref">System.ArgumentException</span></td>
-        <td>
-If the argument references an object in the store,
-but the reference cannot be resolved.
+        <td><p>If the argument references an object in the store,
+but the reference cannot be resolved.</p>
 </td>
       </tr>
       <tr>
         <td><span class="xref">System.ArgumentOutOfRangeException</span></td>
-        <td>If the argument type is unknown.</td>
+        <td><p>If the argument type is unknown.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -294,8 +295,7 @@ but the reference cannot be resolved.
   </span>
   <a id="Coop_Mod_Persistence_RPC_ArgumentFactory_Resolve_" data-uid="Coop.Mod.Persistence.RPC.ArgumentFactory.Resolve*"></a>
   <h4 id="Coop_Mod_Persistence_RPC_ArgumentFactory_Resolve_Sync_Store_IStore_System_Collections_Generic_List_Coop_Mod_Persistence_RPC_Argument__" data-uid="Coop.Mod.Persistence.RPC.ArgumentFactory.Resolve(Sync.Store.IStore,System.Collections.Generic.List{Coop.Mod.Persistence.RPC.Argument})">Resolve(IStore, List&lt;Argument&gt;)</h4>
-  <div class="markdown level1 summary">
-Resolves a list of transferred RPC arguments to be used in the local function call.
+  <div class="markdown level1 summary"><p>Resolves a list of transferred RPC arguments to be used in the local function call.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -315,12 +315,14 @@ Resolves a list of transferred RPC arguments to be used in the local function ca
       <tr>
         <td><a class="xref" href="Sync.Store.IStore.html">IStore</a></td>
         <td><span class="parametername">store</span></td>
-        <td>Clients remote store instance.</td>
+        <td><p>Clients remote store instance.</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">System.Collections.Generic.List</span>&lt;<a class="xref" href="Coop.Mod.Persistence.RPC.Argument.html">Argument</a>&gt;</td>
         <td><span class="parametername">args</span></td>
-        <td>Argument to be resolved.</td>
+        <td><p>Argument to be resolved.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -335,7 +337,8 @@ Resolves a list of transferred RPC arguments to be used in the local function ca
     <tbody>
       <tr>
         <td><span class="xref">System.Object</span>[]</td>
-        <td>A list of the unwrapped arguments.</td>
+        <td><p>A list of the unwrapped arguments.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -354,9 +357,22 @@ Resolves a list of transferred RPC arguments to be used in the local function ca
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

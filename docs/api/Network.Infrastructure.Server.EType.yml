@@ -1,0 +1,112 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.Server.EType
+  commentId: T:Network.Infrastructure.Server.EType
+  id: Server.EType
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.Server.EType.Direct
+  - Network.Infrastructure.Server.EType.Threaded
+  langs:
+  - csharp
+  - vb
+  name: Server.EType
+  nameWithType: Server.EType
+  fullName: Network.Infrastructure.Server.EType
+  type: Enum
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EType
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 97
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public enum EType
+    content.vb: Public Enum EType
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: Network.Infrastructure.Server.EType.Threaded
+  commentId: F:Network.Infrastructure.Server.EType.Threaded
+  id: Threaded
+  parent: Network.Infrastructure.Server.EType
+  langs:
+  - csharp
+  - vb
+  name: Threaded
+  nameWithType: Server.EType.Threaded
+  fullName: Network.Infrastructure.Server.EType.Threaded
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Threaded
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 99
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Threaded = 0
+    return:
+      type: Network.Infrastructure.Server.EType
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.Server.EType.Direct
+  commentId: F:Network.Infrastructure.Server.EType.Direct
+  id: Direct
+  parent: Network.Infrastructure.Server.EType
+  langs:
+  - csharp
+  - vb
+  name: Direct
+  nameWithType: Server.EType.Direct
+  fullName: Network.Infrastructure.Server.EType.Direct
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Direct
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 100
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Direct = 1
+    return:
+      type: Network.Infrastructure.Server.EType
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: Network.Infrastructure.Server.EType
+  commentId: T:Network.Infrastructure.Server.EType
+  parent: Network.Infrastructure
+  name: Server.EType
+  nameWithType: Server.EType
+  fullName: Network.Infrastructure.Server.EType

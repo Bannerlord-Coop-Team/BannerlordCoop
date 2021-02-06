@@ -1,0 +1,2075 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager
+  commentId: T:Coop.Mod.Managers.ClientCharacterCreatorManager
+  id: ClientCharacterCreatorManager
+  parent: Coop.Mod.Managers
+  children:
+  - Coop.Mod.Managers.ClientCharacterCreatorManager.#ctor
+  - Coop.Mod.Managers.ClientCharacterCreatorManager.#ctor(TaleWorlds.SaveSystem.Load.LoadResult)
+  - Coop.Mod.Managers.ClientCharacterCreatorManager.ClientCharacterObject
+  - Coop.Mod.Managers.ClientCharacterCreatorManager.ClientHero
+  - Coop.Mod.Managers.ClientCharacterCreatorManager.ClientParty
+  - Coop.Mod.Managers.ClientCharacterCreatorManager.OnCharacterCreationLoadFinishedEvent
+  - Coop.Mod.Managers.ClientCharacterCreatorManager.OnGameLoadFinishedEvent
+  - Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinished
+  - Coop.Mod.Managers.ClientCharacterCreatorManager.SkipCharacterCreation
+  langs:
+  - csharp
+  - vb
+  name: ClientCharacterCreatorManager
+  nameWithType: ClientCharacterCreatorManager
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ClientCharacterCreatorManager
+    path: ../source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+    startLine: 38
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Managers
+  syntax:
+    content: 'public class ClientCharacterCreatorManager : StoryModeGameManager'
+    content.vb: >-
+      Public Class ClientCharacterCreatorManager
+          Inherits StoryModeGameManager
+  inheritance:
+  - System.Object
+  - TaleWorlds.Core.GameManagerBase
+  - TaleWorlds.MountAndBlade.MBGameManager
+  - StoryMode.StoryModeGameManager
+  inheritedMembers:
+  - StoryMode.StoryModeGameManager.OnGameEnd(TaleWorlds.Core.Game)
+  - StoryMode.StoryModeGameManager.DoLoadingForGameManager(TaleWorlds.Core.GameManagerLoadingSteps,TaleWorlds.Core.GameManagerLoadingSteps@)
+  - TaleWorlds.MountAndBlade.MBGameManager.StartNewGame
+  - TaleWorlds.MountAndBlade.MBGameManager.LoadModuleData(System.Boolean)
+  - TaleWorlds.MountAndBlade.MBGameManager.StartNewGame(TaleWorlds.MountAndBlade.MBGameManager)
+  - TaleWorlds.MountAndBlade.MBGameManager.BeginGameStart(TaleWorlds.Core.Game)
+  - TaleWorlds.MountAndBlade.MBGameManager.OnCampaignEarlyStart(TaleWorlds.Core.Game,System.Object)
+  - TaleWorlds.MountAndBlade.MBGameManager.OnCampaignStart(TaleWorlds.Core.Game,System.Object)
+  - TaleWorlds.MountAndBlade.MBGameManager.OnGameInitializationFinished(TaleWorlds.Core.Game)
+  - TaleWorlds.MountAndBlade.MBGameManager.OnGameLoaded(TaleWorlds.Core.Game,System.Object)
+  - TaleWorlds.MountAndBlade.MBGameManager.OnGameCreated(TaleWorlds.Core.Game,System.Object)
+  - TaleWorlds.MountAndBlade.MBGameManager.OnGameStart(TaleWorlds.Core.Game,TaleWorlds.Core.IGameStarter)
+  - TaleWorlds.MountAndBlade.MBGameManager.EndGame
+  - TaleWorlds.MountAndBlade.MBGameManager.OnAfterCampaignStart(TaleWorlds.Core.Game)
+  - TaleWorlds.MountAndBlade.MBGameManager.GetXmlInformationFromModule
+  - TaleWorlds.MountAndBlade.MBGameManager.Current
+  - TaleWorlds.MountAndBlade.MBGameManager.ApplicationTime
+  - TaleWorlds.MountAndBlade.MBGameManager.CheatMode
+  - TaleWorlds.MountAndBlade.MBGameManager.IsDevelopmentMode
+  - TaleWorlds.MountAndBlade.MBGameManager.IsEditModeOn
+  - TaleWorlds.MountAndBlade.MBGameManager.DeterministicMode
+  - TaleWorlds.Core.GameManagerBase.Initialize
+  - TaleWorlds.Core.GameManagerBase.AddComponent(System.Type)
+  - TaleWorlds.Core.GameManagerBase.AddComponent``1
+  - TaleWorlds.Core.GameManagerBase.GetComponent(System.Type)
+  - TaleWorlds.Core.GameManagerBase.GetComponent``1
+  - TaleWorlds.Core.GameManagerBase.GetComponents``1
+  - TaleWorlds.Core.GameManagerBase.RemoveComponent``1
+  - TaleWorlds.Core.GameManagerBase.RemoveComponent(TaleWorlds.Core.GameManagerComponent)
+  - TaleWorlds.Core.GameManagerBase.OnTick(System.Single)
+  - TaleWorlds.Core.GameManagerBase.OnGameNetworkBegin
+  - TaleWorlds.Core.GameManagerBase.OnGameNetworkEnd
+  - TaleWorlds.Core.GameManagerBase.OnPlayerConnect(TaleWorlds.Core.VirtualPlayer)
+  - TaleWorlds.Core.GameManagerBase.OnPlayerDisconnect(TaleWorlds.Core.VirtualPlayer)
+  - TaleWorlds.Core.GameManagerBase.DoLoadingForGameManager
+  - TaleWorlds.Core.GameManagerBase.Game
+  - TaleWorlds.Core.GameManagerBase.Components
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.#ctor(TaleWorlds.SaveSystem.Load.LoadResult)
+  commentId: M:Coop.Mod.Managers.ClientCharacterCreatorManager.#ctor(TaleWorlds.SaveSystem.Load.LoadResult)
+  id: '#ctor(TaleWorlds.SaveSystem.Load.LoadResult)'
+  parent: Coop.Mod.Managers.ClientCharacterCreatorManager
+  langs:
+  - csharp
+  - vb
+  name: ClientCharacterCreatorManager(LoadResult)
+  nameWithType: ClientCharacterCreatorManager.ClientCharacterCreatorManager(LoadResult)
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientCharacterCreatorManager(TaleWorlds.SaveSystem.Load.LoadResult)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+    startLine: 40
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Managers
+  syntax:
+    content: public ClientCharacterCreatorManager(LoadResult saveGameData)
+    parameters:
+    - id: saveGameData
+      type: TaleWorlds.SaveSystem.Load.LoadResult
+    content.vb: Public Sub New(saveGameData As LoadResult)
+  overload: Coop.Mod.Managers.ClientCharacterCreatorManager.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.#ctor
+  commentId: M:Coop.Mod.Managers.ClientCharacterCreatorManager.#ctor
+  id: '#ctor'
+  parent: Coop.Mod.Managers.ClientCharacterCreatorManager
+  langs:
+  - csharp
+  - vb
+  name: ClientCharacterCreatorManager()
+  nameWithType: ClientCharacterCreatorManager.ClientCharacterCreatorManager()
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientCharacterCreatorManager()
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+    startLine: 42
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Managers
+  syntax:
+    content: public ClientCharacterCreatorManager()
+    content.vb: Public Sub New
+  overload: Coop.Mod.Managers.ClientCharacterCreatorManager.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.OnCharacterCreationLoadFinishedEvent
+  commentId: E:Coop.Mod.Managers.ClientCharacterCreatorManager.OnCharacterCreationLoadFinishedEvent
+  id: OnCharacterCreationLoadFinishedEvent
+  parent: Coop.Mod.Managers.ClientCharacterCreatorManager
+  langs:
+  - csharp
+  - vb
+  name: OnCharacterCreationLoadFinishedEvent
+  nameWithType: ClientCharacterCreatorManager.OnCharacterCreationLoadFinishedEvent
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.OnCharacterCreationLoadFinishedEvent
+  type: Event
+  source:
+    remote:
+      path: source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnCharacterCreationLoadFinishedEvent
+    path: ../source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+    startLine: 47
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Managers
+  syntax:
+    content: public static event ClientCharacterCreatorManager.OnLoadFinishedEventHandler OnCharacterCreationLoadFinishedEvent
+    return:
+      type: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+    content.vb: Public Shared Event OnCharacterCreationLoadFinishedEvent As ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.OnGameLoadFinishedEvent
+  commentId: E:Coop.Mod.Managers.ClientCharacterCreatorManager.OnGameLoadFinishedEvent
+  id: OnGameLoadFinishedEvent
+  parent: Coop.Mod.Managers.ClientCharacterCreatorManager
+  langs:
+  - csharp
+  - vb
+  name: OnGameLoadFinishedEvent
+  nameWithType: ClientCharacterCreatorManager.OnGameLoadFinishedEvent
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.OnGameLoadFinishedEvent
+  type: Event
+  source:
+    remote:
+      path: source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnGameLoadFinishedEvent
+    path: ../source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+    startLine: 48
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Managers
+  syntax:
+    content: public static event ClientCharacterCreatorManager.OnLoadFinishedEventHandler OnGameLoadFinishedEvent
+    return:
+      type: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+    content.vb: Public Shared Event OnGameLoadFinishedEvent As ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientParty
+  commentId: P:Coop.Mod.Managers.ClientCharacterCreatorManager.ClientParty
+  id: ClientParty
+  parent: Coop.Mod.Managers.ClientCharacterCreatorManager
+  langs:
+  - csharp
+  - vb
+  name: ClientParty
+  nameWithType: ClientCharacterCreatorManager.ClientParty
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientParty
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ClientParty
+    path: ../source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+    startLine: 50
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Managers
+  syntax:
+    content: public MobileParty ClientParty { get; }
+    parameters: []
+    return:
+      type: TaleWorlds.CampaignSystem.MobileParty
+    content.vb: Public ReadOnly Property ClientParty As MobileParty
+  overload: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientParty*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientHero
+  commentId: P:Coop.Mod.Managers.ClientCharacterCreatorManager.ClientHero
+  id: ClientHero
+  parent: Coop.Mod.Managers.ClientCharacterCreatorManager
+  langs:
+  - csharp
+  - vb
+  name: ClientHero
+  nameWithType: ClientCharacterCreatorManager.ClientHero
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientHero
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ClientHero
+    path: ../source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+    startLine: 51
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Managers
+  syntax:
+    content: public Hero ClientHero { get; }
+    parameters: []
+    return:
+      type: TaleWorlds.CampaignSystem.Hero
+    content.vb: Public ReadOnly Property ClientHero As Hero
+  overload: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientHero*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientCharacterObject
+  commentId: P:Coop.Mod.Managers.ClientCharacterCreatorManager.ClientCharacterObject
+  id: ClientCharacterObject
+  parent: Coop.Mod.Managers.ClientCharacterCreatorManager
+  langs:
+  - csharp
+  - vb
+  name: ClientCharacterObject
+  nameWithType: ClientCharacterCreatorManager.ClientCharacterObject
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientCharacterObject
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ClientCharacterObject
+    path: ../source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+    startLine: 52
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Managers
+  syntax:
+    content: public CharacterObject ClientCharacterObject { get; }
+    parameters: []
+    return:
+      type: TaleWorlds.CampaignSystem.CharacterObject
+    content.vb: Public ReadOnly Property ClientCharacterObject As CharacterObject
+  overload: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientCharacterObject*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinished
+  commentId: M:Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinished
+  id: OnLoadFinished
+  parent: Coop.Mod.Managers.ClientCharacterCreatorManager
+  langs:
+  - csharp
+  - vb
+  name: OnLoadFinished()
+  nameWithType: ClientCharacterCreatorManager.OnLoadFinished()
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinished()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnLoadFinished
+    path: ../source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+    startLine: 55
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Managers
+  syntax:
+    content: public override void OnLoadFinished()
+    content.vb: Public Overrides Sub OnLoadFinished
+  overridden: StoryMode.StoryModeGameManager.OnLoadFinished
+  overload: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinished*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.SkipCharacterCreation
+  commentId: M:Coop.Mod.Managers.ClientCharacterCreatorManager.SkipCharacterCreation
+  id: SkipCharacterCreation
+  parent: Coop.Mod.Managers.ClientCharacterCreatorManager
+  langs:
+  - csharp
+  - vb
+  name: SkipCharacterCreation()
+  nameWithType: ClientCharacterCreatorManager.SkipCharacterCreation()
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.SkipCharacterCreation()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SkipCharacterCreation
+    path: ../source/Coop/Mod/Managers/ClientCharacterCreatorManager.cs
+    startLine: 73
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Managers
+  syntax:
+    content: void SkipCharacterCreation()
+    content.vb: Sub SkipCharacterCreation
+  overload: Coop.Mod.Managers.ClientCharacterCreatorManager.SkipCharacterCreation*
+references:
+- uid: Coop.Mod.Managers
+  commentId: N:Coop.Mod.Managers
+  name: Coop.Mod.Managers
+  nameWithType: Coop.Mod.Managers
+  fullName: Coop.Mod.Managers
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: TaleWorlds.Core.GameManagerBase
+  commentId: T:TaleWorlds.Core.GameManagerBase
+  parent: TaleWorlds.Core
+  isExternal: true
+  name: GameManagerBase
+  nameWithType: GameManagerBase
+  fullName: TaleWorlds.Core.GameManagerBase
+- uid: TaleWorlds.MountAndBlade.MBGameManager
+  commentId: T:TaleWorlds.MountAndBlade.MBGameManager
+  parent: TaleWorlds.MountAndBlade
+  isExternal: true
+  name: MBGameManager
+  nameWithType: MBGameManager
+  fullName: TaleWorlds.MountAndBlade.MBGameManager
+- uid: StoryMode.StoryModeGameManager
+  commentId: T:StoryMode.StoryModeGameManager
+  parent: StoryMode
+  isExternal: true
+  name: StoryModeGameManager
+  nameWithType: StoryModeGameManager
+  fullName: StoryMode.StoryModeGameManager
+- uid: StoryMode.StoryModeGameManager.OnGameEnd(TaleWorlds.Core.Game)
+  commentId: M:StoryMode.StoryModeGameManager.OnGameEnd(TaleWorlds.Core.Game)
+  parent: StoryMode.StoryModeGameManager
+  isExternal: true
+  name: OnGameEnd(Game)
+  nameWithType: StoryModeGameManager.OnGameEnd(Game)
+  fullName: StoryMode.StoryModeGameManager.OnGameEnd(TaleWorlds.Core.Game)
+  spec.csharp:
+  - uid: StoryMode.StoryModeGameManager.OnGameEnd(TaleWorlds.Core.Game)
+    name: OnGameEnd
+    nameWithType: StoryModeGameManager.OnGameEnd
+    fullName: StoryMode.StoryModeGameManager.OnGameEnd
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: StoryMode.StoryModeGameManager.OnGameEnd(TaleWorlds.Core.Game)
+    name: OnGameEnd
+    nameWithType: StoryModeGameManager.OnGameEnd
+    fullName: StoryMode.StoryModeGameManager.OnGameEnd
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: StoryMode.StoryModeGameManager.DoLoadingForGameManager(TaleWorlds.Core.GameManagerLoadingSteps,TaleWorlds.Core.GameManagerLoadingSteps@)
+  commentId: M:StoryMode.StoryModeGameManager.DoLoadingForGameManager(TaleWorlds.Core.GameManagerLoadingSteps,TaleWorlds.Core.GameManagerLoadingSteps@)
+  parent: StoryMode.StoryModeGameManager
+  isExternal: true
+  name: DoLoadingForGameManager(GameManagerLoadingSteps, GameManagerLoadingSteps)
+  nameWithType: StoryModeGameManager.DoLoadingForGameManager(GameManagerLoadingSteps, GameManagerLoadingSteps)
+  fullName: StoryMode.StoryModeGameManager.DoLoadingForGameManager(TaleWorlds.Core.GameManagerLoadingSteps, TaleWorlds.Core.GameManagerLoadingSteps)
+  spec.csharp:
+  - uid: StoryMode.StoryModeGameManager.DoLoadingForGameManager(TaleWorlds.Core.GameManagerLoadingSteps,TaleWorlds.Core.GameManagerLoadingSteps@)
+    name: DoLoadingForGameManager
+    nameWithType: StoryModeGameManager.DoLoadingForGameManager
+    fullName: StoryMode.StoryModeGameManager.DoLoadingForGameManager
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.GameManagerLoadingSteps
+    name: GameManagerLoadingSteps
+    nameWithType: GameManagerLoadingSteps
+    fullName: TaleWorlds.Core.GameManagerLoadingSteps
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: TaleWorlds.Core.GameManagerLoadingSteps
+    name: GameManagerLoadingSteps
+    nameWithType: GameManagerLoadingSteps
+    fullName: TaleWorlds.Core.GameManagerLoadingSteps
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: StoryMode.StoryModeGameManager.DoLoadingForGameManager(TaleWorlds.Core.GameManagerLoadingSteps,TaleWorlds.Core.GameManagerLoadingSteps@)
+    name: DoLoadingForGameManager
+    nameWithType: StoryModeGameManager.DoLoadingForGameManager
+    fullName: StoryMode.StoryModeGameManager.DoLoadingForGameManager
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.GameManagerLoadingSteps
+    name: GameManagerLoadingSteps
+    nameWithType: GameManagerLoadingSteps
+    fullName: TaleWorlds.Core.GameManagerLoadingSteps
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: TaleWorlds.Core.GameManagerLoadingSteps
+    name: GameManagerLoadingSteps
+    nameWithType: GameManagerLoadingSteps
+    fullName: TaleWorlds.Core.GameManagerLoadingSteps
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.StartNewGame
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: StartNewGame()
+  nameWithType: MBGameManager.StartNewGame()
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame()
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame
+    name: StartNewGame
+    nameWithType: MBGameManager.StartNewGame
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame
+    name: StartNewGame
+    nameWithType: MBGameManager.StartNewGame
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.LoadModuleData(System.Boolean)
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.LoadModuleData(System.Boolean)
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: LoadModuleData(Boolean)
+  nameWithType: MBGameManager.LoadModuleData(Boolean)
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.LoadModuleData(System.Boolean)
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.LoadModuleData(System.Boolean)
+    name: LoadModuleData
+    nameWithType: MBGameManager.LoadModuleData
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.LoadModuleData
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.LoadModuleData(System.Boolean)
+    name: LoadModuleData
+    nameWithType: MBGameManager.LoadModuleData
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.LoadModuleData
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame(TaleWorlds.MountAndBlade.MBGameManager)
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.StartNewGame(TaleWorlds.MountAndBlade.MBGameManager)
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: StartNewGame(MBGameManager)
+  nameWithType: MBGameManager.StartNewGame(MBGameManager)
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame(TaleWorlds.MountAndBlade.MBGameManager)
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame(TaleWorlds.MountAndBlade.MBGameManager)
+    name: StartNewGame
+    nameWithType: MBGameManager.StartNewGame
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.MountAndBlade.MBGameManager
+    name: MBGameManager
+    nameWithType: MBGameManager
+    fullName: TaleWorlds.MountAndBlade.MBGameManager
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame(TaleWorlds.MountAndBlade.MBGameManager)
+    name: StartNewGame
+    nameWithType: MBGameManager.StartNewGame
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.StartNewGame
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.MountAndBlade.MBGameManager
+    name: MBGameManager
+    nameWithType: MBGameManager
+    fullName: TaleWorlds.MountAndBlade.MBGameManager
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.BeginGameStart(TaleWorlds.Core.Game)
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.BeginGameStart(TaleWorlds.Core.Game)
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: BeginGameStart(Game)
+  nameWithType: MBGameManager.BeginGameStart(Game)
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.BeginGameStart(TaleWorlds.Core.Game)
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.BeginGameStart(TaleWorlds.Core.Game)
+    name: BeginGameStart
+    nameWithType: MBGameManager.BeginGameStart
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.BeginGameStart
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.BeginGameStart(TaleWorlds.Core.Game)
+    name: BeginGameStart
+    nameWithType: MBGameManager.BeginGameStart
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.BeginGameStart
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignEarlyStart(TaleWorlds.Core.Game,System.Object)
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.OnCampaignEarlyStart(TaleWorlds.Core.Game,System.Object)
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: OnCampaignEarlyStart(Game, Object)
+  nameWithType: MBGameManager.OnCampaignEarlyStart(Game, Object)
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignEarlyStart(TaleWorlds.Core.Game, System.Object)
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignEarlyStart(TaleWorlds.Core.Game,System.Object)
+    name: OnCampaignEarlyStart
+    nameWithType: MBGameManager.OnCampaignEarlyStart
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignEarlyStart
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignEarlyStart(TaleWorlds.Core.Game,System.Object)
+    name: OnCampaignEarlyStart
+    nameWithType: MBGameManager.OnCampaignEarlyStart
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignEarlyStart
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignStart(TaleWorlds.Core.Game,System.Object)
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.OnCampaignStart(TaleWorlds.Core.Game,System.Object)
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: OnCampaignStart(Game, Object)
+  nameWithType: MBGameManager.OnCampaignStart(Game, Object)
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignStart(TaleWorlds.Core.Game, System.Object)
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignStart(TaleWorlds.Core.Game,System.Object)
+    name: OnCampaignStart
+    nameWithType: MBGameManager.OnCampaignStart
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignStart
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignStart(TaleWorlds.Core.Game,System.Object)
+    name: OnCampaignStart
+    nameWithType: MBGameManager.OnCampaignStart
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnCampaignStart
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameInitializationFinished(TaleWorlds.Core.Game)
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.OnGameInitializationFinished(TaleWorlds.Core.Game)
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: OnGameInitializationFinished(Game)
+  nameWithType: MBGameManager.OnGameInitializationFinished(Game)
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameInitializationFinished(TaleWorlds.Core.Game)
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameInitializationFinished(TaleWorlds.Core.Game)
+    name: OnGameInitializationFinished
+    nameWithType: MBGameManager.OnGameInitializationFinished
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameInitializationFinished
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameInitializationFinished(TaleWorlds.Core.Game)
+    name: OnGameInitializationFinished
+    nameWithType: MBGameManager.OnGameInitializationFinished
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameInitializationFinished
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameLoaded(TaleWorlds.Core.Game,System.Object)
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.OnGameLoaded(TaleWorlds.Core.Game,System.Object)
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: OnGameLoaded(Game, Object)
+  nameWithType: MBGameManager.OnGameLoaded(Game, Object)
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameLoaded(TaleWorlds.Core.Game, System.Object)
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameLoaded(TaleWorlds.Core.Game,System.Object)
+    name: OnGameLoaded
+    nameWithType: MBGameManager.OnGameLoaded
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameLoaded
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameLoaded(TaleWorlds.Core.Game,System.Object)
+    name: OnGameLoaded
+    nameWithType: MBGameManager.OnGameLoaded
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameLoaded
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameCreated(TaleWorlds.Core.Game,System.Object)
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.OnGameCreated(TaleWorlds.Core.Game,System.Object)
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: OnGameCreated(Game, Object)
+  nameWithType: MBGameManager.OnGameCreated(Game, Object)
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameCreated(TaleWorlds.Core.Game, System.Object)
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameCreated(TaleWorlds.Core.Game,System.Object)
+    name: OnGameCreated
+    nameWithType: MBGameManager.OnGameCreated
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameCreated
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameCreated(TaleWorlds.Core.Game,System.Object)
+    name: OnGameCreated
+    nameWithType: MBGameManager.OnGameCreated
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameCreated
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameStart(TaleWorlds.Core.Game,TaleWorlds.Core.IGameStarter)
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.OnGameStart(TaleWorlds.Core.Game,TaleWorlds.Core.IGameStarter)
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: OnGameStart(Game, IGameStarter)
+  nameWithType: MBGameManager.OnGameStart(Game, IGameStarter)
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameStart(TaleWorlds.Core.Game, TaleWorlds.Core.IGameStarter)
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameStart(TaleWorlds.Core.Game,TaleWorlds.Core.IGameStarter)
+    name: OnGameStart
+    nameWithType: MBGameManager.OnGameStart
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameStart
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: TaleWorlds.Core.IGameStarter
+    name: IGameStarter
+    nameWithType: IGameStarter
+    fullName: TaleWorlds.Core.IGameStarter
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnGameStart(TaleWorlds.Core.Game,TaleWorlds.Core.IGameStarter)
+    name: OnGameStart
+    nameWithType: MBGameManager.OnGameStart
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnGameStart
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: TaleWorlds.Core.IGameStarter
+    name: IGameStarter
+    nameWithType: IGameStarter
+    fullName: TaleWorlds.Core.IGameStarter
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.EndGame
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.EndGame
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: EndGame()
+  nameWithType: MBGameManager.EndGame()
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.EndGame()
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.EndGame
+    name: EndGame
+    nameWithType: MBGameManager.EndGame
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.EndGame
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.EndGame
+    name: EndGame
+    nameWithType: MBGameManager.EndGame
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.EndGame
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.OnAfterCampaignStart(TaleWorlds.Core.Game)
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.OnAfterCampaignStart(TaleWorlds.Core.Game)
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: OnAfterCampaignStart(Game)
+  nameWithType: MBGameManager.OnAfterCampaignStart(Game)
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.OnAfterCampaignStart(TaleWorlds.Core.Game)
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnAfterCampaignStart(TaleWorlds.Core.Game)
+    name: OnAfterCampaignStart
+    nameWithType: MBGameManager.OnAfterCampaignStart
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnAfterCampaignStart
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.OnAfterCampaignStart(TaleWorlds.Core.Game)
+    name: OnAfterCampaignStart
+    nameWithType: MBGameManager.OnAfterCampaignStart
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.OnAfterCampaignStart
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.Game
+    name: Game
+    nameWithType: Game
+    fullName: TaleWorlds.Core.Game
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.GetXmlInformationFromModule
+  commentId: M:TaleWorlds.MountAndBlade.MBGameManager.GetXmlInformationFromModule
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: GetXmlInformationFromModule()
+  nameWithType: MBGameManager.GetXmlInformationFromModule()
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.GetXmlInformationFromModule()
+  spec.csharp:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.GetXmlInformationFromModule
+    name: GetXmlInformationFromModule
+    nameWithType: MBGameManager.GetXmlInformationFromModule
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.GetXmlInformationFromModule
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.MountAndBlade.MBGameManager.GetXmlInformationFromModule
+    name: GetXmlInformationFromModule
+    nameWithType: MBGameManager.GetXmlInformationFromModule
+    fullName: TaleWorlds.MountAndBlade.MBGameManager.GetXmlInformationFromModule
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.MountAndBlade.MBGameManager.Current
+  commentId: P:TaleWorlds.MountAndBlade.MBGameManager.Current
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: Current
+  nameWithType: MBGameManager.Current
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.Current
+- uid: TaleWorlds.MountAndBlade.MBGameManager.ApplicationTime
+  commentId: P:TaleWorlds.MountAndBlade.MBGameManager.ApplicationTime
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: ApplicationTime
+  nameWithType: MBGameManager.ApplicationTime
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.ApplicationTime
+- uid: TaleWorlds.MountAndBlade.MBGameManager.CheatMode
+  commentId: P:TaleWorlds.MountAndBlade.MBGameManager.CheatMode
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: CheatMode
+  nameWithType: MBGameManager.CheatMode
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.CheatMode
+- uid: TaleWorlds.MountAndBlade.MBGameManager.IsDevelopmentMode
+  commentId: P:TaleWorlds.MountAndBlade.MBGameManager.IsDevelopmentMode
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: IsDevelopmentMode
+  nameWithType: MBGameManager.IsDevelopmentMode
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.IsDevelopmentMode
+- uid: TaleWorlds.MountAndBlade.MBGameManager.IsEditModeOn
+  commentId: P:TaleWorlds.MountAndBlade.MBGameManager.IsEditModeOn
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: IsEditModeOn
+  nameWithType: MBGameManager.IsEditModeOn
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.IsEditModeOn
+- uid: TaleWorlds.MountAndBlade.MBGameManager.DeterministicMode
+  commentId: P:TaleWorlds.MountAndBlade.MBGameManager.DeterministicMode
+  parent: TaleWorlds.MountAndBlade.MBGameManager
+  isExternal: true
+  name: DeterministicMode
+  nameWithType: MBGameManager.DeterministicMode
+  fullName: TaleWorlds.MountAndBlade.MBGameManager.DeterministicMode
+- uid: TaleWorlds.Core.GameManagerBase.Initialize
+  commentId: M:TaleWorlds.Core.GameManagerBase.Initialize
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: Initialize()
+  nameWithType: GameManagerBase.Initialize()
+  fullName: TaleWorlds.Core.GameManagerBase.Initialize()
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.Initialize
+    name: Initialize
+    nameWithType: GameManagerBase.Initialize
+    fullName: TaleWorlds.Core.GameManagerBase.Initialize
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.Initialize
+    name: Initialize
+    nameWithType: GameManagerBase.Initialize
+    fullName: TaleWorlds.Core.GameManagerBase.Initialize
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.AddComponent(System.Type)
+  commentId: M:TaleWorlds.Core.GameManagerBase.AddComponent(System.Type)
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: AddComponent(Type)
+  nameWithType: GameManagerBase.AddComponent(Type)
+  fullName: TaleWorlds.Core.GameManagerBase.AddComponent(System.Type)
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.AddComponent(System.Type)
+    name: AddComponent
+    nameWithType: GameManagerBase.AddComponent
+    fullName: TaleWorlds.Core.GameManagerBase.AddComponent
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Type
+    name: Type
+    nameWithType: Type
+    fullName: System.Type
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.AddComponent(System.Type)
+    name: AddComponent
+    nameWithType: GameManagerBase.AddComponent
+    fullName: TaleWorlds.Core.GameManagerBase.AddComponent
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Type
+    name: Type
+    nameWithType: Type
+    fullName: System.Type
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.AddComponent``1
+  commentId: M:TaleWorlds.Core.GameManagerBase.AddComponent``1
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: AddComponent<T>()
+  nameWithType: GameManagerBase.AddComponent<T>()
+  fullName: TaleWorlds.Core.GameManagerBase.AddComponent<T>()
+  nameWithType.vb: GameManagerBase.AddComponent(Of T)()
+  fullName.vb: TaleWorlds.Core.GameManagerBase.AddComponent(Of T)()
+  name.vb: AddComponent(Of T)()
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.AddComponent``1
+    name: AddComponent<T>
+    nameWithType: GameManagerBase.AddComponent<T>
+    fullName: TaleWorlds.Core.GameManagerBase.AddComponent<T>
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.AddComponent``1
+    name: AddComponent(Of T)
+    nameWithType: GameManagerBase.AddComponent(Of T)
+    fullName: TaleWorlds.Core.GameManagerBase.AddComponent(Of T)
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.GetComponent(System.Type)
+  commentId: M:TaleWorlds.Core.GameManagerBase.GetComponent(System.Type)
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: GetComponent(Type)
+  nameWithType: GameManagerBase.GetComponent(Type)
+  fullName: TaleWorlds.Core.GameManagerBase.GetComponent(System.Type)
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.GetComponent(System.Type)
+    name: GetComponent
+    nameWithType: GameManagerBase.GetComponent
+    fullName: TaleWorlds.Core.GameManagerBase.GetComponent
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Type
+    name: Type
+    nameWithType: Type
+    fullName: System.Type
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.GetComponent(System.Type)
+    name: GetComponent
+    nameWithType: GameManagerBase.GetComponent
+    fullName: TaleWorlds.Core.GameManagerBase.GetComponent
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Type
+    name: Type
+    nameWithType: Type
+    fullName: System.Type
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.GetComponent``1
+  commentId: M:TaleWorlds.Core.GameManagerBase.GetComponent``1
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: GetComponent<T>()
+  nameWithType: GameManagerBase.GetComponent<T>()
+  fullName: TaleWorlds.Core.GameManagerBase.GetComponent<T>()
+  nameWithType.vb: GameManagerBase.GetComponent(Of T)()
+  fullName.vb: TaleWorlds.Core.GameManagerBase.GetComponent(Of T)()
+  name.vb: GetComponent(Of T)()
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.GetComponent``1
+    name: GetComponent<T>
+    nameWithType: GameManagerBase.GetComponent<T>
+    fullName: TaleWorlds.Core.GameManagerBase.GetComponent<T>
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.GetComponent``1
+    name: GetComponent(Of T)
+    nameWithType: GameManagerBase.GetComponent(Of T)
+    fullName: TaleWorlds.Core.GameManagerBase.GetComponent(Of T)
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.GetComponents``1
+  commentId: M:TaleWorlds.Core.GameManagerBase.GetComponents``1
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: GetComponents<T>()
+  nameWithType: GameManagerBase.GetComponents<T>()
+  fullName: TaleWorlds.Core.GameManagerBase.GetComponents<T>()
+  nameWithType.vb: GameManagerBase.GetComponents(Of T)()
+  fullName.vb: TaleWorlds.Core.GameManagerBase.GetComponents(Of T)()
+  name.vb: GetComponents(Of T)()
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.GetComponents``1
+    name: GetComponents<T>
+    nameWithType: GameManagerBase.GetComponents<T>
+    fullName: TaleWorlds.Core.GameManagerBase.GetComponents<T>
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.GetComponents``1
+    name: GetComponents(Of T)
+    nameWithType: GameManagerBase.GetComponents(Of T)
+    fullName: TaleWorlds.Core.GameManagerBase.GetComponents(Of T)
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.RemoveComponent``1
+  commentId: M:TaleWorlds.Core.GameManagerBase.RemoveComponent``1
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: RemoveComponent<T>()
+  nameWithType: GameManagerBase.RemoveComponent<T>()
+  fullName: TaleWorlds.Core.GameManagerBase.RemoveComponent<T>()
+  nameWithType.vb: GameManagerBase.RemoveComponent(Of T)()
+  fullName.vb: TaleWorlds.Core.GameManagerBase.RemoveComponent(Of T)()
+  name.vb: RemoveComponent(Of T)()
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.RemoveComponent``1
+    name: RemoveComponent<T>
+    nameWithType: GameManagerBase.RemoveComponent<T>
+    fullName: TaleWorlds.Core.GameManagerBase.RemoveComponent<T>
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.RemoveComponent``1
+    name: RemoveComponent(Of T)
+    nameWithType: GameManagerBase.RemoveComponent(Of T)
+    fullName: TaleWorlds.Core.GameManagerBase.RemoveComponent(Of T)
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.RemoveComponent(TaleWorlds.Core.GameManagerComponent)
+  commentId: M:TaleWorlds.Core.GameManagerBase.RemoveComponent(TaleWorlds.Core.GameManagerComponent)
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: RemoveComponent(GameManagerComponent)
+  nameWithType: GameManagerBase.RemoveComponent(GameManagerComponent)
+  fullName: TaleWorlds.Core.GameManagerBase.RemoveComponent(TaleWorlds.Core.GameManagerComponent)
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.RemoveComponent(TaleWorlds.Core.GameManagerComponent)
+    name: RemoveComponent
+    nameWithType: GameManagerBase.RemoveComponent
+    fullName: TaleWorlds.Core.GameManagerBase.RemoveComponent
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.GameManagerComponent
+    name: GameManagerComponent
+    nameWithType: GameManagerComponent
+    fullName: TaleWorlds.Core.GameManagerComponent
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.RemoveComponent(TaleWorlds.Core.GameManagerComponent)
+    name: RemoveComponent
+    nameWithType: GameManagerBase.RemoveComponent
+    fullName: TaleWorlds.Core.GameManagerBase.RemoveComponent
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.GameManagerComponent
+    name: GameManagerComponent
+    nameWithType: GameManagerComponent
+    fullName: TaleWorlds.Core.GameManagerComponent
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.OnTick(System.Single)
+  commentId: M:TaleWorlds.Core.GameManagerBase.OnTick(System.Single)
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: OnTick(Single)
+  nameWithType: GameManagerBase.OnTick(Single)
+  fullName: TaleWorlds.Core.GameManagerBase.OnTick(System.Single)
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.OnTick(System.Single)
+    name: OnTick
+    nameWithType: GameManagerBase.OnTick
+    fullName: TaleWorlds.Core.GameManagerBase.OnTick
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Single
+    name: Single
+    nameWithType: Single
+    fullName: System.Single
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.OnTick(System.Single)
+    name: OnTick
+    nameWithType: GameManagerBase.OnTick
+    fullName: TaleWorlds.Core.GameManagerBase.OnTick
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Single
+    name: Single
+    nameWithType: Single
+    fullName: System.Single
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.OnGameNetworkBegin
+  commentId: M:TaleWorlds.Core.GameManagerBase.OnGameNetworkBegin
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: OnGameNetworkBegin()
+  nameWithType: GameManagerBase.OnGameNetworkBegin()
+  fullName: TaleWorlds.Core.GameManagerBase.OnGameNetworkBegin()
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.OnGameNetworkBegin
+    name: OnGameNetworkBegin
+    nameWithType: GameManagerBase.OnGameNetworkBegin
+    fullName: TaleWorlds.Core.GameManagerBase.OnGameNetworkBegin
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.OnGameNetworkBegin
+    name: OnGameNetworkBegin
+    nameWithType: GameManagerBase.OnGameNetworkBegin
+    fullName: TaleWorlds.Core.GameManagerBase.OnGameNetworkBegin
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.OnGameNetworkEnd
+  commentId: M:TaleWorlds.Core.GameManagerBase.OnGameNetworkEnd
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: OnGameNetworkEnd()
+  nameWithType: GameManagerBase.OnGameNetworkEnd()
+  fullName: TaleWorlds.Core.GameManagerBase.OnGameNetworkEnd()
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.OnGameNetworkEnd
+    name: OnGameNetworkEnd
+    nameWithType: GameManagerBase.OnGameNetworkEnd
+    fullName: TaleWorlds.Core.GameManagerBase.OnGameNetworkEnd
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.OnGameNetworkEnd
+    name: OnGameNetworkEnd
+    nameWithType: GameManagerBase.OnGameNetworkEnd
+    fullName: TaleWorlds.Core.GameManagerBase.OnGameNetworkEnd
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.OnPlayerConnect(TaleWorlds.Core.VirtualPlayer)
+  commentId: M:TaleWorlds.Core.GameManagerBase.OnPlayerConnect(TaleWorlds.Core.VirtualPlayer)
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: OnPlayerConnect(VirtualPlayer)
+  nameWithType: GameManagerBase.OnPlayerConnect(VirtualPlayer)
+  fullName: TaleWorlds.Core.GameManagerBase.OnPlayerConnect(TaleWorlds.Core.VirtualPlayer)
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.OnPlayerConnect(TaleWorlds.Core.VirtualPlayer)
+    name: OnPlayerConnect
+    nameWithType: GameManagerBase.OnPlayerConnect
+    fullName: TaleWorlds.Core.GameManagerBase.OnPlayerConnect
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.VirtualPlayer
+    name: VirtualPlayer
+    nameWithType: VirtualPlayer
+    fullName: TaleWorlds.Core.VirtualPlayer
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.OnPlayerConnect(TaleWorlds.Core.VirtualPlayer)
+    name: OnPlayerConnect
+    nameWithType: GameManagerBase.OnPlayerConnect
+    fullName: TaleWorlds.Core.GameManagerBase.OnPlayerConnect
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.VirtualPlayer
+    name: VirtualPlayer
+    nameWithType: VirtualPlayer
+    fullName: TaleWorlds.Core.VirtualPlayer
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.OnPlayerDisconnect(TaleWorlds.Core.VirtualPlayer)
+  commentId: M:TaleWorlds.Core.GameManagerBase.OnPlayerDisconnect(TaleWorlds.Core.VirtualPlayer)
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: OnPlayerDisconnect(VirtualPlayer)
+  nameWithType: GameManagerBase.OnPlayerDisconnect(VirtualPlayer)
+  fullName: TaleWorlds.Core.GameManagerBase.OnPlayerDisconnect(TaleWorlds.Core.VirtualPlayer)
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.OnPlayerDisconnect(TaleWorlds.Core.VirtualPlayer)
+    name: OnPlayerDisconnect
+    nameWithType: GameManagerBase.OnPlayerDisconnect
+    fullName: TaleWorlds.Core.GameManagerBase.OnPlayerDisconnect
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.VirtualPlayer
+    name: VirtualPlayer
+    nameWithType: VirtualPlayer
+    fullName: TaleWorlds.Core.VirtualPlayer
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.OnPlayerDisconnect(TaleWorlds.Core.VirtualPlayer)
+    name: OnPlayerDisconnect
+    nameWithType: GameManagerBase.OnPlayerDisconnect
+    fullName: TaleWorlds.Core.GameManagerBase.OnPlayerDisconnect
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.Core.VirtualPlayer
+    name: VirtualPlayer
+    nameWithType: VirtualPlayer
+    fullName: TaleWorlds.Core.VirtualPlayer
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.DoLoadingForGameManager
+  commentId: M:TaleWorlds.Core.GameManagerBase.DoLoadingForGameManager
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: DoLoadingForGameManager()
+  nameWithType: GameManagerBase.DoLoadingForGameManager()
+  fullName: TaleWorlds.Core.GameManagerBase.DoLoadingForGameManager()
+  spec.csharp:
+  - uid: TaleWorlds.Core.GameManagerBase.DoLoadingForGameManager
+    name: DoLoadingForGameManager
+    nameWithType: GameManagerBase.DoLoadingForGameManager
+    fullName: TaleWorlds.Core.GameManagerBase.DoLoadingForGameManager
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.Core.GameManagerBase.DoLoadingForGameManager
+    name: DoLoadingForGameManager
+    nameWithType: GameManagerBase.DoLoadingForGameManager
+    fullName: TaleWorlds.Core.GameManagerBase.DoLoadingForGameManager
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.Core.GameManagerBase.Game
+  commentId: P:TaleWorlds.Core.GameManagerBase.Game
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: Game
+  nameWithType: GameManagerBase.Game
+  fullName: TaleWorlds.Core.GameManagerBase.Game
+- uid: TaleWorlds.Core.GameManagerBase.Components
+  commentId: P:TaleWorlds.Core.GameManagerBase.Components
+  parent: TaleWorlds.Core.GameManagerBase
+  isExternal: true
+  name: Components
+  nameWithType: GameManagerBase.Components
+  fullName: TaleWorlds.Core.GameManagerBase.Components
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: TaleWorlds.Core
+  commentId: N:TaleWorlds.Core
+  isExternal: true
+  name: TaleWorlds.Core
+  nameWithType: TaleWorlds.Core
+  fullName: TaleWorlds.Core
+- uid: TaleWorlds.MountAndBlade
+  commentId: N:TaleWorlds.MountAndBlade
+  isExternal: true
+  name: TaleWorlds.MountAndBlade
+  nameWithType: TaleWorlds.MountAndBlade
+  fullName: TaleWorlds.MountAndBlade
+- uid: StoryMode
+  commentId: N:StoryMode
+  isExternal: true
+  name: StoryMode
+  nameWithType: StoryMode
+  fullName: StoryMode
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.#ctor*
+  commentId: Overload:Coop.Mod.Managers.ClientCharacterCreatorManager.#ctor
+  name: ClientCharacterCreatorManager
+  nameWithType: ClientCharacterCreatorManager.ClientCharacterCreatorManager
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientCharacterCreatorManager
+- uid: TaleWorlds.SaveSystem.Load.LoadResult
+  commentId: T:TaleWorlds.SaveSystem.Load.LoadResult
+  parent: TaleWorlds.SaveSystem.Load
+  isExternal: true
+  name: LoadResult
+  nameWithType: LoadResult
+  fullName: TaleWorlds.SaveSystem.Load.LoadResult
+- uid: TaleWorlds.SaveSystem.Load
+  commentId: N:TaleWorlds.SaveSystem.Load
+  isExternal: true
+  name: TaleWorlds.SaveSystem.Load
+  nameWithType: TaleWorlds.SaveSystem.Load
+  fullName: TaleWorlds.SaveSystem.Load
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  commentId: T:Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  parent: Coop.Mod.Managers
+  name: ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  nameWithType: ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinishedEventHandler
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientParty*
+  commentId: Overload:Coop.Mod.Managers.ClientCharacterCreatorManager.ClientParty
+  name: ClientParty
+  nameWithType: ClientCharacterCreatorManager.ClientParty
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientParty
+- uid: TaleWorlds.CampaignSystem.MobileParty
+  commentId: T:TaleWorlds.CampaignSystem.MobileParty
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: MobileParty
+  nameWithType: MobileParty
+  fullName: TaleWorlds.CampaignSystem.MobileParty
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientHero*
+  commentId: Overload:Coop.Mod.Managers.ClientCharacterCreatorManager.ClientHero
+  name: ClientHero
+  nameWithType: ClientCharacterCreatorManager.ClientHero
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientHero
+- uid: TaleWorlds.CampaignSystem.Hero
+  commentId: T:TaleWorlds.CampaignSystem.Hero
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: Hero
+  nameWithType: Hero
+  fullName: TaleWorlds.CampaignSystem.Hero
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientCharacterObject*
+  commentId: Overload:Coop.Mod.Managers.ClientCharacterCreatorManager.ClientCharacterObject
+  name: ClientCharacterObject
+  nameWithType: ClientCharacterCreatorManager.ClientCharacterObject
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.ClientCharacterObject
+- uid: TaleWorlds.CampaignSystem.CharacterObject
+  commentId: T:TaleWorlds.CampaignSystem.CharacterObject
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: CharacterObject
+  nameWithType: CharacterObject
+  fullName: TaleWorlds.CampaignSystem.CharacterObject
+- uid: StoryMode.StoryModeGameManager.OnLoadFinished
+  commentId: M:StoryMode.StoryModeGameManager.OnLoadFinished
+  parent: StoryMode.StoryModeGameManager
+  isExternal: true
+  name: OnLoadFinished()
+  nameWithType: StoryModeGameManager.OnLoadFinished()
+  fullName: StoryMode.StoryModeGameManager.OnLoadFinished()
+  spec.csharp:
+  - uid: StoryMode.StoryModeGameManager.OnLoadFinished
+    name: OnLoadFinished
+    nameWithType: StoryModeGameManager.OnLoadFinished
+    fullName: StoryMode.StoryModeGameManager.OnLoadFinished
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: StoryMode.StoryModeGameManager.OnLoadFinished
+    name: OnLoadFinished
+    nameWithType: StoryModeGameManager.OnLoadFinished
+    fullName: StoryMode.StoryModeGameManager.OnLoadFinished
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinished*
+  commentId: Overload:Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinished
+  name: OnLoadFinished
+  nameWithType: ClientCharacterCreatorManager.OnLoadFinished
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.OnLoadFinished
+- uid: Coop.Mod.Managers.ClientCharacterCreatorManager.SkipCharacterCreation*
+  commentId: Overload:Coop.Mod.Managers.ClientCharacterCreatorManager.SkipCharacterCreation
+  name: SkipCharacterCreation
+  nameWithType: ClientCharacterCreatorManager.SkipCharacterCreation
+  fullName: Coop.Mod.Managers.ClientCharacterCreatorManager.SkipCharacterCreation

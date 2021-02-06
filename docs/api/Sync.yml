@@ -1,0 +1,233 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync
+  commentId: N:Sync
+  id: Sync
+  children:
+  - Sync.EMethodPatchFlag
+  - Sync.EPatchBehaviour
+  - Sync.FieldAccess
+  - Sync.FieldAccess`2
+  - Sync.FieldAccessGroup`2
+  - Sync.FieldChangeBuffer
+  - Sync.MethodAccess
+  - Sync.MethodId
+  - Sync.MethodPatch
+  - Sync.MethodPatchFactory
+  - Sync.MethodPatchFactory.SMethodParameter
+  - Sync.MethodRegistry
+  - Sync.Patcher
+  - Sync.PropertyPatch
+  - Sync.SyncPriority
+  - Sync.Tracker
+  - Sync.ValueAccess
+  - Sync.ValueChangeRequest
+  - Sync.ValueData
+  langs:
+  - csharp
+  - vb
+  name: Sync
+  nameWithType: Sync
+  fullName: Sync
+  type: Namespace
+  assemblies:
+  - Sync
+references:
+- uid: Sync.EPatchBehaviour
+  commentId: T:Sync.EPatchBehaviour
+  parent: Sync
+  name: EPatchBehaviour
+  nameWithType: EPatchBehaviour
+  fullName: Sync.EPatchBehaviour
+- uid: Sync.MethodPatch
+  commentId: T:Sync.MethodPatch
+  parent: Sync
+  name: MethodPatch
+  nameWithType: MethodPatch
+  fullName: Sync.MethodPatch
+- uid: Sync.EMethodPatchFlag
+  commentId: T:Sync.EMethodPatchFlag
+  parent: Sync
+  name: EMethodPatchFlag
+  nameWithType: EMethodPatchFlag
+  fullName: Sync.EMethodPatchFlag
+- uid: Sync.ValueChangeRequest
+  commentId: T:Sync.ValueChangeRequest
+  parent: Sync
+  name: ValueChangeRequest
+  nameWithType: ValueChangeRequest
+  fullName: Sync.ValueChangeRequest
+- uid: Sync.FieldChangeBuffer
+  commentId: T:Sync.FieldChangeBuffer
+  parent: Sync
+  name: FieldChangeBuffer
+  nameWithType: FieldChangeBuffer
+  fullName: Sync.FieldChangeBuffer
+- uid: Sync.MethodId
+  commentId: T:Sync.MethodId
+  parent: Sync
+  name: MethodId
+  nameWithType: MethodId
+  fullName: Sync.MethodId
+- uid: Sync.MethodPatchFactory
+  commentId: T:Sync.MethodPatchFactory
+  name: MethodPatchFactory
+  nameWithType: MethodPatchFactory
+  fullName: Sync.MethodPatchFactory
+- uid: Sync.MethodPatchFactory.SMethodParameter
+  commentId: T:Sync.MethodPatchFactory.SMethodParameter
+  name: MethodPatchFactory.SMethodParameter
+  nameWithType: MethodPatchFactory.SMethodParameter
+  fullName: Sync.MethodPatchFactory.SMethodParameter
+- uid: Sync.MethodRegistry
+  commentId: T:Sync.MethodRegistry
+  name: MethodRegistry
+  nameWithType: MethodRegistry
+  fullName: Sync.MethodRegistry
+- uid: Sync.PropertyPatch
+  commentId: T:Sync.PropertyPatch
+  parent: Sync
+  name: PropertyPatch
+  nameWithType: PropertyPatch
+  fullName: Sync.PropertyPatch
+- uid: Sync.ValueAccess
+  commentId: T:Sync.ValueAccess
+  parent: Sync
+  name: ValueAccess
+  nameWithType: ValueAccess
+  fullName: Sync.ValueAccess
+- uid: Sync.Tracker
+  commentId: T:Sync.Tracker
+  parent: Sync
+  name: Tracker
+  nameWithType: Tracker
+  fullName: Sync.Tracker
+- uid: Sync.Patcher
+  commentId: T:Sync.Patcher
+  name: Patcher
+  nameWithType: Patcher
+  fullName: Sync.Patcher
+- uid: Sync.ValueData
+  commentId: T:Sync.ValueData
+  name: ValueData
+  nameWithType: ValueData
+  fullName: Sync.ValueData
+- uid: Sync.FieldAccess`2
+  commentId: T:Sync.FieldAccess`2
+  name: FieldAccess<TDeclaring, TFieldType>
+  nameWithType: FieldAccess<TDeclaring, TFieldType>
+  fullName: Sync.FieldAccess<TDeclaring, TFieldType>
+  nameWithType.vb: FieldAccess(Of TDeclaring, TFieldType)
+  fullName.vb: Sync.FieldAccess(Of TDeclaring, TFieldType)
+  name.vb: FieldAccess(Of TDeclaring, TFieldType)
+  spec.csharp:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TFieldType
+    nameWithType: TFieldType
+    fullName: TFieldType
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TFieldType
+    nameWithType: TFieldType
+    fullName: TFieldType
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldAccess
+  commentId: T:Sync.FieldAccess
+  parent: Sync
+  name: FieldAccess
+  nameWithType: FieldAccess
+  fullName: Sync.FieldAccess
+- uid: Sync.FieldAccessGroup`2
+  commentId: T:Sync.FieldAccessGroup`2
+  parent: Sync
+  name: FieldAccessGroup<TDeclaring, TValueObject>
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject)
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject)
+  name.vb: FieldAccessGroup(Of TDeclaring, TValueObject)
+  spec.csharp:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValueObject
+    nameWithType: TValueObject
+    fullName: TValueObject
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValueObject
+    nameWithType: TValueObject
+    fullName: TValueObject
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.MethodAccess
+  commentId: T:Sync.MethodAccess
+  parent: Sync
+  name: MethodAccess
+  nameWithType: MethodAccess
+  fullName: Sync.MethodAccess
+- uid: Sync.SyncPriority
+  commentId: T:Sync.SyncPriority
+  name: SyncPriority
+  nameWithType: SyncPriority
+  fullName: Sync.SyncPriority
+- uid: Sync
+  commentId: N:Sync
+  name: Sync
+  nameWithType: Sync
+  fullName: Sync

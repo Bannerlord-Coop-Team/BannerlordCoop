@@ -1,0 +1,1035 @@
+### YamlMime:ManagedReference
+items:
+- uid: Common.OrderedHashSet`1.Enumerator
+  commentId: T:Common.OrderedHashSet`1.Enumerator
+  id: OrderedHashSet`1.Enumerator
+  parent: Common
+  children:
+  - Common.OrderedHashSet`1.Enumerator.#ctor(Common.OrderedHashSet{`0})
+  - Common.OrderedHashSet`1.Enumerator.#ctor(Common.OrderedHashSet{`0},System.Int32)
+  - Common.OrderedHashSet`1.Enumerator.Current
+  - Common.OrderedHashSet`1.Enumerator.m_index
+  - Common.OrderedHashSet`1.Enumerator.m_set
+  - Common.OrderedHashSet`1.Enumerator.m_version
+  - Common.OrderedHashSet`1.Enumerator.MoveNext
+  - Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Current
+  - Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Reset
+  - Common.OrderedHashSet`1.Enumerator.System#IDisposable#Dispose
+  langs:
+  - csharp
+  - vb
+  name: OrderedHashSet<T>.Enumerator
+  nameWithType: OrderedHashSet<T>.Enumerator
+  fullName: Common.OrderedHashSet<T>.Enumerator
+  type: Struct
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Enumerator
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 320
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: >-
+      [Serializable]
+
+      public struct Enumerator : IEnumerator<T>, IDisposable, IEnumerator
+    content.vb: >-
+      <Serializable>
+
+      Public Structure Enumerator
+
+          Implements IEnumerator(Of T), IDisposable, IEnumerator
+  implements:
+  - System.Collections.Generic.IEnumerator{{T}}
+  - System.IDisposable
+  - System.Collections.IEnumerator
+  inheritedMembers:
+  - System.ValueType.Equals(System.Object)
+  - System.ValueType.GetHashCode
+  - System.ValueType.ToString
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  attributes:
+  - type: System.SerializableAttribute
+    ctor: System.SerializableAttribute.#ctor
+    arguments: []
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator
+  modifiers.csharp:
+  - public
+  - struct
+  modifiers.vb:
+  - Public
+  - Structure
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator
+  name.vb: OrderedHashSet(Of T).Enumerator
+- uid: Common.OrderedHashSet`1.Enumerator.m_set
+  commentId: F:Common.OrderedHashSet`1.Enumerator.m_set
+  id: m_set
+  parent: Common.OrderedHashSet`1.Enumerator
+  langs:
+  - csharp
+  - vb
+  name: m_set
+  nameWithType: OrderedHashSet<T>.Enumerator.m_set
+  fullName: Common.OrderedHashSet<T>.Enumerator.m_set
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_set
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 323
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: OrderedHashSet<T> m_set
+    return:
+      type: Common.OrderedHashSet`1
+    content.vb: m_set As OrderedHashSet(Of T)
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.m_set
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.m_set
+- uid: Common.OrderedHashSet`1.Enumerator.m_index
+  commentId: F:Common.OrderedHashSet`1.Enumerator.m_index
+  id: m_index
+  parent: Common.OrderedHashSet`1.Enumerator
+  langs:
+  - csharp
+  - vb
+  name: m_index
+  nameWithType: OrderedHashSet<T>.Enumerator.m_index
+  fullName: Common.OrderedHashSet<T>.Enumerator.m_index
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_index
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 324
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: int m_index
+    return:
+      type: System.Int32
+    content.vb: m_index As Integer
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.m_index
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.m_index
+- uid: Common.OrderedHashSet`1.Enumerator.m_version
+  commentId: F:Common.OrderedHashSet`1.Enumerator.m_version
+  id: m_version
+  parent: Common.OrderedHashSet`1.Enumerator
+  langs:
+  - csharp
+  - vb
+  name: m_version
+  nameWithType: OrderedHashSet<T>.Enumerator.m_version
+  fullName: Common.OrderedHashSet<T>.Enumerator.m_version
+  type: Field
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_version
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 325
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: int m_version
+    return:
+      type: System.Int32
+    content.vb: m_version As Integer
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.m_version
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.m_version
+- uid: Common.OrderedHashSet`1.Enumerator.Current
+  commentId: P:Common.OrderedHashSet`1.Enumerator.Current
+  id: Current
+  parent: Common.OrderedHashSet`1.Enumerator
+  langs:
+  - csharp
+  - vb
+  name: Current
+  nameWithType: OrderedHashSet<T>.Enumerator.Current
+  fullName: Common.OrderedHashSet<T>.Enumerator.Current
+  type: Property
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Current
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 327
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public T Current { get; }
+    parameters: []
+    return:
+      type: '{T}'
+    content.vb: Public ReadOnly Property Current As T
+  overload: Common.OrderedHashSet`1.Enumerator.Current*
+  implements:
+  - System.Collections.Generic.IEnumerator{{T}}.Current
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.Current
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.Current
+- uid: Common.OrderedHashSet`1.Enumerator.#ctor(Common.OrderedHashSet{`0})
+  commentId: M:Common.OrderedHashSet`1.Enumerator.#ctor(Common.OrderedHashSet{`0})
+  id: '#ctor(Common.OrderedHashSet{`0})'
+  parent: Common.OrderedHashSet`1.Enumerator
+  langs:
+  - csharp
+  - vb
+  name: Enumerator(OrderedHashSet<T>)
+  nameWithType: OrderedHashSet<T>.Enumerator.Enumerator(OrderedHashSet<T>)
+  fullName: Common.OrderedHashSet<T>.Enumerator.Enumerator(Common.OrderedHashSet<T>)
+  type: Constructor
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 329
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: Enumerator(OrderedHashSet<T> set)
+    parameters:
+    - id: set
+      type: Common.OrderedHashSet`1
+    content.vb: Sub New(set As OrderedHashSet(Of T))
+  overload: Common.OrderedHashSet`1.Enumerator.#ctor*
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.Enumerator(OrderedHashSet(Of T))
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.Enumerator(Common.OrderedHashSet(Of T))
+  name.vb: Enumerator(OrderedHashSet(Of T))
+- uid: Common.OrderedHashSet`1.Enumerator.#ctor(Common.OrderedHashSet{`0},System.Int32)
+  commentId: M:Common.OrderedHashSet`1.Enumerator.#ctor(Common.OrderedHashSet{`0},System.Int32)
+  id: '#ctor(Common.OrderedHashSet{`0},System.Int32)'
+  parent: Common.OrderedHashSet`1.Enumerator
+  langs:
+  - csharp
+  - vb
+  name: Enumerator(OrderedHashSet<T>, Int32)
+  nameWithType: OrderedHashSet<T>.Enumerator.Enumerator(OrderedHashSet<T>, Int32)
+  fullName: Common.OrderedHashSet<T>.Enumerator.Enumerator(Common.OrderedHashSet<T>, System.Int32)
+  type: Constructor
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 333
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: Enumerator(OrderedHashSet<T> set, int startIndex)
+    parameters:
+    - id: set
+      type: Common.OrderedHashSet`1
+    - id: startIndex
+      type: System.Int32
+    content.vb: Sub New(set As OrderedHashSet(Of T), startIndex As Integer)
+  overload: Common.OrderedHashSet`1.Enumerator.#ctor*
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.Enumerator(OrderedHashSet(Of T), Int32)
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.Enumerator(Common.OrderedHashSet(Of T), System.Int32)
+  name.vb: Enumerator(OrderedHashSet(Of T), Int32)
+- uid: Common.OrderedHashSet`1.Enumerator.MoveNext
+  commentId: M:Common.OrderedHashSet`1.Enumerator.MoveNext
+  id: MoveNext
+  parent: Common.OrderedHashSet`1.Enumerator
+  langs:
+  - csharp
+  - vb
+  name: MoveNext()
+  nameWithType: OrderedHashSet<T>.Enumerator.MoveNext()
+  fullName: Common.OrderedHashSet<T>.Enumerator.MoveNext()
+  type: Method
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MoveNext
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 341
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public bool MoveNext()
+    return:
+      type: System.Boolean
+    content.vb: Public Function MoveNext As Boolean
+  overload: Common.OrderedHashSet`1.Enumerator.MoveNext*
+  implements:
+  - System.Collections.IEnumerator.MoveNext
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.MoveNext()
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.MoveNext()
+- uid: Common.OrderedHashSet`1.Enumerator.System#IDisposable#Dispose
+  commentId: M:Common.OrderedHashSet`1.Enumerator.System#IDisposable#Dispose
+  id: System#IDisposable#Dispose
+  isEii: true
+  parent: Common.OrderedHashSet`1.Enumerator
+  langs:
+  - csharp
+  - vb
+  name: IDisposable.Dispose()
+  nameWithType: OrderedHashSet<T>.Enumerator.IDisposable.Dispose()
+  fullName: Common.OrderedHashSet<T>.Enumerator.System.IDisposable.Dispose()
+  type: Method
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: System.IDisposable.Dispose
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 359
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: void IDisposable.Dispose()
+    content.vb: Sub System.IDisposable.Dispose Implements IDisposable.Dispose
+  overload: Common.OrderedHashSet`1.Enumerator.System#IDisposable#Dispose*
+  implements:
+  - System.IDisposable.Dispose
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.System.IDisposable.Dispose()
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.System.IDisposable.Dispose()
+  name.vb: System.IDisposable.Dispose()
+- uid: Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Current
+  commentId: P:Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Current
+  id: System#Collections#IEnumerator#Current
+  isEii: true
+  parent: Common.OrderedHashSet`1.Enumerator
+  langs:
+  - csharp
+  - vb
+  name: IEnumerator.Current
+  nameWithType: OrderedHashSet<T>.Enumerator.IEnumerator.Current
+  fullName: Common.OrderedHashSet<T>.Enumerator.System.Collections.IEnumerator.Current
+  type: Property
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: System.Collections.IEnumerator.Current
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 363
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: object IEnumerator.Current { get; }
+    parameters: []
+    return:
+      type: System.Object
+    content.vb: ReadOnly WriteOnly Property System.Collections.IEnumerator.Current As Object Implements IEnumerator.Current
+  overload: Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Current*
+  implements:
+  - System.Collections.IEnumerator.Current
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.System.Collections.IEnumerator.Current
+  modifiers.csharp:
+  - get
+  modifiers.vb:
+  - ReadOnly
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.System.Collections.IEnumerator.Current
+  name.vb: System.Collections.IEnumerator.Current
+- uid: Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Reset
+  commentId: M:Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Reset
+  id: System#Collections#IEnumerator#Reset
+  isEii: true
+  parent: Common.OrderedHashSet`1.Enumerator
+  langs:
+  - csharp
+  - vb
+  name: IEnumerator.Reset()
+  nameWithType: OrderedHashSet<T>.Enumerator.IEnumerator.Reset()
+  fullName: Common.OrderedHashSet<T>.Enumerator.System.Collections.IEnumerator.Reset()
+  type: Method
+  source:
+    remote:
+      path: source/Common/OrderedHashSet.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: System.Collections.IEnumerator.Reset
+    path: ../source/Common/OrderedHashSet.cs
+    startLine: 376
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: void IEnumerator.Reset()
+    content.vb: Sub System.Collections.IEnumerator.Reset Implements IEnumerator.Reset
+  overload: Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Reset*
+  implements:
+  - System.Collections.IEnumerator.Reset
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.System.Collections.IEnumerator.Reset()
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.System.Collections.IEnumerator.Reset()
+  name.vb: System.Collections.IEnumerator.Reset()
+references:
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: System.Collections.Generic.IEnumerator{{T}}
+  commentId: T:System.Collections.Generic.IEnumerator{`0}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IEnumerator`1
+  name: IEnumerator<T>
+  nameWithType: IEnumerator<T>
+  fullName: System.Collections.Generic.IEnumerator<T>
+  nameWithType.vb: IEnumerator(Of T)
+  fullName.vb: System.Collections.Generic.IEnumerator(Of T)
+  name.vb: IEnumerator(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerator`1
+    name: IEnumerator
+    nameWithType: IEnumerator
+    fullName: System.Collections.Generic.IEnumerator
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerator`1
+    name: IEnumerator
+    nameWithType: IEnumerator
+    fullName: System.Collections.Generic.IEnumerator
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.IDisposable
+  commentId: T:System.IDisposable
+  parent: System
+  isExternal: true
+  name: IDisposable
+  nameWithType: IDisposable
+  fullName: System.IDisposable
+- uid: System.Collections.IEnumerator
+  commentId: T:System.Collections.IEnumerator
+  parent: System.Collections
+  isExternal: true
+  name: IEnumerator
+  nameWithType: IEnumerator
+  fullName: System.Collections.IEnumerator
+- uid: System.ValueType.Equals(System.Object)
+  commentId: M:System.ValueType.Equals(System.Object)
+  parent: System.ValueType
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: ValueType.Equals(Object)
+  fullName: System.ValueType.Equals(System.Object)
+  spec.csharp:
+  - uid: System.ValueType.Equals(System.Object)
+    name: Equals
+    nameWithType: ValueType.Equals
+    fullName: System.ValueType.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.ValueType.Equals(System.Object)
+    name: Equals
+    nameWithType: ValueType.Equals
+    fullName: System.ValueType.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ValueType.GetHashCode
+  commentId: M:System.ValueType.GetHashCode
+  parent: System.ValueType
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: ValueType.GetHashCode()
+  fullName: System.ValueType.GetHashCode()
+  spec.csharp:
+  - uid: System.ValueType.GetHashCode
+    name: GetHashCode
+    nameWithType: ValueType.GetHashCode
+    fullName: System.ValueType.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.ValueType.GetHashCode
+    name: GetHashCode
+    nameWithType: ValueType.GetHashCode
+    fullName: System.ValueType.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.ValueType.ToString
+  commentId: M:System.ValueType.ToString
+  parent: System.ValueType
+  isExternal: true
+  name: ToString()
+  nameWithType: ValueType.ToString()
+  fullName: System.ValueType.ToString()
+  spec.csharp:
+  - uid: System.ValueType.ToString
+    name: ToString
+    nameWithType: ValueType.ToString
+    fullName: System.ValueType.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.ValueType.ToString
+    name: ToString
+    nameWithType: ValueType.ToString
+    fullName: System.ValueType.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.IEnumerator`1
+  commentId: T:System.Collections.Generic.IEnumerator`1
+  isExternal: true
+  name: IEnumerator<T>
+  nameWithType: IEnumerator<T>
+  fullName: System.Collections.Generic.IEnumerator<T>
+  nameWithType.vb: IEnumerator(Of T)
+  fullName.vb: System.Collections.Generic.IEnumerator(Of T)
+  name.vb: IEnumerator(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerator`1
+    name: IEnumerator
+    nameWithType: IEnumerator
+    fullName: System.Collections.Generic.IEnumerator
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerator`1
+    name: IEnumerator
+    nameWithType: IEnumerator
+    fullName: System.Collections.Generic.IEnumerator
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Collections
+  commentId: N:System.Collections
+  isExternal: true
+  name: System.Collections
+  nameWithType: System.Collections
+  fullName: System.Collections
+- uid: System.ValueType
+  commentId: T:System.ValueType
+  parent: System
+  isExternal: true
+  name: ValueType
+  nameWithType: ValueType
+  fullName: System.ValueType
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Common.OrderedHashSet`1
+  commentId: T:Common.OrderedHashSet`1
+  parent: Common
+  name: OrderedHashSet<T>
+  nameWithType: OrderedHashSet<T>
+  fullName: Common.OrderedHashSet<T>
+  nameWithType.vb: OrderedHashSet(Of T)
+  fullName.vb: Common.OrderedHashSet(Of T)
+  name.vb: OrderedHashSet(Of T)
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1
+    name: OrderedHashSet
+    nameWithType: OrderedHashSet
+    fullName: Common.OrderedHashSet
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1
+    name: OrderedHashSet
+    nameWithType: OrderedHashSet
+    fullName: Common.OrderedHashSet
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: Common.OrderedHashSet`1.Enumerator.Current*
+  commentId: Overload:Common.OrderedHashSet`1.Enumerator.Current
+  name: Current
+  nameWithType: OrderedHashSet<T>.Enumerator.Current
+  fullName: Common.OrderedHashSet<T>.Enumerator.Current
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.Current
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.Current
+- uid: System.Collections.Generic.IEnumerator{{T}}.Current
+  commentId: P:System.Collections.Generic.IEnumerator{`0}.Current
+  parent: System.Collections.Generic.IEnumerator{{T}}
+  definition: System.Collections.Generic.IEnumerator`1.Current
+  name: Current
+  nameWithType: IEnumerator<T>.Current
+  fullName: System.Collections.Generic.IEnumerator<T>.Current
+  nameWithType.vb: IEnumerator(Of T).Current
+  fullName.vb: System.Collections.Generic.IEnumerator(Of T).Current
+- uid: '{T}'
+  commentId: '!:T'
+  definition: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: System.Collections.Generic.IEnumerator`1.Current
+  commentId: P:System.Collections.Generic.IEnumerator`1.Current
+  isExternal: true
+  name: Current
+  nameWithType: IEnumerator<T>.Current
+  fullName: System.Collections.Generic.IEnumerator<T>.Current
+  nameWithType.vb: IEnumerator(Of T).Current
+  fullName.vb: System.Collections.Generic.IEnumerator(Of T).Current
+- uid: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: Common.OrderedHashSet`1.Enumerator.#ctor*
+  commentId: Overload:Common.OrderedHashSet`1.Enumerator.#ctor
+  name: Enumerator
+  nameWithType: OrderedHashSet<T>.Enumerator.Enumerator
+  fullName: Common.OrderedHashSet<T>.Enumerator.Enumerator
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.Enumerator
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.Enumerator
+- uid: Common.OrderedHashSet`1.Enumerator.MoveNext*
+  commentId: Overload:Common.OrderedHashSet`1.Enumerator.MoveNext
+  name: MoveNext
+  nameWithType: OrderedHashSet<T>.Enumerator.MoveNext
+  fullName: Common.OrderedHashSet<T>.Enumerator.MoveNext
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.MoveNext
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.MoveNext
+- uid: System.Collections.IEnumerator.MoveNext
+  commentId: M:System.Collections.IEnumerator.MoveNext
+  parent: System.Collections.IEnumerator
+  isExternal: true
+  name: MoveNext()
+  nameWithType: IEnumerator.MoveNext()
+  fullName: System.Collections.IEnumerator.MoveNext()
+  spec.csharp:
+  - uid: System.Collections.IEnumerator.MoveNext
+    name: MoveNext
+    nameWithType: IEnumerator.MoveNext
+    fullName: System.Collections.IEnumerator.MoveNext
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Collections.IEnumerator.MoveNext
+    name: MoveNext
+    nameWithType: IEnumerator.MoveNext
+    fullName: System.Collections.IEnumerator.MoveNext
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Common.OrderedHashSet`1.Enumerator.System#IDisposable#Dispose*
+  commentId: Overload:Common.OrderedHashSet`1.Enumerator.System#IDisposable#Dispose
+  name: IDisposable.Dispose
+  nameWithType: OrderedHashSet<T>.Enumerator.IDisposable.Dispose
+  fullName: Common.OrderedHashSet<T>.Enumerator.System.IDisposable.Dispose
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.System.IDisposable.Dispose
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.System.IDisposable.Dispose
+  name.vb: System.IDisposable.Dispose
+- uid: System.IDisposable.Dispose
+  commentId: M:System.IDisposable.Dispose
+  parent: System.IDisposable
+  isExternal: true
+  name: Dispose()
+  nameWithType: IDisposable.Dispose()
+  fullName: System.IDisposable.Dispose()
+  spec.csharp:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    nameWithType: IDisposable.Dispose
+    fullName: System.IDisposable.Dispose
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    nameWithType: IDisposable.Dispose
+    fullName: System.IDisposable.Dispose
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Current*
+  commentId: Overload:Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Current
+  name: IEnumerator.Current
+  nameWithType: OrderedHashSet<T>.Enumerator.IEnumerator.Current
+  fullName: Common.OrderedHashSet<T>.Enumerator.System.Collections.IEnumerator.Current
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.System.Collections.IEnumerator.Current
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.System.Collections.IEnumerator.Current
+  name.vb: System.Collections.IEnumerator.Current
+- uid: System.Collections.IEnumerator.Current
+  commentId: P:System.Collections.IEnumerator.Current
+  parent: System.Collections.IEnumerator
+  isExternal: true
+  name: Current
+  nameWithType: IEnumerator.Current
+  fullName: System.Collections.IEnumerator.Current
+- uid: Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Reset*
+  commentId: Overload:Common.OrderedHashSet`1.Enumerator.System#Collections#IEnumerator#Reset
+  name: IEnumerator.Reset
+  nameWithType: OrderedHashSet<T>.Enumerator.IEnumerator.Reset
+  fullName: Common.OrderedHashSet<T>.Enumerator.System.Collections.IEnumerator.Reset
+  nameWithType.vb: OrderedHashSet(Of T).Enumerator.System.Collections.IEnumerator.Reset
+  fullName.vb: Common.OrderedHashSet(Of T).Enumerator.System.Collections.IEnumerator.Reset
+  name.vb: System.Collections.IEnumerator.Reset
+- uid: System.Collections.IEnumerator.Reset
+  commentId: M:System.Collections.IEnumerator.Reset
+  parent: System.Collections.IEnumerator
+  isExternal: true
+  name: Reset()
+  nameWithType: IEnumerator.Reset()
+  fullName: System.Collections.IEnumerator.Reset()
+  spec.csharp:
+  - uid: System.Collections.IEnumerator.Reset
+    name: Reset
+    nameWithType: IEnumerator.Reset
+    fullName: System.Collections.IEnumerator.Reset
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Collections.IEnumerator.Reset
+    name: Reset
+    nameWithType: IEnumerator.Reset
+    fullName: System.Collections.IEnumerator.Reset
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )

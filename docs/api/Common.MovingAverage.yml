@@ -1,0 +1,1007 @@
+### YamlMime:ManagedReference
+items:
+- uid: Common.MovingAverage
+  commentId: T:Common.MovingAverage
+  id: MovingAverage
+  parent: Common
+  children:
+  - Common.MovingAverage.#ctor(System.Int32)
+  - Common.MovingAverage.AllTimeMax
+  - Common.MovingAverage.AllTimeMin
+  - Common.MovingAverage.Average
+  - Common.MovingAverage.m_iBack
+  - Common.MovingAverage.m_iCount
+  - Common.MovingAverage.m_iFront
+  - Common.MovingAverage.m_Max
+  - Common.MovingAverage.m_Min
+  - Common.MovingAverage.m_Values
+  - Common.MovingAverage.Max
+  - Common.MovingAverage.Min
+  - Common.MovingAverage.NextIndex(System.Int32)
+  - Common.MovingAverage.Push(System.Int64)
+  - Common.MovingAverage.Size
+  langs:
+  - csharp
+  - vb
+  name: MovingAverage
+  nameWithType: MovingAverage
+  fullName: Common.MovingAverage
+  type: Class
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MovingAverage
+    path: ../source/Common/MovingAverage.cs
+    startLine: 5
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public class MovingAverage
+    content.vb: Public Class MovingAverage
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Common.MovingAverage.Size
+  commentId: P:Common.MovingAverage.Size
+  id: Size
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: Size
+  nameWithType: MovingAverage.Size
+  fullName: Common.MovingAverage.Size
+  type: Property
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Size
+    path: ../source/Common/MovingAverage.cs
+    startLine: 7
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public int Size { get; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public ReadOnly Property Size As Integer
+  overload: Common.MovingAverage.Size*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Common.MovingAverage.m_Values
+  commentId: F:Common.MovingAverage.m_Values
+  id: m_Values
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: m_Values
+  nameWithType: MovingAverage.m_Values
+  fullName: Common.MovingAverage.m_Values
+  type: Field
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Values
+    path: ../source/Common/MovingAverage.cs
+    startLine: 9
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: readonly long[] m_Values
+    return:
+      type: System.Int64[]
+    content.vb: ReadOnly m_Values As Long()
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Common.MovingAverage.m_iBack
+  commentId: F:Common.MovingAverage.m_iBack
+  id: m_iBack
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: m_iBack
+  nameWithType: MovingAverage.m_iBack
+  fullName: Common.MovingAverage.m_iBack
+  type: Field
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_iBack
+    path: ../source/Common/MovingAverage.cs
+    startLine: 10
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: int m_iBack
+    return:
+      type: System.Int32
+    content.vb: m_iBack As Integer
+- uid: Common.MovingAverage.m_iCount
+  commentId: F:Common.MovingAverage.m_iCount
+  id: m_iCount
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: m_iCount
+  nameWithType: MovingAverage.m_iCount
+  fullName: Common.MovingAverage.m_iCount
+  type: Field
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_iCount
+    path: ../source/Common/MovingAverage.cs
+    startLine: 11
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: int m_iCount
+    return:
+      type: System.Int32
+    content.vb: m_iCount As Integer
+- uid: Common.MovingAverage.m_iFront
+  commentId: F:Common.MovingAverage.m_iFront
+  id: m_iFront
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: m_iFront
+  nameWithType: MovingAverage.m_iFront
+  fullName: Common.MovingAverage.m_iFront
+  type: Field
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_iFront
+    path: ../source/Common/MovingAverage.cs
+    startLine: 12
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: int m_iFront
+    return:
+      type: System.Int32
+    content.vb: m_iFront As Integer
+- uid: Common.MovingAverage.m_Min
+  commentId: F:Common.MovingAverage.m_Min
+  id: m_Min
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: m_Min
+  nameWithType: MovingAverage.m_Min
+  fullName: Common.MovingAverage.m_Min
+  type: Field
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Min
+    path: ../source/Common/MovingAverage.cs
+    startLine: 14
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: long? m_Min
+    return:
+      type: System.Nullable{System.Int64}
+    content.vb: m_Min As Long?
+- uid: Common.MovingAverage.m_Max
+  commentId: F:Common.MovingAverage.m_Max
+  id: m_Max
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: m_Max
+  nameWithType: MovingAverage.m_Max
+  fullName: Common.MovingAverage.m_Max
+  type: Field
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Max
+    path: ../source/Common/MovingAverage.cs
+    startLine: 15
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: long? m_Max
+    return:
+      type: System.Nullable{System.Int64}
+    content.vb: m_Max As Long?
+- uid: Common.MovingAverage.Min
+  commentId: P:Common.MovingAverage.Min
+  id: Min
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: Min
+  nameWithType: MovingAverage.Min
+  fullName: Common.MovingAverage.Min
+  type: Property
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Min
+    path: ../source/Common/MovingAverage.cs
+    startLine: 17
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public long Min { get; }
+    parameters: []
+    return:
+      type: System.Int64
+    content.vb: Public ReadOnly Property Min As Long
+  overload: Common.MovingAverage.Min*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Common.MovingAverage.Max
+  commentId: P:Common.MovingAverage.Max
+  id: Max
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: Max
+  nameWithType: MovingAverage.Max
+  fullName: Common.MovingAverage.Max
+  type: Property
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Max
+    path: ../source/Common/MovingAverage.cs
+    startLine: 28
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public long Max { get; }
+    parameters: []
+    return:
+      type: System.Int64
+    content.vb: Public ReadOnly Property Max As Long
+  overload: Common.MovingAverage.Max*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Common.MovingAverage.AllTimeMin
+  commentId: P:Common.MovingAverage.AllTimeMin
+  id: AllTimeMin
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: AllTimeMin
+  nameWithType: MovingAverage.AllTimeMin
+  fullName: Common.MovingAverage.AllTimeMin
+  type: Property
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: AllTimeMin
+    path: ../source/Common/MovingAverage.cs
+    startLine: 40
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public long AllTimeMin { get; }
+    parameters: []
+    return:
+      type: System.Int64
+    content.vb: Public ReadOnly Property AllTimeMin As Long
+  overload: Common.MovingAverage.AllTimeMin*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Common.MovingAverage.AllTimeMax
+  commentId: P:Common.MovingAverage.AllTimeMax
+  id: AllTimeMax
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: AllTimeMax
+  nameWithType: MovingAverage.AllTimeMax
+  fullName: Common.MovingAverage.AllTimeMax
+  type: Property
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: AllTimeMax
+    path: ../source/Common/MovingAverage.cs
+    startLine: 41
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public long AllTimeMax { get; }
+    parameters: []
+    return:
+      type: System.Int64
+    content.vb: Public ReadOnly Property AllTimeMax As Long
+  overload: Common.MovingAverage.AllTimeMax*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Common.MovingAverage.#ctor(System.Int32)
+  commentId: M:Common.MovingAverage.#ctor(System.Int32)
+  id: '#ctor(System.Int32)'
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: MovingAverage(Int32)
+  nameWithType: MovingAverage.MovingAverage(Int32)
+  fullName: Common.MovingAverage.MovingAverage(System.Int32)
+  type: Constructor
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Common/MovingAverage.cs
+    startLine: 43
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public MovingAverage(int size)
+    parameters:
+    - id: size
+      type: System.Int32
+    content.vb: Public Sub New(size As Integer)
+  overload: Common.MovingAverage.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Common.MovingAverage.Average
+  commentId: P:Common.MovingAverage.Average
+  id: Average
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: Average
+  nameWithType: MovingAverage.Average
+  fullName: Common.MovingAverage.Average
+  type: Property
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Average
+    path: ../source/Common/MovingAverage.cs
+    startLine: 53
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public double Average { get; }
+    parameters: []
+    return:
+      type: System.Double
+    content.vb: Public ReadOnly Property Average As Double
+  overload: Common.MovingAverage.Average*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Common.MovingAverage.Push(System.Int64)
+  commentId: M:Common.MovingAverage.Push(System.Int64)
+  id: Push(System.Int64)
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: Push(Int64)
+  nameWithType: MovingAverage.Push(Int64)
+  fullName: Common.MovingAverage.Push(System.Int64)
+  type: Method
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Push
+    path: ../source/Common/MovingAverage.cs
+    startLine: 55
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public double Push(long value)
+    parameters:
+    - id: value
+      type: System.Int64
+    return:
+      type: System.Double
+    content.vb: Public Function Push(value As Long) As Double
+  overload: Common.MovingAverage.Push*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Common.MovingAverage.NextIndex(System.Int32)
+  commentId: M:Common.MovingAverage.NextIndex(System.Int32)
+  id: NextIndex(System.Int32)
+  parent: Common.MovingAverage
+  langs:
+  - csharp
+  - vb
+  name: NextIndex(Int32)
+  nameWithType: MovingAverage.NextIndex(Int32)
+  fullName: Common.MovingAverage.NextIndex(System.Int32)
+  type: Method
+  source:
+    remote:
+      path: source/Common/MovingAverage.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: NextIndex
+    path: ../source/Common/MovingAverage.cs
+    startLine: 80
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: int NextIndex(int index)
+    parameters:
+    - id: index
+      type: System.Int32
+    return:
+      type: System.Int32
+    content.vb: Function NextIndex(index As Integer) As Integer
+  overload: Common.MovingAverage.NextIndex*
+references:
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Common.MovingAverage.Size*
+  commentId: Overload:Common.MovingAverage.Size
+  name: Size
+  nameWithType: MovingAverage.Size
+  fullName: Common.MovingAverage.Size
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: System.Int64[]
+  isExternal: true
+  name: Int64[]
+  nameWithType: Int64[]
+  fullName: System.Int64[]
+  nameWithType.vb: Int64()
+  fullName.vb: System.Int64()
+  name.vb: Int64()
+  spec.csharp:
+  - uid: System.Int64
+    name: Int64
+    nameWithType: Int64
+    fullName: System.Int64
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  spec.vb:
+  - uid: System.Int64
+    name: Int64
+    nameWithType: Int64
+    fullName: System.Int64
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+- uid: System.Nullable{System.Int64}
+  commentId: T:System.Nullable{System.Int64}
+  parent: System
+  definition: System.Nullable`1
+  name: Nullable<Int64>
+  nameWithType: Nullable<Int64>
+  fullName: System.Nullable<System.Int64>
+  nameWithType.vb: Nullable(Of Int64)
+  fullName.vb: System.Nullable(Of System.Int64)
+  name.vb: Nullable(Of Int64)
+  spec.csharp:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Int64
+    name: Int64
+    nameWithType: Int64
+    fullName: System.Int64
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Int64
+    name: Int64
+    nameWithType: Int64
+    fullName: System.Int64
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Nullable`1
+  commentId: T:System.Nullable`1
+  isExternal: true
+  name: Nullable<T>
+  nameWithType: Nullable<T>
+  fullName: System.Nullable<T>
+  nameWithType.vb: Nullable(Of T)
+  fullName.vb: System.Nullable(Of T)
+  name.vb: Nullable(Of T)
+  spec.csharp:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Nullable`1
+    name: Nullable
+    nameWithType: Nullable
+    fullName: System.Nullable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.MovingAverage.Min*
+  commentId: Overload:Common.MovingAverage.Min
+  name: Min
+  nameWithType: MovingAverage.Min
+  fullName: Common.MovingAverage.Min
+- uid: System.Int64
+  commentId: T:System.Int64
+  parent: System
+  isExternal: true
+  name: Int64
+  nameWithType: Int64
+  fullName: System.Int64
+- uid: Common.MovingAverage.Max*
+  commentId: Overload:Common.MovingAverage.Max
+  name: Max
+  nameWithType: MovingAverage.Max
+  fullName: Common.MovingAverage.Max
+- uid: Common.MovingAverage.AllTimeMin*
+  commentId: Overload:Common.MovingAverage.AllTimeMin
+  name: AllTimeMin
+  nameWithType: MovingAverage.AllTimeMin
+  fullName: Common.MovingAverage.AllTimeMin
+- uid: Common.MovingAverage.AllTimeMax*
+  commentId: Overload:Common.MovingAverage.AllTimeMax
+  name: AllTimeMax
+  nameWithType: MovingAverage.AllTimeMax
+  fullName: Common.MovingAverage.AllTimeMax
+- uid: Common.MovingAverage.#ctor*
+  commentId: Overload:Common.MovingAverage.#ctor
+  name: MovingAverage
+  nameWithType: MovingAverage.MovingAverage
+  fullName: Common.MovingAverage.MovingAverage
+- uid: Common.MovingAverage.Average*
+  commentId: Overload:Common.MovingAverage.Average
+  name: Average
+  nameWithType: MovingAverage.Average
+  fullName: Common.MovingAverage.Average
+- uid: System.Double
+  commentId: T:System.Double
+  parent: System
+  isExternal: true
+  name: Double
+  nameWithType: Double
+  fullName: System.Double
+- uid: Common.MovingAverage.Push*
+  commentId: Overload:Common.MovingAverage.Push
+  name: Push
+  nameWithType: MovingAverage.Push
+  fullName: Common.MovingAverage.Push
+- uid: Common.MovingAverage.NextIndex*
+  commentId: Overload:Common.MovingAverage.NextIndex
+  name: NextIndex
+  nameWithType: MovingAverage.NextIndex
+  fullName: Common.MovingAverage.NextIndex

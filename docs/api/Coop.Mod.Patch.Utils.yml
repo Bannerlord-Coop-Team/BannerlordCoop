@@ -1,0 +1,593 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Patch.Utils
+  commentId: T:Coop.Mod.Patch.Utils
+  id: Utils
+  parent: Coop.Mod.Patch
+  children:
+  - Coop.Mod.Patch.Utils.GetPrivateField``1(System.Type,System.String,System.Object)
+  - Coop.Mod.Patch.Utils.InvokePrivateMethod(System.Type,System.String,System.Object,System.Object[])
+  - Coop.Mod.Patch.Utils.InvokePrivateMethod``1(System.Type,System.String,System.Object,System.Object[])
+  - Coop.Mod.Patch.Utils.SetPrivateField(System.Type,System.String,System.Object,System.Object)
+  langs:
+  - csharp
+  - vb
+  name: Utils
+  nameWithType: Utils
+  fullName: Coop.Mod.Patch.Utils
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Utils.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Utils
+    path: ../source/Coop/Mod/Patch/Utils.cs
+    startLine: 6
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: public static class Utils
+    content.vb: Public Module Utils
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - static
+  - class
+  modifiers.vb:
+  - Public
+  - Module
+- uid: Coop.Mod.Patch.Utils.InvokePrivateMethod(System.Type,System.String,System.Object,System.Object[])
+  commentId: M:Coop.Mod.Patch.Utils.InvokePrivateMethod(System.Type,System.String,System.Object,System.Object[])
+  id: InvokePrivateMethod(System.Type,System.String,System.Object,System.Object[])
+  parent: Coop.Mod.Patch.Utils
+  langs:
+  - csharp
+  - vb
+  name: InvokePrivateMethod(Type, String, Object, Object[])
+  nameWithType: Utils.InvokePrivateMethod(Type, String, Object, Object[])
+  fullName: Coop.Mod.Patch.Utils.InvokePrivateMethod(System.Type, System.String, System.Object, System.Object[])
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Utils.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: InvokePrivateMethod
+    path: ../source/Coop/Mod/Patch/Utils.cs
+    startLine: 8
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: public static void InvokePrivateMethod(Type type, string name, object instance, object[] parameters = null)
+    parameters:
+    - id: type
+      type: System.Type
+    - id: name
+      type: System.String
+    - id: instance
+      type: System.Object
+    - id: parameters
+      type: System.Object[]
+    content.vb: Public Shared Sub InvokePrivateMethod(type As Type, name As String, instance As Object, parameters As Object() = Nothing)
+  overload: Coop.Mod.Patch.Utils.InvokePrivateMethod*
+  nameWithType.vb: Utils.InvokePrivateMethod(Type, String, Object, Object())
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Coop.Mod.Patch.Utils.InvokePrivateMethod(System.Type, System.String, System.Object, System.Object())
+  name.vb: InvokePrivateMethod(Type, String, Object, Object())
+- uid: Coop.Mod.Patch.Utils.InvokePrivateMethod``1(System.Type,System.String,System.Object,System.Object[])
+  commentId: M:Coop.Mod.Patch.Utils.InvokePrivateMethod``1(System.Type,System.String,System.Object,System.Object[])
+  id: InvokePrivateMethod``1(System.Type,System.String,System.Object,System.Object[])
+  parent: Coop.Mod.Patch.Utils
+  langs:
+  - csharp
+  - vb
+  name: InvokePrivateMethod<T>(Type, String, Object, Object[])
+  nameWithType: Utils.InvokePrivateMethod<T>(Type, String, Object, Object[])
+  fullName: Coop.Mod.Patch.Utils.InvokePrivateMethod<T>(System.Type, System.String, System.Object, System.Object[])
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Utils.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: InvokePrivateMethod
+    path: ../source/Coop/Mod/Patch/Utils.cs
+    startLine: 24
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: public static T InvokePrivateMethod<T>(Type type, string name, object instance, object[] parameters = null)
+    parameters:
+    - id: type
+      type: System.Type
+    - id: name
+      type: System.String
+    - id: instance
+      type: System.Object
+    - id: parameters
+      type: System.Object[]
+    typeParameters:
+    - id: T
+    return:
+      type: '{T}'
+    content.vb: Public Shared Function InvokePrivateMethod(Of T)(type As Type, name As String, instance As Object, parameters As Object() = Nothing) As T
+  overload: Coop.Mod.Patch.Utils.InvokePrivateMethod*
+  nameWithType.vb: Utils.InvokePrivateMethod(Of T)(Type, String, Object, Object())
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Coop.Mod.Patch.Utils.InvokePrivateMethod(Of T)(System.Type, System.String, System.Object, System.Object())
+  name.vb: InvokePrivateMethod(Of T)(Type, String, Object, Object())
+- uid: Coop.Mod.Patch.Utils.GetPrivateField``1(System.Type,System.String,System.Object)
+  commentId: M:Coop.Mod.Patch.Utils.GetPrivateField``1(System.Type,System.String,System.Object)
+  id: GetPrivateField``1(System.Type,System.String,System.Object)
+  parent: Coop.Mod.Patch.Utils
+  langs:
+  - csharp
+  - vb
+  name: GetPrivateField<T>(Type, String, Object)
+  nameWithType: Utils.GetPrivateField<T>(Type, String, Object)
+  fullName: Coop.Mod.Patch.Utils.GetPrivateField<T>(System.Type, System.String, System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Utils.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetPrivateField
+    path: ../source/Coop/Mod/Patch/Utils.cs
+    startLine: 52
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: >-
+      public static T GetPrivateField<T>(Type type, string name, object instance)
+          where T : class
+    parameters:
+    - id: type
+      type: System.Type
+    - id: name
+      type: System.String
+    - id: instance
+      type: System.Object
+    typeParameters:
+    - id: T
+    return:
+      type: '{T}'
+    content.vb: Public Shared Function GetPrivateField(Of T As Class)(type As Type, name As String, instance As Object) As T
+  overload: Coop.Mod.Patch.Utils.GetPrivateField*
+  nameWithType.vb: Utils.GetPrivateField(Of T)(Type, String, Object)
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Coop.Mod.Patch.Utils.GetPrivateField(Of T)(System.Type, System.String, System.Object)
+  name.vb: GetPrivateField(Of T)(Type, String, Object)
+- uid: Coop.Mod.Patch.Utils.SetPrivateField(System.Type,System.String,System.Object,System.Object)
+  commentId: M:Coop.Mod.Patch.Utils.SetPrivateField(System.Type,System.String,System.Object,System.Object)
+  id: SetPrivateField(System.Type,System.String,System.Object,System.Object)
+  parent: Coop.Mod.Patch.Utils
+  langs:
+  - csharp
+  - vb
+  name: SetPrivateField(Type, String, Object, Object)
+  nameWithType: Utils.SetPrivateField(Type, String, Object, Object)
+  fullName: Coop.Mod.Patch.Utils.SetPrivateField(System.Type, System.String, System.Object, System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Patch/Utils.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SetPrivateField
+    path: ../source/Coop/Mod/Patch/Utils.cs
+    startLine: 72
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Patch
+  syntax:
+    content: public static void SetPrivateField(Type type, string name, object instance, object value)
+    parameters:
+    - id: type
+      type: System.Type
+    - id: name
+      type: System.String
+    - id: instance
+      type: System.Object
+    - id: value
+      type: System.Object
+    content.vb: Public Shared Sub SetPrivateField(type As Type, name As String, instance As Object, value As Object)
+  overload: Coop.Mod.Patch.Utils.SetPrivateField*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+references:
+- uid: Coop.Mod.Patch
+  commentId: N:Coop.Mod.Patch
+  name: Coop.Mod.Patch
+  nameWithType: Coop.Mod.Patch
+  fullName: Coop.Mod.Patch
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Coop.Mod.Patch.Utils.InvokePrivateMethod*
+  commentId: Overload:Coop.Mod.Patch.Utils.InvokePrivateMethod
+  name: InvokePrivateMethod
+  nameWithType: Utils.InvokePrivateMethod
+  fullName: Coop.Mod.Patch.Utils.InvokePrivateMethod
+- uid: System.Type
+  commentId: T:System.Type
+  parent: System
+  isExternal: true
+  name: Type
+  nameWithType: Type
+  fullName: System.Type
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String
+- uid: System.Object[]
+  isExternal: true
+  name: Object[]
+  nameWithType: Object[]
+  fullName: System.Object[]
+  nameWithType.vb: Object()
+  fullName.vb: System.Object()
+  name.vb: Object()
+  spec.csharp:
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  spec.vb:
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+- uid: '{T}'
+  commentId: '!:T'
+  definition: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: Coop.Mod.Patch.Utils.GetPrivateField*
+  commentId: Overload:Coop.Mod.Patch.Utils.GetPrivateField
+  name: GetPrivateField
+  nameWithType: Utils.GetPrivateField
+  fullName: Coop.Mod.Patch.Utils.GetPrivateField
+- uid: Coop.Mod.Patch.Utils.SetPrivateField*
+  commentId: Overload:Coop.Mod.Patch.Utils.SetPrivateField
+  name: SetPrivateField
+  nameWithType: Utils.SetPrivateField
+  fullName: Coop.Mod.Patch.Utils.SetPrivateField

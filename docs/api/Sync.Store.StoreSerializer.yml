@@ -1,0 +1,543 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync.Store.StoreSerializer
+  commentId: T:Sync.Store.StoreSerializer
+  id: StoreSerializer
+  parent: Sync.Store
+  children:
+  - Sync.Store.StoreSerializer.#ctor(Sync.Store.ISerializableFactory)
+  - Sync.Store.StoreSerializer.Deserialize(System.Byte[])
+  - Sync.Store.StoreSerializer.Factory
+  - Sync.Store.StoreSerializer.Serialize(System.Object)
+  langs:
+  - csharp
+  - vb
+  name: StoreSerializer
+  nameWithType: StoreSerializer
+  fullName: Sync.Store.StoreSerializer
+  type: Class
+  source:
+    remote:
+      path: source/Sync/Store/StoreSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: StoreSerializer
+    path: ../source/Sync/Store/StoreSerializer.cs
+    startLine: 7
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public class StoreSerializer
+    content.vb: Public Class StoreSerializer
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Sync.Store.StoreSerializer.#ctor(Sync.Store.ISerializableFactory)
+  commentId: M:Sync.Store.StoreSerializer.#ctor(Sync.Store.ISerializableFactory)
+  id: '#ctor(Sync.Store.ISerializableFactory)'
+  parent: Sync.Store.StoreSerializer
+  langs:
+  - csharp
+  - vb
+  name: StoreSerializer(ISerializableFactory)
+  nameWithType: StoreSerializer.StoreSerializer(ISerializableFactory)
+  fullName: Sync.Store.StoreSerializer.StoreSerializer(Sync.Store.ISerializableFactory)
+  type: Constructor
+  source:
+    remote:
+      path: source/Sync/Store/StoreSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Sync/Store/StoreSerializer.cs
+    startLine: 9
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public StoreSerializer([CanBeNull] ISerializableFactory factory)
+    parameters:
+    - id: factory
+      type: Sync.Store.ISerializableFactory
+      attributes:
+      - type: JetBrains.Annotations.CanBeNullAttribute
+        ctor: JetBrains.Annotations.CanBeNullAttribute.#ctor
+        arguments: []
+    content.vb: Public Sub New(factory As ISerializableFactory)
+  overload: Sync.Store.StoreSerializer.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Sync.Store.StoreSerializer.Factory
+  commentId: P:Sync.Store.StoreSerializer.Factory
+  id: Factory
+  parent: Sync.Store.StoreSerializer
+  langs:
+  - csharp
+  - vb
+  name: Factory
+  nameWithType: StoreSerializer.Factory
+  fullName: Sync.Store.StoreSerializer.Factory
+  type: Property
+  source:
+    remote:
+      path: source/Sync/Store/StoreSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Factory
+    path: ../source/Sync/Store/StoreSerializer.cs
+    startLine: 14
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public ISerializableFactory Factory { get; }
+    parameters: []
+    return:
+      type: Sync.Store.ISerializableFactory
+    content.vb: Public ReadOnly Property Factory As ISerializableFactory
+  overload: Sync.Store.StoreSerializer.Factory*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Sync.Store.StoreSerializer.Serialize(System.Object)
+  commentId: M:Sync.Store.StoreSerializer.Serialize(System.Object)
+  id: Serialize(System.Object)
+  parent: Sync.Store.StoreSerializer
+  langs:
+  - csharp
+  - vb
+  name: Serialize(Object)
+  nameWithType: StoreSerializer.Serialize(Object)
+  fullName: Sync.Store.StoreSerializer.Serialize(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Store/StoreSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Serialize
+    path: ../source/Sync/Store/StoreSerializer.cs
+    startLine: 16
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public byte[] Serialize(object obj)
+    parameters:
+    - id: obj
+      type: System.Object
+    return:
+      type: System.Byte[]
+    content.vb: Public Function Serialize(obj As Object) As Byte()
+  overload: Sync.Store.StoreSerializer.Serialize*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Sync.Store.StoreSerializer.Deserialize(System.Byte[])
+  commentId: M:Sync.Store.StoreSerializer.Deserialize(System.Byte[])
+  id: Deserialize(System.Byte[])
+  parent: Sync.Store.StoreSerializer
+  langs:
+  - csharp
+  - vb
+  name: Deserialize(Byte[])
+  nameWithType: StoreSerializer.Deserialize(Byte[])
+  fullName: Sync.Store.StoreSerializer.Deserialize(System.Byte[])
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Store/StoreSerializer.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Deserialize
+    path: ../source/Sync/Store/StoreSerializer.cs
+    startLine: 25
+  assemblies:
+  - Sync
+  namespace: Sync.Store
+  syntax:
+    content: public object Deserialize(byte[] raw)
+    parameters:
+    - id: raw
+      type: System.Byte[]
+    return:
+      type: System.Object
+    content.vb: Public Function Deserialize(raw As Byte()) As Object
+  overload: Sync.Store.StoreSerializer.Deserialize*
+  nameWithType.vb: StoreSerializer.Deserialize(Byte())
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+  fullName.vb: Sync.Store.StoreSerializer.Deserialize(System.Byte())
+  name.vb: Deserialize(Byte())
+references:
+- uid: Sync.Store
+  commentId: N:Sync.Store
+  name: Sync.Store
+  nameWithType: Sync.Store
+  fullName: Sync.Store
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Sync.Store.StoreSerializer.#ctor*
+  commentId: Overload:Sync.Store.StoreSerializer.#ctor
+  name: StoreSerializer
+  nameWithType: StoreSerializer.StoreSerializer
+  fullName: Sync.Store.StoreSerializer.StoreSerializer
+- uid: Sync.Store.ISerializableFactory
+  commentId: T:Sync.Store.ISerializableFactory
+  parent: Sync.Store
+  name: ISerializableFactory
+  nameWithType: ISerializableFactory
+  fullName: Sync.Store.ISerializableFactory
+- uid: Sync.Store.StoreSerializer.Factory*
+  commentId: Overload:Sync.Store.StoreSerializer.Factory
+  name: Factory
+  nameWithType: StoreSerializer.Factory
+  fullName: Sync.Store.StoreSerializer.Factory
+- uid: Sync.Store.StoreSerializer.Serialize*
+  commentId: Overload:Sync.Store.StoreSerializer.Serialize
+  name: Serialize
+  nameWithType: StoreSerializer.Serialize
+  fullName: Sync.Store.StoreSerializer.Serialize
+- uid: System.Byte[]
+  isExternal: true
+  name: Byte[]
+  nameWithType: Byte[]
+  fullName: System.Byte[]
+  nameWithType.vb: Byte()
+  fullName.vb: System.Byte()
+  name.vb: Byte()
+  spec.csharp:
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  spec.vb:
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+- uid: Sync.Store.StoreSerializer.Deserialize*
+  commentId: Overload:Sync.Store.StoreSerializer.Deserialize
+  name: Deserialize
+  nameWithType: StoreSerializer.Deserialize
+  fullName: Sync.Store.StoreSerializer.Deserialize

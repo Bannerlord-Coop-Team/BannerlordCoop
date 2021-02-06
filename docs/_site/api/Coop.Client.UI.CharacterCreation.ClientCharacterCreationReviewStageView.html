@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -84,7 +83,7 @@
   </div>
   <div classs="implements">
     <h5>Implements</h5>
-    <div><span class="xref">StoryMode.CharacterCreationSystem.ICharacterCreationStageListener</span></div>
+    <div><span class="xref">TaleWorlds.CampaignSystem.CharacterCreationContent.ICharacterCreationStageListener</span></div>
   </div>
   <div class="inheritedMembers">
     <h5>Inherited Members</h5>
@@ -99,6 +98,12 @@
     </div>
     <div>
       <span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.OnFinalize()</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.LoadEscapeMenuMovie()</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.ReleaseEscapeMenuMovie()</span>
     </div>
     <div>
       <span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.CharacterLayer</span>
@@ -128,10 +133,16 @@
       <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase.OnRefresh()</span>
     </div>
     <div>
-      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase.StoryMode.CharacterCreationSystem.ICharacterCreationStageListener.OnStageFinalize()</span>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase.TaleWorlds.CampaignSystem.CharacterCreationContent.ICharacterCreationStageListener.OnStageFinalize()</span>
     </div>
     <div>
       <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase.GoToIndex(System.Int32)</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase.HandleEscapeMenu(StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase, TaleWorlds.Engine.Screens.ScreenLayer)</span>
+    </div>
+    <div>
+      <span class="xref">StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase.GetEscapeMenuItems(StoryMode.View.CharacterCreationSystem.CharacterCreationStageViewBase)</span>
     </div>
     <div>
       <span class="xref">System.Object.ToString()</span>
@@ -172,12 +183,12 @@ public class ClientCharacterCreationReviewStageView : CharacterCreationReviewSta
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/UI/CharacterCreationUI/CharacterCreationUI.cs/#L44">View Source</a>
   </span>
   <a id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView__ctor_" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.#ctor*"></a>
-  <h4 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView__ctor_StoryMode_CharacterCreationSystem_CharacterCreation_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Localization_TextObject_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Localization_TextObject_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageWithInt_" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.#ctor(StoryMode.CharacterCreationSystem.CharacterCreation,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage,TaleWorlds.Localization.TextObject,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage,TaleWorlds.Localization.TextObject,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageWithInt)">ClientCharacterCreationReviewStageView(CharacterCreation, ControlCharacterCreationStage, TextObject, ControlCharacterCreationStage, TextObject, ControlCharacterCreationStage, ControlCharacterCreationStageReturnInt, ControlCharacterCreationStageReturnInt, ControlCharacterCreationStageReturnInt, ControlCharacterCreationStageWithInt)</h4>
+  <h4 id="Coop_Client_UI_CharacterCreation_ClientCharacterCreationReviewStageView__ctor_StoryMode_CharacterCreationSystem_CharacterCreation_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Localization_TextObject_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Localization_TextObject_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStage_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageReturnInt_TaleWorlds_Core_ViewModelCollection_ControlCharacterCreationStageWithInt_" data-uid="Coop.Client.UI.CharacterCreation.ClientCharacterCreationReviewStageView.#ctor(StoryMode.CharacterCreationSystem.CharacterCreation,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage,TaleWorlds.Localization.TextObject,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage,TaleWorlds.Localization.TextObject,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStage,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageReturnInt,TaleWorlds.Core.ViewModelCollection.ControlCharacterCreationStageWithInt)">ClientCharacterCreationReviewStageView(CharacterCreationSystem.CharacterCreation, ControlCharacterCreationStage, TextObject, ControlCharacterCreationStage, TextObject, ControlCharacterCreationStage, ControlCharacterCreationStageReturnInt, ControlCharacterCreationStageReturnInt, ControlCharacterCreationStageReturnInt, ControlCharacterCreationStageWithInt)</h4>
   <div class="markdown level1 summary"></div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public ClientCharacterCreationReviewStageView(CharacterCreation characterCreation, ControlCharacterCreationStage affirmativeAction, TextObject affirmativeActionText, ControlCharacterCreationStage negativeAction, TextObject negativeActionText, ControlCharacterCreationStage onRefresh, ControlCharacterCreationStageReturnInt getCurrentStageIndexAction, ControlCharacterCreationStageReturnInt getTotalStageCountAction, ControlCharacterCreationStageReturnInt getFurthestIndexAction, ControlCharacterCreationStageWithInt goToIndexAction)</code></pre>
+    <pre><code class="lang-csharp hljs">public ClientCharacterCreationReviewStageView(CharacterCreationSystem.CharacterCreation characterCreation, ControlCharacterCreationStage affirmativeAction, TextObject affirmativeActionText, ControlCharacterCreationStage negativeAction, TextObject negativeActionText, ControlCharacterCreationStage onRefresh, ControlCharacterCreationStageReturnInt getCurrentStageIndexAction, ControlCharacterCreationStageReturnInt getTotalStageCountAction, ControlCharacterCreationStageReturnInt getFurthestIndexAction, ControlCharacterCreationStageWithInt goToIndexAction)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -343,7 +354,7 @@ public class ClientCharacterCreationReviewStageView : CharacterCreationReviewSta
   <div><span class="xref">StoryMode.GauntletUI.CharacterCreationSystem.CharacterCreationReviewStageView.PreviousStage()</span></div>
   <h3 id="implements">Implements</h3>
   <div>
-      <span class="xref">StoryMode.CharacterCreationSystem.ICharacterCreationStageListener</span>
+      <span class="xref">TaleWorlds.CampaignSystem.CharacterCreationContent.ICharacterCreationStageListener</span>
   </div>
 </article>
           </div>
@@ -360,9 +371,22 @@ public class ClientCharacterCreationReviewStageView : CharacterCreationReviewSta
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

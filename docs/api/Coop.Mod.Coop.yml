@@ -1,0 +1,657 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Coop
+  commentId: T:Coop.Mod.Coop
+  id: Coop
+  parent: Coop.Mod
+  children:
+  - Coop.Mod.Coop.DoSync
+  - Coop.Mod.Coop.DoSync(System.Object)
+  - Coop.Mod.Coop.DoSync(TaleWorlds.CampaignSystem.MobileParty)
+  - Coop.Mod.Coop.IsArbiter
+  - Coop.Mod.Coop.IsClientConnected
+  - Coop.Mod.Coop.IsClientPlaying
+  - Coop.Mod.Coop.IsServer
+  langs:
+  - csharp
+  - vb
+  name: Coop
+  nameWithType: Coop
+  fullName: Coop.Mod.Coop
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Coop.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Coop
+    path: ../source/Coop/Mod/Coop.cs
+    startLine: 4
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public static class Coop
+    content.vb: Public Module Coop
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - static
+  - class
+  modifiers.vb:
+  - Public
+  - Module
+- uid: Coop.Mod.Coop.IsServer
+  commentId: P:Coop.Mod.Coop.IsServer
+  id: IsServer
+  parent: Coop.Mod.Coop
+  langs:
+  - csharp
+  - vb
+  name: IsServer
+  nameWithType: Coop.IsServer
+  fullName: Coop.Mod.Coop.IsServer
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Coop.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IsServer
+    path: ../source/Coop/Mod/Coop.cs
+    startLine: 6
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public static bool IsServer { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Shared ReadOnly Property IsServer As Boolean
+  overload: Coop.Mod.Coop.IsServer*
+  modifiers.csharp:
+  - public
+  - static
+  - get
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Coop.IsClientConnected
+  commentId: P:Coop.Mod.Coop.IsClientConnected
+  id: IsClientConnected
+  parent: Coop.Mod.Coop
+  langs:
+  - csharp
+  - vb
+  name: IsClientConnected
+  nameWithType: Coop.IsClientConnected
+  fullName: Coop.Mod.Coop.IsClientConnected
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Coop.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IsClientConnected
+    path: ../source/Coop/Mod/Coop.cs
+    startLine: 7
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public static bool IsClientConnected { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Shared ReadOnly Property IsClientConnected As Boolean
+  overload: Coop.Mod.Coop.IsClientConnected*
+  modifiers.csharp:
+  - public
+  - static
+  - get
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Coop.IsClientPlaying
+  commentId: P:Coop.Mod.Coop.IsClientPlaying
+  id: IsClientPlaying
+  parent: Coop.Mod.Coop
+  langs:
+  - csharp
+  - vb
+  name: IsClientPlaying
+  nameWithType: Coop.IsClientPlaying
+  fullName: Coop.Mod.Coop.IsClientPlaying
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Coop.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IsClientPlaying
+    path: ../source/Coop/Mod/Coop.cs
+    startLine: 8
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public static bool IsClientPlaying { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Shared ReadOnly Property IsClientPlaying As Boolean
+  overload: Coop.Mod.Coop.IsClientPlaying*
+  modifiers.csharp:
+  - public
+  - static
+  - get
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Coop.IsArbiter
+  commentId: P:Coop.Mod.Coop.IsArbiter
+  id: IsArbiter
+  parent: Coop.Mod.Coop
+  langs:
+  - csharp
+  - vb
+  name: IsArbiter
+  nameWithType: Coop.IsArbiter
+  fullName: Coop.Mod.Coop.IsArbiter
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Coop.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IsArbiter
+    path: ../source/Coop/Mod/Coop.cs
+    startLine: 13
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  summary: "\nThe arbiter is the game instance with authority over all clients.\n"
+  example: []
+  syntax:
+    content: public static bool IsArbiter { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Shared ReadOnly Property IsArbiter As Boolean
+  overload: Coop.Mod.Coop.IsArbiter*
+  modifiers.csharp:
+  - public
+  - static
+  - get
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Coop.DoSync
+  commentId: M:Coop.Mod.Coop.DoSync
+  id: DoSync
+  parent: Coop.Mod.Coop
+  langs:
+  - csharp
+  - vb
+  name: DoSync()
+  nameWithType: Coop.DoSync()
+  fullName: Coop.Mod.Coop.DoSync()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Coop.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DoSync
+    path: ../source/Coop/Mod/Coop.cs
+    startLine: 16
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public static bool DoSync()
+    return:
+      type: System.Boolean
+    content.vb: Public Shared Function DoSync As Boolean
+  overload: Coop.Mod.Coop.DoSync*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Coop.Mod.Coop.DoSync(System.Object)
+  commentId: M:Coop.Mod.Coop.DoSync(System.Object)
+  id: DoSync(System.Object)
+  parent: Coop.Mod.Coop
+  langs:
+  - csharp
+  - vb
+  name: DoSync(Object)
+  nameWithType: Coop.DoSync(Object)
+  fullName: Coop.Mod.Coop.DoSync(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Coop.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DoSync
+    path: ../source/Coop/Mod/Coop.cs
+    startLine: 26
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  summary: "\nReturns whether changes to an object should be synchronized.\n"
+  example: []
+  syntax:
+    content: public static bool DoSync(object instance)
+    parameters:
+    - id: instance
+      type: System.Object
+      description: ''
+    return:
+      type: System.Boolean
+      description: ''
+    content.vb: Public Shared Function DoSync(instance As Object) As Boolean
+  overload: Coop.Mod.Coop.DoSync*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Coop.Mod.Coop.DoSync(TaleWorlds.CampaignSystem.MobileParty)
+  commentId: M:Coop.Mod.Coop.DoSync(TaleWorlds.CampaignSystem.MobileParty)
+  id: DoSync(TaleWorlds.CampaignSystem.MobileParty)
+  parent: Coop.Mod.Coop
+  langs:
+  - csharp
+  - vb
+  name: DoSync(MobileParty)
+  nameWithType: Coop.DoSync(MobileParty)
+  fullName: Coop.Mod.Coop.DoSync(TaleWorlds.CampaignSystem.MobileParty)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Coop.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DoSync
+    path: ../source/Coop/Mod/Coop.cs
+    startLine: 36
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public static bool DoSync(MobileParty party)
+    parameters:
+    - id: party
+      type: TaleWorlds.CampaignSystem.MobileParty
+    return:
+      type: System.Boolean
+    content.vb: Public Shared Function DoSync(party As MobileParty) As Boolean
+  overload: Coop.Mod.Coop.DoSync*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+references:
+- uid: Coop.Mod
+  commentId: N:Coop.Mod
+  name: Coop.Mod
+  nameWithType: Coop.Mod
+  fullName: Coop.Mod
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Coop.Mod.Coop.IsServer*
+  commentId: Overload:Coop.Mod.Coop.IsServer
+  name: IsServer
+  nameWithType: Coop.IsServer
+  fullName: Coop.Mod.Coop.IsServer
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.Mod.Coop.IsClientConnected*
+  commentId: Overload:Coop.Mod.Coop.IsClientConnected
+  name: IsClientConnected
+  nameWithType: Coop.IsClientConnected
+  fullName: Coop.Mod.Coop.IsClientConnected
+- uid: Coop.Mod.Coop.IsClientPlaying*
+  commentId: Overload:Coop.Mod.Coop.IsClientPlaying
+  name: IsClientPlaying
+  nameWithType: Coop.IsClientPlaying
+  fullName: Coop.Mod.Coop.IsClientPlaying
+- uid: Coop.Mod.Coop.IsArbiter*
+  commentId: Overload:Coop.Mod.Coop.IsArbiter
+  name: IsArbiter
+  nameWithType: Coop.IsArbiter
+  fullName: Coop.Mod.Coop.IsArbiter
+- uid: Coop.Mod.Coop.DoSync*
+  commentId: Overload:Coop.Mod.Coop.DoSync
+  name: DoSync
+  nameWithType: Coop.DoSync
+  fullName: Coop.Mod.Coop.DoSync
+- uid: TaleWorlds.CampaignSystem.MobileParty
+  commentId: T:TaleWorlds.CampaignSystem.MobileParty
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: MobileParty
+  nameWithType: MobileParty
+  fullName: TaleWorlds.CampaignSystem.MobileParty
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem

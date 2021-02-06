@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -73,10 +72,9 @@
   
   <h1 id="Coop_Mod_DebugUtil_Replay" data-uid="Coop.Mod.DebugUtil.Replay" class="text-break">Class Replay
   </h1>
-  <div class="markdown level0 summary">
-Module for search abnormal desynchronization between two identical movement sequences.
+  <div class="markdown level0 summary"><p>Module for search abnormal desynchronization between two identical movement sequences.
 There are three steps:
-<table><tbody><tr></tr><tr></tr><tr></tr></tbody></table>
+<table><tbody><tr></tr><tr></tr><tr></tr></tbody></table></p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -115,9 +113,8 @@ There are three steps:
     <pre><code class="lang-csharp hljs">public static class Replay</code></pre>
   </div>
   <h5 id="Coop_Mod_DebugUtil_Replay_remarks"><strong>Remarks</strong></h5>
-  <div class="markdown level0 remarks">
-See
-<a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki">BannerlordCoop wiki</a>
+  <div class="markdown level0 remarks"><p>See
+<a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki">BannerlordCoop wiki</a></p>
 </div>
   <h3 id="fields">Fields
   </h3>
@@ -545,8 +542,7 @@ See
   </span>
   <a id="Coop_Mod_DebugUtil_Replay_ExportToFile_" data-uid="Coop.Mod.DebugUtil.Replay.ExportToFile*"></a>
   <h4 id="Coop_Mod_DebugUtil_Replay_ExportToFile_System_String_System_Collections_Generic_List_System_Nullable_System_Int64___System_Int32_System_Int32_" data-uid="Coop.Mod.DebugUtil.Replay.ExportToFile(System.String,System.Collections.Generic.List{System.Nullable{System.Int64}},System.Int32,System.Int32)">ExportToFile(String, List&lt;Nullable&lt;Int64&gt;&gt;, Int32, Int32)</h4>
-  <div class="markdown level1 summary">
-Export verified data in html-report (compatible with Excel).
+  <div class="markdown level1 summary"><p>Export verified data in html-report (compatible with Excel).</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -566,25 +562,27 @@ Export verified data in html-report (compatible with Excel).
       <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">path</span></td>
-        <td>path with filename and extension where report will be stored</td>
+        <td><p>path with filename and extension where report will be stored</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">System.Collections.Generic.List</span>&lt;<span class="xref">System.Nullable</span>&lt;<span class="xref">System.Int64</span>&gt;&gt;</td>
         <td><span class="parametername">diffTime</span></td>
-        <td>
-data with difference in start time of movements (in milliseconds of in-game
-time)
+        <td><p>data with difference in start time of movements (in milliseconds of in-game
+time)</p>
 </td>
       </tr>
       <tr>
         <td><span class="xref">System.Int32</span></td>
         <td><span class="parametername">skipped</span></td>
-        <td>count of unknown movements in first recorded data (recording state)</td>
+        <td><p>count of unknown movements in first recorded data (recording state)</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">System.Int32</span></td>
         <td><span class="parametername">newEvents</span></td>
-        <td>count of unknown movements in second recorded data (playback state)</td>
+        <td><p>count of unknown movements in second recorded data (playback state)</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -644,8 +642,7 @@ time)
   </span>
   <a id="Coop_Mod_DebugUtil_Replay_OnEventPlayback_" data-uid="Coop.Mod.DebugUtil.Replay.OnEventPlayback*"></a>
   <h4 id="Coop_Mod_DebugUtil_Replay_OnEventPlayback" data-uid="Coop.Mod.DebugUtil.Replay.OnEventPlayback">OnEventPlayback()</h4>
-  <div class="markdown level1 summary">
-Replay main party movement
+  <div class="markdown level1 summary"><p>Replay main party movement</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -661,8 +658,7 @@ Replay main party movement
   </span>
   <a id="Coop_Mod_DebugUtil_Replay_OnEventRecording_" data-uid="Coop.Mod.DebugUtil.Replay.OnEventRecording*"></a>
   <h4 id="Coop_Mod_DebugUtil_Replay_OnEventRecording_EntityId_TaleWorlds_CampaignSystem_MobileParty_Coop_Mod_Persistence_Party_MovementData_" data-uid="Coop.Mod.DebugUtil.Replay.OnEventRecording(EntityId,TaleWorlds.CampaignSystem.MobileParty,Coop.Mod.Persistence.Party.MovementData)">OnEventRecording(EntityId, MobileParty, MovementData)</h4>
-  <div class="markdown level1 summary">
-Record party movement while first and second steps
+  <div class="markdown level1 summary"><p>Record party movement while first and second steps</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -705,10 +701,9 @@ Record party movement while first and second steps
   </span>
   <a id="Coop_Mod_DebugUtil_Replay_Playback_" data-uid="Coop.Mod.DebugUtil.Replay.Playback*"></a>
   <h4 id="Coop_Mod_DebugUtil_Replay_Playback_System_String_" data-uid="Coop.Mod.DebugUtil.Replay.Playback(System.String)">Playback(String)</h4>
-  <div class="markdown level1 summary">
-Start replay movements of main party from file and wait &apos;stop&apos; command.
+  <div class="markdown level1 summary"><p>Start replay movements of main party from file and wait &apos;stop&apos; command.
 At the same time it starting recording movement for further analize.
-Second step.
+Second step.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -728,7 +723,8 @@ Second step.
       <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">filename</span></td>
-        <td>Filename without path and extension</td>
+        <td><p>Filename without path and extension</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -756,9 +752,8 @@ Second step.
   </span>
   <a id="Coop_Mod_DebugUtil_Replay_StartRecord_" data-uid="Coop.Mod.DebugUtil.Replay.StartRecord*"></a>
   <h4 id="Coop_Mod_DebugUtil_Replay_StartRecord_System_String_" data-uid="Coop.Mod.DebugUtil.Replay.StartRecord(System.String)">StartRecord(String)</h4>
-  <div class="markdown level1 summary">
-Start recording movement and wait &apos;stop&apos; command.
-First step.
+  <div class="markdown level1 summary"><p>Start recording movement and wait &apos;stop&apos; command.
+First step.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -778,7 +773,8 @@ First step.
       <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">filename</span></td>
-        <td>Filename without path and extension</td>
+        <td><p>Filename without path and extension</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -806,9 +802,8 @@ First step.
   </span>
   <a id="Coop_Mod_DebugUtil_Replay_Stop_" data-uid="Coop.Mod.DebugUtil.Replay.Stop*"></a>
   <h4 id="Coop_Mod_DebugUtil_Replay_Stop" data-uid="Coop.Mod.DebugUtil.Replay.Stop">Stop()</h4>
-  <div class="markdown level1 summary">
-Stop recording and save it in file if it was recording state.
-Stop playback and verify first recorded movements with second recorded movements.
+  <div class="markdown level1 summary"><p>Stop recording and save it in file if it was recording state.
+Stop playback and verify first recorded movements with second recorded movements.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -839,10 +834,9 @@ Stop playback and verify first recorded movements with second recorded movements
   </span>
   <a id="Coop_Mod_DebugUtil_Replay_VerifyEvents_" data-uid="Coop.Mod.DebugUtil.Replay.VerifyEvents*"></a>
   <h4 id="Coop_Mod_DebugUtil_Replay_VerifyEvents" data-uid="Coop.Mod.DebugUtil.Replay.VerifyEvents">VerifyEvents()</h4>
-  <div class="markdown level1 summary">
-Verify difference in start time of similar movements in first recorded data (recording state)
+  <div class="markdown level1 summary"><p>Verify difference in start time of similar movements in first recorded data (recording state)
 and last recorded data (playback state).
-Third step.
+Third step.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -864,9 +858,22 @@ Third step.
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

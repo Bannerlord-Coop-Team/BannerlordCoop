@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -73,8 +72,7 @@
   
   <h1 id="Coop_Mod_Patch_CampaignPatches_SetTimeSpeedPatch" data-uid="Coop.Mod.Patch.CampaignPatches.SetTimeSpeedPatch" class="text-break">Class SetTimeSpeedPatch
   </h1>
-  <div class="markdown level0 summary">
-<p>
+  <div class="markdown level0 summary"><p>
     Creates a flag when <span class="xref">TaleWorlds.CampaignSystem.Campaign.SetTimeSpeed(System.Int32)</span> is called.
 </p>
 <p>
@@ -120,9 +118,8 @@
 static class SetTimeSpeedPatch</code></pre>
   </div>
   <h5 id="Coop_Mod_Patch_CampaignPatches_SetTimeSpeedPatch_remarks"><strong>Remarks</strong></h5>
-  <div class="markdown level0 remarks">
-This class prefixes <span class="xref">TaleWorlds.CampaignSystem.Campaign.SetTimeSpeed(System.Int32)</span> to add a flag and know
-when the user have changed the map speed.
+  <div class="markdown level0 remarks"><p>This class prefixes <span class="xref">TaleWorlds.CampaignSystem.Campaign.SetTimeSpeed(System.Int32)</span> to add a flag and know
+when the user have changed the map speed.</p>
 </div>
   <h3 id="methods">Methods
   </h3>
@@ -231,9 +228,22 @@ static void Prefix(Campaign __instance, int speed)</code></pre>
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

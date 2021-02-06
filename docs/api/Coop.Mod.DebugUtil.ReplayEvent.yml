@@ -1,0 +1,637 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.DebugUtil.ReplayEvent
+  commentId: T:Coop.Mod.DebugUtil.ReplayEvent
+  id: ReplayEvent
+  parent: Coop.Mod.DebugUtil
+  children:
+  - Coop.Mod.DebugUtil.ReplayEvent.applied
+  - Coop.Mod.DebugUtil.ReplayEvent.entityId
+  - Coop.Mod.DebugUtil.ReplayEvent.Equals(System.Object)
+  - Coop.Mod.DebugUtil.ReplayEvent.GetHashCode
+  - Coop.Mod.DebugUtil.ReplayEvent.movement
+  - Coop.Mod.DebugUtil.ReplayEvent.party
+  - Coop.Mod.DebugUtil.ReplayEvent.time
+  langs:
+  - csharp
+  - vb
+  name: ReplayEvent
+  nameWithType: ReplayEvent
+  fullName: Coop.Mod.DebugUtil.ReplayEvent
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/ReplayEvent.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ReplayEvent
+    path: ../source/Coop/Mod/DebugUtil/ReplayEvent.cs
+    startLine: 13
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  summary: "\nUsed for store info about movements of parties on campaign map into file which will be used\nfor playback recorded time interval.\n"
+  example: []
+  syntax:
+    content: public class ReplayEvent
+    content.vb: Public Class ReplayEvent
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.DebugUtil.ReplayEvent.time
+  commentId: F:Coop.Mod.DebugUtil.ReplayEvent.time
+  id: time
+  parent: Coop.Mod.DebugUtil.ReplayEvent
+  langs:
+  - csharp
+  - vb
+  name: time
+  nameWithType: ReplayEvent.time
+  fullName: Coop.Mod.DebugUtil.ReplayEvent.time
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/ReplayEvent.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: time
+    path: ../source/Coop/Mod/DebugUtil/ReplayEvent.cs
+    startLine: 15
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: public CampaignTime time
+    return:
+      type: TaleWorlds.CampaignSystem.CampaignTime
+    content.vb: Public time As CampaignTime
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.DebugUtil.ReplayEvent.entityId
+  commentId: F:Coop.Mod.DebugUtil.ReplayEvent.entityId
+  id: entityId
+  parent: Coop.Mod.DebugUtil.ReplayEvent
+  langs:
+  - csharp
+  - vb
+  name: entityId
+  nameWithType: ReplayEvent.entityId
+  fullName: Coop.Mod.DebugUtil.ReplayEvent.entityId
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/ReplayEvent.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: entityId
+    path: ../source/Coop/Mod/DebugUtil/ReplayEvent.cs
+    startLine: 16
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: public EntityId entityId
+    return:
+      type: EntityId
+    content.vb: Public entityId As EntityId
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.DebugUtil.ReplayEvent.party
+  commentId: F:Coop.Mod.DebugUtil.ReplayEvent.party
+  id: party
+  parent: Coop.Mod.DebugUtil.ReplayEvent
+  langs:
+  - csharp
+  - vb
+  name: party
+  nameWithType: ReplayEvent.party
+  fullName: Coop.Mod.DebugUtil.ReplayEvent.party
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/ReplayEvent.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: party
+    path: ../source/Coop/Mod/DebugUtil/ReplayEvent.cs
+    startLine: 17
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: public MobileParty party
+    return:
+      type: TaleWorlds.CampaignSystem.MobileParty
+    content.vb: Public party As MobileParty
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.DebugUtil.ReplayEvent.movement
+  commentId: F:Coop.Mod.DebugUtil.ReplayEvent.movement
+  id: movement
+  parent: Coop.Mod.DebugUtil.ReplayEvent
+  langs:
+  - csharp
+  - vb
+  name: movement
+  nameWithType: ReplayEvent.movement
+  fullName: Coop.Mod.DebugUtil.ReplayEvent.movement
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/ReplayEvent.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: movement
+    path: ../source/Coop/Mod/DebugUtil/ReplayEvent.cs
+    startLine: 18
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: public MovementData movement
+    return:
+      type: Coop.Mod.Persistence.Party.MovementData
+    content.vb: Public movement As MovementData
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.DebugUtil.ReplayEvent.applied
+  commentId: F:Coop.Mod.DebugUtil.ReplayEvent.applied
+  id: applied
+  parent: Coop.Mod.DebugUtil.ReplayEvent
+  langs:
+  - csharp
+  - vb
+  name: applied
+  nameWithType: ReplayEvent.applied
+  fullName: Coop.Mod.DebugUtil.ReplayEvent.applied
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/ReplayEvent.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: applied
+    path: ../source/Coop/Mod/DebugUtil/ReplayEvent.cs
+    startLine: 19
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: public bool applied
+    return:
+      type: System.Boolean
+    content.vb: Public applied As Boolean
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.DebugUtil.ReplayEvent.Equals(System.Object)
+  commentId: M:Coop.Mod.DebugUtil.ReplayEvent.Equals(System.Object)
+  id: Equals(System.Object)
+  parent: Coop.Mod.DebugUtil.ReplayEvent
+  langs:
+  - csharp
+  - vb
+  name: Equals(Object)
+  nameWithType: ReplayEvent.Equals(Object)
+  fullName: Coop.Mod.DebugUtil.ReplayEvent.Equals(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/ReplayEvent.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Equals
+    path: ../source/Coop/Mod/DebugUtil/ReplayEvent.cs
+    startLine: 21
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: public override bool Equals(object obj)
+    parameters:
+    - id: obj
+      type: System.Object
+    return:
+      type: System.Boolean
+    content.vb: Public Overrides Function Equals(obj As Object) As Boolean
+  overridden: System.Object.Equals(System.Object)
+  overload: Coop.Mod.DebugUtil.ReplayEvent.Equals*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Coop.Mod.DebugUtil.ReplayEvent.GetHashCode
+  commentId: M:Coop.Mod.DebugUtil.ReplayEvent.GetHashCode
+  id: GetHashCode
+  parent: Coop.Mod.DebugUtil.ReplayEvent
+  langs:
+  - csharp
+  - vb
+  name: GetHashCode()
+  nameWithType: ReplayEvent.GetHashCode()
+  fullName: Coop.Mod.DebugUtil.ReplayEvent.GetHashCode()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/DebugUtil/ReplayEvent.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetHashCode
+    path: ../source/Coop/Mod/DebugUtil/ReplayEvent.cs
+    startLine: 29
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.DebugUtil
+  syntax:
+    content: public override int GetHashCode()
+    return:
+      type: System.Int32
+    content.vb: Public Overrides Function GetHashCode As Integer
+  overridden: System.Object.GetHashCode
+  overload: Coop.Mod.DebugUtil.ReplayEvent.GetHashCode*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+references:
+- uid: Coop.Mod.DebugUtil
+  commentId: N:Coop.Mod.DebugUtil
+  name: Coop.Mod.DebugUtil
+  nameWithType: Coop.Mod.DebugUtil
+  fullName: Coop.Mod.DebugUtil
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: TaleWorlds.CampaignSystem.CampaignTime
+  commentId: T:TaleWorlds.CampaignSystem.CampaignTime
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: CampaignTime
+  nameWithType: CampaignTime
+  fullName: TaleWorlds.CampaignSystem.CampaignTime
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: EntityId
+  isExternal: true
+  name: EntityId
+  nameWithType: EntityId
+  fullName: EntityId
+- uid: TaleWorlds.CampaignSystem.MobileParty
+  commentId: T:TaleWorlds.CampaignSystem.MobileParty
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: MobileParty
+  nameWithType: MobileParty
+  fullName: TaleWorlds.CampaignSystem.MobileParty
+- uid: Coop.Mod.Persistence.Party.MovementData
+  commentId: T:Coop.Mod.Persistence.Party.MovementData
+  parent: Coop.Mod.Persistence.Party
+  name: MovementData
+  nameWithType: MovementData
+  fullName: Coop.Mod.Persistence.Party.MovementData
+- uid: Coop.Mod.Persistence.Party
+  commentId: N:Coop.Mod.Persistence.Party
+  name: Coop.Mod.Persistence.Party
+  nameWithType: Coop.Mod.Persistence.Party
+  fullName: Coop.Mod.Persistence.Party
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.DebugUtil.ReplayEvent.Equals*
+  commentId: Overload:Coop.Mod.DebugUtil.ReplayEvent.Equals
+  name: Equals
+  nameWithType: ReplayEvent.Equals
+  fullName: Coop.Mod.DebugUtil.ReplayEvent.Equals
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.DebugUtil.ReplayEvent.GetHashCode*
+  commentId: Overload:Coop.Mod.DebugUtil.ReplayEvent.GetHashCode
+  name: GetHashCode
+  nameWithType: ReplayEvent.GetHashCode
+  fullName: Coop.Mod.DebugUtil.ReplayEvent.GetHashCode
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32

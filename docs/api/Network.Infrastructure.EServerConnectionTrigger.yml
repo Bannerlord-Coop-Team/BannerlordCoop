@@ -1,0 +1,151 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.EServerConnectionTrigger
+  commentId: T:Network.Infrastructure.EServerConnectionTrigger
+  id: EServerConnectionTrigger
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.EServerConnectionTrigger.ClientInfoVerified
+  - Network.Infrastructure.EServerConnectionTrigger.ClientReady
+  - Network.Infrastructure.EServerConnectionTrigger.Close
+  langs:
+  - csharp
+  - vb
+  name: EServerConnectionTrigger
+  nameWithType: EServerConnectionTrigger
+  fullName: Network.Infrastructure.EServerConnectionTrigger
+  type: Enum
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EServerConnectionTrigger
+    path: ../source/Network/Infrastructure/ConnectionServerSM.cs
+    startLine: 29
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public enum EServerConnectionTrigger
+    content.vb: Public Enum EServerConnectionTrigger
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: Network.Infrastructure.EServerConnectionTrigger.Close
+  commentId: F:Network.Infrastructure.EServerConnectionTrigger.Close
+  id: Close
+  parent: Network.Infrastructure.EServerConnectionTrigger
+  langs:
+  - csharp
+  - vb
+  name: Close
+  nameWithType: EServerConnectionTrigger.Close
+  fullName: Network.Infrastructure.EServerConnectionTrigger.Close
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Close
+    path: ../source/Network/Infrastructure/ConnectionServerSM.cs
+    startLine: 34
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  summary: "\nClose connection with client.\n"
+  example: []
+  syntax:
+    content: Close = 0
+    return:
+      type: Network.Infrastructure.EServerConnectionTrigger
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EServerConnectionTrigger.ClientInfoVerified
+  commentId: F:Network.Infrastructure.EServerConnectionTrigger.ClientInfoVerified
+  id: ClientInfoVerified
+  parent: Network.Infrastructure.EServerConnectionTrigger
+  langs:
+  - csharp
+  - vb
+  name: ClientInfoVerified
+  nameWithType: EServerConnectionTrigger.ClientInfoVerified
+  fullName: Network.Infrastructure.EServerConnectionTrigger.ClientInfoVerified
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ClientInfoVerified
+    path: ../source/Network/Infrastructure/ConnectionServerSM.cs
+    startLine: 39
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  summary: "\nClient info is valid.\n"
+  example: []
+  syntax:
+    content: ClientInfoVerified = 1
+    return:
+      type: Network.Infrastructure.EServerConnectionTrigger
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EServerConnectionTrigger.ClientReady
+  commentId: F:Network.Infrastructure.EServerConnectionTrigger.ClientReady
+  id: ClientReady
+  parent: Network.Infrastructure.EServerConnectionTrigger
+  langs:
+  - csharp
+  - vb
+  name: ClientReady
+  nameWithType: EServerConnectionTrigger.ClientReady
+  fullName: Network.Infrastructure.EServerConnectionTrigger.ClientReady
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ClientReady
+    path: ../source/Network/Infrastructure/ConnectionServerSM.cs
+    startLine: 44
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  summary: "\nClient is ready for state transfer and synchronization.\n"
+  example: []
+  syntax:
+    content: ClientReady = 2
+    return:
+      type: Network.Infrastructure.EServerConnectionTrigger
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: Network.Infrastructure.EServerConnectionTrigger
+  commentId: T:Network.Infrastructure.EServerConnectionTrigger
+  parent: Network.Infrastructure
+  name: EServerConnectionTrigger
+  nameWithType: EServerConnectionTrigger
+  fullName: Network.Infrastructure.EServerConnectionTrigger

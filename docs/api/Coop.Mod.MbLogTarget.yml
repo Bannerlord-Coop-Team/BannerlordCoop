@@ -1,0 +1,1594 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.MbLogTarget
+  commentId: T:Coop.Mod.MbLogTarget
+  id: MbLogTarget
+  parent: Coop.Mod
+  children:
+  - Coop.Mod.MbLogTarget.Write(NLog.LogEventInfo)
+  langs:
+  - csharp
+  - vb
+  name: MbLogTarget
+  nameWithType: MbLogTarget
+  fullName: Coop.Mod.MbLogTarget
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/MbLogTarget.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MbLogTarget
+    path: ../source/Coop/Mod/MbLogTarget.cs
+    startLine: 7
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: >-
+      [Target("MbLog")]
+
+      public class MbLogTarget : TargetWithLayout, ISupportsInitialize, IInternalLoggerContext, IDisposable
+    content.vb: >-
+      <Target("MbLog")>
+
+      Public Class MbLogTarget
+          Inherits TargetWithLayout
+          Implements ISupportsInitialize, IInternalLoggerContext, IDisposable
+  inheritance:
+  - System.Object
+  - NLog.Targets.Target
+  - NLog.Targets.TargetWithLayout
+  implements:
+  - NLog.Internal.ISupportsInitialize
+  - NLog.Common.IInternalLoggerContext
+  - System.IDisposable
+  inheritedMembers:
+  - NLog.Targets.TargetWithLayout.Layout
+  - NLog.Targets.Target.NLog#Internal#ISupportsInitialize#Initialize(NLog.Config.LoggingConfiguration)
+  - NLog.Targets.Target.NLog#Internal#ISupportsInitialize#Close
+  - NLog.Targets.Target.Dispose
+  - NLog.Targets.Target.Flush(NLog.Common.AsyncContinuation)
+  - NLog.Targets.Target.PrecalculateVolatileLayouts(NLog.LogEventInfo)
+  - NLog.Targets.Target.ToString
+  - NLog.Targets.Target.WriteAsyncLogEvent(NLog.Common.AsyncLogEventInfo)
+  - NLog.Targets.Target.WriteAsyncLogEvents(NLog.Common.AsyncLogEventInfo[])
+  - NLog.Targets.Target.WriteAsyncLogEvents(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+  - NLog.Targets.Target.Dispose(System.Boolean)
+  - NLog.Targets.Target.InitializeTarget
+  - NLog.Targets.Target.CloseTarget
+  - NLog.Targets.Target.FlushAsync(NLog.Common.AsyncContinuation)
+  - NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo)
+  - NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo)
+  - NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo[])
+  - NLog.Targets.Target.Write(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+  - NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo[])
+  - NLog.Targets.Target.WriteAsyncThreadSafe(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+  - NLog.Targets.Target.MergeEventProperties(NLog.LogEventInfo)
+  - NLog.Targets.Target.RenderLogEvent(NLog.Layouts.Layout,NLog.LogEventInfo)
+  - NLog.Targets.Target.Register``1(System.String)
+  - NLog.Targets.Target.Register(System.String,System.Type)
+  - NLog.Targets.Target.Name
+  - NLog.Targets.Target.OptimizeBufferReuse
+  - NLog.Targets.Target.SyncRoot
+  - NLog.Targets.Target.LoggingConfiguration
+  - NLog.Targets.Target.NLog#Common#IInternalLoggerContext#LogFactory
+  - NLog.Targets.Target.IsInitialized
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  attributes:
+  - type: NLog.Targets.TargetAttribute
+    ctor: NLog.Targets.TargetAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: MbLog
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.MbLogTarget.Write(NLog.LogEventInfo)
+  commentId: M:Coop.Mod.MbLogTarget.Write(NLog.LogEventInfo)
+  id: Write(NLog.LogEventInfo)
+  parent: Coop.Mod.MbLogTarget
+  langs:
+  - csharp
+  - vb
+  name: Write(LogEventInfo)
+  nameWithType: MbLogTarget.Write(LogEventInfo)
+  fullName: Coop.Mod.MbLogTarget.Write(NLog.LogEventInfo)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/MbLogTarget.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Write
+    path: ../source/Coop/Mod/MbLogTarget.cs
+    startLine: 10
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: protected override void Write(LogEventInfo logEvent)
+    parameters:
+    - id: logEvent
+      type: NLog.LogEventInfo
+    content.vb: Protected Overrides Sub Write(logEvent As LogEventInfo)
+  overridden: NLog.Targets.Target.Write(NLog.LogEventInfo)
+  overload: Coop.Mod.MbLogTarget.Write*
+  modifiers.csharp:
+  - protected
+  - override
+  modifiers.vb:
+  - Protected
+  - Overrides
+references:
+- uid: Coop.Mod
+  commentId: N:Coop.Mod
+  name: Coop.Mod
+  nameWithType: Coop.Mod
+  fullName: Coop.Mod
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: NLog.Targets.Target
+  commentId: T:NLog.Targets.Target
+  parent: NLog.Targets
+  isExternal: true
+  name: Target
+  nameWithType: Target
+  fullName: NLog.Targets.Target
+- uid: NLog.Targets.TargetWithLayout
+  commentId: T:NLog.Targets.TargetWithLayout
+  parent: NLog.Targets
+  isExternal: true
+  name: TargetWithLayout
+  nameWithType: TargetWithLayout
+  fullName: NLog.Targets.TargetWithLayout
+- uid: NLog.Internal.ISupportsInitialize
+  commentId: T:NLog.Internal.ISupportsInitialize
+  parent: NLog.Internal
+  isExternal: true
+  name: ISupportsInitialize
+  nameWithType: ISupportsInitialize
+  fullName: NLog.Internal.ISupportsInitialize
+- uid: NLog.Common.IInternalLoggerContext
+  commentId: T:NLog.Common.IInternalLoggerContext
+  parent: NLog.Common
+  isExternal: true
+  name: IInternalLoggerContext
+  nameWithType: IInternalLoggerContext
+  fullName: NLog.Common.IInternalLoggerContext
+- uid: System.IDisposable
+  commentId: T:System.IDisposable
+  parent: System
+  isExternal: true
+  name: IDisposable
+  nameWithType: IDisposable
+  fullName: System.IDisposable
+- uid: NLog.Targets.TargetWithLayout.Layout
+  commentId: P:NLog.Targets.TargetWithLayout.Layout
+  parent: NLog.Targets.TargetWithLayout
+  isExternal: true
+  name: Layout
+  nameWithType: TargetWithLayout.Layout
+  fullName: NLog.Targets.TargetWithLayout.Layout
+- uid: NLog.Targets.Target.NLog#Internal#ISupportsInitialize#Initialize(NLog.Config.LoggingConfiguration)
+  commentId: M:NLog.Targets.Target.NLog#Internal#ISupportsInitialize#Initialize(NLog.Config.LoggingConfiguration)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: ISupportsInitialize.Initialize(LoggingConfiguration)
+  nameWithType: Target.ISupportsInitialize.Initialize(LoggingConfiguration)
+  fullName: NLog.Targets.Target.NLog.Internal.ISupportsInitialize.Initialize(NLog.Config.LoggingConfiguration)
+  nameWithType.vb: Target.NLog.Internal.ISupportsInitialize.Initialize(LoggingConfiguration)
+  name.vb: NLog.Internal.ISupportsInitialize.Initialize(LoggingConfiguration)
+  spec.csharp:
+  - uid: NLog.Targets.Target.NLog#Internal#ISupportsInitialize#Initialize(NLog.Config.LoggingConfiguration)
+    name: ISupportsInitialize.Initialize
+    nameWithType: Target.ISupportsInitialize.Initialize
+    fullName: NLog.Targets.Target.NLog.Internal.ISupportsInitialize.Initialize
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Config.LoggingConfiguration
+    name: LoggingConfiguration
+    nameWithType: LoggingConfiguration
+    fullName: NLog.Config.LoggingConfiguration
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.NLog#Internal#ISupportsInitialize#Initialize(NLog.Config.LoggingConfiguration)
+    name: NLog.Internal.ISupportsInitialize.Initialize
+    nameWithType: Target.NLog.Internal.ISupportsInitialize.Initialize
+    fullName: NLog.Targets.Target.NLog.Internal.ISupportsInitialize.Initialize
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Config.LoggingConfiguration
+    name: LoggingConfiguration
+    nameWithType: LoggingConfiguration
+    fullName: NLog.Config.LoggingConfiguration
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.NLog#Internal#ISupportsInitialize#Close
+  commentId: M:NLog.Targets.Target.NLog#Internal#ISupportsInitialize#Close
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: ISupportsInitialize.Close()
+  nameWithType: Target.ISupportsInitialize.Close()
+  fullName: NLog.Targets.Target.NLog.Internal.ISupportsInitialize.Close()
+  nameWithType.vb: Target.NLog.Internal.ISupportsInitialize.Close()
+  name.vb: NLog.Internal.ISupportsInitialize.Close()
+  spec.csharp:
+  - uid: NLog.Targets.Target.NLog#Internal#ISupportsInitialize#Close
+    name: ISupportsInitialize.Close
+    nameWithType: Target.ISupportsInitialize.Close
+    fullName: NLog.Targets.Target.NLog.Internal.ISupportsInitialize.Close
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.NLog#Internal#ISupportsInitialize#Close
+    name: NLog.Internal.ISupportsInitialize.Close
+    nameWithType: Target.NLog.Internal.ISupportsInitialize.Close
+    fullName: NLog.Targets.Target.NLog.Internal.ISupportsInitialize.Close
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.Dispose
+  commentId: M:NLog.Targets.Target.Dispose
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: Dispose()
+  nameWithType: Target.Dispose()
+  fullName: NLog.Targets.Target.Dispose()
+  spec.csharp:
+  - uid: NLog.Targets.Target.Dispose
+    name: Dispose
+    nameWithType: Target.Dispose
+    fullName: NLog.Targets.Target.Dispose
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.Dispose
+    name: Dispose
+    nameWithType: Target.Dispose
+    fullName: NLog.Targets.Target.Dispose
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.Flush(NLog.Common.AsyncContinuation)
+  commentId: M:NLog.Targets.Target.Flush(NLog.Common.AsyncContinuation)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: Flush(AsyncContinuation)
+  nameWithType: Target.Flush(AsyncContinuation)
+  fullName: NLog.Targets.Target.Flush(NLog.Common.AsyncContinuation)
+  spec.csharp:
+  - uid: NLog.Targets.Target.Flush(NLog.Common.AsyncContinuation)
+    name: Flush
+    nameWithType: Target.Flush
+    fullName: NLog.Targets.Target.Flush
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncContinuation
+    name: AsyncContinuation
+    nameWithType: AsyncContinuation
+    fullName: NLog.Common.AsyncContinuation
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.Flush(NLog.Common.AsyncContinuation)
+    name: Flush
+    nameWithType: Target.Flush
+    fullName: NLog.Targets.Target.Flush
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncContinuation
+    name: AsyncContinuation
+    nameWithType: AsyncContinuation
+    fullName: NLog.Common.AsyncContinuation
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.PrecalculateVolatileLayouts(NLog.LogEventInfo)
+  commentId: M:NLog.Targets.Target.PrecalculateVolatileLayouts(NLog.LogEventInfo)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: PrecalculateVolatileLayouts(LogEventInfo)
+  nameWithType: Target.PrecalculateVolatileLayouts(LogEventInfo)
+  fullName: NLog.Targets.Target.PrecalculateVolatileLayouts(NLog.LogEventInfo)
+  spec.csharp:
+  - uid: NLog.Targets.Target.PrecalculateVolatileLayouts(NLog.LogEventInfo)
+    name: PrecalculateVolatileLayouts
+    nameWithType: Target.PrecalculateVolatileLayouts
+    fullName: NLog.Targets.Target.PrecalculateVolatileLayouts
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.LogEventInfo
+    name: LogEventInfo
+    nameWithType: LogEventInfo
+    fullName: NLog.LogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.PrecalculateVolatileLayouts(NLog.LogEventInfo)
+    name: PrecalculateVolatileLayouts
+    nameWithType: Target.PrecalculateVolatileLayouts
+    fullName: NLog.Targets.Target.PrecalculateVolatileLayouts
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.LogEventInfo
+    name: LogEventInfo
+    nameWithType: LogEventInfo
+    fullName: NLog.LogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.ToString
+  commentId: M:NLog.Targets.Target.ToString
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: ToString()
+  nameWithType: Target.ToString()
+  fullName: NLog.Targets.Target.ToString()
+  spec.csharp:
+  - uid: NLog.Targets.Target.ToString
+    name: ToString
+    nameWithType: Target.ToString
+    fullName: NLog.Targets.Target.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.ToString
+    name: ToString
+    nameWithType: Target.ToString
+    fullName: NLog.Targets.Target.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.WriteAsyncLogEvent(NLog.Common.AsyncLogEventInfo)
+  commentId: M:NLog.Targets.Target.WriteAsyncLogEvent(NLog.Common.AsyncLogEventInfo)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: WriteAsyncLogEvent(AsyncLogEventInfo)
+  nameWithType: Target.WriteAsyncLogEvent(AsyncLogEventInfo)
+  fullName: NLog.Targets.Target.WriteAsyncLogEvent(NLog.Common.AsyncLogEventInfo)
+  spec.csharp:
+  - uid: NLog.Targets.Target.WriteAsyncLogEvent(NLog.Common.AsyncLogEventInfo)
+    name: WriteAsyncLogEvent
+    nameWithType: Target.WriteAsyncLogEvent
+    fullName: NLog.Targets.Target.WriteAsyncLogEvent
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.WriteAsyncLogEvent(NLog.Common.AsyncLogEventInfo)
+    name: WriteAsyncLogEvent
+    nameWithType: Target.WriteAsyncLogEvent
+    fullName: NLog.Targets.Target.WriteAsyncLogEvent
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.WriteAsyncLogEvents(NLog.Common.AsyncLogEventInfo[])
+  commentId: M:NLog.Targets.Target.WriteAsyncLogEvents(NLog.Common.AsyncLogEventInfo[])
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: WriteAsyncLogEvents(AsyncLogEventInfo[])
+  nameWithType: Target.WriteAsyncLogEvents(AsyncLogEventInfo[])
+  fullName: NLog.Targets.Target.WriteAsyncLogEvents(NLog.Common.AsyncLogEventInfo[])
+  nameWithType.vb: Target.WriteAsyncLogEvents(AsyncLogEventInfo())
+  fullName.vb: NLog.Targets.Target.WriteAsyncLogEvents(NLog.Common.AsyncLogEventInfo())
+  name.vb: WriteAsyncLogEvents(AsyncLogEventInfo())
+  spec.csharp:
+  - uid: NLog.Targets.Target.WriteAsyncLogEvents(NLog.Common.AsyncLogEventInfo[])
+    name: WriteAsyncLogEvents
+    nameWithType: Target.WriteAsyncLogEvents
+    fullName: NLog.Targets.Target.WriteAsyncLogEvents
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.WriteAsyncLogEvents(NLog.Common.AsyncLogEventInfo[])
+    name: WriteAsyncLogEvents
+    nameWithType: Target.WriteAsyncLogEvents
+    fullName: NLog.Targets.Target.WriteAsyncLogEvents
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.WriteAsyncLogEvents(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+  commentId: M:NLog.Targets.Target.WriteAsyncLogEvents(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: WriteAsyncLogEvents(IList<AsyncLogEventInfo>)
+  nameWithType: Target.WriteAsyncLogEvents(IList<AsyncLogEventInfo>)
+  fullName: NLog.Targets.Target.WriteAsyncLogEvents(System.Collections.Generic.IList<NLog.Common.AsyncLogEventInfo>)
+  nameWithType.vb: Target.WriteAsyncLogEvents(IList(Of AsyncLogEventInfo))
+  fullName.vb: NLog.Targets.Target.WriteAsyncLogEvents(System.Collections.Generic.IList(Of NLog.Common.AsyncLogEventInfo))
+  name.vb: WriteAsyncLogEvents(IList(Of AsyncLogEventInfo))
+  spec.csharp:
+  - uid: NLog.Targets.Target.WriteAsyncLogEvents(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+    name: WriteAsyncLogEvents
+    nameWithType: Target.WriteAsyncLogEvents
+    fullName: NLog.Targets.Target.WriteAsyncLogEvents
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    nameWithType: IList
+    fullName: System.Collections.Generic.IList
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.WriteAsyncLogEvents(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+    name: WriteAsyncLogEvents
+    nameWithType: Target.WriteAsyncLogEvents
+    fullName: NLog.Targets.Target.WriteAsyncLogEvents
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    nameWithType: IList
+    fullName: System.Collections.Generic.IList
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.Dispose(System.Boolean)
+  commentId: M:NLog.Targets.Target.Dispose(System.Boolean)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: Dispose(Boolean)
+  nameWithType: Target.Dispose(Boolean)
+  fullName: NLog.Targets.Target.Dispose(System.Boolean)
+  spec.csharp:
+  - uid: NLog.Targets.Target.Dispose(System.Boolean)
+    name: Dispose
+    nameWithType: Target.Dispose
+    fullName: NLog.Targets.Target.Dispose
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.Dispose(System.Boolean)
+    name: Dispose
+    nameWithType: Target.Dispose
+    fullName: NLog.Targets.Target.Dispose
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.InitializeTarget
+  commentId: M:NLog.Targets.Target.InitializeTarget
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: InitializeTarget()
+  nameWithType: Target.InitializeTarget()
+  fullName: NLog.Targets.Target.InitializeTarget()
+  spec.csharp:
+  - uid: NLog.Targets.Target.InitializeTarget
+    name: InitializeTarget
+    nameWithType: Target.InitializeTarget
+    fullName: NLog.Targets.Target.InitializeTarget
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.InitializeTarget
+    name: InitializeTarget
+    nameWithType: Target.InitializeTarget
+    fullName: NLog.Targets.Target.InitializeTarget
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.CloseTarget
+  commentId: M:NLog.Targets.Target.CloseTarget
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: CloseTarget()
+  nameWithType: Target.CloseTarget()
+  fullName: NLog.Targets.Target.CloseTarget()
+  spec.csharp:
+  - uid: NLog.Targets.Target.CloseTarget
+    name: CloseTarget
+    nameWithType: Target.CloseTarget
+    fullName: NLog.Targets.Target.CloseTarget
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.CloseTarget
+    name: CloseTarget
+    nameWithType: Target.CloseTarget
+    fullName: NLog.Targets.Target.CloseTarget
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.FlushAsync(NLog.Common.AsyncContinuation)
+  commentId: M:NLog.Targets.Target.FlushAsync(NLog.Common.AsyncContinuation)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: FlushAsync(AsyncContinuation)
+  nameWithType: Target.FlushAsync(AsyncContinuation)
+  fullName: NLog.Targets.Target.FlushAsync(NLog.Common.AsyncContinuation)
+  spec.csharp:
+  - uid: NLog.Targets.Target.FlushAsync(NLog.Common.AsyncContinuation)
+    name: FlushAsync
+    nameWithType: Target.FlushAsync
+    fullName: NLog.Targets.Target.FlushAsync
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncContinuation
+    name: AsyncContinuation
+    nameWithType: AsyncContinuation
+    fullName: NLog.Common.AsyncContinuation
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.FlushAsync(NLog.Common.AsyncContinuation)
+    name: FlushAsync
+    nameWithType: Target.FlushAsync
+    fullName: NLog.Targets.Target.FlushAsync
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncContinuation
+    name: AsyncContinuation
+    nameWithType: AsyncContinuation
+    fullName: NLog.Common.AsyncContinuation
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo)
+  commentId: M:NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: Write(AsyncLogEventInfo)
+  nameWithType: Target.Write(AsyncLogEventInfo)
+  fullName: NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo)
+  spec.csharp:
+  - uid: NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo)
+    name: Write
+    nameWithType: Target.Write
+    fullName: NLog.Targets.Target.Write
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo)
+    name: Write
+    nameWithType: Target.Write
+    fullName: NLog.Targets.Target.Write
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo)
+  commentId: M:NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: WriteAsyncThreadSafe(AsyncLogEventInfo)
+  nameWithType: Target.WriteAsyncThreadSafe(AsyncLogEventInfo)
+  fullName: NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo)
+  spec.csharp:
+  - uid: NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo)
+    name: WriteAsyncThreadSafe
+    nameWithType: Target.WriteAsyncThreadSafe
+    fullName: NLog.Targets.Target.WriteAsyncThreadSafe
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo)
+    name: WriteAsyncThreadSafe
+    nameWithType: Target.WriteAsyncThreadSafe
+    fullName: NLog.Targets.Target.WriteAsyncThreadSafe
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo[])
+  commentId: M:NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo[])
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: Write(AsyncLogEventInfo[])
+  nameWithType: Target.Write(AsyncLogEventInfo[])
+  fullName: NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo[])
+  nameWithType.vb: Target.Write(AsyncLogEventInfo())
+  fullName.vb: NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo())
+  name.vb: Write(AsyncLogEventInfo())
+  spec.csharp:
+  - uid: NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo[])
+    name: Write
+    nameWithType: Target.Write
+    fullName: NLog.Targets.Target.Write
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.Write(NLog.Common.AsyncLogEventInfo[])
+    name: Write
+    nameWithType: Target.Write
+    fullName: NLog.Targets.Target.Write
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.Write(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+  commentId: M:NLog.Targets.Target.Write(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: Write(IList<AsyncLogEventInfo>)
+  nameWithType: Target.Write(IList<AsyncLogEventInfo>)
+  fullName: NLog.Targets.Target.Write(System.Collections.Generic.IList<NLog.Common.AsyncLogEventInfo>)
+  nameWithType.vb: Target.Write(IList(Of AsyncLogEventInfo))
+  fullName.vb: NLog.Targets.Target.Write(System.Collections.Generic.IList(Of NLog.Common.AsyncLogEventInfo))
+  name.vb: Write(IList(Of AsyncLogEventInfo))
+  spec.csharp:
+  - uid: NLog.Targets.Target.Write(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+    name: Write
+    nameWithType: Target.Write
+    fullName: NLog.Targets.Target.Write
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    nameWithType: IList
+    fullName: System.Collections.Generic.IList
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.Write(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+    name: Write
+    nameWithType: Target.Write
+    fullName: NLog.Targets.Target.Write
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    nameWithType: IList
+    fullName: System.Collections.Generic.IList
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo[])
+  commentId: M:NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo[])
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: WriteAsyncThreadSafe(AsyncLogEventInfo[])
+  nameWithType: Target.WriteAsyncThreadSafe(AsyncLogEventInfo[])
+  fullName: NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo[])
+  nameWithType.vb: Target.WriteAsyncThreadSafe(AsyncLogEventInfo())
+  fullName.vb: NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo())
+  name.vb: WriteAsyncThreadSafe(AsyncLogEventInfo())
+  spec.csharp:
+  - uid: NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo[])
+    name: WriteAsyncThreadSafe
+    nameWithType: Target.WriteAsyncThreadSafe
+    fullName: NLog.Targets.Target.WriteAsyncThreadSafe
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.WriteAsyncThreadSafe(NLog.Common.AsyncLogEventInfo[])
+    name: WriteAsyncThreadSafe
+    nameWithType: Target.WriteAsyncThreadSafe
+    fullName: NLog.Targets.Target.WriteAsyncThreadSafe
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.WriteAsyncThreadSafe(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+  commentId: M:NLog.Targets.Target.WriteAsyncThreadSafe(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: WriteAsyncThreadSafe(IList<AsyncLogEventInfo>)
+  nameWithType: Target.WriteAsyncThreadSafe(IList<AsyncLogEventInfo>)
+  fullName: NLog.Targets.Target.WriteAsyncThreadSafe(System.Collections.Generic.IList<NLog.Common.AsyncLogEventInfo>)
+  nameWithType.vb: Target.WriteAsyncThreadSafe(IList(Of AsyncLogEventInfo))
+  fullName.vb: NLog.Targets.Target.WriteAsyncThreadSafe(System.Collections.Generic.IList(Of NLog.Common.AsyncLogEventInfo))
+  name.vb: WriteAsyncThreadSafe(IList(Of AsyncLogEventInfo))
+  spec.csharp:
+  - uid: NLog.Targets.Target.WriteAsyncThreadSafe(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+    name: WriteAsyncThreadSafe
+    nameWithType: Target.WriteAsyncThreadSafe
+    fullName: NLog.Targets.Target.WriteAsyncThreadSafe
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    nameWithType: IList
+    fullName: System.Collections.Generic.IList
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.WriteAsyncThreadSafe(System.Collections.Generic.IList{NLog.Common.AsyncLogEventInfo})
+    name: WriteAsyncThreadSafe
+    nameWithType: Target.WriteAsyncThreadSafe
+    fullName: NLog.Targets.Target.WriteAsyncThreadSafe
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Collections.Generic.IList`1
+    name: IList
+    nameWithType: IList
+    fullName: System.Collections.Generic.IList
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: NLog.Common.AsyncLogEventInfo
+    name: AsyncLogEventInfo
+    nameWithType: AsyncLogEventInfo
+    fullName: NLog.Common.AsyncLogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.MergeEventProperties(NLog.LogEventInfo)
+  commentId: M:NLog.Targets.Target.MergeEventProperties(NLog.LogEventInfo)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: MergeEventProperties(LogEventInfo)
+  nameWithType: Target.MergeEventProperties(LogEventInfo)
+  fullName: NLog.Targets.Target.MergeEventProperties(NLog.LogEventInfo)
+  spec.csharp:
+  - uid: NLog.Targets.Target.MergeEventProperties(NLog.LogEventInfo)
+    name: MergeEventProperties
+    nameWithType: Target.MergeEventProperties
+    fullName: NLog.Targets.Target.MergeEventProperties
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.LogEventInfo
+    name: LogEventInfo
+    nameWithType: LogEventInfo
+    fullName: NLog.LogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.MergeEventProperties(NLog.LogEventInfo)
+    name: MergeEventProperties
+    nameWithType: Target.MergeEventProperties
+    fullName: NLog.Targets.Target.MergeEventProperties
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.LogEventInfo
+    name: LogEventInfo
+    nameWithType: LogEventInfo
+    fullName: NLog.LogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.RenderLogEvent(NLog.Layouts.Layout,NLog.LogEventInfo)
+  commentId: M:NLog.Targets.Target.RenderLogEvent(NLog.Layouts.Layout,NLog.LogEventInfo)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: RenderLogEvent(Layout, LogEventInfo)
+  nameWithType: Target.RenderLogEvent(Layout, LogEventInfo)
+  fullName: NLog.Targets.Target.RenderLogEvent(NLog.Layouts.Layout, NLog.LogEventInfo)
+  spec.csharp:
+  - uid: NLog.Targets.Target.RenderLogEvent(NLog.Layouts.Layout,NLog.LogEventInfo)
+    name: RenderLogEvent
+    nameWithType: Target.RenderLogEvent
+    fullName: NLog.Targets.Target.RenderLogEvent
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Layouts.Layout
+    name: Layout
+    nameWithType: Layout
+    fullName: NLog.Layouts.Layout
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: NLog.LogEventInfo
+    name: LogEventInfo
+    nameWithType: LogEventInfo
+    fullName: NLog.LogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.RenderLogEvent(NLog.Layouts.Layout,NLog.LogEventInfo)
+    name: RenderLogEvent
+    nameWithType: Target.RenderLogEvent
+    fullName: NLog.Targets.Target.RenderLogEvent
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.Layouts.Layout
+    name: Layout
+    nameWithType: Layout
+    fullName: NLog.Layouts.Layout
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: NLog.LogEventInfo
+    name: LogEventInfo
+    nameWithType: LogEventInfo
+    fullName: NLog.LogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.Register``1(System.String)
+  commentId: M:NLog.Targets.Target.Register``1(System.String)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: Register<T>(String)
+  nameWithType: Target.Register<T>(String)
+  fullName: NLog.Targets.Target.Register<T>(System.String)
+  nameWithType.vb: Target.Register(Of T)(String)
+  fullName.vb: NLog.Targets.Target.Register(Of T)(System.String)
+  name.vb: Register(Of T)(String)
+  spec.csharp:
+  - uid: NLog.Targets.Target.Register``1(System.String)
+    name: Register<T>
+    nameWithType: Target.Register<T>
+    fullName: NLog.Targets.Target.Register<T>
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.Register``1(System.String)
+    name: Register(Of T)
+    nameWithType: Target.Register(Of T)
+    fullName: NLog.Targets.Target.Register(Of T)
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.Register(System.String,System.Type)
+  commentId: M:NLog.Targets.Target.Register(System.String,System.Type)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: Register(String, Type)
+  nameWithType: Target.Register(String, Type)
+  fullName: NLog.Targets.Target.Register(System.String, System.Type)
+  spec.csharp:
+  - uid: NLog.Targets.Target.Register(System.String,System.Type)
+    name: Register
+    nameWithType: Target.Register
+    fullName: NLog.Targets.Target.Register
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Type
+    name: Type
+    nameWithType: Type
+    fullName: System.Type
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.Register(System.String,System.Type)
+    name: Register
+    nameWithType: Target.Register
+    fullName: NLog.Targets.Target.Register
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.String
+    name: String
+    nameWithType: String
+    fullName: System.String
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Type
+    name: Type
+    nameWithType: Type
+    fullName: System.Type
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: NLog.Targets.Target.Name
+  commentId: P:NLog.Targets.Target.Name
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: Name
+  nameWithType: Target.Name
+  fullName: NLog.Targets.Target.Name
+- uid: NLog.Targets.Target.OptimizeBufferReuse
+  commentId: P:NLog.Targets.Target.OptimizeBufferReuse
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: OptimizeBufferReuse
+  nameWithType: Target.OptimizeBufferReuse
+  fullName: NLog.Targets.Target.OptimizeBufferReuse
+- uid: NLog.Targets.Target.SyncRoot
+  commentId: P:NLog.Targets.Target.SyncRoot
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: SyncRoot
+  nameWithType: Target.SyncRoot
+  fullName: NLog.Targets.Target.SyncRoot
+- uid: NLog.Targets.Target.LoggingConfiguration
+  commentId: P:NLog.Targets.Target.LoggingConfiguration
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: LoggingConfiguration
+  nameWithType: Target.LoggingConfiguration
+  fullName: NLog.Targets.Target.LoggingConfiguration
+- uid: NLog.Targets.Target.NLog#Common#IInternalLoggerContext#LogFactory
+  commentId: P:NLog.Targets.Target.NLog#Common#IInternalLoggerContext#LogFactory
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: IInternalLoggerContext.LogFactory
+  nameWithType: Target.IInternalLoggerContext.LogFactory
+  fullName: NLog.Targets.Target.NLog.Common.IInternalLoggerContext.LogFactory
+  nameWithType.vb: Target.NLog.Common.IInternalLoggerContext.LogFactory
+  name.vb: NLog.Common.IInternalLoggerContext.LogFactory
+- uid: NLog.Targets.Target.IsInitialized
+  commentId: P:NLog.Targets.Target.IsInitialized
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: IsInitialized
+  nameWithType: Target.IsInitialized
+  fullName: NLog.Targets.Target.IsInitialized
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: NLog.Targets
+  commentId: N:NLog.Targets
+  isExternal: true
+  name: NLog.Targets
+  nameWithType: NLog.Targets
+  fullName: NLog.Targets
+- uid: NLog.Internal
+  commentId: N:NLog.Internal
+  isExternal: true
+  name: NLog.Internal
+  nameWithType: NLog.Internal
+  fullName: NLog.Internal
+- uid: NLog.Common
+  commentId: N:NLog.Common
+  isExternal: true
+  name: NLog.Common
+  nameWithType: NLog.Common
+  fullName: NLog.Common
+- uid: NLog.Targets.Target.Write(NLog.LogEventInfo)
+  commentId: M:NLog.Targets.Target.Write(NLog.LogEventInfo)
+  parent: NLog.Targets.Target
+  isExternal: true
+  name: Write(LogEventInfo)
+  nameWithType: Target.Write(LogEventInfo)
+  fullName: NLog.Targets.Target.Write(NLog.LogEventInfo)
+  spec.csharp:
+  - uid: NLog.Targets.Target.Write(NLog.LogEventInfo)
+    name: Write
+    nameWithType: Target.Write
+    fullName: NLog.Targets.Target.Write
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.LogEventInfo
+    name: LogEventInfo
+    nameWithType: LogEventInfo
+    fullName: NLog.LogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: NLog.Targets.Target.Write(NLog.LogEventInfo)
+    name: Write
+    nameWithType: Target.Write
+    fullName: NLog.Targets.Target.Write
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: NLog.LogEventInfo
+    name: LogEventInfo
+    nameWithType: LogEventInfo
+    fullName: NLog.LogEventInfo
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.MbLogTarget.Write*
+  commentId: Overload:Coop.Mod.MbLogTarget.Write
+  name: Write
+  nameWithType: MbLogTarget.Write
+  fullName: Coop.Mod.MbLogTarget.Write
+- uid: NLog.LogEventInfo
+  commentId: T:NLog.LogEventInfo
+  parent: NLog
+  isExternal: true
+  name: LogEventInfo
+  nameWithType: LogEventInfo
+  fullName: NLog.LogEventInfo
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog

@@ -1,0 +1,1822 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.Server
+  commentId: T:Network.Infrastructure.Server
+  id: Server
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.Server.#ctor(Network.Infrastructure.Server.EType)
+  - Network.Infrastructure.Server.ActiveConfig
+  - Network.Infrastructure.Server.ActiveConnections
+  - Network.Infrastructure.Server.AverageFrameTime
+  - Network.Infrastructure.Server.CanPlayerJoin
+  - Network.Infrastructure.Server.Connected(Network.Infrastructure.ConnectionServer)
+  - Network.Infrastructure.Server.Disconnected(Network.Infrastructure.ConnectionServer,Network.Infrastructure.EDisconnectReason)
+  - Network.Infrastructure.Server.Finalize
+  - Network.Infrastructure.Server.Load(Network.Infrastructure.ServerConfiguration)
+  - Network.Infrastructure.Server.Logger
+  - Network.Infrastructure.Server.m_FrameLimiter
+  - Network.Infrastructure.Server.m_IsStopRequest
+  - Network.Infrastructure.Server.m_ServerSM
+  - Network.Infrastructure.Server.m_StopRequestLock
+  - Network.Infrastructure.Server.m_Thread
+  - Network.Infrastructure.Server.OnClientConnected
+  - Network.Infrastructure.Server.OnClientDisconnected
+  - Network.Infrastructure.Server.Run
+  - Network.Infrastructure.Server.SendToAll(Network.Protocol.Packet)
+  - Network.Infrastructure.Server.ServerType
+  - Network.Infrastructure.Server.ShutDown
+  - Network.Infrastructure.Server.Start(Network.Infrastructure.ServerConfiguration)
+  - Network.Infrastructure.Server.StartMainLoop
+  - Network.Infrastructure.Server.State
+  - Network.Infrastructure.Server.Stop
+  - Network.Infrastructure.Server.StopMainLoop
+  - Network.Infrastructure.Server.ToString
+  - Network.Infrastructure.Server.Update(System.TimeSpan)
+  - Network.Infrastructure.Server.Updateables
+  langs:
+  - csharp
+  - vb
+  name: Server
+  nameWithType: Server
+  fullName: Network.Infrastructure.Server
+  type: Class
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Server
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 11
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: 'public class Server : IUpdateable'
+    content.vb: >-
+      Public Class Server
+
+          Implements IUpdateable
+  inheritance:
+  - System.Object
+  implements:
+  - Common.IUpdateable
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Network.Infrastructure.Server.Logger
+  commentId: F:Network.Infrastructure.Server.Logger
+  id: Logger
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: Server.Logger
+  fullName: Network.Infrastructure.Server.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 13
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Network.Infrastructure.Server.Updateables
+  commentId: F:Network.Infrastructure.Server.Updateables
+  id: Updateables
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: Updateables
+  nameWithType: Server.Updateables
+  fullName: Network.Infrastructure.Server.Updateables
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Updateables
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 15
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public readonly UpdateableList Updateables
+    return:
+      type: Common.UpdateableList
+    content.vb: Public ReadOnly Updateables As UpdateableList
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.Server.ActiveConfig
+  commentId: F:Network.Infrastructure.Server.ActiveConfig
+  id: ActiveConfig
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: ActiveConfig
+  nameWithType: Server.ActiveConfig
+  fullName: Network.Infrastructure.Server.ActiveConfig
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ActiveConfig
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 16
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public ServerConfiguration ActiveConfig
+    return:
+      type: Network.Infrastructure.ServerConfiguration
+    content.vb: Public ActiveConfig As ServerConfiguration
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.Server.State
+  commentId: P:Network.Infrastructure.Server.State
+  id: State
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: State
+  nameWithType: Server.State
+  fullName: Network.Infrastructure.Server.State
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: State
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 17
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public Enum State { get; }
+    parameters: []
+    return:
+      type: System.Enum
+    content.vb: 'Public ReadOnly Property State As '
+  overload: Network.Infrastructure.Server.State*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.Server.OnClientConnected
+  commentId: E:Network.Infrastructure.Server.OnClientConnected
+  id: OnClientConnected
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: OnClientConnected
+  nameWithType: Server.OnClientConnected
+  fullName: Network.Infrastructure.Server.OnClientConnected
+  type: Event
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnClientConnected
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 19
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public event Action<ConnectionServer> OnClientConnected
+    return:
+      type: System.Action{Network.Infrastructure.ConnectionServer}
+    content.vb: Public Event OnClientConnected As Action(Of ConnectionServer)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.Server.OnClientDisconnected
+  commentId: E:Network.Infrastructure.Server.OnClientDisconnected
+  id: OnClientDisconnected
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: OnClientDisconnected
+  nameWithType: Server.OnClientDisconnected
+  fullName: Network.Infrastructure.Server.OnClientDisconnected
+  type: Event
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnClientDisconnected
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 20
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public event Action<ConnectionServer, EDisconnectReason> OnClientDisconnected
+    return:
+      type: System.Action{Network.Infrastructure.ConnectionServer,Network.Infrastructure.EDisconnectReason}
+    content.vb: Public Event OnClientDisconnected As Action(Of ConnectionServer, EDisconnectReason)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.Server.Start(Network.Infrastructure.ServerConfiguration)
+  commentId: M:Network.Infrastructure.Server.Start(Network.Infrastructure.ServerConfiguration)
+  id: Start(Network.Infrastructure.ServerConfiguration)
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: Start(ServerConfiguration)
+  nameWithType: Server.Start(ServerConfiguration)
+  fullName: Network.Infrastructure.Server.Start(Network.Infrastructure.ServerConfiguration)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Start
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 22
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public void Start(ServerConfiguration config)
+    parameters:
+    - id: config
+      type: Network.Infrastructure.ServerConfiguration
+    content.vb: Public Sub Start(config As ServerConfiguration)
+  overload: Network.Infrastructure.Server.Start*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.Server.Stop
+  commentId: M:Network.Infrastructure.Server.Stop
+  id: Stop
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: Stop()
+  nameWithType: Server.Stop()
+  fullName: Network.Infrastructure.Server.Stop()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Stop
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 33
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public void Stop()
+    content.vb: Public Sub Stop
+  overload: Network.Infrastructure.Server.Stop*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.Server.SendToAll(Network.Protocol.Packet)
+  commentId: M:Network.Infrastructure.Server.SendToAll(Network.Protocol.Packet)
+  id: SendToAll(Network.Protocol.Packet)
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: SendToAll(Packet)
+  nameWithType: Server.SendToAll(Packet)
+  fullName: Network.Infrastructure.Server.SendToAll(Network.Protocol.Packet)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SendToAll
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 41
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public void SendToAll(Packet packet)
+    parameters:
+    - id: packet
+      type: Network.Protocol.Packet
+    content.vb: Public Sub SendToAll(packet As Packet)
+  overload: Network.Infrastructure.Server.SendToAll*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.Server.ToString
+  commentId: M:Network.Infrastructure.Server.ToString
+  id: ToString
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: ToString()
+  nameWithType: Server.ToString()
+  fullName: Network.Infrastructure.Server.ToString()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ToString
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 49
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public override string ToString()
+    return:
+      type: System.String
+    content.vb: Public Overrides Function ToString As String
+  overridden: System.Object.ToString
+  overload: Network.Infrastructure.Server.ToString*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Network.Infrastructure.Server.Connected(Network.Infrastructure.ConnectionServer)
+  commentId: M:Network.Infrastructure.Server.Connected(Network.Infrastructure.ConnectionServer)
+  id: Connected(Network.Infrastructure.ConnectionServer)
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: Connected(ConnectionServer)
+  nameWithType: Server.Connected(ConnectionServer)
+  fullName: Network.Infrastructure.Server.Connected(Network.Infrastructure.ConnectionServer)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Connected
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 70
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public virtual void Connected(ConnectionServer con)
+    parameters:
+    - id: con
+      type: Network.Infrastructure.ConnectionServer
+    content.vb: Public Overridable Sub Connected(con As ConnectionServer)
+  overload: Network.Infrastructure.Server.Connected*
+  modifiers.csharp:
+  - public
+  - virtual
+  modifiers.vb:
+  - Public
+  - Overridable
+- uid: Network.Infrastructure.Server.Disconnected(Network.Infrastructure.ConnectionServer,Network.Infrastructure.EDisconnectReason)
+  commentId: M:Network.Infrastructure.Server.Disconnected(Network.Infrastructure.ConnectionServer,Network.Infrastructure.EDisconnectReason)
+  id: Disconnected(Network.Infrastructure.ConnectionServer,Network.Infrastructure.EDisconnectReason)
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: Disconnected(ConnectionServer, EDisconnectReason)
+  nameWithType: Server.Disconnected(ConnectionServer, EDisconnectReason)
+  fullName: Network.Infrastructure.Server.Disconnected(Network.Infrastructure.ConnectionServer, Network.Infrastructure.EDisconnectReason)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Disconnected
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 77
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public virtual void Disconnected(ConnectionServer con, EDisconnectReason eReason)
+    parameters:
+    - id: con
+      type: Network.Infrastructure.ConnectionServer
+    - id: eReason
+      type: Network.Infrastructure.EDisconnectReason
+    content.vb: Public Overridable Sub Disconnected(con As ConnectionServer, eReason As EDisconnectReason)
+  overload: Network.Infrastructure.Server.Disconnected*
+  modifiers.csharp:
+  - public
+  - virtual
+  modifiers.vb:
+  - Public
+  - Overridable
+- uid: Network.Infrastructure.Server.CanPlayerJoin
+  commentId: M:Network.Infrastructure.Server.CanPlayerJoin
+  id: CanPlayerJoin
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: CanPlayerJoin()
+  nameWithType: Server.CanPlayerJoin()
+  fullName: Network.Infrastructure.Server.CanPlayerJoin()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: CanPlayerJoin
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 89
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public virtual bool CanPlayerJoin()
+    return:
+      type: System.Boolean
+    content.vb: Public Overridable Function CanPlayerJoin As Boolean
+  overload: Network.Infrastructure.Server.CanPlayerJoin*
+  modifiers.csharp:
+  - public
+  - virtual
+  modifiers.vb:
+  - Public
+  - Overridable
+- uid: Network.Infrastructure.Server.ServerType
+  commentId: P:Network.Infrastructure.Server.ServerType
+  id: ServerType
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: ServerType
+  nameWithType: Server.ServerType
+  fullName: Network.Infrastructure.Server.ServerType
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ServerType
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 103
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public Server.EType ServerType { get; }
+    parameters: []
+    return:
+      type: Network.Infrastructure.Server.EType
+    content.vb: Public ReadOnly Property ServerType As Server.EType
+  overload: Network.Infrastructure.Server.ServerType*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.Server.#ctor(Network.Infrastructure.Server.EType)
+  commentId: M:Network.Infrastructure.Server.#ctor(Network.Infrastructure.Server.EType)
+  id: '#ctor(Network.Infrastructure.Server.EType)'
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: Server(Server.EType)
+  nameWithType: Server.Server(Server.EType)
+  fullName: Network.Infrastructure.Server.Server(Network.Infrastructure.Server.EType)
+  type: Constructor
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 105
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public Server(Server.EType eType)
+    parameters:
+    - id: eType
+      type: Network.Infrastructure.Server.EType
+    content.vb: Public Sub New(eType As Server.EType)
+  overload: Network.Infrastructure.Server.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.Server.Finalize
+  commentId: M:Network.Infrastructure.Server.Finalize
+  id: Finalize
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: Finalize()
+  nameWithType: Server.Finalize()
+  fullName: Network.Infrastructure.Server.Finalize()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Finalize
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 122
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: protected void Finalize()
+    content.vb: Protected Sub Finalize
+  overload: Network.Infrastructure.Server.Finalize*
+  modifiers.csharp:
+  - protected
+  modifiers.vb:
+  - Protected
+- uid: Network.Infrastructure.Server.ActiveConnections
+  commentId: P:Network.Infrastructure.Server.ActiveConnections
+  id: ActiveConnections
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: ActiveConnections
+  nameWithType: Server.ActiveConnections
+  fullName: Network.Infrastructure.Server.ActiveConnections
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ActiveConnections
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 127
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public List<ConnectionServer> ActiveConnections { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{Network.Infrastructure.ConnectionServer}
+    content.vb: Public ReadOnly Property ActiveConnections As List(Of ConnectionServer)
+  overload: Network.Infrastructure.Server.ActiveConnections*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.Server.Load(Network.Infrastructure.ServerConfiguration)
+  commentId: M:Network.Infrastructure.Server.Load(Network.Infrastructure.ServerConfiguration)
+  id: Load(Network.Infrastructure.ServerConfiguration)
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: Load(ServerConfiguration)
+  nameWithType: Server.Load(ServerConfiguration)
+  fullName: Network.Infrastructure.Server.Load(Network.Infrastructure.ServerConfiguration)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Load
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 129
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: void Load(ServerConfiguration config)
+    parameters:
+    - id: config
+      type: Network.Infrastructure.ServerConfiguration
+    content.vb: Sub Load(config As ServerConfiguration)
+  overload: Network.Infrastructure.Server.Load*
+- uid: Network.Infrastructure.Server.ShutDown
+  commentId: M:Network.Infrastructure.Server.ShutDown
+  id: ShutDown
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: ShutDown()
+  nameWithType: Server.ShutDown()
+  fullName: Network.Infrastructure.Server.ShutDown()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ShutDown
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 135
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: void ShutDown()
+    content.vb: Sub ShutDown
+  overload: Network.Infrastructure.Server.ShutDown*
+- uid: Network.Infrastructure.Server.m_ServerSM
+  commentId: F:Network.Infrastructure.Server.m_ServerSM
+  id: m_ServerSM
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: m_ServerSM
+  nameWithType: Server.m_ServerSM
+  fullName: Network.Infrastructure.Server.m_ServerSM
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_ServerSM
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 147
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: readonly ServerSM m_ServerSM
+    return:
+      type: Network.Infrastructure.ServerSM
+    content.vb: ReadOnly m_ServerSM As ServerSM
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Network.Infrastructure.Server.m_IsStopRequest
+  commentId: F:Network.Infrastructure.Server.m_IsStopRequest
+  id: m_IsStopRequest
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: m_IsStopRequest
+  nameWithType: Server.m_IsStopRequest
+  fullName: Network.Infrastructure.Server.m_IsStopRequest
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_IsStopRequest
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 148
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: bool m_IsStopRequest
+    return:
+      type: System.Boolean
+    content.vb: m_IsStopRequest As Boolean
+- uid: Network.Infrastructure.Server.m_StopRequestLock
+  commentId: F:Network.Infrastructure.Server.m_StopRequestLock
+  id: m_StopRequestLock
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: m_StopRequestLock
+  nameWithType: Server.m_StopRequestLock
+  fullName: Network.Infrastructure.Server.m_StopRequestLock
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_StopRequestLock
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 149
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: readonly object m_StopRequestLock
+    return:
+      type: System.Object
+    content.vb: ReadOnly m_StopRequestLock As Object
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Network.Infrastructure.Server.m_Thread
+  commentId: F:Network.Infrastructure.Server.m_Thread
+  id: m_Thread
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: m_Thread
+  nameWithType: Server.m_Thread
+  fullName: Network.Infrastructure.Server.m_Thread
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Thread
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 150
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Thread m_Thread
+    return:
+      type: System.Threading.Thread
+    content.vb: m_Thread As Thread
+- uid: Network.Infrastructure.Server.m_FrameLimiter
+  commentId: F:Network.Infrastructure.Server.m_FrameLimiter
+  id: m_FrameLimiter
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: m_FrameLimiter
+  nameWithType: Server.m_FrameLimiter
+  fullName: Network.Infrastructure.Server.m_FrameLimiter
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_FrameLimiter
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 151
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: >-
+      [CanBeNull]
+
+      FrameLimiter m_FrameLimiter
+    return:
+      type: Common.FrameLimiter
+    content.vb: >-
+      <CanBeNull>
+
+      m_FrameLimiter As FrameLimiter
+  attributes:
+  - type: JetBrains.Annotations.CanBeNullAttribute
+    ctor: JetBrains.Annotations.CanBeNullAttribute.#ctor
+    arguments: []
+- uid: Network.Infrastructure.Server.AverageFrameTime
+  commentId: P:Network.Infrastructure.Server.AverageFrameTime
+  id: AverageFrameTime
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: AverageFrameTime
+  nameWithType: Server.AverageFrameTime
+  fullName: Network.Infrastructure.Server.AverageFrameTime
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: AverageFrameTime
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 153
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public TimeSpan AverageFrameTime { get; }
+    parameters: []
+    return:
+      type: System.TimeSpan
+    content.vb: Public ReadOnly Property AverageFrameTime As TimeSpan
+  overload: Network.Infrastructure.Server.AverageFrameTime*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Infrastructure.Server.StartMainLoop
+  commentId: M:Network.Infrastructure.Server.StartMainLoop
+  id: StartMainLoop
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: StartMainLoop()
+  nameWithType: Server.StartMainLoop()
+  fullName: Network.Infrastructure.Server.StartMainLoop()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: StartMainLoop
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 155
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: void StartMainLoop()
+    content.vb: Sub StartMainLoop
+  overload: Network.Infrastructure.Server.StartMainLoop*
+- uid: Network.Infrastructure.Server.Run
+  commentId: M:Network.Infrastructure.Server.Run
+  id: Run
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: Run()
+  nameWithType: Server.Run()
+  fullName: Network.Infrastructure.Server.Run()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Run
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 169
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: void Run()
+    content.vb: Sub Run
+  overload: Network.Infrastructure.Server.Run*
+- uid: Network.Infrastructure.Server.StopMainLoop
+  commentId: M:Network.Infrastructure.Server.StopMainLoop
+  id: StopMainLoop
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: StopMainLoop()
+  nameWithType: Server.StopMainLoop()
+  fullName: Network.Infrastructure.Server.StopMainLoop()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: StopMainLoop
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 189
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: void StopMainLoop()
+    content.vb: Sub StopMainLoop
+  overload: Network.Infrastructure.Server.StopMainLoop*
+- uid: Network.Infrastructure.Server.Update(System.TimeSpan)
+  commentId: M:Network.Infrastructure.Server.Update(System.TimeSpan)
+  id: Update(System.TimeSpan)
+  parent: Network.Infrastructure.Server
+  langs:
+  - csharp
+  - vb
+  name: Update(TimeSpan)
+  nameWithType: Server.Update(TimeSpan)
+  fullName: Network.Infrastructure.Server.Update(System.TimeSpan)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/Server.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Update
+    path: ../source/Network/Infrastructure/Server.cs
+    startLine: 205
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public void Update(TimeSpan frameTime)
+    parameters:
+    - id: frameTime
+      type: System.TimeSpan
+    content.vb: Public Sub Update(frameTime As TimeSpan)
+  overload: Network.Infrastructure.Server.Update*
+  implements:
+  - Common.IUpdateable.Update(System.TimeSpan)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Common.IUpdateable
+  commentId: T:Common.IUpdateable
+  parent: Common
+  name: IUpdateable
+  nameWithType: IUpdateable
+  fullName: Common.IUpdateable
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: Common.UpdateableList
+  commentId: T:Common.UpdateableList
+  parent: Common
+  name: UpdateableList
+  nameWithType: UpdateableList
+  fullName: Common.UpdateableList
+- uid: Network.Infrastructure.ServerConfiguration
+  commentId: T:Network.Infrastructure.ServerConfiguration
+  parent: Network.Infrastructure
+  name: ServerConfiguration
+  nameWithType: ServerConfiguration
+  fullName: Network.Infrastructure.ServerConfiguration
+- uid: Network.Infrastructure.Server.State*
+  commentId: Overload:Network.Infrastructure.Server.State
+  name: State
+  nameWithType: Server.State
+  fullName: Network.Infrastructure.Server.State
+- uid: System.Enum
+  commentId: T:System.Enum
+  parent: System
+  isExternal: true
+  name: Enum
+  nameWithType: Enum
+  fullName: System.Enum
+- uid: System.Action{Network.Infrastructure.ConnectionServer}
+  commentId: T:System.Action{Network.Infrastructure.ConnectionServer}
+  parent: System
+  definition: System.Action`1
+  name: Action<ConnectionServer>
+  nameWithType: Action<ConnectionServer>
+  fullName: System.Action<Network.Infrastructure.ConnectionServer>
+  nameWithType.vb: Action(Of ConnectionServer)
+  fullName.vb: System.Action(Of Network.Infrastructure.ConnectionServer)
+  name.vb: Action(Of ConnectionServer)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Network.Infrastructure.ConnectionServer
+    name: ConnectionServer
+    nameWithType: ConnectionServer
+    fullName: Network.Infrastructure.ConnectionServer
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Network.Infrastructure.ConnectionServer
+    name: ConnectionServer
+    nameWithType: ConnectionServer
+    fullName: Network.Infrastructure.ConnectionServer
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Action`1
+  commentId: T:System.Action`1
+  isExternal: true
+  name: Action<T>
+  nameWithType: Action<T>
+  fullName: System.Action<T>
+  nameWithType.vb: Action(Of T)
+  fullName.vb: System.Action(Of T)
+  name.vb: Action(Of T)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Action{Network.Infrastructure.ConnectionServer,Network.Infrastructure.EDisconnectReason}
+  commentId: T:System.Action{Network.Infrastructure.ConnectionServer,Network.Infrastructure.EDisconnectReason}
+  parent: System
+  definition: System.Action`2
+  name: Action<ConnectionServer, EDisconnectReason>
+  nameWithType: Action<ConnectionServer, EDisconnectReason>
+  fullName: System.Action<Network.Infrastructure.ConnectionServer, Network.Infrastructure.EDisconnectReason>
+  nameWithType.vb: Action(Of ConnectionServer, EDisconnectReason)
+  fullName.vb: System.Action(Of Network.Infrastructure.ConnectionServer, Network.Infrastructure.EDisconnectReason)
+  name.vb: Action(Of ConnectionServer, EDisconnectReason)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Network.Infrastructure.ConnectionServer
+    name: ConnectionServer
+    nameWithType: ConnectionServer
+    fullName: Network.Infrastructure.ConnectionServer
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Network.Infrastructure.EDisconnectReason
+    name: EDisconnectReason
+    nameWithType: EDisconnectReason
+    fullName: Network.Infrastructure.EDisconnectReason
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Network.Infrastructure.ConnectionServer
+    name: ConnectionServer
+    nameWithType: ConnectionServer
+    fullName: Network.Infrastructure.ConnectionServer
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Network.Infrastructure.EDisconnectReason
+    name: EDisconnectReason
+    nameWithType: EDisconnectReason
+    fullName: Network.Infrastructure.EDisconnectReason
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Action`2
+  commentId: T:System.Action`2
+  isExternal: true
+  name: Action<T1, T2>
+  nameWithType: Action<T1, T2>
+  fullName: System.Action<T1, T2>
+  nameWithType.vb: Action(Of T1, T2)
+  fullName.vb: System.Action(Of T1, T2)
+  name.vb: Action(Of T1, T2)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.Server.Start*
+  commentId: Overload:Network.Infrastructure.Server.Start
+  name: Start
+  nameWithType: Server.Start
+  fullName: Network.Infrastructure.Server.Start
+- uid: Network.Infrastructure.Server.Stop*
+  commentId: Overload:Network.Infrastructure.Server.Stop
+  name: Stop
+  nameWithType: Server.Stop
+  fullName: Network.Infrastructure.Server.Stop
+- uid: Network.Infrastructure.Server.SendToAll*
+  commentId: Overload:Network.Infrastructure.Server.SendToAll
+  name: SendToAll
+  nameWithType: Server.SendToAll
+  fullName: Network.Infrastructure.Server.SendToAll
+- uid: Network.Protocol.Packet
+  commentId: T:Network.Protocol.Packet
+  parent: Network.Protocol
+  name: Packet
+  nameWithType: Packet
+  fullName: Network.Protocol.Packet
+- uid: Network.Protocol
+  commentId: N:Network.Protocol
+  name: Network.Protocol
+  nameWithType: Network.Protocol
+  fullName: Network.Protocol
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.Server.ToString*
+  commentId: Overload:Network.Infrastructure.Server.ToString
+  name: ToString
+  nameWithType: Server.ToString
+  fullName: Network.Infrastructure.Server.ToString
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String
+- uid: Network.Infrastructure.Server.Connected*
+  commentId: Overload:Network.Infrastructure.Server.Connected
+  name: Connected
+  nameWithType: Server.Connected
+  fullName: Network.Infrastructure.Server.Connected
+- uid: Network.Infrastructure.ConnectionServer
+  commentId: T:Network.Infrastructure.ConnectionServer
+  parent: Network.Infrastructure
+  name: ConnectionServer
+  nameWithType: ConnectionServer
+  fullName: Network.Infrastructure.ConnectionServer
+- uid: Network.Infrastructure.Server.Disconnected*
+  commentId: Overload:Network.Infrastructure.Server.Disconnected
+  name: Disconnected
+  nameWithType: Server.Disconnected
+  fullName: Network.Infrastructure.Server.Disconnected
+- uid: Network.Infrastructure.EDisconnectReason
+  commentId: T:Network.Infrastructure.EDisconnectReason
+  parent: Network.Infrastructure
+  name: EDisconnectReason
+  nameWithType: EDisconnectReason
+  fullName: Network.Infrastructure.EDisconnectReason
+- uid: Network.Infrastructure.Server.CanPlayerJoin*
+  commentId: Overload:Network.Infrastructure.Server.CanPlayerJoin
+  name: CanPlayerJoin
+  nameWithType: Server.CanPlayerJoin
+  fullName: Network.Infrastructure.Server.CanPlayerJoin
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Network.Infrastructure.Server.ServerType*
+  commentId: Overload:Network.Infrastructure.Server.ServerType
+  name: ServerType
+  nameWithType: Server.ServerType
+  fullName: Network.Infrastructure.Server.ServerType
+- uid: Network.Infrastructure.Server.EType
+  commentId: T:Network.Infrastructure.Server.EType
+  parent: Network.Infrastructure
+  name: Server.EType
+  nameWithType: Server.EType
+  fullName: Network.Infrastructure.Server.EType
+- uid: Network.Infrastructure.Server.#ctor*
+  commentId: Overload:Network.Infrastructure.Server.#ctor
+  name: Server
+  nameWithType: Server.Server
+  fullName: Network.Infrastructure.Server.Server
+- uid: Network.Infrastructure.Server.Finalize*
+  commentId: Overload:Network.Infrastructure.Server.Finalize
+  name: Finalize
+  nameWithType: Server.Finalize
+  fullName: Network.Infrastructure.Server.Finalize
+- uid: Network.Infrastructure.Server.ActiveConnections*
+  commentId: Overload:Network.Infrastructure.Server.ActiveConnections
+  name: ActiveConnections
+  nameWithType: Server.ActiveConnections
+  fullName: Network.Infrastructure.Server.ActiveConnections
+- uid: System.Collections.Generic.List{Network.Infrastructure.ConnectionServer}
+  commentId: T:System.Collections.Generic.List{Network.Infrastructure.ConnectionServer}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  name: List<ConnectionServer>
+  nameWithType: List<ConnectionServer>
+  fullName: System.Collections.Generic.List<Network.Infrastructure.ConnectionServer>
+  nameWithType.vb: List(Of ConnectionServer)
+  fullName.vb: System.Collections.Generic.List(Of Network.Infrastructure.ConnectionServer)
+  name.vb: List(Of ConnectionServer)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Network.Infrastructure.ConnectionServer
+    name: ConnectionServer
+    nameWithType: ConnectionServer
+    fullName: Network.Infrastructure.ConnectionServer
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Network.Infrastructure.ConnectionServer
+    name: ConnectionServer
+    nameWithType: ConnectionServer
+    fullName: Network.Infrastructure.ConnectionServer
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: Network.Infrastructure.Server.Load*
+  commentId: Overload:Network.Infrastructure.Server.Load
+  name: Load
+  nameWithType: Server.Load
+  fullName: Network.Infrastructure.Server.Load
+- uid: Network.Infrastructure.Server.ShutDown*
+  commentId: Overload:Network.Infrastructure.Server.ShutDown
+  name: ShutDown
+  nameWithType: Server.ShutDown
+  fullName: Network.Infrastructure.Server.ShutDown
+- uid: Network.Infrastructure.ServerSM
+  commentId: T:Network.Infrastructure.ServerSM
+  parent: Network.Infrastructure
+  name: ServerSM
+  nameWithType: ServerSM
+  fullName: Network.Infrastructure.ServerSM
+- uid: System.Threading.Thread
+  commentId: T:System.Threading.Thread
+  parent: System.Threading
+  isExternal: true
+  name: Thread
+  nameWithType: Thread
+  fullName: System.Threading.Thread
+- uid: System.Threading
+  commentId: N:System.Threading
+  isExternal: true
+  name: System.Threading
+  nameWithType: System.Threading
+  fullName: System.Threading
+- uid: Common.FrameLimiter
+  commentId: T:Common.FrameLimiter
+  parent: Common
+  name: FrameLimiter
+  nameWithType: FrameLimiter
+  fullName: Common.FrameLimiter
+- uid: Network.Infrastructure.Server.AverageFrameTime*
+  commentId: Overload:Network.Infrastructure.Server.AverageFrameTime
+  name: AverageFrameTime
+  nameWithType: Server.AverageFrameTime
+  fullName: Network.Infrastructure.Server.AverageFrameTime
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan
+- uid: Network.Infrastructure.Server.StartMainLoop*
+  commentId: Overload:Network.Infrastructure.Server.StartMainLoop
+  name: StartMainLoop
+  nameWithType: Server.StartMainLoop
+  fullName: Network.Infrastructure.Server.StartMainLoop
+- uid: Network.Infrastructure.Server.Run*
+  commentId: Overload:Network.Infrastructure.Server.Run
+  name: Run
+  nameWithType: Server.Run
+  fullName: Network.Infrastructure.Server.Run
+- uid: Network.Infrastructure.Server.StopMainLoop*
+  commentId: Overload:Network.Infrastructure.Server.StopMainLoop
+  name: StopMainLoop
+  nameWithType: Server.StopMainLoop
+  fullName: Network.Infrastructure.Server.StopMainLoop
+- uid: Network.Infrastructure.Server.Update*
+  commentId: Overload:Network.Infrastructure.Server.Update
+  name: Update
+  nameWithType: Server.Update
+  fullName: Network.Infrastructure.Server.Update
+- uid: Common.IUpdateable.Update(System.TimeSpan)
+  commentId: M:Common.IUpdateable.Update(System.TimeSpan)
+  parent: Common.IUpdateable
+  isExternal: true
+  name: Update(TimeSpan)
+  nameWithType: IUpdateable.Update(TimeSpan)
+  fullName: Common.IUpdateable.Update(System.TimeSpan)
+  spec.csharp:
+  - uid: Common.IUpdateable.Update(System.TimeSpan)
+    name: Update
+    nameWithType: IUpdateable.Update
+    fullName: Common.IUpdateable.Update
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.TimeSpan
+    name: TimeSpan
+    nameWithType: TimeSpan
+    fullName: System.TimeSpan
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Common.IUpdateable.Update(System.TimeSpan)
+    name: Update
+    nameWithType: IUpdateable.Update
+    fullName: Common.IUpdateable.Update
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.TimeSpan
+    name: TimeSpan
+    nameWithType: TimeSpan
+    fullName: System.TimeSpan
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )

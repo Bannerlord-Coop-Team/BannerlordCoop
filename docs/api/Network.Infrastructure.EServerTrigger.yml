@@ -1,0 +1,176 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.EServerTrigger
+  commentId: T:Network.Infrastructure.EServerTrigger
+  id: EServerTrigger
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.EServerTrigger.Initialized
+  - Network.Infrastructure.EServerTrigger.Start
+  - Network.Infrastructure.EServerTrigger.Stop
+  - Network.Infrastructure.EServerTrigger.Stopped
+  langs:
+  - csharp
+  - vb
+  name: EServerTrigger
+  nameWithType: EServerTrigger
+  fullName: Network.Infrastructure.EServerTrigger
+  type: Enum
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EServerTrigger
+    path: ../source/Network/Infrastructure/ServerSM.cs
+    startLine: 13
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: enum EServerTrigger
+    content.vb: Enum EServerTrigger
+  modifiers.csharp:
+  - enum
+  modifiers.vb:
+  - Enum
+- uid: Network.Infrastructure.EServerTrigger.Start
+  commentId: F:Network.Infrastructure.EServerTrigger.Start
+  id: Start
+  parent: Network.Infrastructure.EServerTrigger
+  langs:
+  - csharp
+  - vb
+  name: Start
+  nameWithType: EServerTrigger.Start
+  fullName: Network.Infrastructure.EServerTrigger.Start
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Start
+    path: ../source/Network/Infrastructure/ServerSM.cs
+    startLine: 15
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Start = 0
+    return:
+      type: Network.Infrastructure.EServerTrigger
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EServerTrigger.Initialized
+  commentId: F:Network.Infrastructure.EServerTrigger.Initialized
+  id: Initialized
+  parent: Network.Infrastructure.EServerTrigger
+  langs:
+  - csharp
+  - vb
+  name: Initialized
+  nameWithType: EServerTrigger.Initialized
+  fullName: Network.Infrastructure.EServerTrigger.Initialized
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Initialized
+    path: ../source/Network/Infrastructure/ServerSM.cs
+    startLine: 16
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Initialized = 1
+    return:
+      type: Network.Infrastructure.EServerTrigger
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EServerTrigger.Stop
+  commentId: F:Network.Infrastructure.EServerTrigger.Stop
+  id: Stop
+  parent: Network.Infrastructure.EServerTrigger
+  langs:
+  - csharp
+  - vb
+  name: Stop
+  nameWithType: EServerTrigger.Stop
+  fullName: Network.Infrastructure.EServerTrigger.Stop
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Stop
+    path: ../source/Network/Infrastructure/ServerSM.cs
+    startLine: 17
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Stop = 2
+    return:
+      type: Network.Infrastructure.EServerTrigger
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Infrastructure.EServerTrigger.Stopped
+  commentId: F:Network.Infrastructure.EServerTrigger.Stopped
+  id: Stopped
+  parent: Network.Infrastructure.EServerTrigger
+  langs:
+  - csharp
+  - vb
+  name: Stopped
+  nameWithType: EServerTrigger.Stopped
+  fullName: Network.Infrastructure.EServerTrigger.Stopped
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ServerSM.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Stopped
+    path: ../source/Network/Infrastructure/ServerSM.cs
+    startLine: 18
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: Stopped = 3
+    return:
+      type: Network.Infrastructure.EServerTrigger
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: Network.Infrastructure.EServerTrigger
+  commentId: T:Network.Infrastructure.EServerTrigger
+  parent: Network.Infrastructure
+  name: EServerTrigger
+  nameWithType: EServerTrigger
+  fullName: Network.Infrastructure.EServerTrigger

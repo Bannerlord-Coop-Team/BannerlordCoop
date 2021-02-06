@@ -5,11 +5,11 @@
         {
           "files": ["**/*.csproj"],
           "exclude": [ "**/bin/**", "**/obj/**" ],
-          "src": "../source"
+		  "src": "../source"
         }
       ],
-      "dest": "obj/api",
-      "shouldSkipMarkup": true,
+      "dest": "api",
+      "shouldSkipMarkup": false,
 	  "disableDefaultFilter": true,
       "properties": {
           "TargetFramework": "TargetFramework=net47"
@@ -22,12 +22,13 @@
         "files": [
           "api/**.yml"
         ],
-        "cwd": "obj"
+        "cwd": "."
       },
       {
         "files": [
           "api/*.md",
           "articles/**.md",
+		  "overview/**.md",
           "toc.yml",
           "*.md"
         ],
@@ -61,7 +62,8 @@
     ],
     "dest": "_site",
     "template": [
-      "default"
+	  "default",
+      "templates/darkfx"
     ]
   }
 }

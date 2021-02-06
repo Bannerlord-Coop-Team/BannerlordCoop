@@ -1,0 +1,1325 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Infrastructure.ConnectionClient
+  commentId: T:Network.Infrastructure.ConnectionClient
+  id: ConnectionClient
+  parent: Network.Infrastructure
+  children:
+  - Network.Infrastructure.ConnectionClient.#ctor(Network.Infrastructure.INetworkConnection,Network.Infrastructure.IGameStatePersistence)
+  - Network.Infrastructure.ConnectionClient.closeConnection(Network.Infrastructure.EDisconnectReason)
+  - Network.Infrastructure.ConnectionClient.Connect
+  - Network.Infrastructure.ConnectionClient.Disconnect(Network.Infrastructure.EDisconnectReason)
+  - Network.Infrastructure.ConnectionClient.Finalize
+  - Network.Infrastructure.ConnectionClient.m_ClientSM
+  - Network.Infrastructure.ConnectionClient.OnClientJoined
+  - Network.Infrastructure.ConnectionClient.OnConnected
+  - Network.Infrastructure.ConnectionClient.OnDisconnected
+  - Network.Infrastructure.ConnectionClient.receiveClientInfoRequest(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  - Network.Infrastructure.ConnectionClient.receiveJoinRequestAccepted(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  - Network.Infrastructure.ConnectionClient.receiveServerKeepAlive(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  - Network.Infrastructure.ConnectionClient.sendClientHello
+  - Network.Infrastructure.ConnectionClient.sendClientInfo
+  - Network.Infrastructure.ConnectionClient.State
+  langs:
+  - csharp
+  - vb
+  name: ConnectionClient
+  nameWithType: ConnectionClient
+  fullName: Network.Infrastructure.ConnectionClient
+  type: Class
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ConnectionClient
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 15
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: 'public class ConnectionClient : ConnectionBase'
+    content.vb: >-
+      Public Class ConnectionClient
+
+          Inherits ConnectionBase
+  inheritance:
+  - System.Object
+  - Network.Infrastructure.ConnectionBase
+  inheritedMembers:
+  - Network.Infrastructure.ConnectionBase.Dispatcher
+  - Network.Infrastructure.ConnectionBase.GameStatePersistence
+  - Network.Infrastructure.ConnectionBase.Send(Network.Protocol.Packet)
+  - Network.Infrastructure.ConnectionBase.SendFragmented(Network.Protocol.Packet)
+  - Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment{System.Byte})
+  - Network.Infrastructure.ConnectionBase.Network
+  - Network.Infrastructure.ConnectionBase.Latency
+  - Network.Infrastructure.ConnectionBase.ToString
+  - Network.Infrastructure.ConnectionBase.m_Stream
+  - Network.Infrastructure.ConnectionBase.m_PackageReader
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Network.Infrastructure.ConnectionClient.m_ClientSM
+  commentId: F:Network.Infrastructure.ConnectionClient.m_ClientSM
+  id: m_ClientSM
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: m_ClientSM
+  nameWithType: ConnectionClient.m_ClientSM
+  fullName: Network.Infrastructure.ConnectionClient.m_ClientSM
+  type: Field
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_ClientSM
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 17
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: readonly ConnectionClientSM m_ClientSM
+    return:
+      type: Network.Infrastructure.ConnectionClientSM
+    content.vb: ReadOnly m_ClientSM As ConnectionClientSM
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Network.Infrastructure.ConnectionClient.OnConnected
+  commentId: E:Network.Infrastructure.ConnectionClient.OnConnected
+  id: OnConnected
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: OnConnected
+  nameWithType: ConnectionClient.OnConnected
+  fullName: Network.Infrastructure.ConnectionClient.OnConnected
+  type: Event
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnConnected
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 19
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public event Action<ConnectionClient> OnConnected
+    return:
+      type: System.Action{Network.Infrastructure.ConnectionClient}
+    content.vb: Public Event OnConnected As Action(Of ConnectionClient)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ConnectionClient.#ctor(Network.Infrastructure.INetworkConnection,Network.Infrastructure.IGameStatePersistence)
+  commentId: M:Network.Infrastructure.ConnectionClient.#ctor(Network.Infrastructure.INetworkConnection,Network.Infrastructure.IGameStatePersistence)
+  id: '#ctor(Network.Infrastructure.INetworkConnection,Network.Infrastructure.IGameStatePersistence)'
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: ConnectionClient(INetworkConnection, IGameStatePersistence)
+  nameWithType: ConnectionClient.ConnectionClient(INetworkConnection, IGameStatePersistence)
+  fullName: Network.Infrastructure.ConnectionClient.ConnectionClient(Network.Infrastructure.INetworkConnection, Network.Infrastructure.IGameStatePersistence)
+  type: Constructor
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 21
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public ConnectionClient(INetworkConnection network, IGameStatePersistence persistence)
+    parameters:
+    - id: network
+      type: Network.Infrastructure.INetworkConnection
+    - id: persistence
+      type: Network.Infrastructure.IGameStatePersistence
+    content.vb: Public Sub New(network As INetworkConnection, persistence As IGameStatePersistence)
+  overload: Network.Infrastructure.ConnectionClient.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ConnectionClient.State
+  commentId: P:Network.Infrastructure.ConnectionClient.State
+  id: State
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: State
+  nameWithType: ConnectionClient.State
+  fullName: Network.Infrastructure.ConnectionClient.State
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: State
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 43
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public override Enum State { get; }
+    parameters: []
+    return:
+      type: System.Enum
+    content.vb: 'Public Overrides ReadOnly Property State As '
+  overridden: Network.Infrastructure.ConnectionBase.State
+  overload: Network.Infrastructure.ConnectionClient.State*
+  modifiers.csharp:
+  - public
+  - override
+  - get
+  modifiers.vb:
+  - Public
+  - Overrides
+  - ReadOnly
+- uid: Network.Infrastructure.ConnectionClient.OnClientJoined
+  commentId: P:Network.Infrastructure.ConnectionClient.OnClientJoined
+  id: OnClientJoined
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: OnClientJoined
+  nameWithType: ConnectionClient.OnClientJoined
+  fullName: Network.Infrastructure.ConnectionClient.OnClientJoined
+  type: Property
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnClientJoined
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 45
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public Action<ConnectionClient> OnClientJoined { get; set; }
+    parameters: []
+    return:
+      type: System.Action{Network.Infrastructure.ConnectionClient}
+    content.vb: Public Property OnClientJoined As Action(Of ConnectionClient)
+  overload: Network.Infrastructure.ConnectionClient.OnClientJoined*
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ConnectionClient.OnDisconnected
+  commentId: E:Network.Infrastructure.ConnectionClient.OnDisconnected
+  id: OnDisconnected
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: OnDisconnected
+  nameWithType: ConnectionClient.OnDisconnected
+  fullName: Network.Infrastructure.ConnectionClient.OnDisconnected
+  type: Event
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnDisconnected
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 47
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public event Action<EDisconnectReason> OnDisconnected
+    return:
+      type: System.Action{Network.Infrastructure.EDisconnectReason}
+    content.vb: Public Event OnDisconnected As Action(Of EDisconnectReason)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ConnectionClient.Finalize
+  commentId: M:Network.Infrastructure.ConnectionClient.Finalize
+  id: Finalize
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: Finalize()
+  nameWithType: ConnectionClient.Finalize()
+  fullName: Network.Infrastructure.ConnectionClient.Finalize()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Finalize
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 49
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: protected void Finalize()
+    content.vb: Protected Sub Finalize
+  overload: Network.Infrastructure.ConnectionClient.Finalize*
+  modifiers.csharp:
+  - protected
+  modifiers.vb:
+  - Protected
+- uid: Network.Infrastructure.ConnectionClient.Connect
+  commentId: M:Network.Infrastructure.ConnectionClient.Connect
+  id: Connect
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: Connect()
+  nameWithType: ConnectionClient.Connect()
+  fullName: Network.Infrastructure.ConnectionClient.Connect()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Connect
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 54
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public void Connect()
+    content.vb: Public Sub Connect
+  overload: Network.Infrastructure.ConnectionClient.Connect*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Infrastructure.ConnectionClient.Disconnect(Network.Infrastructure.EDisconnectReason)
+  commentId: M:Network.Infrastructure.ConnectionClient.Disconnect(Network.Infrastructure.EDisconnectReason)
+  id: Disconnect(Network.Infrastructure.EDisconnectReason)
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: Disconnect(EDisconnectReason)
+  nameWithType: ConnectionClient.Disconnect(EDisconnectReason)
+  fullName: Network.Infrastructure.ConnectionClient.Disconnect(Network.Infrastructure.EDisconnectReason)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Disconnect
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 59
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: public override void Disconnect(EDisconnectReason eReason)
+    parameters:
+    - id: eReason
+      type: Network.Infrastructure.EDisconnectReason
+    content.vb: Public Overrides Sub Disconnect(eReason As EDisconnectReason)
+  overridden: Network.Infrastructure.ConnectionBase.Disconnect(Network.Infrastructure.EDisconnectReason)
+  overload: Network.Infrastructure.ConnectionClient.Disconnect*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Network.Infrastructure.ConnectionClient.closeConnection(Network.Infrastructure.EDisconnectReason)
+  commentId: M:Network.Infrastructure.ConnectionClient.closeConnection(Network.Infrastructure.EDisconnectReason)
+  id: closeConnection(Network.Infrastructure.EDisconnectReason)
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: closeConnection(EDisconnectReason)
+  nameWithType: ConnectionClient.closeConnection(EDisconnectReason)
+  fullName: Network.Infrastructure.ConnectionClient.closeConnection(Network.Infrastructure.EDisconnectReason)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: closeConnection
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 69
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: void closeConnection(EDisconnectReason eReason)
+    parameters:
+    - id: eReason
+      type: Network.Infrastructure.EDisconnectReason
+    content.vb: Sub closeConnection(eReason As EDisconnectReason)
+  overload: Network.Infrastructure.ConnectionClient.closeConnection*
+- uid: Network.Infrastructure.ConnectionClient.sendClientHello
+  commentId: M:Network.Infrastructure.ConnectionClient.sendClientHello
+  id: sendClientHello
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: sendClientHello()
+  nameWithType: ConnectionClient.sendClientHello()
+  fullName: Network.Infrastructure.ConnectionClient.sendClientHello()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: sendClientHello
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 76
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: void sendClientHello()
+    content.vb: Sub sendClientHello
+  overload: Network.Infrastructure.ConnectionClient.sendClientHello*
+- uid: Network.Infrastructure.ConnectionClient.receiveClientInfoRequest(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  commentId: M:Network.Infrastructure.ConnectionClient.receiveClientInfoRequest(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  id: receiveClientInfoRequest(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: receiveClientInfoRequest(ConnectionBase, Packet)
+  nameWithType: ConnectionClient.receiveClientInfoRequest(ConnectionBase, Packet)
+  fullName: Network.Infrastructure.ConnectionClient.receiveClientInfoRequest(Network.Infrastructure.ConnectionBase, Network.Protocol.Packet)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: receiveClientInfoRequest
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 81
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: >-
+      [ConnectionClientPacketHandler(EClientConnectionState.JoinRequesting, EPacket.Server_RequestClientInfo)]
+
+      void receiveClientInfoRequest(ConnectionBase connection, Packet packet)
+    parameters:
+    - id: connection
+      type: Network.Infrastructure.ConnectionBase
+    - id: packet
+      type: Network.Protocol.Packet
+    content.vb: >-
+      <ConnectionClientPacketHandler(EClientConnectionState.JoinRequesting, EPacket.Server_RequestClientInfo)>
+
+      Sub receiveClientInfoRequest(connection As ConnectionBase, packet As Packet)
+  overload: Network.Infrastructure.ConnectionClient.receiveClientInfoRequest*
+  attributes:
+  - type: Network.Infrastructure.ConnectionClientPacketHandlerAttribute
+    ctor: Network.Infrastructure.ConnectionClientPacketHandlerAttribute.#ctor(Network.Infrastructure.EClientConnectionState,Network.Protocol.EPacket)
+    arguments:
+    - type: Network.Infrastructure.EClientConnectionState
+      value: 0
+    - type: Network.Protocol.EPacket
+      value: 6
+- uid: Network.Infrastructure.ConnectionClient.sendClientInfo
+  commentId: M:Network.Infrastructure.ConnectionClient.sendClientInfo
+  id: sendClientInfo
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: sendClientInfo()
+  nameWithType: ConnectionClient.sendClientInfo()
+  fullName: Network.Infrastructure.ConnectionClient.sendClientInfo()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: sendClientInfo
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 89
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: void sendClientInfo()
+    content.vb: Sub sendClientInfo
+  overload: Network.Infrastructure.ConnectionClient.sendClientInfo*
+- uid: Network.Infrastructure.ConnectionClient.receiveJoinRequestAccepted(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  commentId: M:Network.Infrastructure.ConnectionClient.receiveJoinRequestAccepted(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  id: receiveJoinRequestAccepted(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: receiveJoinRequestAccepted(ConnectionBase, Packet)
+  nameWithType: ConnectionClient.receiveJoinRequestAccepted(ConnectionBase, Packet)
+  fullName: Network.Infrastructure.ConnectionClient.receiveJoinRequestAccepted(Network.Infrastructure.ConnectionBase, Network.Protocol.Packet)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: receiveJoinRequestAccepted
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 97
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: >-
+      [ConnectionClientPacketHandler(EClientConnectionState.JoinRequesting, EPacket.Server_JoinRequestAccepted)]
+
+      void receiveJoinRequestAccepted(ConnectionBase connection, Packet packet)
+    parameters:
+    - id: connection
+      type: Network.Infrastructure.ConnectionBase
+    - id: packet
+      type: Network.Protocol.Packet
+    content.vb: >-
+      <ConnectionClientPacketHandler(EClientConnectionState.JoinRequesting, EPacket.Server_JoinRequestAccepted)>
+
+      Sub receiveJoinRequestAccepted(connection As ConnectionBase, packet As Packet)
+  overload: Network.Infrastructure.ConnectionClient.receiveJoinRequestAccepted*
+  attributes:
+  - type: Network.Infrastructure.ConnectionClientPacketHandlerAttribute
+    ctor: Network.Infrastructure.ConnectionClientPacketHandlerAttribute.#ctor(Network.Infrastructure.EClientConnectionState,Network.Protocol.EPacket)
+    arguments:
+    - type: Network.Infrastructure.EClientConnectionState
+      value: 0
+    - type: Network.Protocol.EPacket
+      value: 7
+- uid: Network.Infrastructure.ConnectionClient.receiveServerKeepAlive(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  commentId: M:Network.Infrastructure.ConnectionClient.receiveServerKeepAlive(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  id: receiveServerKeepAlive(Network.Infrastructure.ConnectionBase,Network.Protocol.Packet)
+  parent: Network.Infrastructure.ConnectionClient
+  langs:
+  - csharp
+  - vb
+  name: receiveServerKeepAlive(ConnectionBase, Packet)
+  nameWithType: ConnectionClient.receiveServerKeepAlive(ConnectionBase, Packet)
+  fullName: Network.Infrastructure.ConnectionClient.receiveServerKeepAlive(Network.Infrastructure.ConnectionBase, Network.Protocol.Packet)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Infrastructure/ConnectionClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: receiveServerKeepAlive
+    path: ../source/Network/Infrastructure/ConnectionClient.cs
+    startLine: 109
+  assemblies:
+  - Network
+  namespace: Network.Infrastructure
+  syntax:
+    content: >-
+      [ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.KeepAlive)]
+
+      void receiveServerKeepAlive(ConnectionBase connection, Packet packet)
+    parameters:
+    - id: connection
+      type: Network.Infrastructure.ConnectionBase
+    - id: packet
+      type: Network.Protocol.Packet
+    content.vb: >-
+      <ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.KeepAlive)>
+
+      Sub receiveServerKeepAlive(connection As ConnectionBase, packet As Packet)
+  overload: Network.Infrastructure.ConnectionClient.receiveServerKeepAlive*
+  attributes:
+  - type: Network.Infrastructure.ConnectionClientPacketHandlerAttribute
+    ctor: Network.Infrastructure.ConnectionClientPacketHandlerAttribute.#ctor(Network.Infrastructure.EClientConnectionState,Network.Protocol.EPacket)
+    arguments:
+    - type: Network.Infrastructure.EClientConnectionState
+      value: 1
+    - type: Network.Protocol.EPacket
+      value: 12
+references:
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Network.Infrastructure.ConnectionBase
+  commentId: T:Network.Infrastructure.ConnectionBase
+  parent: Network.Infrastructure
+  name: ConnectionBase
+  nameWithType: ConnectionBase
+  fullName: Network.Infrastructure.ConnectionBase
+- uid: Network.Infrastructure.ConnectionBase.Dispatcher
+  commentId: F:Network.Infrastructure.ConnectionBase.Dispatcher
+  parent: Network.Infrastructure.ConnectionBase
+  name: Dispatcher
+  nameWithType: ConnectionBase.Dispatcher
+  fullName: Network.Infrastructure.ConnectionBase.Dispatcher
+- uid: Network.Infrastructure.ConnectionBase.GameStatePersistence
+  commentId: P:Network.Infrastructure.ConnectionBase.GameStatePersistence
+  parent: Network.Infrastructure.ConnectionBase
+  name: GameStatePersistence
+  nameWithType: ConnectionBase.GameStatePersistence
+  fullName: Network.Infrastructure.ConnectionBase.GameStatePersistence
+- uid: Network.Infrastructure.ConnectionBase.Send(Network.Protocol.Packet)
+  commentId: M:Network.Infrastructure.ConnectionBase.Send(Network.Protocol.Packet)
+  parent: Network.Infrastructure.ConnectionBase
+  name: Send(Packet)
+  nameWithType: ConnectionBase.Send(Packet)
+  fullName: Network.Infrastructure.ConnectionBase.Send(Network.Protocol.Packet)
+  spec.csharp:
+  - uid: Network.Infrastructure.ConnectionBase.Send(Network.Protocol.Packet)
+    name: Send
+    nameWithType: ConnectionBase.Send
+    fullName: Network.Infrastructure.ConnectionBase.Send
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Network.Protocol.Packet
+    name: Packet
+    nameWithType: Packet
+    fullName: Network.Protocol.Packet
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Network.Infrastructure.ConnectionBase.Send(Network.Protocol.Packet)
+    name: Send
+    nameWithType: ConnectionBase.Send
+    fullName: Network.Infrastructure.ConnectionBase.Send
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Network.Protocol.Packet
+    name: Packet
+    nameWithType: Packet
+    fullName: Network.Protocol.Packet
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.ConnectionBase.SendFragmented(Network.Protocol.Packet)
+  commentId: M:Network.Infrastructure.ConnectionBase.SendFragmented(Network.Protocol.Packet)
+  parent: Network.Infrastructure.ConnectionBase
+  name: SendFragmented(Packet)
+  nameWithType: ConnectionBase.SendFragmented(Packet)
+  fullName: Network.Infrastructure.ConnectionBase.SendFragmented(Network.Protocol.Packet)
+  spec.csharp:
+  - uid: Network.Infrastructure.ConnectionBase.SendFragmented(Network.Protocol.Packet)
+    name: SendFragmented
+    nameWithType: ConnectionBase.SendFragmented
+    fullName: Network.Infrastructure.ConnectionBase.SendFragmented
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Network.Protocol.Packet
+    name: Packet
+    nameWithType: Packet
+    fullName: Network.Protocol.Packet
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Network.Infrastructure.ConnectionBase.SendFragmented(Network.Protocol.Packet)
+    name: SendFragmented
+    nameWithType: ConnectionBase.SendFragmented
+    fullName: Network.Infrastructure.ConnectionBase.SendFragmented
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Network.Protocol.Packet
+    name: Packet
+    nameWithType: Packet
+    fullName: Network.Protocol.Packet
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment{System.Byte})
+  commentId: M:Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment{System.Byte})
+  parent: Network.Infrastructure.ConnectionBase
+  isExternal: true
+  name: Receive(ArraySegment<Byte>)
+  nameWithType: ConnectionBase.Receive(ArraySegment<Byte>)
+  fullName: Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment<System.Byte>)
+  nameWithType.vb: ConnectionBase.Receive(ArraySegment(Of Byte))
+  fullName.vb: Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment(Of System.Byte))
+  name.vb: Receive(ArraySegment(Of Byte))
+  spec.csharp:
+  - uid: Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment{System.Byte})
+    name: Receive
+    nameWithType: ConnectionBase.Receive
+    fullName: Network.Infrastructure.ConnectionBase.Receive
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Network.Infrastructure.ConnectionBase.Receive(System.ArraySegment{System.Byte})
+    name: Receive
+    nameWithType: ConnectionBase.Receive
+    fullName: Network.Infrastructure.ConnectionBase.Receive
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.ArraySegment`1
+    name: ArraySegment
+    nameWithType: ArraySegment
+    fullName: System.ArraySegment
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Byte
+    name: Byte
+    nameWithType: Byte
+    fullName: System.Byte
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.ConnectionBase.Network
+  commentId: P:Network.Infrastructure.ConnectionBase.Network
+  parent: Network.Infrastructure.ConnectionBase
+  name: Network
+  nameWithType: ConnectionBase.Network
+  fullName: Network.Infrastructure.ConnectionBase.Network
+- uid: Network.Infrastructure.ConnectionBase.Latency
+  commentId: F:Network.Infrastructure.ConnectionBase.Latency
+  parent: Network.Infrastructure.ConnectionBase
+  name: Latency
+  nameWithType: ConnectionBase.Latency
+  fullName: Network.Infrastructure.ConnectionBase.Latency
+- uid: Network.Infrastructure.ConnectionBase.ToString
+  commentId: M:Network.Infrastructure.ConnectionBase.ToString
+  parent: Network.Infrastructure.ConnectionBase
+  name: ToString()
+  nameWithType: ConnectionBase.ToString()
+  fullName: Network.Infrastructure.ConnectionBase.ToString()
+  spec.csharp:
+  - uid: Network.Infrastructure.ConnectionBase.ToString
+    name: ToString
+    nameWithType: ConnectionBase.ToString
+    fullName: Network.Infrastructure.ConnectionBase.ToString
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Network.Infrastructure.ConnectionBase.ToString
+    name: ToString
+    nameWithType: ConnectionBase.ToString
+    fullName: Network.Infrastructure.ConnectionBase.ToString
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.ConnectionBase.m_Stream
+  commentId: F:Network.Infrastructure.ConnectionBase.m_Stream
+  parent: Network.Infrastructure.ConnectionBase
+  name: m_Stream
+  nameWithType: ConnectionBase.m_Stream
+  fullName: Network.Infrastructure.ConnectionBase.m_Stream
+- uid: Network.Infrastructure.ConnectionBase.m_PackageReader
+  commentId: F:Network.Infrastructure.ConnectionBase.m_PackageReader
+  parent: Network.Infrastructure.ConnectionBase
+  name: m_PackageReader
+  nameWithType: ConnectionBase.m_PackageReader
+  fullName: Network.Infrastructure.ConnectionBase.m_PackageReader
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Network.Infrastructure.ConnectionClientSM
+  commentId: T:Network.Infrastructure.ConnectionClientSM
+  parent: Network.Infrastructure
+  name: ConnectionClientSM
+  nameWithType: ConnectionClientSM
+  fullName: Network.Infrastructure.ConnectionClientSM
+- uid: System.Action{Network.Infrastructure.ConnectionClient}
+  commentId: T:System.Action{Network.Infrastructure.ConnectionClient}
+  parent: System
+  definition: System.Action`1
+  name: Action<ConnectionClient>
+  nameWithType: Action<ConnectionClient>
+  fullName: System.Action<Network.Infrastructure.ConnectionClient>
+  nameWithType.vb: Action(Of ConnectionClient)
+  fullName.vb: System.Action(Of Network.Infrastructure.ConnectionClient)
+  name.vb: Action(Of ConnectionClient)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Network.Infrastructure.ConnectionClient
+    name: ConnectionClient
+    nameWithType: ConnectionClient
+    fullName: Network.Infrastructure.ConnectionClient
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Network.Infrastructure.ConnectionClient
+    name: ConnectionClient
+    nameWithType: ConnectionClient
+    fullName: Network.Infrastructure.ConnectionClient
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Action`1
+  commentId: T:System.Action`1
+  isExternal: true
+  name: Action<T>
+  nameWithType: Action<T>
+  fullName: System.Action<T>
+  nameWithType.vb: Action(Of T)
+  fullName.vb: System.Action(Of T)
+  name.vb: Action(Of T)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.ConnectionClient.#ctor*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.#ctor
+  name: ConnectionClient
+  nameWithType: ConnectionClient.ConnectionClient
+  fullName: Network.Infrastructure.ConnectionClient.ConnectionClient
+- uid: Network.Infrastructure.INetworkConnection
+  commentId: T:Network.Infrastructure.INetworkConnection
+  parent: Network.Infrastructure
+  name: INetworkConnection
+  nameWithType: INetworkConnection
+  fullName: Network.Infrastructure.INetworkConnection
+- uid: Network.Infrastructure.IGameStatePersistence
+  commentId: T:Network.Infrastructure.IGameStatePersistence
+  parent: Network.Infrastructure
+  name: IGameStatePersistence
+  nameWithType: IGameStatePersistence
+  fullName: Network.Infrastructure.IGameStatePersistence
+- uid: Network.Infrastructure.ConnectionBase.State
+  commentId: P:Network.Infrastructure.ConnectionBase.State
+  parent: Network.Infrastructure.ConnectionBase
+  name: State
+  nameWithType: ConnectionBase.State
+  fullName: Network.Infrastructure.ConnectionBase.State
+- uid: Network.Infrastructure.ConnectionClient.State*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.State
+  name: State
+  nameWithType: ConnectionClient.State
+  fullName: Network.Infrastructure.ConnectionClient.State
+- uid: System.Enum
+  commentId: T:System.Enum
+  parent: System
+  isExternal: true
+  name: Enum
+  nameWithType: Enum
+  fullName: System.Enum
+- uid: Network.Infrastructure.ConnectionClient.OnClientJoined*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.OnClientJoined
+  name: OnClientJoined
+  nameWithType: ConnectionClient.OnClientJoined
+  fullName: Network.Infrastructure.ConnectionClient.OnClientJoined
+- uid: System.Action{Network.Infrastructure.EDisconnectReason}
+  commentId: T:System.Action{Network.Infrastructure.EDisconnectReason}
+  parent: System
+  definition: System.Action`1
+  name: Action<EDisconnectReason>
+  nameWithType: Action<EDisconnectReason>
+  fullName: System.Action<Network.Infrastructure.EDisconnectReason>
+  nameWithType.vb: Action(Of EDisconnectReason)
+  fullName.vb: System.Action(Of Network.Infrastructure.EDisconnectReason)
+  name.vb: Action(Of EDisconnectReason)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Network.Infrastructure.EDisconnectReason
+    name: EDisconnectReason
+    nameWithType: EDisconnectReason
+    fullName: Network.Infrastructure.EDisconnectReason
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Network.Infrastructure.EDisconnectReason
+    name: EDisconnectReason
+    nameWithType: EDisconnectReason
+    fullName: Network.Infrastructure.EDisconnectReason
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.ConnectionClient.Finalize*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.Finalize
+  name: Finalize
+  nameWithType: ConnectionClient.Finalize
+  fullName: Network.Infrastructure.ConnectionClient.Finalize
+- uid: Network.Infrastructure.ConnectionClient.Connect*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.Connect
+  name: Connect
+  nameWithType: ConnectionClient.Connect
+  fullName: Network.Infrastructure.ConnectionClient.Connect
+- uid: Network.Infrastructure.ConnectionBase.Disconnect(Network.Infrastructure.EDisconnectReason)
+  commentId: M:Network.Infrastructure.ConnectionBase.Disconnect(Network.Infrastructure.EDisconnectReason)
+  parent: Network.Infrastructure.ConnectionBase
+  name: Disconnect(EDisconnectReason)
+  nameWithType: ConnectionBase.Disconnect(EDisconnectReason)
+  fullName: Network.Infrastructure.ConnectionBase.Disconnect(Network.Infrastructure.EDisconnectReason)
+  spec.csharp:
+  - uid: Network.Infrastructure.ConnectionBase.Disconnect(Network.Infrastructure.EDisconnectReason)
+    name: Disconnect
+    nameWithType: ConnectionBase.Disconnect
+    fullName: Network.Infrastructure.ConnectionBase.Disconnect
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Network.Infrastructure.EDisconnectReason
+    name: EDisconnectReason
+    nameWithType: EDisconnectReason
+    fullName: Network.Infrastructure.EDisconnectReason
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Network.Infrastructure.ConnectionBase.Disconnect(Network.Infrastructure.EDisconnectReason)
+    name: Disconnect
+    nameWithType: ConnectionBase.Disconnect
+    fullName: Network.Infrastructure.ConnectionBase.Disconnect
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Network.Infrastructure.EDisconnectReason
+    name: EDisconnectReason
+    nameWithType: EDisconnectReason
+    fullName: Network.Infrastructure.EDisconnectReason
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Infrastructure.ConnectionClient.Disconnect*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.Disconnect
+  name: Disconnect
+  nameWithType: ConnectionClient.Disconnect
+  fullName: Network.Infrastructure.ConnectionClient.Disconnect
+- uid: Network.Infrastructure.EDisconnectReason
+  commentId: T:Network.Infrastructure.EDisconnectReason
+  parent: Network.Infrastructure
+  name: EDisconnectReason
+  nameWithType: EDisconnectReason
+  fullName: Network.Infrastructure.EDisconnectReason
+- uid: Network.Infrastructure.ConnectionClient.closeConnection*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.closeConnection
+  name: closeConnection
+  nameWithType: ConnectionClient.closeConnection
+  fullName: Network.Infrastructure.ConnectionClient.closeConnection
+- uid: Network.Infrastructure.ConnectionClient.sendClientHello*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.sendClientHello
+  name: sendClientHello
+  nameWithType: ConnectionClient.sendClientHello
+  fullName: Network.Infrastructure.ConnectionClient.sendClientHello
+- uid: Network.Infrastructure.ConnectionClient.receiveClientInfoRequest*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.receiveClientInfoRequest
+  name: receiveClientInfoRequest
+  nameWithType: ConnectionClient.receiveClientInfoRequest
+  fullName: Network.Infrastructure.ConnectionClient.receiveClientInfoRequest
+- uid: Network.Protocol.Packet
+  commentId: T:Network.Protocol.Packet
+  parent: Network.Protocol
+  name: Packet
+  nameWithType: Packet
+  fullName: Network.Protocol.Packet
+- uid: Network.Protocol
+  commentId: N:Network.Protocol
+  name: Network.Protocol
+  nameWithType: Network.Protocol
+  fullName: Network.Protocol
+- uid: Network.Infrastructure.ConnectionClient.sendClientInfo*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.sendClientInfo
+  name: sendClientInfo
+  nameWithType: ConnectionClient.sendClientInfo
+  fullName: Network.Infrastructure.ConnectionClient.sendClientInfo
+- uid: Network.Infrastructure.ConnectionClient.receiveJoinRequestAccepted*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.receiveJoinRequestAccepted
+  name: receiveJoinRequestAccepted
+  nameWithType: ConnectionClient.receiveJoinRequestAccepted
+  fullName: Network.Infrastructure.ConnectionClient.receiveJoinRequestAccepted
+- uid: Network.Infrastructure.ConnectionClient.receiveServerKeepAlive*
+  commentId: Overload:Network.Infrastructure.ConnectionClient.receiveServerKeepAlive
+  name: receiveServerKeepAlive
+  nameWithType: ConnectionClient.receiveServerKeepAlive
+  fullName: Network.Infrastructure.ConnectionClient.receiveServerKeepAlive

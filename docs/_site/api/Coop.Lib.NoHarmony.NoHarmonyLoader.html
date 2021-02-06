@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -89,6 +88,9 @@
     </div>
     <div>
       <span class="xref">TaleWorlds.MountAndBlade.MBSubModuleBase.OnBeforeInitialModuleScreenSetAsRoot()</span>
+    </div>
+    <div>
+      <span class="xref">TaleWorlds.MountAndBlade.MBSubModuleBase.OnConfigChanged()</span>
     </div>
     <div>
       <span class="xref">TaleWorlds.MountAndBlade.MBSubModuleBase.OnApplicationTick(System.Single)</span>
@@ -506,14 +508,12 @@
   </span>
   <a id="Coop_Lib_NoHarmony_NoHarmonyLoader_AddBehavior_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.AddBehavior*"></a>
   <h4 id="Coop_Lib_NoHarmony_NoHarmonyLoader_AddBehavior__1" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.AddBehavior``1">AddBehavior&lt;AddType&gt;()</h4>
-  <div class="markdown level1 summary">
-Use this method in your NoHarmonyLoad() method to add new behavior to the game.
+  <div class="markdown level1 summary"><p>Use this method in your NoHarmonyLoad() method to add new behavior to the game.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void AddBehavior&lt;AddType&gt;()
-
     where AddType : CampaignBehaviorBase, new()</code></pre>
   </div>
   <h5 class="typeParameters">Type Parameters</h5>
@@ -527,7 +527,8 @@ Use this method in your NoHarmonyLoad() method to add new behavior to the game.
     <tbody>
       <tr>
         <td><span class="parametername">AddType</span></td>
-        <td>Behavior type to add</td>
+        <td><p>Behavior type to add</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -540,14 +541,12 @@ Use this method in your NoHarmonyLoad() method to add new behavior to the game.
   </span>
   <a id="Coop_Lib_NoHarmony_NoHarmonyLoader_AddModel_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.AddModel*"></a>
   <h4 id="Coop_Lib_NoHarmony_NoHarmonyLoader_AddModel__1" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.AddModel``1">AddModel&lt;AddType&gt;()</h4>
-  <div class="markdown level1 summary">
-Use this method in your NoHarmonyLoad() method to add new models to the game.
+  <div class="markdown level1 summary"><p>Use this method in your NoHarmonyLoad() method to add new models to the game.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void AddModel&lt;AddType&gt;()
-
     where AddType : GameModel, new()</code></pre>
   </div>
   <h5 class="typeParameters">Type Parameters</h5>
@@ -561,7 +560,8 @@ Use this method in your NoHarmonyLoad() method to add new models to the game.
     <tbody>
       <tr>
         <td><span class="parametername">AddType</span></td>
-        <td>Model type to add</td>
+        <td><p>Model type to add</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -589,8 +589,7 @@ Use this method in your NoHarmonyLoad() method to add new models to the game.
   </span>
   <a id="Coop_Lib_NoHarmony_NoHarmonyLoader_Log_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.Log*"></a>
   <h4 id="Coop_Lib_NoHarmony_NoHarmonyLoader_Log_Coop_Lib_NoHarmony_NoHarmonyLoader_LogLvl_System_String_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.Log(Coop.Lib.NoHarmony.NoHarmonyLoader.LogLvl,System.String)">Log(NoHarmonyLoader.LogLvl, String)</h4>
-  <div class="markdown level1 summary">
-Add a message to NoHarmony log file
+  <div class="markdown level1 summary"><p>Add a message to NoHarmony log file</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -610,12 +609,14 @@ Add a message to NoHarmony log file
       <tr>
         <td><a class="xref" href="Coop.Lib.NoHarmony.NoHarmonyLoader.LogLvl.html">NoHarmonyLoader.LogLvl</a></td>
         <td><span class="parametername">mLvl</span></td>
-        <td>Message logging level</td>
+        <td><p>Message logging level</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">System.String</span></td>
         <td><span class="parametername">message</span></td>
-        <td>Message core</td>
+        <td><p>Message core</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -633,9 +634,7 @@ Add a message to NoHarmony log file
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">NoHarmonyLoader.TaskStatus NHLBehavior&lt;AddType, RemoveType&gt;(Campaign campaign, NoHarmonyLoader.TaskMode mode)
-
     where AddType : CampaignBehaviorBase, new()
-
     where RemoveType : CampaignBehaviorBase</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
@@ -708,9 +707,7 @@ Add a message to NoHarmony log file
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">NoHarmonyLoader.TaskStatus NHLModel&lt;AddType, RemoveType&gt;(IGameStarter gameI, NoHarmonyLoader.TaskMode mode)
-
     where AddType : GameModel, new()
-
     where RemoveType : GameModel</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
@@ -778,8 +775,7 @@ Add a message to NoHarmony log file
   </span>
   <a id="Coop_Lib_NoHarmony_NoHarmonyLoader_NoHarmonyInit_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.NoHarmonyInit*"></a>
   <h4 id="Coop_Lib_NoHarmony_NoHarmonyLoader_NoHarmonyInit" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.NoHarmonyInit">NoHarmonyInit()</h4>
-  <div class="markdown level1 summary">
-Put NoHarmony Initialise code here
+  <div class="markdown level1 summary"><p>Put NoHarmony Initialise code here</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -795,8 +791,7 @@ Put NoHarmony Initialise code here
   </span>
   <a id="Coop_Lib_NoHarmony_NoHarmonyLoader_NoHarmonyLoad_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.NoHarmonyLoad*"></a>
   <h4 id="Coop_Lib_NoHarmony_NoHarmonyLoader_NoHarmonyLoad" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.NoHarmonyLoad">NoHarmonyLoad()</h4>
-  <div class="markdown level1 summary">
-Use add and replace NoHarmony methods here to load your modules;
+  <div class="markdown level1 summary"><p>Use add and replace NoHarmony methods here to load your modules;</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -812,9 +807,8 @@ Use add and replace NoHarmony methods here to load your modules;
   </span>
   <a id="Coop_Lib_NoHarmony_NoHarmonyLoader_OnGameInitializationFinished_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.OnGameInitializationFinished*"></a>
   <h4 id="Coop_Lib_NoHarmony_NoHarmonyLoader_OnGameInitializationFinished_TaleWorlds_Core_Game_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.OnGameInitializationFinished(TaleWorlds.Core.Game)">OnGameInitializationFinished(Game)</h4>
-  <div class="markdown level1 summary">
-Behaviors operations wille be done here, don&apos;t forget to call.OnGameInitializationFinished(game) base if you
-override.
+  <div class="markdown level1 summary"><p>Behaviors operations wille be done here, don&apos;t forget to call.OnGameInitializationFinished(game) base if you
+override.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -849,8 +843,7 @@ override.
   </span>
   <a id="Coop_Lib_NoHarmony_NoHarmonyLoader_OnGameStart_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.OnGameStart*"></a>
   <h4 id="Coop_Lib_NoHarmony_NoHarmonyLoader_OnGameStart_TaleWorlds_Core_Game_TaleWorlds_Core_IGameStarter_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.OnGameStart(TaleWorlds.Core.Game,TaleWorlds.Core.IGameStarter)">OnGameStart(Game, IGameStarter)</h4>
-  <div class="markdown level1 summary">
-Models will be loaded here, don&apos;t forget to call base.OnGameStart(game, gameStarterObject) if you override.
+  <div class="markdown level1 summary"><p>Models will be loaded here, don&apos;t forget to call base.OnGameStart(game, gameStarterObject) if you override.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -890,8 +883,7 @@ Models will be loaded here, don&apos;t forget to call base.OnGameStart(game, gam
   </span>
   <a id="Coop_Lib_NoHarmony_NoHarmonyLoader_OnSubModuleLoad_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.OnSubModuleLoad*"></a>
   <h4 id="Coop_Lib_NoHarmony_NoHarmonyLoader_OnSubModuleLoad" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.OnSubModuleLoad">OnSubModuleLoad()</h4>
-  <div class="markdown level1 summary">
-NoHarmony will initialize here, don&apos;t forget to call base.OnSubModuleLoad() if you override.
+  <div class="markdown level1 summary"><p>NoHarmony will initialize here, don&apos;t forget to call base.OnSubModuleLoad() if you override.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -909,14 +901,12 @@ NoHarmony will initialize here, don&apos;t forget to call base.OnSubModuleLoad()
   </span>
   <a id="Coop_Lib_NoHarmony_NoHarmonyLoader_RemoveModel_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.RemoveModel*"></a>
   <h4 id="Coop_Lib_NoHarmony_NoHarmonyLoader_RemoveModel__1" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.RemoveModel``1">RemoveModel&lt;RemoveType&gt;()</h4>
-  <div class="markdown level1 summary">
-Use this method in your NoHarmonyLoad() method to remove a specified model. (Dangerous)
+  <div class="markdown level1 summary"><p>Use this method in your NoHarmonyLoad() method to remove a specified model. (Dangerous)</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void RemoveModel&lt;RemoveType&gt;()
-
     where RemoveType : GameModel</code></pre>
   </div>
   <h5 class="typeParameters">Type Parameters</h5>
@@ -930,7 +920,8 @@ Use this method in your NoHarmonyLoad() method to remove a specified model. (Dan
     <tbody>
       <tr>
         <td><span class="parametername">RemoveType</span></td>
-        <td>Model type to remove</td>
+        <td><p>Model type to remove</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -943,16 +934,13 @@ Use this method in your NoHarmonyLoad() method to remove a specified model. (Dan
   </span>
   <a id="Coop_Lib_NoHarmony_NoHarmonyLoader_ReplaceBehavior_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.ReplaceBehavior*"></a>
   <h4 id="Coop_Lib_NoHarmony_NoHarmonyLoader_ReplaceBehavior__2_Coop_Lib_NoHarmony_NoHarmonyLoader_TaskMode_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.ReplaceBehavior``2(Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode)">ReplaceBehavior&lt;AddType, RemoveType&gt;(NoHarmonyLoader.TaskMode)</h4>
-  <div class="markdown level1 summary">
-Use this method in your NoHarmonyLoad() method to replace a specified behavior by a new specified one.
+  <div class="markdown level1 summary"><p>Use this method in your NoHarmonyLoad() method to replace a specified behavior by a new specified one.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ReplaceBehavior&lt;AddType, RemoveType&gt;(NoHarmonyLoader.TaskMode m = NoHarmonyLoader.TaskMode.Replace)
-
     where AddType : CampaignBehaviorBase, new()
-
     where RemoveType : CampaignBehaviorBase</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
@@ -968,7 +956,8 @@ Use this method in your NoHarmonyLoad() method to replace a specified behavior b
       <tr>
         <td><a class="xref" href="Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.html">NoHarmonyLoader.TaskMode</a></td>
         <td><span class="parametername">m</span></td>
-        <td>Not required. The replace mode to use. (Do not pick add or remove)</td>
+        <td><p>Not required. The replace mode to use. (Do not pick add or remove)</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -983,11 +972,13 @@ Use this method in your NoHarmonyLoad() method to replace a specified behavior b
     <tbody>
       <tr>
         <td><span class="parametername">AddType</span></td>
-        <td>Behavior type to add</td>
+        <td><p>Behavior type to add</p>
+</td>
       </tr>
       <tr>
         <td><span class="parametername">RemoveType</span></td>
-        <td>Behavior type to remove</td>
+        <td><p>Behavior type to remove</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1000,16 +991,13 @@ Use this method in your NoHarmonyLoad() method to replace a specified behavior b
   </span>
   <a id="Coop_Lib_NoHarmony_NoHarmonyLoader_ReplaceModel_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.ReplaceModel*"></a>
   <h4 id="Coop_Lib_NoHarmony_NoHarmonyLoader_ReplaceModel__2_Coop_Lib_NoHarmony_NoHarmonyLoader_TaskMode_" data-uid="Coop.Lib.NoHarmony.NoHarmonyLoader.ReplaceModel``2(Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode)">ReplaceModel&lt;AddType, RemoveType&gt;(NoHarmonyLoader.TaskMode)</h4>
-  <div class="markdown level1 summary">
-Use this method in your NoHarmonyLoad() method to replace a specified model by a new specified one.
+  <div class="markdown level1 summary"><p>Use this method in your NoHarmonyLoad() method to replace a specified model by a new specified one.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ReplaceModel&lt;AddType, RemoveType&gt;(NoHarmonyLoader.TaskMode m = NoHarmonyLoader.TaskMode.Replace)
-
     where AddType : GameModel, new()
-
     where RemoveType : GameModel</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
@@ -1025,7 +1013,8 @@ Use this method in your NoHarmonyLoad() method to replace a specified model by a
       <tr>
         <td><a class="xref" href="Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode.html">NoHarmonyLoader.TaskMode</a></td>
         <td><span class="parametername">m</span></td>
-        <td>Not required. The replace mode to use. (Do not pick add or remove)</td>
+        <td><p>Not required. The replace mode to use. (Do not pick add or remove)</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1040,11 +1029,13 @@ Use this method in your NoHarmonyLoad() method to replace a specified model by a
     <tbody>
       <tr>
         <td><span class="parametername">AddType</span></td>
-        <td>Model type to add</td>
+        <td><p>Model type to add</p>
+</td>
       </tr>
       <tr>
         <td><span class="parametername">RemoveType</span></td>
-        <td>Model type to be replaced</td>
+        <td><p>Model type to be replaced</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1063,9 +1054,22 @@ Use this method in your NoHarmonyLoad() method to replace a specified model by a
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

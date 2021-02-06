@@ -1,0 +1,54 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.UI
+  commentId: N:Coop.Mod.UI
+  id: Coop.Mod.UI
+  children:
+  - Coop.Mod.UI.CoopConnectMenuVM
+  - Coop.Mod.UI.CoopLoadGameGauntletScreen
+  - Coop.Mod.UI.CoopLoadScreen
+  - Coop.Mod.UI.CoopLoadUI
+  - Coop.Mod.UI.SelectedGameVM
+  langs:
+  - csharp
+  - vb
+  name: Coop.Mod.UI
+  nameWithType: Coop.Mod.UI
+  fullName: Coop.Mod.UI
+  type: Namespace
+  assemblies:
+  - Coop
+references:
+- uid: Coop.Mod.UI.CoopConnectMenuVM
+  commentId: T:Coop.Mod.UI.CoopConnectMenuVM
+  parent: Coop.Mod.UI
+  name: CoopConnectMenuVM
+  nameWithType: CoopConnectMenuVM
+  fullName: Coop.Mod.UI.CoopConnectMenuVM
+- uid: Coop.Mod.UI.SelectedGameVM
+  commentId: T:Coop.Mod.UI.SelectedGameVM
+  parent: Coop.Mod.UI
+  name: SelectedGameVM
+  nameWithType: SelectedGameVM
+  fullName: Coop.Mod.UI.SelectedGameVM
+- uid: Coop.Mod.UI.CoopLoadUI
+  commentId: T:Coop.Mod.UI.CoopLoadUI
+  name: CoopLoadUI
+  nameWithType: CoopLoadUI
+  fullName: Coop.Mod.UI.CoopLoadUI
+- uid: Coop.Mod.UI.CoopLoadScreen
+  commentId: T:Coop.Mod.UI.CoopLoadScreen
+  parent: Coop.Mod.UI
+  name: CoopLoadScreen
+  nameWithType: CoopLoadScreen
+  fullName: Coop.Mod.UI.CoopLoadScreen
+- uid: Coop.Mod.UI.CoopLoadGameGauntletScreen
+  commentId: T:Coop.Mod.UI.CoopLoadGameGauntletScreen
+  name: CoopLoadGameGauntletScreen
+  nameWithType: CoopLoadGameGauntletScreen
+  fullName: Coop.Mod.UI.CoopLoadGameGauntletScreen
+- uid: Coop.Mod.UI
+  commentId: N:Coop.Mod.UI
+  name: Coop.Mod.UI
+  nameWithType: Coop.Mod.UI
+  fullName: Coop.Mod.UI

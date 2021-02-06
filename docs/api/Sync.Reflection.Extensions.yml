@@ -1,0 +1,615 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync.Reflection.Extensions
+  commentId: T:Sync.Reflection.Extensions
+  id: Extensions
+  parent: Sync.Reflection
+  children:
+  - Sync.Reflection.Extensions.Assert``2(System.Collections.Generic.IDictionary{``0,``1},``0)
+  - Sync.Reflection.Extensions.GetDeclaredMethods(System.Type)
+  langs:
+  - csharp
+  - vb
+  name: Extensions
+  nameWithType: Extensions
+  fullName: Sync.Reflection.Extensions
+  type: Class
+  source:
+    remote:
+      path: source/Sync/Reflection/Extensions.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Extensions
+    path: ../source/Sync/Reflection/Extensions.cs
+    startLine: 6
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  syntax:
+    content: public static class Extensions
+    content.vb: Public Module Extensions
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - static
+  - class
+  modifiers.vb:
+  - Public
+  - Module
+- uid: Sync.Reflection.Extensions.GetDeclaredMethods(System.Type)
+  commentId: M:Sync.Reflection.Extensions.GetDeclaredMethods(System.Type)
+  id: GetDeclaredMethods(System.Type)
+  isExtensionMethod: true
+  parent: Sync.Reflection.Extensions
+  langs:
+  - csharp
+  - vb
+  name: GetDeclaredMethods(Type)
+  nameWithType: Extensions.GetDeclaredMethods(Type)
+  fullName: Sync.Reflection.Extensions.GetDeclaredMethods(System.Type)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/Extensions.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetDeclaredMethods
+    path: ../source/Sync/Reflection/Extensions.cs
+    startLine: 8
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  syntax:
+    content: public static MethodInfo[] GetDeclaredMethods(this Type type)
+    parameters:
+    - id: type
+      type: System.Type
+    return:
+      type: System.Reflection.MethodInfo[]
+    content.vb: >-
+      <ExtensionAttribute>
+
+      Public Shared Function GetDeclaredMethods(type As Type) As MethodInfo()
+  overload: Sync.Reflection.Extensions.GetDeclaredMethods*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Sync.Reflection.Extensions.Assert``2(System.Collections.Generic.IDictionary{``0,``1},``0)
+  commentId: M:Sync.Reflection.Extensions.Assert``2(System.Collections.Generic.IDictionary{``0,``1},``0)
+  id: Assert``2(System.Collections.Generic.IDictionary{``0,``1},``0)
+  isExtensionMethod: true
+  parent: Sync.Reflection.Extensions
+  langs:
+  - csharp
+  - vb
+  name: Assert<TKey, TValue>(IDictionary<TKey, TValue>, TKey)
+  nameWithType: Extensions.Assert<TKey, TValue>(IDictionary<TKey, TValue>, TKey)
+  fullName: Sync.Reflection.Extensions.Assert<TKey, TValue>(System.Collections.Generic.IDictionary<TKey, TValue>, TKey)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/Reflection/Extensions.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Assert
+    path: ../source/Sync/Reflection/Extensions.cs
+    startLine: 22
+  assemblies:
+  - Sync
+  namespace: Sync.Reflection
+  summary: "\nTry to get the current value in the dictionary, if not exists, it creates a new <code data-dev-comment-type=\"typeparamref\" class=\"typeparamref\">TValue</code> and it&apos;s added to the dictionary with key <code data-dev-comment-type=\"typeparamref\" class=\"typeparamref\">TKey</code>\n"
+  example: []
+  syntax:
+    content: >-
+      public static TValue Assert<TKey, TValue>(this IDictionary<TKey, TValue> dict, TKey key)
+
+          where TValue : new()
+    parameters:
+    - id: dict
+      type: System.Collections.Generic.IDictionary{{TKey},{TValue}}
+    - id: key
+      type: '{TKey}'
+    typeParameters:
+    - id: TKey
+    - id: TValue
+    return:
+      type: '{TValue}'
+      description: Current value or the added object of type <code data-dev-comment-type="typeparamref" class="typeparamref">TValue</code>
+    content.vb: >-
+      <ExtensionAttribute>
+
+      Public Shared Function Assert(Of TKey, TValue As New)(dict As IDictionary(Of TKey, TValue), key As TKey) As TValue
+  overload: Sync.Reflection.Extensions.Assert*
+  nameWithType.vb: Extensions.Assert(Of TKey, TValue)(IDictionary(Of TKey, TValue), TKey)
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+  fullName.vb: Sync.Reflection.Extensions.Assert(Of TKey, TValue)(System.Collections.Generic.IDictionary(Of TKey, TValue), TKey)
+  name.vb: Assert(Of TKey, TValue)(IDictionary(Of TKey, TValue), TKey)
+references:
+- uid: Sync.Reflection
+  commentId: N:Sync.Reflection
+  name: Sync.Reflection
+  nameWithType: Sync.Reflection
+  fullName: Sync.Reflection
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Sync.Reflection.Extensions.GetDeclaredMethods*
+  commentId: Overload:Sync.Reflection.Extensions.GetDeclaredMethods
+  name: GetDeclaredMethods
+  nameWithType: Extensions.GetDeclaredMethods
+  fullName: Sync.Reflection.Extensions.GetDeclaredMethods
+- uid: System.Type
+  commentId: T:System.Type
+  parent: System
+  isExternal: true
+  name: Type
+  nameWithType: Type
+  fullName: System.Type
+- uid: System.Reflection.MethodInfo[]
+  isExternal: true
+  name: MethodInfo[]
+  nameWithType: MethodInfo[]
+  fullName: System.Reflection.MethodInfo[]
+  nameWithType.vb: MethodInfo()
+  fullName.vb: System.Reflection.MethodInfo()
+  name.vb: MethodInfo()
+  spec.csharp:
+  - uid: System.Reflection.MethodInfo
+    name: MethodInfo
+    nameWithType: MethodInfo
+    fullName: System.Reflection.MethodInfo
+    isExternal: true
+  - name: '[]'
+    nameWithType: '[]'
+    fullName: '[]'
+  spec.vb:
+  - uid: System.Reflection.MethodInfo
+    name: MethodInfo
+    nameWithType: MethodInfo
+    fullName: System.Reflection.MethodInfo
+    isExternal: true
+  - name: ()
+    nameWithType: ()
+    fullName: ()
+- uid: Sync.Reflection.Extensions.Assert*
+  commentId: Overload:Sync.Reflection.Extensions.Assert
+  name: Assert
+  nameWithType: Extensions.Assert
+  fullName: Sync.Reflection.Extensions.Assert
+- uid: System.Collections.Generic.IDictionary{{TKey},{TValue}}
+  commentId: T:System.Collections.Generic.IDictionary{``0,``1}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IDictionary`2
+  name: IDictionary<TKey, TValue>
+  nameWithType: IDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IDictionary<TKey, TValue>
+  nameWithType.vb: IDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IDictionary(Of TKey, TValue)
+  name.vb: IDictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    nameWithType: IDictionary
+    fullName: System.Collections.Generic.IDictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    nameWithType: IDictionary
+    fullName: System.Collections.Generic.IDictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: '{TKey}'
+  commentId: '!:TKey'
+  definition: TKey
+  name: TKey
+  nameWithType: TKey
+  fullName: TKey
+- uid: '{TValue}'
+  commentId: '!:TValue'
+  definition: TValue
+  name: TValue
+  nameWithType: TValue
+  fullName: TValue
+- uid: System.Collections.Generic.IDictionary`2
+  commentId: T:System.Collections.Generic.IDictionary`2
+  isExternal: true
+  name: IDictionary<TKey, TValue>
+  nameWithType: IDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IDictionary<TKey, TValue>
+  nameWithType.vb: IDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IDictionary(Of TKey, TValue)
+  name.vb: IDictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    nameWithType: IDictionary
+    fullName: System.Collections.Generic.IDictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IDictionary`2
+    name: IDictionary
+    nameWithType: IDictionary
+    fullName: System.Collections.Generic.IDictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: TKey
+  commentId: '!:TKey'
+  name: TKey
+  nameWithType: TKey
+  fullName: TKey
+- uid: TValue
+  commentId: '!:TValue'
+  name: TValue
+  nameWithType: TValue
+  fullName: TValue

@@ -1,0 +1,1395 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync.FieldAccess
+  commentId: T:Sync.FieldAccess
+  id: FieldAccess
+  parent: Sync
+  children:
+  - Sync.FieldAccess.#ctor(System.Reflection.FieldInfo)
+  - Sync.FieldAccess.Get(System.Object)
+  - Sync.FieldAccess.m_GetterLocal
+  - Sync.FieldAccess.m_MemberInfo
+  - Sync.FieldAccess.m_Setter
+  - Sync.FieldAccess.Set(System.Object,System.Object)
+  - Sync.FieldAccess.ToString
+  langs:
+  - csharp
+  - vb
+  name: FieldAccess
+  nameWithType: FieldAccess
+  fullName: Sync.FieldAccess
+  type: Class
+  source:
+    remote:
+      path: source/Sync/FieldAccess.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: FieldAccess
+    path: ../source/Sync/FieldAccess.cs
+    startLine: 37
+  assemblies:
+  - Sync
+  namespace: Sync
+  summary: "\nType-erased interface to access an arbitrary field.\n"
+  example: []
+  syntax:
+    content: 'public abstract class FieldAccess : ValueAccess'
+    content.vb: >-
+      Public MustInherit Class FieldAccess
+
+          Inherits ValueAccess
+  inheritance:
+  - System.Object
+  - Sync.Tracker
+  - Sync.ValueAccess
+  derivedClasses:
+  - Sync.FieldAccess`2
+  inheritedMembers:
+  - Sync.Tracker.m_InstanceSpecificHandlers
+  - Sync.Tracker.GlobalHandler
+  - Sync.Tracker.InstanceSpecificHandlers
+  - Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+  - Sync.Tracker.GetHandler(System.Object)
+  - Sync.Tracker.RemoveHandler(System.Object)
+  - Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+  - Sync.Tracker.RemoveGlobalHandler
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  extensionMethods:
+  - Sync.ValueAccess.Sync.FieldChangeBuffer.OnBeforeExpectedChange(System.Object)
+  modifiers.csharp:
+  - public
+  - abstract
+  - class
+  modifiers.vb:
+  - Public
+  - MustInherit
+  - Class
+- uid: Sync.FieldAccess.m_GetterLocal
+  commentId: F:Sync.FieldAccess.m_GetterLocal
+  id: m_GetterLocal
+  parent: Sync.FieldAccess
+  langs:
+  - csharp
+  - vb
+  name: m_GetterLocal
+  nameWithType: FieldAccess.m_GetterLocal
+  fullName: Sync.FieldAccess.m_GetterLocal
+  type: Field
+  source:
+    remote:
+      path: source/Sync/FieldAccess.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_GetterLocal
+    path: ../source/Sync/FieldAccess.cs
+    startLine: 39
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: >-
+      [NotNull]
+
+      readonly Func<object, object> m_GetterLocal
+    return:
+      type: System.Func{System.Object,System.Object}
+    content.vb: >-
+      <NotNull>
+
+      ReadOnly m_GetterLocal As Func(Of Object, Object)
+  attributes:
+  - type: JetBrains.Annotations.NotNullAttribute
+    ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Sync.FieldAccess.m_MemberInfo
+  commentId: F:Sync.FieldAccess.m_MemberInfo
+  id: m_MemberInfo
+  parent: Sync.FieldAccess
+  langs:
+  - csharp
+  - vb
+  name: m_MemberInfo
+  nameWithType: FieldAccess.m_MemberInfo
+  fullName: Sync.FieldAccess.m_MemberInfo
+  type: Field
+  source:
+    remote:
+      path: source/Sync/FieldAccess.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_MemberInfo
+    path: ../source/Sync/FieldAccess.cs
+    startLine: 40
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: >-
+      [NotNull]
+
+      readonly FieldInfo m_MemberInfo
+    return:
+      type: System.Reflection.FieldInfo
+    content.vb: >-
+      <NotNull>
+
+      ReadOnly m_MemberInfo As FieldInfo
+  attributes:
+  - type: JetBrains.Annotations.NotNullAttribute
+    ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Sync.FieldAccess.m_Setter
+  commentId: F:Sync.FieldAccess.m_Setter
+  id: m_Setter
+  parent: Sync.FieldAccess
+  langs:
+  - csharp
+  - vb
+  name: m_Setter
+  nameWithType: FieldAccess.m_Setter
+  fullName: Sync.FieldAccess.m_Setter
+  type: Field
+  source:
+    remote:
+      path: source/Sync/FieldAccess.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Setter
+    path: ../source/Sync/FieldAccess.cs
+    startLine: 41
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: >-
+      [NotNull]
+
+      readonly Action<object, object> m_Setter
+    return:
+      type: System.Action{System.Object,System.Object}
+    content.vb: >-
+      <NotNull>
+
+      ReadOnly m_Setter As Action(Of Object, Object)
+  attributes:
+  - type: JetBrains.Annotations.NotNullAttribute
+    ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Sync.FieldAccess.#ctor(System.Reflection.FieldInfo)
+  commentId: M:Sync.FieldAccess.#ctor(System.Reflection.FieldInfo)
+  id: '#ctor(System.Reflection.FieldInfo)'
+  parent: Sync.FieldAccess
+  langs:
+  - csharp
+  - vb
+  name: FieldAccess(FieldInfo)
+  nameWithType: FieldAccess.FieldAccess(FieldInfo)
+  fullName: Sync.FieldAccess.FieldAccess(System.Reflection.FieldInfo)
+  type: Constructor
+  source:
+    remote:
+      path: source/Sync/FieldAccess.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Sync/FieldAccess.cs
+    startLine: 43
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: protected FieldAccess([NotNull] FieldInfo memberInfo)
+    parameters:
+    - id: memberInfo
+      type: System.Reflection.FieldInfo
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    content.vb: Protected Sub New(memberInfo As FieldInfo)
+  overload: Sync.FieldAccess.#ctor*
+  modifiers.csharp:
+  - protected
+  modifiers.vb:
+  - Protected
+- uid: Sync.FieldAccess.Get(System.Object)
+  commentId: M:Sync.FieldAccess.Get(System.Object)
+  id: Get(System.Object)
+  parent: Sync.FieldAccess
+  langs:
+  - csharp
+  - vb
+  name: Get(Object)
+  nameWithType: FieldAccess.Get(Object)
+  fullName: Sync.FieldAccess.Get(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/FieldAccess.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Get
+    path: ../source/Sync/FieldAccess.cs
+    startLine: 51
+  assemblies:
+  - Sync
+  namespace: Sync
+  example: []
+  syntax:
+    content: public override object Get([CanBeNull] object target)
+    parameters:
+    - id: target
+      type: System.Object
+      attributes:
+      - type: JetBrains.Annotations.CanBeNullAttribute
+        ctor: JetBrains.Annotations.CanBeNullAttribute.#ctor
+        arguments: []
+    return:
+      type: System.Object
+    content.vb: Public Overrides Function Get(target As Object) As Object
+  overridden: Sync.ValueAccess.Get(System.Object)
+  overload: Sync.FieldAccess.Get*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Sync.FieldAccess.Set(System.Object,System.Object)
+  commentId: M:Sync.FieldAccess.Set(System.Object,System.Object)
+  id: Set(System.Object,System.Object)
+  parent: Sync.FieldAccess
+  langs:
+  - csharp
+  - vb
+  name: Set(Object, Object)
+  nameWithType: FieldAccess.Set(Object, Object)
+  fullName: Sync.FieldAccess.Set(System.Object, System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/FieldAccess.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Set
+    path: ../source/Sync/FieldAccess.cs
+    startLine: 57
+  assemblies:
+  - Sync
+  namespace: Sync
+  example: []
+  syntax:
+    content: public override void Set(object target, object value)
+    parameters:
+    - id: target
+      type: System.Object
+    - id: value
+      type: System.Object
+    content.vb: Public Overrides Sub Set(target As Object, value As Object)
+  overridden: Sync.ValueAccess.Set(System.Object,System.Object)
+  overload: Sync.FieldAccess.Set*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Sync.FieldAccess.ToString
+  commentId: M:Sync.FieldAccess.ToString
+  id: ToString
+  parent: Sync.FieldAccess
+  langs:
+  - csharp
+  - vb
+  name: ToString()
+  nameWithType: FieldAccess.ToString()
+  fullName: Sync.FieldAccess.ToString()
+  type: Method
+  source:
+    remote:
+      path: source/Sync/FieldAccess.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ToString
+    path: ../source/Sync/FieldAccess.cs
+    startLine: 67
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: public override string ToString()
+    return:
+      type: System.String
+    content.vb: Public Overrides Function ToString As String
+  overridden: System.Object.ToString
+  overload: Sync.FieldAccess.ToString*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+references:
+- uid: Sync
+  commentId: N:Sync
+  name: Sync
+  nameWithType: Sync
+  fullName: Sync
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Sync.Tracker
+  commentId: T:Sync.Tracker
+  parent: Sync
+  name: Tracker
+  nameWithType: Tracker
+  fullName: Sync.Tracker
+- uid: Sync.ValueAccess
+  commentId: T:Sync.ValueAccess
+  parent: Sync
+  name: ValueAccess
+  nameWithType: ValueAccess
+  fullName: Sync.ValueAccess
+- uid: Sync.Tracker.m_InstanceSpecificHandlers
+  commentId: F:Sync.Tracker.m_InstanceSpecificHandlers
+  parent: Sync.Tracker
+  name: m_InstanceSpecificHandlers
+  nameWithType: Tracker.m_InstanceSpecificHandlers
+  fullName: Sync.Tracker.m_InstanceSpecificHandlers
+- uid: Sync.Tracker.GlobalHandler
+  commentId: P:Sync.Tracker.GlobalHandler
+  parent: Sync.Tracker
+  name: GlobalHandler
+  nameWithType: Tracker.GlobalHandler
+  fullName: Sync.Tracker.GlobalHandler
+- uid: Sync.Tracker.InstanceSpecificHandlers
+  commentId: P:Sync.Tracker.InstanceSpecificHandlers
+  parent: Sync.Tracker
+  name: InstanceSpecificHandlers
+  nameWithType: Tracker.InstanceSpecificHandlers
+  fullName: Sync.Tracker.InstanceSpecificHandlers
+- uid: Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+  commentId: M:Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+  parent: Sync.Tracker
+  isExternal: true
+  name: SetHandler(Object, Action<Object>)
+  nameWithType: Tracker.SetHandler(Object, Action<Object>)
+  fullName: Sync.Tracker.SetHandler(System.Object, System.Action<System.Object>)
+  nameWithType.vb: Tracker.SetHandler(Object, Action(Of Object))
+  fullName.vb: Sync.Tracker.SetHandler(System.Object, System.Action(Of System.Object))
+  name.vb: SetHandler(Object, Action(Of Object))
+  spec.csharp:
+  - uid: Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+    name: SetHandler
+    nameWithType: Tracker.SetHandler
+    fullName: Sync.Tracker.SetHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Tracker.SetHandler(System.Object,System.Action{System.Object})
+    name: SetHandler
+    nameWithType: Tracker.SetHandler
+    fullName: Sync.Tracker.SetHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Action`1
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Tracker.GetHandler(System.Object)
+  commentId: M:Sync.Tracker.GetHandler(System.Object)
+  parent: Sync.Tracker
+  isExternal: true
+  name: GetHandler(Object)
+  nameWithType: Tracker.GetHandler(Object)
+  fullName: Sync.Tracker.GetHandler(System.Object)
+  spec.csharp:
+  - uid: Sync.Tracker.GetHandler(System.Object)
+    name: GetHandler
+    nameWithType: Tracker.GetHandler
+    fullName: Sync.Tracker.GetHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Tracker.GetHandler(System.Object)
+    name: GetHandler
+    nameWithType: Tracker.GetHandler
+    fullName: Sync.Tracker.GetHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Tracker.RemoveHandler(System.Object)
+  commentId: M:Sync.Tracker.RemoveHandler(System.Object)
+  parent: Sync.Tracker
+  isExternal: true
+  name: RemoveHandler(Object)
+  nameWithType: Tracker.RemoveHandler(Object)
+  fullName: Sync.Tracker.RemoveHandler(System.Object)
+  spec.csharp:
+  - uid: Sync.Tracker.RemoveHandler(System.Object)
+    name: RemoveHandler
+    nameWithType: Tracker.RemoveHandler
+    fullName: Sync.Tracker.RemoveHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Tracker.RemoveHandler(System.Object)
+    name: RemoveHandler
+    nameWithType: Tracker.RemoveHandler
+    fullName: Sync.Tracker.RemoveHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+  commentId: M:Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+  parent: Sync.Tracker
+  isExternal: true
+  name: SetGlobalHandler(Action<Object, Object>)
+  nameWithType: Tracker.SetGlobalHandler(Action<Object, Object>)
+  fullName: Sync.Tracker.SetGlobalHandler(System.Action<System.Object, System.Object>)
+  nameWithType.vb: Tracker.SetGlobalHandler(Action(Of Object, Object))
+  fullName.vb: Sync.Tracker.SetGlobalHandler(System.Action(Of System.Object, System.Object))
+  name.vb: SetGlobalHandler(Action(Of Object, Object))
+  spec.csharp:
+  - uid: Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+    name: SetGlobalHandler
+    nameWithType: Tracker.SetGlobalHandler
+    fullName: Sync.Tracker.SetGlobalHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Tracker.SetGlobalHandler(System.Action{System.Object,System.Object})
+    name: SetGlobalHandler
+    nameWithType: Tracker.SetGlobalHandler
+    fullName: Sync.Tracker.SetGlobalHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.Tracker.RemoveGlobalHandler
+  commentId: M:Sync.Tracker.RemoveGlobalHandler
+  parent: Sync.Tracker
+  name: RemoveGlobalHandler()
+  nameWithType: Tracker.RemoveGlobalHandler()
+  fullName: Sync.Tracker.RemoveGlobalHandler()
+  spec.csharp:
+  - uid: Sync.Tracker.RemoveGlobalHandler
+    name: RemoveGlobalHandler
+    nameWithType: Tracker.RemoveGlobalHandler
+    fullName: Sync.Tracker.RemoveGlobalHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.Tracker.RemoveGlobalHandler
+    name: RemoveGlobalHandler
+    nameWithType: Tracker.RemoveGlobalHandler
+    fullName: Sync.Tracker.RemoveGlobalHandler
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.ValueAccess.Sync.FieldChangeBuffer.OnBeforeExpectedChange(System.Object)
+  commentId: M:Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+  parent: Sync.FieldChangeBuffer
+  definition: Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+  name: OnBeforeExpectedChange(Object)
+  nameWithType: FieldChangeBuffer.OnBeforeExpectedChange(Object)
+  fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange(System.Object)
+  spec.csharp:
+  - uid: Sync.FieldChangeBuffer.OnBeforeExpectedChange(System.Object)
+    name: OnBeforeExpectedChange
+    nameWithType: FieldChangeBuffer.OnBeforeExpectedChange
+    fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.FieldChangeBuffer.OnBeforeExpectedChange(System.Object)
+    name: OnBeforeExpectedChange
+    nameWithType: FieldChangeBuffer.OnBeforeExpectedChange
+    fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+  commentId: M:Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+  isExternal: true
+  name: OnBeforeExpectedChange(ValueAccess, Object)
+  nameWithType: FieldChangeBuffer.OnBeforeExpectedChange(ValueAccess, Object)
+  fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess, System.Object)
+  spec.csharp:
+  - uid: Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+    name: OnBeforeExpectedChange
+    nameWithType: FieldChangeBuffer.OnBeforeExpectedChange
+    fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Sync.ValueAccess
+    name: ValueAccess
+    nameWithType: ValueAccess
+    fullName: Sync.ValueAccess
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)
+    name: OnBeforeExpectedChange
+    nameWithType: FieldChangeBuffer.OnBeforeExpectedChange
+    fullName: Sync.FieldChangeBuffer.OnBeforeExpectedChange
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: Sync.ValueAccess
+    name: ValueAccess
+    nameWithType: ValueAccess
+    fullName: Sync.ValueAccess
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldChangeBuffer
+  commentId: T:Sync.FieldChangeBuffer
+  parent: Sync
+  name: FieldChangeBuffer
+  nameWithType: FieldChangeBuffer
+  fullName: Sync.FieldChangeBuffer
+- uid: System.Func{System.Object,System.Object}
+  commentId: T:System.Func{System.Object,System.Object}
+  parent: System
+  definition: System.Func`2
+  name: Func<Object, Object>
+  nameWithType: Func<Object, Object>
+  fullName: System.Func<System.Object, System.Object>
+  nameWithType.vb: Func(Of Object, Object)
+  fullName.vb: System.Func(Of System.Object, System.Object)
+  name.vb: Func(Of Object, Object)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Func`2
+  commentId: T:System.Func`2
+  isExternal: true
+  name: Func<T, TResult>
+  nameWithType: Func<T, TResult>
+  fullName: System.Func<T, TResult>
+  nameWithType.vb: Func(Of T, TResult)
+  fullName.vb: System.Func(Of T, TResult)
+  name.vb: Func(Of T, TResult)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TResult
+    nameWithType: TResult
+    fullName: TResult
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    nameWithType: Func
+    fullName: System.Func
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TResult
+    nameWithType: TResult
+    fullName: TResult
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Reflection.FieldInfo
+  commentId: T:System.Reflection.FieldInfo
+  parent: System.Reflection
+  isExternal: true
+  name: FieldInfo
+  nameWithType: FieldInfo
+  fullName: System.Reflection.FieldInfo
+- uid: System.Reflection
+  commentId: N:System.Reflection
+  isExternal: true
+  name: System.Reflection
+  nameWithType: System.Reflection
+  fullName: System.Reflection
+- uid: System.Action{System.Object,System.Object}
+  commentId: T:System.Action{System.Object,System.Object}
+  parent: System
+  definition: System.Action`2
+  name: Action<Object, Object>
+  nameWithType: Action<Object, Object>
+  fullName: System.Action<System.Object, System.Object>
+  nameWithType.vb: Action(Of Object, Object)
+  fullName.vb: System.Action(Of System.Object, System.Object)
+  name.vb: Action(Of Object, Object)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Action`2
+  commentId: T:System.Action`2
+  isExternal: true
+  name: Action<T1, T2>
+  nameWithType: Action<T1, T2>
+  fullName: System.Action<T1, T2>
+  nameWithType.vb: Action(Of T1, T2)
+  fullName.vb: System.Action(Of T1, T2)
+  name.vb: Action(Of T1, T2)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    nameWithType: Action
+    fullName: System.Action
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T1
+    nameWithType: T1
+    fullName: T1
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: T2
+    nameWithType: T2
+    fullName: T2
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldAccess.#ctor*
+  commentId: Overload:Sync.FieldAccess.#ctor
+  name: FieldAccess
+  nameWithType: FieldAccess.FieldAccess
+  fullName: Sync.FieldAccess.FieldAccess
+- uid: Sync.ValueAccess.Get(System.Object)
+  commentId: M:Sync.ValueAccess.Get(System.Object)
+  parent: Sync.ValueAccess
+  isExternal: true
+  name: Get(Object)
+  nameWithType: ValueAccess.Get(Object)
+  fullName: Sync.ValueAccess.Get(System.Object)
+  spec.csharp:
+  - uid: Sync.ValueAccess.Get(System.Object)
+    name: Get
+    nameWithType: ValueAccess.Get
+    fullName: Sync.ValueAccess.Get
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.ValueAccess.Get(System.Object)
+    name: Get
+    nameWithType: ValueAccess.Get
+    fullName: Sync.ValueAccess.Get
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldAccess.Get*
+  commentId: Overload:Sync.FieldAccess.Get
+  name: Get
+  nameWithType: FieldAccess.Get
+  fullName: Sync.FieldAccess.Get
+- uid: Sync.ValueAccess.Set(System.Object,System.Object)
+  commentId: M:Sync.ValueAccess.Set(System.Object,System.Object)
+  parent: Sync.ValueAccess
+  isExternal: true
+  name: Set(Object, Object)
+  nameWithType: ValueAccess.Set(Object, Object)
+  fullName: Sync.ValueAccess.Set(System.Object, System.Object)
+  spec.csharp:
+  - uid: Sync.ValueAccess.Set(System.Object,System.Object)
+    name: Set
+    nameWithType: ValueAccess.Set
+    fullName: Sync.ValueAccess.Set
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Sync.ValueAccess.Set(System.Object,System.Object)
+    name: Set
+    nameWithType: ValueAccess.Set
+    fullName: Sync.ValueAccess.Set
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldAccess.Set*
+  commentId: Overload:Sync.FieldAccess.Set
+  name: Set
+  nameWithType: FieldAccess.Set
+  fullName: Sync.FieldAccess.Set
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldAccess.ToString*
+  commentId: Overload:Sync.FieldAccess.ToString
+  name: ToString
+  nameWithType: FieldAccess.ToString
+  fullName: Sync.FieldAccess.ToString
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String

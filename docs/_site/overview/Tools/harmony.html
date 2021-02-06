@@ -1,0 +1,259 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Introduction </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Introduction ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    
+    
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="introduction">Introduction</h1>
+
+<p>Harmony is used to monkey patch &quot;unchangable&quot; methods.</p>
+<h1 id="examples">Examples</h1>
+<h2 id="prefix">Prefix</h2>
+<p>The <a href="https://harmony.pardeike.net/articles/patching-prefix.html">prefix</a> allows patching of existing methods before they execute. Prefixes are mainly used to replace existing methods.</p>
+<p><details>
+<summary><strong>Full Class</strong></summary> 
+<p>
+<pre><code class="lang-CS">using HarmonyLib;
+using System;
+using System.Reflection;
+
+namespace ConsoleApp
+{
+    // Example of Bannerlord code. Uneditable code.
+    class Foo
+    {
+        private int myVar;
+
+        public void PrintMyVar()
+        {
+            Console.WriteLine(myVar);
+        }
+
+        // Method we want to change.
+        public void SetMyVar(int newInt)
+        {
+            myVar = newInt;
+        }
+    }
+
+    [HarmonyPatch(typeof(Foo), &quot;SetMyVar&quot;)]
+    class FooPatch
+    {
+        // __instance works similar to the &#39;this&#39; keyword
+        static bool Prefix(ref Foo __instance, ref int newInt)
+        {
+            // Access private field
+            FieldInfo myVarField = typeof(Foo).GetField(&quot;myVar&quot;, BindingFlags.Instance | BindingFlags.NonPublic);
+            // Set newInto of __instance
+            myVarField.SetValue(__instance, newInt + 1);
+
+            // Returning false skips original method
+            return false;
+        }
+    }
+
+
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Harmony harmony = new Harmony(&quot;com.company.project.product&quot;);
+
+            Foo foo = new Foo();
+
+            foo.SetMyVar(2);
+            foo.PrintMyVar(); // -&gt; 2
+
+            harmony.PatchAll();
+
+            foo.SetMyVar(2);
+            foo.PrintMyVar(); // -&gt; 3
+
+            Console.ReadKey();
+        }
+    }
+}
+</code></pre><p>
+</details>
+<br></p>
+<h2 id="postfix">Postfix</h2>
+<p>The <a href="https://harmony.pardeike.net/articles/patching-postfix.html">postfix</a> allows patching of existing methods after they execute. Postfixes are normally used to replace return values.</p>
+<p><details>
+<summary><strong>Full Class</strong></summary> 
+<p>
+<pre><code class="lang-CS">using HarmonyLib;
+using System;
+
+namespace ConsoleApp
+{
+    // Example of Bannerlord code. Uneditable code.
+    class Foo
+    {
+        private int myVar = 2;
+
+        public void PrintMyVar()
+        {
+            Console.WriteLine(myVar);
+        }
+
+        // Method we want to change.
+        public int GetMyVar()
+        {
+            return myVar;
+        }
+    }
+
+    [HarmonyPatch(typeof(Foo), &quot;GetMyVar&quot;)]
+    class FooPatch
+    {
+        // __result is the return value of the original method
+        static int Postfix(int __result)
+        {
+            // This will overwrite the return value
+            return __result + 1;
+        }
+    }
+
+
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Harmony harmony = new Harmony(&quot;com.company.project.product&quot;);
+
+            Foo foo = new Foo();
+
+            Console.WriteLine(foo.GetMyVar()); // -&gt; 2
+
+            // Apply patch
+            harmony.PatchAll();
+
+            Console.WriteLine(foo.GetMyVar()); // -&gt; 3
+
+            Console.ReadKey();
+        }
+    }
+}
+</code></pre><p>
+</details>
+<br></p>
+<h2 id="transpiler">Transpiler</h2>
+<p>Transpilers work directly with the compiled C# code, aka <strong><a href="https://en.wikipedia.org/wiki/Common_Intermediate_Language">MSIL</a></strong>.<br></p>
+<p>This is an advanced topic and we should use this sparingly, for more information see <a href="https://harmony.pardeike.net/articles/patching-transpiler.html">here</a>.</p>
+<h2 id="transpiler-tools">Transpiler Tools</h2>
+<p>There is a <strong><a href="https://github.com/garrettluskey/HarmonyTranspilerTools">library</a></strong> that can help with transpilers by searching and replacing specific IL code.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/docs/overview/Tools/harmony.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../../styles/toggle-theme.js"></script>
+              </div>
+          
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

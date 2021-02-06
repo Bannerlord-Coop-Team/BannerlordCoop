@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -73,10 +72,9 @@
   
   <h1 id="Sync_MethodAccess" data-uid="Sync.MethodAccess" class="text-break">Class MethodAccess
   </h1>
-  <div class="markdown level0 summary">
-Type erased invocation wrapper for patched methods. On creation, a snapshot of the IL
+  <div class="markdown level0 summary"><p>Type erased invocation wrapper for patched methods. On creation, a snapshot of the IL
 representation of the method is stored internally. The snapshot includes all patches
-to the function already applied. The snapshot can be called using <a class="xref" href="Sync.MethodAccess.html#Sync_MethodAccess_CallOriginal_System_Object_System_Object___">CallOriginal(Object, Object[])</a>.
+to the function already applied. The snapshot can be called using <a class="xref" href="Sync.MethodAccess.html#Sync_MethodAccess_CallOriginal_System_Object_System_Object___">CallOriginal(Object, Object[])</a>.</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -87,6 +85,9 @@ to the function already applied. The snapshot can be called using <a class="xref
   </div>
   <div class="inheritedMembers">
     <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="Sync.Tracker.html#Sync_Tracker_m_InstanceSpecificHandlers">Tracker.m_InstanceSpecificHandlers</a>
+    </div>
     <div>
       <a class="xref" href="Sync.Tracker.html#Sync_Tracker_GlobalHandler">Tracker.GlobalHandler</a>
     </div>
@@ -167,6 +168,97 @@ to the function already applied. The snapshot can be called using <a class="xref
       </tr>
     </tbody>
   </table>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_MethodAccess_m_Call.md&amp;value=---%0Auid%3A%20Sync.MethodAccess.m_Call%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/MethodAccess.cs/#L17">View Source</a>
+  </span>
+  <h4 id="Sync_MethodAccess_m_Call" data-uid="Sync.MethodAccess.m_Call">m_Call</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[CanBeNull]
+readonly Action&lt;object, object[]&gt; m_Call</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Action</span>&lt;<span class="xref">System.Object</span>, <span class="xref">System.Object</span>[]&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_MethodAccess_m_CallStatic.md&amp;value=---%0Auid%3A%20Sync.MethodAccess.m_CallStatic%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/MethodAccess.cs/#L18">View Source</a>
+  </span>
+  <h4 id="Sync_MethodAccess_m_CallStatic" data-uid="Sync.MethodAccess.m_CallStatic">m_CallStatic</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[CanBeNull]
+readonly Action&lt;object[]&gt; m_CallStatic</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Action</span>&lt;<span class="xref">System.Object</span>[]&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_MethodAccess_m_StandIn.md&amp;value=---%0Auid%3A%20Sync.MethodAccess.m_StandIn%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/MethodAccess.cs/#L20">View Source</a>
+  </span>
+  <h4 id="Sync_MethodAccess_m_StandIn" data-uid="Sync.MethodAccess.m_StandIn">m_StandIn</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly DynamicMethod m_StandIn</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Reflection.Emit.DynamicMethod</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h3 id="properties">Properties
   </h3>
   <span class="small pull-right mobile-hide">
@@ -178,9 +270,8 @@ to the function already applied. The snapshot can be called using <a class="xref
   </span>
   <a id="Sync_MethodAccess_Condition_" data-uid="Sync.MethodAccess.Condition*"></a>
   <h4 id="Sync_MethodAccess_Condition" data-uid="Sync.MethodAccess.Condition">Condition</h4>
-  <div class="markdown level1 summary">
-If set, this function will be called before invoking any onBeforeCall handlers. If the
-function evaluates to false, the onBeforeCall handlers will not be called.
+  <div class="markdown level1 summary"><p>If set, this function will be called before invoking any onBeforeCall handlers. If the
+function evaluates to false, the onBeforeCall handlers will not be called.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -336,9 +427,8 @@ public Func&lt;object, bool&gt; Condition { get; set; }</code></pre>
   </span>
   <a id="Sync_MethodAccess_CallOriginal_" data-uid="Sync.MethodAccess.CallOriginal*"></a>
   <h4 id="Sync_MethodAccess_CallOriginal_System_Object_System_Object___" data-uid="Sync.MethodAccess.CallOriginal(System.Object,System.Object[])">CallOriginal(Object, Object[])</h4>
-  <div class="markdown level1 summary">
-Invokes the original method as it was at the time of creation of this
-<a class="xref" href="Sync.MethodAccess.html">MethodAccess</a>.
+  <div class="markdown level1 summary"><p>Invokes the original method as it was at the time of creation of this
+<a class="xref" href="Sync.MethodAccess.html">MethodAccess</a>.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -369,6 +459,38 @@ Invokes the original method as it was at the time of creation of this
   </table>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_MethodAccess_InitOriginal_System_Reflection_Emit_DynamicMethod_.md&amp;value=---%0Auid%3A%20Sync.MethodAccess.InitOriginal(System.Reflection.Emit.DynamicMethod)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/MethodAccess.cs/#L56">View Source</a>
+  </span>
+  <a id="Sync_MethodAccess_InitOriginal_" data-uid="Sync.MethodAccess.InitOriginal*"></a>
+  <h4 id="Sync_MethodAccess_InitOriginal_System_Reflection_Emit_DynamicMethod_" data-uid="Sync.MethodAccess.InitOriginal(System.Reflection.Emit.DynamicMethod)">InitOriginal(DynamicMethod)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InitOriginal(DynamicMethod toPatch)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Reflection.Emit.DynamicMethod</span></td>
+        <td><span class="parametername">toPatch</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_MethodAccess_InvokeOnBeforeCallHandler_System_Object_System_Object___.md&amp;value=---%0Auid%3A%20Sync.MethodAccess.InvokeOnBeforeCallHandler(System.Object%2CSystem.Object%5B%5D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
@@ -376,8 +498,7 @@ Invokes the original method as it was at the time of creation of this
   </span>
   <a id="Sync_MethodAccess_InvokeOnBeforeCallHandler_" data-uid="Sync.MethodAccess.InvokeOnBeforeCallHandler*"></a>
   <h4 id="Sync_MethodAccess_InvokeOnBeforeCallHandler_System_Object_System_Object___" data-uid="Sync.MethodAccess.InvokeOnBeforeCallHandler(System.Object,System.Object[])">InvokeOnBeforeCallHandler(Object, Object[])</h4>
-  <div class="markdown level1 summary">
-Invokes registered handlers for the given instance.
+  <div class="markdown level1 summary"><p>Invokes registered handlers for the given instance.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -417,7 +538,8 @@ Invokes registered handlers for the given instance.
     <tbody>
       <tr>
         <td><span class="xref">System.Boolean</span></td>
-        <td>true if a handler was invoked. False otherwise.</td>
+        <td><p>true if a handler was invoked. False otherwise.</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -468,9 +590,22 @@ Invokes registered handlers for the given instance.
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

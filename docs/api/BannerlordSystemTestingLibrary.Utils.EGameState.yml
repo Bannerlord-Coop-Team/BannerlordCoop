@@ -1,0 +1,673 @@
+### YamlMime:ManagedReference
+items:
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState
+  commentId: T:BannerlordSystemTestingLibrary.Utils.EGameState
+  id: EGameState
+  parent: BannerlordSystemTestingLibrary.Utils
+  children:
+  - BannerlordSystemTestingLibrary.Utils.EGameState.BannerEditor
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Barber
+  - BannerlordSystemTestingLibrary.Utils.EGameState.CharacterDeveloper
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Clan
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Crafting
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Editor
+  - BannerlordSystemTestingLibrary.Utils.EGameState.GameLoading
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Initial
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Kingdom
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Lobby
+  - BannerlordSystemTestingLibrary.Utils.EGameState.LobbyGame
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Map
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Mission
+  - BannerlordSystemTestingLibrary.Utils.EGameState.PlayerGame
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Quests
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Starting
+  - BannerlordSystemTestingLibrary.Utils.EGameState.Tutorial
+  - BannerlordSystemTestingLibrary.Utils.EGameState.UnspecifiedDedicatedServer
+  - BannerlordSystemTestingLibrary.Utils.EGameState.VideoPlayback
+  langs:
+  - csharp
+  - vb
+  name: EGameState
+  nameWithType: EGameState
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState
+  type: Enum
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: EGameState
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 13
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: public enum EGameState
+    content.vb: Public Enum EGameState
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Starting
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Starting
+  id: Starting
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Starting
+  nameWithType: EGameState.Starting
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Starting
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Starting
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 15
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Starting = 0
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Initial
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Initial
+  id: Initial
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Initial
+  nameWithType: EGameState.Initial
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Initial
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Initial
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 16
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Initial = 1
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.BannerEditor
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.BannerEditor
+  id: BannerEditor
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: BannerEditor
+  nameWithType: EGameState.BannerEditor
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.BannerEditor
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: BannerEditor
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 17
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: BannerEditor = 2
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Barber
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Barber
+  id: Barber
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Barber
+  nameWithType: EGameState.Barber
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Barber
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Barber
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 18
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Barber = 3
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.CharacterDeveloper
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.CharacterDeveloper
+  id: CharacterDeveloper
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: CharacterDeveloper
+  nameWithType: EGameState.CharacterDeveloper
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.CharacterDeveloper
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: CharacterDeveloper
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 19
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: CharacterDeveloper = 4
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Clan
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Clan
+  id: Clan
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Clan
+  nameWithType: EGameState.Clan
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Clan
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Clan
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 20
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Clan = 5
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Crafting
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Crafting
+  id: Crafting
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Crafting
+  nameWithType: EGameState.Crafting
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Crafting
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Crafting
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 21
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Crafting = 6
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Editor
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Editor
+  id: Editor
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Editor
+  nameWithType: EGameState.Editor
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Editor
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Editor
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 22
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Editor = 7
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.GameLoading
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.GameLoading
+  id: GameLoading
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: GameLoading
+  nameWithType: EGameState.GameLoading
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.GameLoading
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: GameLoading
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 23
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: GameLoading = 8
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Kingdom
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Kingdom
+  id: Kingdom
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Kingdom
+  nameWithType: EGameState.Kingdom
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Kingdom
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Kingdom
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 24
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Kingdom = 9
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.LobbyGame
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.LobbyGame
+  id: LobbyGame
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: LobbyGame
+  nameWithType: EGameState.LobbyGame
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.LobbyGame
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: LobbyGame
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 25
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: LobbyGame = 10
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Lobby
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Lobby
+  id: Lobby
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Lobby
+  nameWithType: EGameState.Lobby
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Lobby
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Lobby
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 26
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Lobby = 11
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Map
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Map
+  id: Map
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Map
+  nameWithType: EGameState.Map
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Map
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Map
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 27
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Map = 12
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Mission
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Mission
+  id: Mission
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Mission
+  nameWithType: EGameState.Mission
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Mission
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Mission
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 28
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Mission = 13
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.PlayerGame
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.PlayerGame
+  id: PlayerGame
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: PlayerGame
+  nameWithType: EGameState.PlayerGame
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.PlayerGame
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: PlayerGame
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 29
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: PlayerGame = 14
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Quests
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Quests
+  id: Quests
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Quests
+  nameWithType: EGameState.Quests
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Quests
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Quests
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 30
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Quests = 15
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.Tutorial
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.Tutorial
+  id: Tutorial
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: Tutorial
+  nameWithType: EGameState.Tutorial
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.Tutorial
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: Tutorial
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 31
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: Tutorial = 16
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.UnspecifiedDedicatedServer
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.UnspecifiedDedicatedServer
+  id: UnspecifiedDedicatedServer
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: UnspecifiedDedicatedServer
+  nameWithType: EGameState.UnspecifiedDedicatedServer
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.UnspecifiedDedicatedServer
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: UnspecifiedDedicatedServer
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 32
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: UnspecifiedDedicatedServer = 17
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState.VideoPlayback
+  commentId: F:BannerlordSystemTestingLibrary.Utils.EGameState.VideoPlayback
+  id: VideoPlayback
+  parent: BannerlordSystemTestingLibrary.Utils.EGameState
+  langs:
+  - csharp
+  - vb
+  name: VideoPlayback
+  nameWithType: EGameState.VideoPlayback
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState.VideoPlayback
+  type: Field
+  source:
+    remote:
+      path: BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+      branch: e2e229ada4f94221ad125ec1685d8141d101c3d3
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+    id: VideoPlayback
+    path: ../source/BannerlordTestingEssentials/BannerlordSystemTestingLibrary/Utils/GameStateUtil.cs
+    startLine: 33
+  assemblies:
+  - BannerlordSystemTestingLibrary
+  namespace: BannerlordSystemTestingLibrary.Utils
+  syntax:
+    content: VideoPlayback = 18
+    return:
+      type: BannerlordSystemTestingLibrary.Utils.EGameState
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: BannerlordSystemTestingLibrary.Utils
+  commentId: N:BannerlordSystemTestingLibrary.Utils
+  name: BannerlordSystemTestingLibrary.Utils
+  nameWithType: BannerlordSystemTestingLibrary.Utils
+  fullName: BannerlordSystemTestingLibrary.Utils
+- uid: BannerlordSystemTestingLibrary.Utils.EGameState
+  commentId: T:BannerlordSystemTestingLibrary.Utils.EGameState
+  parent: BannerlordSystemTestingLibrary.Utils
+  name: EGameState
+  nameWithType: EGameState
+  fullName: BannerlordSystemTestingLibrary.Utils.EGameState

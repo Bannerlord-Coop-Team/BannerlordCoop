@@ -1,0 +1,508 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Protocol.EPacket
+  commentId: T:Network.Protocol.EPacket
+  id: EPacket
+  parent: Network.Protocol
+  children:
+  - Network.Protocol.EPacket.Client_DeclineWorldData
+  - Network.Protocol.EPacket.Client_Hello
+  - Network.Protocol.EPacket.Client_Info
+  - Network.Protocol.EPacket.Client_Loaded
+  - Network.Protocol.EPacket.Client_PartyChanged
+  - Network.Protocol.EPacket.Client_RequestWorldData
+  - Network.Protocol.EPacket.KeepAlive
+  - Network.Protocol.EPacket.Persistence
+  - Network.Protocol.EPacket.Server_JoinRequestAccepted
+  - Network.Protocol.EPacket.Server_RequestClientInfo
+  - Network.Protocol.EPacket.Server_WorldData
+  - Network.Protocol.EPacket.StoreAck
+  - Network.Protocol.EPacket.StoreAdd
+  - Network.Protocol.EPacket.Sync
+  langs:
+  - csharp
+  - vb
+  name: EPacket
+  nameWithType: EPacket
+  fullName: Network.Protocol.EPacket
+  type: Enum
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EPacket
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 5
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: 'public enum EPacket : byte'
+    content.vb: Public Enum EPacket As Byte
+  modifiers.csharp:
+  - public
+  - enum
+  modifiers.vb:
+  - Public
+  - Enum
+- uid: Network.Protocol.EPacket.Client_Hello
+  commentId: F:Network.Protocol.EPacket.Client_Hello
+  id: Client_Hello
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: Client_Hello
+  nameWithType: EPacket.Client_Hello
+  fullName: Network.Protocol.EPacket.Client_Hello
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Client_Hello
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 7
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: Client_Hello = 0
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.Client_Info
+  commentId: F:Network.Protocol.EPacket.Client_Info
+  id: Client_Info
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: Client_Info
+  nameWithType: EPacket.Client_Info
+  fullName: Network.Protocol.EPacket.Client_Info
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Client_Info
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 8
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: Client_Info = 1
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.Client_RequestWorldData
+  commentId: F:Network.Protocol.EPacket.Client_RequestWorldData
+  id: Client_RequestWorldData
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: Client_RequestWorldData
+  nameWithType: EPacket.Client_RequestWorldData
+  fullName: Network.Protocol.EPacket.Client_RequestWorldData
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Client_RequestWorldData
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 9
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: Client_RequestWorldData = 2
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.Client_DeclineWorldData
+  commentId: F:Network.Protocol.EPacket.Client_DeclineWorldData
+  id: Client_DeclineWorldData
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: Client_DeclineWorldData
+  nameWithType: EPacket.Client_DeclineWorldData
+  fullName: Network.Protocol.EPacket.Client_DeclineWorldData
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Client_DeclineWorldData
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 10
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: Client_DeclineWorldData = 3
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.Client_Loaded
+  commentId: F:Network.Protocol.EPacket.Client_Loaded
+  id: Client_Loaded
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: Client_Loaded
+  nameWithType: EPacket.Client_Loaded
+  fullName: Network.Protocol.EPacket.Client_Loaded
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Client_Loaded
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 11
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: Client_Loaded = 4
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.Client_PartyChanged
+  commentId: F:Network.Protocol.EPacket.Client_PartyChanged
+  id: Client_PartyChanged
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: Client_PartyChanged
+  nameWithType: EPacket.Client_PartyChanged
+  fullName: Network.Protocol.EPacket.Client_PartyChanged
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Client_PartyChanged
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 12
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: Client_PartyChanged = 5
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.Server_RequestClientInfo
+  commentId: F:Network.Protocol.EPacket.Server_RequestClientInfo
+  id: Server_RequestClientInfo
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: Server_RequestClientInfo
+  nameWithType: EPacket.Server_RequestClientInfo
+  fullName: Network.Protocol.EPacket.Server_RequestClientInfo
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Server_RequestClientInfo
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 14
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: Server_RequestClientInfo = 6
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.Server_JoinRequestAccepted
+  commentId: F:Network.Protocol.EPacket.Server_JoinRequestAccepted
+  id: Server_JoinRequestAccepted
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: Server_JoinRequestAccepted
+  nameWithType: EPacket.Server_JoinRequestAccepted
+  fullName: Network.Protocol.EPacket.Server_JoinRequestAccepted
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Server_JoinRequestAccepted
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 15
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: Server_JoinRequestAccepted = 7
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.Server_WorldData
+  commentId: F:Network.Protocol.EPacket.Server_WorldData
+  id: Server_WorldData
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: Server_WorldData
+  nameWithType: EPacket.Server_WorldData
+  fullName: Network.Protocol.EPacket.Server_WorldData
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Server_WorldData
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 16
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: Server_WorldData = 8
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.Sync
+  commentId: F:Network.Protocol.EPacket.Sync
+  id: Sync
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: Sync
+  nameWithType: EPacket.Sync
+  fullName: Network.Protocol.EPacket.Sync
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Sync
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 18
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: Sync = 9
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.StoreAdd
+  commentId: F:Network.Protocol.EPacket.StoreAdd
+  id: StoreAdd
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: StoreAdd
+  nameWithType: EPacket.StoreAdd
+  fullName: Network.Protocol.EPacket.StoreAdd
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: StoreAdd
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 19
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: StoreAdd = 10
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.StoreAck
+  commentId: F:Network.Protocol.EPacket.StoreAck
+  id: StoreAck
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: StoreAck
+  nameWithType: EPacket.StoreAck
+  fullName: Network.Protocol.EPacket.StoreAck
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: StoreAck
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 20
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: StoreAck = 11
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.KeepAlive
+  commentId: F:Network.Protocol.EPacket.KeepAlive
+  id: KeepAlive
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: KeepAlive
+  nameWithType: EPacket.KeepAlive
+  fullName: Network.Protocol.EPacket.KeepAlive
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: KeepAlive
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 21
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: KeepAlive = 12
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+- uid: Network.Protocol.EPacket.Persistence
+  commentId: F:Network.Protocol.EPacket.Persistence
+  id: Persistence
+  parent: Network.Protocol.EPacket
+  langs:
+  - csharp
+  - vb
+  name: Persistence
+  nameWithType: EPacket.Persistence
+  fullName: Network.Protocol.EPacket.Persistence
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/Protocol.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Persistence
+    path: ../source/Network/Protocol/Protocol.cs
+    startLine: 22
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: Persistence = 13
+    return:
+      type: Network.Protocol.EPacket
+  modifiers.csharp:
+  - public
+  - const
+  modifiers.vb:
+  - Public
+  - Const
+references:
+- uid: Network.Protocol
+  commentId: N:Network.Protocol
+  name: Network.Protocol
+  nameWithType: Network.Protocol
+  fullName: Network.Protocol
+- uid: Network.Protocol.EPacket
+  commentId: T:Network.Protocol.EPacket
+  parent: Network.Protocol
+  name: EPacket
+  nameWithType: EPacket
+  fullName: Network.Protocol.EPacket

@@ -1,0 +1,88 @@
+### YamlMime:ManagedReference
+items:
+- uid: Common.IUpdateable
+  commentId: T:Common.IUpdateable
+  id: IUpdateable
+  parent: Common
+  children:
+  - Common.IUpdateable.Update(System.TimeSpan)
+  langs:
+  - csharp
+  - vb
+  name: IUpdateable
+  nameWithType: IUpdateable
+  fullName: Common.IUpdateable
+  type: Interface
+  source:
+    remote:
+      path: source/Common/IUpdatable.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IUpdateable
+    path: ../source/Common/IUpdatable.cs
+    startLine: 4
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public interface IUpdateable
+    content.vb: Public Interface IUpdateable
+  modifiers.csharp:
+  - public
+  - interface
+  modifiers.vb:
+  - Public
+  - Interface
+- uid: Common.IUpdateable.Update(System.TimeSpan)
+  commentId: M:Common.IUpdateable.Update(System.TimeSpan)
+  id: Update(System.TimeSpan)
+  parent: Common.IUpdateable
+  langs:
+  - csharp
+  - vb
+  name: Update(TimeSpan)
+  nameWithType: IUpdateable.Update(TimeSpan)
+  fullName: Common.IUpdateable.Update(System.TimeSpan)
+  type: Method
+  source:
+    remote:
+      path: source/Common/IUpdatable.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Update
+    path: ../source/Common/IUpdatable.cs
+    startLine: 6
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: void Update(TimeSpan frameTime)
+    parameters:
+    - id: frameTime
+      type: System.TimeSpan
+    content.vb: Sub Update(frameTime As TimeSpan)
+  overload: Common.IUpdateable.Update*
+references:
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: Common.IUpdateable.Update*
+  commentId: Overload:Common.IUpdateable.Update
+  name: Update
+  nameWithType: IUpdateable.Update
+  fullName: Common.IUpdateable.Update
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System

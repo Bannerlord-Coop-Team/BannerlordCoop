@@ -1,0 +1,655 @@
+### YamlMime:ManagedReference
+items:
+- uid: Network.Protocol.StatePacketPair
+  commentId: T:Network.Protocol.StatePacketPair
+  id: StatePacketPair
+  parent: Network.Protocol
+  children:
+  - Network.Protocol.StatePacketPair.#ctor(System.Enum,Network.Protocol.EPacket)
+  - Network.Protocol.StatePacketPair.ePacket
+  - Network.Protocol.StatePacketPair.Equals(System.Object)
+  - Network.Protocol.StatePacketPair.GetHashCode
+  - Network.Protocol.StatePacketPair.op_Equality(Network.Protocol.StatePacketPair,Network.Protocol.StatePacketPair)
+  - Network.Protocol.StatePacketPair.op_Inequality(Network.Protocol.StatePacketPair,Network.Protocol.StatePacketPair)
+  - Network.Protocol.StatePacketPair.State
+  langs:
+  - csharp
+  - vb
+  name: StatePacketPair
+  nameWithType: StatePacketPair
+  fullName: Network.Protocol.StatePacketPair
+  type: Class
+  source:
+    remote:
+      path: source/Network/Protocol/PacketDispatcher.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: StatePacketPair
+    path: ../source/Network/Protocol/PacketDispatcher.cs
+    startLine: 119
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: class StatePacketPair
+    content.vb: Class StatePacketPair
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - class
+  modifiers.vb:
+  - Class
+- uid: Network.Protocol.StatePacketPair.State
+  commentId: F:Network.Protocol.StatePacketPair.State
+  id: State
+  parent: Network.Protocol.StatePacketPair
+  langs:
+  - csharp
+  - vb
+  name: State
+  nameWithType: StatePacketPair.State
+  fullName: Network.Protocol.StatePacketPair.State
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/PacketDispatcher.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: State
+    path: ../source/Network/Protocol/PacketDispatcher.cs
+    startLine: 121
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public readonly Enum State
+    return:
+      type: System.Enum
+    content.vb: 'Public ReadOnly State As '
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Protocol.StatePacketPair.ePacket
+  commentId: F:Network.Protocol.StatePacketPair.ePacket
+  id: ePacket
+  parent: Network.Protocol.StatePacketPair
+  langs:
+  - csharp
+  - vb
+  name: ePacket
+  nameWithType: StatePacketPair.ePacket
+  fullName: Network.Protocol.StatePacketPair.ePacket
+  type: Field
+  source:
+    remote:
+      path: source/Network/Protocol/PacketDispatcher.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: ePacket
+    path: ../source/Network/Protocol/PacketDispatcher.cs
+    startLine: 122
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public readonly EPacket ePacket
+    return:
+      type: Network.Protocol.EPacket
+    content.vb: Public ReadOnly ePacket As EPacket
+  modifiers.csharp:
+  - public
+  - readonly
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Network.Protocol.StatePacketPair.#ctor(System.Enum,Network.Protocol.EPacket)
+  commentId: M:Network.Protocol.StatePacketPair.#ctor(System.Enum,Network.Protocol.EPacket)
+  id: '#ctor(System.Enum,Network.Protocol.EPacket)'
+  parent: Network.Protocol.StatePacketPair
+  langs:
+  - csharp
+  - vb
+  name: StatePacketPair(Enum, EPacket)
+  nameWithType: StatePacketPair.StatePacketPair(Enum, EPacket)
+  fullName: Network.Protocol.StatePacketPair.StatePacketPair(System.Enum, Network.Protocol.EPacket)
+  type: Constructor
+  source:
+    remote:
+      path: source/Network/Protocol/PacketDispatcher.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Network/Protocol/PacketDispatcher.cs
+    startLine: 123
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public StatePacketPair(Enum state, EPacket ePacket)
+    parameters:
+    - id: state
+      type: System.Enum
+    - id: ePacket
+      type: Network.Protocol.EPacket
+    content.vb: Public Sub New(state As  Enum, ePacket As EPacket)
+  overload: Network.Protocol.StatePacketPair.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Network.Protocol.StatePacketPair.op_Equality(Network.Protocol.StatePacketPair,Network.Protocol.StatePacketPair)
+  commentId: M:Network.Protocol.StatePacketPair.op_Equality(Network.Protocol.StatePacketPair,Network.Protocol.StatePacketPair)
+  id: op_Equality(Network.Protocol.StatePacketPair,Network.Protocol.StatePacketPair)
+  parent: Network.Protocol.StatePacketPair
+  langs:
+  - csharp
+  - vb
+  name: Equality(StatePacketPair, StatePacketPair)
+  nameWithType: StatePacketPair.Equality(StatePacketPair, StatePacketPair)
+  fullName: Network.Protocol.StatePacketPair.Equality(Network.Protocol.StatePacketPair, Network.Protocol.StatePacketPair)
+  type: Operator
+  source:
+    remote:
+      path: source/Network/Protocol/PacketDispatcher.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: op_Equality
+    path: ../source/Network/Protocol/PacketDispatcher.cs
+    startLine: 129
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public static bool operator ==(StatePacketPair lhs, StatePacketPair rhs)
+    parameters:
+    - id: lhs
+      type: Network.Protocol.StatePacketPair
+    - id: rhs
+      type: Network.Protocol.StatePacketPair
+    return:
+      type: System.Boolean
+    content.vb: Public Shared Operator =(lhs As StatePacketPair, rhs As StatePacketPair) As Boolean
+  overload: Network.Protocol.StatePacketPair.op_Equality*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Network.Protocol.StatePacketPair.op_Inequality(Network.Protocol.StatePacketPair,Network.Protocol.StatePacketPair)
+  commentId: M:Network.Protocol.StatePacketPair.op_Inequality(Network.Protocol.StatePacketPair,Network.Protocol.StatePacketPair)
+  id: op_Inequality(Network.Protocol.StatePacketPair,Network.Protocol.StatePacketPair)
+  parent: Network.Protocol.StatePacketPair
+  langs:
+  - csharp
+  - vb
+  name: Inequality(StatePacketPair, StatePacketPair)
+  nameWithType: StatePacketPair.Inequality(StatePacketPair, StatePacketPair)
+  fullName: Network.Protocol.StatePacketPair.Inequality(Network.Protocol.StatePacketPair, Network.Protocol.StatePacketPair)
+  type: Operator
+  source:
+    remote:
+      path: source/Network/Protocol/PacketDispatcher.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: op_Inequality
+    path: ../source/Network/Protocol/PacketDispatcher.cs
+    startLine: 134
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public static bool operator !=(StatePacketPair lhs, StatePacketPair rhs)
+    parameters:
+    - id: lhs
+      type: Network.Protocol.StatePacketPair
+    - id: rhs
+      type: Network.Protocol.StatePacketPair
+    return:
+      type: System.Boolean
+    content.vb: Public Shared Operator <>(lhs As StatePacketPair, rhs As StatePacketPair) As Boolean
+  overload: Network.Protocol.StatePacketPair.op_Inequality*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+- uid: Network.Protocol.StatePacketPair.Equals(System.Object)
+  commentId: M:Network.Protocol.StatePacketPair.Equals(System.Object)
+  id: Equals(System.Object)
+  parent: Network.Protocol.StatePacketPair
+  langs:
+  - csharp
+  - vb
+  name: Equals(Object)
+  nameWithType: StatePacketPair.Equals(Object)
+  fullName: Network.Protocol.StatePacketPair.Equals(System.Object)
+  type: Method
+  source:
+    remote:
+      path: source/Network/Protocol/PacketDispatcher.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Equals
+    path: ../source/Network/Protocol/PacketDispatcher.cs
+    startLine: 139
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public override bool Equals(object obj)
+    parameters:
+    - id: obj
+      type: System.Object
+    return:
+      type: System.Boolean
+    content.vb: Public Overrides Function Equals(obj As Object) As Boolean
+  overridden: System.Object.Equals(System.Object)
+  overload: Network.Protocol.StatePacketPair.Equals*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Network.Protocol.StatePacketPair.GetHashCode
+  commentId: M:Network.Protocol.StatePacketPair.GetHashCode
+  id: GetHashCode
+  parent: Network.Protocol.StatePacketPair
+  langs:
+  - csharp
+  - vb
+  name: GetHashCode()
+  nameWithType: StatePacketPair.GetHashCode()
+  fullName: Network.Protocol.StatePacketPair.GetHashCode()
+  type: Method
+  source:
+    remote:
+      path: source/Network/Protocol/PacketDispatcher.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetHashCode
+    path: ../source/Network/Protocol/PacketDispatcher.cs
+    startLine: 146
+  assemblies:
+  - Network
+  namespace: Network.Protocol
+  syntax:
+    content: public override int GetHashCode()
+    return:
+      type: System.Int32
+    content.vb: Public Overrides Function GetHashCode As Integer
+  overridden: System.Object.GetHashCode
+  overload: Network.Protocol.StatePacketPair.GetHashCode*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+references:
+- uid: Network.Protocol
+  commentId: N:Network.Protocol
+  name: Network.Protocol
+  nameWithType: Network.Protocol
+  fullName: Network.Protocol
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Enum
+  commentId: T:System.Enum
+  parent: System
+  isExternal: true
+  name: Enum
+  nameWithType: Enum
+  fullName: System.Enum
+- uid: Network.Protocol.EPacket
+  commentId: T:Network.Protocol.EPacket
+  parent: Network.Protocol
+  name: EPacket
+  nameWithType: EPacket
+  fullName: Network.Protocol.EPacket
+- uid: Network.Protocol.StatePacketPair.#ctor*
+  commentId: Overload:Network.Protocol.StatePacketPair.#ctor
+  name: StatePacketPair
+  nameWithType: StatePacketPair.StatePacketPair
+  fullName: Network.Protocol.StatePacketPair.StatePacketPair
+- uid: Network.Protocol.StatePacketPair.op_Equality*
+  commentId: Overload:Network.Protocol.StatePacketPair.op_Equality
+  name: Equality
+  nameWithType: StatePacketPair.Equality
+  fullName: Network.Protocol.StatePacketPair.Equality
+- uid: Network.Protocol.StatePacketPair
+  commentId: T:Network.Protocol.StatePacketPair
+  parent: Network.Protocol
+  name: StatePacketPair
+  nameWithType: StatePacketPair
+  fullName: Network.Protocol.StatePacketPair
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Network.Protocol.StatePacketPair.op_Inequality*
+  commentId: Overload:Network.Protocol.StatePacketPair.op_Inequality
+  name: Inequality
+  nameWithType: StatePacketPair.Inequality
+  fullName: Network.Protocol.StatePacketPair.Inequality
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Protocol.StatePacketPair.Equals*
+  commentId: Overload:Network.Protocol.StatePacketPair.Equals
+  name: Equals
+  nameWithType: StatePacketPair.Equals
+  fullName: Network.Protocol.StatePacketPair.Equals
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Network.Protocol.StatePacketPair.GetHashCode*
+  commentId: Overload:Network.Protocol.StatePacketPair.GetHashCode
+  name: GetHashCode
+  nameWithType: StatePacketPair.GetHashCode
+  fullName: Network.Protocol.StatePacketPair.GetHashCode
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32

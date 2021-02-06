@@ -1,0 +1,1472 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.GameEnvironmentClient
+  commentId: T:Coop.Mod.GameEnvironmentClient
+  id: GameEnvironmentClient
+  parent: Coop.Mod
+  children:
+  - Coop.Mod.GameEnvironmentClient.#ctor
+  - Coop.Mod.GameEnvironmentClient.AuthoritativeTime
+  - Coop.Mod.GameEnvironmentClient.GetCurrentCampaign
+  - Coop.Mod.GameEnvironmentClient.GetMobilePartyByIndex(System.Int32)
+  - Coop.Mod.GameEnvironmentClient.PlayerControlledMobileParties
+  - Coop.Mod.GameEnvironmentClient.PlayerControlledParties
+  - Coop.Mod.GameEnvironmentClient.SetIsPlayerControlled(System.Int32,System.Boolean)
+  - Coop.Mod.GameEnvironmentClient.Store
+  - Coop.Mod.GameEnvironmentClient.TargetPosition
+  - Coop.Mod.GameEnvironmentClient.TimeControlMode
+  - Coop.Mod.GameEnvironmentClient.TimeControlModeLock
+  langs:
+  - csharp
+  - vb
+  name: GameEnvironmentClient
+  nameWithType: GameEnvironmentClient
+  fullName: Coop.Mod.GameEnvironmentClient
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GameEnvironmentClient
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 12
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: 'class GameEnvironmentClient : IEnvironmentClient'
+    content.vb: >-
+      Class GameEnvironmentClient
+          Implements IEnvironmentClient
+  inheritance:
+  - System.Object
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentClient
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - class
+  modifiers.vb:
+  - Class
+- uid: Coop.Mod.GameEnvironmentClient.#ctor
+  commentId: M:Coop.Mod.GameEnvironmentClient.#ctor
+  id: '#ctor'
+  parent: Coop.Mod.GameEnvironmentClient
+  langs:
+  - csharp
+  - vb
+  name: GameEnvironmentClient()
+  nameWithType: GameEnvironmentClient.GameEnvironmentClient()
+  fullName: Coop.Mod.GameEnvironmentClient.GameEnvironmentClient()
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 14
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public GameEnvironmentClient()
+    content.vb: Public Sub New
+  overload: Coop.Mod.GameEnvironmentClient.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.GameEnvironmentClient.PlayerControlledMobileParties
+  commentId: P:Coop.Mod.GameEnvironmentClient.PlayerControlledMobileParties
+  id: PlayerControlledMobileParties
+  parent: Coop.Mod.GameEnvironmentClient
+  langs:
+  - csharp
+  - vb
+  name: PlayerControlledMobileParties
+  nameWithType: GameEnvironmentClient.PlayerControlledMobileParties
+  fullName: Coop.Mod.GameEnvironmentClient.PlayerControlledMobileParties
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: PlayerControlledMobileParties
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 19
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public HashSet<MobileParty> PlayerControlledMobileParties { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.HashSet{TaleWorlds.CampaignSystem.MobileParty}
+    content.vb: Public ReadOnly Property PlayerControlledMobileParties As HashSet(Of MobileParty)
+  overload: Coop.Mod.GameEnvironmentClient.PlayerControlledMobileParties*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameEnvironmentClient.TargetPosition
+  commentId: P:Coop.Mod.GameEnvironmentClient.TargetPosition
+  id: TargetPosition
+  parent: Coop.Mod.GameEnvironmentClient
+  langs:
+  - csharp
+  - vb
+  name: TargetPosition
+  nameWithType: GameEnvironmentClient.TargetPosition
+  fullName: Coop.Mod.GameEnvironmentClient.TargetPosition
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TargetPosition
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 22
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
+    parameters: []
+    return:
+      type: Sync.FieldAccessGroup{TaleWorlds.CampaignSystem.MobileParty,Coop.Mod.Persistence.Party.MovementData}
+    content.vb: Public ReadOnly Property TargetPosition As FieldAccessGroup(Of MobileParty, MovementData)
+  overload: Coop.Mod.GameEnvironmentClient.TargetPosition*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentClient.TargetPosition
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameEnvironmentClient.TimeControlMode
+  commentId: P:Coop.Mod.GameEnvironmentClient.TimeControlMode
+  id: TimeControlMode
+  parent: Coop.Mod.GameEnvironmentClient
+  langs:
+  - csharp
+  - vb
+  name: TimeControlMode
+  nameWithType: GameEnvironmentClient.TimeControlMode
+  fullName: Coop.Mod.GameEnvironmentClient.TimeControlMode
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TimeControlMode
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 25
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; }
+    parameters: []
+    return:
+      type: Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,TaleWorlds.CampaignSystem.CampaignTimeControlMode}
+    content.vb: Public ReadOnly Property TimeControlMode As FieldAccess(Of Campaign, CampaignTimeControlMode)
+  overload: Coop.Mod.GameEnvironmentClient.TimeControlMode*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentClient.TimeControlMode
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameEnvironmentClient.TimeControlModeLock
+  commentId: P:Coop.Mod.GameEnvironmentClient.TimeControlModeLock
+  id: TimeControlModeLock
+  parent: Coop.Mod.GameEnvironmentClient
+  langs:
+  - csharp
+  - vb
+  name: TimeControlModeLock
+  nameWithType: GameEnvironmentClient.TimeControlModeLock
+  fullName: Coop.Mod.GameEnvironmentClient.TimeControlModeLock
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: TimeControlModeLock
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 28
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public FieldAccess<Campaign, bool> TimeControlModeLock { get; }
+    parameters: []
+    return:
+      type: Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,System.Boolean}
+    content.vb: Public ReadOnly Property TimeControlModeLock As FieldAccess(Of Campaign, Boolean)
+  overload: Coop.Mod.GameEnvironmentClient.TimeControlModeLock*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentClient.TimeControlModeLock
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameEnvironmentClient.AuthoritativeTime
+  commentId: P:Coop.Mod.GameEnvironmentClient.AuthoritativeTime
+  id: AuthoritativeTime
+  parent: Coop.Mod.GameEnvironmentClient
+  langs:
+  - csharp
+  - vb
+  name: AuthoritativeTime
+  nameWithType: GameEnvironmentClient.AuthoritativeTime
+  fullName: Coop.Mod.GameEnvironmentClient.AuthoritativeTime
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: AuthoritativeTime
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 30
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public CampaignTime AuthoritativeTime { get; set; }
+    parameters: []
+    return:
+      type: TaleWorlds.CampaignSystem.CampaignTime
+    content.vb: Public Property AuthoritativeTime As CampaignTime
+  overload: Coop.Mod.GameEnvironmentClient.AuthoritativeTime*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentClient.AuthoritativeTime
+  modifiers.csharp:
+  - public
+  - get
+  - set
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.GameEnvironmentClient.SetIsPlayerControlled(System.Int32,System.Boolean)
+  commentId: M:Coop.Mod.GameEnvironmentClient.SetIsPlayerControlled(System.Int32,System.Boolean)
+  id: SetIsPlayerControlled(System.Int32,System.Boolean)
+  parent: Coop.Mod.GameEnvironmentClient
+  langs:
+  - csharp
+  - vb
+  name: SetIsPlayerControlled(Int32, Boolean)
+  nameWithType: GameEnvironmentClient.SetIsPlayerControlled(Int32, Boolean)
+  fullName: Coop.Mod.GameEnvironmentClient.SetIsPlayerControlled(System.Int32, System.Boolean)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SetIsPlayerControlled
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 32
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled)
+    parameters:
+    - id: iPartyIndex
+      type: System.Int32
+    - id: isPlayerControlled
+      type: System.Boolean
+    content.vb: Public Sub SetIsPlayerControlled(iPartyIndex As Integer, isPlayerControlled As Boolean)
+  overload: Coop.Mod.GameEnvironmentClient.SetIsPlayerControlled*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled(System.Int32,System.Boolean)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.GameEnvironmentClient.PlayerControlledParties
+  commentId: P:Coop.Mod.GameEnvironmentClient.PlayerControlledParties
+  id: PlayerControlledParties
+  parent: Coop.Mod.GameEnvironmentClient
+  langs:
+  - csharp
+  - vb
+  name: PlayerControlledParties
+  nameWithType: GameEnvironmentClient.PlayerControlledParties
+  fullName: Coop.Mod.GameEnvironmentClient.PlayerControlledParties
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: PlayerControlledParties
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 51
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public IEnumerable<MobileParty> PlayerControlledParties { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IEnumerable{TaleWorlds.CampaignSystem.MobileParty}
+    content.vb: Public ReadOnly Property PlayerControlledParties As IEnumerable(Of MobileParty)
+  overload: Coop.Mod.GameEnvironmentClient.PlayerControlledParties*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentClient.PlayerControlledParties
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameEnvironmentClient.Store
+  commentId: P:Coop.Mod.GameEnvironmentClient.Store
+  id: Store
+  parent: Coop.Mod.GameEnvironmentClient
+  langs:
+  - csharp
+  - vb
+  name: Store
+  nameWithType: GameEnvironmentClient.Store
+  fullName: Coop.Mod.GameEnvironmentClient.Store
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Store
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 53
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public RemoteStore Store { get; }
+    parameters: []
+    return:
+      type: Sync.Store.RemoteStore
+    content.vb: Public ReadOnly Property Store As RemoteStore
+  overload: Coop.Mod.GameEnvironmentClient.Store*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentClient.Store
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.GameEnvironmentClient.GetMobilePartyByIndex(System.Int32)
+  commentId: M:Coop.Mod.GameEnvironmentClient.GetMobilePartyByIndex(System.Int32)
+  id: GetMobilePartyByIndex(System.Int32)
+  parent: Coop.Mod.GameEnvironmentClient
+  langs:
+  - csharp
+  - vb
+  name: GetMobilePartyByIndex(Int32)
+  nameWithType: GameEnvironmentClient.GetMobilePartyByIndex(Int32)
+  fullName: Coop.Mod.GameEnvironmentClient.GetMobilePartyByIndex(System.Int32)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetMobilePartyByIndex
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 58
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public MobileParty GetMobilePartyByIndex(int iPartyIndex)
+    parameters:
+    - id: iPartyIndex
+      type: System.Int32
+    return:
+      type: TaleWorlds.CampaignSystem.MobileParty
+    content.vb: Public Function GetMobilePartyByIndex(iPartyIndex As Integer) As MobileParty
+  overload: Coop.Mod.GameEnvironmentClient.GetMobilePartyByIndex*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyByIndex(System.Int32)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.GameEnvironmentClient.GetCurrentCampaign
+  commentId: M:Coop.Mod.GameEnvironmentClient.GetCurrentCampaign
+  id: GetCurrentCampaign
+  parent: Coop.Mod.GameEnvironmentClient
+  langs:
+  - csharp
+  - vb
+  name: GetCurrentCampaign()
+  nameWithType: GameEnvironmentClient.GetCurrentCampaign()
+  fullName: Coop.Mod.GameEnvironmentClient.GetCurrentCampaign()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/GameEnvironmentClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: GetCurrentCampaign
+    path: ../source/Coop/Mod/GameEnvironmentClient.cs
+    startLine: 63
+  assemblies:
+  - Coop
+  namespace: Coop.Mod
+  syntax:
+    content: public Campaign GetCurrentCampaign()
+    return:
+      type: TaleWorlds.CampaignSystem.Campaign
+    content.vb: Public Function GetCurrentCampaign As Campaign
+  overload: Coop.Mod.GameEnvironmentClient.GetCurrentCampaign*
+  implements:
+  - Coop.Mod.Persistence.IEnvironmentClient.GetCurrentCampaign
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.Mod
+  commentId: N:Coop.Mod
+  name: Coop.Mod
+  nameWithType: Coop.Mod
+  fullName: Coop.Mod
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Coop.Mod.Persistence.IEnvironmentClient
+  commentId: T:Coop.Mod.Persistence.IEnvironmentClient
+  parent: Coop.Mod.Persistence
+  name: IEnvironmentClient
+  nameWithType: IEnvironmentClient
+  fullName: Coop.Mod.Persistence.IEnvironmentClient
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Coop.Mod.Persistence
+  commentId: N:Coop.Mod.Persistence
+  name: Coop.Mod.Persistence
+  nameWithType: Coop.Mod.Persistence
+  fullName: Coop.Mod.Persistence
+- uid: Coop.Mod.GameEnvironmentClient.#ctor*
+  commentId: Overload:Coop.Mod.GameEnvironmentClient.#ctor
+  name: GameEnvironmentClient
+  nameWithType: GameEnvironmentClient.GameEnvironmentClient
+  fullName: Coop.Mod.GameEnvironmentClient.GameEnvironmentClient
+- uid: Coop.Mod.GameEnvironmentClient.PlayerControlledMobileParties*
+  commentId: Overload:Coop.Mod.GameEnvironmentClient.PlayerControlledMobileParties
+  name: PlayerControlledMobileParties
+  nameWithType: GameEnvironmentClient.PlayerControlledMobileParties
+  fullName: Coop.Mod.GameEnvironmentClient.PlayerControlledMobileParties
+- uid: System.Collections.Generic.HashSet{TaleWorlds.CampaignSystem.MobileParty}
+  commentId: T:System.Collections.Generic.HashSet{TaleWorlds.CampaignSystem.MobileParty}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.HashSet`1
+  name: HashSet<MobileParty>
+  nameWithType: HashSet<MobileParty>
+  fullName: System.Collections.Generic.HashSet<TaleWorlds.CampaignSystem.MobileParty>
+  nameWithType.vb: HashSet(Of MobileParty)
+  fullName.vb: System.Collections.Generic.HashSet(Of TaleWorlds.CampaignSystem.MobileParty)
+  name.vb: HashSet(Of MobileParty)
+  spec.csharp:
+  - uid: System.Collections.Generic.HashSet`1
+    name: HashSet
+    nameWithType: HashSet
+    fullName: System.Collections.Generic.HashSet
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.HashSet`1
+    name: HashSet
+    nameWithType: HashSet
+    fullName: System.Collections.Generic.HashSet
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.HashSet`1
+  commentId: T:System.Collections.Generic.HashSet`1
+  isExternal: true
+  name: HashSet<T>
+  nameWithType: HashSet<T>
+  fullName: System.Collections.Generic.HashSet<T>
+  nameWithType.vb: HashSet(Of T)
+  fullName.vb: System.Collections.Generic.HashSet(Of T)
+  name.vb: HashSet(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.HashSet`1
+    name: HashSet
+    nameWithType: HashSet
+    fullName: System.Collections.Generic.HashSet
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.HashSet`1
+    name: HashSet
+    nameWithType: HashSet
+    fullName: System.Collections.Generic.HashSet
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: Coop.Mod.GameEnvironmentClient.TargetPosition*
+  commentId: Overload:Coop.Mod.GameEnvironmentClient.TargetPosition
+  name: TargetPosition
+  nameWithType: GameEnvironmentClient.TargetPosition
+  fullName: Coop.Mod.GameEnvironmentClient.TargetPosition
+- uid: Coop.Mod.Persistence.IEnvironmentClient.TargetPosition
+  commentId: P:Coop.Mod.Persistence.IEnvironmentClient.TargetPosition
+  parent: Coop.Mod.Persistence.IEnvironmentClient
+  name: TargetPosition
+  nameWithType: IEnvironmentClient.TargetPosition
+  fullName: Coop.Mod.Persistence.IEnvironmentClient.TargetPosition
+- uid: Sync.FieldAccessGroup{TaleWorlds.CampaignSystem.MobileParty,Coop.Mod.Persistence.Party.MovementData}
+  commentId: T:Sync.FieldAccessGroup{TaleWorlds.CampaignSystem.MobileParty,Coop.Mod.Persistence.Party.MovementData}
+  parent: Sync
+  definition: Sync.FieldAccessGroup`2
+  name: FieldAccessGroup<MobileParty, MovementData>
+  nameWithType: FieldAccessGroup<MobileParty, MovementData>
+  fullName: Sync.FieldAccessGroup<TaleWorlds.CampaignSystem.MobileParty, Coop.Mod.Persistence.Party.MovementData>
+  nameWithType.vb: FieldAccessGroup(Of MobileParty, MovementData)
+  fullName.vb: Sync.FieldAccessGroup(Of TaleWorlds.CampaignSystem.MobileParty, Coop.Mod.Persistence.Party.MovementData)
+  name.vb: FieldAccessGroup(Of MobileParty, MovementData)
+  spec.csharp:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Coop.Mod.Persistence.Party.MovementData
+    name: MovementData
+    nameWithType: MovementData
+    fullName: Coop.Mod.Persistence.Party.MovementData
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Coop.Mod.Persistence.Party.MovementData
+    name: MovementData
+    nameWithType: MovementData
+    fullName: Coop.Mod.Persistence.Party.MovementData
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldAccessGroup`2
+  commentId: T:Sync.FieldAccessGroup`2
+  parent: Sync
+  name: FieldAccessGroup<TDeclaring, TValueObject>
+  nameWithType: FieldAccessGroup<TDeclaring, TValueObject>
+  fullName: Sync.FieldAccessGroup<TDeclaring, TValueObject>
+  nameWithType.vb: FieldAccessGroup(Of TDeclaring, TValueObject)
+  fullName.vb: Sync.FieldAccessGroup(Of TDeclaring, TValueObject)
+  name.vb: FieldAccessGroup(Of TDeclaring, TValueObject)
+  spec.csharp:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValueObject
+    nameWithType: TValueObject
+    fullName: TValueObject
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccessGroup`2
+    name: FieldAccessGroup
+    nameWithType: FieldAccessGroup
+    fullName: Sync.FieldAccessGroup
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValueObject
+    nameWithType: TValueObject
+    fullName: TValueObject
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync
+  commentId: N:Sync
+  name: Sync
+  nameWithType: Sync
+  fullName: Sync
+- uid: Coop.Mod.GameEnvironmentClient.TimeControlMode*
+  commentId: Overload:Coop.Mod.GameEnvironmentClient.TimeControlMode
+  name: TimeControlMode
+  nameWithType: GameEnvironmentClient.TimeControlMode
+  fullName: Coop.Mod.GameEnvironmentClient.TimeControlMode
+- uid: Coop.Mod.Persistence.IEnvironmentClient.TimeControlMode
+  commentId: P:Coop.Mod.Persistence.IEnvironmentClient.TimeControlMode
+  parent: Coop.Mod.Persistence.IEnvironmentClient
+  name: TimeControlMode
+  nameWithType: IEnvironmentClient.TimeControlMode
+  fullName: Coop.Mod.Persistence.IEnvironmentClient.TimeControlMode
+- uid: Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,TaleWorlds.CampaignSystem.CampaignTimeControlMode}
+  commentId: T:Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,TaleWorlds.CampaignSystem.CampaignTimeControlMode}
+  parent: Sync
+  definition: Sync.FieldAccess`2
+  name: FieldAccess<Campaign, CampaignTimeControlMode>
+  nameWithType: FieldAccess<Campaign, CampaignTimeControlMode>
+  fullName: Sync.FieldAccess<TaleWorlds.CampaignSystem.Campaign, TaleWorlds.CampaignSystem.CampaignTimeControlMode>
+  nameWithType.vb: FieldAccess(Of Campaign, CampaignTimeControlMode)
+  fullName.vb: Sync.FieldAccess(Of TaleWorlds.CampaignSystem.Campaign, TaleWorlds.CampaignSystem.CampaignTimeControlMode)
+  name.vb: FieldAccess(Of Campaign, CampaignTimeControlMode)
+  spec.csharp:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.CampaignSystem.Campaign
+    name: Campaign
+    nameWithType: Campaign
+    fullName: TaleWorlds.CampaignSystem.Campaign
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    name: CampaignTimeControlMode
+    nameWithType: CampaignTimeControlMode
+    fullName: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.CampaignSystem.Campaign
+    name: Campaign
+    nameWithType: Campaign
+    fullName: TaleWorlds.CampaignSystem.Campaign
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    name: CampaignTimeControlMode
+    nameWithType: CampaignTimeControlMode
+    fullName: TaleWorlds.CampaignSystem.CampaignTimeControlMode
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.FieldAccess`2
+  commentId: T:Sync.FieldAccess`2
+  name: FieldAccess<TDeclaring, TFieldType>
+  nameWithType: FieldAccess<TDeclaring, TFieldType>
+  fullName: Sync.FieldAccess<TDeclaring, TFieldType>
+  nameWithType.vb: FieldAccess(Of TDeclaring, TFieldType)
+  fullName.vb: Sync.FieldAccess(Of TDeclaring, TFieldType)
+  name.vb: FieldAccess(Of TDeclaring, TFieldType)
+  spec.csharp:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TFieldType
+    nameWithType: TFieldType
+    fullName: TFieldType
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TDeclaring
+    nameWithType: TDeclaring
+    fullName: TDeclaring
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TFieldType
+    nameWithType: TFieldType
+    fullName: TFieldType
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.GameEnvironmentClient.TimeControlModeLock*
+  commentId: Overload:Coop.Mod.GameEnvironmentClient.TimeControlModeLock
+  name: TimeControlModeLock
+  nameWithType: GameEnvironmentClient.TimeControlModeLock
+  fullName: Coop.Mod.GameEnvironmentClient.TimeControlModeLock
+- uid: Coop.Mod.Persistence.IEnvironmentClient.TimeControlModeLock
+  commentId: P:Coop.Mod.Persistence.IEnvironmentClient.TimeControlModeLock
+  parent: Coop.Mod.Persistence.IEnvironmentClient
+  name: TimeControlModeLock
+  nameWithType: IEnvironmentClient.TimeControlModeLock
+  fullName: Coop.Mod.Persistence.IEnvironmentClient.TimeControlModeLock
+- uid: Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,System.Boolean}
+  commentId: T:Sync.FieldAccess{TaleWorlds.CampaignSystem.Campaign,System.Boolean}
+  parent: Sync
+  definition: Sync.FieldAccess`2
+  name: FieldAccess<Campaign, Boolean>
+  nameWithType: FieldAccess<Campaign, Boolean>
+  fullName: Sync.FieldAccess<TaleWorlds.CampaignSystem.Campaign, System.Boolean>
+  nameWithType.vb: FieldAccess(Of Campaign, Boolean)
+  fullName.vb: Sync.FieldAccess(Of TaleWorlds.CampaignSystem.Campaign, System.Boolean)
+  name.vb: FieldAccess(Of Campaign, Boolean)
+  spec.csharp:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.CampaignSystem.Campaign
+    name: Campaign
+    nameWithType: Campaign
+    fullName: TaleWorlds.CampaignSystem.Campaign
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Sync.FieldAccess`2
+    name: FieldAccess
+    nameWithType: FieldAccess
+    fullName: Sync.FieldAccess
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.CampaignSystem.Campaign
+    name: Campaign
+    nameWithType: Campaign
+    fullName: TaleWorlds.CampaignSystem.Campaign
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.GameEnvironmentClient.AuthoritativeTime*
+  commentId: Overload:Coop.Mod.GameEnvironmentClient.AuthoritativeTime
+  name: AuthoritativeTime
+  nameWithType: GameEnvironmentClient.AuthoritativeTime
+  fullName: Coop.Mod.GameEnvironmentClient.AuthoritativeTime
+- uid: Coop.Mod.Persistence.IEnvironmentClient.AuthoritativeTime
+  commentId: P:Coop.Mod.Persistence.IEnvironmentClient.AuthoritativeTime
+  parent: Coop.Mod.Persistence.IEnvironmentClient
+  name: AuthoritativeTime
+  nameWithType: IEnvironmentClient.AuthoritativeTime
+  fullName: Coop.Mod.Persistence.IEnvironmentClient.AuthoritativeTime
+- uid: TaleWorlds.CampaignSystem.CampaignTime
+  commentId: T:TaleWorlds.CampaignSystem.CampaignTime
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: CampaignTime
+  nameWithType: CampaignTime
+  fullName: TaleWorlds.CampaignSystem.CampaignTime
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: Coop.Mod.GameEnvironmentClient.SetIsPlayerControlled*
+  commentId: Overload:Coop.Mod.GameEnvironmentClient.SetIsPlayerControlled
+  name: SetIsPlayerControlled
+  nameWithType: GameEnvironmentClient.SetIsPlayerControlled
+  fullName: Coop.Mod.GameEnvironmentClient.SetIsPlayerControlled
+- uid: Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled(System.Int32,System.Boolean)
+  commentId: M:Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled(System.Int32,System.Boolean)
+  parent: Coop.Mod.Persistence.IEnvironmentClient
+  isExternal: true
+  name: SetIsPlayerControlled(Int32, Boolean)
+  nameWithType: IEnvironmentClient.SetIsPlayerControlled(Int32, Boolean)
+  fullName: Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled(System.Int32, System.Boolean)
+  spec.csharp:
+  - uid: Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled(System.Int32,System.Boolean)
+    name: SetIsPlayerControlled
+    nameWithType: IEnvironmentClient.SetIsPlayerControlled
+    fullName: Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled(System.Int32,System.Boolean)
+    name: SetIsPlayerControlled
+    nameWithType: IEnvironmentClient.SetIsPlayerControlled
+    fullName: Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Boolean
+    name: Boolean
+    nameWithType: Boolean
+    fullName: System.Boolean
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.Mod.GameEnvironmentClient.PlayerControlledParties*
+  commentId: Overload:Coop.Mod.GameEnvironmentClient.PlayerControlledParties
+  name: PlayerControlledParties
+  nameWithType: GameEnvironmentClient.PlayerControlledParties
+  fullName: Coop.Mod.GameEnvironmentClient.PlayerControlledParties
+- uid: Coop.Mod.Persistence.IEnvironmentClient.PlayerControlledParties
+  commentId: P:Coop.Mod.Persistence.IEnvironmentClient.PlayerControlledParties
+  parent: Coop.Mod.Persistence.IEnvironmentClient
+  name: PlayerControlledParties
+  nameWithType: IEnvironmentClient.PlayerControlledParties
+  fullName: Coop.Mod.Persistence.IEnvironmentClient.PlayerControlledParties
+- uid: System.Collections.Generic.IEnumerable{TaleWorlds.CampaignSystem.MobileParty}
+  commentId: T:System.Collections.Generic.IEnumerable{TaleWorlds.CampaignSystem.MobileParty}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IEnumerable`1
+  name: IEnumerable<MobileParty>
+  nameWithType: IEnumerable<MobileParty>
+  fullName: System.Collections.Generic.IEnumerable<TaleWorlds.CampaignSystem.MobileParty>
+  nameWithType.vb: IEnumerable(Of MobileParty)
+  fullName.vb: System.Collections.Generic.IEnumerable(Of TaleWorlds.CampaignSystem.MobileParty)
+  name.vb: IEnumerable(Of MobileParty)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    nameWithType: IEnumerable
+    fullName: System.Collections.Generic.IEnumerable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    nameWithType: IEnumerable
+    fullName: System.Collections.Generic.IEnumerable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: TaleWorlds.CampaignSystem.MobileParty
+    name: MobileParty
+    nameWithType: MobileParty
+    fullName: TaleWorlds.CampaignSystem.MobileParty
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.IEnumerable`1
+  commentId: T:System.Collections.Generic.IEnumerable`1
+  isExternal: true
+  name: IEnumerable<T>
+  nameWithType: IEnumerable<T>
+  fullName: System.Collections.Generic.IEnumerable<T>
+  nameWithType.vb: IEnumerable(Of T)
+  fullName.vb: System.Collections.Generic.IEnumerable(Of T)
+  name.vb: IEnumerable(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    nameWithType: IEnumerable
+    fullName: System.Collections.Generic.IEnumerable
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    nameWithType: IEnumerable
+    fullName: System.Collections.Generic.IEnumerable
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.GameEnvironmentClient.Store*
+  commentId: Overload:Coop.Mod.GameEnvironmentClient.Store
+  name: Store
+  nameWithType: GameEnvironmentClient.Store
+  fullName: Coop.Mod.GameEnvironmentClient.Store
+- uid: Coop.Mod.Persistence.IEnvironmentClient.Store
+  commentId: P:Coop.Mod.Persistence.IEnvironmentClient.Store
+  parent: Coop.Mod.Persistence.IEnvironmentClient
+  name: Store
+  nameWithType: IEnvironmentClient.Store
+  fullName: Coop.Mod.Persistence.IEnvironmentClient.Store
+- uid: Sync.Store.RemoteStore
+  commentId: T:Sync.Store.RemoteStore
+  parent: Sync.Store
+  name: RemoteStore
+  nameWithType: RemoteStore
+  fullName: Sync.Store.RemoteStore
+- uid: Sync.Store
+  commentId: N:Sync.Store
+  name: Sync.Store
+  nameWithType: Sync.Store
+  fullName: Sync.Store
+- uid: Coop.Mod.GameEnvironmentClient.GetMobilePartyByIndex*
+  commentId: Overload:Coop.Mod.GameEnvironmentClient.GetMobilePartyByIndex
+  name: GetMobilePartyByIndex
+  nameWithType: GameEnvironmentClient.GetMobilePartyByIndex
+  fullName: Coop.Mod.GameEnvironmentClient.GetMobilePartyByIndex
+- uid: Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyByIndex(System.Int32)
+  commentId: M:Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyByIndex(System.Int32)
+  parent: Coop.Mod.Persistence.IEnvironmentClient
+  isExternal: true
+  name: GetMobilePartyByIndex(Int32)
+  nameWithType: IEnvironmentClient.GetMobilePartyByIndex(Int32)
+  fullName: Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyByIndex(System.Int32)
+  spec.csharp:
+  - uid: Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyByIndex(System.Int32)
+    name: GetMobilePartyByIndex
+    nameWithType: IEnvironmentClient.GetMobilePartyByIndex
+    fullName: Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyByIndex
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyByIndex(System.Int32)
+    name: GetMobilePartyByIndex
+    nameWithType: IEnvironmentClient.GetMobilePartyByIndex
+    fullName: Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyByIndex
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Int32
+    name: Int32
+    nameWithType: Int32
+    fullName: System.Int32
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.CampaignSystem.MobileParty
+  commentId: T:TaleWorlds.CampaignSystem.MobileParty
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: MobileParty
+  nameWithType: MobileParty
+  fullName: TaleWorlds.CampaignSystem.MobileParty
+- uid: Coop.Mod.GameEnvironmentClient.GetCurrentCampaign*
+  commentId: Overload:Coop.Mod.GameEnvironmentClient.GetCurrentCampaign
+  name: GetCurrentCampaign
+  nameWithType: GameEnvironmentClient.GetCurrentCampaign
+  fullName: Coop.Mod.GameEnvironmentClient.GetCurrentCampaign
+- uid: Coop.Mod.Persistence.IEnvironmentClient.GetCurrentCampaign
+  commentId: M:Coop.Mod.Persistence.IEnvironmentClient.GetCurrentCampaign
+  parent: Coop.Mod.Persistence.IEnvironmentClient
+  name: GetCurrentCampaign()
+  nameWithType: IEnvironmentClient.GetCurrentCampaign()
+  fullName: Coop.Mod.Persistence.IEnvironmentClient.GetCurrentCampaign()
+  spec.csharp:
+  - uid: Coop.Mod.Persistence.IEnvironmentClient.GetCurrentCampaign
+    name: GetCurrentCampaign
+    nameWithType: IEnvironmentClient.GetCurrentCampaign
+    fullName: Coop.Mod.Persistence.IEnvironmentClient.GetCurrentCampaign
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Coop.Mod.Persistence.IEnvironmentClient.GetCurrentCampaign
+    name: GetCurrentCampaign
+    nameWithType: IEnvironmentClient.GetCurrentCampaign
+    fullName: Coop.Mod.Persistence.IEnvironmentClient.GetCurrentCampaign
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: TaleWorlds.CampaignSystem.Campaign
+  commentId: T:TaleWorlds.CampaignSystem.Campaign
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: Campaign
+  nameWithType: Campaign
+  fullName: TaleWorlds.CampaignSystem.Campaign

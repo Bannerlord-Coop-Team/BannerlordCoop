@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -73,12 +72,11 @@
   
   <h1 id="Sync_FieldChangeBuffer" data-uid="Sync.FieldChangeBuffer" class="text-break">Class FieldChangeBuffer
   </h1>
-  <div class="markdown level0 summary">
-Buffer for pending changes to a value. The changes are detected by creating a snapshot
+  <div class="markdown level0 summary"><p>Buffer for pending changes to a value. The changes are detected by creating a snapshot
 of the value in a prefix to the trigger function and restoring that snapshot in a
 postfix to the trigger function.
 The buffer <a class="xref" href="Sync.FieldChangeBuffer.html#Sync_FieldChangeBuffer_BufferedChanges">BufferedChanges</a> will never be cleared internally. The game
-loop is responsible to process the buffered changes and apply or discard them.
+loop is responsible to process the buffered changes and apply or discard them.</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -116,6 +114,95 @@ loop is responsible to process the buffered changes and apply or discard them.
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static class FieldChangeBuffer</code></pre>
   </div>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_FieldChangeBuffer_ActiveFields.md&amp;value=---%0Auid%3A%20Sync.FieldChangeBuffer.ActiveFields%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/FieldChangeBuffer.cs/#L17">View Source</a>
+  </span>
+  <h4 id="Sync_FieldChangeBuffer_ActiveFields" data-uid="Sync.FieldChangeBuffer.ActiveFields">ActiveFields</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static readonly Stack&lt;ValueData&gt; ActiveFields</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Stack</span>&lt;<a class="xref" href="Sync.ValueData.html">ValueData</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_FieldChangeBuffer_PatchPostfix.md&amp;value=---%0Auid%3A%20Sync.FieldChangeBuffer.PatchPostfix%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/FieldChangeBuffer.cs/#L25">View Source</a>
+  </span>
+  <h4 id="Sync_FieldChangeBuffer_PatchPostfix" data-uid="Sync.FieldChangeBuffer.PatchPostfix">PatchPostfix</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static readonly HarmonyMethod PatchPostfix</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">HarmonyLib.HarmonyMethod</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_FieldChangeBuffer_PatchPrefix.md&amp;value=---%0Auid%3A%20Sync.FieldChangeBuffer.PatchPrefix%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/FieldChangeBuffer.cs/#L19">View Source</a>
+  </span>
+  <h4 id="Sync_FieldChangeBuffer_PatchPrefix" data-uid="Sync.FieldChangeBuffer.PatchPrefix">PatchPrefix</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static readonly HarmonyMethod PatchPrefix</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">HarmonyLib.HarmonyMethod</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h3 id="properties">Properties
   </h3>
   <span class="small pull-right mobile-hide">
@@ -159,10 +246,9 @@ loop is responsible to process the buffered changes and apply or discard them.
   </span>
   <a id="Sync_FieldChangeBuffer_Intercept_" data-uid="Sync.FieldChangeBuffer.Intercept*"></a>
   <h4 id="Sync_FieldChangeBuffer_Intercept_Sync_ValueAccess_System_Collections_Generic_IEnumerable_Sync_MethodAccess__System_Func_System_Boolean__" data-uid="Sync.FieldChangeBuffer.Intercept(Sync.ValueAccess,System.Collections.Generic.IEnumerable{Sync.MethodAccess},System.Func{System.Boolean})">Intercept(ValueAccess, IEnumerable&lt;MethodAccess&gt;, Func&lt;Boolean&gt;)</h4>
-  <div class="markdown level1 summary">
-During the execution of any of the <code data-dev-comment-type="paramref" class="paramref">triggers</code> methods, any change to the
+  <div class="markdown level1 summary"><p>During the execution of any of the <code data-dev-comment-type="paramref" class="paramref">triggers</code> methods, any change to the
 value will not be applied but instead written to the change buffer
-<a class="xref" href="Sync.FieldChangeBuffer.html#Sync_FieldChangeBuffer_BufferedChanges">BufferedChanges</a>.
+<a class="xref" href="Sync.FieldChangeBuffer.html#Sync_FieldChangeBuffer_BufferedChanges">BufferedChanges</a>.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -182,23 +268,91 @@ value will not be applied but instead written to the change buffer
       <tr>
         <td><a class="xref" href="Sync.ValueAccess.html">ValueAccess</a></td>
         <td><span class="parametername">value</span></td>
-        <td>Accessor to the value</td>
+        <td><p>Accessor to the value</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">System.Collections.Generic.IEnumerable</span>&lt;<a class="xref" href="Sync.MethodAccess.html">MethodAccess</a>&gt;</td>
         <td><span class="parametername">triggers</span></td>
-        <td>
-Trigger methods during which the changes to the value are written to the
-buffer instead
+        <td><p>Trigger methods during which the changes to the value are written to the
+buffer instead</p>
 </td>
       </tr>
       <tr>
         <td><span class="xref">System.Func</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
         <td><span class="parametername">condition</span></td>
-        <td>The buffer is only active if the condition evaluates to true</td>
+        <td><p>The buffer is only active if the condition evaluates to true</p>
+</td>
       </tr>
     </tbody>
   </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_FieldChangeBuffer_OnBeforeExpectedChange_Sync_ValueAccess_System_Object_.md&amp;value=---%0Auid%3A%20Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess%2CSystem.Object)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/FieldChangeBuffer.cs/#L40">View Source</a>
+  </span>
+  <a id="Sync_FieldChangeBuffer_OnBeforeExpectedChange_" data-uid="Sync.FieldChangeBuffer.OnBeforeExpectedChange*"></a>
+  <h4 id="Sync_FieldChangeBuffer_OnBeforeExpectedChange_Sync_ValueAccess_System_Object_" data-uid="Sync.FieldChangeBuffer.OnBeforeExpectedChange(Sync.ValueAccess,System.Object)">OnBeforeExpectedChange(ValueAccess, Object)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static void OnBeforeExpectedChange(this ValueAccess access, object target)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.ValueAccess.html">ValueAccess</a></td>
+        <td><span class="parametername">access</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span></td>
+        <td><span class="parametername">target</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_FieldChangeBuffer_PopActiveFields.md&amp;value=---%0Auid%3A%20Sync.FieldChangeBuffer.PopActiveFields%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/FieldChangeBuffer.cs/#L90">View Source</a>
+  </span>
+  <a id="Sync_FieldChangeBuffer_PopActiveFields_" data-uid="Sync.FieldChangeBuffer.PopActiveFields*"></a>
+  <h4 id="Sync_FieldChangeBuffer_PopActiveFields" data-uid="Sync.FieldChangeBuffer.PopActiveFields">PopActiveFields()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static void PopActiveFields()</code></pre>
+  </div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_FieldChangeBuffer_PushActiveFields.md&amp;value=---%0Auid%3A%20Sync.FieldChangeBuffer.PushActiveFields%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/FieldChangeBuffer.cs/#L35">View Source</a>
+  </span>
+  <a id="Sync_FieldChangeBuffer_PushActiveFields_" data-uid="Sync.FieldChangeBuffer.PushActiveFields*"></a>
+  <h4 id="Sync_FieldChangeBuffer_PushActiveFields" data-uid="Sync.FieldChangeBuffer.PushActiveFields">PushActiveFields()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static void PushActiveFields()</code></pre>
+  </div>
 </article>
           </div>
           
@@ -214,9 +368,22 @@ buffer instead
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

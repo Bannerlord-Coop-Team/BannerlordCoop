@@ -21,8 +21,7 @@
     
     
     
-  </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         
@@ -73,10 +72,9 @@
   
   <h1 id="Coop_Mod_Persistence_RPC_EventBroadcastingQueue" data-uid="Coop.Mod.Persistence.RPC.EventBroadcastingQueue" class="text-break">Class EventBroadcastingQueue
   </h1>
-  <div class="markdown level0 summary">
-Queue to broadcast events. Sends all events in order and makes sure, that all event
+  <div class="markdown level0 summary"><p>Queue to broadcast events. Sends all events in order and makes sure, that all event
 arguments can be resolved on the clients. This includes waiting for any pending
-large object transfers.
+large object transfers.</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -129,8 +127,7 @@ large object transfers.
   </span>
   <a id="Coop_Mod_Persistence_RPC_EventBroadcastingQueue__ctor_" data-uid="Coop.Mod.Persistence.RPC.EventBroadcastingQueue.#ctor*"></a>
   <h4 id="Coop_Mod_Persistence_RPC_EventBroadcastingQueue__ctor_Sync_Store_SharedRemoteStore_System_TimeSpan_" data-uid="Coop.Mod.Persistence.RPC.EventBroadcastingQueue.#ctor(Sync.Store.SharedRemoteStore,System.TimeSpan)">EventBroadcastingQueue(SharedRemoteStore, TimeSpan)</h4>
-  <div class="markdown level1 summary">
-</div>
+  <div class="markdown level1 summary"></div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
@@ -149,14 +146,14 @@ large object transfers.
       <tr>
         <td><a class="xref" href="Sync.Store.SharedRemoteStore.html">SharedRemoteStore</a></td>
         <td><span class="parametername">store</span></td>
-        <td>Store to be used for large object transfer.</td>
+        <td><p>Store to be used for large object transfer.</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">System.TimeSpan</span></td>
         <td><span class="parametername">eventTimeout</span></td>
-        <td>
-Maximum amount of time a single event may spend in the queue. After
-which it is dropped.
+        <td><p>Maximum amount of time a single event may spend in the queue. After
+which it is dropped.</p>
 </td>
       </tr>
     </tbody>
@@ -317,10 +314,9 @@ readonly SharedRemoteStore m_Store</code></pre>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs/#L26">View Source</a>
   </span>
   <h4 id="Coop_Mod_Persistence_RPC_EventBroadcastingQueue_MaximumQueueSize" data-uid="Coop.Mod.Persistence.RPC.EventBroadcastingQueue.MaximumQueueSize">MaximumQueueSize</h4>
-  <div class="markdown level1 summary">
-Defines the maximum number of events that can be added to the queue. Smaller in
+  <div class="markdown level1 summary"><p>Defines the maximum number of events that can be added to the queue. Smaller in
 DEBUG to identify situations where events are starving in the queue. Might need
-to be adjusted depending on how much is done using events.
+to be adjusted depending on how much is done using events.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -385,10 +381,9 @@ to be adjusted depending on how much is done using events.
   </span>
   <a id="Coop_Mod_Persistence_RPC_EventBroadcastingQueue_Add_" data-uid="Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Add*"></a>
   <h4 id="Coop_Mod_Persistence_RPC_EventBroadcastingQueue_Add_RailServerRoom_Coop_Mod_Persistence_RPC_EventMethodCall_" data-uid="Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Add(RailServerRoom,Coop.Mod.Persistence.RPC.EventMethodCall)">Add(RailServerRoom, EventMethodCall)</h4>
-  <div class="markdown level1 summary">
-Adds an event to be broadcast.
+  <div class="markdown level1 summary"><p>Adds an event to be broadcast.
 Attention: The queue does not initiate any large object transfers. But it waits
-for the completion of the transfers.
+for the completion of the transfers.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -408,7 +403,8 @@ for the completion of the transfers.
       <tr>
         <td><span class="xref">RailServerRoom</span></td>
         <td><span class="parametername">room</span></td>
-        <td>Room to send the event to.</td>
+        <td><p>Room to send the event to.</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="Coop.Mod.Persistence.RPC.EventMethodCall.html">EventMethodCall</a></td>
@@ -500,9 +496,22 @@ for the completion of the transfers.
                   </li>
                 </ul>
               </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
-                <div></div>
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
               </nav>
             </div>
           </div>

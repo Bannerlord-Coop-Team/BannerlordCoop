@@ -1,0 +1,70 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.BehaviorDelegate
+  commentId: T:Coop.Lib.NoHarmony.NoHarmonyLoader.BehaviorDelegate
+  id: NoHarmonyLoader.BehaviorDelegate
+  parent: Coop.Lib.NoHarmony
+  children: []
+  langs:
+  - csharp
+  - vb
+  name: NoHarmonyLoader.BehaviorDelegate
+  nameWithType: NoHarmonyLoader.BehaviorDelegate
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.BehaviorDelegate
+  type: Delegate
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: BehaviorDelegate
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 363
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: delegate NoHarmonyLoader.TaskStatus BehaviorDelegate(Campaign campaign, NoHarmonyLoader.TaskMode mode);
+    parameters:
+    - id: campaign
+      type: TaleWorlds.CampaignSystem.Campaign
+    - id: mode
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+    return:
+      type: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+    content.vb: Delegate Function BehaviorDelegate(campaign As Campaign, mode As NoHarmonyLoader.TaskMode) As NoHarmonyLoader.TaskStatus
+  modifiers.csharp:
+  - delegate
+  modifiers.vb:
+  - Delegate
+references:
+- uid: Coop.Lib.NoHarmony
+  commentId: N:Coop.Lib.NoHarmony
+  name: Coop.Lib.NoHarmony
+  nameWithType: Coop.Lib.NoHarmony
+  fullName: Coop.Lib.NoHarmony
+- uid: TaleWorlds.CampaignSystem.Campaign
+  commentId: T:TaleWorlds.CampaignSystem.Campaign
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: Campaign
+  nameWithType: Campaign
+  fullName: TaleWorlds.CampaignSystem.Campaign
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  commentId: T:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+  parent: Coop.Lib.NoHarmony
+  name: NoHarmonyLoader.TaskMode
+  nameWithType: NoHarmonyLoader.TaskMode
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskMode
+- uid: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  commentId: T:Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+  parent: Coop.Lib.NoHarmony
+  name: NoHarmonyLoader.TaskStatus
+  nameWithType: NoHarmonyLoader.TaskStatus
+  fullName: Coop.Lib.NoHarmony.NoHarmonyLoader.TaskStatus
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem

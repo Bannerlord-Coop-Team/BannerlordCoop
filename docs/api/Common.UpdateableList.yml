@@ -1,0 +1,591 @@
+### YamlMime:ManagedReference
+items:
+- uid: Common.UpdateableList
+  commentId: T:Common.UpdateableList
+  id: UpdateableList
+  parent: Common
+  children:
+  - Common.UpdateableList.Add(Common.IUpdateable)
+  - Common.UpdateableList.m_Updateables
+  - Common.UpdateableList.Remove(Common.IUpdateable)
+  - Common.UpdateableList.UpdateAll(System.TimeSpan)
+  langs:
+  - csharp
+  - vb
+  name: UpdateableList
+  nameWithType: UpdateableList
+  fullName: Common.UpdateableList
+  type: Class
+  source:
+    remote:
+      path: source/Common/UpdateableList.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: UpdateableList
+    path: ../source/Common/UpdateableList.cs
+    startLine: 6
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public class UpdateableList
+    content.vb: Public Class UpdateableList
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Common.UpdateableList.m_Updateables
+  commentId: F:Common.UpdateableList.m_Updateables
+  id: m_Updateables
+  parent: Common.UpdateableList
+  langs:
+  - csharp
+  - vb
+  name: m_Updateables
+  nameWithType: UpdateableList.m_Updateables
+  fullName: Common.UpdateableList.m_Updateables
+  type: Field
+  source:
+    remote:
+      path: source/Common/UpdateableList.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Updateables
+    path: ../source/Common/UpdateableList.cs
+    startLine: 8
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: readonly List<IUpdateable> m_Updateables
+    return:
+      type: System.Collections.Generic.List{Common.IUpdateable}
+    content.vb: ReadOnly m_Updateables As List(Of IUpdateable)
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Common.UpdateableList.UpdateAll(System.TimeSpan)
+  commentId: M:Common.UpdateableList.UpdateAll(System.TimeSpan)
+  id: UpdateAll(System.TimeSpan)
+  parent: Common.UpdateableList
+  langs:
+  - csharp
+  - vb
+  name: UpdateAll(TimeSpan)
+  nameWithType: UpdateableList.UpdateAll(TimeSpan)
+  fullName: Common.UpdateableList.UpdateAll(System.TimeSpan)
+  type: Method
+  source:
+    remote:
+      path: source/Common/UpdateableList.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: UpdateAll
+    path: ../source/Common/UpdateableList.cs
+    startLine: 10
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public void UpdateAll(TimeSpan frameTime)
+    parameters:
+    - id: frameTime
+      type: System.TimeSpan
+    content.vb: Public Sub UpdateAll(frameTime As TimeSpan)
+  overload: Common.UpdateableList.UpdateAll*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Common.UpdateableList.Add(Common.IUpdateable)
+  commentId: M:Common.UpdateableList.Add(Common.IUpdateable)
+  id: Add(Common.IUpdateable)
+  parent: Common.UpdateableList
+  langs:
+  - csharp
+  - vb
+  name: Add(IUpdateable)
+  nameWithType: UpdateableList.Add(IUpdateable)
+  fullName: Common.UpdateableList.Add(Common.IUpdateable)
+  type: Method
+  source:
+    remote:
+      path: source/Common/UpdateableList.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Add
+    path: ../source/Common/UpdateableList.cs
+    startLine: 24
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public void Add(IUpdateable updateable)
+    parameters:
+    - id: updateable
+      type: Common.IUpdateable
+    content.vb: Public Sub Add(updateable As IUpdateable)
+  overload: Common.UpdateableList.Add*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Common.UpdateableList.Remove(Common.IUpdateable)
+  commentId: M:Common.UpdateableList.Remove(Common.IUpdateable)
+  id: Remove(Common.IUpdateable)
+  parent: Common.UpdateableList
+  langs:
+  - csharp
+  - vb
+  name: Remove(IUpdateable)
+  nameWithType: UpdateableList.Remove(IUpdateable)
+  fullName: Common.UpdateableList.Remove(Common.IUpdateable)
+  type: Method
+  source:
+    remote:
+      path: source/Common/UpdateableList.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Remove
+    path: ../source/Common/UpdateableList.cs
+    startLine: 37
+  assemblies:
+  - Common
+  namespace: Common
+  syntax:
+    content: public void Remove(IUpdateable updateable)
+    parameters:
+    - id: updateable
+      type: Common.IUpdateable
+    content.vb: Public Sub Remove(updateable As IUpdateable)
+  overload: Common.UpdateableList.Remove*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Collections.Generic.List{Common.IUpdateable}
+  commentId: T:System.Collections.Generic.List{Common.IUpdateable}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  name: List<IUpdateable>
+  nameWithType: List<IUpdateable>
+  fullName: System.Collections.Generic.List<Common.IUpdateable>
+  nameWithType.vb: List(Of IUpdateable)
+  fullName.vb: System.Collections.Generic.List(Of Common.IUpdateable)
+  name.vb: List(Of IUpdateable)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Common.IUpdateable
+    name: IUpdateable
+    nameWithType: IUpdateable
+    fullName: Common.IUpdateable
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Common.IUpdateable
+    name: IUpdateable
+    nameWithType: IUpdateable
+    fullName: Common.IUpdateable
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: Common.UpdateableList.UpdateAll*
+  commentId: Overload:Common.UpdateableList.UpdateAll
+  name: UpdateAll
+  nameWithType: UpdateableList.UpdateAll
+  fullName: Common.UpdateableList.UpdateAll
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan
+- uid: Common.UpdateableList.Add*
+  commentId: Overload:Common.UpdateableList.Add
+  name: Add
+  nameWithType: UpdateableList.Add
+  fullName: Common.UpdateableList.Add
+- uid: Common.IUpdateable
+  commentId: T:Common.IUpdateable
+  parent: Common
+  name: IUpdateable
+  nameWithType: IUpdateable
+  fullName: Common.IUpdateable
+- uid: Common.UpdateableList.Remove*
+  commentId: Overload:Common.UpdateableList.Remove
+  name: Remove
+  nameWithType: UpdateableList.Remove
+  fullName: Common.UpdateableList.Remove

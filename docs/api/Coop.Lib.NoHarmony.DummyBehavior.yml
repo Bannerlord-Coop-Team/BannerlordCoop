@@ -1,0 +1,565 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Lib.NoHarmony.DummyBehavior
+  commentId: T:Coop.Lib.NoHarmony.DummyBehavior
+  id: DummyBehavior
+  parent: Coop.Lib.NoHarmony
+  children:
+  - Coop.Lib.NoHarmony.DummyBehavior.RegisterEvents
+  - Coop.Lib.NoHarmony.DummyBehavior.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  langs:
+  - csharp
+  - vb
+  name: DummyBehavior
+  nameWithType: DummyBehavior
+  fullName: Coop.Lib.NoHarmony.DummyBehavior
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: DummyBehavior
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 370
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: 'public sealed class DummyBehavior : CampaignBehaviorBase, ICampaignBehavior'
+    content.vb: >-
+      Public NotInheritable Class DummyBehavior
+          Inherits CampaignBehaviorBase
+          Implements ICampaignBehavior
+  inheritance:
+  - System.Object
+  - TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  implements:
+  - TaleWorlds.CampaignSystem.ICampaignBehavior
+  inheritedMembers:
+  - TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior``1
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - sealed
+  - class
+  modifiers.vb:
+  - Public
+  - NotInheritable
+  - Class
+- uid: Coop.Lib.NoHarmony.DummyBehavior.RegisterEvents
+  commentId: M:Coop.Lib.NoHarmony.DummyBehavior.RegisterEvents
+  id: RegisterEvents
+  parent: Coop.Lib.NoHarmony.DummyBehavior
+  langs:
+  - csharp
+  - vb
+  name: RegisterEvents()
+  nameWithType: DummyBehavior.RegisterEvents()
+  fullName: Coop.Lib.NoHarmony.DummyBehavior.RegisterEvents()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: RegisterEvents
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 373
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: public override void RegisterEvents()
+    content.vb: Public Overrides Sub RegisterEvents
+  overridden: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+  overload: Coop.Lib.NoHarmony.DummyBehavior.RegisterEvents*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+- uid: Coop.Lib.NoHarmony.DummyBehavior.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  commentId: M:Coop.Lib.NoHarmony.DummyBehavior.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  id: SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  parent: Coop.Lib.NoHarmony.DummyBehavior
+  langs:
+  - csharp
+  - vb
+  name: SyncData(IDataStore)
+  nameWithType: DummyBehavior.SyncData(IDataStore)
+  fullName: Coop.Lib.NoHarmony.DummyBehavior.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: SyncData
+    path: ../source/Coop/Lib/NoHarmony/NoHarmonyLoader.cs
+    startLine: 378
+  assemblies:
+  - Coop
+  namespace: Coop.Lib.NoHarmony
+  syntax:
+    content: public override void SyncData(IDataStore dataStore)
+    parameters:
+    - id: dataStore
+      type: TaleWorlds.CampaignSystem.IDataStore
+    content.vb: Public Overrides Sub SyncData(dataStore As IDataStore)
+  overridden: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  overload: Coop.Lib.NoHarmony.DummyBehavior.SyncData*
+  modifiers.csharp:
+  - public
+  - override
+  modifiers.vb:
+  - Public
+  - Overrides
+references:
+- uid: Coop.Lib.NoHarmony
+  commentId: N:Coop.Lib.NoHarmony
+  name: Coop.Lib.NoHarmony
+  nameWithType: Coop.Lib.NoHarmony
+  fullName: Coop.Lib.NoHarmony
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  commentId: T:TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: CampaignBehaviorBase
+  nameWithType: CampaignBehaviorBase
+  fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase
+- uid: TaleWorlds.CampaignSystem.ICampaignBehavior
+  commentId: T:TaleWorlds.CampaignSystem.ICampaignBehavior
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: ICampaignBehavior
+  nameWithType: ICampaignBehavior
+  fullName: TaleWorlds.CampaignSystem.ICampaignBehavior
+- uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior``1
+  commentId: M:TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior``1
+  parent: TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  isExternal: true
+  name: GetCampaignBehavior<T>()
+  nameWithType: CampaignBehaviorBase.GetCampaignBehavior<T>()
+  fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior<T>()
+  nameWithType.vb: CampaignBehaviorBase.GetCampaignBehavior(Of T)()
+  fullName.vb: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior(Of T)()
+  name.vb: GetCampaignBehavior(Of T)()
+  spec.csharp:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior``1
+    name: GetCampaignBehavior<T>
+    nameWithType: CampaignBehaviorBase.GetCampaignBehavior<T>
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior<T>
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior``1
+    name: GetCampaignBehavior(Of T)
+    nameWithType: CampaignBehaviorBase.GetCampaignBehavior(Of T)
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.GetCampaignBehavior(Of T)
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: TaleWorlds.CampaignSystem
+  commentId: N:TaleWorlds.CampaignSystem
+  isExternal: true
+  name: TaleWorlds.CampaignSystem
+  nameWithType: TaleWorlds.CampaignSystem
+  fullName: TaleWorlds.CampaignSystem
+- uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+  commentId: M:TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+  parent: TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  isExternal: true
+  name: RegisterEvents()
+  nameWithType: CampaignBehaviorBase.RegisterEvents()
+  fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents()
+  spec.csharp:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+    name: RegisterEvents
+    nameWithType: CampaignBehaviorBase.RegisterEvents
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+    name: RegisterEvents
+    nameWithType: CampaignBehaviorBase.RegisterEvents
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.RegisterEvents
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Lib.NoHarmony.DummyBehavior.RegisterEvents*
+  commentId: Overload:Coop.Lib.NoHarmony.DummyBehavior.RegisterEvents
+  name: RegisterEvents
+  nameWithType: DummyBehavior.RegisterEvents
+  fullName: Coop.Lib.NoHarmony.DummyBehavior.RegisterEvents
+- uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  commentId: M:TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  parent: TaleWorlds.CampaignSystem.CampaignBehaviorBase
+  isExternal: true
+  name: SyncData(IDataStore)
+  nameWithType: CampaignBehaviorBase.SyncData(IDataStore)
+  fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+  spec.csharp:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+    name: SyncData
+    nameWithType: CampaignBehaviorBase.SyncData
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.CampaignSystem.IDataStore
+    name: IDataStore
+    nameWithType: IDataStore
+    fullName: TaleWorlds.CampaignSystem.IDataStore
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData(TaleWorlds.CampaignSystem.IDataStore)
+    name: SyncData
+    nameWithType: CampaignBehaviorBase.SyncData
+    fullName: TaleWorlds.CampaignSystem.CampaignBehaviorBase.SyncData
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: TaleWorlds.CampaignSystem.IDataStore
+    name: IDataStore
+    nameWithType: IDataStore
+    fullName: TaleWorlds.CampaignSystem.IDataStore
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Lib.NoHarmony.DummyBehavior.SyncData*
+  commentId: Overload:Coop.Lib.NoHarmony.DummyBehavior.SyncData
+  name: SyncData
+  nameWithType: DummyBehavior.SyncData
+  fullName: Coop.Lib.NoHarmony.DummyBehavior.SyncData
+- uid: TaleWorlds.CampaignSystem.IDataStore
+  commentId: T:TaleWorlds.CampaignSystem.IDataStore
+  parent: TaleWorlds.CampaignSystem
+  isExternal: true
+  name: IDataStore
+  nameWithType: IDataStore
+  fullName: TaleWorlds.CampaignSystem.IDataStore

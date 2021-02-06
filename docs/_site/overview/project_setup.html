@@ -1,0 +1,145 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Project Setup </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Project Setup ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="project-setup">Project Setup</h1>
+
+<ol>
+<li>Clone the <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop">repository</a> somewhere on your machine.<br></li>
+<li>Submodules will have to be updated using the command <code>git submodule update --recursive --force</code>.<br></li>
+<li>Run the <code>runmefirst.cmd</code> to dynamically attach your Bannerlord path and resolve references.<br></li>
+<li>If references in projects did not resolved automatically do the following. This can be done in Visual Studio by right-clicking references, going to browse, navigating to your Bannerlord directory through the mb2 shortcut, and selecting all TaleWorld.* .dlls. There are additional .dlls in the Modules folder, being the Native and StoryMode.<br></li>
+<li>Go to project settings for the Coop project and click debug. <br></li>
+<li>Click start external program and browse to your Bannerlord path. You should select the executable for Bannerlord normally located at <code>bin\Win64_Shipping_Client\Bannerlord.exe</code> <br></li>
+<li>For the command line arguments enter this <code>/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_</code> <br></li>
+<li>Now we need to enter the working directory. NOTE: This will select a folder, not a file. The folder you need to select for this is <code>bin\Win64_Shipping_Client</code>. The same path that <code>Bannerlord.exe</code> is located. <br></li>
+<li><p>(Optional) Setup a client instance. <br></p>
+<ol>
+<li><p>To run a client instance open the ClientDebug options. Go to debug and do steps 6-8. The difference here is the command line arguments which should be changed to <code>/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_</code>.</p>
+</li>
+<li><p>Now open the Solution &#39;Coop&#39; properties -&gt; Startup Projects. Select multiple projects and make sure Coop and ClientDebug are set to start.</p>
+</li>
+</ol>
+</li>
+<li>Click debug. <br></li>
+<li>Create a new game and save it as &quot;MP&quot;. <br></li>
+<li>Click on &quot;host game&quot; at the menu and the game will load the &quot;MP&quot; save file on the host. (and client if that is setup) <br></li>
+<li>If there are any issues contact someone in the discord. <br></li>
+</ol>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/docs/overview/project_setup.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

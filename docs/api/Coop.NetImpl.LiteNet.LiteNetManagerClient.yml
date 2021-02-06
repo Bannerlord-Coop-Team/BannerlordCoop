@@ -1,0 +1,886 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  commentId: T:Coop.NetImpl.LiteNet.LiteNetManagerClient
+  id: LiteNetManagerClient
+  parent: Coop.NetImpl.LiteNet
+  children:
+  - Coop.NetImpl.LiteNet.LiteNetManagerClient.#ctor(Network.Infrastructure.GameSession,Network.Infrastructure.ClientConfiguration)
+  - Coop.NetImpl.LiteNet.LiteNetManagerClient.Connect(System.Net.IPAddress,System.Int32)
+  - Coop.NetImpl.LiteNet.LiteNetManagerClient.Connected
+  - Coop.NetImpl.LiteNet.LiteNetManagerClient.Disconnect(Network.Infrastructure.EDisconnectReason)
+  - Coop.NetImpl.LiteNet.LiteNetManagerClient.Logger
+  - Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Configuration
+  - Coop.NetImpl.LiteNet.LiteNetManagerClient.m_NetManager
+  - Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Peer
+  - Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Session
+  - Coop.NetImpl.LiteNet.LiteNetManagerClient.Reconnect
+  - Coop.NetImpl.LiteNet.LiteNetManagerClient.Update(System.TimeSpan)
+  langs:
+  - csharp
+  - vb
+  name: LiteNetManagerClient
+  nameWithType: LiteNetManagerClient
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  type: Class
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: LiteNetManagerClient
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 11
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: 'public class LiteNetManagerClient : IUpdateable'
+    content.vb: >-
+      Public Class LiteNetManagerClient
+          Implements IUpdateable
+  inheritance:
+  - System.Object
+  implements:
+  - Common.IUpdateable
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Configuration
+  commentId: F:Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Configuration
+  id: m_Configuration
+  parent: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  langs:
+  - csharp
+  - vb
+  name: m_Configuration
+  nameWithType: LiteNetManagerClient.m_Configuration
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Configuration
+  type: Field
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Configuration
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 13
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: readonly ClientConfiguration m_Configuration
+    return:
+      type: Network.Infrastructure.ClientConfiguration
+    content.vb: ReadOnly m_Configuration As ClientConfiguration
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.Logger
+  commentId: F:Coop.NetImpl.LiteNet.LiteNetManagerClient.Logger
+  id: Logger
+  parent: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: LiteNetManagerClient.Logger
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 14
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Session
+  commentId: F:Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Session
+  id: m_Session
+  parent: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  langs:
+  - csharp
+  - vb
+  name: m_Session
+  nameWithType: LiteNetManagerClient.m_Session
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Session
+  type: Field
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Session
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 15
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: readonly GameSession m_Session
+    return:
+      type: Network.Infrastructure.GameSession
+    content.vb: ReadOnly m_Session As GameSession
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.m_NetManager
+  commentId: F:Coop.NetImpl.LiteNet.LiteNetManagerClient.m_NetManager
+  id: m_NetManager
+  parent: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  langs:
+  - csharp
+  - vb
+  name: m_NetManager
+  nameWithType: LiteNetManagerClient.m_NetManager
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.m_NetManager
+  type: Field
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_NetManager
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 16
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: NetManager m_NetManager
+    return:
+      type: NetManager
+    content.vb: m_NetManager As NetManager
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Peer
+  commentId: F:Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Peer
+  id: m_Peer
+  parent: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  langs:
+  - csharp
+  - vb
+  name: m_Peer
+  nameWithType: LiteNetManagerClient.m_Peer
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.m_Peer
+  type: Field
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Peer
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 17
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: NetPeer m_Peer
+    return:
+      type: NetPeer
+    content.vb: m_Peer As NetPeer
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.#ctor(Network.Infrastructure.GameSession,Network.Infrastructure.ClientConfiguration)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetManagerClient.#ctor(Network.Infrastructure.GameSession,Network.Infrastructure.ClientConfiguration)
+  id: '#ctor(Network.Infrastructure.GameSession,Network.Infrastructure.ClientConfiguration)'
+  parent: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  langs:
+  - csharp
+  - vb
+  name: LiteNetManagerClient(GameSession, ClientConfiguration)
+  nameWithType: LiteNetManagerClient.LiteNetManagerClient(GameSession, ClientConfiguration)
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.LiteNetManagerClient(Network.Infrastructure.GameSession, Network.Infrastructure.ClientConfiguration)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 19
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public LiteNetManagerClient([NotNull] GameSession session, [NotNull] ClientConfiguration config)
+    parameters:
+    - id: session
+      type: Network.Infrastructure.GameSession
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    - id: config
+      type: Network.Infrastructure.ClientConfiguration
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    content.vb: Public Sub New(session As GameSession, config As ClientConfiguration)
+  overload: Coop.NetImpl.LiteNet.LiteNetManagerClient.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.Connected
+  commentId: P:Coop.NetImpl.LiteNet.LiteNetManagerClient.Connected
+  id: Connected
+  parent: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  langs:
+  - csharp
+  - vb
+  name: Connected
+  nameWithType: LiteNetManagerClient.Connected
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.Connected
+  type: Property
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Connected
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 25
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public bool Connected { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public ReadOnly Property Connected As Boolean
+  overload: Coop.NetImpl.LiteNet.LiteNetManagerClient.Connected*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.Update(System.TimeSpan)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetManagerClient.Update(System.TimeSpan)
+  id: Update(System.TimeSpan)
+  parent: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  langs:
+  - csharp
+  - vb
+  name: Update(TimeSpan)
+  nameWithType: LiteNetManagerClient.Update(TimeSpan)
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.Update(System.TimeSpan)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Update
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 28
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void Update(TimeSpan frameTime)
+    parameters:
+    - id: frameTime
+      type: System.TimeSpan
+    content.vb: Public Sub Update(frameTime As TimeSpan)
+  overload: Coop.NetImpl.LiteNet.LiteNetManagerClient.Update*
+  implements:
+  - Common.IUpdateable.Update(System.TimeSpan)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.Reconnect
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetManagerClient.Reconnect
+  id: Reconnect
+  parent: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  langs:
+  - csharp
+  - vb
+  name: Reconnect()
+  nameWithType: LiteNetManagerClient.Reconnect()
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.Reconnect()
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Reconnect
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 33
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void Reconnect()
+    content.vb: Public Sub Reconnect
+  overload: Coop.NetImpl.LiteNet.LiteNetManagerClient.Reconnect*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.Connect(System.Net.IPAddress,System.Int32)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetManagerClient.Connect(System.Net.IPAddress,System.Int32)
+  id: Connect(System.Net.IPAddress,System.Int32)
+  parent: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  langs:
+  - csharp
+  - vb
+  name: Connect(IPAddress, Int32)
+  nameWithType: LiteNetManagerClient.Connect(IPAddress, Int32)
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.Connect(System.Net.IPAddress, System.Int32)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Connect
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 49
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public string Connect(IPAddress address, int iPort)
+    parameters:
+    - id: address
+      type: System.Net.IPAddress
+    - id: iPort
+      type: System.Int32
+    return:
+      type: System.String
+    content.vb: Public Function Connect(address As IPAddress, iPort As Integer) As String
+  overload: Coop.NetImpl.LiteNet.LiteNetManagerClient.Connect*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.Disconnect(Network.Infrastructure.EDisconnectReason)
+  commentId: M:Coop.NetImpl.LiteNet.LiteNetManagerClient.Disconnect(Network.Infrastructure.EDisconnectReason)
+  id: Disconnect(Network.Infrastructure.EDisconnectReason)
+  parent: Coop.NetImpl.LiteNet.LiteNetManagerClient
+  langs:
+  - csharp
+  - vb
+  name: Disconnect(EDisconnectReason)
+  nameWithType: LiteNetManagerClient.Disconnect(EDisconnectReason)
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.Disconnect(Network.Infrastructure.EDisconnectReason)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Disconnect
+    path: ../source/Coop/NetImpl/LiteNet/LiteNetManagerClient.cs
+    startLine: 84
+  assemblies:
+  - Coop
+  namespace: Coop.NetImpl.LiteNet
+  syntax:
+    content: public void Disconnect(EDisconnectReason eReason)
+    parameters:
+    - id: eReason
+      type: Network.Infrastructure.EDisconnectReason
+    content.vb: Public Sub Disconnect(eReason As EDisconnectReason)
+  overload: Coop.NetImpl.LiteNet.LiteNetManagerClient.Disconnect*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+references:
+- uid: Coop.NetImpl.LiteNet
+  commentId: N:Coop.NetImpl.LiteNet
+  name: Coop.NetImpl.LiteNet
+  nameWithType: Coop.NetImpl.LiteNet
+  fullName: Coop.NetImpl.LiteNet
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Common.IUpdateable
+  commentId: T:Common.IUpdateable
+  parent: Common
+  name: IUpdateable
+  nameWithType: IUpdateable
+  fullName: Common.IUpdateable
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: Network.Infrastructure.ClientConfiguration
+  commentId: T:Network.Infrastructure.ClientConfiguration
+  parent: Network.Infrastructure
+  name: ClientConfiguration
+  nameWithType: ClientConfiguration
+  fullName: Network.Infrastructure.ClientConfiguration
+- uid: Network.Infrastructure
+  commentId: N:Network.Infrastructure
+  name: Network.Infrastructure
+  nameWithType: Network.Infrastructure
+  fullName: Network.Infrastructure
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: Network.Infrastructure.GameSession
+  commentId: T:Network.Infrastructure.GameSession
+  parent: Network.Infrastructure
+  name: GameSession
+  nameWithType: GameSession
+  fullName: Network.Infrastructure.GameSession
+- uid: NetManager
+  isExternal: true
+  name: NetManager
+  nameWithType: NetManager
+  fullName: NetManager
+- uid: NetPeer
+  isExternal: true
+  name: NetPeer
+  nameWithType: NetPeer
+  fullName: NetPeer
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.#ctor*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetManagerClient.#ctor
+  name: LiteNetManagerClient
+  nameWithType: LiteNetManagerClient.LiteNetManagerClient
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.LiteNetManagerClient
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.Connected*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetManagerClient.Connected
+  name: Connected
+  nameWithType: LiteNetManagerClient.Connected
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.Connected
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  name: Boolean
+  nameWithType: Boolean
+  fullName: System.Boolean
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.Update*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetManagerClient.Update
+  name: Update
+  nameWithType: LiteNetManagerClient.Update
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.Update
+- uid: Common.IUpdateable.Update(System.TimeSpan)
+  commentId: M:Common.IUpdateable.Update(System.TimeSpan)
+  parent: Common.IUpdateable
+  isExternal: true
+  name: Update(TimeSpan)
+  nameWithType: IUpdateable.Update(TimeSpan)
+  fullName: Common.IUpdateable.Update(System.TimeSpan)
+  spec.csharp:
+  - uid: Common.IUpdateable.Update(System.TimeSpan)
+    name: Update
+    nameWithType: IUpdateable.Update
+    fullName: Common.IUpdateable.Update
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.TimeSpan
+    name: TimeSpan
+    nameWithType: TimeSpan
+    fullName: System.TimeSpan
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Common.IUpdateable.Update(System.TimeSpan)
+    name: Update
+    nameWithType: IUpdateable.Update
+    fullName: Common.IUpdateable.Update
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.TimeSpan
+    name: TimeSpan
+    nameWithType: TimeSpan
+    fullName: System.TimeSpan
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.Reconnect*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetManagerClient.Reconnect
+  name: Reconnect
+  nameWithType: LiteNetManagerClient.Reconnect
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.Reconnect
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.Connect*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetManagerClient.Connect
+  name: Connect
+  nameWithType: LiteNetManagerClient.Connect
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.Connect
+- uid: System.Net.IPAddress
+  commentId: T:System.Net.IPAddress
+  parent: System.Net
+  isExternal: true
+  name: IPAddress
+  nameWithType: IPAddress
+  fullName: System.Net.IPAddress
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  name: String
+  nameWithType: String
+  fullName: System.String
+- uid: System.Net
+  commentId: N:System.Net
+  isExternal: true
+  name: System.Net
+  nameWithType: System.Net
+  fullName: System.Net
+- uid: Coop.NetImpl.LiteNet.LiteNetManagerClient.Disconnect*
+  commentId: Overload:Coop.NetImpl.LiteNet.LiteNetManagerClient.Disconnect
+  name: Disconnect
+  nameWithType: LiteNetManagerClient.Disconnect
+  fullName: Coop.NetImpl.LiteNet.LiteNetManagerClient.Disconnect
+- uid: Network.Infrastructure.EDisconnectReason
+  commentId: T:Network.Infrastructure.EDisconnectReason
+  parent: Network.Infrastructure
+  name: EDisconnectReason
+  nameWithType: EDisconnectReason
+  fullName: Network.Infrastructure.EDisconnectReason

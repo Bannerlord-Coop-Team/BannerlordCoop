@@ -1,5 +1,13 @@
+# BannerlordCoop
+Mod to enjoy the Mount & Blade II: Bannerlord campaign with other players.
 
-# This is the **HOMEPAGE**.
-Refer to [Markdown](http://daringfireball.net/projects/markdown/) for how to write markdown files.
-## Quick Start Notes:
-1. Add images to *images* folder if the file is referencing an image.
+## Aspiring Contributors
+See [overview](/overview).
+
+# Mod Information
+## Is the mod playable?
+No.
+## When will the mod be done?
+Some time in the future.
+## How many players can be in a game?
+No real limit. We are trying to develop with atlease 8 in mind.

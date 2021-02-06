@@ -1,0 +1,922 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sync.MethodRegistry
+  commentId: T:Sync.MethodRegistry
+  id: MethodRegistry
+  parent: Sync
+  children:
+  - Sync.MethodRegistry.Ids
+  - Sync.MethodRegistry.IdToMethod
+  - Sync.MethodRegistry.Lock
+  - Sync.MethodRegistry.MethodIds
+  - Sync.MethodRegistry.MethodToId
+  - Sync.MethodRegistry.Register(Sync.MethodAccess)
+  langs:
+  - csharp
+  - vb
+  name: MethodRegistry
+  nameWithType: MethodRegistry
+  fullName: Sync.MethodRegistry
+  type: Class
+  source:
+    remote:
+      path: source/Sync/MethodRegistry.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MethodRegistry
+    path: ../source/Sync/MethodRegistry.cs
+    startLine: 6
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: public static class MethodRegistry
+    content.vb: Public Module MethodRegistry
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - static
+  - class
+  modifiers.vb:
+  - Public
+  - Module
+- uid: Sync.MethodRegistry.Lock
+  commentId: F:Sync.MethodRegistry.Lock
+  id: Lock
+  parent: Sync.MethodRegistry
+  langs:
+  - csharp
+  - vb
+  name: Lock
+  nameWithType: MethodRegistry.Lock
+  fullName: Sync.MethodRegistry.Lock
+  type: Field
+  source:
+    remote:
+      path: source/Sync/MethodRegistry.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Lock
+    path: ../source/Sync/MethodRegistry.cs
+    startLine: 8
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: static readonly object Lock
+    return:
+      type: System.Object
+    content.vb: Shared ReadOnly Lock As Object
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Sync.MethodRegistry.MethodIds
+  commentId: F:Sync.MethodRegistry.MethodIds
+  id: MethodIds
+  parent: Sync.MethodRegistry
+  langs:
+  - csharp
+  - vb
+  name: MethodIds
+  nameWithType: MethodRegistry.MethodIds
+  fullName: Sync.MethodRegistry.MethodIds
+  type: Field
+  source:
+    remote:
+      path: source/Sync/MethodRegistry.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MethodIds
+    path: ../source/Sync/MethodRegistry.cs
+    startLine: 10
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: static readonly Dictionary<MethodAccess, MethodId> MethodIds
+    return:
+      type: System.Collections.Generic.Dictionary{Sync.MethodAccess,Sync.MethodId}
+    content.vb: Shared ReadOnly MethodIds As Dictionary(Of MethodAccess, MethodId)
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Sync.MethodRegistry.Ids
+  commentId: F:Sync.MethodRegistry.Ids
+  id: Ids
+  parent: Sync.MethodRegistry
+  langs:
+  - csharp
+  - vb
+  name: Ids
+  nameWithType: MethodRegistry.Ids
+  fullName: Sync.MethodRegistry.Ids
+  type: Field
+  source:
+    remote:
+      path: source/Sync/MethodRegistry.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Ids
+    path: ../source/Sync/MethodRegistry.cs
+    startLine: 13
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: static readonly Dictionary<MethodId, MethodAccess> Ids
+    return:
+      type: System.Collections.Generic.Dictionary{Sync.MethodId,Sync.MethodAccess}
+    content.vb: Shared ReadOnly Ids As Dictionary(Of MethodId, MethodAccess)
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Sync.MethodRegistry.MethodToId
+  commentId: P:Sync.MethodRegistry.MethodToId
+  id: MethodToId
+  parent: Sync.MethodRegistry
+  langs:
+  - csharp
+  - vb
+  name: MethodToId
+  nameWithType: MethodRegistry.MethodToId
+  fullName: Sync.MethodRegistry.MethodToId
+  type: Property
+  source:
+    remote:
+      path: source/Sync/MethodRegistry.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MethodToId
+    path: ../source/Sync/MethodRegistry.cs
+    startLine: 16
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: public static IReadOnlyDictionary<MethodAccess, MethodId> MethodToId { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{Sync.MethodAccess,Sync.MethodId}
+    content.vb: Public Shared ReadOnly Property MethodToId As IReadOnlyDictionary(Of MethodAccess, MethodId)
+  overload: Sync.MethodRegistry.MethodToId*
+  modifiers.csharp:
+  - public
+  - static
+  - get
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: Sync.MethodRegistry.IdToMethod
+  commentId: P:Sync.MethodRegistry.IdToMethod
+  id: IdToMethod
+  parent: Sync.MethodRegistry
+  langs:
+  - csharp
+  - vb
+  name: IdToMethod
+  nameWithType: MethodRegistry.IdToMethod
+  fullName: Sync.MethodRegistry.IdToMethod
+  type: Property
+  source:
+    remote:
+      path: source/Sync/MethodRegistry.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: IdToMethod
+    path: ../source/Sync/MethodRegistry.cs
+    startLine: 17
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: public static IReadOnlyDictionary<MethodId, MethodAccess> IdToMethod { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{Sync.MethodId,Sync.MethodAccess}
+    content.vb: Public Shared ReadOnly Property IdToMethod As IReadOnlyDictionary(Of MethodId, MethodAccess)
+  overload: Sync.MethodRegistry.IdToMethod*
+  modifiers.csharp:
+  - public
+  - static
+  - get
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: Sync.MethodRegistry.Register(Sync.MethodAccess)
+  commentId: M:Sync.MethodRegistry.Register(Sync.MethodAccess)
+  id: Register(Sync.MethodAccess)
+  parent: Sync.MethodRegistry
+  langs:
+  - csharp
+  - vb
+  name: Register(MethodAccess)
+  nameWithType: MethodRegistry.Register(MethodAccess)
+  fullName: Sync.MethodRegistry.Register(Sync.MethodAccess)
+  type: Method
+  source:
+    remote:
+      path: source/Sync/MethodRegistry.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Register
+    path: ../source/Sync/MethodRegistry.cs
+    startLine: 19
+  assemblies:
+  - Sync
+  namespace: Sync
+  syntax:
+    content: public static MethodId Register([NotNull] MethodAccess methodAccess)
+    parameters:
+    - id: methodAccess
+      type: Sync.MethodAccess
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    return:
+      type: Sync.MethodId
+    content.vb: Public Shared Function Register(methodAccess As MethodAccess) As MethodId
+  overload: Sync.MethodRegistry.Register*
+  modifiers.csharp:
+  - public
+  - static
+  modifiers.vb:
+  - Public
+  - Shared
+references:
+- uid: Sync
+  commentId: N:Sync
+  name: Sync
+  nameWithType: Sync
+  fullName: Sync
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: System.Collections.Generic.Dictionary{Sync.MethodAccess,Sync.MethodId}
+  commentId: T:System.Collections.Generic.Dictionary{Sync.MethodAccess,Sync.MethodId}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  name: Dictionary<MethodAccess, MethodId>
+  nameWithType: Dictionary<MethodAccess, MethodId>
+  fullName: System.Collections.Generic.Dictionary<Sync.MethodAccess, Sync.MethodId>
+  nameWithType.vb: Dictionary(Of MethodAccess, MethodId)
+  fullName.vb: System.Collections.Generic.Dictionary(Of Sync.MethodAccess, Sync.MethodId)
+  name.vb: Dictionary(Of MethodAccess, MethodId)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.MethodAccess
+    name: MethodAccess
+    nameWithType: MethodAccess
+    fullName: Sync.MethodAccess
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.MethodId
+    name: MethodId
+    nameWithType: MethodId
+    fullName: Sync.MethodId
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.MethodAccess
+    name: MethodAccess
+    nameWithType: MethodAccess
+    fullName: Sync.MethodAccess
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.MethodId
+    name: MethodId
+    nameWithType: MethodId
+    fullName: Sync.MethodId
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.Dictionary`2
+  commentId: T:System.Collections.Generic.Dictionary`2
+  isExternal: true
+  name: Dictionary<TKey, TValue>
+  nameWithType: Dictionary<TKey, TValue>
+  fullName: System.Collections.Generic.Dictionary<TKey, TValue>
+  nameWithType.vb: Dictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.Dictionary(Of TKey, TValue)
+  name.vb: Dictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: System.Collections.Generic.Dictionary{Sync.MethodId,Sync.MethodAccess}
+  commentId: T:System.Collections.Generic.Dictionary{Sync.MethodId,Sync.MethodAccess}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.Dictionary`2
+  name: Dictionary<MethodId, MethodAccess>
+  nameWithType: Dictionary<MethodId, MethodAccess>
+  fullName: System.Collections.Generic.Dictionary<Sync.MethodId, Sync.MethodAccess>
+  nameWithType.vb: Dictionary(Of MethodId, MethodAccess)
+  fullName.vb: System.Collections.Generic.Dictionary(Of Sync.MethodId, Sync.MethodAccess)
+  name.vb: Dictionary(Of MethodId, MethodAccess)
+  spec.csharp:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.MethodId
+    name: MethodId
+    nameWithType: MethodId
+    fullName: Sync.MethodId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.MethodAccess
+    name: MethodAccess
+    nameWithType: MethodAccess
+    fullName: Sync.MethodAccess
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    nameWithType: Dictionary
+    fullName: System.Collections.Generic.Dictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.MethodId
+    name: MethodId
+    nameWithType: MethodId
+    fullName: Sync.MethodId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.MethodAccess
+    name: MethodAccess
+    nameWithType: MethodAccess
+    fullName: Sync.MethodAccess
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.MethodRegistry.MethodToId*
+  commentId: Overload:Sync.MethodRegistry.MethodToId
+  name: MethodToId
+  nameWithType: MethodRegistry.MethodToId
+  fullName: Sync.MethodRegistry.MethodToId
+- uid: System.Collections.Generic.IReadOnlyDictionary{Sync.MethodAccess,Sync.MethodId}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{Sync.MethodAccess,Sync.MethodId}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  name: IReadOnlyDictionary<MethodAccess, MethodId>
+  nameWithType: IReadOnlyDictionary<MethodAccess, MethodId>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<Sync.MethodAccess, Sync.MethodId>
+  nameWithType.vb: IReadOnlyDictionary(Of MethodAccess, MethodId)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of Sync.MethodAccess, Sync.MethodId)
+  name.vb: IReadOnlyDictionary(Of MethodAccess, MethodId)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.MethodAccess
+    name: MethodAccess
+    nameWithType: MethodAccess
+    fullName: Sync.MethodAccess
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.MethodId
+    name: MethodId
+    nameWithType: MethodId
+    fullName: Sync.MethodId
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.MethodAccess
+    name: MethodAccess
+    nameWithType: MethodAccess
+    fullName: Sync.MethodAccess
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.MethodId
+    name: MethodId
+    nameWithType: MethodId
+    fullName: Sync.MethodId
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.IReadOnlyDictionary`2
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary`2
+  isExternal: true
+  name: IReadOnlyDictionary<TKey, TValue>
+  nameWithType: IReadOnlyDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>
+  nameWithType.vb: IReadOnlyDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of TKey, TValue)
+  name.vb: IReadOnlyDictionary(Of TKey, TValue)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: TKey
+    nameWithType: TKey
+    fullName: TKey
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - name: TValue
+    nameWithType: TValue
+    fullName: TValue
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.MethodRegistry.IdToMethod*
+  commentId: Overload:Sync.MethodRegistry.IdToMethod
+  name: IdToMethod
+  nameWithType: MethodRegistry.IdToMethod
+  fullName: Sync.MethodRegistry.IdToMethod
+- uid: System.Collections.Generic.IReadOnlyDictionary{Sync.MethodId,Sync.MethodAccess}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{Sync.MethodId,Sync.MethodAccess}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  name: IReadOnlyDictionary<MethodId, MethodAccess>
+  nameWithType: IReadOnlyDictionary<MethodId, MethodAccess>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<Sync.MethodId, Sync.MethodAccess>
+  nameWithType.vb: IReadOnlyDictionary(Of MethodId, MethodAccess)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of Sync.MethodId, Sync.MethodAccess)
+  name.vb: IReadOnlyDictionary(Of MethodId, MethodAccess)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.MethodId
+    name: MethodId
+    nameWithType: MethodId
+    fullName: Sync.MethodId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.MethodAccess
+    name: MethodAccess
+    nameWithType: MethodAccess
+    fullName: Sync.MethodAccess
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    nameWithType: IReadOnlyDictionary
+    fullName: System.Collections.Generic.IReadOnlyDictionary
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.MethodId
+    name: MethodId
+    nameWithType: MethodId
+    fullName: Sync.MethodId
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: Sync.MethodAccess
+    name: MethodAccess
+    nameWithType: MethodAccess
+    fullName: Sync.MethodAccess
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Sync.MethodRegistry.Register*
+  commentId: Overload:Sync.MethodRegistry.Register
+  name: Register
+  nameWithType: MethodRegistry.Register
+  fullName: Sync.MethodRegistry.Register
+- uid: Sync.MethodAccess
+  commentId: T:Sync.MethodAccess
+  parent: Sync
+  name: MethodAccess
+  nameWithType: MethodAccess
+  fullName: Sync.MethodAccess
+- uid: Sync.MethodId
+  commentId: T:Sync.MethodId
+  parent: Sync
+  name: MethodId
+  nameWithType: MethodId
+  fullName: Sync.MethodId

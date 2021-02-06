@@ -1,0 +1,1038 @@
+### YamlMime:ManagedReference
+items:
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  commentId: T:Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  id: EventBroadcastingQueue
+  parent: Coop.Mod.Persistence.RPC
+  children:
+  - Coop.Mod.Persistence.RPC.EventBroadcastingQueue.#ctor(Sync.Store.SharedRemoteStore,System.TimeSpan)
+  - Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Add(RailServerRoom,Coop.Mod.Persistence.RPC.EventMethodCall)
+  - Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Count
+  - Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Logger
+  - Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_DistributedObjects
+  - Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Queue
+  - Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Store
+  - Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Timeout
+  - Coop.Mod.Persistence.RPC.EventBroadcastingQueue.MaximumQueueSize
+  - Coop.Mod.Persistence.RPC.EventBroadcastingQueue.OnObjectDistributed(Sync.Store.ObjectId)
+  - Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Update(System.TimeSpan)
+  langs:
+  - csharp
+  - vb
+  name: EventBroadcastingQueue
+  nameWithType: EventBroadcastingQueue
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  type: Class
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: EventBroadcastingQueue
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 16
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  summary: "\nQueue to broadcast events. Sends all events in order and makes sure, that all event\narguments can be resolved on the clients. This includes waiting for any pending\nlarge object transfers.\n"
+  example: []
+  syntax:
+    content: 'public class EventBroadcastingQueue : IUpdateable'
+    content.vb: >-
+      Public Class EventBroadcastingQueue
+          Implements IUpdateable
+  inheritance:
+  - System.Object
+  implements:
+  - Common.IUpdateable
+  inheritedMembers:
+  - System.Object.ToString
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  modifiers.csharp:
+  - public
+  - class
+  modifiers.vb:
+  - Public
+  - Class
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Logger
+  commentId: F:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Logger
+  id: Logger
+  parent: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  langs:
+  - csharp
+  - vb
+  name: Logger
+  nameWithType: EventBroadcastingQueue.Logger
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Logger
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Logger
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 18
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: static readonly Logger Logger
+    return:
+      type: NLog.Logger
+    content.vb: Shared ReadOnly Logger As Logger
+  modifiers.csharp:
+  - static
+  - readonly
+  modifiers.vb:
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.MaximumQueueSize
+  commentId: F:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.MaximumQueueSize
+  id: MaximumQueueSize
+  parent: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  langs:
+  - csharp
+  - vb
+  name: MaximumQueueSize
+  nameWithType: EventBroadcastingQueue.MaximumQueueSize
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.MaximumQueueSize
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: MaximumQueueSize
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 25
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  summary: "\nDefines the maximum number of events that can be added to the queue. Smaller in\nDEBUG to identify situations where events are starving in the queue. Might need\nto be adjusted depending on how much is done using events.\n"
+  example: []
+  syntax:
+    content: public static readonly int MaximumQueueSize
+    return:
+      type: System.Int32
+    content.vb: Public Shared ReadOnly MaximumQueueSize As Integer
+  modifiers.csharp:
+  - public
+  - static
+  - readonly
+  modifiers.vb:
+  - Public
+  - Shared
+  - ReadOnly
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_DistributedObjects
+  commentId: F:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_DistributedObjects
+  id: m_DistributedObjects
+  parent: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  langs:
+  - csharp
+  - vb
+  name: m_DistributedObjects
+  nameWithType: EventBroadcastingQueue.m_DistributedObjects
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_DistributedObjects
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_DistributedObjects
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 27
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: readonly OrderedHashSet<ObjectId> m_DistributedObjects
+    return:
+      type: Common.OrderedHashSet{Sync.Store.ObjectId}
+    content.vb: ReadOnly m_DistributedObjects As OrderedHashSet(Of ObjectId)
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Queue
+  commentId: F:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Queue
+  id: m_Queue
+  parent: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  langs:
+  - csharp
+  - vb
+  name: m_Queue
+  nameWithType: EventBroadcastingQueue.m_Queue
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Queue
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Queue
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 30
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: readonly List<EventBroadcastingQueue.Call> m_Queue
+    return:
+      type: System.Collections.Generic.List{Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Call}
+    content.vb: ReadOnly m_Queue As List(Of EventBroadcastingQueue.Call)
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Store
+  commentId: F:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Store
+  id: m_Store
+  parent: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  langs:
+  - csharp
+  - vb
+  name: m_Store
+  nameWithType: EventBroadcastingQueue.m_Store
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Store
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Store
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 32
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: >-
+      [NotNull]
+
+      readonly SharedRemoteStore m_Store
+    return:
+      type: Sync.Store.SharedRemoteStore
+    content.vb: >-
+      <NotNull>
+
+      ReadOnly m_Store As SharedRemoteStore
+  attributes:
+  - type: JetBrains.Annotations.NotNullAttribute
+    ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+    arguments: []
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Timeout
+  commentId: F:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Timeout
+  id: m_Timeout
+  parent: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  langs:
+  - csharp
+  - vb
+  name: m_Timeout
+  nameWithType: EventBroadcastingQueue.m_Timeout
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.m_Timeout
+  type: Field
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: m_Timeout
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 34
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: readonly TimeSpan m_Timeout
+    return:
+      type: System.TimeSpan
+    content.vb: ReadOnly m_Timeout As TimeSpan
+  modifiers.csharp:
+  - readonly
+  modifiers.vb:
+  - ReadOnly
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.#ctor(Sync.Store.SharedRemoteStore,System.TimeSpan)
+  commentId: M:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.#ctor(Sync.Store.SharedRemoteStore,System.TimeSpan)
+  id: '#ctor(Sync.Store.SharedRemoteStore,System.TimeSpan)'
+  parent: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  langs:
+  - csharp
+  - vb
+  name: EventBroadcastingQueue(SharedRemoteStore, TimeSpan)
+  nameWithType: EventBroadcastingQueue.EventBroadcastingQueue(SharedRemoteStore, TimeSpan)
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.EventBroadcastingQueue(Sync.Store.SharedRemoteStore, System.TimeSpan)
+  type: Constructor
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: .ctor
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 43
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  summary: "\n"
+  example: []
+  syntax:
+    content: public EventBroadcastingQueue([NotNull] SharedRemoteStore store, TimeSpan eventTimeout)
+    parameters:
+    - id: store
+      type: Sync.Store.SharedRemoteStore
+      description: Store to be used for large object transfer.
+      attributes:
+      - type: JetBrains.Annotations.NotNullAttribute
+        ctor: JetBrains.Annotations.NotNullAttribute.#ctor
+        arguments: []
+    - id: eventTimeout
+      type: System.TimeSpan
+      description: "\nMaximum amount of time a single event may spend in the queue. After\nwhich it is dropped.\n"
+    content.vb: Public Sub New(store As SharedRemoteStore, eventTimeout As TimeSpan)
+  overload: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.#ctor*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Count
+  commentId: P:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Count
+  id: Count
+  parent: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  langs:
+  - csharp
+  - vb
+  name: Count
+  nameWithType: EventBroadcastingQueue.Count
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Count
+  type: Property
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Count
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 50
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: public int Count { get; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public ReadOnly Property Count As Integer
+  overload: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Count*
+  modifiers.csharp:
+  - public
+  - get
+  modifiers.vb:
+  - Public
+  - ReadOnly
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Update(System.TimeSpan)
+  commentId: M:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Update(System.TimeSpan)
+  id: Update(System.TimeSpan)
+  parent: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  langs:
+  - csharp
+  - vb
+  name: Update(TimeSpan)
+  nameWithType: EventBroadcastingQueue.Update(TimeSpan)
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Update(System.TimeSpan)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Update
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 61
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: public void Update(TimeSpan frameTime)
+    parameters:
+    - id: frameTime
+      type: System.TimeSpan
+    content.vb: Public Sub Update(frameTime As TimeSpan)
+  overload: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Update*
+  implements:
+  - Common.IUpdateable.Update(System.TimeSpan)
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Add(RailServerRoom,Coop.Mod.Persistence.RPC.EventMethodCall)
+  commentId: M:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Add(RailServerRoom,Coop.Mod.Persistence.RPC.EventMethodCall)
+  id: Add(RailServerRoom,Coop.Mod.Persistence.RPC.EventMethodCall)
+  parent: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  langs:
+  - csharp
+  - vb
+  name: Add(RailServerRoom, EventMethodCall)
+  nameWithType: EventBroadcastingQueue.Add(RailServerRoom, EventMethodCall)
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Add(RailServerRoom, Coop.Mod.Persistence.RPC.EventMethodCall)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: Add
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 100
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  summary: "\nAdds an event to be broadcast.\nAttention: The queue does not initiate any large object transfers. But it waits\nfor the completion of the transfers.\n"
+  example: []
+  syntax:
+    content: public void Add(RailServerRoom room, EventMethodCall rpc)
+    parameters:
+    - id: room
+      type: RailServerRoom
+      description: Room to send the event to.
+    - id: rpc
+      type: Coop.Mod.Persistence.RPC.EventMethodCall
+      description: ''
+    content.vb: Public Sub Add(room As RailServerRoom, rpc As EventMethodCall)
+  overload: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Add*
+  modifiers.csharp:
+  - public
+  modifiers.vb:
+  - Public
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.OnObjectDistributed(Sync.Store.ObjectId)
+  commentId: M:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.OnObjectDistributed(Sync.Store.ObjectId)
+  id: OnObjectDistributed(Sync.Store.ObjectId)
+  parent: Coop.Mod.Persistence.RPC.EventBroadcastingQueue
+  langs:
+  - csharp
+  - vb
+  name: OnObjectDistributed(ObjectId)
+  nameWithType: EventBroadcastingQueue.OnObjectDistributed(ObjectId)
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.OnObjectDistributed(Sync.Store.ObjectId)
+  type: Method
+  source:
+    remote:
+      path: source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+      branch: readthedocs
+      repo: https://github.com/Bannerlord-Coop-Team/BannerlordCoop.git
+    id: OnObjectDistributed
+    path: ../source/Coop/Mod/Persistence/RPC/EventBroadcastingQueue.cs
+    startLine: 131
+  assemblies:
+  - Coop
+  namespace: Coop.Mod.Persistence.RPC
+  syntax:
+    content: void OnObjectDistributed(ObjectId id)
+    parameters:
+    - id: id
+      type: Sync.Store.ObjectId
+    content.vb: Sub OnObjectDistributed(id As ObjectId)
+  overload: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.OnObjectDistributed*
+references:
+- uid: Coop.Mod.Persistence.RPC
+  commentId: N:Coop.Mod.Persistence.RPC
+  name: Coop.Mod.Persistence.RPC
+  nameWithType: Coop.Mod.Persistence.RPC
+  fullName: Coop.Mod.Persistence.RPC
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  name: Object
+  nameWithType: Object
+  fullName: System.Object
+- uid: Common.IUpdateable
+  commentId: T:Common.IUpdateable
+  parent: Common
+  name: IUpdateable
+  nameWithType: IUpdateable
+  fullName: Common.IUpdateable
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  name: ToString()
+  nameWithType: Object.ToString()
+  fullName: System.Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    nameWithType: Object.ToString
+    fullName: System.Object.ToString
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object)
+  nameWithType: Object.Equals(Object)
+  fullName: System.Object.Equals(System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: Equals(Object, Object)
+  nameWithType: Object.Equals(Object, Object)
+  fullName: System.Object.Equals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    nameWithType: Object.Equals
+    fullName: System.Object.Equals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  name: ReferenceEquals(Object, Object)
+  nameWithType: Object.ReferenceEquals(Object, Object)
+  fullName: System.Object.ReferenceEquals(System.Object, System.Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    nameWithType: Object.ReferenceEquals
+    fullName: System.Object.ReferenceEquals
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: ', '
+    nameWithType: ', '
+    fullName: ', '
+  - uid: System.Object
+    name: Object
+    nameWithType: Object
+    fullName: System.Object
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  name: GetHashCode()
+  nameWithType: Object.GetHashCode()
+  fullName: System.Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    nameWithType: Object.GetHashCode
+    fullName: System.Object.GetHashCode
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  name: GetType()
+  nameWithType: Object.GetType()
+  fullName: System.Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    nameWithType: Object.GetType
+    fullName: System.Object.GetType
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  name: MemberwiseClone()
+  nameWithType: Object.MemberwiseClone()
+  fullName: System.Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    nameWithType: Object.MemberwiseClone
+    fullName: System.Object.MemberwiseClone
+    isExternal: true
+  - name: (
+    nameWithType: (
+    fullName: (
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Common
+  commentId: N:Common
+  name: Common
+  nameWithType: Common
+  fullName: Common
+- uid: NLog.Logger
+  commentId: T:NLog.Logger
+  parent: NLog
+  isExternal: true
+  name: Logger
+  nameWithType: Logger
+  fullName: NLog.Logger
+- uid: NLog
+  commentId: N:NLog
+  isExternal: true
+  name: NLog
+  nameWithType: NLog
+  fullName: NLog
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  name: Int32
+  nameWithType: Int32
+  fullName: System.Int32
+- uid: Common.OrderedHashSet{Sync.Store.ObjectId}
+  commentId: T:Common.OrderedHashSet{Sync.Store.ObjectId}
+  parent: Common
+  definition: Common.OrderedHashSet`1
+  name: OrderedHashSet<ObjectId>
+  nameWithType: OrderedHashSet<ObjectId>
+  fullName: Common.OrderedHashSet<Sync.Store.ObjectId>
+  nameWithType.vb: OrderedHashSet(Of ObjectId)
+  fullName.vb: Common.OrderedHashSet(Of Sync.Store.ObjectId)
+  name.vb: OrderedHashSet(Of ObjectId)
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1
+    name: OrderedHashSet
+    nameWithType: OrderedHashSet
+    fullName: Common.OrderedHashSet
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1
+    name: OrderedHashSet
+    nameWithType: OrderedHashSet
+    fullName: Common.OrderedHashSet
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Sync.Store.ObjectId
+    name: ObjectId
+    nameWithType: ObjectId
+    fullName: Sync.Store.ObjectId
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Common.OrderedHashSet`1
+  commentId: T:Common.OrderedHashSet`1
+  parent: Common
+  name: OrderedHashSet<T>
+  nameWithType: OrderedHashSet<T>
+  fullName: Common.OrderedHashSet<T>
+  nameWithType.vb: OrderedHashSet(Of T)
+  fullName.vb: Common.OrderedHashSet(Of T)
+  name.vb: OrderedHashSet(Of T)
+  spec.csharp:
+  - uid: Common.OrderedHashSet`1
+    name: OrderedHashSet
+    nameWithType: OrderedHashSet
+    fullName: Common.OrderedHashSet
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: Common.OrderedHashSet`1
+    name: OrderedHashSet
+    nameWithType: OrderedHashSet
+    fullName: Common.OrderedHashSet
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.List{Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Call}
+  commentId: T:System.Collections.Generic.List{Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Call}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  name: List<EventBroadcastingQueue.Call>
+  nameWithType: List<EventBroadcastingQueue.Call>
+  fullName: System.Collections.Generic.List<Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Call>
+  nameWithType.vb: List(Of EventBroadcastingQueue.Call)
+  fullName.vb: System.Collections.Generic.List(Of Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Call)
+  name.vb: List(Of EventBroadcastingQueue.Call)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Call
+    name: EventBroadcastingQueue.Call
+    nameWithType: EventBroadcastingQueue.Call
+    fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Call
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Call
+    name: EventBroadcastingQueue.Call
+    nameWithType: EventBroadcastingQueue.Call
+    fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Call
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: <
+    nameWithType: <
+    fullName: <
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: '>'
+    nameWithType: '>'
+    fullName: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    nameWithType: List
+    fullName: System.Collections.Generic.List
+    isExternal: true
+  - name: '(Of '
+    nameWithType: '(Of '
+    fullName: '(Of '
+  - name: T
+    nameWithType: T
+    fullName: T
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+- uid: Sync.Store.SharedRemoteStore
+  commentId: T:Sync.Store.SharedRemoteStore
+  parent: Sync.Store
+  name: SharedRemoteStore
+  nameWithType: SharedRemoteStore
+  fullName: Sync.Store.SharedRemoteStore
+- uid: Sync.Store
+  commentId: N:Sync.Store
+  name: Sync.Store
+  nameWithType: Sync.Store
+  fullName: Sync.Store
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.#ctor*
+  commentId: Overload:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.#ctor
+  name: EventBroadcastingQueue
+  nameWithType: EventBroadcastingQueue.EventBroadcastingQueue
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.EventBroadcastingQueue
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Count*
+  commentId: Overload:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Count
+  name: Count
+  nameWithType: EventBroadcastingQueue.Count
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Count
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Update*
+  commentId: Overload:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Update
+  name: Update
+  nameWithType: EventBroadcastingQueue.Update
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Update
+- uid: Common.IUpdateable.Update(System.TimeSpan)
+  commentId: M:Common.IUpdateable.Update(System.TimeSpan)
+  parent: Common.IUpdateable
+  isExternal: true
+  name: Update(TimeSpan)
+  nameWithType: IUpdateable.Update(TimeSpan)
+  fullName: Common.IUpdateable.Update(System.TimeSpan)
+  spec.csharp:
+  - uid: Common.IUpdateable.Update(System.TimeSpan)
+    name: Update
+    nameWithType: IUpdateable.Update
+    fullName: Common.IUpdateable.Update
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.TimeSpan
+    name: TimeSpan
+    nameWithType: TimeSpan
+    fullName: System.TimeSpan
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+  spec.vb:
+  - uid: Common.IUpdateable.Update(System.TimeSpan)
+    name: Update
+    nameWithType: IUpdateable.Update
+    fullName: Common.IUpdateable.Update
+  - name: (
+    nameWithType: (
+    fullName: (
+  - uid: System.TimeSpan
+    name: TimeSpan
+    nameWithType: TimeSpan
+    fullName: System.TimeSpan
+    isExternal: true
+  - name: )
+    nameWithType: )
+    fullName: )
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Add*
+  commentId: Overload:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Add
+  name: Add
+  nameWithType: EventBroadcastingQueue.Add
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.Add
+- uid: RailServerRoom
+  isExternal: true
+  name: RailServerRoom
+  nameWithType: RailServerRoom
+  fullName: RailServerRoom
+- uid: Coop.Mod.Persistence.RPC.EventMethodCall
+  commentId: T:Coop.Mod.Persistence.RPC.EventMethodCall
+  parent: Coop.Mod.Persistence.RPC
+  name: EventMethodCall
+  nameWithType: EventMethodCall
+  fullName: Coop.Mod.Persistence.RPC.EventMethodCall
+- uid: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.OnObjectDistributed*
+  commentId: Overload:Coop.Mod.Persistence.RPC.EventBroadcastingQueue.OnObjectDistributed
+  name: OnObjectDistributed
+  nameWithType: EventBroadcastingQueue.OnObjectDistributed
+  fullName: Coop.Mod.Persistence.RPC.EventBroadcastingQueue.OnObjectDistributed
+- uid: Sync.Store.ObjectId
+  commentId: T:Sync.Store.ObjectId
+  parent: Sync.Store
+  name: ObjectId
+  nameWithType: ObjectId
+  fullName: Sync.Store.ObjectId
