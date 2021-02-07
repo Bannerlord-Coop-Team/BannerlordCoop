@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
@@ -37,7 +38,7 @@ namespace CoopFramework
         ///     that is being created.
         /// </summary>
         /// <param name="factoryMethod">Factory method that creates an instance of the concrete inheriting class."/></param>
-        protected static void AutoWrapAllInstances(Func<TExtended, CoopManaged<TSelf, TExtended>> factoryMethod)
+        protected static void AutoWrapAllInstances(Func<TExtended, TSelf> factoryMethod)
         {
             if (m_ConstructorPatch != null || m_DestructorPatch != null)
                 throw new Exception($"Constructors for {nameof(TExtended)} are already patched!");
@@ -118,6 +119,12 @@ namespace CoopFramework
         #endregion
 
         #region Object instances
+        /// <summary>
+        ///     If the <typeparamref name="TExtended"/> does not implement a destructor, the lifetime of instances
+        ///     needs to be tracked manually. This constant defines the interval in which a check is performed to
+        ///     release automatically created <typeparamref name="TSelf"/> wrapper instance.
+        /// </summary>
+        public const int GCInterval_ms = 500;
 
         /// <summary>
         ///     Returns the instance that is being managed by this <see cref="TSelf" />.
@@ -128,6 +135,8 @@ namespace CoopFramework
         /// <summary>
         ///     Returns all instances of this <see cref="TSelf" /> that very automatically created because
         ///     <see cref="AutoWrapAllInstances" /> is enabled.
+        ///
+        ///     ATTENTION: This collection might be modified from another thread! Lock before use.
         /// </summary>
         public static IReadOnlyCollection<CoopManaged<TSelf, TExtended>> AutoWrappedInstances => m_AutoWrappedInstances;
 
@@ -147,9 +156,12 @@ namespace CoopFramework
             RuntimeHelpers.RunClassConstructor(typeof(TSelf).TypeHandle);
         }
 
-        private static void OnConstructed(CoopManaged<TSelf, TExtended> newInstance)
+        private static void OnConstructed(TSelf newInstance)
         {
-            m_AutoWrappedInstances.Add(newInstance);
+            lock (m_AutoWrappedInstances)
+            {
+                m_AutoWrappedInstances.Add(newInstance as CoopManaged<TSelf, TExtended>);
+            }
         }
 
         private static ECallPropagation Dispatch(CoopManaged<TSelf, TExtended> self,
@@ -250,7 +262,7 @@ namespace CoopFramework
             public MethodId Id { get; }
         }
 
-        private static void HookIntoObjectLifetime(Func<TExtended, CoopManaged<TSelf, TExtended>> factoryMethod)
+        private static void HookIntoObjectLifetime(Func<TExtended, TSelf> factoryMethod)
         {
             m_ConstructorPatch = new ConstructorPatch<TSelf>(typeof(TExtended)).PostfixAll();
             if (!m_ConstructorPatch.Methods.Any())
@@ -265,23 +277,39 @@ namespace CoopFramework
 
             m_DestructorPatch = new DestructorPatch<TSelf>(typeof(TExtended)).Prefix();
             if (!m_DestructorPatch.Methods.Any())
-                throw new Exception(
-                    $"Class {typeof(TExtended)} has no destructor. Cannot unwrap instances automatically");
+            {
+                Logger.Debug($"Class {typeof(TExtended)} has no destructor. Auto unwrapping not possible. Registering with GC to prevent memory leaks.");
+                TimerGC = new Timer((state => UnwrapUnusedInstances()));
+                
+                TimerGC.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(GCInterval_ms));
+            }
+                
 
             foreach (var methodAccess in m_DestructorPatch.Methods)
                 methodAccess.Prefix.SetGlobalHandler((origin, instance, args) =>
                 {
-                    var managedInstances = m_AutoWrappedInstances
-                        .Where(wrapper => wrapper.Instance.TryGetTarget(out var o) && o == instance)
-                        .ToList();
-                    foreach (var managedInstance in managedInstances)
+                    lock (m_AutoWrappedInstances)
                     {
-                        managedInstance.OnBeforeFinalize(instance as TExtended);
-                        m_AutoWrappedInstances.Remove(managedInstance);
+                        var managedInstances = m_AutoWrappedInstances
+                            .Where(wrapper => wrapper.Instance.TryGetTarget(out var o) && o == instance)
+                            .ToList();
+                        foreach (var managedInstance in managedInstances)
+                        {
+                            managedInstance.OnBeforeFinalize(instance as TExtended);
+                            m_AutoWrappedInstances.Remove(managedInstance);
+                        }
                     }
 
                     return ECallPropagation.CallOriginal; // Always call the original desctructor!
                 });
+        }
+
+        private static void UnwrapUnusedInstances()
+        {
+            lock (m_AutoWrappedInstances)
+            {
+                m_AutoWrappedInstances.RemoveAll(managed => !managed.Instance.TryGetTarget(out TExtended intance));
+            }
         }
 
         private static void SetupHandlers([CanBeNull] CoopManaged<TSelf, TExtended> self)
@@ -443,6 +471,8 @@ namespace CoopFramework
 
             return ECallPropagation.CallOriginal;
         }
+
+        [CanBeNull] private static Timer TimerGC;
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
