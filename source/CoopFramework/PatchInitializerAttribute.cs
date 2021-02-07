@@ -12,5 +12,6 @@ namespace CoopFramework
     [AttributeUsage(AttributeTargets.Method)]
     public class PatchInitializerAttribute : Attribute
     {
+        public bool IsInitialized = false;
     }
 }

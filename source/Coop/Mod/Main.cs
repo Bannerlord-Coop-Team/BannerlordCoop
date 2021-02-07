@@ -114,7 +114,7 @@ namespace Coop.Mod
             CoopFramework.CoopFramework.InitPatches(Coop.IsCoopGameSession);
 
             // Skip startup splash screen
-            if (Globals.DEBUG)
+            if (Globals.DEBUG) 
             {
                 typeof(Module).GetField(
                                   "_splashScreenPlayed",
