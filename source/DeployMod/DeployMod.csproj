@@ -14,7 +14,10 @@
     </PropertyGroup>
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="powershell -ExecutionPolicy Unrestricted -File &quot;$(SolutionDir)..\deploy.ps1&quot; ^&#xD;&#xA;        -SolutionDir &quot;$(SolutionDir)\&quot;  ^&#xD;&#xA;        -TargetDir &quot;$(SolutionDir)Coop\bin\$(Configuration)\\&quot; ^&#xD;&#xA;        -Libs Coop.dll,Common.dll,CoopFramework.dll,Network.dll,RemoteAction.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll" />
+        <Exec Command='powershell -ExecutionPolicy Unrestricted ^
+            -File "$(SolutionDir)..\deploy.ps1" -SolutionDir $(SolutionDir)\ ^
+            -TargetDir $(SolutionDir)Coop\bin\$(Configuration)\ ^
+            -Libs Coop.dll,CoopFramework.dll,Common.dll,Network.dll,Sync.dll,RemoteAction.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll' />
     </Target>
 
     <ItemGroup>
@@ -22,14 +25,13 @@
       <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingLibrary\BannerlordSystemTestingLibrary.csproj" />
       <ProjectReference Include="..\ClientDebug\ClientDebug.csproj" />
       <ProjectReference Include="..\Common\Common.csproj" />
-      <ProjectReference Include="..\Coop.Tests\Coop.Tests.csproj" />
-      <ProjectReference Include="..\CoopFramework\CoopFramework.csproj" />
       <ProjectReference Include="..\Coop\Coop.csproj" />
+      <ProjectReference Include="..\CoopFramework\CoopFramework.csproj" />
       <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj" />
       <ProjectReference Include="..\Network\Network.csproj" />
       <ProjectReference Include="..\RailgunNet\RailgunNet\RailgunNet.csproj" />
-      <ProjectReference Include="..\RemoteAction\RemoteAction.csproj" />
       <ProjectReference Include="..\Sync\Sync.csproj" />
+      <ProjectReference Include="..\RemoteAction\RemoteAction.csproj" />
       <ProjectReference Include="..\SystemTests\SystemTests.csproj" />
       <ProjectReference Include="..\TestRunner\TestRunner.csproj" />
     </ItemGroup>
