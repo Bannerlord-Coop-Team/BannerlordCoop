@@ -42,6 +42,11 @@ namespace Coop.Mod.Patch
             }
             access.Prefix.SetGlobalHandler((instance, args) =>
             {
+                if (!Coop.IsCoopGameSession())
+                {
+                    return ECallPropagation.CallOriginal; 
+                }
+                
                 if (args.Length == 0 || !(args[0] is float))
                 {
                     throw new ArgumentException(

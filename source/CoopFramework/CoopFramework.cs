@@ -17,7 +17,7 @@ namespace CoopFramework
             if (m_Initialized)
             {
                 Logger.Error("CoopFramework.InitPatches can only be called once.");
-                return;
+                return; 
             }
 
             Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();

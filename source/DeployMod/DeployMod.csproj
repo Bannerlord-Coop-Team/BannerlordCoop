@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net4.7.2</TargetFramework>
+        <OutputType>Module</OutputType>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+      <PlatformTarget>x64</PlatformTarget>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+      <PlatformTarget>x64</PlatformTarget>
+    </PropertyGroup>
+
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+        <Exec Command="powershell -ExecutionPolicy Unrestricted -File &quot;$(SolutionDir)..\deploy.ps1&quot; ^&#xD;&#xA;        -SolutionDir &quot;$(SolutionDir)\&quot;  ^&#xD;&#xA;        -TargetDir &quot;$(SolutionDir)Coop\bin\$(Configuration)\\&quot; ^&#xD;&#xA;        -Libs Coop.dll,Common.dll,CoopFramework.dll,Network.dll,RemoteAction.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll" />
+    </Target>
+
+    <ItemGroup>
+      <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingFramework\BannerlordSystemTestingFramework.csproj" />
+      <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingLibrary\BannerlordSystemTestingLibrary.csproj" />
+      <ProjectReference Include="..\ClientDebug\ClientDebug.csproj" />
+      <ProjectReference Include="..\Common\Common.csproj" />
+      <ProjectReference Include="..\Coop.Tests\Coop.Tests.csproj" />
+      <ProjectReference Include="..\CoopFramework\CoopFramework.csproj" />
+      <ProjectReference Include="..\Coop\Coop.csproj" />
+      <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj" />
+      <ProjectReference Include="..\Network\Network.csproj" />
+      <ProjectReference Include="..\RailgunNet\RailgunNet\RailgunNet.csproj" />
+      <ProjectReference Include="..\RemoteAction\RemoteAction.csproj" />
+      <ProjectReference Include="..\Sync\Sync.csproj" />
+      <ProjectReference Include="..\SystemTests\SystemTests.csproj" />
+      <ProjectReference Include="..\TestRunner\TestRunner.csproj" />
+    </ItemGroup>
+
+</Project>

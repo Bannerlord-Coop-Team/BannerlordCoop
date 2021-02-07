@@ -5,17 +5,13 @@
 
     <IsPackable>false</IsPackable>
 
-    <Platforms>x64;AnyCPU</Platforms>
+    <Platforms>x64</Platforms>
 
     <Configurations>Debug;Release</Configurations>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DocumentationFile></DocumentationFile>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DocumentationFile />
   </PropertyGroup>
 
   <ItemGroup>
