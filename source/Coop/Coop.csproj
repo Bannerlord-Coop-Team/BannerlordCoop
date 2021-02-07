@@ -361,6 +361,7 @@
     <Compile Include="Mod\Serializers\CustomSerializers\HeroLastSeenInformationSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\HeroSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ItemRosterSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\MBCharacterSkillsSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MBGUIDSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MobilePartiesAroundPositionListSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MobilePartySerializer.cs" />
