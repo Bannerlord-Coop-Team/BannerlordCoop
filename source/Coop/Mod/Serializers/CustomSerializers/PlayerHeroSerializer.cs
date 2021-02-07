@@ -171,14 +171,14 @@ namespace Coop.Mod.Serializers
 
             base.Deserialize(hero);
 
-            List<PartyBase> ownedParties = (List<PartyBase>)hero.GetType()
-                .GetField("_ownedParties", BindingFlags.NonPublic | BindingFlags.Instance)
-                .GetValue(hero);
-
-            ownedParties.Add(hero.PartyBelongedTo.Party);
-
             // Update health due to member starting as injured
             hero.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(hero);
+
+
+            ConstructorInfo ctorInfo = typeof(WarPartyComponent)
+                .GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null,
+                    new Type[] { typeof(Clan), typeof(Hero) }, new ParameterModifier[0]);
+            Campaign.Current.MainParty.PartyComponent = (WarPartyComponent)ctorInfo.Invoke(new object[] { Clan.PlayerClan, Hero.MainHero });
 
             // Invoke party visual onstartup to initialize properly
             typeof(PartyVisual).GetMethod("TaleWorlds.CampaignSystem.IPartyVisual.OnStartup", BindingFlags.Instance | BindingFlags.NonPublic)

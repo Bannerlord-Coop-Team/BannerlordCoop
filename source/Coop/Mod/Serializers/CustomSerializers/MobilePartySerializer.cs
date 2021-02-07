@@ -106,6 +106,9 @@ namespace Coop.Mod.Serializers
                     case "<StationaryStartTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
+                    case "_partyComponent":
+                        // Handle on deserialize
+                        break;
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
                 }
