@@ -159,33 +159,52 @@ namespace Coop.Mod.DebugUtil
         private static void ShowPatches(string name, ReadOnlyCollection<HarmonyLib.Patch> patches)
         {
             List<HarmonyLib.Patch> list = patches.ToList();
-            if (!Imgui.TreeNode($"{name} ({list.Count})"))
+            if (list.Count == 0)
             {
                 return;
             }
             
-            Imgui.Columns(5);
-            Imgui.Text("Namespace");
-            list.ForEach(p => Imgui.Text(p.PatchMethod.DeclaringType?.Namespace));
-            
-            Imgui.NextColumn();
-            Imgui.Text("Declaring class");
-            list.ForEach(p => Imgui.Text(p.PatchMethod.DeclaringType?.Name));
-            
-            Imgui.NextColumn();
-            Imgui.Text("Patch method");
-            list.ForEach(p => Imgui.Text(p.PatchMethod.Name));
-            
-            Imgui.NextColumn();
-            Imgui.Text("Priority");
-            list.ForEach(p => Imgui.Text($"{p.priority}"));
-            
-            Imgui.NextColumn();
-            Imgui.Text("Owner");
-            Imgui.Separator();
-            list.ForEach(p => Imgui.Text(p.owner));
-            
-            Imgui.Columns();
+            if (!Imgui.TreeNode($"{name} ({list.Count})"))
+            {
+                return;
+            }
+
+            foreach (HarmonyLib.Patch patch in list)
+            {
+                string header = patch.PatchMethod.DeclaringType?.FullName;
+                if (Imgui.TreeNode(header))
+                {
+                    const float tabWidth = 200;
+                    Imgui.Text("Patch method:");
+                    Imgui.SameLine(tabWidth);
+                    Imgui.Text(patch.PatchMethod.Name);
+                    
+                    Imgui.Text("Priority:");
+                    Imgui.SameLine(tabWidth);
+                    Imgui.Text($"{patch.priority}");
+                    
+                    Imgui.Text("Owner:");
+                    Imgui.SameLine(tabWidth);
+                    Imgui.Text(patch.owner);
+                    
+                    if (patch.before.Length > 0)
+                    {
+                        Imgui.Text("Before:");
+                        Imgui.SameLine(tabWidth);
+                        Imgui.Text(string.Join(",", patch.before));
+                    }
+                    
+                    if (patch.after.Length > 0)
+                    {
+                        Imgui.Text("After:");
+                        Imgui.SameLine(tabWidth);
+                        Imgui.Text(string.Join(",", patch.after));
+                    }
+                    
+                    Imgui.NewLine();
+                    Imgui.TreePop();
+                }
+            }
             Imgui.TreePop();
         }
 

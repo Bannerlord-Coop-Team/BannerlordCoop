@@ -30,7 +30,7 @@ namespace Sync
             else
             {
                 UsedTypeNames[sTypeName] += 1;
-                sTypeName += UsedTypeNames[sTypeName];
+                sTypeName += "_" + UsedTypeNames[sTypeName];
             }
             TypeBuilder typeBuilder = ModuleBuilder.DefineType(sTypeName, TypeAttributes.Class | TypeAttributes.NotPublic);
             MethodBuilder methodBuilder = typeBuilder.DefineMethod(
