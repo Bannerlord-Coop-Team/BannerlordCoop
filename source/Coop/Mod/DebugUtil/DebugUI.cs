@@ -1,12 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
+using System.Reflection;
 using Common;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
+using CoopFramework;
+using HarmonyLib;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
@@ -40,7 +45,7 @@ namespace Coop.Mod.DebugUtil
                 AddButtons();
                 DisplayDiscovery();
                 DisplayConnectionInfo();
-                DisplayMethodRegistry();
+                DisplayHarmonyPatches();
                 DisplayPersistenceMenu();
                 End();
             }
@@ -110,59 +115,77 @@ namespace Coop.Mod.DebugUtil
             Imgui.Columns();
         }
 
-        private static void DisplayMethodRegistry()
+        private static void DisplayHarmonyPatches()
         {
-            if (!Imgui.TreeNode("Patched method registry"))
+            if (!Imgui.TreeNode("Harmony patches"))
             {
                 return;
             }
-
+            
+            Dictionary<MethodBase, List<MethodId>> byMethod = new Dictionary<MethodBase, List<MethodId>>();
             foreach (KeyValuePair<MethodId, MethodAccess> registrar in Registry.IdToMethod)
             {
-                MethodAccess access = registrar.Value;
-                string sName = $"{registrar.Key} {access}";
+                var key = registrar.Value.MethodBase;
+                if (!byMethod.ContainsKey(key))
+                {
+                    byMethod[key] = new List<MethodId>();
+                }
+                byMethod[key].Add(registrar.Key);
+            }
+
+            foreach (MethodBase method in Harmony.GetAllPatchedMethods())
+            {
+                string sName = $"{method.DeclaringType?.Name}.{method.Name}";
                 if (!Imgui.TreeNode(sName))
                 {
                     continue;
                 }
-
+                
 #if DEBUG
-                Imgui.Columns(2);
-                Imgui.Separator();
-                Imgui.Text("Instance");
-
-                // first line: global handler
-                Imgui.Text("global");
-
-                // instance specific handlers
-                foreach (var handler in access.Prefix.InstanceSpecificHandlers)
-                {
-                    Imgui.Text(handler.Key.ToString());
-                }
-
-                Imgui.NextColumn();
-                Imgui.Text("Handler");
-                Imgui.Separator();
-
-                // first line: global handler
-                Imgui.Text(
-                    access.Prefix.GlobalPrefixHandler != null ?
-                        access.Prefix.GlobalPrefixHandler.Target + "." + access.Prefix.GlobalPrefixHandler.Method.Name :
-                        "-");
-
-                // instance specific handlers
-                foreach (var handler in access.Prefix.InstanceSpecificHandlers)
-                {
-                    Imgui.Text(handler.Value.Target + "." + handler.Value.Method.Name);
-                }
-
-                Imgui.Columns();
-                Imgui.TreePop();
+                var patches = Harmony.GetPatchInfo(method);
+                ShowPatches(nameof(patches.Prefixes), patches.Prefixes);
+                ShowPatches(nameof(patches.Postfixes), patches.Postfixes);
+                ShowPatches(nameof(patches.Transpilers), patches.Transpilers);
+                ShowPatches(nameof(patches.Finalizers), patches.Finalizers);
 #else
                 DisplayDebugDisabledText();
 #endif
+                Imgui.TreePop();
             }
 
+            Imgui.TreePop();
+        }
+
+        private static void ShowPatches(string name, ReadOnlyCollection<HarmonyLib.Patch> patches)
+        {
+            List<HarmonyLib.Patch> list = patches.ToList();
+            if (!Imgui.TreeNode($"{name} ({list.Count})"))
+            {
+                return;
+            }
+            
+            Imgui.Columns(5);
+            Imgui.Text("Namespace");
+            list.ForEach(p => Imgui.Text(p.PatchMethod.DeclaringType?.Namespace));
+            
+            Imgui.NextColumn();
+            Imgui.Text("Declaring class");
+            list.ForEach(p => Imgui.Text(p.PatchMethod.DeclaringType?.Name));
+            
+            Imgui.NextColumn();
+            Imgui.Text("Patch method");
+            list.ForEach(p => Imgui.Text(p.PatchMethod.Name));
+            
+            Imgui.NextColumn();
+            Imgui.Text("Priority");
+            list.ForEach(p => Imgui.Text($"{p.priority}"));
+            
+            Imgui.NextColumn();
+            Imgui.Text("Owner");
+            Imgui.Separator();
+            list.ForEach(p => Imgui.Text(p.owner));
+            
+            Imgui.Columns();
             Imgui.TreePop();
         }
 
@@ -170,7 +193,6 @@ namespace Coop.Mod.DebugUtil
         {
             Imgui.BeginMainThreadScope();
             Imgui.Begin(m_WindowTitle);
-            Imgui.Text("DO NOT MOVE THIS WINDOW IN MAIN MENU! It will crash the game.");
         }
 
         private void AddButtons()
@@ -247,7 +269,8 @@ namespace Coop.Mod.DebugUtil
                 Imgui.Columns(2);
                 Imgui.Separator();
                 Imgui.Text("ID");
-                foreach (RailEntityServer entity in manager.Parties)
+                var parties = manager.Parties.ToList();
+                foreach (RailEntityServer entity in parties)
                 {
                     Imgui.Text(entity.Id.ToString());
                 }
@@ -255,7 +278,7 @@ namespace Coop.Mod.DebugUtil
                 Imgui.NextColumn();
                 Imgui.Text("Entity");
                 Imgui.Separator();
-                foreach (RailEntityServer entity in manager.Parties)
+                foreach (RailEntityServer entity in parties)
                 {
                     Imgui.Text(entity.ToString());
                 }

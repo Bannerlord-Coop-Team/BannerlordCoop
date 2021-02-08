@@ -168,7 +168,7 @@ namespace Sync
         {
             if (!TryGetMethod(method, out MethodAccess access))
             {
-                access = new MethodAccess(method);
+                access = new MethodAccess(method, typeof(TPatch));
                 m_Access.Add(access);
             }
             access.AddFlags(eFlags);
@@ -228,7 +228,7 @@ namespace Sync
                 nameof(DispatchPrefixExecution));
             if (!TryGetMethod(original, out MethodAccess access))
             {
-                access = new MethodAccess(original);
+                access = new MethodAccess(original, typeof(TPatch));
                 m_Access.Add(access);
             }
             MethodPatchFactory<TPatch>.AddPrefix(access, dispatcher);
@@ -258,7 +258,7 @@ namespace Sync
                 nameof(DispatchPostfixExecution));
             if (!TryGetMethod(original, out MethodAccess access))
             {
-                access = new MethodAccess(original);
+                access = new MethodAccess(original, typeof(TPatch));
                 m_Access.Add(access);
             }
             MethodPatchFactory<TPatch>.AddPostfix(access, dispatcher);

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
@@ -18,10 +20,19 @@ namespace Sync
         /// <returns></returns>
         public static MethodInfo CreateFactoryMethod<TPatchGenerator>(DynamicMethod method)
         {
-            string sTypeName = "HarmonyFactory_" + Guid.NewGuid().ToString("N");
-            string sMethodName = nameof(TPatchGenerator) + "." + method.Name;
-            
-            TypeBuilder typeBuilder = ModuleBuilder.DefineType(sTypeName + Guid.NewGuid().ToString("N"), TypeAttributes.Class | TypeAttributes.NotPublic);
+            string sTypeName = typeof(TPatchGenerator).FullName;
+            string sMethodName = method.Name;
+
+            if (!UsedTypeNames.ContainsKey(sTypeName))
+            {
+                UsedTypeNames[sTypeName] = 0;
+            }
+            else
+            {
+                UsedTypeNames[sTypeName] += 1;
+                sTypeName += UsedTypeNames[sTypeName];
+            }
+            TypeBuilder typeBuilder = ModuleBuilder.DefineType(sTypeName, TypeAttributes.Class | TypeAttributes.NotPublic);
             MethodBuilder methodBuilder = typeBuilder.DefineMethod(
                 sMethodName, 
                 MethodAttributes.Static | MethodAttributes.Private, CallingConventions.Standard, 
@@ -60,5 +71,7 @@ namespace Sync
 
         private static readonly ModuleBuilder ModuleBuilder = AssemblyBuilder.DefineDynamicModule(
             nameof(GetPrefixBuilder));
+
+        private static readonly Dictionary<string, int> UsedTypeNames = new Dictionary<string, int>();
     }
 }

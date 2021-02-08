@@ -90,7 +90,7 @@ namespace Coop.Tests.Sync
             MethodInfo dispatcher = AccessTools.Method(
                 typeof(MethodPatchFactory_Test),
                 nameof(DispatcherCallOriginal));
-            MethodAccess access = new MethodAccess(method);
+            MethodAccess access = new MethodAccess(method, typeof(Foo));
             DynamicMethod prefix = MethodPatchFactory<MethodPatchFactory_Test>.GeneratePatch(
                 "Prefix",
                 access,
@@ -135,7 +135,7 @@ namespace Coop.Tests.Sync
             MethodInfo dispatcher = AccessTools.Method(
                 typeof(MethodPatchFactory_Test),
                 nameof(DispatcherTrue));
-            MethodAccess access = new MethodAccess(method);
+            MethodAccess access = new MethodAccess(method, typeof(Foo));
             DynamicMethod prefix = MethodPatchFactory<MethodPatchFactory_Test>.GeneratePatch(
                 "Prefix",
                 access,

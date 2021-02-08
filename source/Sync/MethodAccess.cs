@@ -20,11 +20,24 @@ namespace Sync
         ///     Get the prefix for this method call.
         /// </summary>
         [NotNull] public Prefix Prefix { get; } = new Prefix();
+        /// <summary>
+        ///     Get the postfix for this method call.
+        /// </summary>
         [NotNull] public Postfix Postfix { get; } = new Postfix();
+        /// <summary>
+        ///     The type that declared this invocation wrapper. That is usually the class that generated the patch.
+        /// </summary>
+        [NotNull] public Type DeclaringType { get; }
 
-        public MethodAccess([NotNull] MethodBase info)
+        /// <summary>
+        ///     Creates a new invocation wrapper.
+        /// </summary>
+        /// <param name="info">The method that is being patched.</param>
+        /// <param name="patcherType">The type info of the class that declared the patch. Used for debugging purposes.</param>
+        public MethodAccess([NotNull] MethodBase info, [NotNull] Type patcherType)
         {
             MethodBase = info;
+            DeclaringType = patcherType;
             Id = Registry.Register(this);
             m_StandIn = InvokableFactory.CreateStandIn(this);
             InitOriginal(m_StandIn);

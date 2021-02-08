@@ -15,10 +15,6 @@ namespace Sync
             new Dictionary<MethodBase, DynamicMethod>();
         private static readonly Dictionary<MethodBase, DynamicMethod> Postfixes =
             new Dictionary<MethodBase, DynamicMethod>();
-
-        private const string GeneratedPrefixName = "Prefix";
-        private const string GeneratedPostfixName = "Postfix";
-
         public static void AddPrefix(
             MethodAccess access,
             MethodInfo dispatcher)
@@ -35,7 +31,7 @@ namespace Sync
                     throw new Exception("Patch already initialized.");
                 }
 
-                Prefixes[access.MethodBase] = GeneratePatch(GeneratedPrefixName, access, dispatcher);
+                Prefixes[access.MethodBase] = GeneratePatch($"Prefix_{access.MethodBase.Name}", access, dispatcher);
 
                 MethodInfo factoryMethod = GetPrefixBuilder.CreateFactoryMethod<TPatch>(Prefixes[access.MethodBase]);
 
@@ -59,7 +55,7 @@ namespace Sync
                     throw new Exception("Patch already initialized.");
                 }
 
-                Postfixes[access.MethodBase] = GeneratePatch(GeneratedPostfixName, access, dispatcher);
+                Postfixes[access.MethodBase] = GeneratePatch($"Postfix_{access.MethodBase.Name}", access, dispatcher);
 
                 MethodInfo factoryMethod = GetPrefixBuilder.CreateFactoryMethod<TPatch>(Postfixes[access.MethodBase]);
 
@@ -73,7 +69,7 @@ namespace Sync
                 Patcher.HarmonyInstance.Patch(access.MethodBase, null, patch);
             }
         }
-        
+
         /// <summary>
         ///     Generates a <see cref="DynamicMethod" /> to be used as a harmony prefix. The method
         ///     signature exactly matches the original method that automatically captures the instance
@@ -83,6 +79,7 @@ namespace Sync
         ///     `dispatcher(MethodAccess access, object instance, object [] args)`.
         ///     With `args` containing the original method arguments (excluding __instance).
         /// </summary>
+        /// <param name="sMethodName">Name of the method. Can be arbitrarily chosen.</param>
         /// <param name="methodAccess">Method that is to be prefixed.</param>
         /// <param name="dispatcher">Dispatcher to be called in the prefix.</param>
         /// <returns></returns>
@@ -115,25 +112,12 @@ namespace Sync
                     }); // Inject an __instance
             }
 
-            DynamicMethod dyn;
-            if (methodAccess.MethodBase.DeclaringType != null)
-            {
-                // Member method
-                dyn= new DynamicMethod(
-                    sMethodName,
-                    dispatcher.ReturnType,
-                    parameters.Select(p => p.ParameterType).ToArray(),
-                    methodAccess.MethodBase.DeclaringType,
-                    true);
-            }
-            else
-            {
-                dyn = new DynamicMethod(
-                    sMethodName,
-                    dispatcher.ReturnType,
-                    parameters.Select(p => p.ParameterType).ToArray());
-            }
-                
+            DynamicMethod dyn= new DynamicMethod(
+                sMethodName,
+                dispatcher.ReturnType,
+                parameters.Select(p => p.ParameterType).ToArray(),
+                methodAccess.DeclaringType,
+                true);
 
             for (int i = 0; i < parameters.Count; ++i)
             {
