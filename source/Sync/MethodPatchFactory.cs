@@ -206,7 +206,7 @@ namespace Sync
             il.Emit(OpCodes.Ldloc, args); // Object reference to `args`
 
             // Call dispatcher
-            il.EmitCall(OpCodes.Call, dispatcher, null);
+            il.EmitCall(dispatcher.IsVirtual ? OpCodes.Callvirt : OpCodes.Call, dispatcher, null);
 
             // Done
             il.Emit(OpCodes.Ret);
