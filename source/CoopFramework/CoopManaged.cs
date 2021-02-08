@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using HarmonyLib;
@@ -99,9 +98,10 @@ namespace CoopFramework
         }
 
         /// <summary>
-        ///     Declares a Coop patch that is active when the <param name="condition"></param> evaluates
-        ///     to true. See <see cref="CoopConditions"/> for predefined conditions.
-        ///
+        ///     Declares a Coop patch that is active when the
+        ///     <param name="condition"></param>
+        ///     evaluates
+        ///     to true. See <see cref="CoopConditions" /> for predefined conditions.
         ///     The condition is evaluated when the patched action is executed.
         /// </summary>
         /// <param name="condition"></param>
@@ -116,28 +116,41 @@ namespace CoopFramework
         #endregion
 
         #region Object instances
+
         /// <summary>
-        ///     If the <typeparamref name="TExtended"/> does not implement a destructor, the lifetime of instances
+        ///     Get the instance that is being managed by this wrapper. Since <see cref="CoopManaged{TSelf,TExtended}" />
+        ///     only keeps a <see cref="WeakReference{TExtended}" />, the managed instance might not exist anymore.
+        ///     A return value of false indicates an issue with the lifetime management.
+        /// </summary>
+        /// <param name="resolvedInstance">The managed instance or null.</param>
+        /// <returns></returns>
+        protected bool TryGetInstance(out TExtended resolvedInstance)
+        {
+            if (Instance.TryGetTarget(out resolvedInstance)) return true;
+
+            Logger.Warn("Coop synced {Instance} seems to have expired", ToString());
+            lock (m_AutoWrappedInstances)
+            {
+                // If the wrapper was automatically created, delete it
+                m_AutoWrappedInstances.Remove(this);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        ///     If the <typeparamref name="TExtended" /> does not implement a destructor, the lifetime of instances
         ///     needs to be tracked manually. This constant defines the interval in which a check is performed to
-        ///     release automatically created <typeparamref name="TSelf"/> wrapper instance.
+        ///     release automatically created <typeparamref name="TSelf" /> wrapper instance.
         /// </summary>
         public const int GCInterval_ms = 500;
 
         /// <summary>
-        ///     Returns the instance that is being managed by this <see cref="TSelf" />.
-        /// </summary>
-        [NotNull]
-        protected WeakReference<TExtended> Instance { get; set; }
-
-        /// <summary>
         ///     Returns all instances of this <see cref="TSelf" /> that very automatically created because
         ///     <see cref="AutoWrapAllInstances" /> is enabled.
-        ///
         ///     ATTENTION: This collection might be modified from another thread! Lock before use.
         /// </summary>
         public static IReadOnlyCollection<CoopManaged<TSelf, TExtended>> AutoWrappedInstances => m_AutoWrappedInstances;
-
-        public static readonly FieldChangeStack FieldStack = new FieldChangeStack();
 
         #endregion
 
@@ -145,7 +158,8 @@ namespace CoopFramework
 
         /// <summary>
         ///     Ensures that the static constructors of the inheriting class are called in order to initialize
-        ///     the patch definitions. Needs to be called exactly once on startup.
+        ///     the patch definitions. Needs to be called exactly once on startup. Needs to be protected since
+        ///     private static methods cannot be found using reflection.
         /// </summary>
         [PatchInitializer]
         protected static void RunStaticConstructor()
@@ -153,7 +167,17 @@ namespace CoopFramework
             RuntimeHelpers.RunClassConstructor(typeof(TSelf).TypeHandle);
         }
 
-        private static void OnConstructed(TSelf newInstance)
+        /// <summary>
+        ///     Returns the instance that is being managed by this <see cref="TSelf" />.
+        /// </summary>
+        [NotNull]
+        private WeakReference<TExtended> Instance { get; set; }
+
+        /// <summary>
+        ///     Called when a new instance of <see cref="TSelf" /> was automatically created.
+        /// </summary>
+        /// <param name="newInstance"></param>
+        private static void OnAutoConstructed(TSelf newInstance)
         {
             lock (m_AutoWrappedInstances)
             {
@@ -161,33 +185,40 @@ namespace CoopFramework
             }
         }
 
-        private static ECallPropagation Dispatch(CoopManaged<TSelf, TExtended> self,
+        /// <summary>
+        ///     Called to dispatch a pending method call (prefix). The statically configured behaviours are evaluated
+        ///     and method call treated according to the result.
+        /// </summary>
+        /// <param name="self">The instance of the CoopManager that wraps the instance of the method call. null for static calls.</param>
+        /// <param name="eOriginator">The originator of the action.</param>
+        /// <param name="methodId">The id of the method that is being called.</param>
+        /// <param name="behaviours">The statically configured behaviours that apply to this call.</param>
+        /// <param name="args">Arguments to the method call.</param>
+        /// <returns></returns>
+        private static ECallPropagation Dispatch(
+            [CanBeNull] CoopManaged<TSelf, TExtended> self,
             EOriginator eOriginator,
-            MethodAccess methodAccess,
+            MethodId methodId,
             List<CallBehaviourBuilder> behaviours,
             object[] args)
         {
             TExtended instanceResolved = null; // stays null for static calls
-            if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
-            {
-                // The instance went out of scope?
-                Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
+            if (self != null && !self.TryGetInstance(out instanceResolved))
                 return ECallPropagation.Skip; // Will not work anyways
-            }
-            
+
+            // Evaluate behaviours
             foreach (var behaviour in behaviours)
             {
                 if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) continue;
                 if (behaviour.DoBroadcast)
-                {
-                    behaviour.SynchronizationFactory()?.Broadcast(methodAccess.Id, instanceResolved, args);
-                }
+                    behaviour.SynchronizationFactory()?.Broadcast(methodId, instanceResolved, args);
 
                 if (behaviour.MethodCallHandlerInstance != null)
                     return behaviour.MethodCallHandlerInstance.Invoke(self,
-                        new PendingMethodCall(methodAccess.Id, behaviour.SynchronizationFactory, instanceResolved, args));
+                        new PendingMethodCall(methodId, behaviour.SynchronizationFactory, instanceResolved, args));
                 if (behaviour.MethodCallHandler != null)
-                    return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodAccess.Id, behaviour.SynchronizationFactory,
+                    return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodId,
+                        behaviour.SynchronizationFactory,
                         instanceResolved,
                         args));
                 if (behaviour.CallPropagationBehaviour == ECallPropagation.Skip) return ECallPropagation.Skip;
@@ -196,7 +227,11 @@ namespace CoopFramework
             return ECallPropagation.CallOriginal;
         }
 
-        private void OnAfterRemoved([NotNull] TExtended instance)
+        /// <summary>
+        ///     Called when an auto wrapped instance is being unregistered.
+        /// </summary>
+        /// <param name="instance"></param>
+        private void OnAutoRemoved([NotNull] TExtended instance)
         {
             foreach (var behaviour in m_DefinedBehaviours)
             {
@@ -210,6 +245,11 @@ namespace CoopFramework
             Instance = new WeakReference<TExtended>(null);
         }
 
+        /// <summary>
+        ///     Removes all handlers of a given <see cref="MethodAccess" />.
+        /// </summary>
+        /// <param name="instance">Instance whose handlers should be removed. Null for static handlers.</param>
+        /// <param name="access"></param>
         private static void RemoveHandlers(TExtended instance, MethodAccess access)
         {
             if (instance == null)
@@ -229,11 +269,15 @@ namespace CoopFramework
         private static readonly List<CoopManaged<TSelf, TExtended>> m_AutoWrappedInstances =
             new List<CoopManaged<TSelf, TExtended>>();
 
+        /// <summary>
+        ///     Internal implementation for the method call interface.
+        /// </summary>
         private class PendingMethodCall : IPendingMethodCall
         {
             [CanBeNull] private readonly Func<ISynchronization> m_SyncFactory;
 
-            public PendingMethodCall(MethodId method, [CanBeNull] Func<ISynchronization> syncFactory, [CanBeNull] object instance,
+            public PendingMethodCall(MethodId method, [CanBeNull] Func<ISynchronization> syncFactory,
+                [CanBeNull] object instance,
                 [NotNull] object[] args)
             {
                 Id = method;
@@ -256,12 +300,17 @@ namespace CoopFramework
             public MethodId Id { get; }
         }
 
+        /// <summary>
+        ///     Installs observers or necessary patches to create an instance of <typeparamref name="TSelf" /> whenever
+        ///     an instance of <typeparamref name="TExtended" /> needs wrapping.
+        /// </summary>
+        /// <param name="factoryMethod">Factory to create a <typeparamref name="TSelf" /> instance.</param>
         private static void HookIntoObjectLifetime(Func<TExtended, TSelf> factoryMethod)
         {
-            IObjectManager objectManager = CoopFramework.ObjectManager;
-            bool isManagedClass = objectManager?.Manages<TExtended>() ?? false;
+            var objectManager = CoopFramework.ObjectManager;
+            var isManagedClass = objectManager?.Manages<TExtended>() ?? false;
             m_LifetimeObserver = new ObjectLifetimeObserver<TExtended>();
-            m_LifetimeObserver.OnAfterCreateObject += instance => OnConstructed(factoryMethod(instance));
+            m_LifetimeObserver.OnAfterCreateObject += instance => OnAutoConstructed(factoryMethod(instance));
             m_LifetimeObserver.OnAfterRemoveObject += instance =>
             {
                 lock (m_AutoWrappedInstances)
@@ -271,12 +320,12 @@ namespace CoopFramework
                         .ToList();
                     foreach (var managedInstance in managedInstances)
                     {
-                        managedInstance.OnAfterRemoved(instance as TExtended);
+                        managedInstance.OnAutoRemoved(instance);
                         m_AutoWrappedInstances.Remove(managedInstance);
                     }
                 }
             };
-            
+
             if (isManagedClass)
             {
                 objectManager.Register<TExtended>(m_LifetimeObserver);
@@ -286,43 +335,53 @@ namespace CoopFramework
                 m_LifetimeObserver.PatchConstruction();
                 if (!m_LifetimeObserver.PatchDeconstruction())
                 {
-                    Logger.Debug($"Class {typeof(TExtended)} has no destructor. Auto unwrapping not possible. Registering with GC to prevent memory leaks.");
-                    TimerGC = new Timer((state => UnwrapUnusedInstances()));
+                    Logger.Debug(
+                        $"Class {typeof(TExtended)} has no destructor. Auto unwrapping not possible. Registering with GC to prevent memory leaks.");
+                    TimerGC = new Timer(state => UnwrapUnusedAutoInstances());
                     TimerGC.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(GCInterval_ms));
                 }
             }
         }
-        
-        private static void UnwrapUnusedInstances()
+
+        /// <summary>
+        ///     Cleans up any automatically created <typeparamref name="TSelf" /> instances that are no longer bound to
+        ///     a managed instance.
+        /// </summary>
+        private static void UnwrapUnusedAutoInstances()
         {
             lock (m_AutoWrappedInstances)
             {
-                m_AutoWrappedInstances.RemoveAll(managed => !managed.Instance.TryGetTarget(out TExtended intance));
+                m_AutoWrappedInstances.RemoveAll(managed => !managed.Instance.TryGetTarget(out var intance));
             }
         }
 
+        /// <summary>
+        ///     Setup handlers for the statically configured patches.
+        /// </summary>
+        /// <param name="self">Instance to setup the handlers for or null for static handlers.</param>
         private static void SetupHandlers([CanBeNull] CoopManaged<TSelf, TExtended> self)
         {
             foreach (var patchedMethod in Util.SortByMethod(m_DefinedBehaviours))
-                InitMethodPatches(self, patchedMethod.Key, patchedMethod.Value);
+                SetupMethodHandlers(self, patchedMethod.Key, patchedMethod.Value);
 
 
             foreach (var patchedField in Util.SortByField(m_DefinedBehaviours))
-                InitFieldPatches(self, patchedField.Key, patchedField.Value);
+                SetupFieldHandlers(self, patchedField.Key, patchedField.Value);
         }
 
-        private static void InitMethodPatches(
+        /// <summary>
+        ///     Setup handlers for the given method patches.
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="id"></param>
+        /// <param name="relevantBehaviours"></param>
+        private static void SetupMethodHandlers(
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
             MethodId id,
             [NotNull] List<CallBehaviourBuilder> relevantBehaviours)
         {
             TExtended instanceResolved = null; // stays null for static calls
-            if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
-            {
-                // The instance went out of scope?
-                Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
-                return;
-            }
+            if (self != null && !self.TryGetInstance(out instanceResolved)) return;
 
             var methodAccess = Registry.IdToMethod[id];
             if (self == null)
@@ -333,33 +392,31 @@ namespace CoopFramework
                         // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
                         return ECallPropagation.CallOriginal;
 
-                    return Dispatch(null, eOrigin, methodAccess, relevantBehaviours, args);
+                    return Dispatch(null, eOrigin, methodAccess.Id, relevantBehaviours, args);
                 });
             else
                 // Instance patch
                 methodAccess.Prefix.SetHandler(instanceResolved,
                     (eOrigin, args) =>
                     {
-                        if (!CoopFramework.IsEnabled)
-                        {
-                            return ECallPropagation.CallOriginal;
-                        }
-                        return Dispatch(self, eOrigin, methodAccess, relevantBehaviours, args);
+                        if (!CoopFramework.IsEnabled) return ECallPropagation.CallOriginal;
+                        return Dispatch(self, eOrigin, methodAccess.Id, relevantBehaviours, args);
                     });
         }
 
-        private static void InitFieldPatches(
+        /// <summary>
+        ///     Setup handlers for the given field patches.
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="id"></param>
+        /// <param name="relevantBehaviours"></param>
+        private static void SetupFieldHandlers(
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
             FieldId id,
             [NotNull] List<FieldActionBehaviourBuilder> relevantBehaviours)
         {
             TExtended instanceResolved = null; // stays null for static calls
-            if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
-            {
-                // The instance went out of scope?
-                Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
-                return;
-            }
+            if (self != null && !self.TryGetInstance(out instanceResolved)) return;
 
             var fieldAccess = Registry.IdToField[id];
             var accessors = relevantBehaviours.SelectMany(b => b.Accessors);
@@ -371,80 +428,102 @@ namespace CoopFramework
 
                 if (self == null)
                 {
+                    var prefix = accessor.Prefix.GlobalPrefixHandler;
+                    if (prefix != null)
+                        // Allow for incremental patching by combining the existing handler with the new one
+                        accessor.Prefix.RemoveGlobalHandler();
                     accessor.Prefix.SetGlobalHandler((eOrigin, target, args) =>
                     {
                         if (!CoopFramework.IsEnabled || target != null)
                             // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
                             return ECallPropagation.CallOriginal;
+                        if (prefix?.Invoke(eOrigin, null, args) == ECallPropagation.Skip) return ECallPropagation.Skip;
                         return DispatchPrefix(null, eOrigin, methodRelevantBehaviours, fieldAccess);
                     });
+
+                    var postfix = accessor.Postfix.GlobalHandler;
+                    if (postfix != null)
+                        // Allow for incremental patching by combining the existing handler with the new one
+                        accessor.Postfix.RemoveGlobalHandler();
                     accessor.Postfix.SetGlobalHandler((eOrigin, target, args) =>
                     {
                         if (!CoopFramework.IsEnabled || target != null)
                             // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
                             return;
                         DispatchPostfix(null, eOrigin, methodRelevantBehaviours);
+                        postfix?.Invoke(eOrigin, null, args);
                     });
                 }
                 else
                 {
                     // Instance patch
+                    var prefix = accessor.Prefix.GetHandler(instanceResolved);
+                    if (prefix != null)
+                        // Allow for incremental patching by combining the existing handler with the new one
+                        accessor.Prefix.RemoveHandler(instanceResolved);
+
                     accessor.Prefix.SetHandler(instanceResolved,
                         (origin, args) =>
                         {
-                            if (!CoopFramework.IsEnabled)
-                            {
-                                return ECallPropagation.CallOriginal;
-                            }
+                            if (!CoopFramework.IsEnabled) return ECallPropagation.CallOriginal;
+                            if (prefix?.Invoke(origin, args) == ECallPropagation.Skip) return ECallPropagation.Skip;
                             return DispatchPrefix(self, origin, methodRelevantBehaviours, fieldAccess);
                         });
+
+                    var postfix = accessor.Postfix.GetHandler(instanceResolved);
+                    if (postfix != null)
+                        // Allow for incremental patching by combining the existing handler with the new one
+                        accessor.Postfix.RemoveHandler(instanceResolved);
+
                     accessor.Postfix.SetHandler(instanceResolved,
                         (origin, args) =>
                         {
-                            if (!CoopFramework.IsEnabled)
-                            {
-                                return;
-                            }
+                            if (!CoopFramework.IsEnabled) return;
+
                             DispatchPostfix(self, origin, methodRelevantBehaviours);
+                            postfix?.Invoke(origin, args);
                         });
                 }
             }
         }
 
+
+        /// <summary>
+        ///     Called to dispatch the postfix of a method call that potentially changed a field value.
+        /// </summary>
+        /// <param name="self">The instance of the CoopManager that wraps the instance of the method call. null for static calls.</param>
+        /// <param name="eOriginator">The originator of the action.</param>
+        /// <param name="behaviours">Behaviours that apply to this field.</param>
         private static void DispatchPostfix(
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
-            EOriginator origin,
+            EOriginator eOriginator,
             FieldBehaviourBuilder[] behaviours)
         {
             foreach (var behaviour in behaviours)
             {
-                if (!behaviour.DoesBehaviourApply(origin, self)) return;
+                if (!behaviour.DoesBehaviourApply(eOriginator, self)) return;
 
-                TExtended instanceResolved = null; // stays null for static calls
-                if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
-                {
-                    // The instance went out of scope?
-                    Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
-                    return;
-                }
-
-                FieldChangeBuffer changes = FieldStack.PopUntilMarker(behaviour.Action == EFieldChangeAction.Revert);
-                if (behaviour.DoBroadcast)
-                {
-                    behaviour.SynchronizationFactory()?.Broadcast(changes);
-                }
+                var changes = FieldStack.PopUntilMarker(behaviour.Action == EFieldChangeAction.Revert);
+                if (behaviour.DoBroadcast) behaviour.SynchronizationFactory()?.Broadcast(changes);
             }
         }
 
+        /// <summary>
+        ///     Called to dispatch the prefix of a method call that potentially changes a field value.
+        /// </summary>
+        /// <param name="self">The instance of the CoopManager that wraps the instance of the method call. null for static calls.</param>
+        /// <param name="eOriginator">The originator of the action.</param>
+        /// <param name="behaviours">Behaviours that apply to this field.</param>
+        /// <param name="fieldAccess">Access to the field.</param>
         private static ECallPropagation DispatchPrefix(
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
-            EOriginator origin,
+            EOriginator eOriginator,
             IEnumerable<FieldBehaviourBuilder> behaviours,
             FieldAccess fieldAccess)
         {
             foreach (var behaviour in behaviours)
             {
-                if (!behaviour.DoesBehaviourApply(origin, self)) return ECallPropagation.CallOriginal;
+                if (!behaviour.DoesBehaviourApply(eOriginator, self)) return ECallPropagation.CallOriginal;
 
                 TExtended instanceResolved = null; // stays null for static calls
                 if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
@@ -463,6 +542,7 @@ namespace CoopFramework
 
         [CanBeNull] private static ObjectLifetimeObserver<TExtended> m_LifetimeObserver;
         [CanBeNull] private static Timer TimerGC;
+        [NotNull] private static readonly FieldChangeStack FieldStack = new FieldChangeStack();
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 

@@ -16,8 +16,8 @@ namespace Coop.Tests.CoopFramework
     {
         static CoopManaged_TestConstructorWrapping()
         {
-            Util.CallPatchInitializer(typeof(CoopManagedFoo));
-            Util.CallPatchInitializer(typeof(CoopManagedBaz));
+            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo).TypeHandle);
+            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedBaz).TypeHandle);
         }
 
         [Fact]
