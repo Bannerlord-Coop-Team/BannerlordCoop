@@ -19,9 +19,10 @@ namespace Sync
         /// <returns></returns>
         public ConstructorPatch<TPatch> PostfixAll()
         {
-            foreach (ConstructorInfo info in m_Declaring.GetConstructors())
+            foreach (ConstructorInfo info in m_Declaring.GetConstructors(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
             {
                 Postfix(info);
+                
             }
 
             return this;

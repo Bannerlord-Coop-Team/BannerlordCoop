@@ -11,7 +11,7 @@ using Logger = NLog.Logger;
 
 namespace Coop.Mod.Persistence.Party
 {
-    public class MobilePartySync : SynchronizationClient
+    public class MobilePartySync : SynchronizationBase
     {
         public override void Broadcast(MethodId id, object instance, object[] args)
         {

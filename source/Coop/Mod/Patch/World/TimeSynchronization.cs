@@ -42,18 +42,13 @@ namespace Coop.Mod.Patch
             }
             access.Prefix.SetGlobalHandler((instance, args) =>
             {
-                if (!Coop.IsCoopGameSession())
-                {
-                    return ECallPropagation.CallOriginal; 
-                }
-                
                 if (args.Length == 0 || !(args[0] is float))
                 {
                     throw new ArgumentException(
                         "Unexpected function signature, expected MapTimeTracker.Tick(float seconds). Patch needs to be adjusted.");
                 }
                 
-                if (Coop.IsArbiter)
+                if (Coop.IsServer)
                 {
                     // The host is the authority for the campaign time. Go ahead.
                     return ECallPropagation.CallOriginal;
@@ -62,7 +57,7 @@ namespace Coop.Mod.Patch
                 // Take the predicted server side campaign time
                 if (GetAuthoritativeTime == null)
                 {
-                    throw new Exception("Invalid state. Please set GetAuthoritativeTime during initialization.");
+                    Logger.Warn("Invalid state. Please set GetAuthoritativeTime during initialization.");
                 }
 
                 CampaignTime serverTime = GetAuthoritativeTime.Invoke();

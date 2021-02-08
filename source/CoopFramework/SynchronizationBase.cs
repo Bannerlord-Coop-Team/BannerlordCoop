@@ -6,7 +6,7 @@ using Sync;
 
 namespace CoopFramework
 {
-    public abstract class SynchronizationClient : ISynchronization
+    public abstract class SynchronizationBase : ISynchronization
     {
         #region Debug
         /// <summary>

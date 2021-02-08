@@ -3,6 +3,7 @@
     <PropertyGroup>
         <TargetFramework>net4.7.2</TargetFramework>
         <OutputType>Module</OutputType>
+        <IsPackable>false</IsPackable>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -14,10 +15,7 @@
     </PropertyGroup>
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command='powershell -ExecutionPolicy Unrestricted ^
-            -File "$(SolutionDir)..\deploy.ps1" -SolutionDir $(SolutionDir)\ ^
-            -TargetDir $(SolutionDir)Coop\bin\$(Configuration)\ ^
-            -Libs Coop.dll,CoopFramework.dll,Common.dll,Network.dll,Sync.dll,RemoteAction.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll' />
+        <Exec Command="powershell -ExecutionPolicy Unrestricted ^&#xD;&#xA;            -File &quot;$(SolutionDir)..\deploy.ps1&quot; -SolutionDir $(SolutionDir)\ ^&#xD;&#xA;            -TargetDir $(SolutionDir)Coop\bin\$(Configuration)\ ^&#xD;&#xA;            -Libs Coop.dll,CoopFramework.dll,Common.dll,Network.dll,Sync.dll,RemoteAction.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll" />
     </Target>
 
     <ItemGroup>
@@ -34,6 +32,18 @@
       <ProjectReference Include="..\RemoteAction\RemoteAction.csproj" />
       <ProjectReference Include="..\SystemTests\SystemTests.csproj" />
       <ProjectReference Include="..\TestRunner\TestRunner.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="CoopFramework, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\mb2\Modules\Coop\bin\Win64_Shipping_Client\CoopFramework.dll</HintPath>
+      </Reference>
+      <Reference Include="RemoteAction, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\mb2\Modules\Coop\bin\Win64_Shipping_Client\RemoteAction.dll</HintPath>
+      </Reference>
+      <Reference Include="Sync, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\mb2\Modules\Coop\bin\Win64_Shipping_Client\Sync.dll</HintPath>
+      </Reference>
     </ItemGroup>
 
 </Project>

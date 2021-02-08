@@ -21,12 +21,12 @@ namespace Coop.Tests.Persistence.RPC
         "UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class RPC_Test : IDisposable
     {
-        private readonly SynchronizationClient sync0;
+        private readonly SynchronizationBase sync0;
         public RPC_Test()
         {
             Persistence = m_Environment.Persistence ??
                           throw new Exception("Persistence may not be null. Error in test setup.");
-            sync0 = new CoopSync(m_Environment.GetClientAccess(ClientId0));
+            sync0 = new SynchronizationCoop(m_Environment.GetClientAccess(ClientId0));
             ManagedFoo.Sync = sync0;
         }
 
@@ -65,7 +65,7 @@ namespace Coop.Tests.Persistence.RPC
             {
             }
 
-            public static SynchronizationClient Sync;
+            public static SynchronizationBase Sync;
         }
 
         private readonly TestEnvironment m_Environment = new TestEnvironment(

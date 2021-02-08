@@ -9,9 +9,9 @@ using Sync;
 
 namespace Coop.Mod.Persistence.RemoteAction
 {
-    public class CoopSync : SynchronizationClient
+    public class SynchronizationCoop : SynchronizationBase
     {
-        public CoopSync([NotNull] IClientAccess access)
+        public SynchronizationCoop([NotNull] IClientAccess access)
         {
             m_ClientAccess = access;
         }

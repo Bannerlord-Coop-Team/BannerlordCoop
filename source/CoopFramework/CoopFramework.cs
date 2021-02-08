@@ -11,8 +11,9 @@ namespace CoopFramework
     {
         public static bool IsEnabled => m_IsCoopEnabled?.Invoke() ?? true;
 
-        public static void InitPatches(Func<bool> isCoopEnabled)
+        public static void InitPatches(IObjectManager objectManager, Func<bool> isCoopEnabled)
         {
+            ObjectManager = objectManager;
             m_IsCoopEnabled = isCoopEnabled;
             if (m_Initialized)
             {
@@ -29,6 +30,8 @@ namespace CoopFramework
 
             m_Initialized = true;
         }
+        
+        public static IObjectManager ObjectManager { get; private set; }
 
         #region Private
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();

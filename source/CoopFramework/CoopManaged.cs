@@ -38,11 +38,8 @@ namespace CoopFramework
         ///     that is being created.
         /// </summary>
         /// <param name="factoryMethod">Factory method that creates an instance of the concrete inheriting class."/></param>
-        protected static void AutoWrapAllInstances(Func<TExtended, TSelf> factoryMethod)
+        protected static void AutoWrapAllInstances([NotNull] Func<TExtended, TSelf> factoryMethod)
         {
-            if (m_ConstructorPatch != null || m_DestructorPatch != null)
-                throw new Exception($"Constructors for {nameof(TExtended)} are already patched!");
-
             HookIntoObjectLifetime(factoryMethod);
         }
 
@@ -199,7 +196,7 @@ namespace CoopFramework
             return ECallPropagation.CallOriginal;
         }
 
-        private void OnBeforeFinalize([NotNull] TExtended instance)
+        private void OnAfterRemoved([NotNull] TExtended instance)
         {
             foreach (var behaviour in m_DefinedBehaviours)
             {
@@ -232,9 +229,6 @@ namespace CoopFramework
         private static readonly List<CoopManaged<TSelf, TExtended>> m_AutoWrappedInstances =
             new List<CoopManaged<TSelf, TExtended>>();
 
-        private static ConstructorPatch<TSelf> m_ConstructorPatch;
-        private static DestructorPatch<TSelf> m_DestructorPatch;
-
         private class PendingMethodCall : IPendingMethodCall
         {
             [CanBeNull] private readonly Func<ISynchronization> m_SyncFactory;
@@ -264,46 +258,41 @@ namespace CoopFramework
 
         private static void HookIntoObjectLifetime(Func<TExtended, TSelf> factoryMethod)
         {
-            m_ConstructorPatch = new ConstructorPatch<TSelf>(typeof(TExtended)).PostfixAll();
-            if (!m_ConstructorPatch.Methods.Any())
-                throw new Exception(
-                    $"Class {typeof(TExtended)} has no constructor. Cannot wrap instances automatically");
-
-            foreach (var methodAccess in m_ConstructorPatch.Methods)
-                methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
-                {
-                    OnConstructed(factoryMethod(instance as TExtended));
-                });
-
-            m_DestructorPatch = new DestructorPatch<TSelf>(typeof(TExtended)).Prefix();
-            if (!m_DestructorPatch.Methods.Any())
+            IObjectManager objectManager = CoopFramework.ObjectManager;
+            bool isManagedClass = objectManager?.Manages<TExtended>() ?? false;
+            m_LifetimeObserver = new ObjectLifetimeObserver<TExtended>();
+            m_LifetimeObserver.OnAfterCreateObject += instance => OnConstructed(factoryMethod(instance));
+            m_LifetimeObserver.OnAfterRemoveObject += instance =>
             {
-                Logger.Debug($"Class {typeof(TExtended)} has no destructor. Auto unwrapping not possible. Registering with GC to prevent memory leaks.");
-                TimerGC = new Timer((state => UnwrapUnusedInstances()));
-                
-                TimerGC.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(GCInterval_ms));
-            }
-                
-
-            foreach (var methodAccess in m_DestructorPatch.Methods)
-                methodAccess.Prefix.SetGlobalHandler((origin, instance, args) =>
+                lock (m_AutoWrappedInstances)
                 {
-                    lock (m_AutoWrappedInstances)
+                    var managedInstances = m_AutoWrappedInstances
+                        .Where(wrapper => wrapper.Instance.TryGetTarget(out var o) && o == instance)
+                        .ToList();
+                    foreach (var managedInstance in managedInstances)
                     {
-                        var managedInstances = m_AutoWrappedInstances
-                            .Where(wrapper => wrapper.Instance.TryGetTarget(out var o) && o == instance)
-                            .ToList();
-                        foreach (var managedInstance in managedInstances)
-                        {
-                            managedInstance.OnBeforeFinalize(instance as TExtended);
-                            m_AutoWrappedInstances.Remove(managedInstance);
-                        }
+                        managedInstance.OnAfterRemoved(instance as TExtended);
+                        m_AutoWrappedInstances.Remove(managedInstance);
                     }
-
-                    return ECallPropagation.CallOriginal; // Always call the original desctructor!
-                });
+                }
+            };
+            
+            if (isManagedClass)
+            {
+                objectManager.Register<TExtended>(m_LifetimeObserver);
+            }
+            else
+            {
+                m_LifetimeObserver.PatchConstruction();
+                if (!m_LifetimeObserver.PatchDeconstruction())
+                {
+                    Logger.Debug($"Class {typeof(TExtended)} has no destructor. Auto unwrapping not possible. Registering with GC to prevent memory leaks.");
+                    TimerGC = new Timer((state => UnwrapUnusedInstances()));
+                    TimerGC.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(GCInterval_ms));
+                }
+            }
         }
-
+        
         private static void UnwrapUnusedInstances()
         {
             lock (m_AutoWrappedInstances)
@@ -472,6 +461,7 @@ namespace CoopFramework
             return ECallPropagation.CallOriginal;
         }
 
+        [CanBeNull] private static ObjectLifetimeObserver<TExtended> m_LifetimeObserver;
         [CanBeNull] private static Timer TimerGC;
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
