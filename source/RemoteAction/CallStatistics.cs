@@ -13,9 +13,7 @@ namespace RemoteAction
 
     public class CallStatistics : DropoutStack<CallTrace>
     {
-        private const int HistoryLength = 10;
-
-        public CallStatistics() : base(HistoryLength)
+        public CallStatistics(int capacity) : base(capacity)
         {
         }
 

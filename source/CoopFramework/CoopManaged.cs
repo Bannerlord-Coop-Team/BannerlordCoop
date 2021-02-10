@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -165,6 +165,18 @@ namespace CoopFramework
         protected static void RunStaticConstructor()
         {
             RuntimeHelpers.RunClassConstructor(typeof(TSelf).TypeHandle);
+            
+            // Register relation between fields and their accessors.
+            foreach (var patchedField in Util.SortByField(m_DefinedBehaviours))
+            {
+                foreach (FieldActionBehaviourBuilder behaviour in patchedField.Value)
+                {
+                    foreach (MethodAccess accessor in behaviour.Accessors)
+                    {
+                        Registry.AddRelation(accessor.Id, patchedField.Key);
+                    }
+                }
+            }
         }
 
         /// <summary>

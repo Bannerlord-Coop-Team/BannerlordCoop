@@ -9,6 +9,7 @@ namespace Sync
     {
         public static IReadOnlyDictionary<MethodId, MethodAccess> IdToMethod => m_IdToMethod;
         public static IReadOnlyDictionary<FieldId, FieldAccess> IdToField => m_IdToField;
+        public static IReadOnlyDictionary<MethodId, List<FieldId>> Relation => m_MethodFieldRelation;
 
         public static MethodId Register([NotNull] MethodAccess methodAccess)
         {
@@ -41,6 +42,20 @@ namespace Sync
                 return id;
             }
         }
+
+        public static void AddRelation(MethodId method, FieldId field)
+        {
+            if (!m_MethodFieldRelation.ContainsKey(method))
+            {
+                m_MethodFieldRelation[method] = new List<FieldId>();
+            }
+            else if (m_MethodFieldRelation[method].Contains(field))
+            {
+                return;
+            }
+
+            m_MethodFieldRelation[method].Add(field);
+        }
         
         #region Private
         private static readonly object Lock = new object();
@@ -56,6 +71,10 @@ namespace Sync
 
         private static readonly Dictionary<FieldId, FieldAccess> m_IdToField =
             new Dictionary<FieldId, FieldAccess>();
+
+        private static readonly Dictionary<MethodId, List<FieldId>> m_MethodFieldRelation =
+            new Dictionary<MethodId, List<FieldId>>();
+
         #endregion
     }
 }

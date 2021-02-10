@@ -122,17 +122,17 @@ namespace Coop.Mod.DebugUtil
                 return;
             }
             
-            Dictionary<MethodBase, List<MethodId>> byMethod = new Dictionary<MethodBase, List<MethodId>>();
+            Dictionary<MethodBase, List<MethodId>> coopPatchMethods = new Dictionary<MethodBase, List<MethodId>>();
             foreach (KeyValuePair<MethodId, MethodAccess> registrar in Registry.IdToMethod)
             {
                 var key = registrar.Value.MethodBase;
-                if (!byMethod.ContainsKey(key))
+                if (!coopPatchMethods.ContainsKey(key))
                 {
-                    byMethod[key] = new List<MethodId>();
+                    coopPatchMethods[key] = new List<MethodId>();
                 }
-                byMethod[key].Add(registrar.Key);
+                coopPatchMethods[key].Add(registrar.Key);
             }
-
+            
             foreach (MethodBase method in Harmony.GetAllPatchedMethods())
             {
                 string sName = $"{method.DeclaringType?.Name}.{method.Name}";
@@ -147,6 +147,15 @@ namespace Coop.Mod.DebugUtil
                 ShowPatches(nameof(patches.Postfixes), patches.Postfixes);
                 ShowPatches(nameof(patches.Transpilers), patches.Transpilers);
                 ShowPatches(nameof(patches.Finalizers), patches.Finalizers);
+                
+                if (coopPatchMethods.ContainsKey(method))
+                {
+                    if (Imgui.TreeNode("Coop info"))
+                    {
+                        ShowCoopPatchInfo(coopPatchMethods[method]);
+                        Imgui.TreePop();
+                    }
+                }
 #else
                 DisplayDebugDisabledText();
 #endif
@@ -156,7 +165,8 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private static void ShowPatches(string name, ReadOnlyCollection<HarmonyLib.Patch> patches)
+        private static void ShowPatches(string name, 
+            ReadOnlyCollection<HarmonyLib.Patch> patches)
         {
             List<HarmonyLib.Patch> list = patches.ToList();
             if (list.Count == 0)
@@ -200,12 +210,64 @@ namespace Coop.Mod.DebugUtil
                         Imgui.SameLine(tabWidth);
                         Imgui.Text(string.Join(",", patch.after));
                     }
-                    
+
                     Imgui.NewLine();
                     Imgui.TreePop();
                 }
             }
             Imgui.TreePop();
+        }
+
+        private static void ShowCoopPatchInfo(List<MethodId> coopPatch)
+        {
+            const float tabWidth = 200;
+            foreach (MethodId methodId in coopPatch)
+            {
+                Imgui.Text("MethodId:");
+                Imgui.SameLine(tabWidth);
+                Imgui.Text("" + methodId.InternalValue);
+
+                HashSet<FieldId> relatedFields = new HashSet<FieldId>();
+                if (Registry.Relation.ContainsKey(methodId))
+                {
+                    foreach (FieldId field in Registry.Relation[methodId])
+                    {
+                        FieldAccess access = Registry.IdToField[field];
+                        relatedFields.Add(field);
+                        Imgui.Text("Related FieldId:");
+                        Imgui.SameLine(tabWidth);
+                        Imgui.Text($"{field.InternalValue} [" + access + "]");
+                    }
+                }
+
+                foreach (SynchronizationBase sync in SynchronizationManager.SynchronizationInstances)
+                {
+                    var history = sync.BroadcastHistory
+                        .Where(c => (c.Call.HasValue && Equals(c.Call.Value.Id, methodId)) ||
+                                    (c.Change.HasValue && relatedFields.Contains(c.Change.Value.Id)))
+                        .ToList();
+                    if (history.Count > 0)
+                    {
+                        Imgui.Text($"{sync.GetType().FullName} history:");
+                    }
+
+                    foreach (CallTrace trace in history)
+                    {
+                        Imgui.Text($"{trace.Tick} -");
+                        Imgui.SameLine(tabWidth);
+
+                        if (trace.Call.HasValue)
+                        {
+                            Imgui.Text(trace.Call.Value.ToString());
+                        }
+                        else if (trace.Change.HasValue)
+                        {
+                            Imgui.Text(trace.Change.Value.ToString());
+                        }
+                    }
+                    Imgui.NewLine();
+                }
+            }
         }
 
         private void Begin()

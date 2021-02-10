@@ -12,9 +12,14 @@ namespace CoopFramework
         /// <summary>
         ///     Returns the call history of <see cref="Broadcast" />.
         /// </summary>
-        [NotNull] public CallStatistics BroadcastHistory { get; } = new CallStatistics();
+        [NotNull] public CallStatistics BroadcastHistory { get; } = new CallStatistics(512);
 
         #endregion
+
+        protected SynchronizationBase()
+        {
+            SynchronizationManager.Register(this);
+        }
 
         public abstract void Broadcast(MethodId id, object instance, object[] args);
 
