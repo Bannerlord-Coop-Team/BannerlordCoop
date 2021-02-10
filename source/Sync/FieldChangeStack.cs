@@ -52,7 +52,7 @@ namespace Sync
                 FieldAccess field = data.Access;
 
                 object newValue = data.Access.Get(data.Target);
-                bool changed = !newValue.Equals(data.Value);
+                bool changed = !Equals(newValue, data.Value);
 
                 if (!changed) continue;
 
