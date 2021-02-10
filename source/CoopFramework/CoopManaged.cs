@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -419,7 +419,7 @@ namespace CoopFramework
             if (self != null && !self.TryGetInstance(out instanceResolved)) return;
 
             var fieldAccess = Registry.IdToField[id];
-            var accessors = relevantBehaviours.SelectMany(b => b.Accessors);
+            IEnumerable<MethodAccess> accessors = relevantBehaviours.SelectMany(b => b.Accessors);
             foreach (var accessor in accessors)
             {
                 var methodRelevantBehaviours = relevantBehaviours
@@ -499,9 +499,17 @@ namespace CoopFramework
             EOriginator eOriginator,
             FieldBehaviourBuilder[] behaviours)
         {
+            TExtended instanceResolved = null; // stays null for static calls
+            if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
+            {
+                // The instance went out of scope?
+                Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
+                return; // Will not work anyways
+            }
+            
             foreach (var behaviour in behaviours)
             {
-                if (!behaviour.DoesBehaviourApply(eOriginator, self)) return;
+                if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) return;
 
                 var changes = FieldStack.PopUntilMarker(behaviour.Action == EFieldChangeAction.Revert);
                 if (behaviour.DoBroadcast) behaviour.SynchronizationFactory()?.Broadcast(changes);
@@ -521,17 +529,17 @@ namespace CoopFramework
             IEnumerable<FieldBehaviourBuilder> behaviours,
             FieldAccess fieldAccess)
         {
+            TExtended instanceResolved = null; // stays null for static calls
+            if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
+            {
+                // The instance went out of scope?
+                Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
+                return ECallPropagation.Skip; // Will not work anyways
+            }
+            
             foreach (var behaviour in behaviours)
             {
-                if (!behaviour.DoesBehaviourApply(eOriginator, self)) return ECallPropagation.CallOriginal;
-
-                TExtended instanceResolved = null; // stays null for static calls
-                if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
-                {
-                    // The instance went out of scope?
-                    Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
-                    return ECallPropagation.Skip; // Will not work anyways
-                }
+                if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) return ECallPropagation.CallOriginal;
 
                 FieldStack.PushMarker();
                 FieldStack.PushValue(fieldAccess, instanceResolved);
