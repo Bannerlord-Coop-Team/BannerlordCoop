@@ -30,14 +30,15 @@ namespace Coop.Mod.Persistence.Party
                 MobileParty party = change.Key;
                 if(!m_Handlers.TryGetValue(party.Id, out IMovementHandler handler))
                 {
-                    Logger.Warn("Got FieldChangeBuffer for unmanaged {party}. Ignored.");
+                    Logger.Warn("Got FieldChangeBuffer for unmanaged {party}. Ignored.", party);
                     continue;
                 }
                 BroadcastHistory.Push(new CallTrace()
                 {
                     Value = m_MovementGroup.Id,
                     Instance = party,
-                    Arguments = change.Value
+                    Arguments = change.Value,
+                    Tick = handler.Tick
                 });
                 handler.RequestMovement(change.Value);
             }

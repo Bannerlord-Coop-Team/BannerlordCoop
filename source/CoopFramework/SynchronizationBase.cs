@@ -10,7 +10,7 @@ namespace CoopFramework
         /// <summary>
         ///     Returns the call history of this synchronization instance.
         /// </summary>
-        [NotNull] public CallStatistics BroadcastHistory { get; } = new CallStatistics(32);
+        [NotNull] public CallStatistics BroadcastHistory { get; } = new CallStatistics(128);
 
         #endregion
 

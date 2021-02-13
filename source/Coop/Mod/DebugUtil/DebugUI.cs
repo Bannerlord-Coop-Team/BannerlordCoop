@@ -150,7 +150,7 @@ namespace Coop.Mod.DebugUtil
                 
                 if (coopPatchMethods.ContainsKey(method))
                 {
-                    if (Imgui.TreeNode("Coop info"))
+                    if (Imgui.TreeNode("Coop synchronization"))
                     {
                         ShowCoopPatchInfo(coopPatchMethods[method]);
                         Imgui.TreePop();
@@ -218,6 +218,8 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
+        private static Dictionary<SynchronizationBase, int> m_LogEntrySize = new Dictionary<SynchronizationBase, int>();
+
         private static void ShowCoopPatchInfo(List<MethodId> coopPatch)
         {
             const float tabWidth = 200;
@@ -251,23 +253,45 @@ namespace Coop.Mod.DebugUtil
                         }
                     }
                 }
-
+                
+                Imgui.NewLine();
+                
                 foreach (SynchronizationBase sync in SynchronizationManager.SynchronizationInstances)
                 {
                     var history = sync.BroadcastHistory
                         .Where(c => (c.Call.HasValue && Equals(c.Call.Value, methodId)) ||
-                                    (c.Value.HasValue && relatedFields.Contains(c.Value.Value)))
-                        .ToList();
-                    if (history.Count > 0)
+                                    (c.Value.HasValue && relatedFields.Contains(c.Value.Value)));
+                    if (history.IsEmpty())
                     {
-                        Imgui.Text($"{sync.GetType().FullName} history:");
+                        continue;
                     }
+                    
+                    if (!m_LogEntrySize.ContainsKey(sync))
+                    {
+                        m_LogEntrySize[sync] = 8;
+                    }
+
+                    int length = m_LogEntrySize[sync];
+                    Imgui.Text($"History of {sync.GetType().FullName}");
+                    Imgui.SameLine(400f, 200f);
+                    Imgui.InputInt($"{sync.GetType().Name}", ref length);
+                    if (length > sync.BroadcastHistory.Count)
+                    {
+                        length = sync.BroadcastHistory.Count;
+                    }
+                    m_LogEntrySize[sync] = length;
+                    
+                    history = history
+                        .Take(m_LogEntrySize[sync])
+                        .ToList();
 
                     foreach (CallTrace trace in history)
                     {
                         Imgui.Text($"{trace.Tick}:");
                         Imgui.SameLine(tabWidth);
-                        Imgui.Text($"{trace.Instance}.{trace.Arguments}");
+                        Imgui.Text($"{trace.Instance ?? "null"}");
+                        Imgui.SameLine(tabWidth + 470f);
+                        Imgui.Text($"{trace.Arguments}");
                     }
                     Imgui.NewLine();
                 }

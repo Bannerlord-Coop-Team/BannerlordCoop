@@ -108,6 +108,11 @@ namespace Coop.Mod.Persistence.Party
             TargetPosition = 3,
             NumberOfFleeingsAtLastTravel = 4
         }
+
+        public override string ToString()
+        {
+            return $"{TargetPosition}, {TargetParty}, {TargetSettlement}, {DefaultBehaviour}, {NumberOfFleeingsAtLastTravel}";
+        }
     }
 
     /// <summary>

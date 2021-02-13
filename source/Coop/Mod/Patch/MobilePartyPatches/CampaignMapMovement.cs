@@ -41,8 +41,6 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 .Keep(); // Keep the local changes as a preview.
             
             AutoWrapAllInstances(party => new CampaignMapMovement(party));
-            
-                
         }
         
         /// <summary>
