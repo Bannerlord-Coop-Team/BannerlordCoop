@@ -15,7 +15,7 @@ namespace Coop.Mod.Patch.World
         {
             When(GameLoop)
                 .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)))
-                .Broadcast(() => CoopClient.Instance.SyncBuffered, new CanChangeTimeValidator())
+                .Broadcast(() => CoopClient.Instance.Synchronization, new CanChangeTimeValidator())
                 .Skip();
             When(GameLoop)
                 .Calls(Setter(nameof(Campaign.IsMainPartyWaiting)))

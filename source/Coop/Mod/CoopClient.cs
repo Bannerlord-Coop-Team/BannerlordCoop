@@ -67,7 +67,7 @@ namespace Coop.Mod
             GameState = new CoopGameState();
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
-            SyncBuffered = new CoopSync(this);
+            Synchronization = new CoopSync(this);
             
             #region State Machine Callbacks
             m_CoopClientSM.CharacterCreationState.OnEntry(CreateCharacter);
@@ -88,7 +88,7 @@ namespace Coop.Mod
 
         [CanBeNull] public PersistenceClient Persistence { get; private set; }
         
-        [NotNull] public SyncBuffered SyncBuffered { get; }
+        [NotNull] public SyncBuffered Synchronization { get; }
 
         [NotNull] public GameSession Session { get; }
 
