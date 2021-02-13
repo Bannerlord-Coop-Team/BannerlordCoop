@@ -22,6 +22,7 @@ using RailgunNet.Logic;
 using RemoteAction;
 using Sync;
 using Sync.Behaviour;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using Registry = Sync.Registry;
@@ -222,7 +223,8 @@ namespace Coop.Mod.DebugUtil
 
         private static void ShowCoopPatchInfo(List<MethodId> coopPatch)
         {
-            const float tabWidth = 200;
+            const float indent = 50f;
+            const float tabWidth = 200f;
             foreach (MethodId methodId in coopPatch)
             {
                 Imgui.Text("MethodId:");
@@ -234,11 +236,11 @@ namespace Coop.Mod.DebugUtil
                 {
                     foreach (ValueId valueId in Registry.Relation[methodId])
                     {
-                        void PrintField(ValueAccess valueAccess, float indent = 0f)
+                        void PrintField(ValueAccess valueAccess, float indentF = 0f)
                         {
                             relatedFields.Add(valueAccess.Id);
                             Imgui.Text("Related FieldId:");
-                            Imgui.SameLine(tabWidth + indent);
+                            Imgui.SameLine(tabWidth + indentF);
                             Imgui.Text($"{valueAccess.Id.InternalValue} [" + valueAccess + "]");
                         }
 
@@ -248,7 +250,7 @@ namespace Coop.Mod.DebugUtil
                         {
                             foreach (FieldAccess groupMember in accessGroup.Fields)
                             {
-                                PrintField(groupMember, 50f);
+                                PrintField(groupMember, indent);
                             }
                         }
                     }
@@ -316,9 +318,15 @@ namespace Coop.Mod.DebugUtil
                                 sync.Broadcast(buffer);
                             }
                         }
+
                         
+                        Imgui.Text("Instance: ");
+                        Imgui.SameLine(tabWidth);
                         Imgui.Text($"{instance ?? "null"}");
-                        Imgui.SameLine(tabWidth * 3);
+                        
+                        
+                        Imgui.Text("Arguments: ");
+                        Imgui.SameLine(tabWidth);
                         Imgui.Text($"{string.Join(",", arguments.Select(a => a.ToString()))}");
                     }
                     Imgui.NewLine();
@@ -377,6 +385,9 @@ namespace Coop.Mod.DebugUtil
                     CoopClient.Instance.Disconnect();
                 }
             }
+            
+            Imgui.SameLine(400);
+            Imgui.Checkbox("Show whole map", ref DebugShowWholeMapPatch.IsCheatEnabled);
 
             if (startServerResult != null)
             {
@@ -614,5 +625,24 @@ namespace Coop.Mod.DebugUtil
 
             public int Slack => Peer.RemoteClock.LatestRemote - Peer.RemoteClock.EstimatedRemote;
         }
+        
+        [HarmonyPatch(typeof(MobileParty))]
+        [HarmonyPatch(nameof(MobileParty.SeeingRange), MethodType.Getter)]
+        private static class DebugShowWholeMapPatch
+        {
+            public static bool IsCheatEnabled = false;
+            static bool Prefix(MobileParty __instance, ref float __result)
+            {
+                if (IsCheatEnabled && __instance == MobileParty.MainParty)
+                {
+                    __result = Single.MaxValue;
+                    return false;
+                }
+                return true;
+            }
+        }
+        
     }
+    
+    
 }
