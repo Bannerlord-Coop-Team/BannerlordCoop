@@ -30,7 +30,10 @@ namespace CoopFramework
         /// <inheritdoc cref="IUpdateable.Update(TimeSpan)"/>
         public void Update(TimeSpan frameTime)
         {
-            BroadcastBufferedChanges(m_Buffer);
+            if (m_Buffer.Count() > 0)
+            {
+                BroadcastBufferedChanges(m_Buffer);
+            }
         }
         /// <summary>
         ///     Called when the buffered changes should be broadcast. Usually at the end of a game tick.
