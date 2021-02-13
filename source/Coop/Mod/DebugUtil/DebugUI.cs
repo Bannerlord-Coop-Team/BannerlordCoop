@@ -445,7 +445,13 @@ namespace Coop.Mod.DebugUtil
             {
                 foreach (IPEndPoint ipEndPoint in servers)
                 {
-                    Imgui.Text($"{ipEndPoint}");
+                    if (Imgui.Button($"Connect to {ipEndPoint}"))
+                    {
+                        ServerConfiguration defaultConfiguration = new ServerConfiguration();
+                        CoopClient.Instance.Connect(
+                            defaultConfiguration.NetworkConfiguration.LanAddress,
+                            defaultConfiguration.NetworkConfiguration.LanPort);
+                    }
                 }
             }
             Imgui.Text("Scanning...");
