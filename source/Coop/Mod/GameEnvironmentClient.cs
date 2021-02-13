@@ -24,8 +24,7 @@ namespace Coop.Mod
 
         public void SetAuthoritative(MobileParty party, MovementData data)
         {
-            // TODO
-            throw new NotImplementedException();
+            CampaignMapMovement.Sync.SetAuthoritative(party, data);
         }
 
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;

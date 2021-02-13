@@ -25,14 +25,14 @@ namespace Sync.Behaviour
             return applicableBehaviours;
         }
         
-        public static Dictionary<FieldId, List<FieldActionBehaviourBuilder>> SortByField(List<ActionBehaviourBuilder> allBehaviours)
+        public static Dictionary<ValueId, List<FieldActionBehaviourBuilder>> SortByField(List<ActionBehaviourBuilder> allBehaviours)
         {
-            Dictionary<FieldId, List<FieldActionBehaviourBuilder>> applicableBehaviours =
-                new Dictionary<FieldId, List<FieldActionBehaviourBuilder>>();
+            Dictionary<ValueId, List<FieldActionBehaviourBuilder>> applicableBehaviours =
+                new Dictionary<ValueId, List<FieldActionBehaviourBuilder>>();
             
-            IEnumerable<FieldId> patchedFields = allBehaviours
+            IEnumerable<ValueId> patchedFields = allBehaviours
                 .SelectMany(b => b.FieldChangeAction.Keys).Distinct();
-            foreach (FieldId patchedField in patchedFields)
+            foreach (ValueId patchedField in patchedFields)
             {
                 var fieldBehaviours = allBehaviours
                     .Where(a => a.FieldChangeAction.ContainsKey(patchedField))

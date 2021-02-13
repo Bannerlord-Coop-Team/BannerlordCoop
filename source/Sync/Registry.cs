@@ -8,8 +8,8 @@ namespace Sync
     public static class Registry
     {
         public static IReadOnlyDictionary<MethodId, MethodAccess> IdToMethod => m_IdToMethod;
-        public static IReadOnlyDictionary<FieldId, FieldAccess> IdToField => m_IdToField;
-        public static IReadOnlyDictionary<MethodId, List<FieldId>> Relation => m_MethodFieldRelation;
+        public static IReadOnlyDictionary<ValueId, ValueAccess> IdToValue => m_IdToValue;
+        public static IReadOnlyDictionary<MethodId, List<ValueId>> Relation => m_MethodValueRelation;
 
         public static MethodId Register([NotNull] MethodAccess methodAccess)
         {
@@ -27,34 +27,34 @@ namespace Sync
             }
         }
 
-        public static FieldId Register([NotNull] FieldAccess fieldAccess)
+        public static ValueId Register([NotNull] ValueAccess valueAccess)
         {
             lock (Lock)
             {
-                if (m_FieldToId.ContainsKey(fieldAccess))
+                if (m_ValueToId.ContainsKey(valueAccess))
                 {
-                    throw new ArgumentException($"Duplicate register for: {fieldAccess}");
+                    throw new ArgumentException($"Duplicate register for: {valueAccess}");
                 }
 
-                FieldId id = FieldId.GetNextId();
-                m_IdToField.Add(id, fieldAccess);
-                m_FieldToId.Add(fieldAccess, id);
+                ValueId id = ValueId.GetNextId();
+                m_IdToValue.Add(id, valueAccess);
+                m_ValueToId.Add(valueAccess, id);
                 return id;
             }
         }
 
-        public static void AddRelation(MethodId method, FieldId field)
+        public static void AddRelation(MethodId method, ValueId value)
         {
-            if (!m_MethodFieldRelation.ContainsKey(method))
+            if (!m_MethodValueRelation.ContainsKey(method))
             {
-                m_MethodFieldRelation[method] = new List<FieldId>();
+                m_MethodValueRelation[method] = new List<ValueId>();
             }
-            else if (m_MethodFieldRelation[method].Contains(field))
+            else if (m_MethodValueRelation[method].Contains(value))
             {
                 return;
             }
 
-            m_MethodFieldRelation[method].Add(field);
+            m_MethodValueRelation[method].Add(value);
         }
         
         #region Private
@@ -66,14 +66,14 @@ namespace Sync
         private static readonly Dictionary<MethodId, MethodAccess> m_IdToMethod =
             new Dictionary<MethodId, MethodAccess>();
         
-        private static readonly Dictionary<FieldAccess, FieldId> m_FieldToId =
-            new Dictionary<FieldAccess, FieldId>();
+        private static readonly Dictionary<ValueAccess, ValueId> m_ValueToId =
+            new Dictionary<ValueAccess, ValueId>();
 
-        private static readonly Dictionary<FieldId, FieldAccess> m_IdToField =
-            new Dictionary<FieldId, FieldAccess>();
+        private static readonly Dictionary<ValueId, ValueAccess> m_IdToValue =
+            new Dictionary<ValueId, ValueAccess>();
 
-        private static readonly Dictionary<MethodId, List<FieldId>> m_MethodFieldRelation =
-            new Dictionary<MethodId, List<FieldId>>();
+        private static readonly Dictionary<MethodId, List<ValueId>> m_MethodValueRelation =
+            new Dictionary<MethodId, List<ValueId>>();
 
         #endregion
     }

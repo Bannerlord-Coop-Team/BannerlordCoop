@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 using CoopFramework;
+using JetBrains.Annotations;
 using NLog;
+using RemoteAction;
 using Sync;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
 
@@ -13,6 +13,10 @@ namespace Coop.Mod.Persistence.Party
 {
     public class MobilePartySync : SynchronizationBase
     {
+        public MobilePartySync([NotNull] FieldAccessGroup<MobileParty, MovementData> movement)
+        {
+            m_MovementGroup = movement ?? throw new ArgumentNullException();
+        }
         public override void Broadcast(MethodId id, object instance, object[] args)
         {
             // We didn't patch any methods, so this is never called.
@@ -29,10 +33,13 @@ namespace Coop.Mod.Persistence.Party
                     Logger.Warn("Got FieldChangeBuffer for unmanaged {party}. Ignored.");
                     continue;
                 }
-
-                MovementData latest = handler.GetLatest();
-                UpdateData(latest, change.Value);
-                handler.RequestMovement(latest);
+                BroadcastHistory.Push(new CallTrace()
+                {
+                    Value = m_MovementGroup.Id,
+                    Instance = party,
+                    Arguments = change.Value
+                });
+                handler.RequestMovement(change.Value);
             }
         }
         
@@ -57,69 +64,41 @@ namespace Coop.Mod.Persistence.Party
             }
         }
         
+        public void SetAuthoritative(MobileParty party, MovementData data)
+        {
+            m_MovementGroup.SetTyped(party, data);
+        }
+        
         #region Private
 
-        private Dictionary<MobileParty, List<Tuple<FieldInfo, ValueChangeRequest>>> SortByParty(
-            Dictionary<FieldAccess, Dictionary<object, ValueChangeRequest>> input)
+        private Dictionary<MobileParty, MovementData> SortByParty(
+            Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>> input)
         {
-            Dictionary<MobileParty, List<Tuple<FieldInfo, ValueChangeRequest>>> requestedChanges = new Dictionary<MobileParty, List<Tuple<FieldInfo, ValueChangeRequest>>>();
+            Dictionary<MobileParty, MovementData> requestedChanges = new Dictionary<MobileParty, MovementData>();
             foreach (var bufferEntry in input)
             {
-                FieldAccess field = bufferEntry.Key;
-                if (field.MemberInfo.DeclaringType != typeof(MobileParty))
+                ValueAccess access = bufferEntry.Key;
+                if (access.DeclaringType != typeof(MobileParty))
                 {
                     continue;
                 }
 
                 foreach (var change in bufferEntry.Value)
                 {
-                    if (change.Key is MobileParty party)
+                    if (change.Key is MobileParty party && change.Value.RequestedValue is MovementData movementData)
                     {
-                        if (!requestedChanges.ContainsKey(party))
-                        {
-                            requestedChanges[party] = new List<Tuple<FieldInfo, ValueChangeRequest>>();
-                        }
-
-                        requestedChanges[party]
-                            .Add(new Tuple<FieldInfo, ValueChangeRequest>(field.MemberInfo, change.Value));
+                        requestedChanges[party] = movementData;
                     }
                 }
             }
 
             return requestedChanges;
         }
-        
-        private void UpdateData(MovementData toUpdate, List<Tuple<FieldInfo, ValueChangeRequest>> changes)
-        {
-            foreach (var change in changes)
-            {
-                FieldInfo field = change.Item1;
-                if (field.FieldType == typeof(AiBehavior))
-                {
-                    toUpdate.DefaultBehaviour = (AiBehavior) change.Item2.RequestedValue;
-                }
-                else if (field.FieldType == typeof(Settlement))
-                {
-                    toUpdate.TargetSettlement = (Settlement) change.Item2.RequestedValue;
-                }
-                else if (field.FieldType == typeof(MobileParty))
-                {
-                    toUpdate.TargetParty = (MobileParty) change.Item2.RequestedValue;
-                }
-                else if (field.FieldType == typeof(Vec2))
-                {
-                    toUpdate.TargetPosition = (Vec2) change.Item2.RequestedValue;
-                }
-                else if (field.FieldType == typeof(int))
-                {
-                    toUpdate.NumberOfFleeingsAtLastTravel = (int) change.Item2.RequestedValue;
-                }
-            }
-        }
-
         private readonly Dictionary<MBGUID, IMovementHandler> m_Handlers =
             new Dictionary<MBGUID, IMovementHandler>();
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        [NotNull] private FieldAccessGroup<MobileParty, MovementData> m_MovementGroup;
+
         #endregion
     }
 }

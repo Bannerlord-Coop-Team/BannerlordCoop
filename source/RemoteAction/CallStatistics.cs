@@ -1,13 +1,17 @@
 ﻿using System.Diagnostics;
 using Common;
+using JetBrains.Annotations;
 using RailgunNet.System.Types;
+using Sync;
 
 namespace RemoteAction
 {
     public struct CallTrace
     {
-        public FieldChange? Change { get; set; }
-        public MethodCall? Call { get; set; }
+        public ValueId? Value { get; set; }
+        public MethodId? Call { get; set; }
+        [CanBeNull] public object Instance { get; set; }
+        [CanBeNull] public object Arguments { get; set; }
         public Tick Tick { get; set; }
     }
 
@@ -22,7 +26,9 @@ namespace RemoteAction
         {
             Push(new CallTrace
             {
-                Call = call,
+                Call = call.Id,
+                Instance = call.Instance,
+                Arguments = call.Arguments,
                 Tick = tick
             });
         }
@@ -32,7 +38,9 @@ namespace RemoteAction
         {
             Push(new CallTrace
             {
-                Change = change,
+                Value = change.Id,
+                Instance = change.Instance,
+                Arguments = change.Arguments,
                 Tick = tick
             });
         }

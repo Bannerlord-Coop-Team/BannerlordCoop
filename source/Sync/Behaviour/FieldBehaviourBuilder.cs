@@ -7,7 +7,7 @@ namespace Sync.Behaviour
 {
     public class FieldBehaviourBuilder : ActionBehaviour
     {
-        public FieldBehaviourBuilder(IEnumerable<FieldId> fieldIds, Condition condition) : base(condition)
+        public FieldBehaviourBuilder(IEnumerable<ValueId> fieldIds, Condition condition) : base(condition)
         {
             m_FieldIds = fieldIds;
         }
@@ -23,7 +23,7 @@ namespace Sync.Behaviour
             DoBroadcast = true;
             if (validator != null)
             {
-                foreach (FieldId id in m_FieldIds)
+                foreach (ValueId id in m_FieldIds)
                 {
                     ActionValidatorRegistry.Register(id, validator);
                 }
@@ -57,7 +57,7 @@ namespace Sync.Behaviour
         public Func<ISynchronization> SynchronizationFactory { get; private set; }
         
         #region Private
-        private readonly IEnumerable<FieldId> m_FieldIds;
+        private readonly IEnumerable<ValueId> m_FieldIds;
         #endregion
     }
 }

@@ -16,13 +16,14 @@ namespace Sync
     /// <typeparam name="TValueObject">
     ///     Class that can store the values for all fields.
     /// </typeparam>
-    public class FieldAccessGroup<TDeclaring, TValueObject> : ValueAccess
+    public class FieldAccessGroup<TDeclaring, TValueObject> : FieldAccessGroup
         where TValueObject : class, IEnumerable<object>
     {
-        [NotNull] private readonly List<FieldAccess> m_Fields = new List<FieldAccess>();
+        public override IEnumerable<FieldAccess> Fields => m_Fields;
 
-        public FieldAccessGroup()
+        public FieldAccessGroup([NotNull] IEnumerable<FieldAccess> fields) : base(typeof(TDeclaring))
         {
+            m_Fields = fields.ToArray();
             VerifyConstructor();
         }
 
@@ -34,37 +35,6 @@ namespace Sync
             {
                 throw new ArgumentException($"{typeof(TValueObject)} has no matching constructor.");
             }
-        }
-
-        /// <summary>
-        ///     Adds a field to the collection.
-        /// </summary>
-        /// <param name="sFieldName">Name of the field.</param>
-        /// <typeparam name="TFieldType">Type of the field.</typeparam>
-        /// <returns>this</returns>
-        /// <exception cref="Exception">If the field was not found.</exception>
-        public FieldAccessGroup<TDeclaring, TValueObject> AddField<TFieldType>(string sFieldName)
-        {
-            FieldInfo info = AccessTools.Field(typeof(TDeclaring), sFieldName);
-            if (info == null)
-            {
-                throw new Exception($"Field {typeof(TDeclaring)}.{sFieldName} not found.");
-            }
-
-            return AddField<TFieldType>(info);
-        }
-
-        public FieldAccessGroup<TDeclaring, TValueObject> AddField<TFieldType>(
-            [NotNull] FieldInfo memberInfo)
-        {
-            return AddField(new FieldAccess<TDeclaring, TFieldType>(memberInfo));
-        }
-
-        public FieldAccessGroup<TDeclaring, TValueObject> AddField(
-            [NotNull] FieldAccess fieldAccess)
-        {
-            m_Fields.Add(fieldAccess);
-            return this;
         }
 
         /// <inheritdoc />
@@ -124,6 +94,25 @@ namespace Sync
             {
                 pair.Field.Set(target, pair.Value);
             }
+        }
+        
+        public override string ToString()
+        {
+            return $"{typeof(TValueObject).Name} {DeclaringType?.Name}.[{string.Join(", ", Fields.Select(f => f.MemberInfo.Name))}])";
+        }
+        
+        [NotNull] private readonly FieldAccess[] m_Fields;
+    }
+
+    /// <summary>
+    ///     Type erased base class for field groups.
+    /// </summary>
+    public abstract class FieldAccessGroup : ValueAccess
+    {
+        [NotNull] public abstract IEnumerable<FieldAccess> Fields { get; }
+
+        protected FieldAccessGroup(Type declaringType) : base(declaringType)
+        {
         }
     }
 }

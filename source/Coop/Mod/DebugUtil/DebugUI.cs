@@ -227,24 +227,36 @@ namespace Coop.Mod.DebugUtil
                 Imgui.SameLine(tabWidth);
                 Imgui.Text("" + methodId.InternalValue);
 
-                HashSet<FieldId> relatedFields = new HashSet<FieldId>();
+                HashSet<ValueId> relatedFields = new HashSet<ValueId>();
                 if (Registry.Relation.ContainsKey(methodId))
                 {
-                    foreach (FieldId field in Registry.Relation[methodId])
+                    foreach (ValueId valueId in Registry.Relation[methodId])
                     {
-                        FieldAccess access = Registry.IdToField[field];
-                        relatedFields.Add(field);
-                        Imgui.Text("Related FieldId:");
-                        Imgui.SameLine(tabWidth);
-                        Imgui.Text($"{field.InternalValue} [" + access + "]");
+                        void PrintField(ValueAccess valueAccess, float indent = 0f)
+                        {
+                            relatedFields.Add(valueAccess.Id);
+                            Imgui.Text("Related FieldId:");
+                            Imgui.SameLine(tabWidth + indent);
+                            Imgui.Text($"{valueAccess.Id.InternalValue} [" + valueAccess + "]");
+                        }
+
+                        ValueAccess access = Registry.IdToValue[valueId];
+                        PrintField(access);
+                        if (access is FieldAccessGroup accessGroup)
+                        {
+                            foreach (FieldAccess groupMember in accessGroup.Fields)
+                            {
+                                PrintField(groupMember, 50f);
+                            }
+                        }
                     }
                 }
 
                 foreach (SynchronizationBase sync in SynchronizationManager.SynchronizationInstances)
                 {
                     var history = sync.BroadcastHistory
-                        .Where(c => (c.Call.HasValue && Equals(c.Call.Value.Id, methodId)) ||
-                                    (c.Change.HasValue && relatedFields.Contains(c.Change.Value.Id)))
+                        .Where(c => (c.Call.HasValue && Equals(c.Call.Value, methodId)) ||
+                                    (c.Value.HasValue && relatedFields.Contains(c.Value.Value)))
                         .ToList();
                     if (history.Count > 0)
                     {
@@ -253,17 +265,9 @@ namespace Coop.Mod.DebugUtil
 
                     foreach (CallTrace trace in history)
                     {
-                        Imgui.Text($"{trace.Tick} -");
+                        Imgui.Text($"{trace.Tick}:");
                         Imgui.SameLine(tabWidth);
-
-                        if (trace.Call.HasValue)
-                        {
-                            Imgui.Text(trace.Call.Value.ToString());
-                        }
-                        else if (trace.Change.HasValue)
-                        {
-                            Imgui.Text(trace.Change.Value.ToString());
-                        }
+                        Imgui.Text($"{trace.Instance}.{trace.Arguments}");
                     }
                     Imgui.NewLine();
                 }

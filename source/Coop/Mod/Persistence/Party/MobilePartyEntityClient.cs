@@ -4,6 +4,7 @@ using Coop.Mod.DebugUtil;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
+using RailgunNet.System.Types;
 using RemoteAction;
 using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
@@ -26,6 +27,8 @@ namespace Coop.Mod.Persistence.Party
         {
             m_Environment = environment;
         }
+
+        public Tick Tick => Room.Tick;
 
         /// <summary>
         ///     Handler to issue a move command for this party to the server.

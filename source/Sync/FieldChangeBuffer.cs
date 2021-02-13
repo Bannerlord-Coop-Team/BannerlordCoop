@@ -8,11 +8,11 @@ namespace Sync
     public class FieldChangeBuffer
     {
         [NotNull]
-        public object AddChange(FieldAccess field, FieldData data, object newValue)
+        public object AddChange(ValueAccess access, FieldData data, object newValue)
         {
             lock (m_BufferedChanges)
             {
-                Dictionary<object, ValueChangeRequest> fieldBuffer = m_BufferedChanges.Assert(field);
+                Dictionary<object, ValueChangeRequest> fieldBuffer = m_BufferedChanges.Assert(access);
                 if (fieldBuffer.TryGetValue(data.Target, out ValueChangeRequest cached))
                 {
                     if (cached.RequestProcessed)
@@ -34,12 +34,12 @@ namespace Sync
             return data.Value;
         }
 
-        [NotNull] public Dictionary<FieldAccess, Dictionary<object, ValueChangeRequest>> FetchChanges()
+        [NotNull] public Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>> FetchChanges()
         {
             lock (m_BufferedChanges)
             {
                 var ret = m_BufferedChanges;
-                m_BufferedChanges = new Dictionary<FieldAccess, Dictionary<object, ValueChangeRequest>>();
+                m_BufferedChanges = new Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>();
                 return ret;
             }
         }
@@ -55,8 +55,8 @@ namespace Sync
         private static readonly Lazy<FieldChangeBuffer> m_Instance =
             new Lazy<FieldChangeBuffer>(() => new FieldChangeBuffer());
         
-        private Dictionary<FieldAccess, Dictionary<object, ValueChangeRequest>> m_BufferedChanges =
-            new Dictionary<FieldAccess, Dictionary<object, ValueChangeRequest>>();
+        private Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>> m_BufferedChanges =
+            new Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>();
         #endregion
     }
 }

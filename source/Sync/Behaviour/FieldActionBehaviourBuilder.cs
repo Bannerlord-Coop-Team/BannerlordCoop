@@ -10,7 +10,7 @@ namespace Sync.Behaviour
     /// </summary>
     public class FieldActionBehaviourBuilder
     {
-        public FieldActionBehaviourBuilder(IEnumerable<FieldId> fieldIds, Condition condition)
+        public FieldActionBehaviourBuilder(IEnumerable<ValueId> fieldIds, Condition condition)
         {
             m_FieldIds = fieldIds;
             m_Condition = condition;
@@ -32,7 +32,7 @@ namespace Sync.Behaviour
         public List<MethodAccess> Accessors { get; } = new List<MethodAccess>();
         public FieldBehaviourBuilder Behaviour { get; private set; }
         #region Private
-        private readonly IEnumerable<FieldId> m_FieldIds;
+        private readonly IEnumerable<ValueId> m_FieldIds;
         private Condition m_Condition;
         #endregion
     }

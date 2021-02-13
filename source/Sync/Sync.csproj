@@ -89,7 +89,7 @@
     <Compile Include="Behaviour\Util.cs" />
     <Compile Include="ConstructorPatch.cs" />
     <Compile Include="DestructorPatch.cs" />
-    <Compile Include="FieldId.cs" />
+    <Compile Include="ValueId.cs" />
     <Compile Include="GetPrefixBuilder.cs" />
     <Compile Include="MethodPatch.cs" />
     <Compile Include="EMethodPatchFlag.cs" />

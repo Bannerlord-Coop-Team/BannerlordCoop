@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
@@ -11,6 +12,7 @@ using Network.Protocol;
 using RailgunNet;
 using RailgunNet.Connection.Client;
 using RemoteAction;
+using Sync;
 using Sync.Store;
 using Xunit;
 using Registry = Coop.Mod.Persistence.Registry;
@@ -120,14 +122,16 @@ namespace Coop.Tests.Persistence.RPC
             CallTrace trace = sync0.BroadcastHistory.Peek();
             Assert.Equal(Persistence.Rooms[ClientId0].Tick, trace.Tick);
             Assert.True(trace.Call.HasValue);
-            MethodCall tracedCall = trace.Call.Value;
+            MethodId tracedCallId = trace.Call.Value;
             Assert.Equal(
                 Argument.Null,
-                tracedCall.Instance); // Since it's a static call the instance is null
+                trace.Instance); // Since it's a static call the instance is null
 
             // Verify the RPC argument
-            Assert.Single(tracedCall.Arguments);
-            Argument arg0 = tracedCall.Arguments.ToList()[ClientId0];
+            Assert.IsAssignableFrom<IEnumerable<Argument>>(trace.Arguments);
+            List<Argument> args = ((IEnumerable<Argument>) trace.Arguments).ToList();
+            Assert.Single(args);
+            Argument arg0 = args[ClientId0];
             Assert.Equal(
                 EventArgType.StoreObjectId,
                 arg0.EventType); // strings are always put into the store
@@ -178,8 +182,11 @@ namespace Coop.Tests.Persistence.RPC
             conClient0ToServer.ExecuteSends();
             CallTrace trace = sync0.BroadcastHistory.Peek();
             Assert.True(trace.Call.HasValue);
-            MethodCall tracedCall = trace.Call.Value;
-            ObjectId messageId = tracedCall.Arguments.ToList()[0].StoreObjectId.Value;
+            Assert.IsAssignableFrom<IEnumerable<Argument>>(trace.Arguments);
+            List<Argument> args = ((IEnumerable<Argument>) trace.Arguments).ToList();
+            Assert.Single(args);
+            Assert.True(args[0].StoreObjectId.HasValue);
+            ObjectId messageId = args[0].StoreObjectId.Value;
 
             // Client0 is waiting for the ACK
             Assert.Single(client0Store.State);
@@ -313,8 +320,9 @@ namespace Coop.Tests.Persistence.RPC
             // Verify the argument was received by the server
             CallTrace trace = sync0.BroadcastHistory.Peek();
             Assert.True(trace.Call.HasValue);
-            MethodCall tracedCall = trace.Call.Value;
-            ObjectId messageId = tracedCall.Arguments.ToList()[0].StoreObjectId.Value;
+            Assert.IsAssignableFrom<IEnumerable<Argument>>(trace.Arguments);
+            List<Argument> args = ((IEnumerable<Argument>) trace.Arguments).ToList();
+            ObjectId messageId = args[0].StoreObjectId.Value;
             Assert.True(m_Environment.StoreServer.Data.ContainsKey(messageId));
         }
 
@@ -412,8 +420,9 @@ namespace Coop.Tests.Persistence.RPC
             Foo.SyncedMethod(sMessage);
             CallTrace trace = sync0.BroadcastHistory.Peek();
             Assert.True(trace.Call.HasValue);
-            MethodCall tracedCall = trace.Call.Value;
-            ObjectId messageId = tracedCall.Arguments.ToList()[0].StoreObjectId.Value;
+            Assert.IsAssignableFrom<IEnumerable<Argument>>(trace.Arguments);
+            List<Argument> args = ((IEnumerable<Argument>) trace.Arguments).ToList();
+            ObjectId messageId = args[0].StoreObjectId.Value;
 
             // Sync to server
             client0.Update();
@@ -453,8 +462,9 @@ namespace Coop.Tests.Persistence.RPC
             conClient0ToServer.ExecuteSends();
             CallTrace trace = sync0.BroadcastHistory.Peek();
             Assert.True(trace.Call.HasValue);
-            MethodCall tracedCall = trace.Call.Value;
-            ObjectId messageId = tracedCall.Arguments.ToList()[0].StoreObjectId.Value;
+            Assert.IsAssignableFrom<IEnumerable<Argument>>(trace.Arguments);
+            List<Argument> args = ((IEnumerable<Argument>) trace.Arguments).ToList();
+            ObjectId messageId = args[0].StoreObjectId.Value;
 
             // The server relayed the StoreAdd to client 1
             Assert.Single(conServerToClient1.SendBuffer);

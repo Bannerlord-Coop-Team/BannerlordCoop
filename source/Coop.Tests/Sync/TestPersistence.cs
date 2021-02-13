@@ -77,7 +77,7 @@ namespace Coop.Tests.Sync
         }
 
         public IEnumerable<MobileParty> PlayerControlledParties { get; }
-        public MobilePartySync PartySync { get; } = new MobilePartySync();
+        public MobilePartySync PartySync { get; }
         public RemoteStore Store { get; }
 
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)
@@ -109,6 +109,6 @@ namespace Coop.Tests.Sync
             throw new NotImplementedException();
         }
 
-        public MobilePartySync PartySync { get; } = new MobilePartySync();
+        public MobilePartySync PartySync { get; }
     }
 }

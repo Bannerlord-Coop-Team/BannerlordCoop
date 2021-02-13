@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using JetBrains.Annotations;
+﻿using JetBrains.Annotations;
 using RemoteAction;
 using Sync;
 
@@ -10,9 +8,9 @@ namespace CoopFramework
     {
         #region Debug
         /// <summary>
-        ///     Returns the call history of <see cref="Broadcast" />.
+        ///     Returns the call history of this synchronization instance.
         /// </summary>
-        [NotNull] public CallStatistics BroadcastHistory { get; } = new CallStatistics(512);
+        [NotNull] public CallStatistics BroadcastHistory { get; } = new CallStatistics(32);
 
         #endregion
 

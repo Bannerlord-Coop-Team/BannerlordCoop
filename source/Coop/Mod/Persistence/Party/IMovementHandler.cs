@@ -1,4 +1,5 @@
 ﻿using JetBrains.Annotations;
+using RailgunNet.System.Types;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence.Party
@@ -8,6 +9,7 @@ namespace Coop.Mod.Persistence.Party
     /// </summary>
     public interface IMovementHandler
     {
+        Tick Tick { get; }
         /// <summary>
         ///     Requests a change of the movement data of the managed party.
         /// </summary>

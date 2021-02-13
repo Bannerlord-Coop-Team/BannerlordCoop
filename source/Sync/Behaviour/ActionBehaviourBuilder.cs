@@ -34,10 +34,16 @@ namespace Sync.Behaviour
 
             return fieldChangeAction;
         }
+        public FieldActionBehaviourBuilder Changes(FieldAccessGroup group)
+        {
+            var fieldChangeAction = new FieldActionBehaviourBuilder(new List<ValueId>(){group.Id}, m_Condition);
+            Register(group.Id, fieldChangeAction);
+            return fieldChangeAction;
+        }
 
         #region Getters
         public Dictionary<MethodId, CallBehaviourBuilder> CallBehaviours { get; } = new Dictionary<MethodId, CallBehaviourBuilder>();
-        public Dictionary<FieldId, FieldActionBehaviourBuilder> FieldChangeAction { get; } = new Dictionary<FieldId, FieldActionBehaviourBuilder>();
+        public Dictionary<ValueId, FieldActionBehaviourBuilder> FieldChangeAction { get; } = new Dictionary<ValueId, FieldActionBehaviourBuilder>();
         #endregion
         
         
@@ -52,7 +58,7 @@ namespace Sync.Behaviour
             CallBehaviours[key] = behaviourBuilder;
         }
 
-        private void Register(FieldId key, FieldActionBehaviourBuilder change)
+        private void Register(ValueId key, FieldActionBehaviourBuilder change)
         {
             if (FieldChangeAction.ContainsKey(key))
             {

@@ -424,13 +424,13 @@ namespace CoopFramework
         /// <param name="relevantBehaviours"></param>
         private static void SetupFieldHandlers(
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
-            FieldId id,
+            ValueId id,
             [NotNull] List<FieldActionBehaviourBuilder> relevantBehaviours)
         {
             TExtended instanceResolved = null; // stays null for static calls
             if (self != null && !self.TryGetInstance(out instanceResolved)) return;
 
-            var fieldAccess = Registry.IdToField[id];
+            var valueAccess = Registry.IdToValue[id];
             IEnumerable<MethodAccess> accessors = relevantBehaviours.SelectMany(b => b.Accessors);
             foreach (var accessor in accessors)
             {
@@ -450,7 +450,7 @@ namespace CoopFramework
                             // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
                             return ECallPropagation.CallOriginal;
                         if (prefix?.Invoke(eOrigin, null, args) == ECallPropagation.Skip) return ECallPropagation.Skip;
-                        return DispatchPrefix(null, eOrigin, methodRelevantBehaviours, fieldAccess);
+                        return DispatchPrefix(null, eOrigin, methodRelevantBehaviours, valueAccess);
                     });
 
                     var postfix = accessor.Postfix.GlobalHandler;
@@ -479,7 +479,7 @@ namespace CoopFramework
                         {
                             if (!CoopFramework.IsEnabled) return ECallPropagation.CallOriginal;
                             if (prefix?.Invoke(origin, args) == ECallPropagation.Skip) return ECallPropagation.Skip;
-                            return DispatchPrefix(self, origin, methodRelevantBehaviours, fieldAccess);
+                            return DispatchPrefix(self, origin, methodRelevantBehaviours, valueAccess);
                         });
 
                     var postfix = accessor.Postfix.GetHandler(instanceResolved);
@@ -534,12 +534,12 @@ namespace CoopFramework
         /// <param name="self">The instance of the CoopManager that wraps the instance of the method call. null for static calls.</param>
         /// <param name="eOriginator">The originator of the action.</param>
         /// <param name="behaviours">Behaviours that apply to this field.</param>
-        /// <param name="fieldAccess">Access to the field.</param>
+        /// <param name="valueAccess">Access to the value.</param>
         private static ECallPropagation DispatchPrefix(
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
             EOriginator eOriginator,
             IEnumerable<FieldBehaviourBuilder> behaviours,
-            FieldAccess fieldAccess)
+            ValueAccess valueAccess)
         {
             TExtended instanceResolved = null; // stays null for static calls
             if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
@@ -554,7 +554,7 @@ namespace CoopFramework
                 if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) return ECallPropagation.CallOriginal;
 
                 FieldStack.PushMarker();
-                FieldStack.PushValue(fieldAccess, instanceResolved);
+                FieldStack.PushValue(valueAccess, instanceResolved);
             }
 
             return ECallPropagation.CallOriginal;

@@ -13,7 +13,7 @@ namespace Sync
     /// <typeparam name="TFieldType">Type of the field itself.</typeparam>
     public class FieldAccess<TDeclaring, TFieldType> : FieldAccess
     {
-        public FieldAccess(FieldInfo memberInfo) : base(memberInfo)
+        public FieldAccess(FieldInfo memberInfo) : base(typeof(TDeclaring), memberInfo)
         {
             if (memberInfo.GetUnderlyingType() != typeof(TFieldType))
             {
@@ -37,8 +37,6 @@ namespace Sync
     /// </summary>
     public abstract class FieldAccess : ValueAccess
     {
-        public readonly FieldId Id;
-        
         [NotNull] public readonly FieldInfo MemberInfo;
         
         /// <inheritdoc />
@@ -60,12 +58,11 @@ namespace Sync
 
         public override string ToString()
         {
-            return $"{MemberInfo.DeclaringType?.Name}.{MemberInfo.Name}";
+            return $"{DeclaringType?.Name}.{MemberInfo.Name}";
         }
         
-        protected FieldAccess([NotNull] FieldInfo memberInfo)
+        protected FieldAccess(Type declaringType, [NotNull] FieldInfo memberInfo) : base(declaringType)
         {
-            Id = Registry.Register(this);
             MemberInfo = memberInfo;
             m_GetterLocal = InvokableFactory.CreateUntypedGetter<object>(memberInfo);
             m_Setter = InvokableFactory.CreateUntypedSetter<object>(memberInfo);

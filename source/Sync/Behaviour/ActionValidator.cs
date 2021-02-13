@@ -2,9 +2,9 @@
 {
     public static class ActionValidator
     {
-        public static bool IsValid(FieldId field)
+        public static bool IsValid(ValueId value)
         {
-            if(ActionValidatorRegistry.TryGet(field, out IActionValidator validator))
+            if(ActionValidatorRegistry.TryGet(value, out IActionValidator validator))
             {
                 return validator.Validate() == EValidationResult.Valid;
             }

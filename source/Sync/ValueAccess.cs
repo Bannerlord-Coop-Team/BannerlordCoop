@@ -8,6 +8,15 @@ namespace Sync
     /// </summary>
     public abstract class ValueAccess
     {
+        public readonly ValueId Id;
+        [NotNull] public readonly Type DeclaringType;
+
+        public ValueAccess(Type declaringType)
+        {
+            Id = Registry.Register(this);
+            DeclaringType = declaringType;
+        }
+        
         /// <summary>
         ///     Returns the current value of an instance of this <see cref="ValueAccess" />.
         /// </summary>

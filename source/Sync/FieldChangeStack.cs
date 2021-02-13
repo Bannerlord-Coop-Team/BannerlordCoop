@@ -28,7 +28,7 @@ namespace Sync
         /// </summary>
         /// <param name="access">Access object to the field value</param>
         /// <param name="target">Instance that the field belongs to</param>
-        public void PushValue(FieldAccess access, object target)
+        public void PushValue(ValueAccess access, object target)
         {
             m_ActiveFields.Push(new FieldData(access, target, access.Get(target)));
         }
@@ -49,17 +49,17 @@ namespace Sync
                     break; // The marker
                 }
 
-                FieldAccess field = data.Access;
+                ValueAccess access = data.Access;
 
                 object newValue = data.Access.Get(data.Target);
                 bool changed = !Equals(newValue, data.Value);
 
                 if (!changed) continue;
 
-                object latestActualValue = buffer.AddChange(field, data, newValue);
+                object latestActualValue = buffer.AddChange(access, data, newValue);
                 if (bRevertToOriginalValue)
                 {
-                    field.Set(data.Target, latestActualValue);
+                    access.Set(data.Target, latestActualValue);
                 }
             }
 

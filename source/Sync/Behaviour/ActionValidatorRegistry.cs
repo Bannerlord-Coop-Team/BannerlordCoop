@@ -6,7 +6,7 @@ namespace Sync.Behaviour
 {
     public static class ActionValidatorRegistry
     {
-        public static bool TryGet(FieldId id, out IActionValidator validator)
+        public static bool TryGet(ValueId id, out IActionValidator validator)
         {
             return m_FieldValidators.TryGetValue(id, out validator);
         }
@@ -27,7 +27,7 @@ namespace Sync.Behaviour
             }
         }
 
-        public static void Register(FieldId id, [NotNull] IActionValidator validator)
+        public static void Register(ValueId id, [NotNull] IActionValidator validator)
         {
             lock (Lock)
             {
@@ -46,8 +46,8 @@ namespace Sync.Behaviour
         private static readonly Dictionary<MethodId, IActionValidator> m_MethodValidators =
             new Dictionary<MethodId, IActionValidator>();
 
-        private static readonly Dictionary<FieldId, IActionValidator> m_FieldValidators =
-            new Dictionary<FieldId, IActionValidator>();
+        private static readonly Dictionary<ValueId, IActionValidator> m_FieldValidators =
+            new Dictionary<ValueId, IActionValidator>();
         #endregion
     }
 }

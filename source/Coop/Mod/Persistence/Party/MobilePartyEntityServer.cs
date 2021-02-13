@@ -2,6 +2,7 @@
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
+using RailgunNet.System.Types;
 using RemoteAction;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
@@ -86,6 +87,8 @@ namespace Coop.Mod.Persistence.Party
                 State.IsPlayerControlled = true;
             }
         }
+
+        public Tick Tick => Room.Tick;
 
         /// <summary>
         ///     Handler to apply a movement command to the authoritative state.
