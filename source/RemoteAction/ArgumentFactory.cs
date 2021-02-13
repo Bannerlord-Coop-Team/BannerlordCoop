@@ -110,6 +110,13 @@ namespace RemoteAction
                     // New campaign? Send by value
                     return new Argument(store.Insert(obj));
                 default:
+                    if (obj.GetType().IsEnum)
+                    {
+                        if (obj.GetType().GetEnumUnderlyingType() == typeof(int))
+                        {
+                            return new Argument((int) obj);
+                        }
+                    }
                     return new Argument(store.Insert(obj));
             }
         }

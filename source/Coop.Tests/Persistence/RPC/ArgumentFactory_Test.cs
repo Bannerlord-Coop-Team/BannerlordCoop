@@ -174,5 +174,43 @@ namespace Coop.Tests.Persistence.RPC
             Assert.IsType<DateTime>(resolvedClient1);
             Assert.Equal(time, resolvedClient1);
         }
+
+        enum ETest
+        {
+            First,
+            Second,
+            Third
+        }
+        
+        [Fact]
+        void EnumCanBeUsedAsArgument()
+        {
+            // Create
+            ETest transferedValue = ETest.Second;
+            Argument arg = ArgumentFactory.Create(m_StoreClient0, transferedValue, true);
+            Assert.Equal(EventArgType.Int, arg.EventType);
+            Assert.False(arg.MbGUID.HasValue);
+            Assert.True(arg.Int.HasValue);
+            Assert.False(arg.StoreObjectId.HasValue);
+
+            // Serialize
+            buffer.EncodeEventArg(arg);
+
+            // Deserialize
+            Argument argDeserialized = buffer.DecodeEventArg();
+            Assert.Equal(arg, argDeserialized);
+
+            // Resolve on client 0 works since that store was used for the create
+            object resolved = ArgumentFactory.Resolve(m_StoreClient0, argDeserialized);
+            Assert.NotNull(resolved);
+            Assert.IsType<int>(resolved);
+            Assert.Equal(transferedValue, (ETest) resolved);
+
+            // client 1 can resolve the argument
+            object resolvedClient1 = ArgumentFactory.Resolve(m_StoreClient1, argDeserialized);
+            Assert.NotNull(resolvedClient1);
+            Assert.IsType<int>(resolvedClient1);
+            Assert.Equal(transferedValue, (ETest) resolvedClient1);
+        }
     }
 }
