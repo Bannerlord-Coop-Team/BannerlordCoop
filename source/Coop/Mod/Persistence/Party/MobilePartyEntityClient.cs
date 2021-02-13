@@ -155,7 +155,7 @@ namespace Coop.Mod.Persistence.Party
                 {
                     throw new Exception($"Mobile party id {State.PartyId} not found.");
                 }
-                m_Environment.PartySync.Register(m_Instance, this);
+                m_Environment.PartySync.RegisterLocalHandler(m_Instance, this);
             }
         }
 

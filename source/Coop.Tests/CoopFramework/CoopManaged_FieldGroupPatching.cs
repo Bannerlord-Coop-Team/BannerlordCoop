@@ -11,12 +11,12 @@ namespace Coop.Tests.CoopFramework
     [Collection("UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class CoopManaged_FieldGroupPatching
     {
-        private readonly Mock<SynchronizationBase> m_SyncMock;
+        private readonly Mock<SyncBuffered> m_SyncMock;
         private FieldChangeBuffer m_LatestBuffer;
         
         public CoopManaged_FieldGroupPatching()
         {
-            m_SyncMock = new Mock<SynchronizationBase>();
+            m_SyncMock = new Mock<SyncBuffered>();
             m_SyncMock.Setup(h => h.Broadcast(It.IsAny<FieldChangeBuffer>()))
                 .Callback<FieldChangeBuffer>(buffer =>
                 {
@@ -90,7 +90,7 @@ namespace Coop.Tests.CoopFramework
                     Field<int>(nameof(Foo.m_Baz))
                 });
             
-            public static SynchronizationBase Sync;
+            public static SyncBuffered Sync;
             
             static CoopManagedFoo()
             {

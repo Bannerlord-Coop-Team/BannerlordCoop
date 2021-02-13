@@ -12,19 +12,28 @@ using Logger = NLog.Logger;
 
 namespace Coop.Mod.Persistence.Party
 {
-    public class MobilePartySync : SynchronizationBase
+    /// <summary>
+    ///     Synchronization implementation for the map movement data of <see cref="MobileParty"/>.
+    /// </summary>
+    public class MobilePartySync : SyncBuffered
     {
         public MobilePartySync([NotNull] FieldAccessGroup<MobileParty, MovementData> movement)
         {
             m_MovementGroup = movement ?? throw new ArgumentNullException();
         }
+        /// <inheritdoc cref="ISynchronization.Broadcast(MethodId, object, object[])"/>
         public override void Broadcast(MethodId id, object instance, object[] args)
         {
             // We didn't patch any methods, so this is never called.
             throw new System.NotImplementedException();
         }
-
-        public void Register(MobileParty party, IMovementHandler handler)
+        /// <summary>
+        ///     Register a handler to be called when the movement data of a <see cref="MobileParty"/> is changed locally
+        ///     by the regular game loop.
+        /// </summary>
+        /// <param name="party">The instance the handler is for.</param>
+        /// <param name="handler">The handler.</param>
+        public void RegisterLocalHandler(MobileParty party, IMovementHandler handler)
         {
             if (m_Handlers.ContainsKey(party.Id))
             {
@@ -33,7 +42,10 @@ namespace Coop.Mod.Persistence.Party
 
             m_Handlers[party.Id] = handler;
         }
-
+        /// <summary>
+        ///     Removes a handler.
+        /// </summary>
+        /// <param name="railEntity">The handler to remove.</param>
         public void Unregister(IMovementHandler railEntity)
         {
             foreach (var keyVal in m_Handlers)
@@ -44,15 +56,23 @@ namespace Coop.Mod.Persistence.Party
                 return;
             }
         }
-        
+        /// <summary>
+        ///     Set the movement data of a <see cref="MobileParty"/> as an authoritative action originating from the
+        ///     server.
+        /// </summary>
+        /// <param name="party">Instance to set the data on.</param>
+        /// <param name="data">Data to set.</param>
+        /// <param name="bIsPlayerControlled">`true` if the party is controlled by any player, local or remote.</param>
+        /// <exception cref="InvalidOperationException">When <paramref name="data"/> is inconsistent.</exception>
         public void SetAuthoritative(MobileParty party, MovementData data, bool bIsPlayerControlled)
         {
             if (!data.IsValid())
             {
+                string sMessage = $"Received inconsistent data for {party}: {data}. Ignored";
 #if DEBUG
-                throw new InvalidOperationException();
+                throw new InvalidStateException(sMessage);
 #else
-                Logger.Warn("Received invalid data for {Party}: {Movement}. Ignored", party, data);
+                Logger.Warn(sMessage);
                 return;
 #endif
             }
@@ -67,9 +87,8 @@ namespace Coop.Mod.Persistence.Party
             }
             SetDefaultBehaviourNeedsUpdate(party);
         }
-
-
-        public override void BroadcastBufferedChanges(FieldChangeBuffer buffer)
+        /// <inheritdoc cref="SyncBuffered.BroadcastBufferedChanges(FieldChangeBuffer)"/>
+        protected override void BroadcastBufferedChanges(FieldChangeBuffer buffer)
         {
             var changes = SortByParty(buffer.FetchChanges());
             foreach (var change in changes)

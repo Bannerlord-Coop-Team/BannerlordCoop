@@ -4,29 +4,51 @@ using System.Linq;
 using CoopFramework;
 using JetBrains.Annotations;
 using NLog;
+using RailgunNet.Connection.Client;
 using RemoteAction;
 using Sync;
+using Sync.Store;
 
 namespace Coop.Mod.Persistence.RemoteAction
 {
-    public class SynchronizationCoop : SynchronizationBase
+    /// <summary>
+    ///     Default synchronization implementation for remote procedure calls (RPC.
+    ///
+    ///     Uses the <see cref="ArgumentFactory"/> to serialize & broadcast all arguments as well as the instance.
+    ///     After the instance & arguments have been received by all clients, the call is invoked on the next
+    ///     game tick.
+    /// </summary>
+    public class CoopSync : SyncBuffered
     {
-        public SynchronizationCoop([NotNull] IClientAccess access)
+        public CoopSync([NotNull] IClientAccess access)
         {
             m_ClientAccess = access;
         }
-
+        /// <inheritdoc cref="ISynchronization.Broadcast(MethodId, object, object[])"/>
         public override void Broadcast(MethodId id, object instance, object[] args)
         {
+            RemoteStore store = m_ClientAccess.GetStore();
+            RailClientRoom room = m_ClientAccess.GetRoom();
+            if (store == null)
+            {
+                Logger.Error($"RemoteStore is null. Cannot broadcast.");
+                return;
+            }
+            if (room == null)
+            {
+                Logger.Error($"RailRoom is null. Cannot broadcast.");
+                return;
+            }
+            
             var access = Sync.Registry.IdToMethod[id];
             var bDebounce = access.Flags.HasFlag(EMethodPatchFlag.DebounceCalls);
             var call = new MethodCall(
                 id,
                 ArgumentFactory.Create(
-                    m_ClientAccess.GetStore(),
+                    store,
                     instance,
                     false),
-                ProduceArguments(access.Flags, args));
+                ProduceArguments(store, access.Flags, args));
 
             if (bDebounce && PendingRequests.Instance.IsPending(call))
             {
@@ -40,24 +62,37 @@ namespace Coop.Mod.Persistence.RemoteAction
                         evt =>
                         {
                             evt.Call = call;
-                            BroadcastHistory.Push(evt.Call, m_ClientAccess.GetRoom().Tick);
+                            BroadcastHistory.Push(evt.Call, room.Tick);
                         });
             }
         }
-
-        public override void BroadcastBufferedChanges(FieldChangeBuffer buffer)
+        /// <inheritdoc cref="SyncBuffered.BroadcastBufferedChanges(FieldChangeBuffer)"/>
+        protected override void BroadcastBufferedChanges(FieldChangeBuffer buffer)
         {
+            RemoteStore store = m_ClientAccess.GetStore();
+            RailClientRoom room = m_ClientAccess.GetRoom();
+            if (store == null)
+            {
+                Logger.Error($"RemoteStore is null. Cannot broadcast.");
+                return;
+            }
+            if (room == null)
+            {
+                Logger.Error($"RailRoom is null. Cannot broadcast.");
+                return;
+            }
+            
             foreach (var change in buffer.FetchChanges())
             {
                 var access = change.Key;
                 foreach (var instanceChange in change.Value)
                 {
                     var argInstance = ArgumentFactory.Create(
-                        m_ClientAccess.GetStore(),
+                        store,
                         instanceChange.Key,
                         false);
                     var argValue = ArgumentFactory.Create(
-                        m_ClientAccess.GetStore(),
+                        store,
                         instanceChange.Value.RequestedValue,
                         false);
                     var fieldChange = new FieldChange(
@@ -78,12 +113,12 @@ namespace Coop.Mod.Persistence.RemoteAction
         }
         #region Private
 
-        private List<Argument> ProduceArguments(EMethodPatchFlag flags, object[] args)
+        private List<Argument> ProduceArguments(RemoteStore store, EMethodPatchFlag flags, object[] args)
         {
             var bTransferByValue = flags.HasFlag(EMethodPatchFlag.TransferArgumentsByValue);
             return args.Select(
                     obj => ArgumentFactory.Create(
-                        m_ClientAccess.GetStore(),
+                        store,
                         obj,
                         bTransferByValue))
                 .ToList();

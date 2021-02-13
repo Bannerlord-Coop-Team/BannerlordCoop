@@ -218,7 +218,7 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private static Dictionary<SynchronizationBase, int> m_LogEntrySize = new Dictionary<SynchronizationBase, int>();
+        private static Dictionary<SyncBuffered, int> m_LogEntrySize = new Dictionary<SyncBuffered, int>();
 
         private static void ShowCoopPatchInfo(List<MethodId> coopPatch)
         {
@@ -256,7 +256,7 @@ namespace Coop.Mod.DebugUtil
                 
                 Imgui.NewLine();
                 
-                foreach (SynchronizationBase sync in SynchronizationManager.SynchronizationInstances)
+                foreach (SyncBuffered sync in SynchronizationManager.SynchronizationInstances)
                 {
                     var history = sync.BroadcastHistory
                         .Where(c => (c.Call.HasValue && Equals(c.Call.Value, methodId)) ||
@@ -536,7 +536,7 @@ namespace Coop.Mod.DebugUtil
                 return;
             }
 
-            if (CoopClient.Instance?.SynchronizationBase.BroadcastHistory == null)
+            if (CoopClient.Instance?.SyncBuffered.BroadcastHistory == null)
             {
                 Imgui.Text("Coop client not connected.");
             }
@@ -556,7 +556,7 @@ namespace Coop.Mod.DebugUtil
                 }
 
 #if DEBUG
-                CallStatistics history = CoopClient.Instance?.SynchronizationBase.BroadcastHistory;
+                CallStatistics history = CoopClient.Instance?.SyncBuffered.BroadcastHistory;
                 Imgui.Columns(2);
                 
                 Imgui.Text("Tick");

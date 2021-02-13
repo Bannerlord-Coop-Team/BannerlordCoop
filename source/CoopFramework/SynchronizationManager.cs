@@ -6,8 +6,8 @@ namespace CoopFramework
 {
     public static class SynchronizationManager
     {
-        public static IReadOnlyList<SynchronizationBase> SynchronizationInstances => m_SynchronizationInstances;
-        public static void Register(SynchronizationBase sync)
+        public static IReadOnlyList<SyncBuffered> SynchronizationInstances => m_SynchronizationInstances;
+        public static void Register(SyncBuffered sync)
         {
             m_SynchronizationInstances.Add(sync);
             m_Updatables.Add(sync);
@@ -16,7 +16,7 @@ namespace CoopFramework
         {
             m_Updatables.UpdateAll(frameTime);
         }
-        private static List<SynchronizationBase> m_SynchronizationInstances = new List<SynchronizationBase>();
+        private static List<SyncBuffered> m_SynchronizationInstances = new List<SyncBuffered>();
         private static UpdateableList m_Updatables = new UpdateableList();
     }
 }

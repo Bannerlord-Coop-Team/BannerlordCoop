@@ -78,7 +78,7 @@ namespace Coop.Mod.Persistence.Party
                         State.PartyId);
                     return;
                 }
-                m_Environment.PartySync.Register(m_Instance, this);
+                m_Environment.PartySync.RegisterLocalHandler(m_Instance, this);
             }
         }
 

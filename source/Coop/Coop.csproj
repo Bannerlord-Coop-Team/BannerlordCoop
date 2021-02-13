@@ -286,7 +286,7 @@
     <Compile Include="Mod\Persistence\Party\MobilePartySync.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventFieldChange.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventActionBase.cs" />
-    <Compile Include="Mod\Persistence\RemoteAction\SynchronizationCoop.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\CoopSync.cs" />
     <Compile Include="Mod\Persistence\Party\EventPartyMoveTo.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityClient.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityServer.cs" />
