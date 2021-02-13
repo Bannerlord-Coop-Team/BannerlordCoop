@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Patch.MobilePartyPatches;
-using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using RemoteAction;
-using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 
@@ -24,7 +22,7 @@ namespace Coop.Mod
 
         public void SetAuthoritative(MobileParty party, MovementData data)
         {
-            CampaignMapMovement.Sync.SetAuthoritative(party, data);
+            CampaignMapMovement.Sync.SetAuthoritative(party, data, PlayerControlledParties.Contains(party));
         }
 
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;
@@ -59,11 +57,6 @@ namespace Coop.Mod
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)
         {
             return MobileParty.All.SingleOrDefault(p => p.Party.Index == iPartyIndex);
-        }
-
-        public Campaign GetCurrentCampaign()
-        {
-            return Campaign.Current;
         }
         #endregion
     }

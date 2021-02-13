@@ -45,7 +45,7 @@ namespace Coop.Mod.Persistence.RemoteAction
             }
         }
 
-        public override void Broadcast(FieldChangeBuffer buffer)
+        public override void BroadcastBufferedChanges(FieldChangeBuffer buffer)
         {
             foreach (var change in buffer.FetchChanges())
             {
@@ -75,10 +75,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                             });
                 }
             }
-
-            throw new NotImplementedException();
         }
-
         #region Private
 
         private List<Argument> ProduceArguments(EMethodPatchFlag flags, object[] args)

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using JetBrains.Annotations;
 using Sync.Reflection;
 
@@ -41,6 +42,33 @@ namespace Sync
                 var ret = m_BufferedChanges;
                 m_BufferedChanges = new Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>();
                 return ret;
+            }
+        }
+
+        public void AddChanges(FieldChangeBuffer other)
+        {
+            var changesOther = other.FetchChanges();
+            lock (m_BufferedChanges)
+            {
+                foreach (var entry in changesOther)
+                {
+                    if (!m_BufferedChanges.ContainsKey(entry.Key))
+                    {
+                        m_BufferedChanges[entry.Key] = entry.Value;
+                        continue;
+                    }
+
+                    var changes = m_BufferedChanges[entry.Key];
+                    foreach (var entryInner in entry.Value)
+                    {
+                        if (!changes.ContainsKey(entryInner.Key))
+                        {
+                            changes[entryInner.Key] = entryInner.Value;
+                        }
+
+                        changes[entryInner.Key].RequestedValue = entryInner.Value.RequestedValue;
+                    }
+                }
             }
         }
 

@@ -56,11 +56,5 @@ namespace RemoteAction
         /// <returns></returns>
         [CanBeNull]
         MobileParty GetMobilePartyByIndex(int iPartyIndex);
-
-        /// <summary>
-        ///     Returns the active campaign of the client.
-        /// </summary>
-        /// <returns></returns>
-        Campaign GetCurrentCampaign();
     }
 }

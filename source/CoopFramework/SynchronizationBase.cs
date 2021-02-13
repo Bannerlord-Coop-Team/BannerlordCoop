@@ -1,10 +1,12 @@
-﻿using JetBrains.Annotations;
+﻿using System;
+using Common;
+using JetBrains.Annotations;
 using RemoteAction;
 using Sync;
 
 namespace CoopFramework
 {
-    public abstract class SynchronizationBase : ISynchronization
+    public abstract class SynchronizationBase : ISynchronization, IUpdateable
     {
         #region Debug
         /// <summary>
@@ -20,7 +22,18 @@ namespace CoopFramework
         }
 
         public abstract void Broadcast(MethodId id, object instance, object[] args);
+        public abstract void BroadcastBufferedChanges(FieldChangeBuffer buffer);
 
-        public abstract void Broadcast(FieldChangeBuffer buffer);
+        public void Broadcast(FieldChangeBuffer buffer)
+        {
+            m_Buffer.AddChanges(buffer);
+        }
+        public void Update(TimeSpan frameTime)
+        {
+            BroadcastBufferedChanges(m_Buffer);
+        }
+
+        [NotNull] private FieldChangeBuffer m_Buffer { get; } = new FieldChangeBuffer();
+        
     }
 }

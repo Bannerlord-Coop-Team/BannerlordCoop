@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Linq;
 using Common;
 using JetBrains.Annotations;
 using RailgunNet.System.Types;
@@ -11,7 +12,7 @@ namespace RemoteAction
         public ValueId? Value { get; set; }
         public MethodId? Call { get; set; }
         [CanBeNull] public object Instance { get; set; }
-        [CanBeNull] public object Arguments { get; set; }
+        [CanBeNull] public object[] Arguments { get; set; }
         public Tick Tick { get; set; }
     }
 
@@ -28,7 +29,7 @@ namespace RemoteAction
             {
                 Call = call.Id,
                 Instance = call.Instance,
-                Arguments = call.Arguments,
+                Arguments = call.Arguments.Select(a => (object) a).ToArray(),
                 Tick = tick
             });
         }
@@ -40,7 +41,7 @@ namespace RemoteAction
             {
                 Value = change.Id,
                 Instance = change.Instance,
-                Arguments = change.Arguments,
+                Arguments = change.Arguments.Select(a => (object) a).ToArray(),
                 Tick = tick
             });
         }

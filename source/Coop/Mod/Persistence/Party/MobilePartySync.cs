@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using CoopFramework;
 using JetBrains.Annotations;
 using NLog;
@@ -22,28 +23,7 @@ namespace Coop.Mod.Persistence.Party
             // We didn't patch any methods, so this is never called.
             throw new System.NotImplementedException();
         }
-        public override void Broadcast(FieldChangeBuffer buffer)
-        {
-            var changes = SortByParty(buffer.FetchChanges());
-            foreach (var change in changes)
-            {
-                MobileParty party = change.Key;
-                if(!m_Handlers.TryGetValue(party.Id, out IMovementHandler handler))
-                {
-                    Logger.Warn("Got FieldChangeBuffer for unmanaged {party}. Ignored.", party);
-                    continue;
-                }
-                BroadcastHistory.Push(new CallTrace()
-                {
-                    Value = m_MovementGroup.Id,
-                    Instance = party,
-                    Arguments = change.Value,
-                    Tick = handler.Tick
-                });
-                handler.RequestMovement(change.Value);
-            }
-        }
-        
+
         public void Register(MobileParty party, IMovementHandler handler)
         {
             if (m_Handlers.ContainsKey(party.Id))
@@ -65,12 +45,67 @@ namespace Coop.Mod.Persistence.Party
             }
         }
         
-        public void SetAuthoritative(MobileParty party, MovementData data)
+        public void SetAuthoritative(MobileParty party, MovementData data, bool bIsPlayerControlled)
         {
+            if (!data.IsValid())
+            {
+#if DEBUG
+                throw new InvalidOperationException();
+#else
+                Logger.Warn("Received invalid data for {Party}: {Movement}. Ignored", party, data);
+                return;
+#endif
+            }
+            
             m_MovementGroup.SetTyped(party, data);
+            if (bIsPlayerControlled && !Coop.IsController(party))
+            {
+                // That is a remote player moving. We need to update the local MainParty as well
+                // because Campaign.Tick will otherwise not update the AI decisions and just
+                // ignore some actions (for example EngageParty).
+                SetDefaultBehaviourNeedsUpdate(Campaign.Current.MainParty);
+            }
+            SetDefaultBehaviourNeedsUpdate(party);
+        }
+
+
+        public override void BroadcastBufferedChanges(FieldChangeBuffer buffer)
+        {
+            var changes = SortByParty(buffer.FetchChanges());
+            foreach (var change in changes)
+            {
+                MobileParty party = change.Key;
+                if(!m_Handlers.TryGetValue(party.Id, out IMovementHandler handler))
+                {
+                    Logger.Debug("Got FieldChangeBuffer for unmanaged {party}. Ignored.", party);
+                    continue;
+                }
+                BroadcastHistory.Push(new CallTrace()
+                {
+                    Value = m_MovementGroup.Id,
+                    Instance = party,
+                    Arguments = new object[] {change.Value},
+                    Tick = handler.Tick
+                });
+                
+#if DEBUG
+                if (!change.Value.IsValid())
+                {
+                    throw new InvalidOperationException();
+                }
+#endif
+                handler.RequestMovement(change.Value);
+            }
         }
         
         #region Private
+        private void SetDefaultBehaviourNeedsUpdate(MobileParty party)
+        {
+            typeof(MobileParty).GetField(
+                    "_defaultBehaviorNeedsUpdate",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(party, true);
+        }
 
         private Dictionary<MobileParty, MovementData> SortByParty(
             Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>> input)

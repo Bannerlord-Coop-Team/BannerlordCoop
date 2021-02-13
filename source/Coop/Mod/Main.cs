@@ -209,7 +209,9 @@ namespace Coop.Mod
                 // DebugConsole.Toggle();
             }
 
-            Updateables.UpdateAll(TimeSpan.FromSeconds(dt));
+            TimeSpan frameTime = TimeSpan.FromSeconds(dt);
+            SynchronizationManager.ProcessBufferedChanges(frameTime);
+            Updateables.UpdateAll(frameTime);
         }
 
         private void initLogger()

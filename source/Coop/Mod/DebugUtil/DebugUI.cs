@@ -273,7 +273,6 @@ namespace Coop.Mod.DebugUtil
 
                     int length = m_LogEntrySize[sync];
                     Imgui.Text($"History of {sync.GetType().FullName}");
-                    Imgui.SameLine(400f, 200f);
                     Imgui.InputInt($"{sync.GetType().Name}", ref length);
                     if (length > sync.BroadcastHistory.Count)
                     {
@@ -285,13 +284,42 @@ namespace Coop.Mod.DebugUtil
                         .Take(m_LogEntrySize[sync])
                         .ToList();
 
+                    int iButton = 0;
                     foreach (CallTrace trace in history)
                     {
+                        object instance = trace.Instance;
+                        if (instance is Argument arg)
+                        {
+                            instance = ArgumentFactory.Resolve(CoopClient.Instance.GetStore(), arg);
+                        }
+
+                        object[] arguments = trace.Arguments;
+                        if (!arguments.IsEmpty() && arguments.All(a => a is Argument))
+                        {
+                            arguments = ArgumentFactory.Resolve(CoopClient.Instance.GetStore(), arguments.Select(a=>(Argument) a));
+                        }
+                        
                         Imgui.Text($"{trace.Tick}:");
-                        Imgui.SameLine(tabWidth);
-                        Imgui.Text($"{trace.Instance ?? "null"}");
-                        Imgui.SameLine(tabWidth + 470f);
-                        Imgui.Text($"{trace.Arguments}");
+                        Imgui.SameLine(200f); 
+                        if (Imgui.SmallButton($"Resend this action {iButton++}"))
+                        {
+                            if (trace.Call.HasValue)
+                            {
+                                sync.Broadcast(trace.Call.Value, instance, arguments);
+                            }
+                            else if (trace.Value.HasValue && arguments.Length > 0)
+                            {
+                                object argument = arguments[0];
+                                ValueAccess access = Registry.IdToValue[trace.Value.Value];
+                                FieldChangeBuffer buffer = new FieldChangeBuffer();
+                                buffer.AddChange(access, new FieldData(access, instance, argument), argument);
+                                sync.Broadcast(buffer);
+                            }
+                        }
+                        
+                        Imgui.Text($"{instance ?? "null"}");
+                        Imgui.SameLine(tabWidth * 3);
+                        Imgui.Text($"{string.Join(",", arguments.Select(a => a.ToString()))}");
                     }
                     Imgui.NewLine();
                 }

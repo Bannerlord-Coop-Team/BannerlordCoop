@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using RailgunNet.System.Encoding;
 using RemoteAction;
@@ -112,6 +113,30 @@ namespace Coop.Mod.Persistence.Party
         public override string ToString()
         {
             return $"{TargetPosition}, {TargetParty}, {TargetSettlement}, {DefaultBehaviour}, {NumberOfFleeingsAtLastTravel}";
+        }
+
+        public bool IsValid()
+        {
+            bool bRequiresTargetParty = DefaultBehaviour == AiBehavior.EngageParty ||
+                                        DefaultBehaviour == AiBehavior.EscortParty ||
+                                        DefaultBehaviour == AiBehavior.JoinParty ||
+                                        DefaultBehaviour == AiBehavior.GoAroundParty;
+            if (bRequiresTargetParty && TargetParty == null)
+            {
+                return false;
+            }
+
+            bool bRequiresTargetSettlement = DefaultBehaviour == AiBehavior.AssaultSettlement ||
+                                             DefaultBehaviour == AiBehavior.BesiegeSettlement ||
+                                             DefaultBehaviour == AiBehavior.DefendSettlement ||
+                                             DefaultBehaviour == AiBehavior.RaidSettlement ||
+                                             DefaultBehaviour == AiBehavior.GoToSettlement;
+            if (bRequiresTargetSettlement && TargetSettlement == null)
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 

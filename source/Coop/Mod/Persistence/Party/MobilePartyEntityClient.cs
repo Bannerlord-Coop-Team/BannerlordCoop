@@ -78,16 +78,6 @@ namespace Coop.Mod.Persistence.Party
                 party,
                 data);
             m_Environment.SetAuthoritative(party, data);
-
-            if (State.IsPlayerControlled && party != m_Environment.GetCurrentCampaign().MainParty)
-            {
-                // That is a remote player moving. We need to update the local MainParty as well
-                // because Campaign.Tick will otherwise not update the AI decisions and just
-                // ignore some actions (for example EngageParty).
-                SetDefaultBehaviourNeedsUpdate(m_Environment.GetCurrentCampaign().MainParty);
-            }
-            SetDefaultBehaviourNeedsUpdate(party);
-
             Replay.ReplayRecording?.Invoke(Id, party, data);
         }
 
@@ -106,14 +96,6 @@ namespace Coop.Mod.Persistence.Party
                         State.Movement.SettlementIndex) as Settlement
                     : null
             };
-        }
-
-        private void SetDefaultBehaviourNeedsUpdate(MobileParty party)
-        {
-            typeof(MobileParty).GetField(
-                                   "_defaultBehaviorNeedsUpdate",
-                                   BindingFlags.Instance | BindingFlags.NonPublic)
-                               .SetValue(party, true);
         }
 
         /// <summary>

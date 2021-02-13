@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Coop.Mod.Patch.Party;
@@ -59,8 +59,18 @@ namespace Coop.Mod.Persistence
                 m_PartiesToAdd.Clear();
             }
 
+
             foreach (MobileParty party in toBeAdded)
             {
+                lock (m_Lock)
+                {
+                    if (m_Parties.ContainsKey(party))
+                        continue; // Happens because we hook into multiple events that might trigger twice for one instance
+                    
+                    m_Parties.Add(party, null); // Reserve to prevent duplicate entity creation
+                }
+
+                // Need to leave m_Lock, otherwise the entity creation might deadlock since it needs to makes game state queries in the main thread
                 MobilePartyEntityServer entity =
                     m_Room.AddNewEntity<MobilePartyEntityServer>(
                         e => e.State.PartyId = party.Party.Index);
@@ -68,11 +78,11 @@ namespace Coop.Mod.Persistence
 
                 lock (m_Lock)
                 {
-                    m_Parties.Add(party, entity);
+                    m_Parties[party] = entity;
                 }
             }
         }
-
+        
         /// <summary>
         ///     Called for each player controlled entity when the controlling player leaves the game.
         ///     The entity control has already been revoked from the player. This callback is expected
@@ -135,6 +145,7 @@ namespace Coop.Mod.Persistence
 
                 entityToRemove = m_Parties[party];
                 m_Parties.Remove(party);
+                m_PartiesToAdd.Remove(party);
             }
 
             m_Room.MarkForRemoval(entityToRemove);
@@ -152,13 +163,6 @@ namespace Coop.Mod.Persistence
             {
                 if (m_Parties.ContainsKey(party))
                 {
-                    if (!SuppressInconsistentStateWarnings)
-                    {
-                        Logger.Warn(
-                            "Inconsistent internal state: {party} was already registered.",
-                            party);
-                    }
-
                     return;
                 }
 

@@ -62,6 +62,11 @@ namespace Coop.Mod.Persistence.Party
         /// <exception cref="Exception"></exception>
         private void Register()
         {
+            if (IsRemoving)
+            {
+                return;
+            }
+            
             if (m_Instance == null && Controller == null)
             {
                 m_Instance = m_Environment.GetMobilePartyByIndex(State.PartyId);
