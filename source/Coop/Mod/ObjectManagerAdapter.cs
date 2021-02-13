@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using CoopFramework;
 using HarmonyLib;
 using JetBrains.Annotations;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod
@@ -25,6 +27,12 @@ namespace Coop.Mod
                 // Managed by MBObjectManager
                 return true;
             }
+
+            if (typeof(T) == typeof(Campaign))
+            {
+                // Global instance
+                return true;
+            }
             return false;
         }
         
@@ -35,44 +43,53 @@ namespace Coop.Mod
             {
                 throw new ArgumentException($"{observer} is already a registered handler!", nameof(observer));
             }
-            Handler handler = new Handler(typeof(T), observer);
-            m_Handlers[observer] = handler;
 
-            MBObjectManager manager = MBObjectManager.Instance;
-            if (manager != null)
+            if (typeof(T).IsSubclassOf(typeof(MBObjectBase)))
             {
-                manager.AddHandler(handler);
+                m_Handlers[observer] = new ObjectManagerHandler(typeof(T), observer, MBObjectManager.Instance);
+            }
+            else if (typeof(T) == typeof(Campaign))
+            {
+                m_Handlers[observer] = new CampaignLifetimeHandler(observer);
             }
         }
 
         /// <inheritdoc cref="IObjectManager.Unregister"/>
         public void Unregister(IObjectLifetimeObserver observer)
         {
-            if (m_Handlers.TryGetValue(observer, out Handler handler))
+            if (m_Handlers.TryGetValue(observer, out IHandler handler))
             {
                 m_Handlers.Remove(observer);
-                
-                MBObjectManager manager = MBObjectManager.Instance;
-                if (manager != null)
-                {
-                    manager.RemoveHandler(handler);
-                }
+                handler.Unregister();
             }
         }
 
         #region Private
+
+        private interface IHandler
+        {
+            void Unregister();
+        }
+        
         /// <summary>
         ///     Handler implementation to track object creation & unregister in a <see cref="MBObjectManager"/>.
         ///     The current interface does not allow to track registration for some reason. This is annoying because
         ///     during serialization (load save), the objects are not actually created but loaded in an initialized
         ///     state directly to memory and then internally registered.
         /// </summary>
-        private class Handler : IObjectManagerHandler
+        private class ObjectManagerHandler : IObjectManagerHandler, IHandler
         {
-            public Handler(Type type, [NotNull] IObjectLifetimeObserver observer)
+            public ObjectManagerHandler(
+                Type type, 
+                [NotNull] IObjectLifetimeObserver observer,
+                MBObjectManager mbObjectManager)
             {
                 RegisteredType = type;
                 m_Observer = observer;
+                if (mbObjectManager != null)
+                {
+                    Register(mbObjectManager);
+                }
             }
             
             public void AfterCreateObject(MBObjectBase objectBase)
@@ -99,6 +116,23 @@ namespace Coop.Mod
                 }
             }
 
+            public void Register(MBObjectManager manager)
+            {
+                Unregister();
+                m_Manager = manager;
+                m_Manager.AddHandler(this);
+            }
+            
+            public void Unregister()
+            {
+                if (m_Manager != null)
+                {
+                    m_Manager.RemoveHandler(this);
+                    m_Manager = null;
+                }
+            }
+
+            private MBObjectManager m_Manager;
             private readonly IObjectLifetimeObserver m_Observer;
             public Type RegisteredType { get; }
         }
@@ -113,9 +147,12 @@ namespace Coop.Mod
                 return;
             }
             
-            foreach (var handler in m_Handlers)
+            foreach (var pair in m_Handlers)
             {
-                manager.AddHandler(handler.Value);
+                if (pair.Value is ObjectManagerHandler handler)
+                {
+                    manager.AddHandler(handler);
+                }
             }
         }
         /// <summary>
@@ -139,9 +176,12 @@ namespace Coop.Mod
         /// <param name="obj"></param>
         private void OnAfterRegisterObjectWithoutInitialization(MBObjectBase obj)
         {
-            foreach (KeyValuePair<IObjectLifetimeObserver,Handler> pair in m_Handlers)
+            foreach (KeyValuePair<IObjectLifetimeObserver,IHandler> pair in m_Handlers)
             {
-                pair.Value.RegisterObjectWithoutInitialization(obj);
+                if (pair.Value is ObjectManagerHandler handler)
+                {
+                    handler.RegisterObjectWithoutInitialization(obj);
+                }
             }
         }
 
@@ -158,11 +198,33 @@ namespace Coop.Mod
             }
         }
         
+        private class CampaignLifetimeHandler : IHandler
+        {
+            public CampaignLifetimeHandler([NotNull] IObjectLifetimeObserver observer)
+            {
+                m_Observer = observer;
+                Main.Instance.OnGameInit += OnGameInit;
+            }
+
+            private void OnGameInit(Game game)
+            {
+                if (game.GameType is Campaign campaign)
+                {
+                    m_Observer.AfterRegisterObject(campaign);
+                }
+            }
+            public void Unregister()
+            {
+                Main.Instance.OnGameInit -= OnGameInit;
+            }
+
+            private readonly IObjectLifetimeObserver m_Observer;
+        }
         
         private static readonly Lazy<ObjectManagerAdapter> m_Instance =
             new Lazy<ObjectManagerAdapter>(() => new ObjectManagerAdapter());
 
-        private Dictionary<IObjectLifetimeObserver, Handler> m_Handlers = new Dictionary<IObjectLifetimeObserver, Handler>();
+        private Dictionary<IObjectLifetimeObserver, IHandler> m_Handlers = new Dictionary<IObjectLifetimeObserver, IHandler>();
 
         #endregion
     }

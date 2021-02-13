@@ -17,10 +17,10 @@ namespace Coop.Mod.Patch.World
                 .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)))
                 .Broadcast(() => CoopClient.Instance.SyncBuffered, new CanChangeTimeValidator())
                 .Skip();
-        
             When(GameLoop)
                 .Calls(Setter(nameof(Campaign.IsMainPartyWaiting)))
                 .DelegateTo(SetIsMainPartyWaiting);
+            AutoWrapAllInstances(c => new TimeControl(c));
         }
         
         private class CanChangeTimeValidator : IActionValidator

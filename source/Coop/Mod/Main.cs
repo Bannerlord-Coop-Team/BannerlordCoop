@@ -188,6 +188,13 @@ namespace Coop.Mod
             base.OnSubModuleUnloaded();
         }
 
+        public Action<Game> OnGameInit;
+        public override void OnGameInitializationFinished(Game game)
+        {
+            base.OnGameInitializationFinished(game);
+            OnGameInit?.Invoke(game);
+        }
+
         public override void OnGameEnd(Game game)
         {
             base.OnGameEnd(game);
