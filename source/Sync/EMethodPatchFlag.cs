@@ -16,11 +16,6 @@ namespace Sync
         ///     using the <see cref="Sync.Store.RemoteStore" />.
         ///     Unset if by-reference should be preferred.
         /// </summary>
-        TransferArgumentsByValue = 1 << 1,
-        
-        /// <summary>
-        ///     Bit 2: If set, multiple calls to this function with the same arguments are ignored.
-        /// </summary>
-        DebounceCalls = 1 << 2
+        TransferArgumentsByValue = 1 << 1
     }
 }

@@ -41,7 +41,6 @@ namespace Coop.Mod.Persistence.RemoteAction
             }
             
             var access = Sync.Registry.IdToMethod[id];
-            var bDebounce = access.Flags.HasFlag(EMethodPatchFlag.DebounceCalls);
             var call = new MethodCall(
                 id,
                 ArgumentFactory.Create(
@@ -50,7 +49,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                     false),
                 ProduceArguments(store, access.Flags, args));
 
-            if (bDebounce && PendingRequests.Instance.IsPending(call))
+            if (PendingRequests.Instance.IsPending(call))
             {
                 Logger.Debug("Debounced RPC {}", call);
             }
