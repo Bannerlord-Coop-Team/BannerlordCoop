@@ -64,7 +64,7 @@ namespace Coop.Mod.Persistence.Party
         /// <param name="data">Data to set.</param>
         /// <param name="bIsPlayerControlled">`true` if the party is controlled by any player, local or remote.</param>
         /// <exception cref="InvalidOperationException">When <paramref name="data"/> is inconsistent.</exception>
-        public void SetAuthoritative(MobileParty party, MovementData data, bool bIsPlayerControlled)
+        public void SetAuthoritative(MobileParty party, MovementData data)
         {
             if (!data.IsValid())
             {
@@ -78,7 +78,7 @@ namespace Coop.Mod.Persistence.Party
             }
             
             m_MovementGroup.SetTyped(party, data);
-            if (bIsPlayerControlled && !Coop.IsController(party))
+            if (party.IsRemotePlayerMainParty())
             {
                 // That is a remote player moving. We need to update the local MainParty as well
                 // because Campaign.Tick will otherwise not update the AI decisions and just
@@ -105,7 +105,7 @@ namespace Coop.Mod.Persistence.Party
                 if (!Coop.IsController(party))
                 {
                     // Revert the local changes, we will receive the correct one from the server.
-                    SetAuthoritative(party, before, false);
+                    SetAuthoritative(party, before);
                     continue;
                 }
                 

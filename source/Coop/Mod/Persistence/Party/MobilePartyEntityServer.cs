@@ -31,11 +31,12 @@ namespace Coop.Mod.Persistence.Party
         {
             if (Controller == null)
             {
-                Register();
+                RegisterAsDefaultController();
             }
             else
             {
-                Unregister();
+                UnregisterAsController();
+                State.IsPlayerControlled = true;
             }
         }
 
@@ -44,7 +45,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         protected override void OnAdded()
         {
-            Register();
+            RegisterAsDefaultController();
         }
 
         /// <summary>
@@ -52,7 +53,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         protected override void OnRemoved()
         {
-            Unregister();
+            UnregisterAsController();
         }
 
         /// <summary>
@@ -60,7 +61,7 @@ namespace Coop.Mod.Persistence.Party
         ///     the authoritative state.
         /// </summary>
         /// <exception cref="Exception"></exception>
-        private void Register()
+        private void RegisterAsDefaultController()
         {
             if (IsRemoving)
             {
@@ -73,7 +74,7 @@ namespace Coop.Mod.Persistence.Party
                 State.IsPlayerControlled = false;
                 if (m_Instance == null)
                 {
-                    Logger.Error(
+                    Logger.Warn(
                         "Mobile party id {} not found in the local game state. Desync?",
                         State.PartyId);
                     return;
@@ -85,15 +86,13 @@ namespace Coop.Mod.Persistence.Party
         /// <summary>
         ///     Unregisters all handlers.
         /// </summary>
-        private void Unregister()
+        private void UnregisterAsController()
         {
-            if (m_Instance != null)
-            {
-                State.IsPlayerControlled = true;
-            }
+            m_Environment.PartySync.Unregister(this);
+            m_Instance = null;
         }
 
-        public Tick Tick => Room.Tick;
+        public Tick Tick => Room?.Tick ?? Tick.INVALID;
 
         /// <summary>
         ///     Handler to apply a movement command to the authoritative state.

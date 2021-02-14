@@ -25,12 +25,33 @@ namespace Coop.Mod
 
             return null;
         }
-
-        public static bool IsPlayerControlled(this MobileParty party)
+        /// <summary>
+        ///     Returns whether the given <see cref="MobileParty"/> is the main party of any player, remote or local.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <returns></returns>
+        public static bool IsAnyPlayerMainParty(this MobileParty party)
         {
-            return CoopClient.Instance.GameState.IsPlayerControlledParty(party);
+            return Coop.IsAnyPlayerMainParty(party);
         }
-
+        /// <summary>
+        ///     Returns whether the given <see cref="MobileParty"/> is the main party of the local game instance.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <returns></returns>
+        public static bool IsLocalPlayerMainParty(this MobileParty party)
+        {
+            return Coop.IsLocalPlayerMainParty(party);
+        }
+        /// <summary>
+        ///     Returns whether the given <see cref="MobileParty"/> is the main party of a remote game instance.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <returns></returns>
+        public static bool IsRemotePlayerMainParty(this MobileParty party)
+        {
+            return Coop.IsRemotePlayerMainParty(party);
+        }
         public static string ToFriendlyString(this LoadGameResult loadResult)
         {
             if (!loadResult.LoadResult.Successful)

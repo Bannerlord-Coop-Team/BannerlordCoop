@@ -263,9 +263,9 @@ namespace Coop.Mod
             party.Party.UpdateVisibilityAndInspected(false);
 
             // Add party to persistance since manual creation of party is not handled
-            Persistence.EntityManager.AddParty(party);
+            Persistence.MobilePartyEntityManager.AddParty(party);
 
-            Persistence.EntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
+            Persistence.MobilePartyEntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
         }
 
         private void SendInitialWorldData(ConnectionServer connection)

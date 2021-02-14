@@ -76,7 +76,7 @@ namespace Coop.Tests.Sync
             throw new NotImplementedException();
         }
 
-        public IEnumerable<MobileParty> PlayerControlledParties { get; }
+        public IEnumerable<MobileParty> PlayerMainParties { get; }
         public MobilePartySync PartySync { get; }
         public RemoteStore Store { get; }
 

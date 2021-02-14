@@ -24,9 +24,9 @@ namespace RemoteAction
         CampaignTime AuthoritativeTime { get; set; }
 
         /// <summary>
-        ///     Returns all parties that are controlled by human players, local or remote.
+        ///     Returns all parties that are the main parties of human players, local or remote.
         /// </summary>
-        IEnumerable<MobileParty> PlayerControlledParties { get; }
+        IEnumerable<MobileParty> PlayerMainParties { get; }
         
         /// <summary>
         ///     Gets the synchronization for <see cref="MobileParty"/> instances.

@@ -1,4 +1,5 @@
-﻿using Sync.Behaviour;
+﻿using JetBrains.Annotations;
+using Sync.Behaviour;
 
 namespace CoopFramework
 {
@@ -15,6 +16,11 @@ namespace CoopFramework
         ///     means it is to be applied.
         /// </summary>
         public static Condition RemoteAuthority = IsOriginator(EOriginator.RemoteAuthority);
+
+        public static Condition Not([NotNull] Condition condition)
+        {
+            return new Condition((originator, o) => !condition.Evaluate(originator, o));
+        }
         
         #region Private
         private static Condition IsOriginator(EOriginator eOriginator)

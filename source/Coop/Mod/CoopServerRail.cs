@@ -31,7 +31,7 @@ namespace Coop.Mod
             m_Server = server;
             EventQueue = new EventBroadcastingQueue(store, eventTimeout);
             m_Instance = new RailServer(registry);
-            EntityManager = new EntityManager(m_Instance);
+            MobilePartyEntityManager = new MobilePartyEntityManager(m_Instance);
         }
 
         [CanBeNull] public RailServerRoom Room => m_Instance.Room;
@@ -41,7 +41,7 @@ namespace Coop.Mod
 
         public EventBroadcastingQueue EventQueue { get; }
 
-        [NotNull] public EntityManager EntityManager { get; }
+        [NotNull] public MobilePartyEntityManager MobilePartyEntityManager { get; }
 
         public void Update(TimeSpan frameTime)
         {

@@ -44,7 +44,7 @@ namespace Coop.Mod.Patch.World
             if (!(call.Instance is Campaign campaign)) throw new ArgumentException();
 
             bool isEveryMainPartyWaiting = isLocalMainPartyWaiting;
-            foreach (MobileParty party in env.PlayerControlledParties)
+            foreach (MobileParty party in env.PlayerMainParties)
             {
                 isEveryMainPartyWaiting = isEveryMainPartyWaiting && party.ComputeIsWaiting();
             }

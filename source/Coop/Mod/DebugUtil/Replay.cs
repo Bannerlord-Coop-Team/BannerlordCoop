@@ -181,7 +181,7 @@ namespace Coop.Mod.DebugUtil
             }
 
             PlaybackMainPartyList =
-                PlaybackEventList.Where(q => q.party.IsPlayerControlled()).ToList();
+                PlaybackEventList.Where(q => q.party.IsAnyPlayerMainParty()).ToList();
             RecordingEventList = new List<ReplayEvent>();
 
             currentFilename = filename;
@@ -275,7 +275,7 @@ namespace Coop.Mod.DebugUtil
                     party = party,
                     movement = movement
                 });
-            if (party.IsPlayerControlled())
+            if (party.IsAnyPlayerMainParty())
             {
                 Logger.Info("[REPLAY] Yet one player's moving recorded.");
             }

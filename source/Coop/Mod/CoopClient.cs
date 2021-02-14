@@ -64,7 +64,6 @@ namespace Coop.Mod
             Session = new GameSession(new GameData());
             Session.OnConnectionDestroyed += ConnectionDestroyed;
             m_NetManager = new LiteNetManagerClient(Session, config);
-            GameState = new CoopGameState();
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
             Synchronization = new CoopSync(this);
@@ -93,8 +92,6 @@ namespace Coop.Mod
         [NotNull] public GameSession Session { get; }
 
         public static CoopClient Instance => m_Instance.Value;
-
-        public CoopGameState GameState { get; }
         public CoopEvents Events { get; }
 
         public bool ClientConnected

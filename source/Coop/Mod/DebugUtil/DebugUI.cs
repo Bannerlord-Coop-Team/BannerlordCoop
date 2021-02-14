@@ -406,20 +406,23 @@ namespace Coop.Mod.DebugUtil
                 return;
             }
 
-            if (CoopServer.Instance?.Persistence?.EntityManager == null)
+            if (CoopServer.Instance?.Persistence?.MobilePartyEntityManager == null)
             {
                 Imgui.Text("No coop server running.");
             }
             else
             {
-                EntityManager manager = CoopServer.Instance.Persistence.EntityManager;
+                MobilePartyEntityManager manager = CoopServer.Instance.Persistence.MobilePartyEntityManager;
                 Imgui.Columns(2);
                 Imgui.Separator();
                 Imgui.Text("ID");
                 var parties = manager.Parties.ToList();
                 foreach (RailEntityServer entity in parties)
                 {
-                    Imgui.Text(entity.Id.ToString());
+                    if (entity != null)
+                    {
+                        Imgui.Text(entity.Id.ToString());
+                    }
                 }
 
                 Imgui.NextColumn();

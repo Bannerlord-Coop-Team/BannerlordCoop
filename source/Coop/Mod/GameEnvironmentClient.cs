@@ -17,12 +17,12 @@ namespace Coop.Mod
             TimeSynchronization.GetAuthoritativeTime += () => AuthoritativeTime;
         }
 
-        public HashSet<MobileParty> PlayerControlledMobileParties { get; } =
+        public HashSet<MobileParty> PlayerControlledMainParties { get; } =
             new HashSet<MobileParty>();
 
         public void SetAuthoritative(MobileParty party, MovementData data)
         {
-            CampaignMapMovement.Sync.SetAuthoritative(party, data, PlayerControlledParties.Contains(party));
+            CampaignMapMovement.Sync.SetAuthoritative(party, data);
         }
 
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;
@@ -38,15 +38,15 @@ namespace Coop.Mod
 
             if (isPlayerControlled)
             {
-                PlayerControlledMobileParties.Add(party);
+                PlayerControlledMainParties.Add(party);
             }
             else
             {
-                PlayerControlledMobileParties.Remove(party);
+                PlayerControlledMainParties.Remove(party);
             }
         }
 
-        public IEnumerable<MobileParty> PlayerControlledParties => PlayerControlledMobileParties;
+        public IEnumerable<MobileParty> PlayerMainParties => PlayerControlledMainParties;
         public MobilePartySync PartySync { get; } = CampaignMapMovement.Sync;
 
         public RemoteStore Store =>

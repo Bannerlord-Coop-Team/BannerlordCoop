@@ -293,7 +293,7 @@
     <Compile Include="Mod\Persistence\Party\MobilePartyState.cs" />
     <Compile Include="Mod\Persistence\Party\MovementData.cs" />
     <Compile Include="Mod\Persistence\PersistenceClient.cs" />
-    <Compile Include="Mod\Persistence\EntityManager.cs" />
+    <Compile Include="Mod\Persistence\MobilePartyEntityManager.cs" />
     <Compile Include="Mod\Persistence\Registry.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventBroadcastingQueue.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventMethodCall.cs" />
@@ -307,7 +307,6 @@
     <Compile Include="Mod\SaveLoad.cs" />
     <Compile Include="Mod\GameData.cs" />
     <Compile Include="Mod\CoopEvents.cs" />
-    <Compile Include="Mod\CoopGameState.cs" />
     <Compile Include="Mod\CoopClient.cs" />
     <Compile Include="Mod\CoopServer.cs" />
     <Compile Include="Mod\Extensions.cs" />

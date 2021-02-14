@@ -1,4 +1,9 @@
-﻿using TaleWorlds.CampaignSystem;
+﻿using System.Linq;
+using Coop.Mod.Persistence;
+using RailgunNet;
+using RailgunNet.Util;
+using RemoteAction;
+using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod
 {
@@ -20,7 +25,6 @@ namespace Coop.Mod
         {
             return IsClientConnected || IsServer;
         }
-        
         /// <summary>
         ///     Return whether the given MobileParty can be controlled by this game instance.
         /// </summary>
@@ -38,8 +42,7 @@ namespace Coop.Mod
                 return false;
             }
             
-            bool isPlayerControlled = CoopClient.Instance.GameState.IsPlayerControlledParty(party);
-            if (isPlayerControlled && party == MobileParty.MainParty)
+            if (IsLocalPlayerMainParty(party))
             {
                 // Main party of the local client
                 return true;
@@ -47,6 +50,51 @@ namespace Coop.Mod
 
             // Every other party is controlled by the arbiter.
             return IsArbiter;
+        }
+        /// <summary>
+        ///     Returns whether the given <see cref="MobileParty"/> is the main party of any player, remote or local.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <returns></returns>
+        public static bool IsAnyPlayerMainParty(MobileParty party)
+        {
+            if (IsClientConnected)
+            {
+                IEnvironmentClient env = CoopClient.Instance?.Persistence?.Environment;
+                if (env != null)
+                {
+                    return env.PlayerMainParties.Contains(party);
+                }
+            }
+            else if (IsServer)
+            {
+                MobilePartyEntityManager manager = CoopServer.Instance?.Persistence?.MobilePartyEntityManager;
+                if (manager != null)
+                {
+                    return manager.IsControlledByClient(party);
+                }
+            }
+
+            // Coop is not running -> only the main party is controlled by the player.
+            return party == MobileParty.MainParty;
+        }
+        /// <summary>
+        ///     Returns whether the given <see cref="MobileParty"/> is the main party of the local game instance.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <returns></returns>
+        public static bool IsLocalPlayerMainParty(MobileParty party)
+        {
+            return IsAnyPlayerMainParty(party) && party == MobileParty.MainParty;
+        }
+        /// <summary>
+        ///     Returns whether the given <see cref="MobileParty"/> is the main party of a remote game instance.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <returns></returns>
+        public static bool IsRemotePlayerMainParty(MobileParty party)
+        {
+            return IsAnyPlayerMainParty(party) && party != MobileParty.MainParty;
         }
     }
 }

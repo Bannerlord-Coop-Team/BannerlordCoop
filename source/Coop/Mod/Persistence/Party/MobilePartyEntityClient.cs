@@ -28,7 +28,7 @@ namespace Coop.Mod.Persistence.Party
             m_Environment = environment;
         }
 
-        public Tick Tick => Room.Tick;
+        public Tick Tick => Room?.Tick ?? Tick.INVALID;
 
         /// <summary>
         ///     Handler to issue a move command for this party to the server.
@@ -106,11 +106,11 @@ namespace Coop.Mod.Persistence.Party
             if (Controller != null)
             {
                 // We control the party now.
-                Register();
+                RegisterAsController();
             }
             else
             {
-                Unregister();
+                UnregisterAsController();
             }
         }
 
@@ -146,7 +146,7 @@ namespace Coop.Mod.Persistence.Party
         ///     this client.
         /// </summary>
         /// <exception cref="Exception"></exception>
-        private void Register()
+        private void RegisterAsController()
         {
             if (m_Instance == null && Controller != null)
             {
@@ -162,7 +162,7 @@ namespace Coop.Mod.Persistence.Party
         /// <summary>
         ///     Unregisters all handlers.
         /// </summary>
-        private void Unregister()
+        private void UnregisterAsController()
         {
             m_Environment.PartySync.Unregister(this);
             m_Instance = null;
