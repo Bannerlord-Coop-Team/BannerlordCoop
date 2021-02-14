@@ -99,6 +99,16 @@ namespace Coop.Mod.Persistence.Party
                     Logger.Debug("Got FieldChangeBuffer for unmanaged {party}. Ignored.", party);
                     continue;
                 }
+
+                MovementData before = change.Value.Item1;
+                MovementData requested = change.Value.Item2;
+                if (!Coop.IsController(party))
+                {
+                    // Revert the local changes, we will receive the correct one from the server.
+                    SetAuthoritative(party, before, false);
+                    continue;
+                }
+                
                 BroadcastHistory.Push(new CallTrace()
                 {
                     Value = m_MovementGroup.Id,
@@ -108,12 +118,12 @@ namespace Coop.Mod.Persistence.Party
                 });
                 
 #if DEBUG
-                if (!change.Value.IsValid())
+                if (!requested.IsValid())
                 {
                     throw new InvalidOperationException();
                 }
 #endif
-                handler.RequestMovement(change.Value);
+                handler.RequestMovement(requested);
             }
         }
         
@@ -126,10 +136,10 @@ namespace Coop.Mod.Persistence.Party
                 .SetValue(party, true);
         }
 
-        private Dictionary<MobileParty, MovementData> SortByParty(
+        private Dictionary<MobileParty, Tuple<MovementData, MovementData>> SortByParty(
             Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>> input)
         {
-            Dictionary<MobileParty, MovementData> requestedChanges = new Dictionary<MobileParty, MovementData>();
+            Dictionary<MobileParty, Tuple<MovementData, MovementData>> requestedChanges = new Dictionary<MobileParty, Tuple<MovementData, MovementData>>();
             foreach (var bufferEntry in input)
             {
                 ValueAccess access = bufferEntry.Key;
@@ -140,9 +150,9 @@ namespace Coop.Mod.Persistence.Party
 
                 foreach (var change in bufferEntry.Value)
                 {
-                    if (change.Key is MobileParty party && change.Value.RequestedValue is MovementData movementData)
+                    if (change.Key is MobileParty party)
                     {
-                        requestedChanges[party] = movementData;
+                        requestedChanges[party] = new Tuple<MovementData, MovementData>(change.Value.OriginalValue as MovementData, change.Value.RequestedValue as MovementData);
                     }
                 }
             }

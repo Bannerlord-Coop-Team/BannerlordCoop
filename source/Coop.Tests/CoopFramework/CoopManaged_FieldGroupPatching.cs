@@ -51,9 +51,9 @@ namespace Coop.Tests.CoopFramework
             
             // Verify that the fields where packed as defined by CoopManaged.Group
             ValueChangeRequest fooChange = instanceChanges[foo];
-            Assert.IsType<List<object>>(fooChange.LatestActualValue);
+            Assert.IsType<List<object>>(fooChange.OriginalValue);
             Assert.IsType<List<object>>(fooChange.RequestedValue);
-            List<object> valueBefore = (List<object>) fooChange.LatestActualValue;
+            List<object> valueBefore = (List<object>) fooChange.OriginalValue;
             List<object> requestedValue = (List<object>) fooChange.RequestedValue;
             Assert.Equal(2, valueBefore.Count);
             Assert.Equal(2, requestedValue.Count);

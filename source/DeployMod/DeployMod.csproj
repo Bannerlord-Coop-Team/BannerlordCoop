@@ -33,17 +33,4 @@
       <ProjectReference Include="..\SystemTests\SystemTests.csproj" />
       <ProjectReference Include="..\TestRunner\TestRunner.csproj" />
     </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="CoopFramework, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\mb2\Modules\Coop\bin\Win64_Shipping_Client\CoopFramework.dll</HintPath>
-      </Reference>
-      <Reference Include="RemoteAction, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\mb2\Modules\Coop\bin\Win64_Shipping_Client\RemoteAction.dll</HintPath>
-      </Reference>
-      <Reference Include="Sync, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\mb2\Modules\Coop\bin\Win64_Shipping_Client\Sync.dll</HintPath>
-      </Reference>
-    </ItemGroup>
-
 </Project>

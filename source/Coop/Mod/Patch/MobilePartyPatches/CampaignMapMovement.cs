@@ -29,17 +29,16 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                     Field<int>("_numberOfFleeingsAtLastTravel")
                 });
             Sync = new MobilePartySync(Movement);
-            
-            When(PartyController)
+
+            When(GameLoop)
                 .Changes(Movement)
                 .Through(
                     Setter(nameof(MobileParty.DefaultBehavior)),
                     Setter(nameof(MobileParty.TargetSettlement)),
                     Setter(nameof(MobileParty.TargetParty)),
                     Setter(nameof(MobileParty.TargetPosition)))
-                .Broadcast(() => Sync)
-                .Keep(); // Keep the local changes as a preview.
-            
+                .Broadcast(() => Sync);
+
             AutoWrapAllInstances(party => new CampaignMapMovement(party));
         }
         
@@ -51,15 +50,6 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         public CampaignMapMovement([NotNull] MobileParty instance) : base(instance)
         {
         }
-        
-        /// <summary>
-        ///     Condition that returns whether the <see cref="MobileParty"/> instance is controlled by the local
-        ///     game instance.
-        /// </summary>
-        private static Condition PartyController = new Condition((eOriginator, instance) =>
-        {
-            return eOriginator == EOriginator.Game && Coop.IsController(instance as MobileParty);
-        });
 
         private static FieldAccessGroup<MobileParty, MovementData> Movement { get; }
     }

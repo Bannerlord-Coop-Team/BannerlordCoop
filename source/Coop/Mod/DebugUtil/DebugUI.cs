@@ -275,12 +275,6 @@ namespace Coop.Mod.DebugUtil
 
                     int length = m_LogEntrySize[sync];
                     Imgui.Text($"History of {sync.GetType().FullName}");
-                    Imgui.InputInt($"{sync.GetType().Name}", ref length);
-                    if (length > sync.BroadcastHistory.Count)
-                    {
-                        length = sync.BroadcastHistory.Count;
-                    }
-                    m_LogEntrySize[sync] = length;
                     
                     history = history
                         .Take(m_LogEntrySize[sync])
@@ -329,7 +323,12 @@ namespace Coop.Mod.DebugUtil
                         Imgui.SameLine(tabWidth);
                         Imgui.Text($"{string.Join(",", arguments.Select(a => a.ToString()))}");
                     }
-                    Imgui.NewLine();
+                    Imgui.InputInt($"Show more of {sync.GetType().Name}", ref length);
+                    if (length > sync.BroadcastHistory.Count)
+                    {
+                        length = sync.BroadcastHistory.Count;
+                    }
+                    m_LogEntrySize[sync] = length;
                 }
             }
         }

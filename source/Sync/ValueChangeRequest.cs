@@ -3,18 +3,13 @@
     public class ValueChangeRequest
     {
         /// <summary>
-        ///     The value set in the instance when it was checked the last time.
+        ///     The value set in the instance before the change request was recorded.
         /// </summary>
-        public object LatestActualValue { get; set; }
+        public object OriginalValue { get; set; }
 
         /// <summary>
         ///     The value that was buffered.
         /// </summary>
         public object RequestedValue { get; set; }
-
-        /// <summary>
-        ///     True when <see cref="RequestedValue" /> was acknowledged.
-        /// </summary>
-        public bool RequestProcessed { get; set; }
     }
 }

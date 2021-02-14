@@ -23,7 +23,7 @@ namespace CoopFramework
         /// <inheritdoc cref="ISynchronization.Broadcast(MethodId, object, object[])"/>
         public abstract void Broadcast(MethodId id, object instance, object[] args);
         /// <inheritdoc cref="ISynchronization.Broadcast(FieldChangeBuffer)"/>
-        public void Broadcast(FieldChangeBuffer buffer)
+        public virtual void Broadcast(FieldChangeBuffer buffer)
         {
             m_Buffer.AddChanges(buffer);
         }

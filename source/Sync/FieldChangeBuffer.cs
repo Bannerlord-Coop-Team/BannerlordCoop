@@ -16,18 +16,13 @@ namespace Sync
                 Dictionary<object, ValueChangeRequest> fieldBuffer = m_BufferedChanges.Assert(access);
                 if (fieldBuffer.TryGetValue(data.Target, out ValueChangeRequest cached))
                 {
-                    if (cached.RequestProcessed)
-                    {
-                        cached.RequestProcessed = false;
-                    }
-
                     cached.RequestedValue = newValue;
-                    return cached.LatestActualValue;
+                    return cached.OriginalValue;
                 }
 
                 fieldBuffer[data.Target] = new ValueChangeRequest
                 {
-                    LatestActualValue = data.Value,
+                    OriginalValue = data.Value,
                     RequestedValue = newValue
                 };
             }
