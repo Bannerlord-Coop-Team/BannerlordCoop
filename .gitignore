@@ -544,5 +544,4 @@ source/.editorconfig
 source/.idea
 
 # Docs
-docs/_site/**
-api/**.yml
+docs-source/api/*

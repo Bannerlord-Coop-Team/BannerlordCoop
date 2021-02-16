@@ -1,0 +1,69 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "files": ["**/*.csproj"],
+          "exclude": [ "**/bin/**", "**/obj/**" ],
+		  "src": "../source"
+        }
+      ],
+      "dest": "api",
+      "shouldSkipMarkup": false,
+	  "disableDefaultFilter": true,
+      "properties": {
+          "TargetFramework": "TargetFramework=net47"
+      }
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "api/**.yml"
+        ],
+        "cwd": "."
+      },
+      {
+        "files": [
+          "api/*.md",
+          "articles/**.md",
+		  "overview/**.md",
+          "toc.yml",
+          "*.md"
+        ],
+        "exclude": [
+          "obj/**",
+          "_site/**"
+        ]
+      }
+    ],
+    "resource": [
+      {
+        "files": [
+          "images/**"
+        ],
+        "exclude": [
+          "obj/**",
+          "_site/**"
+        ]
+      }
+    ],
+    "overwrite": [
+      {
+        "files": [
+          "apidoc/**.md"
+        ],
+        "exclude": [
+          "obj/**",
+          "_site/**"
+        ]
+      }
+    ],
+    "dest": "../docs",
+    "template": [
+	  "default",
+      "templates/darkfx"
+    ]
+  }
+}
