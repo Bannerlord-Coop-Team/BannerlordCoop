@@ -1,4 +1,4 @@
-![Picture of Architecture](/images/Architecture.png)
+![Picture of Architecture](~/images/Architecture.png)
 
 # Components
 ## Network

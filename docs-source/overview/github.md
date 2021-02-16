@@ -11,4 +11,4 @@ Github Teams to organize repositories.<br/>
 
 # Branching Strategy
 
-![Image of Branching Strategy](/images/branching_strategy.png)
+![Image of Branching Strategy](~/images/branching_strategy.png)

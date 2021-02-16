@@ -7,7 +7,7 @@ Bannerlord loads these modules at startup.<br/>
 
 ## Reading Bannerlord Code
 
-We recommend using [dnspy](/overview/Tools/dnspy.html) to read Bannerlord dlls.<br/>
+We recommend using [dnspy](./dnspy.html) to read Bannerlord dlls.<br/>
 
 ## Accessing Private Variables/Classes
 
