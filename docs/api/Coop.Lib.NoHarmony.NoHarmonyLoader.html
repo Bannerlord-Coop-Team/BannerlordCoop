@@ -514,6 +514,7 @@
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void AddBehavior&lt;AddType&gt;()
+
     where AddType : CampaignBehaviorBase, new()</code></pre>
   </div>
   <h5 class="typeParameters">Type Parameters</h5>
@@ -547,6 +548,7 @@
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void AddModel&lt;AddType&gt;()
+
     where AddType : GameModel, new()</code></pre>
   </div>
   <h5 class="typeParameters">Type Parameters</h5>
@@ -634,7 +636,9 @@
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">NoHarmonyLoader.TaskStatus NHLBehavior&lt;AddType, RemoveType&gt;(Campaign campaign, NoHarmonyLoader.TaskMode mode)
+
     where AddType : CampaignBehaviorBase, new()
+
     where RemoveType : CampaignBehaviorBase</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
@@ -707,7 +711,9 @@
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">NoHarmonyLoader.TaskStatus NHLModel&lt;AddType, RemoveType&gt;(IGameStarter gameI, NoHarmonyLoader.TaskMode mode)
+
     where AddType : GameModel, new()
+
     where RemoveType : GameModel</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
@@ -907,6 +913,7 @@ override.</p>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void RemoveModel&lt;RemoveType&gt;()
+
     where RemoveType : GameModel</code></pre>
   </div>
   <h5 class="typeParameters">Type Parameters</h5>
@@ -940,7 +947,9 @@ override.</p>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ReplaceBehavior&lt;AddType, RemoveType&gt;(NoHarmonyLoader.TaskMode m = NoHarmonyLoader.TaskMode.Replace)
+
     where AddType : CampaignBehaviorBase, new()
+
     where RemoveType : CampaignBehaviorBase</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
@@ -997,7 +1006,9 @@ override.</p>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ReplaceModel&lt;AddType, RemoveType&gt;(NoHarmonyLoader.TaskMode m = NoHarmonyLoader.TaskMode.Replace)
+
     where AddType : GameModel, new()
+
     where RemoveType : GameModel</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>

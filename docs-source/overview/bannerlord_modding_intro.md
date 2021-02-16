@@ -169,4 +169,4 @@ namespace ConsoleApp
 
 ## Patching Existing Code
 
-There is existing Bannerlord code that you may want to change. For this we use [Harmony](/overview/Tools/harmony.html).
+There is existing Bannerlord code that you may want to change. For this we use [Harmony](./Tools/harmony.html).

@@ -1,5 +1,5 @@
 # Development Tools
-**[Dnspy](https://github.com/dnSpy/dnSpy/releases)** is used to view existing Bannerlord code. View more extensive documentation [here](Tools/dnspy.md).<br/>
+**[Dnspy](https://github.com/dnSpy/dnSpy/releases)** is used to view existing Bannerlord code. View more extensive documentation [here](./dnspy.md).<br/>
 **[Visual Studio](https://visualstudio.microsoft.com/downloads/)** is used to develop the mod. We recommend that you use Community 2019.<br/>
 
 # Libraries
