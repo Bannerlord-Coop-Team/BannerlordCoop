@@ -8,14 +8,17 @@ using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Patch.World
 {
+    /// <summary>
+    ///     Patches the time control in the local campaign instance and synchronizes it across all players.
+    /// </summary>
     public class TimeControl : CoopManaged<TimeControl, Campaign>
     {
         public static bool CanSyncTimeControlMode = false;
         static TimeControl()
         {
-            When(GameLoop)
+            When(GameLoop & CanChangeTimeClientside)
                 .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)))
-                .Broadcast(() => CoopClient.Instance.Synchronization, new CanChangeTimeValidator())
+                .Broadcast(() => CoopClient.Instance.Synchronization, new CanChangeTimeServerside())
                 .Skip();
             When(GameLoop)
                 .Calls(Setter(nameof(Campaign.IsMainPartyWaiting)))
@@ -23,11 +26,19 @@ namespace Coop.Mod.Patch.World
             AutoWrapAllInstances(c => new TimeControl(c));
         }
         
-        private class CanChangeTimeValidator : IActionValidator
+        /// <summary>
+        ///     Serverside check if the time control mode can be changed right now.
+        /// </summary>
+        private class CanChangeTimeServerside : IActionValidator
         {
-            public EValidationResult Validate()
+            public bool IsAllowed()
             {
-                return CanSyncTimeControlMode ? EValidationResult.Valid : EValidationResult.Invalid;
+                return CoopServer.Instance.AreAllClientsPlaying;
+            }
+
+            public string GetReasonForRejection()
+            {
+                return "Some players are currently connecting";
             }
         }
         public TimeControl([NotNull] Campaign instance) : base(instance)
@@ -53,5 +64,7 @@ namespace Coop.Mod.Patch.World
             Registry.IdToMethod[call.Id].CallOriginal(call.Instance, call.Parameters);
             return ECallPropagation.Skip;
         }
+        
+        private static readonly Condition CanChangeTimeClientside = new Condition((eOrigin, _) => CanSyncTimeControlMode);
     }
 }

@@ -32,5 +32,7 @@ namespace Sync
         /// <param name="value">Value to set.</param>
         /// <exception cref="ArgumentException">If the target or value are not of the expected type.</exception>
         public abstract void Set(object target, object value);
+
+        public abstract override string ToString();
     }
 }

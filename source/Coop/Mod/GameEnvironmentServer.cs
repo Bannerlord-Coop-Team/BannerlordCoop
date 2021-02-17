@@ -17,8 +17,6 @@ namespace Coop.Mod
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public bool CanChangeTimeControlMode => CoopServer.Instance.AreAllClientsPlaying;
-
         public EventBroadcastingQueue EventQueue => CoopServer.Instance.Persistence?.EventQueue;
 
         public MobileParty GetMobilePartyByIndex(int iPartyIndex)

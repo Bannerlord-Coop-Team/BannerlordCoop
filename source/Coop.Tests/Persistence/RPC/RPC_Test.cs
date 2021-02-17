@@ -38,7 +38,6 @@ namespace Coop.Tests.Persistence.RPC
             m_Environment.Destroy();
             Foo.LatestArgument = "";
             Foo.NumberOfCalls = 0;
-            PendingRequests.Instance.Clear();
         }
 
         private class Foo

@@ -56,22 +56,22 @@ namespace Coop.Mod.Persistence.RemoteAction
                 {
                     if (!IsValid())
                     {
-                        Logger.Debug("[{eventId}] Broadcast SyncCall '{call}' rejected: invalid.", EventId, Call);
+                        ActionValidatorRegistry.TryGet(Call.Id, out IActionValidator validator);
+                        Logger.Info("[{EventId}] Broadcast SyncCall '{Call}' rejected by {Validator}: {Reason}", EventId, Call, validator.GetType().Name, validator.GetReasonForRejection());
                         return;
                     }
 
-                    Logger.Trace("[{eventId}] Broadcast SyncCall: {call}", EventId, Call);
+                    Logger.Trace("[{EventId}] Broadcast SyncCall: {Call}", EventId, Call);
                     m_EnvironmentServer.EventQueue.Add(serverRoom, this);
                 }
                 else if (room is RailClientRoom)
                 {
-                    Logger.Trace("[{eventId}] SyncCall: {call}", EventId, Call);
+                    Logger.Trace("[{EventId}] SyncCall: {Call}", EventId, Call);
                     // TODO: The call is not synchronized to a campaign time at this point. We probably want an execution queue of some sorts that executes the call at the right point in time.
                     method.Call(
                         EOriginator.RemoteAuthority,
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Instance),
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Arguments));
-                    PendingRequests.Instance.Remove(Call);
                 }
             }
             else

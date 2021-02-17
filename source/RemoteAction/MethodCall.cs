@@ -15,7 +15,7 @@ namespace RemoteAction
 
         public bool IsValid()
         {
-            return ActionValidator.IsValid(Id);
+            return ActionValidator.IsAllowed(Id);
         }
 
         public readonly MethodId Id;

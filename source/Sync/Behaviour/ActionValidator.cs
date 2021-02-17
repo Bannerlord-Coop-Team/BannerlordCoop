@@ -2,21 +2,21 @@
 {
     public static class ActionValidator
     {
-        public static bool IsValid(ValueId value)
+        public static bool IsAllowed(ValueId value)
         {
             if(ActionValidatorRegistry.TryGet(value, out IActionValidator validator))
             {
-                return validator.Validate() == EValidationResult.Valid;
+                return validator.IsAllowed();
             }
 
             return true;
         }
         
-        public static bool IsValid(MethodId method)
+        public static bool IsAllowed(MethodId method)
         {
             if(ActionValidatorRegistry.TryGet(method, out IActionValidator validator))
             {
-                return validator.Validate() == EValidationResult.Valid;
+                return validator.IsAllowed();
             }
 
             return true;

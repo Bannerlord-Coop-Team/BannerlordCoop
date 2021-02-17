@@ -570,8 +570,6 @@ namespace Coop.Mod.DebugUtil
                         $"Event queue {queue.Count}/{EventBroadcastingQueue.MaximumQueueSize}.");
                     Imgui.Text(
                         $"    min {m_AverageEventsInQueue.AllTimeMin} / avg {Math.Round(m_AverageEventsInQueue.Average)} / max {m_AverageEventsInQueue.AllTimeMax}.");
-                    Imgui.Text(
-                        $"Pending RPC: {PendingRequests.Instance.PendingRequestCount()}");
                 }
 
 #if DEBUG

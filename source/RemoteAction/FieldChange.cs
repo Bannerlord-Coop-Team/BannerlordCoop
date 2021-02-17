@@ -16,7 +16,7 @@ namespace RemoteAction
 
         public bool IsValid()
         {
-            return ActionValidator.IsValid(Id);
+            return ActionValidator.IsAllowed(Id);
         }
 
         public FieldChange(ValueId id, Argument instance, Argument value)

@@ -8,6 +8,7 @@ using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using RailgunNet.Util;
 using RemoteAction;
+using Sync.Behaviour;
 
 namespace Coop.Mod.Persistence.RemoteAction
 {
@@ -48,26 +49,26 @@ namespace Coop.Mod.Persistence.RemoteAction
                 {
                     if (!IsValid())
                     {
-                        Logger.Debug("[{eventId}] Broadcast FieldChange '{field}' rejected: invalid.", EventId, Field);
+                        ActionValidatorRegistry.TryGet(Field.Id, out IActionValidator validator);
+                        Logger.Info("[{EventId}] Broadcast FieldChange '{Field}' rejected by {Validator}: {Reason}", EventId, Field, validator.GetType().Name, validator.GetReasonForRejection());
                         return;
                     }
 
-                    Logger.Trace("[{eventId}] Broadcast FieldChange: {field}", EventId, Field);
+                    Logger.Trace("[{EventId}] Broadcast FieldChange: {Field}", EventId, Field);
                     m_EnvironmentServer.EventQueue.Add(serverRoom, this);
                 }
                 else if (room is RailClientRoom)
                 {
-                    Logger.Trace("[{eventId}] FieldChange: {field}", EventId, Field);
+                    Logger.Trace("[{EventId}] FieldChange: {Field}", EventId, Field);
                     // TODO: The call is not synchronized to a campaign time at this point. We probably want an execution queue of some sorts that executes the call at the right point in time.
                     field.Set(
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Field.Instance),
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Field.Arguments.First()));
-                    PendingRequests.Instance.Remove(Field);
                 }
             }
             else
             {
-                Logger.Warn("[{eventId}] Unknown SyncCall: {field}", EventId, Field);
+                Logger.Warn("[{EventId}] Unknown FieldChange: {Field}", EventId, Field);
             }
         }
     }
