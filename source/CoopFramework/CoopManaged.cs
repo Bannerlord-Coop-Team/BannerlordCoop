@@ -8,6 +8,9 @@ using JetBrains.Annotations;
 using NLog;
 using Sync;
 using Sync.Behaviour;
+using Sync.Invokable;
+using Sync.Patch;
+using Sync.Value;
 
 namespace CoopFramework
 {
@@ -59,7 +62,7 @@ namespace CoopFramework
         /// </summary>
         /// <param name="sPropertyName"></param>
         /// <returns></returns>
-        protected static MethodAccess Setter(string sPropertyName)
+        protected static PatchedInvokable Setter(string sPropertyName)
         {
             return new PropertyPatch<TSelf>(typeof(TExtended)).InterceptSetter(sPropertyName)
                 .PostfixSetter(sPropertyName).Setters.First();
@@ -72,7 +75,7 @@ namespace CoopFramework
         /// </summary>
         /// <param name="sMethodName"></param>
         /// <returns></returns>
-        protected static MethodAccess Method(string sMethodName)
+        protected static PatchedInvokable Method(string sMethodName)
         {
             return new MethodPatch<TSelf>(typeof(TExtended)).Intercept(sMethodName).Postfix(sMethodName).Methods
                 .First();
@@ -165,18 +168,12 @@ namespace CoopFramework
         protected static void RunStaticConstructor()
         {
             RuntimeHelpers.RunClassConstructor(typeof(TSelf).TypeHandle);
-            
+
             // Register relation between fields and their accessors.
             foreach (var patchedField in Util.SortByField(m_DefinedBehaviours))
-            {
-                foreach (FieldActionBehaviourBuilder behaviour in patchedField.Value)
-                {
-                    foreach (MethodAccess accessor in behaviour.Accessors)
-                    {
-                        Registry.AddRelation(accessor.Id, patchedField.Key);
-                    }
-                }
-            }
+            foreach (var behaviour in patchedField.Value)
+            foreach (var accessor in behaviour.Accessors)
+                Registry.AddRelation(accessor.Id, patchedField.Key);
         }
 
         /// <summary>
@@ -203,14 +200,14 @@ namespace CoopFramework
         /// </summary>
         /// <param name="self">The instance of the CoopManager that wraps the instance of the method call. null for static calls.</param>
         /// <param name="eOriginator">The originator of the action.</param>
-        /// <param name="methodId">The id of the method that is being called.</param>
+        /// <param name="invokableId">The id of the method that is being called.</param>
         /// <param name="behaviours">The statically configured behaviours that apply to this call.</param>
         /// <param name="args">Arguments to the method call.</param>
         /// <returns></returns>
         private static ECallPropagation Dispatch(
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
             EOriginator eOriginator,
-            MethodId methodId,
+            InvokableId invokableId,
             List<CallBehaviourBuilder> behaviours,
             object[] args)
         {
@@ -223,13 +220,13 @@ namespace CoopFramework
             {
                 if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) continue;
                 if (behaviour.DoBroadcast)
-                    behaviour.SynchronizationFactory()?.Broadcast(methodId, instanceResolved, args);
+                    behaviour.SynchronizationFactory()?.Broadcast(invokableId, instanceResolved, args);
 
                 if (behaviour.MethodCallHandlerInstance != null)
                     return behaviour.MethodCallHandlerInstance.Invoke(self,
-                        new PendingMethodCall(methodId, behaviour.SynchronizationFactory, instanceResolved, args));
+                        new PendingMethodCall(invokableId, behaviour.SynchronizationFactory, instanceResolved, args));
                 if (behaviour.MethodCallHandler != null)
-                    return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(methodId,
+                    return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(invokableId,
                         behaviour.SynchronizationFactory,
                         instanceResolved,
                         args));
@@ -250,7 +247,8 @@ namespace CoopFramework
                 foreach (var accessor in behaviour.FieldChangeAction.SelectMany(f => f.Value.Accessors))
                     RemoveHandlers(instance, accessor);
 
-                foreach (var accessor in behaviour.CallBehaviours.Select(pair => Registry.IdToMethod[pair.Key]))
+                foreach (var accessor in behaviour.CallBehaviours.Select(pair =>
+                    Registry.IdToInvokable[pair.Key] as PatchedInvokable))
                     RemoveHandlers(instance, accessor);
             }
 
@@ -258,21 +256,21 @@ namespace CoopFramework
         }
 
         /// <summary>
-        ///     Removes all handlers of a given <see cref="MethodAccess" />.
+        ///     Removes all handlers of a given <see cref="PatchedInvokable" />.
         /// </summary>
         /// <param name="instance">Instance whose handlers should be removed. Null for static handlers.</param>
-        /// <param name="access"></param>
-        private static void RemoveHandlers(TExtended instance, MethodAccess access)
+        /// <param name="invokable"></param>
+        private static void RemoveHandlers(TExtended instance, PatchedInvokable invokable)
         {
             if (instance == null)
             {
-                access.Prefix.RemoveGlobalHandler();
-                access.Postfix.RemoveGlobalHandler();
+                invokable.Prefix.RemoveGlobalHandler();
+                invokable.Postfix.RemoveGlobalHandler();
             }
             else
             {
-                access.Prefix.RemoveHandler(instance);
-                access.Postfix.RemoveHandler(instance);
+                invokable.Prefix.RemoveHandler(instance);
+                invokable.Postfix.RemoveHandler(instance);
             }
         }
 
@@ -288,11 +286,11 @@ namespace CoopFramework
         {
             [CanBeNull] private readonly Func<ISynchronization> m_SyncFactory;
 
-            public PendingMethodCall(MethodId method, [CanBeNull] Func<ISynchronization> syncFactory,
+            public PendingMethodCall(InvokableId invokable, [CanBeNull] Func<ISynchronization> syncFactory,
                 [CanBeNull] object instance,
                 [NotNull] object[] args)
             {
-                Id = method;
+                Id = invokable;
                 m_SyncFactory = syncFactory;
                 Instance = instance;
                 Parameters = args;
@@ -309,7 +307,7 @@ namespace CoopFramework
 
             public object Instance { get; }
             public object[] Parameters { get; }
-            public MethodId Id { get; }
+            public InvokableId Id { get; }
         }
 
         /// <summary>
@@ -374,7 +372,13 @@ namespace CoopFramework
         private static void SetupHandlers([CanBeNull] CoopManaged<TSelf, TExtended> self)
         {
             foreach (var patchedMethod in Util.SortByMethod(m_DefinedBehaviours))
-                SetupMethodHandlers(self, patchedMethod.Key, patchedMethod.Value);
+            {
+                var invokable = Registry.IdToInvokable[patchedMethod.Key];
+                if (invokable is PatchedInvokable patch)
+                    SetupMethodHandlers(self, patch, patchedMethod.Value);
+                else
+                    throw new Exception($"{invokable} is of an unexpected type.");
+            }
 
 
             foreach (var patchedField in Util.SortByField(m_DefinedBehaviours))
@@ -385,34 +389,32 @@ namespace CoopFramework
         ///     Setup handlers for the given method patches.
         /// </summary>
         /// <param name="self"></param>
-        /// <param name="id"></param>
+        /// <param name="patchedInvokable"></param>
         /// <param name="relevantBehaviours"></param>
         private static void SetupMethodHandlers(
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
-            MethodId id,
+            [NotNull] PatchedInvokable patchedInvokable,
             [NotNull] List<CallBehaviourBuilder> relevantBehaviours)
         {
             TExtended instanceResolved = null; // stays null for static calls
             if (self != null && !self.TryGetInstance(out instanceResolved)) return;
-
-            var methodAccess = Registry.IdToMethod[id];
             if (self == null)
                 // Static patch
-                methodAccess.Prefix.SetGlobalHandler((eOrigin, target, args) =>
+                patchedInvokable.Prefix.SetGlobalHandler((eOrigin, target, args) =>
                 {
                     if (!CoopFramework.IsEnabled || target != null)
                         // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
                         return ECallPropagation.CallOriginal;
 
-                    return Dispatch(null, eOrigin, methodAccess.Id, relevantBehaviours, args);
+                    return Dispatch(null, eOrigin, patchedInvokable.Id, relevantBehaviours, args);
                 });
             else
                 // Instance patch
-                methodAccess.Prefix.SetHandler(instanceResolved,
+                patchedInvokable.Prefix.SetHandler(instanceResolved,
                     (eOrigin, args) =>
                     {
                         if (!CoopFramework.IsEnabled) return ECallPropagation.CallOriginal;
-                        return Dispatch(self, eOrigin, methodAccess.Id, relevantBehaviours, args);
+                        return Dispatch(self, eOrigin, patchedInvokable.Id, relevantBehaviours, args);
                     });
         }
 
@@ -424,14 +426,14 @@ namespace CoopFramework
         /// <param name="relevantBehaviours"></param>
         private static void SetupFieldHandlers(
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
-            ValueId id,
+            FieldId id,
             [NotNull] List<FieldActionBehaviourBuilder> relevantBehaviours)
         {
             TExtended instanceResolved = null; // stays null for static calls
             if (self != null && !self.TryGetInstance(out instanceResolved)) return;
 
-            var valueAccess = Registry.IdToValue[id];
-            IEnumerable<MethodAccess> accessors = relevantBehaviours.SelectMany(b => b.Accessors);
+            var field = Registry.IdToField[id];
+            var accessors = relevantBehaviours.SelectMany(b => b.Accessors);
             foreach (var accessor in accessors)
             {
                 var methodRelevantBehaviours = relevantBehaviours
@@ -450,7 +452,7 @@ namespace CoopFramework
                             // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
                             return ECallPropagation.CallOriginal;
                         if (prefix?.Invoke(eOrigin, null, args) == ECallPropagation.Skip) return ECallPropagation.Skip;
-                        return DispatchPrefix(null, eOrigin, methodRelevantBehaviours, valueAccess);
+                        return DispatchPrefix(null, eOrigin, methodRelevantBehaviours, field);
                     });
 
                     var postfix = accessor.Postfix.GlobalHandler;
@@ -479,7 +481,7 @@ namespace CoopFramework
                         {
                             if (!CoopFramework.IsEnabled) return ECallPropagation.CallOriginal;
                             if (prefix?.Invoke(origin, args) == ECallPropagation.Skip) return ECallPropagation.Skip;
-                            return DispatchPrefix(self, origin, methodRelevantBehaviours, valueAccess);
+                            return DispatchPrefix(self, origin, methodRelevantBehaviours, field);
                         });
 
                     var postfix = accessor.Postfix.GetHandler(instanceResolved);
@@ -518,7 +520,7 @@ namespace CoopFramework
                 Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
                 return; // Will not work anyways
             }
-            
+
             foreach (var behaviour in behaviours)
             {
                 if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) return;
@@ -534,12 +536,12 @@ namespace CoopFramework
         /// <param name="self">The instance of the CoopManager that wraps the instance of the method call. null for static calls.</param>
         /// <param name="eOriginator">The originator of the action.</param>
         /// <param name="behaviours">Behaviours that apply to this field.</param>
-        /// <param name="valueAccess">Access to the value.</param>
+        /// <param name="field">Access to the value.</param>
         private static ECallPropagation DispatchPrefix(
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
             EOriginator eOriginator,
             IEnumerable<FieldBehaviourBuilder> behaviours,
-            ValueAccess valueAccess)
+            Field field)
         {
             TExtended instanceResolved = null; // stays null for static calls
             if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
@@ -548,13 +550,13 @@ namespace CoopFramework
                 Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
                 return ECallPropagation.Skip; // Will not work anyways
             }
-            
+
             foreach (var behaviour in behaviours)
             {
                 if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) return ECallPropagation.CallOriginal;
 
                 FieldStack.PushMarker();
-                FieldStack.PushValue(valueAccess, instanceResolved);
+                FieldStack.PushValue(field, instanceResolved);
             }
 
             return ECallPropagation.CallOriginal;

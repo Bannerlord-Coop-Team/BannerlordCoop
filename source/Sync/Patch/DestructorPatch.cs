@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Reflection;
-using HarmonyLib;
 using JetBrains.Annotations;
 
-namespace Sync
+namespace Sync.Patch
 {
     public class DestructorPatch<TPatch> : MethodPatch<TPatch>
     {
@@ -18,12 +17,11 @@ namespace Sync
         public DestructorPatch<TPatch> Prefix()
         {
             Intercept(
-                "Finalize", 
-                BindingFlags.NonPublic | 
-                BindingFlags.Instance | 
+                "Finalize",
+                BindingFlags.NonPublic |
+                BindingFlags.Instance |
                 BindingFlags.DeclaredOnly);
             return this;
         }
-        
     }
 }

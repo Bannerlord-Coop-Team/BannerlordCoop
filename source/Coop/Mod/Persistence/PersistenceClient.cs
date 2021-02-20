@@ -10,6 +10,7 @@ using RailgunNet.Connection.Client;
 using RemoteAction;
 using Sync;
 using Sync.Behaviour;
+using Sync.Value;
 
 namespace Coop.Mod.Persistence
 {

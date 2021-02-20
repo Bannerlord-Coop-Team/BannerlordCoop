@@ -1,6 +1,6 @@
 ﻿using System;
-using Sync;
 using Sync.Behaviour;
+using Sync.Patch;
 using Xunit;
 
 namespace Coop.Tests.Sync
@@ -9,6 +9,43 @@ namespace Coop.Tests.Sync
         "UsesGlobalPatcher")] // Need be executed sequential since harmony patches are always global
     public class MethodPatcher_Prefix
     {
+        private static readonly MethodPatch<MethodPatcher_Prefix> Patch =
+            new MethodPatch<MethodPatcher_Prefix>(typeof(TestRPC))
+                .Intercept(nameof(TestRPC.SyncedMethod))
+                .Intercept(nameof(TestRPC.StaticSyncedMethod));
+
+        [Fact]
+        private void IsSyncHandlerCalled()
+        {
+            // Register sync handler
+            var instance = new TestRPC();
+            Assert.Equal(0, instance.NumberOfCalls);
+            var iNumberOfHandlerCalls = 0;
+
+            Assert.True(Patch.TryGetMethod(nameof(TestRPC.SyncedMethod), out var method));
+            method.Prefix.SetHandler(instance, args =>
+            {
+                ++iNumberOfHandlerCalls;
+                return ECallPropagation.Skip;
+            });
+
+            // Trigger the handler
+            instance.SyncedMethod(42);
+            Assert.Equal(0, instance.NumberOfCalls);
+            Assert.Equal(1, iNumberOfHandlerCalls);
+
+            method.Prefix.RemoveHandler(instance);
+        }
+
+        [Fact]
+        private void OriginalIsCalledIfNoHandlerExists()
+        {
+            var instance = new TestRPC();
+            Assert.Equal(0, instance.NumberOfCalls);
+            instance.SyncedMethod(42);
+            Assert.Equal(1, instance.NumberOfCalls);
+        }
+
         private class TestRPC
         {
             [ThreadStatic] public static int? StaticLatestArgument;
@@ -27,42 +64,6 @@ namespace Coop.Tests.Sync
                 ++StaticNumberOfCalls;
                 StaticLatestArgument = iSomeArgument;
             }
-        }
-
-        private static readonly MethodPatch<MethodPatcher_Prefix> Patch = new MethodPatch<MethodPatcher_Prefix>(typeof(TestRPC))
-                                                    .Intercept(nameof(TestRPC.SyncedMethod))
-                                                    .Intercept(nameof(TestRPC.StaticSyncedMethod));
-
-        [Fact]
-        private void IsSyncHandlerCalled()
-        {
-            // Register sync handler
-            TestRPC instance = new TestRPC();
-            Assert.Equal(0, instance.NumberOfCalls);
-            int iNumberOfHandlerCalls = 0;
-
-            Assert.True(Patch.TryGetMethod(nameof(TestRPC.SyncedMethod), out MethodAccess method));
-            method.Prefix.SetHandler(instance, args => 
-            { 
-                ++iNumberOfHandlerCalls;
-                return ECallPropagation.Skip;
-            });
-
-            // Trigger the handler
-            instance.SyncedMethod(42);
-            Assert.Equal(0, instance.NumberOfCalls);
-            Assert.Equal(1, iNumberOfHandlerCalls);
-
-            method.Prefix.RemoveHandler(instance);
-        }
-
-        [Fact]
-        private void OriginalIsCalledIfNoHandlerExists()
-        {
-            TestRPC instance = new TestRPC();
-            Assert.Equal(0, instance.NumberOfCalls);
-            instance.SyncedMethod(42);
-            Assert.Equal(1, instance.NumberOfCalls);
         }
     }
 }

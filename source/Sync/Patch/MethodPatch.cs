@@ -6,25 +6,26 @@ using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
 using Sync.Behaviour;
+using Sync.Invokable;
 
-namespace Sync
+namespace Sync.Patch
 {
     /// <summary>
     ///     Patch generator for method calls.
     /// </summary>
     public class MethodPatch<TPatch>
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        
-        private const BindingFlags All = BindingFlags.Instance | 
-                                         BindingFlags.Static | 
-                                         BindingFlags.Public | 
-                                         BindingFlags.NonPublic | 
-                                         BindingFlags.GetField | 
-                                         BindingFlags.SetField | 
-                                         BindingFlags.GetProperty | 
+        private const BindingFlags All = BindingFlags.Instance |
+                                         BindingFlags.Static |
+                                         BindingFlags.Public |
+                                         BindingFlags.NonPublic |
+                                         BindingFlags.GetField |
+                                         BindingFlags.SetField |
+                                         BindingFlags.GetProperty |
                                          BindingFlags.SetProperty;
-        private readonly List<MethodAccess> m_Access = new List<MethodAccess>();
+
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private readonly List<PatchedInvokable> m_Access = new List<PatchedInvokable>();
         protected readonly Type m_Declaring;
 
         public MethodPatch([NotNull] Type declaringClass)
@@ -32,11 +33,11 @@ namespace Sync
             m_Declaring = declaringClass;
         }
 
-        public IEnumerable<MethodAccess> Methods => m_Access;
+        public IEnumerable<PatchedInvokable> Methods => m_Access;
 
         /// <summary>
         ///     Patches all member methods of the declaring class with a prefix that relays all calls to
-        ///     <see cref="MethodAccess.InvokePrefix" />.
+        ///     <see cref="PatchedInvokable.InvokePrefix" />.
         /// </summary>
         /// <param name="eBindingFlags"></param>
         /// <returns></returns>
@@ -44,17 +45,14 @@ namespace Sync
             BindingFlags eBindingFlags =
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly)
         {
-            foreach (MethodInfo method in m_Declaring.GetMethods(eBindingFlags))
-            {
-                Intercept(method);
-            }
+            foreach (var method in m_Declaring.GetMethods(eBindingFlags)) Intercept(method);
 
             return this;
         }
 
         /// <summary>
-        ///     Creates a <see cref="MethodAccess" /> and patches in a prefix that relays all calls to
-        ///     <see cref="MethodAccess.InvokePrefix" />.
+        ///     Creates a <see cref="PatchedInvokable" /> and patches in a prefix that relays all calls to
+        ///     <see cref="PatchedInvokable.InvokePrefix" />.
         /// </summary>
         /// <param name="method">Method to track.</param>
         /// <returns>this</returns>
@@ -66,19 +64,17 @@ namespace Sync
             MethodBase method)
         {
             if (method.DeclaringType != m_Declaring)
-            {
                 throw new ArgumentException(
                     $"Provided method {method} is not declared in {m_Declaring}",
                     nameof(method));
-            }
 
             PatchPrefix(method);
             return this;
         }
 
         /// <summary>
-        ///     Creates a <see cref="MethodAccess" /> and patches in a prefix that relays all calls to
-        ///     <see cref="MethodAccess.InvokePrefix" />.
+        ///     Creates a <see cref="PatchedInvokable" /> and patches in a prefix that relays all calls to
+        ///     <see cref="PatchedInvokable.InvokePrefix" />.
         /// </summary>
         /// <param name="sMethodName">Name of the method</param>
         /// <param name="eFlags">Flags for the generated interceptor.</param>
@@ -88,13 +84,9 @@ namespace Sync
             string sMethodName,
             BindingFlags eBindingFlags = All)
         {
-            foreach (MethodInfo info in m_Declaring.GetMethods(eBindingFlags))
-            {
+            foreach (var info in m_Declaring.GetMethods(eBindingFlags))
                 if (info.Name == sMethodName)
-                {
                     Intercept(info);
-                }
-            }
 
             return this;
         }
@@ -113,22 +105,15 @@ namespace Sync
             Type[] genericInstantiations,
             BindingFlags eBindingFlags = All)
         {
-            foreach (MethodInfo info in m_Declaring.GetMethods(eBindingFlags))
-            {
+            foreach (var info in m_Declaring.GetMethods(eBindingFlags))
                 if (info.IsGenericMethod && info.Name == sMethodName)
-                {
-                    foreach (Type genericArg in genericInstantiations)
-                    {
+                    foreach (var genericArg in genericInstantiations)
                         Intercept(info.MakeGenericMethod(genericArg));
-                    }
-                }
-            }
 
             return this;
         }
-        
+
         /// <summary>
-        /// 
         /// </summary>
         /// <param name="sMethodName"></param>
         /// <param name="eBindingFlags"></param>
@@ -137,139 +122,132 @@ namespace Sync
             string sMethodName,
             BindingFlags eBindingFlags = All)
         {
-            foreach (MethodInfo info in m_Declaring.GetMethods(eBindingFlags))
-            {
+            foreach (var info in m_Declaring.GetMethods(eBindingFlags))
                 if (info.Name == sMethodName)
-                {
                     Postfix(info);
-                }
-            }
 
             return this;
         }
-        
+
         public MethodPatch<TPatch> Postfix(
             MethodBase method)
         {
             if (method.DeclaringType != m_Declaring)
-            {
                 throw new ArgumentException(
                     $"Provided method {method} is not declared in {m_Declaring}",
                     nameof(method));
-            }
 
             PatchPostfix(method);
             return this;
         }
 
         public MethodPatch<TPatch> AddFlags(
-            MethodBase method, 
-            EMethodPatchFlag eFlags)
+            MethodBase method,
+            EInvokableFlag eFlags)
         {
-            if (!TryGetMethod(method, out MethodAccess access))
+            if (!TryGetMethod(method, out var access))
             {
-                access = new MethodAccess(method, typeof(TPatch));
+                access = new PatchedInvokable(method, typeof(TPatch));
                 m_Access.Add(access);
             }
+
             access.AddFlags(eFlags);
             return this;
         }
 
-        public bool TryGetMethod(string sMethodName, out MethodAccess methodAccess)
+        public bool TryGetMethod(string sMethodName, out PatchedInvokable patchedInvokable)
         {
-            MethodInfo method = AccessTools.Method(m_Declaring, sMethodName);
+            var method = AccessTools.Method(m_Declaring, sMethodName);
             if (method.IsGenericMethod)
-            {
                 throw new ArgumentException(
                     $"Unable to generate patch: provided method {method} is generic. Use a [HarmonyPatch] with TargetMethod instead.",
                     nameof(method));
-            }
 
-            return TryGetMethod(method, out methodAccess);
+            return TryGetMethod(method, out patchedInvokable);
         }
 
         public bool TryGetMethod(
             string sMethodName,
             Type[] genericArguments,
-            out MethodAccess methodAccess)
+            out PatchedInvokable patchedInvokable)
         {
-            MethodInfo method = AccessTools.Method(
+            var method = AccessTools.Method(
                 m_Declaring,
                 sMethodName,
                 null,
                 genericArguments);
             if (method.IsGenericMethod)
-            {
                 throw new ArgumentException(
                     $"Unable to generate patch: provided method {method} is generic. Use a [HarmonyPatch] with TargetMethod instead.",
                     nameof(method));
-            }
 
-            return TryGetMethod(method, out methodAccess);
+            return TryGetMethod(method, out patchedInvokable);
         }
 
-        public bool TryGetMethod(MethodBase methodInfo, out MethodAccess methodAccess)
+        public bool TryGetMethod(MethodBase methodInfo, out PatchedInvokable patchedInvokable)
         {
-            methodAccess = m_Access.FirstOrDefault(m => m.MethodBase.Equals(methodInfo));
-            return methodAccess != null;
+            patchedInvokable = m_Access.FirstOrDefault(m => m.Original.Equals(methodInfo));
+            return patchedInvokable != null;
         }
 
         /// <summary>
-        ///     Dynamically creates a new prefix for a call to <paramref name="original"/> that redirects the call
-        ///     to our static dispatcher <see cref="DispatchPrefixExecution"/>.
+        ///     Dynamically creates a new prefix for a call to <paramref name="original" /> that redirects the call
+        ///     to our static dispatcher <see cref="DispatchPrefixExecution" />.
         /// </summary>
         /// <param name="original">Method to be patched.</param>
         private void PatchPrefix(
             MethodBase original)
         {
             Logger.Debug("{original} is being prefixed by {patcher}", original, typeof(TPatch));
-            MethodInfo dispatcher = AccessTools.Method(
+            var dispatcher = AccessTools.Method(
                 typeof(MethodPatch<TPatch>),
                 nameof(DispatchPrefixExecution));
-            if (!TryGetMethod(original, out MethodAccess access))
+            if (!TryGetMethod(original, out var access))
             {
-                access = new MethodAccess(original, typeof(TPatch));
+                access = new PatchedInvokable(original, typeof(TPatch));
                 m_Access.Add(access);
             }
+
             MethodPatchFactory<TPatch>.AddPrefix(access, dispatcher);
         }
 
         /// <summary>
-        ///     Dispatcher that is being called for prefixes to forward the call to <see cref="MethodAccess.InvokePrefix" />.
+        ///     Dispatcher that is being called for prefixes to forward the call to <see cref="PatchedInvokable.InvokePrefix" />.
         /// </summary>
-        /// <param name="methodAccess">Access to the patched method that is being called.</param>
+        /// <param name="patchedInvokable">Access to the patched method that is being called.</param>
         /// <param name="instance">Instance that the method is being called on.</param>
         /// <param name="args">Parameters to the method call.</param>
         /// <returns></returns>
         private static bool DispatchPrefixExecution(
-            MethodAccess methodAccess,
+            PatchedInvokable patchedInvokable,
             [CanBeNull] object instance,
             params object[] args)
         {
-            return methodAccess.InvokePrefix(EOriginator.Game, instance, args);
+            return patchedInvokable.InvokePrefix(EOriginator.Game, instance, args);
         }
-        
+
         private void PatchPostfix(
             MethodBase original)
         {
             Logger.Debug("{original} is being postfixed by {patcher}", original, typeof(TPatch));
-            MethodInfo dispatcher = AccessTools.Method(
+            var dispatcher = AccessTools.Method(
                 typeof(MethodPatch<TPatch>),
                 nameof(DispatchPostfixExecution));
-            if (!TryGetMethod(original, out MethodAccess access))
+            if (!TryGetMethod(original, out var access))
             {
-                access = new MethodAccess(original, typeof(TPatch));
+                access = new PatchedInvokable(original, typeof(TPatch));
                 m_Access.Add(access);
             }
+
             MethodPatchFactory<TPatch>.AddPostfix(access, dispatcher);
         }
-        
+
         private static void DispatchPostfixExecution(
-            MethodAccess methodAccess,
+            PatchedInvokable patchedInvokable,
             [CanBeNull] object instance,
             params object[] args)
         {
-            methodAccess.InvokePostfix(EOriginator.Game, instance, args);
+            patchedInvokable.InvokePostfix(EOriginator.Game, instance, args);
         }
     }
 }

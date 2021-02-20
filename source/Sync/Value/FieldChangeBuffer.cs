@@ -1,41 +1,41 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using JetBrains.Annotations;
 using Sync.Reflection;
 
-namespace Sync
+namespace Sync.Value
 {
     public class FieldChangeBuffer
     {
         [NotNull]
-        public object AddChange(ValueAccess access, FieldData data, object newValue)
+        public object AddChange(Field access, FieldData data, object newValue)
         {
             lock (m_BufferedChanges)
             {
-                Dictionary<object, ValueChangeRequest> fieldBuffer = m_BufferedChanges.Assert(access);
-                if (fieldBuffer.TryGetValue(data.Target, out ValueChangeRequest cached))
+                var fieldBuffer = m_BufferedChanges.Assert(access);
+                if (fieldBuffer.TryGetValue(data.Target, out var cached))
                 {
                     cached.RequestedValue = newValue;
                     return cached.OriginalValue;
                 }
 
-                fieldBuffer[data.Target] = new ValueChangeRequest
+                fieldBuffer[data.Target] = new FieldChangeRequest
                 {
                     OriginalValue = data.Value,
                     RequestedValue = newValue
                 };
             }
-            
+
             return data.Value;
         }
 
-        [NotNull] public Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>> FetchChanges()
+        [NotNull]
+        public Dictionary<Field, Dictionary<object, FieldChangeRequest>> FetchChanges()
         {
             lock (m_BufferedChanges)
             {
                 var ret = m_BufferedChanges;
-                m_BufferedChanges = new Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>();
+                m_BufferedChanges = new Dictionary<Field, Dictionary<object, FieldChangeRequest>>();
                 return ret;
             }
         }
@@ -56,10 +56,7 @@ namespace Sync
                     var changes = m_BufferedChanges[entry.Key];
                     foreach (var entryInner in entry.Value)
                     {
-                        if (!changes.ContainsKey(entryInner.Key))
-                        {
-                            changes[entryInner.Key] = entryInner.Value;
-                        }
+                        if (!changes.ContainsKey(entryInner.Key)) changes[entryInner.Key] = entryInner.Value;
 
                         changes[entryInner.Key].RequestedValue = entryInner.Value.RequestedValue;
                     }
@@ -74,12 +71,15 @@ namespace Sync
                 return m_BufferedChanges.Count;
             }
         }
+
         #region Private
+
         private static readonly Lazy<FieldChangeBuffer> m_Instance =
             new Lazy<FieldChangeBuffer>(() => new FieldChangeBuffer());
-        
-        private Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>> m_BufferedChanges =
-            new Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>>();
+
+        private Dictionary<Field, Dictionary<object, FieldChangeRequest>> m_BufferedChanges =
+            new Dictionary<Field, Dictionary<object, FieldChangeRequest>>();
+
         #endregion
     }
 }

@@ -81,8 +81,8 @@ namespace Sync.Store
 
         public ObjectId Insert(object obj)
         {
-            byte[] raw = m_Serializer.Serialize(obj);
-            ObjectId id = new ObjectId(XXHash.XXH32(raw));
+            var raw = m_Serializer.Serialize(obj);
+            var id = new ObjectId(XXHash.XXH32(raw));
             m_Data[id] = obj;
             Logger.Trace("[{id}] Insert: {object} [{type}]", id, obj, obj.GetType());
             SendAdd(id, raw);
@@ -109,8 +109,8 @@ namespace Sync.Store
         private void ReceiveAdd(ConnectionBase connection, Packet packet)
         {
             // Receive the object
-            byte[] raw = packet.Payload.ToArray();
-            ObjectId id = new ObjectId(XXHash.XXH32(raw));
+            var raw = packet.Payload.ToArray();
+            var id = new ObjectId(XXHash.XXH32(raw));
             m_State[id] = new RemoteObjectState(RemoteObjectState.EOrigin.Remote);
 
             // Add to store
@@ -133,11 +133,8 @@ namespace Sync.Store
             }
 
             // Call handlers
-            bool bDoSendAck = true;
-            if (OnPacketAddDeserialized != null)
-            {
-                bDoSendAck = OnPacketAddDeserialized.Invoke(id, raw, m_Data[id]);
-            }
+            var bDoSendAck = true;
+            if (OnPacketAddDeserialized != null) bDoSendAck = OnPacketAddDeserialized.Invoke(id, raw, m_Data[id]);
 
             if (bDoSendAck)
             {
@@ -148,18 +145,13 @@ namespace Sync.Store
 
         public void SendACK(ObjectId id)
         {
-            if (!m_State.ContainsKey(id))
-            {
-                throw new Exception($"Invalid internal state for {id}: Unknown.");
-            }
+            if (!m_State.ContainsKey(id)) throw new Exception($"Invalid internal state for {id}: Unknown.");
 
             if (m_State[id].Origin == RemoteObjectState.EOrigin.Local)
-            {
                 throw new Exception(
                     "Invalid internal state for {id}: A locally added object cannot be acknowledged.");
-            }
 
-            ByteWriter writer = new ByteWriter();
+            var writer = new ByteWriter();
             writer.Binary.Write(id.Value);
             m_State[id].Acknowledged = true;
             m_Connection.Send(new Packet(EPacket.StoreAck, writer.ToArray()));
@@ -171,11 +163,9 @@ namespace Sync.Store
         [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.StoreAck)]
         private void ReceiveAck(ConnectionBase connection, Packet packet)
         {
-            ObjectId id = new ObjectId(new ByteReader(packet.Payload).Binary.ReadUInt32());
+            var id = new ObjectId(new ByteReader(packet.Payload).Binary.ReadUInt32());
             if (!m_Data.ContainsKey(id) || !m_State.ContainsKey(id))
-            {
                 throw new Exception($"Received ACK for unknown object {id}.");
-            }
 
             m_State[id].Acknowledged = true;
             Logger.Trace(

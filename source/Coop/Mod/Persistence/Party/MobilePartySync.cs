@@ -6,6 +6,9 @@ using JetBrains.Annotations;
 using NLog;
 using RemoteAction;
 using Sync;
+using Sync.Behaviour;
+using Sync.Invokable;
+using Sync.Value;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
@@ -21,8 +24,8 @@ namespace Coop.Mod.Persistence.Party
         {
             m_MovementGroup = movement ?? throw new ArgumentNullException();
         }
-        /// <inheritdoc cref="ISynchronization.Broadcast(MethodId, object, object[])"/>
-        public override void Broadcast(MethodId id, object instance, object[] args)
+        /// <inheritdoc cref="ISynchronization.Broadcast(InvokableId, object, object[])"/>
+        public override void Broadcast(InvokableId id, object instance, object[] args)
         {
             // We didn't patch any methods, so this is never called.
             throw new System.NotImplementedException();
@@ -137,13 +140,13 @@ namespace Coop.Mod.Persistence.Party
         }
 
         private Dictionary<MobileParty, Tuple<MovementData, MovementData>> SortByParty(
-            Dictionary<ValueAccess, Dictionary<object, ValueChangeRequest>> input)
+            Dictionary<Field, Dictionary<object, FieldChangeRequest>> input)
         {
             Dictionary<MobileParty, Tuple<MovementData, MovementData>> requestedChanges = new Dictionary<MobileParty, Tuple<MovementData, MovementData>>();
             foreach (var bufferEntry in input)
             {
-                ValueAccess access = bufferEntry.Key;
-                if (access.DeclaringType != typeof(MobileParty))
+                Field field = bufferEntry.Key;
+                if (field.DeclaringType != typeof(MobileParty))
                 {
                     continue;
                 }

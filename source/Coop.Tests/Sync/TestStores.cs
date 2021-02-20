@@ -13,8 +13,8 @@ namespace Coop.Tests.Sync
             Connections = connections;
 
             foreach ((ConnectionTestImpl client, ConnectionTestImpl server) con in connections
-                                                                                   .ConnectionsClient
-                                                                                   .Zip(connections.ConnectionsServer, (c, s) => (c, s))
+                .ConnectionsClient
+                .Zip(connections.ConnectionsServer, (c, s) => (c, s))
             )
             {
                 StoresClient.Add(

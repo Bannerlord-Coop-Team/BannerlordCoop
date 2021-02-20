@@ -10,6 +10,7 @@
         /// </summary>
         /// <returns></returns>
         bool IsAllowed();
+
         /// <summary>
         ///     Returns a description of why the action is not allowed.
         /// </summary>

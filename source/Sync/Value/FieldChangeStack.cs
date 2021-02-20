@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using HarmonyLib;
-using Sync.Reflection;
+﻿using System.Collections.Generic;
 
-namespace Sync
+namespace Sync.Value
 {
     /// <summary>
     ///     Buffer for pending changes to a value. The changes are detected by creating a snapshot
@@ -14,8 +11,14 @@ namespace Sync
     /// </summary>
     public class FieldChangeStack
     {
+        #region Private
+
+        private readonly Stack<FieldData> m_ActiveFields = new Stack<FieldData>();
+
+        #endregion
+
         /// <summary>
-        ///     Pushes a marker to the stack. The next call to <see cref="PopUntilMarker"/> will pop until this marker
+        ///     Pushes a marker to the stack. The next call to <see cref="PopUntilMarker" /> will pop until this marker
         ///     is encountered.
         /// </summary>
         public void PushMarker()
@@ -28,14 +31,14 @@ namespace Sync
         /// </summary>
         /// <param name="access">Access object to the field value</param>
         /// <param name="target">Instance that the field belongs to</param>
-        public void PushValue(ValueAccess access, object target)
+        public void PushValue(Field access, object target)
         {
             m_ActiveFields.Push(new FieldData(access, target, access.Get(target)));
         }
 
         /// <summary>
         ///     Pops all changes until a marker is encountered. The popped field changes are stored in the
-        ///     <see cref="BufferedChanges"/>.
+        ///     <see cref="BufferedChanges" />.
         /// </summary>
         /// <param name="bRevertToOriginalValue"></param>
         public FieldChangeBuffer PopUntilMarker(bool bRevertToOriginalValue)
@@ -43,31 +46,21 @@ namespace Sync
             var buffer = new FieldChangeBuffer();
             while (m_ActiveFields.Count > 0)
             {
-                FieldData data = m_ActiveFields.Pop();
-                if (data == null)
-                {
-                    break; // The marker
-                }
+                var data = m_ActiveFields.Pop();
+                if (data == null) break; // The marker
 
-                ValueAccess access = data.Access;
+                var access = data.Access;
 
-                object newValue = data.Access.Get(data.Target);
-                bool changed = !Equals(newValue, data.Value);
+                var newValue = data.Access.Get(data.Target);
+                var changed = !Equals(newValue, data.Value);
 
                 if (!changed) continue;
 
-                object latestActualValue = buffer.AddChange(access, data, newValue);
-                if (bRevertToOriginalValue)
-                {
-                    access.Set(data.Target, latestActualValue);
-                }
+                var latestActualValue = buffer.AddChange(access, data, newValue);
+                if (bRevertToOriginalValue) access.Set(data.Target, latestActualValue);
             }
 
             return buffer;
         }
-
-        #region Private
-        private readonly Stack<FieldData> m_ActiveFields = new Stack<FieldData>();
-        #endregion
     }
 }

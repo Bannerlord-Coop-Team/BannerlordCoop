@@ -1,9 +1,8 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using CoopFramework;
 using JetBrains.Annotations;
 using Moq;
-using Sync;
+using Sync.Value;
 using Xunit;
 
 namespace Coop.Tests.CoopFramework
@@ -13,17 +12,15 @@ namespace Coop.Tests.CoopFramework
     {
         private readonly Mock<SyncBuffered> m_SyncMock;
         private FieldChangeBuffer m_LatestBuffer;
-        
+
         public CoopManaged_FieldGroupPatching()
         {
             m_SyncMock = new Mock<SyncBuffered>();
             m_SyncMock.Setup(h => h.Broadcast(It.IsAny<FieldChangeBuffer>()))
-                .Callback<FieldChangeBuffer>(buffer =>
-                {
-                    m_LatestBuffer = buffer;
-                });
+                .Callback<FieldChangeBuffer>(buffer => { m_LatestBuffer = buffer; });
             CoopManagedFoo.Sync = m_SyncMock.Object;
         }
+
         [Fact]
         private void DoesRevertFieldChangeThroughProperty()
         {
@@ -36,32 +33,32 @@ namespace Coop.Tests.CoopFramework
             foo.SetBoth(1, 43);
             Assert.Equal(0, foo.m_Bar);
             Assert.Equal(42, foo.m_Baz);
-            
+
             // Verify that the change was recorded to the field change buffer
             Assert.NotNull(m_LatestBuffer);
             Assert.Equal(1, m_LatestBuffer.Count());
             var changes = m_LatestBuffer.FetchChanges();
             Assert.Single(changes);
-            Assert.True(changes.ContainsKey(CoopManagedFoo.Group));
-            
+            Assert.True(changes.ContainsKey(CoopManagedFoo.AccessGroup));
+
             // Verify the change was recorded on the `foo` instance
-            var instanceChanges = changes[CoopManagedFoo.Group];
+            var instanceChanges = changes[CoopManagedFoo.AccessGroup];
             Assert.Single(instanceChanges);
             Assert.True(instanceChanges.ContainsKey(foo));
-            
+
             // Verify that the fields where packed as defined by CoopManaged.Group
-            ValueChangeRequest fooChange = instanceChanges[foo];
+            var fooChange = instanceChanges[foo];
             Assert.IsType<List<object>>(fooChange.OriginalValue);
             Assert.IsType<List<object>>(fooChange.RequestedValue);
-            List<object> valueBefore = (List<object>) fooChange.OriginalValue;
-            List<object> requestedValue = (List<object>) fooChange.RequestedValue;
+            var valueBefore = (List<object>) fooChange.OriginalValue;
+            var requestedValue = (List<object>) fooChange.RequestedValue;
             Assert.Equal(2, valueBefore.Count);
             Assert.Equal(2, requestedValue.Count);
             Assert.IsType<int>(valueBefore[0]);
             Assert.IsType<int>(valueBefore[1]);
             Assert.IsType<int>(requestedValue[0]);
             Assert.IsType<int>(requestedValue[1]);
-            
+
             // Verify the actual field values
             Assert.Equal(0, (int) valueBefore[0]); // m_Bar
             Assert.Equal(42, (int) valueBefore[1]); // m_Baz
@@ -71,7 +68,7 @@ namespace Coop.Tests.CoopFramework
 
         private class Foo
         {
-            public int m_Bar = 0;
+            public int m_Bar;
             public int m_Baz = 42;
 
             public void SetBoth(int bar, int baz)
@@ -83,19 +80,20 @@ namespace Coop.Tests.CoopFramework
 
         private class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
         {
-           
-            public static FieldAccessGroup<Foo, List<object>> Group = new FieldAccessGroup<Foo, List<object>>(
-                new FieldAccess[]{
-                    Field<int>(nameof(Foo.m_Bar)), 
-                    Field<int>(nameof(Foo.m_Baz))
-                });
-            
+            public static readonly FieldAccessGroup<Foo, List<object>> AccessGroup =
+                new FieldAccessGroup<Foo, List<object>>(
+                    new[]
+                    {
+                        Field<int>(nameof(Foo.m_Bar)),
+                        Field<int>(nameof(Foo.m_Baz))
+                    });
+
             public static SyncBuffered Sync;
-            
+
             static CoopManagedFoo()
             {
                 When(GameLoop)
-                    .Changes(Group)
+                    .Changes(AccessGroup)
                     .Through(Method(nameof(Foo.SetBoth)))
                     .Broadcast(() => Sync)
                     .Revert();

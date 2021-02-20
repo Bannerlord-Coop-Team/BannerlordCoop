@@ -1,17 +1,17 @@
 ﻿using JetBrains.Annotations;
 
-namespace Sync
+namespace Sync.Value
 {
     public class FieldData
     {
-        public FieldData([NotNull] ValueAccess access, object target, object value)
+        public FieldData([NotNull] Field access, object target, object value)
         {
             Access = access;
             Target = target;
             Value = value;
         }
 
-        public ValueAccess Access { get; }
+        public Field Access { get; }
         public object Target { get; }
         public object Value { get; }
     }

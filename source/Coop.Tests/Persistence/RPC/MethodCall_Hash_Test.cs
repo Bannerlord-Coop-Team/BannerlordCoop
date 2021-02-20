@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Coop.Mod.Persistence.RemoteAction;
 using RemoteAction;
 using Sync;
+using Sync.Invokable;
 using Sync.Store;
 using TaleWorlds.ObjectSystem;
 using Xunit;
@@ -51,7 +52,7 @@ namespace Coop.Tests.Persistence.RPC
         {
             int iNumberOfArguments = random.Next(0, 10);
             return new MethodCall(
-                new MethodId(random.Next()),
+                new InvokableId(random.Next()),
                 GetRandomArgument(random),
                 GetRandomArguments(random, iNumberOfArguments));
         }

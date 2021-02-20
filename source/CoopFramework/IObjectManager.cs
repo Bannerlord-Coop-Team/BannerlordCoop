@@ -11,13 +11,14 @@
         /// </summary>
         /// <param name="registeredObject"></param>
         void AfterRegisterObject(object registeredObject);
-        
+
         /// <summary>
         ///     Called after an instance of the object was unregistered with the object manager.
         /// </summary>
         /// <param name="removedObject"></param>
         void AfterUnregisterObject(object removedObject);
     }
+
     /// <summary>
     ///     Interface for a manager of arbitrary game objects.
     /// </summary>
@@ -29,12 +30,14 @@
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         bool Manages<T>();
+
         /// <summary>
         ///     Register an observer for a given type.
         /// </summary>
         /// <param name="observer"></param>
         /// <typeparam name="T"></typeparam>
         void Register<T>(IObjectLifetimeObserver observer);
+
         /// <summary>
         ///     Removes a registered observer.
         /// </summary>

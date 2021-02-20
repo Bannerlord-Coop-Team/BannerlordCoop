@@ -7,7 +7,9 @@ using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using RailgunNet.Util;
 using RemoteAction;
+using Sync;
 using Sync.Behaviour;
+using Sync.Invokable;
 
 namespace Coop.Mod.Persistence.RemoteAction
 {
@@ -50,7 +52,7 @@ namespace Coop.Mod.Persistence.RemoteAction
 
         protected override void Execute(RailRoom room, RailController sender)
         {
-            if (Sync.Registry.IdToMethod.TryGetValue(Call.Id, out var method))
+            if (Sync.Registry.IdToInvokable.TryGetValue(Call.Id, out Invokable method))
             {
                 if (room is RailServerRoom serverRoom)
                 {
@@ -68,7 +70,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                 {
                     Logger.Trace("[{EventId}] SyncCall: {Call}", EventId, Call);
                     // TODO: The call is not synchronized to a campaign time at this point. We probably want an execution queue of some sorts that executes the call at the right point in time.
-                    method.Call(
+                    method.Invoke(
                         EOriginator.RemoteAuthority,
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Instance),
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Call.Arguments));

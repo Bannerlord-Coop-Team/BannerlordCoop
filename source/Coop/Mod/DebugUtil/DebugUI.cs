@@ -22,6 +22,8 @@ using RailgunNet.Logic;
 using RemoteAction;
 using Sync;
 using Sync.Behaviour;
+using Sync.Invokable;
+using Sync.Value;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
@@ -123,13 +125,13 @@ namespace Coop.Mod.DebugUtil
                 return;
             }
             
-            Dictionary<MethodBase, List<MethodId>> coopPatchMethods = new Dictionary<MethodBase, List<MethodId>>();
-            foreach (KeyValuePair<MethodId, MethodAccess> registrar in Registry.IdToMethod)
+            Dictionary<MethodBase, List<InvokableId>> coopPatchMethods = new Dictionary<MethodBase, List<InvokableId>>();
+            foreach (KeyValuePair<InvokableId, Invokable> registrar in Registry.IdToInvokable)
             {
-                var key = registrar.Value.MethodBase;
+                var key = registrar.Value.Original;
                 if (!coopPatchMethods.ContainsKey(key))
                 {
-                    coopPatchMethods[key] = new List<MethodId>();
+                    coopPatchMethods[key] = new List<InvokableId>();
                 }
                 coopPatchMethods[key].Add(registrar.Key);
             }
@@ -221,22 +223,22 @@ namespace Coop.Mod.DebugUtil
 
         private static Dictionary<SyncBuffered, int> m_LogEntrySize = new Dictionary<SyncBuffered, int>();
 
-        private static void ShowCoopPatchInfo(List<MethodId> coopPatch)
+        private static void ShowCoopPatchInfo(List<InvokableId> coopPatch)
         {
             const float indent = 50f;
             const float tabWidth = 200f;
-            foreach (MethodId methodId in coopPatch)
+            foreach (InvokableId methodId in coopPatch)
             {
                 Imgui.Text("MethodId:");
                 Imgui.SameLine(tabWidth);
                 Imgui.Text("" + methodId.InternalValue);
 
-                HashSet<ValueId> relatedFields = new HashSet<ValueId>();
+                HashSet<FieldId> relatedFields = new HashSet<FieldId>();
                 if (Registry.Relation.ContainsKey(methodId))
                 {
-                    foreach (ValueId valueId in Registry.Relation[methodId])
+                    foreach (FieldId valueId in Registry.Relation[methodId])
                     {
-                        void PrintField(ValueAccess valueAccess, float indentF = 0f)
+                        void PrintField(Field valueAccess, float indentF = 0f)
                         {
                             relatedFields.Add(valueAccess.Id);
                             Imgui.Text("Related FieldId:");
@@ -244,11 +246,11 @@ namespace Coop.Mod.DebugUtil
                             Imgui.Text($"{valueAccess.Id.InternalValue} [" + valueAccess + "]");
                         }
 
-                        ValueAccess access = Registry.IdToValue[valueId];
-                        PrintField(access);
-                        if (access is FieldAccessGroup accessGroup)
+                        Field field = Registry.IdToField[valueId];
+                        PrintField(field);
+                        if (field is FieldAccessGroup group)
                         {
-                            foreach (FieldAccess groupMember in accessGroup.Fields)
+                            foreach (FieldAccess groupMember in group.Fields)
                             {
                                 PrintField(groupMember, indent);
                             }
@@ -306,9 +308,9 @@ namespace Coop.Mod.DebugUtil
                             else if (trace.Value.HasValue && arguments.Length > 0)
                             {
                                 object argument = arguments[0];
-                                ValueAccess access = Registry.IdToValue[trace.Value.Value];
+                                Field field = Registry.IdToField[trace.Value.Value];
                                 FieldChangeBuffer buffer = new FieldChangeBuffer();
-                                buffer.AddChange(access, new FieldData(access, instance, argument), argument);
+                                buffer.AddChange(field, new FieldData(field, instance, argument), argument);
                                 sync.Broadcast(buffer);
                             }
                         }

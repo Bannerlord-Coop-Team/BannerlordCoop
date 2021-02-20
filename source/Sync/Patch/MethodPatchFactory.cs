@@ -6,67 +6,63 @@ using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 using HarmonyLib;
 using JetBrains.Annotations;
+using Sync.Invokable;
 
-namespace Sync
+namespace Sync.Patch
 {
     public static class MethodPatchFactory<TPatch>
     {
         private static readonly Dictionary<MethodBase, DynamicMethod> Prefixes =
             new Dictionary<MethodBase, DynamicMethod>();
+
         private static readonly Dictionary<MethodBase, DynamicMethod> Postfixes =
             new Dictionary<MethodBase, DynamicMethod>();
+
         public static void AddPrefix(
-            MethodAccess access,
+            PatchedInvokable access,
             MethodInfo dispatcher)
         {
             if (dispatcher.ReturnType != typeof(bool))
-            {
-                throw new Exception("Prefix dispatcher require a return type of bool that decide if the original function should be called.");
-            }
-            
+                throw new Exception(
+                    "Prefix dispatcher require a return type of bool that decide if the original function should be called.");
+
             lock (Patcher.HarmonyLock)
             {
-                if (Prefixes.ContainsKey(access.MethodBase))
-                {
-                    throw new Exception("Patch already initialized.");
-                }
+                if (Prefixes.ContainsKey(access.Original)) throw new Exception("Patch already initialized.");
 
-                Prefixes[access.MethodBase] = GeneratePatch($"Prefix_{access.MethodBase.Name}", access, dispatcher);
+                Prefixes[access.Original] = GeneratePatch($"Prefix_{access.Original.Name}", access, dispatcher);
 
-                MethodInfo factoryMethod = GetPrefixBuilder.CreateFactoryMethod<TPatch>(Prefixes[access.MethodBase]);
+                var factoryMethod = GetPrefixBuilder.CreateFactoryMethod<TPatch>(Prefixes[access.Original]);
 
-                HarmonyMethod patch = new HarmonyMethod(factoryMethod)
+                var patch = new HarmonyMethod(factoryMethod)
                 {
                     priority = SyncPriority.MethodPatchGenerated,
 #if DEBUG
                     debug = true
 #endif
                 };
-                Patcher.HarmonyInstance.Patch(access.MethodBase, patch);
+                Patcher.HarmonyInstance.Patch(access.Original, patch);
             }
         }
 
-        public static void AddPostfix(MethodAccess access, MethodInfo dispatcher)
+        public static void AddPostfix(PatchedInvokable access, MethodInfo dispatcher)
         {
             lock (Patcher.HarmonyLock)
             {
-                if (Postfixes.ContainsKey(access.MethodBase))
-                {
-                    throw new Exception("Patch already initialized.");
-                }
+                if (Postfixes.ContainsKey(access.Original)) throw new Exception("Patch already initialized.");
 
-                Postfixes[access.MethodBase] = GeneratePatch($"Postfix_{access.MethodBase.Name}", access, dispatcher);
+                Postfixes[access.Original] = GeneratePatch($"Postfix_{access.Original.Name}", access, dispatcher);
 
-                MethodInfo factoryMethod = GetPrefixBuilder.CreateFactoryMethod<TPatch>(Postfixes[access.MethodBase]);
+                var factoryMethod = GetPrefixBuilder.CreateFactoryMethod<TPatch>(Postfixes[access.Original]);
 
-                HarmonyMethod patch = new HarmonyMethod(factoryMethod)
+                var patch = new HarmonyMethod(factoryMethod)
                 {
                     priority = SyncPriority.MethodPatchGenerated,
 #if DEBUG
                     debug = true
 #endif
                 };
-                Patcher.HarmonyInstance.Patch(access.MethodBase, null, patch);
+                Patcher.HarmonyInstance.Patch(access.Original, null, patch);
             }
         }
 
@@ -80,76 +76,70 @@ namespace Sync
         ///     With `args` containing the original method arguments (excluding __instance).
         /// </summary>
         /// <param name="sMethodName">Name of the method. Can be arbitrarily chosen.</param>
-        /// <param name="methodAccess">Method that is to be prefixed.</param>
+        /// <param name="patchedInvokable">Method that is to be prefixed.</param>
         /// <param name="dispatcher">Dispatcher to be called in the prefix.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
         public static DynamicMethod GeneratePatch(
             string sMethodName,
-            MethodAccess methodAccess,
+            PatchedInvokable patchedInvokable,
             MethodInfo dispatcher)
         {
-            List<SMethodParameter> parameters = methodAccess.MethodBase.GetParameters()
-                                                            .Select(
-                                                                p => new SMethodParameter
-                                                                {
-                                                                    Info = p,
-                                                                    ParameterType =
-                                                                        p.ParameterType,
-                                                                    Name = p.Name
-                                                                })
-                                                            .ToList();
-            if (!methodAccess.MethodBase.IsStatic)
-            {
+            var parameters = patchedInvokable.Original.GetParameters()
+                .Select(
+                    p => new SMethodParameter
+                    {
+                        Info = p,
+                        ParameterType =
+                            p.ParameterType,
+                        Name = p.Name
+                    })
+                .ToList();
+            if (!patchedInvokable.Original.IsStatic)
                 parameters.Insert(
                     0,
                     new SMethodParameter
                     {
                         Info = null,
-                        ParameterType = methodAccess.MethodBase.DeclaringType,
+                        ParameterType = patchedInvokable.Original.DeclaringType,
                         Name = "__instance"
                     }); // Inject an __instance
-            }
 
-            DynamicMethod dyn= new DynamicMethod(
+            var dyn = new DynamicMethod(
                 sMethodName,
                 dispatcher.ReturnType,
                 parameters.Select(p => p.ParameterType).ToArray(),
-                methodAccess.DeclaringType,
+                patchedInvokable.DeclaringType,
                 true);
 
-            for (int i = 0; i < parameters.Count; ++i)
+            for (var i = 0; i < parameters.Count; ++i)
             {
-                SMethodParameter parameter = parameters[i];
-                ParameterAttributes attr = parameter.Info?.Attributes ?? ParameterAttributes.In;
+                var parameter = parameters[i];
+                var attr = parameter.Info?.Attributes ?? ParameterAttributes.In;
 
-                int iArgIndex = i + 1; // +1 because 0 is the return value
+                var iArgIndex = i + 1; // +1 because 0 is the return value
                 dyn.DefineParameter(iArgIndex, attr, parameter.Name);
             }
 
             // Generate a dispatcher call
-            ILGenerator il = dyn.GetILGenerator();
+            var il = dyn.GetILGenerator();
 
             // We want to embed the SyncMethod instance into the DynamicMethod. Unsafe code ahead!
             // https://stackoverflow.com/questions/4989681/place-an-object-on-top-of-stack-in-ilgenerator
-            GCHandle gcHandle = GCHandle.Alloc(methodAccess);
-            IntPtr pMethod = GCHandle.ToIntPtr(gcHandle);
+            var gcHandle = GCHandle.Alloc(patchedInvokable);
+            var pMethod = GCHandle.ToIntPtr(gcHandle);
 
             // Arg0: SyncMethod instance
             if (IntPtr.Size == 4)
-            {
                 il.Emit(OpCodes.Ldc_I4, pMethod.ToInt32());
-            }
             else
-            {
                 il.Emit(OpCodes.Ldc_I8, pMethod.ToInt64());
-            }
 
-            il.Emit(OpCodes.Ldobj, typeof(MethodAccess));
+            il.Emit(OpCodes.Ldobj, typeof(PatchedInvokable));
 
             // Arg1: The instance. 
-            bool isStatic = methodAccess.MethodBase.IsStatic;
+            var isStatic = patchedInvokable.Original.IsStatic;
             if (isStatic)
             {
                 il.Emit(OpCodes.Ldnull);
@@ -164,7 +154,7 @@ namespace Sync
             }
 
             // Arg2: object[] of all args. Prepare the array
-            LocalBuilder args = il.DeclareLocal(typeof(object[]));
+            var args = il.DeclareLocal(typeof(object[]));
 
             // start off by creating an object[] with correct size
             il.Emit(OpCodes.Ldc_I4, parameters.Count);
@@ -172,16 +162,13 @@ namespace Sync
             il.Emit(OpCodes.Stloc, args); // store into local var `args`
 
             // Place argument in array
-            for (int i = 0; i < parameters.Count; ++i)
+            for (var i = 0; i < parameters.Count; ++i)
             {
-                int iArgIndex = isStatic ? i : i + 1; // +1 because of the injected __instance
+                var iArgIndex = isStatic ? i : i + 1; // +1 because of the injected __instance
                 il.Emit(OpCodes.Ldloc, args); // Object reference to `args`
                 il.Emit(OpCodes.Ldc_I4, i); // Array index into `args`
                 il.Emit(OpCodes.Ldarg, iArgIndex); // value to put at index
-                if (parameters[i].ParameterType.IsValueType)
-                {
-                    il.Emit(OpCodes.Box, parameters[i].ParameterType);
-                }
+                if (parameters[i].ParameterType.IsValueType) il.Emit(OpCodes.Box, parameters[i].ParameterType);
 
                 il.Emit(OpCodes.Stelem_Ref); // pops value, index and array reference from stack.
             }

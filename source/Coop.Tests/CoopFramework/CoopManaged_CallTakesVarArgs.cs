@@ -1,7 +1,5 @@
 ﻿using CoopFramework;
 using JetBrains.Annotations;
-using Moq;
-using Sync.Behaviour;
 using Xunit;
 
 namespace Coop.Tests.CoopFramework

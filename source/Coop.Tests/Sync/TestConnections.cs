@@ -9,7 +9,7 @@ namespace Coop.Tests.Sync
     {
         public TestConnectionsRaw(int iNumberOfClients)
         {
-            for (int i = 0; i < iNumberOfClients; ++i)
+            for (var i = 0; i < iNumberOfClients; ++i)
             {
                 ConnectionsClient.Add(new InMemoryConnection());
                 ConnectionsServer.Add(new InMemoryConnection());
@@ -35,14 +35,14 @@ namespace Coop.Tests.Sync
         public TestConnections(TestConnectionsRaw raw, bool bSetupPersistence)
         {
             foreach ((InMemoryConnection client, InMemoryConnection server) con in raw
-                                                                                   .ConnectionsClient
-                                                                                   .Zip(raw.ConnectionsServer, (c, s) => (c, s))
+                .ConnectionsClient
+                .Zip(raw.ConnectionsServer, (c, s) => (c, s))
             )
             {
-                IGameStatePersistence persistenceClient = bSetupPersistence ?
-                    new RailNetPeerWrapper(con.client) :
-                    (IGameStatePersistence) new GameStatePersistenceTestImpl();
-                ConnectionTestImpl client = new ConnectionTestImpl(
+                var persistenceClient = bSetupPersistence
+                    ? new RailNetPeerWrapper(con.client)
+                    : (IGameStatePersistence) new GameStatePersistenceTestImpl();
+                var client = new ConnectionTestImpl(
                     ConnectionTestImpl.EType.Client,
                     con.client,
                     persistenceClient)
@@ -50,10 +50,10 @@ namespace Coop.Tests.Sync
                     StateImpl = EClientConnectionState.Connected
                 };
 
-                IGameStatePersistence persistenceServer = bSetupPersistence ?
-                    new RailNetPeerWrapper(con.server) :
-                    (IGameStatePersistence) new GameStatePersistenceTestImpl();
-                ConnectionTestImpl server = new ConnectionTestImpl(
+                var persistenceServer = bSetupPersistence
+                    ? new RailNetPeerWrapper(con.server)
+                    : (IGameStatePersistence) new GameStatePersistenceTestImpl();
+                var server = new ConnectionTestImpl(
                     ConnectionTestImpl.EType.Server,
                     con.server,
                     persistenceServer)

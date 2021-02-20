@@ -1,7 +1,7 @@
 ﻿using System;
 using HarmonyLib;
 
-namespace Sync
+namespace Sync.Patch
 {
     public static class Patcher
     {

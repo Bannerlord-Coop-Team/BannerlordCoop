@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 using HarmonyLib;
 using JetBrains.Annotations;
+using Sync.Invokable;
 
-namespace Sync
+namespace Sync.Patch
 {
     /// <summary>
     ///     Patch generator for properties.
@@ -23,16 +23,16 @@ namespace Sync
             m_GetterPatch = new MethodPatch<TPatch>(m_Declaring);
         }
 
-        public IEnumerable<MethodAccess> Setters => m_SetterPatch.Methods;
-        public IEnumerable<MethodAccess> Getters => m_GetterPatch.Methods;
-        
+        public IEnumerable<PatchedInvokable> Setters => m_SetterPatch.Methods;
+        public IEnumerable<PatchedInvokable> Getters => m_GetterPatch.Methods;
+
         public PropertyPatch<TPatch> InterceptSetter(string sProperty)
         {
             m_SetterPatch.Intercept(
                 AccessTools.PropertySetter(m_Declaring, sProperty));
             return this;
         }
-        
+
         public PropertyPatch<TPatch> PostfixSetter(string sProperty)
         {
             m_SetterPatch.Postfix(
@@ -46,6 +46,7 @@ namespace Sync
                 AccessTools.PropertyGetter(m_Declaring, sProperty));
             return this;
         }
+
         public PropertyPatch<TPatch> PostfixGetter(string sProperty)
         {
             m_GetterPatch.Postfix(

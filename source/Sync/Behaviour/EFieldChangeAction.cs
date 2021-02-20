@@ -10,6 +10,7 @@
         ///     The change to the field is kept.
         /// </summary>
         Keep,
+
         /// <summary>
         ///     The change to the field is reverted.
         /// </summary>

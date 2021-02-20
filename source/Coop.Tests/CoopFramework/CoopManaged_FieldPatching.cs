@@ -1,7 +1,5 @@
 ﻿using CoopFramework;
 using JetBrains.Annotations;
-using Moq;
-using Sync.Behaviour;
 using Xunit;
 
 namespace Coop.Tests.CoopFramework
@@ -21,7 +19,7 @@ namespace Coop.Tests.CoopFramework
             foo.BarProperty = 43;
             Assert.Equal(42, foo.m_Bar);
             Assert.Equal(42, foo.m_Baz);
-            
+
             foo.BazProperty = 43;
             Assert.Equal(42, foo.m_Bar);
             Assert.Equal(42, foo.m_Baz);
@@ -70,7 +68,7 @@ namespace Coop.Tests.CoopFramework
             {
                 set => m_Bar = value;
             }
-            
+
             public int BazProperty
             {
                 set => m_Baz = value;
@@ -89,7 +87,7 @@ namespace Coop.Tests.CoopFramework
             {
                 When(GameLoop)
                     .Changes(
-                        Field<int>(nameof(Foo.m_Bar)), 
+                        Field<int>(nameof(Foo.m_Bar)),
                         Field<int>(nameof(Foo.m_Baz)))
                     .Through(
                         Setter(nameof(Foo.BarProperty)),

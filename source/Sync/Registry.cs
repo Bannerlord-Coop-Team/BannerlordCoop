@@ -1,79 +1,71 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 using JetBrains.Annotations;
+using Sync.Invokable;
+using Sync.Value;
 
 namespace Sync
 {
     public static class Registry
     {
-        public static IReadOnlyDictionary<MethodId, MethodAccess> IdToMethod => m_IdToMethod;
-        public static IReadOnlyDictionary<ValueId, ValueAccess> IdToValue => m_IdToValue;
-        public static IReadOnlyDictionary<MethodId, List<ValueId>> Relation => m_MethodValueRelation;
+        public static IReadOnlyDictionary<InvokableId, Invokable.Invokable> IdToInvokable => m_IdToInvokable;
+        public static IReadOnlyDictionary<FieldId, Field> IdToField => m_IdToField;
+        public static IReadOnlyDictionary<InvokableId, List<FieldId>> Relation => m_InvokableValueRelation;
 
-        public static MethodId Register([NotNull] MethodAccess methodAccess)
+        public static InvokableId Register([NotNull] Invokable.Invokable invokable)
         {
             lock (Lock)
             {
-                if (m_MethodToId.ContainsKey(methodAccess))
-                {
-                    throw new ArgumentException($"Duplicate register for: {methodAccess}");
-                }
+                if (m_MethodToId.ContainsKey(invokable))
+                    throw new ArgumentException($"Duplicate register for: {invokable}");
 
-                MethodId id = MethodId.GetNextId();
-                m_IdToMethod.Add(id, methodAccess);
-                m_MethodToId.Add(methodAccess, id);
+                var id = InvokableId.GetNextId();
+                m_IdToInvokable.Add(id, invokable);
+                m_MethodToId.Add(invokable, id);
                 return id;
             }
         }
 
-        public static ValueId Register([NotNull] ValueAccess valueAccess)
+        public static FieldId Register([NotNull] Field field)
         {
             lock (Lock)
             {
-                if (m_ValueToId.ContainsKey(valueAccess))
-                {
-                    throw new ArgumentException($"Duplicate register for: {valueAccess}");
-                }
+                if (m_ValueToId.ContainsKey(field)) throw new ArgumentException($"Duplicate register for: {field}");
 
-                ValueId id = ValueId.GetNextId();
-                m_IdToValue.Add(id, valueAccess);
-                m_ValueToId.Add(valueAccess, id);
+                var id = FieldId.GetNextId();
+                m_IdToField.Add(id, field);
+                m_ValueToId.Add(field, id);
                 return id;
             }
         }
 
-        public static void AddRelation(MethodId method, ValueId value)
+        public static void AddRelation(InvokableId invokable, FieldId field)
         {
-            if (!m_MethodValueRelation.ContainsKey(method))
-            {
-                m_MethodValueRelation[method] = new List<ValueId>();
-            }
-            else if (m_MethodValueRelation[method].Contains(value))
-            {
-                return;
-            }
+            if (!m_InvokableValueRelation.ContainsKey(invokable))
+                m_InvokableValueRelation[invokable] = new List<FieldId>();
+            else if (m_InvokableValueRelation[invokable].Contains(field)) return;
 
-            m_MethodValueRelation[method].Add(value);
+            m_InvokableValueRelation[invokable].Add(field);
         }
-        
+
         #region Private
+
         private static readonly object Lock = new object();
 
-        private static readonly Dictionary<MethodAccess, MethodId> m_MethodToId =
-            new Dictionary<MethodAccess, MethodId>();
+        private static readonly Dictionary<Invokable.Invokable, InvokableId> m_MethodToId =
+            new Dictionary<Invokable.Invokable, InvokableId>();
 
-        private static readonly Dictionary<MethodId, MethodAccess> m_IdToMethod =
-            new Dictionary<MethodId, MethodAccess>();
-        
-        private static readonly Dictionary<ValueAccess, ValueId> m_ValueToId =
-            new Dictionary<ValueAccess, ValueId>();
+        private static readonly Dictionary<InvokableId, Invokable.Invokable> m_IdToInvokable =
+            new Dictionary<InvokableId, Invokable.Invokable>();
 
-        private static readonly Dictionary<ValueId, ValueAccess> m_IdToValue =
-            new Dictionary<ValueId, ValueAccess>();
+        private static readonly Dictionary<Field, FieldId> m_ValueToId =
+            new Dictionary<Field, FieldId>();
 
-        private static readonly Dictionary<MethodId, List<ValueId>> m_MethodValueRelation =
-            new Dictionary<MethodId, List<ValueId>>();
+        private static readonly Dictionary<FieldId, Field> m_IdToField =
+            new Dictionary<FieldId, Field>();
+
+        private static readonly Dictionary<InvokableId, List<FieldId>> m_InvokableValueRelation =
+            new Dictionary<InvokableId, List<FieldId>>();
 
         #endregion
     }

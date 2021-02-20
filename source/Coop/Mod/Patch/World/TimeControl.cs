@@ -61,8 +61,7 @@ namespace Coop.Mod.Patch.World
             }
 
             // Override
-            Registry.IdToMethod[call.Id].CallOriginal(call.Instance, call.Parameters);
-            return ECallPropagation.Skip;
+            return isEveryMainPartyWaiting ? ECallPropagation.CallOriginal : ECallPropagation.Skip;
         }
         
         private static readonly Condition CanChangeTimeClientside = new Condition((eOrigin, _) => CanSyncTimeControlMode);

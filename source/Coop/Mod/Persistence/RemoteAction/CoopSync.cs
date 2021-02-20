@@ -7,7 +7,10 @@ using NLog;
 using RailgunNet.Connection.Client;
 using RemoteAction;
 using Sync;
+using Sync.Behaviour;
+using Sync.Invokable;
 using Sync.Store;
+using Sync.Value;
 
 namespace Coop.Mod.Persistence.RemoteAction
 {
@@ -24,30 +27,30 @@ namespace Coop.Mod.Persistence.RemoteAction
         {
             m_ClientAccess = access;
         }
-        /// <inheritdoc cref="ISynchronization.Broadcast(MethodId, object, object[])"/>
-        public override void Broadcast(MethodId id, object instance, object[] args)
+        /// <inheritdoc cref="ISynchronization.Broadcast(InvokableId, object, object[])"/>
+        public override void Broadcast(InvokableId id, object instance, object[] args)
         {
             RemoteStore store = m_ClientAccess.GetStore();
             RailClientRoom room = m_ClientAccess.GetRoom();
             if (store == null)
             {
-                Logger.Error("RemoteStore is null. Cannot broadcast {Call}", Sync.Registry.IdToMethod[id]);
+                Logger.Error("RemoteStore is null. Cannot broadcast {Call}", Sync.Registry.IdToInvokable[id]);
                 return;
             }
             if (room == null)
             {
-                Logger.Error("RailRoom is null. Cannot broadcast {Call}", Sync.Registry.IdToMethod[id]);
+                Logger.Error("RailRoom is null. Cannot broadcast {Call}", Sync.Registry.IdToInvokable[id]);
                 return;
             }
             
-            var access = Sync.Registry.IdToMethod[id];
+            var invokable = Sync.Registry.IdToInvokable[id];
             var call = new MethodCall(
                 id,
                 ArgumentFactory.Create(
                     store,
                     instance,
                     false),
-            ProduceArguments(store, access.Flags, args));
+            ProduceArguments(store, invokable.Flags, args));
             room.RaiseEvent<EventMethodCall>(
                     evt =>
                     {
@@ -74,7 +77,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                     return;
                 }
                 
-                var access = change.Key;
+                Field field = change.Key;
                 foreach (var instanceChange in change.Value)
                 {
                     var argInstance = ArgumentFactory.Create(
@@ -86,7 +89,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                         instanceChange.Value.RequestedValue,
                         false);
                     var fieldChange = new FieldChange(
-                        access.Id,
+                        field.Id,
                         argInstance,
                         argValue);
                     room.RaiseEvent<EventFieldChange>(
@@ -100,9 +103,9 @@ namespace Coop.Mod.Persistence.RemoteAction
         }
         #region Private
 
-        private List<Argument> ProduceArguments(RemoteStore store, EMethodPatchFlag flags, object[] args)
+        private List<Argument> ProduceArguments(RemoteStore store, EInvokableFlag flags, object[] args)
         {
-            var bTransferByValue = flags.HasFlag(EMethodPatchFlag.TransferArgumentsByValue);
+            var bTransferByValue = flags.HasFlag(EInvokableFlag.TransferArgumentsByValue);
             return args.Select(
                     obj => ArgumentFactory.Create(
                         store,

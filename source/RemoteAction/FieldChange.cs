@@ -2,6 +2,7 @@
 using System.Linq;
 using Sync;
 using Sync.Behaviour;
+using Sync.Value;
 
 namespace RemoteAction
 {
@@ -10,7 +11,7 @@ namespace RemoteAction
     /// </summary>
     public readonly struct FieldChange : ISynchronizedAction
     {
-        public readonly ValueId Id;
+        public readonly FieldId Id;
         public readonly Argument Instance; // Instance of the object containing the field.
         public IEnumerable<Argument> Arguments { get; } // Length == 0. The new value of the field.
 
@@ -19,7 +20,7 @@ namespace RemoteAction
             return ActionValidator.IsAllowed(Id);
         }
 
-        public FieldChange(ValueId id, Argument instance, Argument value)
+        public FieldChange(FieldId id, Argument instance, Argument value)
         {
             Id = id;
             Instance = instance;
@@ -29,7 +30,7 @@ namespace RemoteAction
         public override string ToString()
         {
             var sRet = Instance.EventType == EventArgType.Null ? "static " : $"{Instance} ";
-            if (Registry.IdToValue.TryGetValue(Id, out var field))
+            if (Registry.IdToField.TryGetValue(Id, out var field))
                 sRet += $"{field}";
             else
                 sRet += $"[UNREGISTERED] {Id.InternalValue}";

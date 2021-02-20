@@ -9,11 +9,10 @@ namespace Coop.Tests.CoopFramework
     {
         public static void CallPatchInitializer(Type t)
         {
-            var methods= t.GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy);
+            var methods = t.GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public |
+                                       BindingFlags.FlattenHierarchy);
             foreach (var initializer in methods.Where(m => m.IsDefined(typeof(PatchInitializerAttribute))))
-            {
                 initializer.Invoke(null, null);
-            }
         }
     }
 }

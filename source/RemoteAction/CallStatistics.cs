@@ -4,13 +4,15 @@ using Common;
 using JetBrains.Annotations;
 using RailgunNet.System.Types;
 using Sync;
+using Sync.Invokable;
+using Sync.Value;
 
 namespace RemoteAction
 {
     public struct CallTrace
     {
-        public ValueId? Value { get; set; }
-        public MethodId? Call { get; set; }
+        public FieldId? Value { get; set; }
+        public InvokableId? Call { get; set; }
         [CanBeNull] public object Instance { get; set; }
         [CanBeNull] public object[] Arguments { get; set; }
         public Tick Tick { get; set; }

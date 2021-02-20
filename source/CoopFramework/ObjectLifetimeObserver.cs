@@ -2,8 +2,8 @@
 using System.Linq;
 using JetBrains.Annotations;
 using NLog;
-using Sync;
 using Sync.Behaviour;
+using Sync.Patch;
 
 namespace CoopFramework
 {
@@ -11,22 +11,16 @@ namespace CoopFramework
     {
         public Action<T> OnAfterCreateObject;
         public Action<T> OnAfterRemoveObject;
-        
+
         public void AfterRegisterObject(object createdObject)
         {
-            if (!(createdObject is T instance))
-            {
-                throw new Exception("Unexpected object type.");
-            }
+            if (!(createdObject is T instance)) throw new Exception("Unexpected object type.");
             OnAfterCreateObject?.Invoke(instance);
         }
 
         public void AfterUnregisterObject(object removedObject)
         {
-            if (!(removedObject is T instance))
-            {
-                throw new Exception("Unexpected object type.");
-            }
+            if (!(removedObject is T instance)) throw new Exception("Unexpected object type.");
             OnAfterRemoveObject?.Invoke(instance);
         }
 
@@ -43,7 +37,7 @@ namespace CoopFramework
                 });
             return true;
         }
-        
+
         public bool PatchDeconstruction()
         {
             m_DestructorPatch = new DestructorPatch<ObjectLifetimeObserver<T>>(typeof(T)).Prefix();
@@ -57,11 +51,13 @@ namespace CoopFramework
                 });
             return true;
         }
-        
+
         #region Private
+
         [CanBeNull] private static ConstructorPatch<ObjectLifetimeObserver<T>> m_ConstructorPatch;
         [CanBeNull] private static DestructorPatch<ObjectLifetimeObserver<T>> m_DestructorPatch;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         #endregion
     }
 }

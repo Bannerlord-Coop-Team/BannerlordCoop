@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
@@ -10,7 +9,6 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Factory;
 using RailgunNet.Logic;
 using RemoteAction;
-using Sync;
 using Sync.Store;
 
 namespace Coop.Tests.Sync
@@ -35,25 +33,25 @@ namespace Coop.Tests.Sync
 
             // Railgun
             RailSynchronizedFactory.Detect(Assembly.GetAssembly(typeof(RailBitBufferExtensions)));
-            TestEnvironmentServer serverEnvironment = new TestEnvironmentServer(StoreServer);
+            var serverEnvironment = new TestEnvironmentServer(StoreServer);
             EventQueue = serverEnvironment.EventQueue;
-            RailRegistry registryServer = serverRegistryCreator(serverEnvironment);
+            var registryServer = serverRegistryCreator(serverEnvironment);
             Persistence = new TestPersistence(registryServer);
 
             foreach (((RailNetPeerWrapper First, RailNetPeerWrapper Second) First, RemoteStore
                 Second) it in RailPeerClient.Zip(RailPeerServer, (c, s) => (c, s)).Zip(StoresClient, (c, s) => (c, s)))
             {
-                RailNetPeerWrapper client = it.First.First;
-                RailNetPeerWrapper server = it.First.Second;
-                RemoteStore store = it.Second;
+                var client = it.First.First;
+                var server = it.First.Second;
+                var store = it.Second;
 
-                RailRegistry registryClient =
+                var registryClient =
                     clientRegistryCreator(new TestEnvironmentClient(store));
                 Persistence.AddClient(registryClient, client, server);
             }
 
             // Let railgun do its initialization routine
-            for (int i = 0; i < 5; ++i)
+            for (var i = 0; i < 5; ++i)
             {
                 Persistence.UpdateServer();
                 ExecuteSendsServer();
@@ -77,13 +75,13 @@ namespace Coop.Tests.Sync
 
         public List<RailNetPeerWrapper> RailPeerClient =>
             Connections.ConnectionsClient.Select(c => c.GameStatePersistence)
-                       .Cast<RailNetPeerWrapper>()
-                       .ToList();
+                .Cast<RailNetPeerWrapper>()
+                .ToList();
 
         public List<RailNetPeerWrapper> RailPeerServer =>
             Connections.ConnectionsServer.Select(c => c.GameStatePersistence)
-                       .Cast<RailNetPeerWrapper>()
-                       .ToList();
+                .Cast<RailNetPeerWrapper>()
+                .ToList();
 
         public void ExecuteSendsClients()
         {

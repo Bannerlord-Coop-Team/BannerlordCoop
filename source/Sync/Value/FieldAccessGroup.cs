@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using HarmonyLib;
 using JetBrains.Annotations;
 
-namespace Sync
+namespace Sync.Value
 {
     /// <summary>
     ///     A collection of <see cref="FieldAccess" /> that are declared in the same class. All fields of
@@ -19,7 +17,7 @@ namespace Sync
     public class FieldAccessGroup<TDeclaring, TValueObject> : FieldAccessGroup
         where TValueObject : class, IEnumerable<object>
     {
-        public override IEnumerable<FieldAccess> Fields => m_Fields;
+        [NotNull] private readonly FieldAccess[] m_Fields;
 
         public FieldAccessGroup([NotNull] IEnumerable<FieldAccess> fields) : base(typeof(TDeclaring))
         {
@@ -27,23 +25,20 @@ namespace Sync
             VerifyConstructor();
         }
 
+        public override IEnumerable<FieldAccess> Fields => m_Fields;
+
         private static void VerifyConstructor()
         {
-            ConstructorInfo constructor =
+            var constructor =
                 typeof(TValueObject).GetConstructor(new[] {typeof(IEnumerable<object>[])});
             if (constructor == null)
-            {
                 throw new ArgumentException($"{typeof(TValueObject)} has no matching constructor.");
-            }
         }
 
         /// <inheritdoc />
         public override object Get(object target)
         {
-            if (target is TDeclaring castedTarget)
-            {
-                return GetTyped(castedTarget);
-            }
+            if (target is TDeclaring castedTarget) return GetTyped(castedTarget);
 
             throw new ArgumentException(
                 $"Invalid argument. Expected {typeof(TDeclaring)}. Got {target.GetType()}.",
@@ -54,14 +49,10 @@ namespace Sync
         public override void Set(object target, object value)
         {
             if (target is TDeclaring castedTarget && value is TValueObject castedValue)
-            {
                 SetTyped(castedTarget, castedValue);
-            }
             else
-            {
                 throw new ArgumentException(
                     $"Invalid arguments. Expected {typeof(TDeclaring)}, {typeof(TValueObject)}. Got {target.GetType()}, {value.GetType()}.");
-            }
         }
 
         /// <summary>
@@ -72,8 +63,8 @@ namespace Sync
         public TValueObject GetTyped(TDeclaring target)
         {
             return (TValueObject) typeof(TValueObject)
-                                  .GetConstructor(new[] {typeof(IEnumerable<object>[])})
-                                  ?.Invoke(new object[] {m_Fields.Select(i => i.Get(target))});
+                .GetConstructor(new[] {typeof(IEnumerable<object>[])})
+                ?.Invoke(new object[] {m_Fields.Select(i => i.Get(target))});
         }
 
         /// <summary>
@@ -90,29 +81,25 @@ namespace Sync
                     Field = field,
                     Value = value
                 });
-            foreach (var pair in zipped)
-            {
-                pair.Field.Set(target, pair.Value);
-            }
+            foreach (var pair in zipped) pair.Field.Set(target, pair.Value);
         }
-        
+
         public override string ToString()
         {
-            return $"{typeof(TValueObject).Name} {DeclaringType?.Name}.[{string.Join(", ", Fields.Select(f => f.MemberInfo.Name))}])";
+            return
+                $"{typeof(TValueObject).Name} {DeclaringType?.Name}.[{string.Join(", ", Fields.Select(f => f.MemberInfo.Name))}])";
         }
-        
-        [NotNull] private readonly FieldAccess[] m_Fields;
     }
 
     /// <summary>
     ///     Type erased base class for field groups.
     /// </summary>
-    public abstract class FieldAccessGroup : ValueAccess
+    public abstract class FieldAccessGroup : Field
     {
-        [NotNull] public abstract IEnumerable<FieldAccess> Fields { get; }
-
         protected FieldAccessGroup(Type declaringType) : base(declaringType)
         {
         }
+
+        [NotNull] public abstract IEnumerable<FieldAccess> Fields { get; }
     }
 }

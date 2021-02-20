@@ -3,6 +3,7 @@ using CoopFramework;
 using JetBrains.Annotations;
 using Sync;
 using Sync.Behaviour;
+using Sync.Value;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 

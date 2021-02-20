@@ -1,12 +1,12 @@
 ﻿using System;
 
-namespace Sync
+namespace Sync.Invokable
 {
     /// <summary>
     ///     Flags indicating the desired behaviour of a generated patch for a method.
     /// </summary>
     [Flags]
-    public enum EMethodPatchFlag : byte
+    public enum EInvokableFlag : byte
     {
         None = 0,
 

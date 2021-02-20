@@ -1,20 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using JetBrains.Annotations;
+using Sync.Invokable;
+using Sync.Value;
 
 namespace Sync.Behaviour
 {
     public static class Util
     {
-        public static Dictionary<MethodId, List<CallBehaviourBuilder>> SortByMethod(List<ActionBehaviourBuilder> allBehaviours)
+        public static Dictionary<InvokableId, List<CallBehaviourBuilder>> SortByMethod(
+            List<ActionBehaviourBuilder> allBehaviours)
         {
-            Dictionary<MethodId, List<CallBehaviourBuilder>> applicableBehaviours =
-                new Dictionary<MethodId, List<CallBehaviourBuilder>>();
-            
-            IEnumerable<MethodId> patchedMethods = allBehaviours
+            var applicableBehaviours =
+                new Dictionary<InvokableId, List<CallBehaviourBuilder>>();
+
+            var patchedMethods = allBehaviours
                 .SelectMany(b => b.CallBehaviours.Keys).Distinct();
-            foreach (MethodId patchedMethod in patchedMethods)
+            foreach (var patchedMethod in patchedMethods)
             {
                 var callBehaviours = allBehaviours
                     .Where(a => a.CallBehaviours.ContainsKey(patchedMethod))
@@ -24,15 +25,16 @@ namespace Sync.Behaviour
 
             return applicableBehaviours;
         }
-        
-        public static Dictionary<ValueId, List<FieldActionBehaviourBuilder>> SortByField(List<ActionBehaviourBuilder> allBehaviours)
+
+        public static Dictionary<FieldId, List<FieldActionBehaviourBuilder>> SortByField(
+            List<ActionBehaviourBuilder> allBehaviours)
         {
-            Dictionary<ValueId, List<FieldActionBehaviourBuilder>> applicableBehaviours =
-                new Dictionary<ValueId, List<FieldActionBehaviourBuilder>>();
-            
-            IEnumerable<ValueId> patchedFields = allBehaviours
+            var applicableBehaviours =
+                new Dictionary<FieldId, List<FieldActionBehaviourBuilder>>();
+
+            var patchedFields = allBehaviours
                 .SelectMany(b => b.FieldChangeAction.Keys).Distinct();
-            foreach (ValueId patchedField in patchedFields)
+            foreach (var patchedField in patchedFields)
             {
                 var fieldBehaviours = allBehaviours
                     .Where(a => a.FieldChangeAction.ContainsKey(patchedField))

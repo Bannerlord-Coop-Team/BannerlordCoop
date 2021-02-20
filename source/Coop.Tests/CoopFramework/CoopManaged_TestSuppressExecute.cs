@@ -1,8 +1,7 @@
 ﻿using CoopFramework;
 using JetBrains.Annotations;
-using Moq;
-using Sync;
 using Sync.Behaviour;
+using Sync.Invokable;
 using Xunit;
 
 namespace Coop.Tests.CoopFramework
@@ -44,7 +43,7 @@ namespace Coop.Tests.CoopFramework
             var sync = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.Bar);
 
-            CoopManagedFoo.BarSetter.Call(EOriginator.RemoteAuthority, foo, new object[] {43});
+            CoopManagedFoo.BarSetter.Invoke(EOriginator.RemoteAuthority, foo, new object[] {43});
             Assert.Equal(43, foo.Bar);
         }
 
@@ -67,7 +66,7 @@ namespace Coop.Tests.CoopFramework
             var sync = new CoopManagedFoo(foo);
             Assert.Equal(42, foo.Baz);
 
-            CoopManagedFoo.BazSetter.Call(EOriginator.RemoteAuthority, foo, new object[] {43});
+            CoopManagedFoo.BazSetter.Invoke(EOriginator.RemoteAuthority, foo, new object[] {43});
             Assert.Equal(42, foo.Baz);
         }
 
@@ -79,8 +78,8 @@ namespace Coop.Tests.CoopFramework
 
         private class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
         {
-            public static readonly MethodAccess BarSetter = Setter(nameof(Foo.Bar));
-            public static readonly MethodAccess BazSetter = Setter(nameof(Foo.Baz));
+            public static readonly PatchedInvokable BarSetter = Setter(nameof(Foo.Bar));
+            public static readonly PatchedInvokable BazSetter = Setter(nameof(Foo.Baz));
 
             static CoopManagedFoo()
             {

@@ -1,24 +1,24 @@
 ﻿using System;
 using JetBrains.Annotations;
 
-namespace Sync
+namespace Sync.Value
 {
     /// <summary>
     ///     Type-erased interface for setting and getting a value from an instance.
     /// </summary>
-    public abstract class ValueAccess
+    public abstract class Field
     {
-        public readonly ValueId Id;
         [NotNull] public readonly Type DeclaringType;
+        public readonly FieldId Id;
 
-        public ValueAccess(Type declaringType)
+        public Field(Type declaringType)
         {
             Id = Registry.Register(this);
             DeclaringType = declaringType;
         }
-        
+
         /// <summary>
-        ///     Returns the current value of an instance of this <see cref="ValueAccess" />.
+        ///     Returns the current value of an instance of this <see cref="Field" />.
         /// </summary>
         /// <param name="target">Instance to get the value from.</param>
         /// <exception cref="ArgumentException">If the target or value are not of the expected type.</exception>
@@ -26,7 +26,7 @@ namespace Sync
         public abstract object Get(object target);
 
         /// <summary>
-        ///     Sets the current value of an instance of this <see cref="ValueAccess" />.
+        ///     Sets the current value of an instance of this <see cref="Field" />.
         /// </summary>
         /// <param name="target">Instance to set the value on.</param>
         /// <param name="value">Value to set.</param>

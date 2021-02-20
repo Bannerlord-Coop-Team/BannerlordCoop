@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
@@ -8,8 +7,8 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Factory;
 using RemoteAction;
-using Sync;
 using Sync.Store;
+using Sync.Value;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Tests.Sync
@@ -32,7 +31,7 @@ namespace Coop.Tests.Sync
             RailNetPeerWrapper connectionClientSide,
             RailNetPeerWrapper connectionServerSide)
         {
-            RailClient client = new RailClient(registryClient);
+            var client = new RailClient(registryClient);
             Rooms.Add(client.StartRoom());
             Clients.Add(client);
             Server.AddClient(connectionServerSide, "");
@@ -41,10 +40,7 @@ namespace Coop.Tests.Sync
 
         public void UpdateClients()
         {
-            foreach (RailClient client in Clients)
-            {
-                client.Update();
-            }
+            foreach (var client in Clients) client.Update();
         }
 
         public void UpdateServer()
@@ -59,7 +55,7 @@ namespace Coop.Tests.Sync
         {
             Store = store;
         }
-        
+
         public FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; }
         public FieldAccess<Campaign, bool> TimeControlModeLock { get; }
 

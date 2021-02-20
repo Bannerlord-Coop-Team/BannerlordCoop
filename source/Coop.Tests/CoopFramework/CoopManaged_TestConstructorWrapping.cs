@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using CoopFramework;
 using JetBrains.Annotations;
-using Moq;
-using Sync;
-using Sync.Behaviour;
+using Sync.Invokable;
 using Xunit;
-using Action = System.Action;
 
 namespace Coop.Tests.CoopFramework
 {
@@ -73,7 +71,7 @@ namespace Coop.Tests.CoopFramework
             Assert.Null(restoredFoo);
             Assert.True(finalizerCalled);
         }
-        
+
         [Fact]
         private void BazIsReleased()
         {
@@ -82,12 +80,12 @@ namespace Coop.Tests.CoopFramework
             new Action(() =>
             {
                 var baz = new Baz();
-                
+
                 // Set finalizer callback on the managed instance
-                CoopManagedBaz managedBaz = CoopManagedBaz.CreatedInstances[baz];
+                var managedBaz = CoopManagedBaz.CreatedInstances[baz];
                 CoopManagedBaz.CreatedInstances.Remove(baz);
                 managedBaz.OnFinalizerCalled = () => { managedFinalizerCalled = true; };
-                
+
                 reference = new WeakReference<Baz>(baz, false);
                 baz = null;
             })();
@@ -97,10 +95,10 @@ namespace Coop.Tests.CoopFramework
             GC.WaitForPendingFinalizers();
             Assert.False(reference.TryGetTarget(out var restoredBaz));
             Assert.Null(restoredBaz);
-            
+
             // Check if the managed instance was released as well. Since Baz does not have a destructor, we have to
             // wait for the internal garbage collection of CoopManaged.
-            System.Threading.Thread.Sleep(CoopManagedBaz.GCInterval_ms + 50);
+            Thread.Sleep(CoopManagedBaz.GCInterval_ms + 50);
             GC.Collect();
             GC.WaitForPendingFinalizers();
             Assert.True(managedFinalizerCalled);
@@ -119,7 +117,7 @@ namespace Coop.Tests.CoopFramework
 
         private class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
         {
-            public static readonly MethodAccess BarSetter = Setter(nameof(Foo.Bar));
+            public static readonly PatchedInvokable BarSetter = Setter(nameof(Foo.Bar));
 
             static CoopManagedFoo()
             {
@@ -149,15 +147,13 @@ namespace Coop.Tests.CoopFramework
         private class Baz
         {
         }
-        
+
         private class CoopManagedBaz : CoopManaged<CoopManagedBaz, Baz>
         {
-            public Action OnFinalizerCalled;
+            public static readonly Dictionary<Baz, CoopManagedBaz> CreatedInstances =
+                new Dictionary<Baz, CoopManagedBaz>();
 
-            ~CoopManagedBaz()
-            {
-                OnFinalizerCalled?.Invoke();
-            }
+            public Action OnFinalizerCalled;
 
             static CoopManagedBaz()
             {
@@ -169,7 +165,10 @@ namespace Coop.Tests.CoopFramework
                 CreatedInstances[instance] = this;
             }
 
-            public static Dictionary<Baz, CoopManagedBaz> CreatedInstances = new Dictionary<Baz, CoopManagedBaz>();
+            ~CoopManagedBaz()
+            {
+                OnFinalizerCalled?.Invoke();
+            }
         }
     }
 }

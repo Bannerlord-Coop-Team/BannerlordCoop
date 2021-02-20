@@ -1,9 +1,8 @@
 ﻿using System;
 using CoopFramework;
 using JetBrains.Annotations;
-using Moq;
-using Sync;
 using Sync.Behaviour;
+using Sync.Invokable;
 using Xunit;
 
 namespace Coop.Tests.CoopFramework
@@ -67,7 +66,7 @@ namespace Coop.Tests.CoopFramework
 
         private class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
         {
-            public static readonly MethodAccess BarSetter = Setter(nameof(Foo.Bar));
+            public static readonly PatchedInvokable BarSetter = Setter(nameof(Foo.Bar));
 
             static CoopManagedFoo()
             {

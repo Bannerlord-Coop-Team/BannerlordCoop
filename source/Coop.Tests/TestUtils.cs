@@ -15,6 +15,7 @@ using NLog;
 using NLog.Config;
 using NLog.Targets;
 using Sync;
+using Sync.Value;
 using Xunit;
 
 namespace Coop.Tests

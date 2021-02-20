@@ -1,6 +1,6 @@
-﻿namespace Sync
+﻿namespace Sync.Value
 {
-    public class ValueChangeRequest
+    public class FieldChangeRequest
     {
         /// <summary>
         ///     The value set in the instance before the change request was recorded.

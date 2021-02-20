@@ -9,7 +9,7 @@
         ///     The call was made locally by the regular game loop.
         /// </summary>
         Game,
-        
+
         /// <summary>
         ///     The call was received through the coop framework and is an authoritative action, such as the server
         ///     sending a state update. This is intended to be applied immediately and without modification.

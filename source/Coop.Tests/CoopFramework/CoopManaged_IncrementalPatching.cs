@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
 using CoopFramework;
 using JetBrains.Annotations;
-using Moq;
-using Sync;
 using Sync.Behaviour;
+using Sync.Invokable;
 using Xunit;
 
 namespace Coop.Tests.CoopFramework
@@ -60,7 +58,7 @@ namespace Coop.Tests.CoopFramework
 
         private class CoopManagedFoo : CoopManaged<CoopManagedFoo, Foo>
         {
-            public static readonly MethodAccess BarSetter = Setter(nameof(Foo.Bar));
+            public static readonly PatchedInvokable BarSetter = Setter(nameof(Foo.Bar));
 
             public Func<IPendingMethodCall, ECallPropagation> BarHandler;
             public bool WasCalled;
@@ -86,7 +84,7 @@ namespace Coop.Tests.CoopFramework
 
         private class CoopManagedFoo2 : CoopManaged<CoopManagedFoo2, Foo>
         {
-            public static readonly MethodAccess BarSetter = Setter(nameof(Foo.Bar));
+            public static readonly PatchedInvokable BarSetter = Setter(nameof(Foo.Bar));
 
             public Func<IPendingMethodCall, ECallPropagation> BarHandler;
             public bool WasCalled;

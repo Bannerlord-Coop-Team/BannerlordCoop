@@ -1,23 +1,20 @@
-﻿namespace Sync.Behaviour
+﻿using Sync.Invokable;
+using Sync.Value;
+
+namespace Sync.Behaviour
 {
     public static class ActionValidator
     {
-        public static bool IsAllowed(ValueId value)
+        public static bool IsAllowed(FieldId field)
         {
-            if(ActionValidatorRegistry.TryGet(value, out IActionValidator validator))
-            {
-                return validator.IsAllowed();
-            }
+            if (ActionValidatorRegistry.TryGet(field, out var validator)) return validator.IsAllowed();
 
             return true;
         }
-        
-        public static bool IsAllowed(MethodId method)
+
+        public static bool IsAllowed(InvokableId invokable)
         {
-            if(ActionValidatorRegistry.TryGet(method, out IActionValidator validator))
-            {
-                return validator.IsAllowed();
-            }
+            if (ActionValidatorRegistry.TryGet(invokable, out var validator)) return validator.IsAllowed();
 
             return true;
         }

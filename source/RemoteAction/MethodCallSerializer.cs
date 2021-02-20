@@ -5,6 +5,7 @@ using NLog;
 using RailgunNet;
 using RailgunNet.System.Encoding;
 using Sync;
+using Sync.Invokable;
 
 namespace RemoteAction
 {
@@ -49,7 +50,7 @@ namespace RemoteAction
         [Decoder]
         public static MethodCall ReadMethodCall(this RailBitBuffer buffer)
         {
-            var id = new MethodId(buffer.ReadInt());
+            var id = new InvokableId(buffer.ReadInt());
             var instance = buffer.DecodeEventArg();
             var iNumberOfArguments = buffer.ReadInt();
             var args = new List<Argument>();

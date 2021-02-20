@@ -4,7 +4,7 @@ using HarmonyLib;
 using JetBrains.Annotations;
 using Sync.Reflection;
 
-namespace Sync
+namespace Sync.Value
 {
     /// <summary>
     ///     Typed interface to access an arbitrary field.
@@ -16,9 +16,7 @@ namespace Sync
         public FieldAccess(FieldInfo memberInfo) : base(typeof(TDeclaring), memberInfo)
         {
             if (memberInfo.GetUnderlyingType() != typeof(TFieldType))
-            {
                 throw new ArgumentException("Unexpected underlying type.", nameof(memberInfo));
-            }
         }
 
         public TFieldType GetTyped(TDeclaring target)
@@ -35,10 +33,17 @@ namespace Sync
     /// <summary>
     ///     Type-erased interface to access an arbitrary field.
     /// </summary>
-    public abstract class FieldAccess : ValueAccess
+    public abstract class FieldAccess : Field
     {
         [NotNull] public readonly FieldInfo MemberInfo;
-        
+
+        protected FieldAccess(Type declaringType, [NotNull] FieldInfo memberInfo) : base(declaringType)
+        {
+            MemberInfo = memberInfo;
+            m_GetterLocal = InvokableFactory.CreateUntypedGetter<object>(memberInfo);
+            m_Setter = InvokableFactory.CreateUntypedSetter<object>(memberInfo);
+        }
+
         /// <inheritdoc />
         public override object Get([CanBeNull] object target)
         {
@@ -48,10 +53,7 @@ namespace Sync
         /// <inheritdoc />
         public override void Set(object target, object value)
         {
-            if (target == null)
-            {
-                return;
-            }
+            if (target == null) return;
 
             m_Setter.Invoke(target, value);
         }
@@ -60,18 +62,11 @@ namespace Sync
         {
             return $"{DeclaringType?.Name}.{MemberInfo.Name}";
         }
-        
-        protected FieldAccess(Type declaringType, [NotNull] FieldInfo memberInfo) : base(declaringType)
-        {
-            MemberInfo = memberInfo;
-            m_GetterLocal = InvokableFactory.CreateUntypedGetter<object>(memberInfo);
-            m_Setter = InvokableFactory.CreateUntypedSetter<object>(memberInfo);
-        }
-        
+
         #region Private
 
         [NotNull] private readonly Func<object, object> m_GetterLocal;
-        
+
         [NotNull] private readonly Action<object, object> m_Setter;
 
         #endregion

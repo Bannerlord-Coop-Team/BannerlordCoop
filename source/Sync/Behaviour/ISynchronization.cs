@@ -1,7 +1,8 @@
 ﻿using JetBrains.Annotations;
-using Sync;
+using Sync.Invokable;
+using Sync.Value;
 
-namespace CoopFramework
+namespace Sync.Behaviour
 {
     /// <summary>
     ///     Interface to synchronize method calls and field changes to other clients.
@@ -14,7 +15,8 @@ namespace CoopFramework
         /// <param name="id">Id of the method to call.</param>
         /// <param name="instance">Instance to call the method on. null for a static call.</param>
         /// <param name="args">Method call arguments.</param>
-        void Broadcast(MethodId id, [CanBeNull] object instance, [NotNull] object[] args);
+        void Broadcast(InvokableId id, [CanBeNull] object instance, [NotNull] object[] args);
+
         /// <summary>
         ///     Broadcast a field change buffer to all clients.
         /// </summary>

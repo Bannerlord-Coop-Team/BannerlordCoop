@@ -13,6 +13,7 @@ using RailgunNet;
 using RailgunNet.Connection.Client;
 using RemoteAction;
 using Sync;
+using Sync.Invokable;
 using Sync.Store;
 using Xunit;
 using Registry = Coop.Mod.Persistence.Registry;
@@ -121,7 +122,7 @@ namespace Coop.Tests.Persistence.RPC
             CallTrace trace = sync0.BroadcastHistory.Peek();
             Assert.Equal(Persistence.Rooms[ClientId0].Tick, trace.Tick);
             Assert.True(trace.Call.HasValue);
-            MethodId tracedCallId = trace.Call.Value;
+            InvokableId tracedCallId = trace.Call.Value;
             Assert.Equal(
                 Argument.Null,
                 trace.Instance); // Since it's a static call the instance is null

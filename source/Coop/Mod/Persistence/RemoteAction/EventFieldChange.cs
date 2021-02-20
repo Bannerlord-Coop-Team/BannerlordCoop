@@ -43,7 +43,7 @@ namespace Coop.Mod.Persistence.RemoteAction
 
         protected override void Execute(RailRoom room, RailController sender)
         {
-            if (Sync.Registry.IdToValue.TryGetValue(Field.Id, out var field))
+            if (Sync.Registry.IdToField.TryGetValue(Field.Id, out var field))
             {
                 if (room is RailServerRoom serverRoom)
                 {

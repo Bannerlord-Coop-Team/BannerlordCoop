@@ -2,7 +2,7 @@
 using System.Reflection;
 using JetBrains.Annotations;
 
-namespace Sync
+namespace Sync.Patch
 {
     /// <summary>
     ///     Creates a patch builder for constructors of a type.
@@ -19,11 +19,9 @@ namespace Sync
         /// <returns></returns>
         public ConstructorPatch<TPatch> PostfixAll()
         {
-            foreach (ConstructorInfo info in m_Declaring.GetConstructors(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
-            {
-                Postfix(info);
-                
-            }
+            foreach (var info in m_Declaring.GetConstructors(BindingFlags.Public | BindingFlags.Static |
+                                                             BindingFlags.Instance | BindingFlags.NonPublic |
+                                                             BindingFlags.DeclaredOnly)) Postfix(info);
 
             return this;
         }

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using Sync;
 using Sync.Behaviour;
+using Sync.Invokable;
 
 namespace RemoteAction
 {
@@ -18,10 +19,10 @@ namespace RemoteAction
             return ActionValidator.IsAllowed(Id);
         }
 
-        public readonly MethodId Id;
+        public readonly InvokableId Id;
         public readonly Argument Instance; // Instance to call the method on.
 
-        public MethodCall(MethodId id, Argument instance, IEnumerable<Argument> arguments)
+        public MethodCall(InvokableId id, Argument instance, IEnumerable<Argument> arguments)
         {
             Arguments = arguments;
             Id = id;
@@ -31,7 +32,7 @@ namespace RemoteAction
         public override string ToString()
         {
             var sRet = Instance.EventType == EventArgType.Null ? "static " : $"{Instance} ";
-            if (Registry.IdToMethod.TryGetValue(Id, out var method))
+            if (Registry.IdToInvokable.TryGetValue(Id, out var method))
                 sRet += $"{method}";
             else
                 sRet += $"[UNREGISTERED] {Id.InternalValue}";
