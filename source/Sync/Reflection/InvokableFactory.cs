@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
-using Sync.Invokable;
+using Sync.Call;
 
 namespace Sync.Reflection
 {

@@ -7,7 +7,7 @@ using Sync.Behaviour;
 using Sync.Patch;
 using Sync.Reflection;
 
-namespace Sync.Invokable
+namespace Sync.Call
 {
     /// <summary>
     ///     Type erased invocation wrapper for patched methods. On creation, a snapshot of the IL

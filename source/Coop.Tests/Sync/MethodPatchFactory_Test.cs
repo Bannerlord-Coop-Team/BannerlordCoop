@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using HarmonyLib;
 using Sync.Behaviour;
-using Sync.Invokable;
+using Sync.Call;
 using Sync.Patch;
 using Xunit;
 

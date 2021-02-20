@@ -3,7 +3,7 @@ using Common;
 using JetBrains.Annotations;
 using RemoteAction;
 using Sync.Behaviour;
-using Sync.Invokable;
+using Sync.Call;
 using Sync.Value;
 
 namespace CoopFramework

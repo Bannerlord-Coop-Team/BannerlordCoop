@@ -2,7 +2,7 @@
 using JetBrains.Annotations;
 using Sync.Behaviour;
 
-namespace Sync.Invokable
+namespace Sync.Call
 {
     /// <summary>
     ///     Type erased invocation wrapper for patched methods. Every invokable instance is registered with

@@ -5,7 +5,7 @@ using NLog;
 using RailgunNet;
 using RailgunNet.System.Encoding;
 using Sync;
-using Sync.Invokable;
+using Sync.Call;
 
 namespace RemoteAction
 {

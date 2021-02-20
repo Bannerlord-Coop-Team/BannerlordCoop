@@ -4,7 +4,7 @@ using Common;
 using JetBrains.Annotations;
 using RailgunNet.System.Types;
 using Sync;
-using Sync.Invokable;
+using Sync.Call;
 using Sync.Value;
 
 namespace RemoteAction

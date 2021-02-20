@@ -4,7 +4,7 @@ using System.Linq;
 using JetBrains.Annotations;
 using Sync.Behaviour;
 
-namespace Sync.Invokable
+namespace Sync.Call
 {
     public class Postfix
     {

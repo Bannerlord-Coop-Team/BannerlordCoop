@@ -1,7 +1,7 @@
 ﻿using CoopFramework;
 using JetBrains.Annotations;
 using Sync.Behaviour;
-using Sync.Invokable;
+using Sync.Call;
 using Xunit;
 
 namespace Coop.Tests.CoopFramework

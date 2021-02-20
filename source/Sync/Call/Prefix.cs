@@ -4,7 +4,7 @@ using System.Linq;
 using JetBrains.Annotations;
 using Sync.Behaviour;
 
-namespace Sync.Invokable
+namespace Sync.Call
 {
     /// <summary>
     ///     Base class for class wrappers that notify when specific instances of the wrapped class

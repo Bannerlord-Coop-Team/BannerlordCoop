@@ -1,5 +1,5 @@
 ﻿using JetBrains.Annotations;
-using Sync.Invokable;
+using Sync.Call;
 using Sync.Value;
 
 namespace Sync.Behaviour

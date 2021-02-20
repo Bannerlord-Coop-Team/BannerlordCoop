@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Coop.Mod.Persistence.RemoteAction;
 using RemoteAction;
 using Sync;
-using Sync.Invokable;
+using Sync.Call;
 using Sync.Store;
 using TaleWorlds.ObjectSystem;
 using Xunit;

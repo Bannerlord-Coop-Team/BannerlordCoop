@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using HarmonyLib;
 using JetBrains.Annotations;
-using Sync.Invokable;
+using Sync.Call;
 
 namespace Sync.Patch
 {

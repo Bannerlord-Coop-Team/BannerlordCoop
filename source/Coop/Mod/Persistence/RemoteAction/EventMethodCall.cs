@@ -9,7 +9,7 @@ using RailgunNet.Util;
 using RemoteAction;
 using Sync;
 using Sync.Behaviour;
-using Sync.Invokable;
+using Sync.Call;
 
 namespace Coop.Mod.Persistence.RemoteAction
 {

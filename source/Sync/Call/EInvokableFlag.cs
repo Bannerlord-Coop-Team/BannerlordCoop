@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sync.Invokable
+namespace Sync.Call
 {
     /// <summary>
     ///     Flags indicating the desired behaviour of a generated patch for a method.

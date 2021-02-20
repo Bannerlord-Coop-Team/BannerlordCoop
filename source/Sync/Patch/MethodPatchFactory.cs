@@ -6,7 +6,7 @@ using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 using HarmonyLib;
 using JetBrains.Annotations;
-using Sync.Invokable;
+using Sync.Call;
 
 namespace Sync.Patch
 {

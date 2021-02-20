@@ -7,7 +7,7 @@ using NLog;
 using RemoteAction;
 using Sync;
 using Sync.Behaviour;
-using Sync.Invokable;
+using Sync.Call;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;

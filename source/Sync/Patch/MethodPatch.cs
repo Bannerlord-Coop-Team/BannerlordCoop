@@ -6,7 +6,7 @@ using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
 using Sync.Behaviour;
-using Sync.Invokable;
+using Sync.Call;
 
 namespace Sync.Patch
 {

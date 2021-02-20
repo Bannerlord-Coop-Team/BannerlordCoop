@@ -22,7 +22,7 @@ using RailgunNet.Logic;
 using RemoteAction;
 using Sync;
 using Sync.Behaviour;
-using Sync.Invokable;
+using Sync.Call;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;

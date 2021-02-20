@@ -13,7 +13,7 @@ using RailgunNet;
 using RailgunNet.Connection.Client;
 using RemoteAction;
 using Sync;
-using Sync.Invokable;
+using Sync.Call;
 using Sync.Store;
 using Xunit;
 using Registry = Coop.Mod.Persistence.Registry;

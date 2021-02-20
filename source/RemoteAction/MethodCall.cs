@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Sync;
 using Sync.Behaviour;
-using Sync.Invokable;
+using Sync.Call;
 
 namespace RemoteAction
 {

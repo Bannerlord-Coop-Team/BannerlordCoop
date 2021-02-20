@@ -1,18 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
-using Sync.Invokable;
+using Sync.Call;
 using Sync.Value;
 
 namespace Sync
 {
     public static class Registry
     {
-        public static IReadOnlyDictionary<InvokableId, Invokable.Invokable> IdToInvokable => m_IdToInvokable;
+        public static IReadOnlyDictionary<InvokableId, Call.Invokable> IdToInvokable => m_IdToInvokable;
         public static IReadOnlyDictionary<FieldId, Field> IdToField => m_IdToField;
         public static IReadOnlyDictionary<InvokableId, List<FieldId>> Relation => m_InvokableValueRelation;
 
-        public static InvokableId Register([NotNull] Invokable.Invokable invokable)
+        public static InvokableId Register([NotNull] Call.Invokable invokable)
         {
             lock (Lock)
             {
@@ -52,11 +52,11 @@ namespace Sync
 
         private static readonly object Lock = new object();
 
-        private static readonly Dictionary<Invokable.Invokable, InvokableId> m_MethodToId =
-            new Dictionary<Invokable.Invokable, InvokableId>();
+        private static readonly Dictionary<Call.Invokable, InvokableId> m_MethodToId =
+            new Dictionary<Call.Invokable, InvokableId>();
 
-        private static readonly Dictionary<InvokableId, Invokable.Invokable> m_IdToInvokable =
-            new Dictionary<InvokableId, Invokable.Invokable>();
+        private static readonly Dictionary<InvokableId, Call.Invokable> m_IdToInvokable =
+            new Dictionary<InvokableId, Call.Invokable>();
 
         private static readonly Dictionary<Field, FieldId> m_ValueToId =
             new Dictionary<Field, FieldId>();

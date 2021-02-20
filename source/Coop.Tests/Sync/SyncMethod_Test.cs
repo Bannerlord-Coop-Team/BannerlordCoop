@@ -1,7 +1,7 @@
 ﻿using System;
 using Sync;
 using Sync.Behaviour;
-using Sync.Invokable;
+using Sync.Call;
 using Sync.Patch;
 using Xunit;
 

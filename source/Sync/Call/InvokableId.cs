@@ -1,4 +1,4 @@
-﻿namespace Sync.Invokable
+﻿namespace Sync.Call
 {
     public readonly struct InvokableId
     {

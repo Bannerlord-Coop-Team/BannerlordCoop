@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Sync.Invokable;
+using Sync.Call;
 using Sync.Value;
 
 namespace Sync.Behaviour
