@@ -245,6 +245,7 @@
   <ItemGroup>
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Mod\CoopClientSM.cs" />
+    <Compile Include="Mod\CoopConditions.cs" />
     <Compile Include="Mod\ObjectManagerAdapter.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />
     <Compile Include="Mod\DebugUtil\CLICommands.cs" />
@@ -264,6 +265,7 @@
     <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
     <Compile Include="Mod\Patch\MobilePartyPatches\CampaignMapMovement.cs" />
+    <Compile Include="Mod\Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />
     <Compile Include="Mod\Patch\Party\BanditsCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyFoodCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyHorseCampaignBehavior.cs" />

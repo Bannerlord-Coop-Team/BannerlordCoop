@@ -101,6 +101,14 @@ namespace Coop.Mod.Persistence.Party
         /// <exception cref="ArgumentException"></exception>
         public void RequestMovement(MovementData data)
         {
+            if (Equals(GetLatest(), data))
+            {
+                Logger.Trace(
+                    "[{tick}] Server controlled entity move {id} ignored. Data did not change.",
+                    Room.Tick,
+                    Id);
+                return;
+            }
             Logger.Trace(
                 "[{tick}] Server controlled entity move {id} to '{position}'.",
                 Room.Tick,

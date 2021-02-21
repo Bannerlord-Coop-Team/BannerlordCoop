@@ -1,8 +1,6 @@
 ﻿using Coop.Mod.Persistence.Party;
 using CoopFramework;
 using JetBrains.Annotations;
-using Sync;
-using Sync.Behaviour;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
@@ -20,6 +18,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         /// </summary>
         static CampaignMapMovement()
         {
+            // The fields relevant for party movement
             Movement = 
                 new FieldAccessGroup<MobileParty, MovementData>(new FieldAccess[]
                 {
@@ -31,6 +30,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 });
             Sync = new MobilePartySync(Movement);
 
+            // Setters for the movement fields
             When(GameLoop)
                 .Changes(Movement)
                 .Through(
@@ -39,6 +39,22 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                     Setter(nameof(MobileParty.TargetParty)),
                     Setter(nameof(MobileParty.TargetPosition)))
                 .Broadcast(() => Sync);
+            
+            When(GameLoop & Not(CoopConditions.ControlsParty))
+                .Calls(
+                    Method(nameof(MobileParty.SetMoveBesiegeSettlement)),
+                    Method(nameof(MobileParty.SetMoveDefendSettlement)),
+                    Method(nameof(MobileParty.SetMoveEngageParty)),
+                    Method(nameof(MobileParty.SetMoveEscortParty)),
+                    Method(nameof(MobileParty.SetMoveModeHold)),
+                    Method(nameof(MobileParty.SetMoveRaidSettlement)),
+                    Method(nameof(MobileParty.SetMoveGoAroundParty)),
+                    Method(nameof(MobileParty.SetMoveGoToPoint)),
+                    Method(nameof(MobileParty.SetMoveGoToSettlement)),
+                    Method(nameof(MobileParty.SetMovePatrolAroundPoint)),
+                    Method(nameof(MobileParty.SetMovePatrolAroundSettlement))
+                    )
+                .Skip();
 
             AutoWrapAllInstances(party => new CampaignMapMovement(party));
         }
@@ -50,6 +66,12 @@ namespace Coop.Mod.Patch.MobilePartyPatches
 
         public CampaignMapMovement([NotNull] MobileParty instance) : base(instance)
         {
+            if (!Coop.IsController(instance))
+            {
+                // Disable AI decision making for newly spawned parties that we do not control locally. Will be kept
+                // intact by a separate patch DisablePartyAi.
+                instance.Ai.SetDoNotMakeNewDecisions(true);
+            }
         }
 
         private static FieldAccessGroup<MobileParty, MovementData> Movement { get; }

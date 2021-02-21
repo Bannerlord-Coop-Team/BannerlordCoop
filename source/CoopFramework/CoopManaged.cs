@@ -19,7 +19,7 @@ namespace CoopFramework
     ///     <code>
     /// </code>
     /// </summary>
-    public abstract class CoopManaged<TSelf, TExtended> : CoopConditions where TExtended : class
+    public abstract class CoopManaged<TSelf, TExtended> : DefaultConditions where TExtended : class
     {
         /// <summary>
         ///     Creates synchronization for a given instance of <typeparamref name="TExtended" />.
@@ -104,7 +104,7 @@ namespace CoopFramework
         ///     Declares a Coop patch that is active when the
         ///     <param name="condition"></param>
         ///     evaluates
-        ///     to true. See <see cref="CoopConditions" /> for predefined conditions.
+        ///     to true. See <see cref="DefaultConditions" /> for predefined conditions.
         ///     The condition is evaluated when the patched action is executed.
         /// </summary>
         /// <param name="condition"></param>

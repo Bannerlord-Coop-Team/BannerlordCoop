@@ -89,6 +89,7 @@ namespace Coop.Mod.Persistence.Party
                 SetDefaultBehaviourNeedsUpdate(Campaign.Current.MainParty);
             }
             SetDefaultBehaviourNeedsUpdate(party);
+            party.RecalculateShortTermAi();
         }
         /// <inheritdoc cref="SyncBuffered.BroadcastBufferedChanges(FieldChangeBuffer)"/>
         protected override void BroadcastBufferedChanges(FieldChangeBuffer buffer)

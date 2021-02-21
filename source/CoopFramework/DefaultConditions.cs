@@ -3,7 +3,7 @@ using Sync.Behaviour;
 
 namespace CoopFramework
 {
-    public class CoopConditions
+    public class DefaultConditions
     {
         /// <summary>
         ///     The action was emitted during the regular game loop. i.e. it is not a authoritative call from the

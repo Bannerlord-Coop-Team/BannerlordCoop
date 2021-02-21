@@ -8,7 +8,9 @@ using System.Reflection;
 using Common;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
+using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.RemoteAction;
+using Coop.Mod.Persistence.World;
 using Coop.NetImpl.LiteNet;
 using CoopFramework;
 using HarmonyLib;
@@ -20,15 +22,12 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using RemoteAction;
-using Sync;
-using Sync.Behaviour;
 using Sync.Call;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using Registry = Sync.Registry;
-using TaleWorlds.Library;
 using Logger = NLog.Logger;
 
 namespace Coop.Mod.DebugUtil
@@ -410,7 +409,17 @@ namespace Coop.Mod.DebugUtil
 
             if (CoopServer.Instance?.Persistence?.MobilePartyEntityManager == null)
             {
-                Imgui.Text("No coop server running.");
+                RailClientRoom clientRoom = CoopClient.Instance?.Persistence?.Room;
+                if (clientRoom != null)
+                {
+                    var entities = clientRoom.Entities
+                        .OfType<MobilePartyEntityClient>()
+                        .ToList().OrderBy(o => o.State.PartyId);
+                    foreach (MobilePartyEntityClient entity in entities)
+                    {
+                        Imgui.Text(entity.ToString());
+                    }
+                }
             }
             else
             {
@@ -432,7 +441,10 @@ namespace Coop.Mod.DebugUtil
                 Imgui.Separator();
                 foreach (RailEntityServer entity in parties)
                 {
-                    Imgui.Text(entity.ToString());
+                    if (entity != null)
+                    {
+                        Imgui.Text(entity.ToString());
+                    }
                 }
 
                 Imgui.Columns();
