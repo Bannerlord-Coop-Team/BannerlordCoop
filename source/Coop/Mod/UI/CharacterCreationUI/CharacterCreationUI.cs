@@ -5,15 +5,15 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade.View.Screen;
 using TaleWorlds.Core.ViewModelCollection;
 using StoryMode.ViewModelCollection.CharacterCreationSystem;
-using StoryMode.CharacterCreationSystem;
+using TaleWorlds.CampaignSystem.CharacterCreationContent;
 using StoryMode.GauntletUI.CharacterCreationSystem;
 
-namespace Coop.Client.UI.CharacterCreation
+namespace Coop.Client.UI.CharacterCreationVM
 {
 	class ClientCharacterCreationReviewStageVM : CharacterCreationReviewStageVM
 	{
 		public ClientCharacterCreationReviewStageVM(
-			StoryMode.CharacterCreationSystem.CharacterCreation characterCreation, 
+			CharacterCreation characterCreation, 
 			Action affirmativeAction, 
 			TextObject affirmativeActionText, 
 			Action negativeAction, 
@@ -42,7 +42,7 @@ namespace Coop.Client.UI.CharacterCreation
 	public class ClientCharacterCreationReviewStageView : CharacterCreationReviewStageView
 	{
 		public ClientCharacterCreationReviewStageView(
-			StoryMode.CharacterCreationSystem.CharacterCreation characterCreation, 
+			CharacterCreation characterCreation, 
 			ControlCharacterCreationStage affirmativeAction, 
 			TextObject affirmativeActionText, 
 			ControlCharacterCreationStage negativeAction, 

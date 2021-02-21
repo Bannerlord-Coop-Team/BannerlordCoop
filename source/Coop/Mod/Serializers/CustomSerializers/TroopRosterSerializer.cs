@@ -12,12 +12,22 @@ namespace Coop.Mod.Serializers
     [Serializable]
     internal class TroopRosterSerializer : ICustomSerializer
     {
+        [NonSerialized]
+        readonly FieldInfo rosterDataField = typeof(TroopRoster).GetField("data", BindingFlags.NonPublic | BindingFlags.Instance);
         readonly List<byte[]> data = new List<byte[]>();
         int versionNumber;
         public TroopRosterSerializer(TroopRoster roster)
         {
             versionNumber = roster.VersionNo;
-            foreach (TroopRosterElement troop in roster)
+
+            TroopRosterElement[] troops = (TroopRosterElement[])rosterDataField.GetValue(roster);
+
+            if(troops == null)
+            {
+                return;
+            }
+
+            foreach (TroopRosterElement troop in troops)
             {
                 // TaleWorlds BinaryWriter
                 BinaryWriter writer = new BinaryWriter();

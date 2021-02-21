@@ -14,8 +14,7 @@ namespace Coop.Mod.Patch.Party
     class BanditsCampaignBehaviorPatch
     {
         public static EventHandler<MobileParty> OnBanditAdded;
-
-        static bool Prefix(BanditsCampaignBehavior __instance, ref MobileParty banditParty, ref TextObject name, ref Clan faction, ref Settlement homeSettlement)
+        static bool Prefix(BanditsCampaignBehavior __instance, ref MobileParty banditParty, ref Clan faction, ref Settlement homeSettlement)
         {
             OnBanditAdded?.Invoke(__instance, banditParty);
             return true;
