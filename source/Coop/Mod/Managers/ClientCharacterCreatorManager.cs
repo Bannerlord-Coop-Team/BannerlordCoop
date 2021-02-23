@@ -65,6 +65,9 @@ namespace Coop.Mod.Managers
                 SkipCharacterCreation();
             }
 
+            Settlement settlement = Settlement.Find("tutorial_training_field");
+            MobileParty.MainParty.Position2D = settlement.Position2D;
+
             OnGameLoadFinishedEvent?.Invoke(this, new HeroEventArgs(
                 MobileParty.MainParty.Name.ToString(),
                 CoopClient.Instance.SyncedObjectStore.Insert(Hero.MainHero)

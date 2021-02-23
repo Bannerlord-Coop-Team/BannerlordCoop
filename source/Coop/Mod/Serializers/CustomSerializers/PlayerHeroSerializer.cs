@@ -182,10 +182,10 @@ namespace Coop.Mod.Serializers
             hero.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(hero);
 
 
-            ConstructorInfo ctorInfo = typeof(WarPartyComponent)
+            ConstructorInfo ctorInfo = typeof(LordPartyComponent)
                 .GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null,
                     new Type[] { typeof(Clan), typeof(Hero) }, new ParameterModifier[0]);
-            Campaign.Current.MainParty.PartyComponent = (WarPartyComponent)ctorInfo.Invoke(new object[] { Clan.PlayerClan, Hero.MainHero });
+            Campaign.Current.MainParty.PartyComponent = (LordPartyComponent)ctorInfo.Invoke(new object[] { Clan.PlayerClan, Hero.MainHero });
 
             // Invoke party visual onstartup to initialize properly
             typeof(PartyVisual).GetMethod("TaleWorlds.CampaignSystem.IPartyVisual.OnStartup", BindingFlags.Instance | BindingFlags.NonPublic)
