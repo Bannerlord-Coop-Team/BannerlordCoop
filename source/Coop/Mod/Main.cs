@@ -44,7 +44,7 @@ namespace Coop.Mod
         private bool m_IsFirstTick = true;
 
         #region MainMenuButtons
-        public static InitialStateOption CoopCampaign = 
+        public static InitialStateOption CoopCampaign =
             new InitialStateOption(
                 "CoOp Campaign",
                 new TextObject("Host Co-op Campaign"),
@@ -79,7 +79,7 @@ namespace Coop.Mod
                                 new object[] { }));
                     }
                 },
-                false);
+                () => { return false; });
 
         public static InitialStateOption JoinCoopGame =
             new InitialStateOption(
@@ -87,7 +87,7 @@ namespace Coop.Mod
               new TextObject("Join Co-op Campaign"),
               9991,
               JoinWindow,
-              false
+              () => { return false; }
             );
         #endregion
 
@@ -185,7 +185,7 @@ namespace Coop.Mod
                                     new object[] { }));
                         }
                     },
-                    false);
+                    () => { return false; });
 
             JoinCoopGame =
                 new InitialStateOption(
@@ -193,7 +193,7 @@ namespace Coop.Mod
                   new TextObject("Join Co-op Campaign"),
                   9991,
                   JoinWindow,
-                  false
+                  () => { return false; }
                 );
 
             Module.CurrentModule.AddInitialStateOption(CoopCampaign);

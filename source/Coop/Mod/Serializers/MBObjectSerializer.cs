@@ -19,7 +19,7 @@ namespace Coop.Mod.Serializers
             ID = new MBGUIDSerializer(value.Id);
         }
 
-        public object Deserialize()
+        public virtual object Deserialize()
         {
             return MBObjectManager.Instance.GetObject((MBGUID)ID.Deserialize());
         }

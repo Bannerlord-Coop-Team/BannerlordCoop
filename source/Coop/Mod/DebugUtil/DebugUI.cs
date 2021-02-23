@@ -17,6 +17,8 @@ using RailgunNet.Logic;
 using Sync;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
+using Logger = NLog.Logger;
 
 namespace Coop.Mod.DebugUtil
 {
@@ -180,12 +182,6 @@ namespace Coop.Mod.DebugUtil
             if (Imgui.SmallButton("Close DebugUI"))
             {
                 Visible = false;
-            }
-
-            Imgui.SameLine(130);
-            if (Imgui.SmallButton("Toggle console"))
-            {
-                DebugConsole.Toggle();
             }
 
             if (CoopServer.Instance.Current == null && !CoopClient.Instance.ClientConnected)

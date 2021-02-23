@@ -17,7 +17,7 @@ $BaseDir        = "${SolutionDir}..\"
 $DeployDir      = "${BaseDir}deploy\"
 $ConfigPath     = "${BaseDir}config.json"
 $TemplateDir    = "${BaseDir}template"
-$UIMovieDir    = "${BaseDir}UIMovies"
+$UIMovieDir     = "${BaseDir}UIMovies"
 
 # create output directory structure
 $DeployBinDir = "$DeployDir\bin\Win64_Shipping_Client"
@@ -35,7 +35,8 @@ Write-Output $config
 $subModuleContent = Get-Content -path $TemplateDir\SubModule.xml -Raw
 $subModuleContent = $subModuleContent.replace('${name}', $config.name)
 $subModuleContent = $subModuleContent.replace('${version}', $config.version)
-$subModuleContent | Out-File -FilePath $DeployDir\SubModule.xml
+$subModuleContent = $subModuleContent.replace('${game_version}', $config.game_version)
+$subModuleContent | Out-File -Encoding utf8 -FilePath $DeployDir\SubModule.xml
 
 
 # copy mod dll

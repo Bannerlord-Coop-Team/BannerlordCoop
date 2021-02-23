@@ -202,6 +202,9 @@
     <Reference Include="TaleWorlds.Localization">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.ModuleManager">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ModuleManager.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>
@@ -363,6 +366,7 @@
     <Compile Include="Mod\Serializers\CustomSerializers\HeroLastSeenInformationSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\HeroSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ItemRosterSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\MBCharacterSkillsSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MBGUIDSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MobilePartiesAroundPositionListSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MobilePartySerializer.cs" />

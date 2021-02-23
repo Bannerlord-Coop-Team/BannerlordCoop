@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Module>
     <Name value="${name}"/>
     <Id value="${name}"/>
@@ -5,11 +6,11 @@
     <SingleplayerModule value="true"/>
     <MultiplayerModule value="false"/>
     <DependedModules>
-        <DependedModule Id="Native"/>
-        <DependedModule Id="SandBoxCore"/>
-        <DependedModule Id="Sandbox"/>
-        <DependedModule Id="CustomBattle"/>
-        <DependedModule Id="StoryMode" />
+        <DependedModule Id="Native" DependentVersion="${game_version}"/>
+        <DependedModule Id="SandBoxCore" DependentVersion="${game_version}"/>
+        <DependedModule Id="Sandbox" DependentVersion="${game_version}"/>
+        <DependedModule Id="CustomBattle" DependentVersion="${game_version}"/>
+        <DependedModule Id="StoryMode" DependentVersion="${game_version}"/>
     </DependedModules>
     <SubModules>
         <SubModule>
@@ -22,5 +23,6 @@
             </Tags>
         </SubModule>
     </SubModules>
-    <Xmls/>
+    <Xmls>
+    </Xmls>
 </Module>
