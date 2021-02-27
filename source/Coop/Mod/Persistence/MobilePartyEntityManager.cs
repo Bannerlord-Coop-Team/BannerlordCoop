@@ -155,7 +155,6 @@ namespace Coop.Mod.Persistence
                         e =>
                         {
                             e.State.PartyId = party.Id;
-                            e.State.Movement = party.GetMovementData().ToState();
                         });
                 Logger.Debug("Added new entity {}.", entity);
 

@@ -67,13 +67,21 @@ namespace Coop.Mod.Persistence.Party
                 UnregisterAsController();
             }
         }
-        
+
+        protected override void UpdateProxy()
+        {
+            if (HasReadyState(Tick) && !Coop.IsController(m_ManagedParty))
+            {
+                UpdateLocalMovement();
+            }
+        }
+
         /// <summary>
         ///     Called when this party is added to the Railgun room.
         /// </summary>
         protected override void OnAdded()
         {
-            State.OnMovementChanged += UpdateLocalMovement;
+            // State.OnMovementChanged += UpdateLocalMovement;
             State.OnPlayerControlledChanged += OnPlayerControlledChanged;
         }
 
@@ -83,7 +91,7 @@ namespace Coop.Mod.Persistence.Party
         protected override void OnRemoved()
         {
             State.OnPlayerControlledChanged -= OnPlayerControlledChanged;
-            State.OnMovementChanged -= UpdateLocalMovement;
+            // State.OnMovementChanged -= UpdateLocalMovement;
         }
 
         /// <summary>
@@ -130,12 +138,6 @@ namespace Coop.Mod.Persistence.Party
                 }
             }
             MovementData data = State.Movement.ToData();
-            Logger.Trace(
-                "[{tick}] Received move entity {id} ({party}) to {position}.",
-                Room.Tick,
-                Id,
-                m_ManagedParty,
-                data);
             m_Environment.SetAuthoritative(m_ManagedParty, data);
             Replay.ReplayRecording?.Invoke(Id, m_ManagedParty, data);
         }
@@ -145,7 +147,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         private void OnPlayerControlledChanged()
         {
-            MobileParty party = MobileParty.All.SingleOrDefault(p => p.Id == State.PartyId);
+            MobileParty party = m_Environment.GetMobilePartyById(State.PartyId);
             m_Environment.SetIsPlayerControlled(party.Id, State.IsPlayerControlled);
         }
         

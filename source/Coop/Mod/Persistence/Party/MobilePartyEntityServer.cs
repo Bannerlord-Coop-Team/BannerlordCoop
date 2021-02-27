@@ -44,6 +44,12 @@ namespace Coop.Mod.Persistence.Party
         protected override void OnAdded()
         {
             RegisterAsDefaultController();
+            MobileParty party = m_Environment.GetMobilePartyById(State.PartyId);
+            if (party != null)
+            {
+                // Initialize state
+                RequestMovement(party.GetMovementData()); 
+            }
         }
 
         /// <summary>
