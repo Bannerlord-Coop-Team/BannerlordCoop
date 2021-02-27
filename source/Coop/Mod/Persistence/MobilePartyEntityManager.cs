@@ -133,6 +133,7 @@ namespace Coop.Mod.Persistence
                 m_ClientControlledParties.Add(peer, party);
             }
             peer.GrantControl(correspondingEntity);
+            party.Ai.SetDoNotMakeNewDecisions(true);
             Logger.Info("{Party} control granted to {Peer}", party, peer);
         }
 
@@ -161,6 +162,7 @@ namespace Coop.Mod.Persistence
                 if (controller != null)
                 {
                     controller.GrantControl(entity);
+                    party.Ai.SetDoNotMakeNewDecisions(true);
                 }
 
                 lock (m_Lock)

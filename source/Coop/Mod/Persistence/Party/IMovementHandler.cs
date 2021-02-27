@@ -15,8 +15,12 @@ namespace Coop.Mod.Persistence.Party
         /// <summary>
         ///     Requests a change of the movement data of the managed party.
         /// </summary>
-        /// <param name="currentPosition"></param>
         /// <param name="newValue"></param>
-        void RequestMovement(Vec2 currentPosition, [NotNull] MovementData newValue);
+        void RequestMovement([NotNull] MovementData newValue);
+        /// <summary>
+        ///     Requests a change of the current position of the managed party on the campaign map.
+        /// </summary>
+        /// <param name="position"></param>
+        void RequestPosition(Vec2 position);
     }
 }

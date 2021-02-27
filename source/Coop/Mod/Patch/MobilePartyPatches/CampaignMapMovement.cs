@@ -1,6 +1,7 @@
 ﻿using Coop.Mod.Persistence.Party;
 using CoopFramework;
 using JetBrains.Annotations;
+using Sync.Call;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
@@ -18,7 +19,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         /// </summary>
         static CampaignMapMovement()
         {
-            // The fields relevant for party movement
+            // Define the patched fields for target movement & current position
             Movement = 
                 new FieldAccessGroup<MobileParty, MovementData>(new FieldAccess[]
                 {
@@ -28,9 +29,13 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                     Field<Vec2>("_targetPosition"),
                     Field<int>("_numberOfFleeingsAtLastTravel")
                 });
-            Sync = new MobilePartySync(Movement);
+            MapPosition = Field<Vec2>("_position2D");
+            MapPositionSetter = Setter(nameof(MobileParty.Position2D));
+            
+            // Init synchronization
+            Sync = new MobilePartySync(Movement, MapPosition, MapPositionSetter);
 
-            // Setters for the movement fields
+            // Synchronize setters for the target movement fields
             When(GameLoop)
                 .Changes(Movement)
                 .Through(
@@ -38,6 +43,12 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                     Setter(nameof(MobileParty.TargetSettlement)),
                     Setter(nameof(MobileParty.TargetParty)),
                     Setter(nameof(MobileParty.TargetPosition)))
+                .Broadcast(() => Sync);
+
+            // Set current position on serverside
+            When(GameLoop & CoopConditions.IsServer)
+                .Changes(MapPosition)
+                .Through(MapPositionSetter)
                 .Broadcast(() => Sync);
             
             /*When(GameLoop & Not(CoopConditions.ControlsParty))
@@ -69,11 +80,13 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             if (!Coop.IsController(instance))
             {
                 // Disable AI decision making for newly spawned parties that we do not control locally. Will be kept
-                // intact by a separate patch DisablePartyAi.
+                // intact by a separate patch DisablePartyDecisionMaking.
                 instance.Ai.SetDoNotMakeNewDecisions(true);
             }
         }
 
         private static FieldAccessGroup<MobileParty, MovementData> Movement { get; }
+        private static FieldAccess<MobileParty, Vec2> MapPosition { get; }
+        private static PatchedInvokable MapPositionSetter { get; }
     }
 }

@@ -19,6 +19,10 @@ namespace Sync.Behaviour
 
         public CallBehaviourBuilder Calls(params PatchedInvokable[] methods)
         {
+            if (methods.Length == 0)
+            {
+                throw new ArgumentOutOfRangeException();
+            }
             var behaviour = new CallBehaviourBuilder(methods.Select(m => m.Id), m_Condition);
             foreach (var method in methods) Register(method.Id, behaviour);
             return behaviour;
@@ -26,6 +30,10 @@ namespace Sync.Behaviour
 
         public FieldActionBehaviourBuilder Changes(params FieldAccess[] fields)
         {
+            if (fields.Length == 0)
+            {
+                throw new ArgumentOutOfRangeException();
+            }
             var fieldChangeAction = new FieldActionBehaviourBuilder(fields.Select(f => f.Id), m_Condition);
             foreach (var field in fields) Register(field.Id, fieldChangeAction);
 

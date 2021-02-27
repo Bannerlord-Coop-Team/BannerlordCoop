@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 using CoopFramework;
 using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
 using RemoteAction;
-using Sync;
 using Sync.Behaviour;
 using Sync.Call;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
 
@@ -21,9 +20,14 @@ namespace Coop.Mod.Persistence.Party
     /// </summary>
     public class MobilePartySync : SyncBuffered
     {
-        public MobilePartySync([NotNull] FieldAccessGroup<MobileParty, MovementData> movement)
+        public MobilePartySync(
+            [NotNull] FieldAccessGroup<MobileParty, MovementData> movement, 
+            [NotNull] FieldAccess<MobileParty, Vec2> mapPosition, 
+            [NotNull] PatchedInvokable mapPositionSetter)
         {
             m_MovementGroup = movement ?? throw new ArgumentNullException();
+            m_MapPosition = mapPosition ?? throw new ArgumentNullException();
+            m_MapPositionSetter = mapPositionSetter ?? throw new ArgumentNullException();
         }
         /// <inheritdoc cref="ISynchronization.Broadcast(InvokableId, object, object[])"/>
         public override void Broadcast(InvokableId id, object instance, object[] args)
@@ -96,33 +100,60 @@ namespace Coop.Mod.Persistence.Party
             
             party.RecalculateShortTermAi();
         }
+        
+        public void SetAuthoritative(MobileParty party, Vec2 position)
+        {
+            m_MapPositionSetter.Invoke(EOriginator.RemoteAuthority, party, new object[]{position});
+        }
+        
         /// <inheritdoc cref="SyncBuffered.BroadcastBufferedChanges(FieldChangeBuffer)"/>
         protected override void BroadcastBufferedChanges(FieldChangeBuffer buffer)
         {
-            var changes = SortByParty(buffer.FetchChanges());
+            var changes = buffer.FetchChanges();
+            foreach (KeyValuePair<Field,Dictionary<object,FieldChangeRequest>> pair in changes)
+            {
+                if (pair.Key.Id == m_MovementGroup.Id)
+                {
+                    BroadcastMovement(pair.Value);
+                }
+                else if (pair.Key.Id == m_MapPosition.Id)
+                {
+                    BroadcastPosition(pair.Value);
+                }
+            }
+        }
+        
+        #region Private
+
+        private void BroadcastMovement(Dictionary<object,FieldChangeRequest> changes)
+        {
             foreach (var change in changes)
             {
-                MobileParty party = change.Key;
+                MobileParty party = change.Key as MobileParty;
+                if (party == null)
+                {
+                    throw new Exception($"{change.Key} is not a MobileParty, skip");
+                }
+                
                 if(!m_Handlers.TryGetValue(party.Id, out IMovementHandler handler))
                 {
                     Logger.Debug("Got FieldChangeBuffer for unmanaged {party}. Ignored.", party);
                     continue;
                 }
 
-                MovementData before = change.Value.Item1;
-                MovementData requested = change.Value.Item2;
+                MovementData before = change.Value.OriginalValue as MovementData;
                 if (!Coop.IsController(party))
                 {
                     // Revert the local changes, we will receive the correct one from the server.
                     SetAuthoritative(party, before);
                     continue;
                 }
-                
+                MovementData requested = change.Value.RequestedValue as MovementData;
                 BroadcastHistory.Push(new CallTrace()
                 {
                     Value = m_MovementGroup.Id,
                     Instance = party,
-                    Arguments = new object[] {change.Value},
+                    Arguments = new object[] {requested},
                     Tick = handler.Tick
                 });
                 
@@ -132,41 +163,50 @@ namespace Coop.Mod.Persistence.Party
                     throw new InvalidOperationException();
                 }
 #endif
-                handler.RequestMovement(party.Position2D, requested);
+                handler.RequestMovement(requested);
             }
         }
-        
-        #region Private
-        private static readonly AccessTools.FieldRef<MobileParty, bool> m_DefaultBehaviorNeedsUpdate = 
-            AccessTools.FieldRefAccess<MobileParty, bool>("_defaultBehaviorNeedsUpdate");
 
-        private Dictionary<MobileParty, Tuple<MovementData, MovementData>> SortByParty(
-            Dictionary<Field, Dictionary<object, FieldChangeRequest>> input)
+        private void BroadcastPosition(Dictionary<object, FieldChangeRequest> changes)
         {
-            Dictionary<MobileParty, Tuple<MovementData, MovementData>> requestedChanges = new Dictionary<MobileParty, Tuple<MovementData, MovementData>>();
-            foreach (var bufferEntry in input)
+            foreach (var change in changes)
             {
-                Field field = bufferEntry.Key;
-                if (field.DeclaringType != typeof(MobileParty))
+                MobileParty party = change.Key as MobileParty;
+                if (party == null)
                 {
+                    throw new Exception($"{change.Key} is not a MobileParty, skip");
+                }
+                
+                if(!m_Handlers.TryGetValue(party.Id, out IMovementHandler handler))
+                {
+                    Logger.Debug("Got FieldChangeBuffer for unmanaged {party}. Ignored.", party);
                     continue;
                 }
 
-                foreach (var change in bufferEntry.Value)
+                if (change.Value.OriginalValue is Vec2 before &&
+                    change.Value.RequestedValue is Vec2 request)
                 {
-                    if (change.Key is MobileParty party)
+                    if (!Compare.CoordinatesEqual(before, request))
                     {
-                        requestedChanges[party] = new Tuple<MovementData, MovementData>(change.Value.OriginalValue as MovementData, change.Value.RequestedValue as MovementData);
+                        handler.RequestPosition(request);
                     }
                 }
+                else
+                {
+                    throw new Exception($"Unexpected buffer content.");
+                }
             }
-
-            return requestedChanges;
         }
+        
+        private static readonly AccessTools.FieldRef<MobileParty, bool> m_DefaultBehaviorNeedsUpdate = 
+            AccessTools.FieldRefAccess<MobileParty, bool>("_defaultBehaviorNeedsUpdate");
+
         private readonly Dictionary<MBGUID, IMovementHandler> m_Handlers =
             new Dictionary<MBGUID, IMovementHandler>();
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        [NotNull] private FieldAccessGroup<MobileParty, MovementData> m_MovementGroup;
+        [NotNull] private readonly FieldAccessGroup<MobileParty, MovementData> m_MovementGroup;
+        [NotNull] private readonly FieldAccess<MobileParty, Vec2>  m_MapPosition;
+        [NotNull] private readonly PatchedInvokable m_MapPositionSetter;
 
         #endregion
     }

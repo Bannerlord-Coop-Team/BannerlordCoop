@@ -57,7 +57,15 @@ namespace Coop.Mod.Persistence.Party
             }
             
             // Initialize state
-            RequestMovement(m_Instance.Position2D, m_Instance.GetMovementData());
+            MovementData movement = null;
+            Vec2? position = null;
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                movement = m_Instance.GetMovementData();
+                position = m_Instance.Position2D;
+            }, true);
+            RequestMovement(movement);
+            RequestPosition(position.Value);
         }
 
         /// <summary>
@@ -105,7 +113,7 @@ namespace Coop.Mod.Persistence.Party
         /// <param name="currentPosition"></param>
         /// <param name="data"></param>
         /// <exception cref="ArgumentException"></exception>
-        public void RequestMovement(Vec2 currentPosition, MovementData data)
+        public void RequestMovement(MovementData data)
         {
             Logger.Trace(
                 "[{tick}] Server controlled entity move {id} to '{position}'.",
@@ -113,12 +121,19 @@ namespace Coop.Mod.Persistence.Party
                 Id,
                 data);
 
-            State.MapPosition = currentPosition;
             State.Movement.DefaultBehavior = data.DefaultBehaviour;
             State.Movement.TargetPosition = data.TargetPosition;
             State.Movement.TargetPartyIndex = data.TargetParty?.Id ?? Coop.InvalidId;
             State.Movement.SettlementIndex =
                 data.TargetSettlement?.Id ?? Coop.InvalidId;
+        }
+        /// <summary>
+        ///     Requests a change of the current position of the managed party on the campaign map.
+        /// </summary>
+        /// <param name="position"></param>
+        public void RequestPosition(Vec2 position)
+        {
+            State.MapPosition = position;
         }
 
         public override string ToString()

@@ -4,6 +4,7 @@ using JetBrains.Annotations;
 using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
 namespace RemoteAction
@@ -17,6 +18,12 @@ namespace RemoteAction
         ///     Set the movement data of the given party as an authoritative action.
         /// </summary>
         void SetAuthoritative(MobileParty party, MovementData data);
+        /// <summary>
+        ///     Set the current position of the given party as an authoritative action.
+        /// </summary>
+        /// <param name="mManagedParty"></param>
+        /// <param name="mapPosition"></param>
+        void SetAuthoritative(MobileParty mManagedParty, Vec2 mapPosition);
         
         /// <summary>
         ///     The master campaign time. On the host this equals to the local campaign time.

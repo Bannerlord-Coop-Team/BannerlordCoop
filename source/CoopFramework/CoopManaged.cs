@@ -90,7 +90,7 @@ namespace CoopFramework
         /// <typeparam name="TField"></typeparam>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        protected static FieldAccess Field<TField>(string sFieldName)
+        protected static FieldAccess<TExtended, TField> Field<TField>(string sFieldName)
         {
             var info = AccessTools.Field(typeof(TExtended), sFieldName);
             if (info == null) throw new Exception($"Field {typeof(TExtended)}.{sFieldName} not found.");

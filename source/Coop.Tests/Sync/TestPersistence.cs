@@ -11,6 +11,7 @@ using RemoteAction;
 using Sync.Store;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Tests.Sync
@@ -64,6 +65,11 @@ namespace Coop.Tests.Sync
         public void SetAuthoritative(MobileParty party, MovementData data)
         {
             // TODO
+            throw new NotImplementedException();
+        }
+
+        public void SetAuthoritative(MobileParty mManagedParty, Vec2 mapPosition)
+        {
             throw new NotImplementedException();
         }
 

@@ -36,9 +36,8 @@ namespace Coop.Mod.Persistence.Party
         /// <summary>
         ///     Handler to issue a move command for this party to the server.
         /// </summary>
-        /// <param name="currentPosition"></param>
         /// <exception cref="ArgumentException"></exception>
-        public void RequestMovement(Vec2 currentPosition, [NotNull] MovementData data)
+        public void RequestMovement([NotNull] MovementData data)
         {
             if (data == null)
             {
@@ -53,7 +52,16 @@ namespace Coop.Mod.Persistence.Party
                     e.Movement = data.ToState();
                 });
         }
-        
+        /// <summary>
+        ///     Requests a change of the current position of the managed party on the campaign map.
+        /// </summary>
+        /// <param name="position"></param>
+        /// <exception cref="InvalidOperationException"></exception>
+        public void RequestPosition(Vec2 position)
+        {
+            throw new InvalidOperationException("Client cannot set the authoritative position of a MobileParty. This is controlled by the server.");
+        }
+
         /// <summary>
         ///     Called when the controller of this party changes.
         /// </summary>
@@ -140,6 +148,12 @@ namespace Coop.Mod.Persistence.Party
 
         private void UpdateLocalPosition()
         {
+            if (float.IsNaN(State.MapPosition.Vec2.x) || 
+                float.IsNaN(State.MapPosition.Vec2.y) ||
+                State.MapPosition.Vec2 == Vec2.Zero)
+            {
+                return;
+            }
             if (m_ManagedParty == null)
             {
                 m_ManagedParty = m_Environment.GetMobilePartyById(State.PartyId);
@@ -150,7 +164,7 @@ namespace Coop.Mod.Persistence.Party
                 }
             }
 
-            m_ManagedParty.Position2D = State.MapPosition;
+            m_Environment.SetAuthoritative(m_ManagedParty, State.MapPosition);
         }
 
         /// <summary>

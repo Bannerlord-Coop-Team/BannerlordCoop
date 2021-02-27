@@ -7,6 +7,7 @@ using Coop.Mod.Persistence.Party;
 using RemoteAction;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod
@@ -24,6 +25,10 @@ namespace Coop.Mod
         public void SetAuthoritative(MobileParty party, MovementData data)
         {
             CampaignMapMovement.Sync.SetAuthoritative(party, data);
+        }
+        public void SetAuthoritative(MobileParty party, Vec2 position)
+        {
+            CampaignMapMovement.Sync.SetAuthoritative(party, position);
         }
 
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;
