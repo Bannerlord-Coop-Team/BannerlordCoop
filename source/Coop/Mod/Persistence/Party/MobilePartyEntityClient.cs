@@ -7,6 +7,8 @@ using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using RemoteAction;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
+using Logger = NLog.Logger;
 
 namespace Coop.Mod.Persistence.Party
 {
@@ -34,9 +36,9 @@ namespace Coop.Mod.Persistence.Party
         /// <summary>
         ///     Handler to issue a move command for this party to the server.
         /// </summary>
-        /// <param name="args">MovementData</param>
+        /// <param name="currentPosition"></param>
         /// <exception cref="ArgumentException"></exception>
-        public void RequestMovement([NotNull] MovementData data)
+        public void RequestMovement(Vec2 currentPosition, [NotNull] MovementData data)
         {
             if (data == null)
             {
@@ -67,21 +69,14 @@ namespace Coop.Mod.Persistence.Party
                 UnregisterAsController();
             }
         }
-
-        protected override void UpdateProxy()
-        {
-            if (HasReadyState(Tick) && !Coop.IsController(m_ManagedParty))
-            {
-                UpdateLocalMovement();
-            }
-        }
-
+        
         /// <summary>
         ///     Called when this party is added to the Railgun room.
         /// </summary>
         protected override void OnAdded()
         {
-            // State.OnMovementChanged += UpdateLocalMovement;
+            State.OnPositionChanged += UpdateLocalPosition;
+            State.OnMovementChanged += UpdateLocalMovement;
             State.OnPlayerControlledChanged += OnPlayerControlledChanged;
         }
 
@@ -91,7 +86,8 @@ namespace Coop.Mod.Persistence.Party
         protected override void OnRemoved()
         {
             State.OnPlayerControlledChanged -= OnPlayerControlledChanged;
-            // State.OnMovementChanged -= UpdateLocalMovement;
+            State.OnMovementChanged -= UpdateLocalMovement;
+            State.OnPositionChanged -= UpdateLocalPosition;
         }
 
         /// <summary>
@@ -140,6 +136,21 @@ namespace Coop.Mod.Persistence.Party
             MovementData data = State.Movement.ToData();
             m_Environment.SetAuthoritative(m_ManagedParty, data);
             Replay.ReplayRecording?.Invoke(Id, m_ManagedParty, data);
+        }
+
+        private void UpdateLocalPosition()
+        {
+            if (m_ManagedParty == null)
+            {
+                m_ManagedParty = m_Environment.GetMobilePartyById(State.PartyId);
+                if (m_ManagedParty == null)
+                {
+                    Logger.Warn("Mobile party id {PartyId} not found", State.PartyId);
+                    return;
+                }
+            }
+
+            m_ManagedParty.Position2D = State.MapPosition;
         }
 
         /// <summary>

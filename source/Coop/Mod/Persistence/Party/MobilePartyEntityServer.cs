@@ -4,6 +4,8 @@ using NLog;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
+using Logger = NLog.Logger;
 
 namespace Coop.Mod.Persistence.Party
 {
@@ -16,6 +18,7 @@ namespace Coop.Mod.Persistence.Party
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         [NotNull] private readonly IEnvironmentServer m_Environment;
         [CanBeNull] private MobileParty m_Instance;
+        private bool m_bIsRegisteredAsDefaultHandler = false;
 
         public MobilePartyEntityServer([NotNull] IEnvironmentServer environment)
         {
@@ -44,12 +47,17 @@ namespace Coop.Mod.Persistence.Party
         protected override void OnAdded()
         {
             RegisterAsDefaultController();
-            MobileParty party = m_Environment.GetMobilePartyById(State.PartyId);
-            if (party != null)
+            m_Instance = m_Environment.GetMobilePartyById(State.PartyId);
+            if (m_Instance == null)
             {
-                // Initialize state
-                RequestMovement(party.GetMovementData()); 
+                Logger.Warn(
+                    "Mobile party id {PartyId} not found in the local game state. Desync?",
+                    State.PartyId);
+                return;
             }
+            
+            // Initialize state
+            RequestMovement(m_Instance.Position2D, m_Instance.GetMovementData());
         }
 
         /// <summary>
@@ -72,18 +80,11 @@ namespace Coop.Mod.Persistence.Party
                 return;
             }
             
-            if (m_Instance == null && Controller == null)
+            if (!m_bIsRegisteredAsDefaultHandler && Controller == null && m_Instance != null)
             {
-                m_Instance = m_Environment.GetMobilePartyById(State.PartyId);
                 State.IsPlayerControlled = false;
-                if (m_Instance == null)
-                {
-                    Logger.Warn(
-                        "Mobile party id {} not found in the local game state. Desync?",
-                        State.PartyId);
-                    return;
-                }
                 m_Environment.PartySync.RegisterLocalHandler(m_Instance, this);
+                m_bIsRegisteredAsDefaultHandler = true;
             }
         }
 
@@ -93,7 +94,7 @@ namespace Coop.Mod.Persistence.Party
         private void UnregisterAsController()
         {
             m_Environment.PartySync.Unregister(this);
-            m_Instance = null;
+            m_bIsRegisteredAsDefaultHandler = false;
         }
 
         public Tick Tick => Room?.Tick ?? Tick.INVALID;
@@ -101,9 +102,10 @@ namespace Coop.Mod.Persistence.Party
         /// <summary>
         ///     Handler to apply a movement command to the authoritative state.
         /// </summary>
-        /// <param name="args">MovementData</param>
+        /// <param name="currentPosition"></param>
+        /// <param name="data"></param>
         /// <exception cref="ArgumentException"></exception>
-        public void RequestMovement(MovementData data)
+        public void RequestMovement(Vec2 currentPosition, MovementData data)
         {
             Logger.Trace(
                 "[{tick}] Server controlled entity move {id} to '{position}'.",
@@ -111,6 +113,7 @@ namespace Coop.Mod.Persistence.Party
                 Id,
                 data);
 
+            State.MapPosition = currentPosition;
             State.Movement.DefaultBehavior = data.DefaultBehaviour;
             State.Movement.TargetPosition = data.TargetPosition;
             State.Movement.TargetPartyIndex = data.TargetParty?.Id ?? Coop.InvalidId;

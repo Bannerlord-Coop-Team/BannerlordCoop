@@ -132,7 +132,7 @@ namespace Coop.Mod.Persistence.Party
                     throw new InvalidOperationException();
                 }
 #endif
-                handler.RequestMovement(requested);
+                handler.RequestMovement(party.Position2D, requested);
             }
         }
         
