@@ -112,7 +112,7 @@ namespace Coop.Mod.Persistence.Party
                 data);
 
             State.Movement.DefaultBehavior = data.DefaultBehaviour;
-            State.Movement.Position = data.TargetPosition;
+            State.Movement.TargetPosition = data.TargetPosition;
             State.Movement.TargetPartyIndex = data.TargetParty?.Id ?? Coop.InvalidId;
             State.Movement.SettlementIndex =
                 data.TargetSettlement?.Id ?? Coop.InvalidId;

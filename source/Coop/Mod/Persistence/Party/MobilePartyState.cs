@@ -68,7 +68,7 @@ namespace Coop.Mod.Persistence.Party
         public MBGUID TargetPartyIndex { get; set; } = Coop.InvalidId;
         public MBGUID SettlementIndex { get; set; } = Coop.InvalidId;
         public AiBehavior DefaultBehavior { get; set; }
-        public Vec2 Position { get; set; }
+        public Vec2 TargetPosition { get; set; }
 
         public override bool Equals(object obj)
         {
@@ -78,7 +78,7 @@ namespace Coop.Mod.Persistence.Party
                 return false;
             }
 
-            if (!Compare.CoordinatesEqual(Position, other.Position))
+            if (!Compare.CoordinatesEqual(TargetPosition, other.TargetPosition))
             {
                 return false;
             }
@@ -97,7 +97,7 @@ namespace Coop.Mod.Persistence.Party
         public override string ToString()
         {
             return
-                $"Party: {TargetPartyIndex}, Settlement: {SettlementIndex}, Behaviour: {DefaultBehavior}, Position {Position}";
+                $"Party: {TargetPartyIndex}, Settlement: {SettlementIndex}, Behaviour: {DefaultBehavior}, Position {TargetPosition}";
         }
     }
 
@@ -113,7 +113,7 @@ namespace Coop.Mod.Persistence.Party
         public static void WriteMovementState(this RailBitBuffer buffer, MovementState state)
         {
             buffer.WriteByte((byte) state.DefaultBehavior);
-            CoordinateCompressor.WriteVec2(buffer, state.Position);
+            CoordinateCompressor.WriteVec2(buffer, state.TargetPosition);
             buffer.WriteMBGUID(state.TargetPartyIndex);
             buffer.WriteMBGUID(state.SettlementIndex);
         }
@@ -124,7 +124,7 @@ namespace Coop.Mod.Persistence.Party
             return new MovementState
             {
                 DefaultBehavior = (AiBehavior) buffer.ReadByte(),
-                Position = CoordinateCompressor.ReadVec2(buffer),
+                TargetPosition = CoordinateCompressor.ReadVec2(buffer),
                 TargetPartyIndex = buffer.ReadMBGUID(),
                 SettlementIndex = buffer.ReadMBGUID()
             };

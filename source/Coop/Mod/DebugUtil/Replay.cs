@@ -309,7 +309,7 @@ namespace Coop.Mod.DebugUtil
                     entity.State.Movement = new MovementState
                     {
                         DefaultBehavior = replay.movement.DefaultBehaviour,
-                        Position = replay.movement.TargetPosition,
+                        TargetPosition = replay.movement.TargetPosition,
                         SettlementIndex = replay.movement.TargetSettlement != null ?
                             replay.movement.TargetSettlement.Id :
                             Coop.InvalidId,

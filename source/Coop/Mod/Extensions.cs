@@ -14,12 +14,17 @@ namespace Coop.Mod
 {
     public static class Extensions
     {
+        /// <summary>
+        ///     Conversion from a RailGun <see cref="MovementState"/>.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <returns></returns>
         public static MovementData ToData(this MovementState state)
         {
             return new MovementData
             {
                 DefaultBehaviour = state.DefaultBehavior,
-                TargetPosition = state.Position,
+                TargetPosition = state.TargetPosition,
                 TargetParty = state.TargetPartyIndex != Coop.InvalidId
                     ? MBObjectManager.Instance.GetObject(state.TargetPartyIndex) as
                         MobileParty
@@ -30,16 +35,26 @@ namespace Coop.Mod
                     : null
             };
         }
+        /// <summary>
+        ///     Conversion to a RailGun <see cref="MovementState"/>.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <returns></returns>
         public static MovementState ToState(this MovementData data)
         {
             return new MovementState
             {
                 DefaultBehavior = data.DefaultBehaviour,
-                Position = data.TargetPosition,
+                TargetPosition = data.TargetPosition,
                 TargetPartyIndex = data.TargetParty?.Id ?? Coop.InvalidId,
                 SettlementIndex = data.TargetSettlement?.Id ?? Coop.InvalidId
             };
         }
+        /// <summary>
+        ///     Returns the set of movement relevant data.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <returns></returns>
         public static MovementData GetMovementData(this MobileParty party)
         {
             return new MovementData()
@@ -50,19 +65,6 @@ namespace Coop.Mod
                 TargetPosition = party.TargetPosition,
                 NumberOfFleeingsAtLastTravel = party.NumberOfFleeingsAtLastTravel
             };
-        }
-        public static T GetGameModel<T>(this Game game)
-            where T : GameModel
-        {
-            foreach (GameModel model in game.BasicModels.GetGameModels())
-            {
-                if (model is T t)
-                {
-                    return t;
-                }
-            }
-
-            return null;
         }
         /// <summary>
         ///     Returns whether the given <see cref="MobileParty"/> is the main party of any player, remote or local.
