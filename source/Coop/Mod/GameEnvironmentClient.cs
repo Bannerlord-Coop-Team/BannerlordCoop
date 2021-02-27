@@ -7,6 +7,7 @@ using Coop.Mod.Persistence.Party;
 using RemoteAction;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod
 {
@@ -27,9 +28,9 @@ namespace Coop.Mod
 
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;
 
-        public void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled)
+        public void SetIsPlayerControlled(MBGUID guid, bool isPlayerControlled)
         {
-            MobileParty party = GetMobilePartyByIndex(iPartyIndex);
+            MobileParty party = GetMobilePartyById(guid);
 
             if(party == null)
             {
@@ -54,9 +55,9 @@ namespace Coop.Mod
             throw new InvalidOperationException("Client not initialized.");
 
         #region Game state access
-        public MobileParty GetMobilePartyByIndex(int iPartyIndex)
+        public MobileParty GetMobilePartyById(MBGUID guid)
         {
-            return MobileParty.All.SingleOrDefault(p => p.Party.Index == iPartyIndex);
+            return MobileParty.All.SingleOrDefault(p => p.Id == guid);
         }
         #endregion
     }

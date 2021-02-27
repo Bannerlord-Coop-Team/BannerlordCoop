@@ -4,6 +4,7 @@ using JetBrains.Annotations;
 using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
 namespace RemoteAction
 {
@@ -43,18 +44,18 @@ namespace RemoteAction
         ///     Sets whether a party is controlled by a human player (locally or remote). Called
         ///     by the persistence framework whenever the controller changes.
         /// </summary>
-        /// <param name="iPartyIndex">
-        ///     Party index, to be resolved using <see cref="GetMobilePartyByIndex" />
+        /// <param name="guid">
+        ///     Party guid, to be resolved using <see cref="GetMobilePartyById" />
         /// </param>
         /// <param name="isPlayerControlled"></param>
-        void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled);
+        void SetIsPlayerControlled(MBGUID guid, bool isPlayerControlled);
 
         /// <summary>
-        ///     Returns a party given its party index.
+        ///     Returns a party given its guid.
         /// </summary>
-        /// <param name="iPartyIndex"></param>
+        /// <param name="guid"></param>
         /// <returns></returns>
         [CanBeNull]
-        MobileParty GetMobilePartyByIndex(int iPartyIndex);
+        MobileParty GetMobilePartyById(MBGUID guid);
     }
 }

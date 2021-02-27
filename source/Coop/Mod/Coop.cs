@@ -4,11 +4,13 @@ using RailgunNet;
 using RailgunNet.Util;
 using RemoteAction;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod
 {
     public static class Coop
     {
+        public static MBGUID InvalidId = new MBGUID(0xDEADBEEF);
         public static bool IsServer => CoopServer.Instance.Current != null;
         public static bool IsClientConnected => CoopClient.Instance.ClientConnected;
 

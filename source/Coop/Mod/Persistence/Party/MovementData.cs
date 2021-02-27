@@ -152,11 +152,11 @@ namespace Coop.Mod.Persistence.Party
             buffer.WriteMBGUID(
                 movementData.TargetSettlement != null ?
                     movementData.TargetSettlement.Id :
-                    MovementState.InvalidIndex);
+                    Coop.InvalidId);
             buffer.WriteMBGUID(
                 movementData.TargetParty != null ?
                     movementData.TargetParty.Id :
-                    MovementState.InvalidIndex);
+                    Coop.InvalidId);
             MovementStateSerializer.CoordinateCompressor.WriteVec2(
                 buffer,
                 movementData.TargetPosition);
@@ -170,10 +170,10 @@ namespace Coop.Mod.Persistence.Party
             return new MovementData
             {
                 DefaultBehaviour = (AiBehavior) buffer.ReadByte(),
-                TargetSettlement = (id = buffer.ReadMBGUID()) != MovementState.InvalidIndex ?
+                TargetSettlement = (id = buffer.ReadMBGUID()) != Coop.InvalidId ?
                     (Settlement) MBObjectManager.Instance.GetObject(id) :
                     null,
-                TargetParty = (id = buffer.ReadMBGUID()) != MovementState.InvalidIndex ?
+                TargetParty = (id = buffer.ReadMBGUID()) != Coop.InvalidId ?
                     (MobileParty) MBObjectManager.Instance.GetObject(id) :
                     null,
                 TargetPosition = MovementStateSerializer.CoordinateCompressor.ReadVec2(buffer),

@@ -40,7 +40,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                     Setter(nameof(MobileParty.TargetPosition)))
                 .Broadcast(() => Sync);
             
-            When(GameLoop & Not(CoopConditions.ControlsParty))
+            /*When(GameLoop & Not(CoopConditions.ControlsParty))
                 .Calls(
                     Method(nameof(MobileParty.SetMoveBesiegeSettlement)),
                     Method(nameof(MobileParty.SetMoveDefendSettlement)),
@@ -54,7 +54,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                     Method(nameof(MobileParty.SetMovePatrolAroundPoint)),
                     Method(nameof(MobileParty.SetMovePatrolAroundSettlement))
                     )
-                .Skip();
+                .Skip();*/
 
             AutoWrapAllInstances(party => new CampaignMapMovement(party));
         }

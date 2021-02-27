@@ -86,13 +86,8 @@ namespace Coop.Mod.Persistence
             // Parties
             foreach (MobileParty party in Campaign.Current.MobileParties)
             {
-                if (party.Party.Index == MobilePartyState.InvalidPartyId)
-                {
-                    throw new Exception("Invalid party id!");
-                }
-
                 MobilePartyEntityServer entity = room.AddNewEntity<MobilePartyEntityServer>(
-                    e => e.State.PartyId = party.Party.Index);
+                    e => e.State.PartyId = party.Id);
                 m_Parties.Add(party, entity);
             }
 
@@ -109,7 +104,7 @@ namespace Coop.Mod.Persistence
         {
             MobilePartyEntityServer entity =
                 m_Room.AddNewEntity<MobilePartyEntityServer>(
-                    e => e.State.PartyId = party.Party.Index);
+                    e => e.State.PartyId = party.Id);
             Logger.Debug("Added new entity {}.", entity);
 
             lock (m_Lock)
@@ -157,7 +152,11 @@ namespace Coop.Mod.Persistence
                 // Need to leave m_Lock, otherwise the entity creation might deadlock since it needs to makes game state queries in the main thread
                 MobilePartyEntityServer entity =
                     m_Room.AddNewEntity<MobilePartyEntityServer>(
-                        e => e.State.PartyId = party.Party.Index);
+                        e =>
+                        {
+                            e.State.PartyId = party.Id;
+                            e.State.Movement = party.GetMovementData().ToState();
+                        });
                 Logger.Debug("Added new entity {}.", entity);
 
                 if (controller != null)
@@ -236,7 +235,7 @@ namespace Coop.Mod.Persistence
 
         private void OnPartyAdded(MobileParty party)
         {
-            if (party.Party.Index == MobilePartyState.InvalidPartyId)
+            if (party.Id == Coop.InvalidId)
             {
                 throw new Exception($"Invalid party id in {party}");
             }

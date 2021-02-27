@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.Reflection;
 using Coop.Mod.Patch;
+using Coop.Mod.Persistence.Party;
 using Sync.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 
@@ -12,6 +14,43 @@ namespace Coop.Mod
 {
     public static class Extensions
     {
+        public static MovementData ToData(this MovementState state)
+        {
+            return new MovementData
+            {
+                DefaultBehaviour = state.DefaultBehavior,
+                TargetPosition = state.Position,
+                TargetParty = state.TargetPartyIndex != Coop.InvalidId
+                    ? MBObjectManager.Instance.GetObject(state.TargetPartyIndex) as
+                        MobileParty
+                    : null,
+                TargetSettlement = state.SettlementIndex != Coop.InvalidId
+                    ? MBObjectManager.Instance.GetObject(
+                        state.SettlementIndex) as Settlement
+                    : null
+            };
+        }
+        public static MovementState ToState(this MovementData data)
+        {
+            return new MovementState
+            {
+                DefaultBehavior = data.DefaultBehaviour,
+                Position = data.TargetPosition,
+                TargetPartyIndex = data.TargetParty?.Id ?? Coop.InvalidId,
+                SettlementIndex = data.TargetSettlement?.Id ?? Coop.InvalidId
+            };
+        }
+        public static MovementData GetMovementData(this MobileParty party)
+        {
+            return new MovementData()
+            {
+                DefaultBehaviour = party.DefaultBehavior,
+                TargetParty = party.TargetParty,
+                TargetSettlement =  party.TargetSettlement,
+                TargetPosition = party.TargetPosition,
+                NumberOfFleeingsAtLastTravel = party.NumberOfFleeingsAtLastTravel
+            };
+        }
         public static T GetGameModel<T>(this Game game)
             where T : GameModel
         {

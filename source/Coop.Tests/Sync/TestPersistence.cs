@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
@@ -10,6 +11,7 @@ using RemoteAction;
 using Sync.Store;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Tests.Sync
 {
@@ -67,21 +69,15 @@ namespace Coop.Tests.Sync
 
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Zero;
 
-        public void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled)
-        {
-            throw new NotImplementedException();
-        }
-
         public IEnumerable<MobileParty> PlayerMainParties { get; }
         public MobilePartySync PartySync { get; }
         public RemoteStore Store { get; }
-
-        public MobileParty GetMobilePartyByIndex(int iPartyIndex)
+        public void SetIsPlayerControlled(MBGUID guid, bool isPlayerControlled)
         {
             throw new NotImplementedException();
         }
 
-        public Campaign GetCurrentCampaign()
+        public MobileParty GetMobilePartyById(MBGUID guid)
         {
             throw new NotImplementedException();
         }
@@ -100,7 +96,7 @@ namespace Coop.Tests.Sync
         public SharedRemoteStore Store { get; }
         public EventBroadcastingQueue EventQueue { get; }
 
-        public MobileParty GetMobilePartyByIndex(int iPartyIndex)
+        public MobileParty GetMobilePartyById(MBGUID guid)
         {
             throw new NotImplementedException();
         }

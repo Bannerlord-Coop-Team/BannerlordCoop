@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using RailgunNet.Logic;
 using RailgunNet.System.Encoding;
 using RemoteAction;
@@ -13,7 +13,6 @@ namespace Coop.Mod.Persistence.Party
     /// </summary>
     public class MobilePartyState : RailState
     {
-        public static readonly int InvalidPartyId = -1;
         private bool m_IsPlayerControlled;
         private MovementState m_Movement = new MovementState();
 
@@ -21,7 +20,7 @@ namespace Coop.Mod.Persistence.Party
         ///     Party ID as found in <see cref="TaleWorlds.CampaignSystem.MobileParty.Party.Index" />.
         /// </summary>
         [Immutable]
-        public int PartyId { get; set; } = InvalidPartyId;
+        public MBGUID PartyId { get; set; } = Coop.InvalidId;
 
         /// <summary>
         ///     Is the party controlled by any player?
@@ -66,9 +65,8 @@ namespace Coop.Mod.Persistence.Party
     /// </summary>
     public class MovementState
     {
-        public static MBGUID InvalidIndex = new MBGUID(0xDEADBEEF);
-        public MBGUID TargetPartyIndex { get; set; } = InvalidIndex;
-        public MBGUID SettlementIndex { get; set; } = InvalidIndex;
+        public MBGUID TargetPartyIndex { get; set; } = Coop.InvalidId;
+        public MBGUID SettlementIndex { get; set; } = Coop.InvalidId;
         public AiBehavior DefaultBehavior { get; set; }
         public Vec2 Position { get; set; }
 

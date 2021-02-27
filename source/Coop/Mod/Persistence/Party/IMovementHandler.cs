@@ -15,10 +15,5 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         /// <param name="newValue"></param>
         void RequestMovement([NotNull] MovementData newValue);
-        /// <summary>
-        ///     Returns the latest authoritative movement for the managed party.
-        /// </summary>
-        /// <returns></returns>
-        MovementData GetLatest();
     }
 }

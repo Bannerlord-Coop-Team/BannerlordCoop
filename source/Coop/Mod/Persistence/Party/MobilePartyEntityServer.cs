@@ -3,9 +3,7 @@ using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
-using RemoteAction;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.Party
 {
@@ -70,7 +68,7 @@ namespace Coop.Mod.Persistence.Party
             
             if (m_Instance == null && Controller == null)
             {
-                m_Instance = m_Environment.GetMobilePartyByIndex(State.PartyId);
+                m_Instance = m_Environment.GetMobilePartyById(State.PartyId);
                 State.IsPlayerControlled = false;
                 if (m_Instance == null)
                 {
@@ -101,14 +99,6 @@ namespace Coop.Mod.Persistence.Party
         /// <exception cref="ArgumentException"></exception>
         public void RequestMovement(MovementData data)
         {
-            if (Equals(GetLatest(), data))
-            {
-                Logger.Trace(
-                    "[{tick}] Server controlled entity move {id} ignored. Data did not change.",
-                    Room.Tick,
-                    Id);
-                return;
-            }
             Logger.Trace(
                 "[{tick}] Server controlled entity move {id} to '{position}'.",
                 Room.Tick,
@@ -117,26 +107,9 @@ namespace Coop.Mod.Persistence.Party
 
             State.Movement.DefaultBehavior = data.DefaultBehaviour;
             State.Movement.Position = data.TargetPosition;
-            State.Movement.TargetPartyIndex = data.TargetParty?.Id ?? MovementState.InvalidIndex;
+            State.Movement.TargetPartyIndex = data.TargetParty?.Id ?? Coop.InvalidId;
             State.Movement.SettlementIndex =
-                data.TargetSettlement?.Id ?? MovementState.InvalidIndex;
-        }
-
-        public MovementData GetLatest()
-        {
-            return new MovementData
-            {
-                DefaultBehaviour = State.Movement.DefaultBehavior,
-                TargetPosition = State.Movement.Position,
-                TargetParty = State.Movement.TargetPartyIndex != MovementState.InvalidIndex
-                    ? MBObjectManager.Instance.GetObject(State.Movement.TargetPartyIndex) as
-                        MobileParty
-                    : null,
-                TargetSettlement = State.Movement.SettlementIndex != MovementState.InvalidIndex
-                    ? MBObjectManager.Instance.GetObject(
-                        State.Movement.SettlementIndex) as Settlement
-                    : null
-            };
+                data.TargetSettlement?.Id ?? Coop.InvalidId;
         }
 
         public override string ToString()

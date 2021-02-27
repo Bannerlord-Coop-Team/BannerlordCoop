@@ -1,14 +1,12 @@
-﻿using System;
-using System.Reflection;
+using System;
+using System.Linq;
 using Coop.Mod.DebugUtil;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using RemoteAction;
-using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence.Party
 {
@@ -18,16 +16,19 @@ namespace Coop.Mod.Persistence.Party
     /// </summary>
     public class MobilePartyEntityClient : RailEntityClient<MobilePartyState>, IMovementHandler
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-
-        [NotNull] private readonly IEnvironmentClient m_Environment;
-        [CanBeNull] private MobileParty m_Instance;
-
         public MobilePartyEntityClient([NotNull] IEnvironmentClient environment)
         {
             m_Environment = environment;
         }
 
+        public override string ToString()
+        {
+            return $"Party {State.PartyId} ({Id}): {m_ManagedParty}";
+        }
+        
+        /// <summary>
+        ///     Current tick of the room this entity lives in.
+        /// </summary>
         public Tick Tick => Room?.Tick ?? Tick.INVALID;
 
         /// <summary>
@@ -47,57 +48,10 @@ namespace Coop.Mod.Persistence.Party
                 e =>
                 {
                     e.EntityId = Id;
-                    e.Movement = new MovementState
-                    {
-                        DefaultBehavior = data.DefaultBehaviour,
-                        Position = data.TargetPosition,
-                        TargetPartyIndex = data.TargetParty?.Id ?? MovementState.InvalidIndex,
-                        SettlementIndex = data.TargetSettlement?.Id ?? MovementState.InvalidIndex
-                    };
+                    e.Movement = data.ToState();
                 });
         }
-
-        /// <summary>
-        ///     Handler to apply a received move command for this party.
-        /// </summary>
-        /// <exception cref="Exception"></exception>
-        private void UpdateLocalMovement()
-        {
-            if (State.PartyId == MobilePartyState.InvalidPartyId)
-            {
-                throw new Exception("Invalid party id!");
-            }
-
-            MobileParty party = m_Environment.GetMobilePartyByIndex(State.PartyId);
-            if (party == null) return;
-            MovementData data = GetLatest();
-            Logger.Trace(
-                "[{tick}] Received move entity {id} ({party}) to {position}.",
-                Room.Tick,
-                Id,
-                party,
-                data);
-            m_Environment.SetAuthoritative(party, data);
-            Replay.ReplayRecording?.Invoke(Id, party, data);
-        }
-
-        public MovementData GetLatest()
-        {
-            return new MovementData
-            {
-                DefaultBehaviour = State.Movement.DefaultBehavior,
-                TargetPosition = State.Movement.Position,
-                TargetParty = State.Movement.TargetPartyIndex != MovementState.InvalidIndex
-                    ? MBObjectManager.Instance.GetObject(State.Movement.TargetPartyIndex) as
-                        MobileParty
-                    : null,
-                TargetSettlement = State.Movement.SettlementIndex != MovementState.InvalidIndex
-                    ? MBObjectManager.Instance.GetObject(
-                        State.Movement.SettlementIndex) as Settlement
-                    : null
-            };
-        }
-
+        
         /// <summary>
         ///     Called when the controller of this party changes.
         /// </summary>
@@ -113,15 +67,7 @@ namespace Coop.Mod.Persistence.Party
                 UnregisterAsController();
             }
         }
-
-        /// <summary>
-        ///     Handler to be called when the control of this party changes to or from any player.
-        /// </summary>
-        private void OnPlayerControlledChanged()
-        {
-            m_Environment.SetIsPlayerControlled(State.PartyId, State.IsPlayerControlled);
-        }
-
+        
         /// <summary>
         ///     Called when this party is added to the Railgun room.
         /// </summary>
@@ -148,14 +94,14 @@ namespace Coop.Mod.Persistence.Party
         /// <exception cref="Exception"></exception>
         private void RegisterAsController()
         {
-            if (m_Instance == null && Controller != null)
+            if (m_ManagedParty == null && Controller != null)
             {
-                m_Instance = m_Environment.GetMobilePartyByIndex(State.PartyId);
-                if (m_Instance == null)
+                m_ManagedParty = m_Environment.GetMobilePartyById(State.PartyId);
+                if (m_ManagedParty == null)
                 {
                     throw new Exception($"Mobile party id {State.PartyId} not found.");
                 }
-                m_Environment.PartySync.RegisterLocalHandler(m_Instance, this);
+                m_Environment.PartySync.RegisterLocalHandler(m_ManagedParty, this);
             }
         }
 
@@ -165,12 +111,46 @@ namespace Coop.Mod.Persistence.Party
         private void UnregisterAsController()
         {
             m_Environment.PartySync.Unregister(this);
-            m_Instance = null;
+            m_ManagedParty = null;
         }
 
-        public override string ToString()
+        /// <summary>
+        ///     Handler to apply a received move command for this party.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        private void UpdateLocalMovement()
         {
-            return $"Party {State.PartyId} ({Id}): {m_Instance}";
+            if (m_ManagedParty == null)
+            {
+                m_ManagedParty = m_Environment.GetMobilePartyById(State.PartyId);
+                if (m_ManagedParty == null)
+                {
+                    Logger.Warn("Mobile party id {PartyId} not found", State.PartyId);
+                    return;
+                }
+            }
+            MovementData data = State.Movement.ToData();
+            Logger.Trace(
+                "[{tick}] Received move entity {id} ({party}) to {position}.",
+                Room.Tick,
+                Id,
+                m_ManagedParty,
+                data);
+            m_Environment.SetAuthoritative(m_ManagedParty, data);
+            Replay.ReplayRecording?.Invoke(Id, m_ManagedParty, data);
         }
+
+        /// <summary>
+        ///     Handler to be called when the control of this party changes to or from any player.
+        /// </summary>
+        private void OnPlayerControlledChanged()
+        {
+            MobileParty party = MobileParty.All.SingleOrDefault(p => p.Id == State.PartyId);
+            m_Environment.SetIsPlayerControlled(party.Id, State.IsPlayerControlled);
+        }
+        
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        [NotNull] private readonly IEnvironmentClient m_Environment;
+        [CanBeNull] private MobileParty m_ManagedParty;
     }
 }

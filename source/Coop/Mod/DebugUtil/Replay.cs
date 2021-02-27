@@ -312,10 +312,10 @@ namespace Coop.Mod.DebugUtil
                         Position = replay.movement.TargetPosition,
                         SettlementIndex = replay.movement.TargetSettlement != null ?
                             replay.movement.TargetSettlement.Id :
-                            MovementState.InvalidIndex,
+                            Coop.InvalidId,
                         TargetPartyIndex = replay.movement.TargetParty != null ?
                             replay.movement.TargetParty.Id :
-                            MovementState.InvalidIndex
+                            Coop.InvalidId
                     };
                 }
 

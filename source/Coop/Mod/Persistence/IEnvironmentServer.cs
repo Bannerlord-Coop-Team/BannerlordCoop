@@ -1,11 +1,11 @@
 ﻿using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.RemoteAction;
 using JetBrains.Annotations;
-using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
-namespace RemoteAction
+namespace Coop.Mod.Persistence
 {
     /// <summary>
     ///     Provides an abstraction layer between the persistence and the game for the server.
@@ -26,12 +26,12 @@ namespace RemoteAction
         EventBroadcastingQueue EventQueue { get; }
 
         /// <summary>
-        ///     Returns a party given its party index.
+        ///     Returns a party given its guid.
         /// </summary>
-        /// <param name="iPartyIndex"></param>
+        /// <param name="guid"></param>
         /// <returns></returns>
         [CanBeNull]
-        MobileParty GetMobilePartyByIndex(int iPartyIndex);
+        MobileParty GetMobilePartyById(MBGUID guid);
         
         /// <summary>
         ///     Gets the synchronization for <see cref="MobileParty"/> instances.

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using CoopFramework;
+using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
 using RemoteAction;
@@ -86,9 +87,13 @@ namespace Coop.Mod.Persistence.Party
                 // That is a remote player moving. We need to update the local MainParty as well
                 // because Campaign.Tick will otherwise not update the AI decisions and just
                 // ignore some actions (for example EngageParty).
-                SetDefaultBehaviourNeedsUpdate(Campaign.Current.MainParty);
+                m_DefaultBehaviorNeedsUpdate(Campaign.Current.MainParty) = true;
             }
-            SetDefaultBehaviourNeedsUpdate(party);
+            else
+            {
+                m_DefaultBehaviorNeedsUpdate(party) = Coop.IsController(party);
+            }
+            
             party.RecalculateShortTermAi();
         }
         /// <inheritdoc cref="SyncBuffered.BroadcastBufferedChanges(FieldChangeBuffer)"/>
@@ -132,13 +137,8 @@ namespace Coop.Mod.Persistence.Party
         }
         
         #region Private
-        private void SetDefaultBehaviourNeedsUpdate(MobileParty party)
-        {
-            typeof(MobileParty).GetField(
-                    "_defaultBehaviorNeedsUpdate",
-                    BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(party, true);
-        }
+        private static readonly AccessTools.FieldRef<MobileParty, bool> m_DefaultBehaviorNeedsUpdate = 
+            AccessTools.FieldRefAccess<MobileParty, bool>("_defaultBehaviorNeedsUpdate");
 
         private Dictionary<MobileParty, Tuple<MovementData, MovementData>> SortByParty(
             Dictionary<Field, Dictionary<object, FieldChangeRequest>> input)

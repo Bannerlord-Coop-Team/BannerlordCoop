@@ -10,6 +10,7 @@ using RemoteAction;
 using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod
 {
@@ -19,13 +20,13 @@ namespace Coop.Mod
 
         public EventBroadcastingQueue EventQueue => CoopServer.Instance.Persistence?.EventQueue;
 
-        public MobileParty GetMobilePartyByIndex(int iPartyIndex)
+        public MobileParty GetMobilePartyById(MBGUID guid)
         {
             MobileParty ret = null;
             GameLoopRunner.RunOnMainThread(
                 () =>
                 {
-                    ret = MobileParty.All.SingleOrDefault(p => p.Party.Index == iPartyIndex);
+                    ret = MobileParty.All.SingleOrDefault(p => p.Id == guid);
                 });
             return ret;
         }
