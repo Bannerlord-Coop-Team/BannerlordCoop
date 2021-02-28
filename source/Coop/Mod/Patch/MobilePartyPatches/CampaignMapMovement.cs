@@ -9,8 +9,21 @@ using TaleWorlds.Library;
 namespace Coop.Mod.Patch.MobilePartyPatches
 {
     /// <summary>
-    ///     Intercepts changes to all movement data of a <see cref="MobileParty"/> instance. The synchronization
-    ///     of the intercepted data is handled through <see cref="MobilePartySync"/>.
+    ///     Handles synchronization of campaign map movement data of a <see cref="MobileParty"/> instance. It records
+    ///     all changes made to the relevant fields during one frame. At the end of a frame, the changes are accumulated
+    ///     and sent to all clients. Two categories of fields are synchronized this way:
+    ///
+    ///     1.  Movement order data. See <see cref="MovementData"/>. These are different fields of a party that are
+    ///         relevant to it's movement behaviour on the map. Specifically it contains the <see cref="AiBehavior"/>
+    ///         that defines the "long term" movement goal and all its related information.
+    ///
+    ///         The movement order data is buffered for each frame. The buffered data is then passed onto the
+    ///         <see cref="MobilePartySync"/> instance which in turn decides what to do with the captured data.
+    /// 
+    ///     2.  Position data. This is the 2D position on the campaign map of the party. It is captured into a buffer
+    ///         on the server only. The positions captured on the server will be sent to all clients. This will overwrite
+    ///         whatever the client is doing locally and acts as a ground truth for all parties, regardless of movement
+    ///         orders.
     /// </summary>
     public class CampaignMapMovement : CoopManaged<CampaignMapMovement, MobileParty>
     {
@@ -20,8 +33,8 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         static CampaignMapMovement()
         {
             // Define the patched fields for target movement & current position
-            Movement = 
-                new FieldAccessGroup<MobileParty, MovementData>(new FieldAccess[]
+            MovementOrderGroup =
+                new FieldAccessGroup<MobileParty, MovementData>(new FieldAccess[] 
                 {
                     Field<AiBehavior>("_defaultBehavior"),
                     Field<Settlement>("_targetSettlement"),
@@ -32,12 +45,11 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             MapPosition = Field<Vec2>("_position2D");
             MapPositionSetter = Setter(nameof(MobileParty.Position2D));
             
-            // Init synchronization
-            Sync = new MobilePartySync(Movement, MapPosition, MapPositionSetter);
+            Sync = new MobilePartySync(MovementOrderGroup, MapPosition, MapPositionSetter);
 
             // Synchronize setters for the target movement fields
             When(GameLoop)
-                .Changes(Movement)
+                .Changes(MovementOrderGroup)
                 .Through(
                     Setter(nameof(MobileParty.DefaultBehavior)),
                     Setter(nameof(MobileParty.TargetSettlement)),
@@ -45,7 +57,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                     Setter(nameof(MobileParty.TargetPosition)))
                 .Broadcast(() => Sync);
 
-            // Set current position on serverside
+            // Capture the current position to a buffer and process it trough `Sync`.
             When(GameLoop & CoopConditions.IsServer)
                 .Changes(MapPosition)
                 .Through(MapPositionSetter)
@@ -85,7 +97,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             }
         }
 
-        private static FieldAccessGroup<MobileParty, MovementData> Movement { get; }
+        private static FieldAccessGroup<MobileParty, MovementData> MovementOrderGroup { get; }
         private static FieldAccess<MobileParty, Vec2> MapPosition { get; }
         private static PatchedInvokable MapPositionSetter { get; }
     }

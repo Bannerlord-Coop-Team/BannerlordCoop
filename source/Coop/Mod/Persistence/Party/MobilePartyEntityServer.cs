@@ -10,90 +10,47 @@ using Logger = NLog.Logger;
 namespace Coop.Mod.Persistence.Party
 {
     /// <summary>
-    ///     Railgun: Mobile party implementation for the server. One instance for each mobile party
-    ///     that is registered in the Railgun room.
+    ///     Represents a serverside <see cref="MobileParty" /> entity that is currently active in the game world.
     /// </summary>
     public class MobilePartyEntityServer : RailEntityServer<MobilePartyState>, IMovementHandler
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         [NotNull] private readonly IEnvironmentServer m_Environment;
+        private bool m_bIsRegisteredAsController;
         [CanBeNull] private MobileParty m_Instance;
-        private bool m_bIsRegisteredAsDefaultHandler = false;
 
         public MobilePartyEntityServer([NotNull] IEnvironmentServer environment)
         {
             m_Environment = environment;
         }
 
-        /// <summary>
-        ///     Called when the controller of this party changes.
-        /// </summary>
-        protected override void OnControllerChanged()
+        public override string ToString()
         {
-            if (Controller == null)
-            {
-                RegisterAsDefaultController();
-            }
-            else
-            {
-                UnregisterAsController();
-                State.IsPlayerControlled = true;
-            }
-        }
-
-        /// <summary>
-        ///     Called when this party is added to the Railgun room.
-        /// </summary>
-        protected override void OnAdded()
-        {
-            RegisterAsDefaultController();
-            m_Instance = m_Environment.GetMobilePartyById(State.PartyId);
-            if (m_Instance == null)
-            {
-                Logger.Warn(
-                    "Mobile party id {PartyId} not found in the local game state. Desync?",
-                    State.PartyId);
-                return;
-            }
-            
-            // Initialize state
-            MovementData movement = null;
-            Vec2? position = null;
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                movement = m_Instance.GetMovementData();
-                position = m_Instance.Position2D;
-            }, true);
-            RequestMovement(movement);
-            RequestPosition(position.Value);
-        }
-
-        /// <summary>
-        ///     Called when this party is removed from the Railgun room.
-        /// </summary>
-        protected override void OnRemoved()
-        {
-            UnregisterAsController();
+            return $"Party {State.PartyId} ({Id}): {m_Instance}";
         }
 
         /// <summary>
         ///     Registers handlers to intercept issued movement commands to this party and apply them
         ///     the authoritative state.
         /// </summary>
-        /// <exception cref="Exception"></exception>
-        private void RegisterAsDefaultController()
+        private void RegisterAsDefaultController([NotNull] MobileParty party)
         {
             if (IsRemoving)
             {
+                // Will be removed from the room in the next tick. There's no point in taking control over it.
                 return;
             }
-            
-            if (!m_bIsRegisteredAsDefaultHandler && Controller == null && m_Instance != null)
+
+            bool bIsControlledByAnyClient = Controller != null;
+            if (bIsControlledByAnyClient ||
+                m_bIsRegisteredAsController)
             {
-                State.IsPlayerControlled = false;
-                m_Environment.PartySync.RegisterLocalHandler(m_Instance, this);
-                m_bIsRegisteredAsDefaultHandler = true;
+                return;
             }
+
+            State.IsPlayerControlled = false;
+            m_Environment.PartySync.RegisterLocalHandler(party, this);
+            m_bIsRegisteredAsController = true;
         }
 
         /// <summary>
@@ -102,8 +59,10 @@ namespace Coop.Mod.Persistence.Party
         private void UnregisterAsController()
         {
             m_Environment.PartySync.Unregister(this);
-            m_bIsRegisteredAsDefaultHandler = false;
+            m_bIsRegisteredAsController = false;
         }
+
+        #region IMovementHandler
 
         public Tick Tick => Room?.Tick ?? Tick.INVALID;
 
@@ -127,6 +86,7 @@ namespace Coop.Mod.Persistence.Party
             State.Movement.SettlementIndex =
                 data.TargetSettlement?.Id ?? Coop.InvalidId;
         }
+
         /// <summary>
         ///     Requests a change of the current position of the managed party on the campaign map.
         /// </summary>
@@ -136,9 +96,66 @@ namespace Coop.Mod.Persistence.Party
             State.MapPosition = position;
         }
 
-        public override string ToString()
+        #endregion
+
+        #region RailEntityServer
+
+        /// <summary>
+        ///     Called when the controller of this party changes.
+        /// </summary>
+        protected override void OnControllerChanged()
         {
-            return $"Party {State.PartyId} ({Id}): {m_Instance}";
+            if (Controller == null &&
+                m_Instance != null)
+            {
+                RegisterAsDefaultController(m_Instance);
+            }
+            else
+            {
+                UnregisterAsController();
+                State.IsPlayerControlled = true;
+            }
         }
+
+        /// <summary>
+        ///     Called when this party is added to the room.
+        /// </summary>
+        protected override void OnAdded()
+        {
+            // Get the instance
+            m_Instance = m_Environment.GetMobilePartyById(State.PartyId);
+            if (m_Instance == null)
+            {
+                Logger.Warn(
+                    "Mobile party id {PartyId} not found in the local game state. Desync!",
+                    State.PartyId);
+                return;
+            }
+
+            // Server takes initial control of all entities. Players are then granted control over their own
+            // party.
+            RegisterAsDefaultController(m_Instance);
+
+            // Get initial state from the game object.
+            MovementData movement = null;
+            Vec2? position = null;
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                movement = m_Instance.GetMovementData();
+                position = m_Instance.Position2D;
+            });
+            RequestMovement(movement);
+            RequestPosition(position.Value);
+        }
+
+        /// <summary>
+        ///     Called when this party is removed from the room.
+        /// </summary>
+        protected override void OnRemoved()
+        {
+            UnregisterAsController();
+        }
+
+        #endregion
     }
 }

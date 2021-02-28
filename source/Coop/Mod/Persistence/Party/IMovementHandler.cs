@@ -6,7 +6,7 @@ using TaleWorlds.Library;
 namespace Coop.Mod.Persistence.Party
 {
     /// <summary>
-    ///     Interface for a synchronized handler of <see cref="MobileParty"/> movement changes.
+    ///     Interface for a synchronized handler of <see cref="MobileParty" /> movement changes.
     /// </summary>
     public interface IMovementHandler
     {
@@ -17,6 +17,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         /// <param name="newValue"></param>
         void RequestMovement([NotNull] MovementData newValue);
+
         /// <summary>
         ///     Requests a change of the current position of the managed party on the campaign map.
         /// </summary>

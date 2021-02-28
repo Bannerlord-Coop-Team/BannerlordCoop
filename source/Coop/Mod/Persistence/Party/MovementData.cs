@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using RailgunNet.System.Encoding;
 using RemoteAction;
@@ -77,42 +76,34 @@ namespace Coop.Mod.Persistence.Party
             return Values.GetEnumerator();
         }
 
-        public override int GetHashCode()
-        {
-            return base.GetHashCode();
-        }
-
         IEnumerator IEnumerable.GetEnumerator()
         {
             return Values.GetEnumerator();
         }
 
-        public override bool Equals(Object obj)
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
+
+        public override bool Equals(object obj)
         {
             if (!(obj is MovementData))
             {
                 return false;
             }
 
-            MovementData other = (MovementData)obj;
+            MovementData other = (MovementData) obj;
             return DefaultBehaviour == other.DefaultBehaviour &&
                    TargetPosition.NearlyEquals(other.TargetPosition, Compare.COORDINATE_PRECISION) &&
                    TargetParty?.Id == other.TargetParty?.Id &&
                    TargetSettlement?.Id == other.TargetSettlement?.Id;
         }
 
-        private enum Field
-        {
-            DefaultBehavior = 0,
-            TargetSettlement = 1,
-            TargetParty = 2,
-            TargetPosition = 3,
-            NumberOfFleeingsAtLastTravel = 4
-        }
-
         public override string ToString()
         {
-            return $"{TargetPosition}, {TargetParty}, {TargetSettlement}, {DefaultBehaviour}, {NumberOfFleeingsAtLastTravel}";
+            return
+                $"{TargetPosition}, {TargetParty}, {TargetSettlement}, {DefaultBehaviour}, {NumberOfFleeingsAtLastTravel}";
         }
 
         public bool IsValid()
@@ -138,6 +129,15 @@ namespace Coop.Mod.Persistence.Party
 
             return true;
         }
+
+        private enum Field
+        {
+            DefaultBehavior = 0,
+            TargetSettlement = 1,
+            TargetParty = 2,
+            TargetPosition = 3,
+            NumberOfFleeingsAtLastTravel = 4
+        }
     }
 
     /// <summary>
@@ -150,13 +150,9 @@ namespace Coop.Mod.Persistence.Party
         {
             buffer.WriteByte((byte) movementData.DefaultBehaviour);
             buffer.WriteMBGUID(
-                movementData.TargetSettlement != null ?
-                    movementData.TargetSettlement.Id :
-                    Coop.InvalidId);
+                movementData.TargetSettlement != null ? movementData.TargetSettlement.Id : Coop.InvalidId);
             buffer.WriteMBGUID(
-                movementData.TargetParty != null ?
-                    movementData.TargetParty.Id :
-                    Coop.InvalidId);
+                movementData.TargetParty != null ? movementData.TargetParty.Id : Coop.InvalidId);
             MovementStateSerializer.CoordinateCompressor.WriteVec2(
                 buffer,
                 movementData.TargetPosition);
@@ -170,12 +166,12 @@ namespace Coop.Mod.Persistence.Party
             return new MovementData
             {
                 DefaultBehaviour = (AiBehavior) buffer.ReadByte(),
-                TargetSettlement = (id = buffer.ReadMBGUID()) != Coop.InvalidId ?
-                    (Settlement) MBObjectManager.Instance.GetObject(id) :
-                    null,
-                TargetParty = (id = buffer.ReadMBGUID()) != Coop.InvalidId ?
-                    (MobileParty) MBObjectManager.Instance.GetObject(id) :
-                    null,
+                TargetSettlement = (id = buffer.ReadMBGUID()) != Coop.InvalidId
+                    ? (Settlement) MBObjectManager.Instance.GetObject(id)
+                    : null,
+                TargetParty = (id = buffer.ReadMBGUID()) != Coop.InvalidId
+                    ? (MobileParty) MBObjectManager.Instance.GetObject(id)
+                    : null,
                 TargetPosition = MovementStateSerializer.CoordinateCompressor.ReadVec2(buffer),
                 NumberOfFleeingsAtLastTravel = buffer.ReadInt()
             };

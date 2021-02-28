@@ -13,10 +13,6 @@ namespace Coop.Mod.Persistence.Party
     /// </summary>
     public class MobilePartyState : RailState
     {
-        private bool m_IsPlayerControlled;
-        private MovementState m_Movement = new MovementState();
-        private MapPosition m_MapPosition = new MapPosition(Vec2.Invalid);
-
         /// <summary>
         ///     Party ID as found in <see cref="TaleWorlds.CampaignSystem.MobileParty.Party.Index" />.
         /// </summary>
@@ -57,7 +53,8 @@ namespace Coop.Mod.Persistence.Party
             }
         }
 
-        [Mutable] public MapPosition MapPosition
+        [Mutable]
+        public MapPosition MapPosition
         {
             get => m_MapPosition;
             set
@@ -73,10 +70,18 @@ namespace Coop.Mod.Persistence.Party
         public event Action OnPositionChanged;
         public event Action OnMovementChanged;
         public event Action OnPlayerControlledChanged;
+
+        #region Private
+
+        private bool m_IsPlayerControlled;
+        private MovementState m_Movement = new MovementState();
+        private MapPosition m_MapPosition = new MapPosition(Vec2.Invalid);
+
+        #endregion
     }
 
     /// <summary>
-    ///     Contains all data relevant to a movement command in serializable format.
+    ///     Contains all data relevant to a movement order in a Railgun serializable format.
     /// </summary>
     public class MovementState
     {
@@ -147,18 +152,28 @@ namespace Coop.Mod.Persistence.Party
     }
 
     /// <summary>
-    ///     Describes a position on the campaign map
+    ///     Describes a position on the campaign map. Basically just a wrapper around <see cref="Vec2" /> so it can be
+    ///     used in Railgun with its own encoder / decoder and custom precision for campaign map coordinates.
     /// </summary>
-    public struct MapPosition
+    public readonly struct MapPosition
     {
-        public static implicit operator MapPosition(Vec2 v) => new MapPosition(v);
-        public static implicit operator Vec2(MapPosition p) => p.Vec2;
+        public static implicit operator MapPosition(Vec2 v)
+        {
+            return new MapPosition(v);
+        }
+
+        public static implicit operator Vec2(MapPosition p)
+        {
+            return p.Vec2;
+        }
+
         public MapPosition(Vec2 pos)
         {
             Vec2 = pos;
         }
+
         public Vec2 Vec2 { get; }
-        
+
         public override bool Equals(object obj)
         {
             return obj is MapPosition position && Equals(position);
@@ -174,9 +189,9 @@ namespace Coop.Mod.Persistence.Party
             return Vec2.GetHashCode();
         }
     }
-    
+
     /// <summary>
-    ///     Railgun encoder & decoder for a map position.
+    ///     Railgun encoder & decoder for a <see cref="MapPosition" />.
     /// </summary>
     public static class MapPositionSerializer
     {

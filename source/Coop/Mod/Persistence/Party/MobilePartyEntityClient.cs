@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Coop.Mod.DebugUtil;
 using JetBrains.Annotations;
 using NLog;
@@ -13,21 +12,19 @@ using Logger = NLog.Logger;
 namespace Coop.Mod.Persistence.Party
 {
     /// <summary>
-    ///     Railgun: Mobile party implementation for clients. One instance for each mobile party
-    ///     that is registered in the Railgun room.
+    ///     Represents a clientside <see cref="MobileParty" /> entity that is currently active in the game world.
     /// </summary>
     public class MobilePartyEntityClient : RailEntityClient<MobilePartyState>, IMovementHandler
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        [NotNull] private readonly IEnvironmentClient m_Environment;
+        [CanBeNull] private MobileParty m_ManagedParty;
+
         public MobilePartyEntityClient([NotNull] IEnvironmentClient environment)
         {
             m_Environment = environment;
         }
 
-        public override string ToString()
-        {
-            return $"Party {State.PartyId} ({Id}): {m_ManagedParty}";
-        }
-        
         /// <summary>
         ///     Current tick of the room this entity lives in.
         /// </summary>
@@ -52,6 +49,7 @@ namespace Coop.Mod.Persistence.Party
                     e.Movement = data.ToState();
                 });
         }
+
         /// <summary>
         ///     Requests a change of the current position of the managed party on the campaign map.
         /// </summary>
@@ -59,7 +57,13 @@ namespace Coop.Mod.Persistence.Party
         /// <exception cref="InvalidOperationException"></exception>
         public void RequestPosition(Vec2 position)
         {
-            throw new InvalidOperationException("Client cannot set the authoritative position of a MobileParty. This is controlled by the server.");
+            throw new InvalidOperationException(
+                "Client cannot set the authoritative position of a MobileParty. This is controlled by the server.");
+        }
+
+        public override string ToString()
+        {
+            return $"Party {State.PartyId} ({Id}): {m_ManagedParty}";
         }
 
         /// <summary>
@@ -68,8 +72,8 @@ namespace Coop.Mod.Persistence.Party
         protected override void OnControllerChanged()
         {
             if (Controller != null)
-            {
                 // We control the party now.
+            {
                 RegisterAsController();
             }
             else
@@ -77,7 +81,7 @@ namespace Coop.Mod.Persistence.Party
                 UnregisterAsController();
             }
         }
-        
+
         /// <summary>
         ///     Called when this party is added to the Railgun room.
         /// </summary>
@@ -106,13 +110,15 @@ namespace Coop.Mod.Persistence.Party
         /// <exception cref="Exception"></exception>
         private void RegisterAsController()
         {
-            if (m_ManagedParty == null && Controller != null)
+            if (m_ManagedParty == null &&
+                Controller != null)
             {
                 m_ManagedParty = m_Environment.GetMobilePartyById(State.PartyId);
                 if (m_ManagedParty == null)
                 {
                     throw new Exception($"Mobile party id {State.PartyId} not found.");
                 }
+
                 m_Environment.PartySync.RegisterLocalHandler(m_ManagedParty, this);
             }
         }
@@ -141,6 +147,7 @@ namespace Coop.Mod.Persistence.Party
                     return;
                 }
             }
+
             MovementData data = State.Movement.ToData();
             m_Environment.SetAuthoritative(m_ManagedParty, data);
             Replay.ReplayRecording?.Invoke(Id, m_ManagedParty, data);
@@ -148,12 +155,13 @@ namespace Coop.Mod.Persistence.Party
 
         private void UpdateLocalPosition()
         {
-            if (float.IsNaN(State.MapPosition.Vec2.x) || 
+            if (float.IsNaN(State.MapPosition.Vec2.x) ||
                 float.IsNaN(State.MapPosition.Vec2.y) ||
                 State.MapPosition.Vec2 == Vec2.Zero)
             {
                 return;
             }
+
             if (m_ManagedParty == null)
             {
                 m_ManagedParty = m_Environment.GetMobilePartyById(State.PartyId);
@@ -175,9 +183,5 @@ namespace Coop.Mod.Persistence.Party
             MobileParty party = m_Environment.GetMobilePartyById(State.PartyId);
             m_Environment.SetIsPlayerControlled(party.Id, State.IsPlayerControlled);
         }
-        
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        [NotNull] private readonly IEnvironmentClient m_Environment;
-        [CanBeNull] private MobileParty m_ManagedParty;
     }
 }
