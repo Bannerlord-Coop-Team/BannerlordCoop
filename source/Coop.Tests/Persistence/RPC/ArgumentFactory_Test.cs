@@ -4,6 +4,7 @@ using Coop.Tests.Sync;
 using RailgunNet.System.Encoding;
 using RemoteAction;
 using Sync.Store;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace Coop.Tests.Persistence.RPC
@@ -211,6 +212,37 @@ namespace Coop.Tests.Persistence.RPC
             Assert.NotNull(resolvedClient1);
             Assert.IsType<int>(resolvedClient1);
             Assert.Equal(transferedValue, (ETest) resolvedClient1);
+        }
+
+        [Fact]
+        void SmallObjectSerializationWorks()
+        {
+            Tuple<bool, float> toBeTransfered = new Tuple<bool, float>(true, 42);
+            byte[] raw = m_StoreClient0.Serialize(toBeTransfered);
+            Argument arg = new Argument(raw);
+            Assert.Equal(EventArgType.SmallObjectRaw, arg.EventType);
+            Assert.False(arg.MbGUID.HasValue);
+            Assert.NotNull(arg.Raw);
+            Assert.False(arg.StoreObjectId.HasValue);
+
+            // Serialize
+            buffer.EncodeEventArg(arg);
+            
+            // Deserialize
+            Argument argDeserialized = buffer.DecodeEventArg();
+            Assert.Equal(EventArgType.SmallObjectRaw, argDeserialized.EventType);
+
+            // Resolve on client 0 works since that store was used for the create
+            object resolved = ArgumentFactory.Resolve(m_StoreClient0, argDeserialized);
+            Assert.NotNull(resolved);
+            Assert.IsType<Tuple<bool, float>>(resolved);
+            Assert.Equal(toBeTransfered, (Tuple<bool, float>) resolved);
+
+            // client 1 can resolve the argument
+            object resolvedClient1 = ArgumentFactory.Resolve(m_StoreClient1, argDeserialized);
+            Assert.NotNull(resolvedClient1);
+            Assert.IsType<Tuple<bool, float>>(resolvedClient1);
+            Assert.Equal(toBeTransfered, (Tuple<bool, float>) resolvedClient1);
         }
     }
 }

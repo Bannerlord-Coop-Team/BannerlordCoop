@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
 using NLog;
+using RailgunNet;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
@@ -14,6 +15,7 @@ namespace RemoteAction
     /// </summary>
     public static class ArgumentFactory
     {
+        private const int c_MaxSmallObjectSize = RailConfig.MAXSIZE_EVENT / 4;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         /// <summary>
@@ -58,6 +60,9 @@ namespace RemoteAction
                     return resolvedObject;
                 case EventArgType.CurrentCampaign:
                     return Campaign.Current;
+                case EventArgType.SmallObjectRaw:
+                    if (store == null) throw new ArgumentException($"Cannot resolve ${arg}, no store provided.");
+                    return store.Deserialize(arg.Raw);
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -110,6 +115,7 @@ namespace RemoteAction
                     // New campaign? Send by value
                     return new Argument(store.Insert(obj));
                 default:
+                    // Enums
                     if (obj.GetType().IsEnum)
                     {
                         if (obj.GetType().GetEnumUnderlyingType() == typeof(int))
@@ -117,7 +123,16 @@ namespace RemoteAction
                             return new Argument((int) obj);
                         }
                     }
-                    return new Argument(store.Insert(obj));
+
+                    byte[] raw = store.Serialize(obj);
+                    if (raw.Length <= c_MaxSmallObjectSize)
+                    {
+                        // Small objects directly by value
+                        return new Argument(raw);
+                    }
+                    
+                    // Larger objects by store
+                    return new Argument(store.Insert(obj, raw));
             }
         }
     }

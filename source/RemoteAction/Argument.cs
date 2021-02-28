@@ -30,7 +30,8 @@ namespace RemoteAction
         Int,
         Float,
         StoreObjectId,
-        CurrentCampaign
+        CurrentCampaign,
+        SmallObjectRaw
     }
 
     /// <summary>
@@ -55,6 +56,7 @@ namespace RemoteAction
         public int? Int { get; }
         public float? Float { get; }
         public ObjectId? StoreObjectId { get; }
+        public byte[] Raw { get; }
 
         public Argument(int i) : this()
         {
@@ -80,6 +82,12 @@ namespace RemoteAction
             StoreObjectId = id;
         }
 
+        public Argument(byte[] raw) : this()
+        {
+            EventType = EventArgType.SmallObjectRaw;
+            Raw = raw;
+        }
+
         public override int GetHashCode()
         {
             var hash = (int) EventType;
@@ -103,6 +111,9 @@ namespace RemoteAction
                     argHash = StoreObjectId.Value.GetHashCode();
                     break;
                 case EventArgType.CurrentCampaign:
+                    break;
+                case EventArgType.SmallObjectRaw:
+                    argHash = Raw.GetHashCode();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -137,6 +148,8 @@ namespace RemoteAction
                     return $"{StoreObjectId.ToString()}";
                 case EventArgType.CurrentCampaign:
                     return "Campaign.Current";
+                case EventArgType.SmallObjectRaw:
+                    return "Raw byte array";
                 default:
                     throw new ArgumentOutOfRangeException();
             }

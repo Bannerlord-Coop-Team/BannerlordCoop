@@ -79,13 +79,27 @@ namespace Sync.Store
 
         public IReadOnlyDictionary<ObjectId, RemoteObjectState> State => m_State;
 
+        public byte[] Serialize(object obj)
+        {
+            return m_Serializer.Serialize(obj);
+        }
+
+        public object Deserialize(byte[] raw)
+        {
+            return m_Serializer.Deserialize(raw);
+        }
+
         public ObjectId Insert(object obj)
         {
-            var raw = m_Serializer.Serialize(obj);
-            var id = new ObjectId(XXHash.XXH32(raw));
+            return Insert(obj, Serialize(obj));
+        }
+
+        public ObjectId Insert(object obj, byte[] serialized)
+        {
+            var id = new ObjectId(XXHash.XXH32(serialized));
             m_Data[id] = obj;
-            Logger.Trace("[{id}] Insert: {object} [{type}]", id, obj, obj.GetType());
-            SendAdd(id, raw);
+            Logger.Trace("[{Id}] Insert: {Object} [{Type}]", id, obj, obj.GetType());
+            SendAdd(id, serialized);
             return id;
         }
 
@@ -124,7 +138,7 @@ namespace Sync.Store
             }
             else
             {
-                m_Data[id] = m_Serializer.Deserialize(raw);
+                m_Data[id] = Deserialize(raw);
                 Logger.Trace(
                     "[{id}] Received: {object} [{type}]",
                     id,

@@ -46,6 +46,9 @@ namespace RemoteAction
                 case EventArgType.CurrentCampaign:
                     // Empty
                     break;
+                case EventArgType.SmallObjectRaw:
+                    buffer.WriteByteArray(arg.Raw);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -73,6 +76,8 @@ namespace RemoteAction
                     return new Argument(new ObjectId(buffer.ReadUInt()));
                 case EventArgType.CurrentCampaign:
                     return Argument.CurrentCampaign;
+                case EventArgType.SmallObjectRaw:
+                    return new Argument(buffer.ReadByteArray());
                 default:
                     throw new ArgumentOutOfRangeException();
             }

@@ -34,15 +34,29 @@ namespace Sync.Store
             m_Serializer = new StoreSerializer(serializableFactory);
         }
 
+        public byte[] Serialize(object obj)
+        {
+            return m_Serializer.Serialize(obj);
+        }
+
+        public object Deserialize(byte[] raw)
+        {
+            return m_Serializer.Deserialize(raw);
+        }
+
         public ObjectId Insert(object obj)
         {
-            var raw = m_Serializer.Serialize(obj);
-            var id = new ObjectId(XXHash.XXH32(raw));
+            return Insert(obj, Serialize(obj));
+        }
+
+        public ObjectId Insert(object obj, byte[] serialized)
+        {
+            var id = new ObjectId(XXHash.XXH32(serialized));
             m_Data[id] = obj;
-            Logger.Trace("[{id}] Insert: {object}", id, obj);
+            Logger.Trace("[{Id}] Insert: {Object}", id, obj);
 
             m_PendingAcks[id] = new PendingResponse(null, m_Stores.Values.ToList());
-            foreach (var store in m_Stores.Values) store.SendAdd(id, raw);
+            foreach (var store in m_Stores.Values) store.SendAdd(id, serialized);
 
             return id;
         }
