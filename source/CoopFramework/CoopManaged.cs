@@ -15,9 +15,8 @@ using Sync.Value;
 namespace CoopFramework
 {
     /// <summary>
-    ///     Base class to extend a type to be managed by the Coop framework.
-    ///     <code>
-    /// </code>
+    ///     Base class to extend a type to be managed by the Coop framework. A coop managed class can be extended
+    ///     with additional data and generate patches for the original class at runtime. 
     /// </summary>
     public abstract class CoopManaged<TSelf, TExtended> : DefaultConditions where TExtended : class
     {
@@ -320,8 +319,8 @@ namespace CoopFramework
             var objectManager = CoopFramework.ObjectManager;
             var isManagedClass = objectManager?.Manages<TExtended>() ?? false;
             m_LifetimeObserver = new ObjectLifetimeObserver<TExtended>();
-            m_LifetimeObserver.OnAfterCreateObject += instance => OnAutoConstructed(factoryMethod(instance));
-            m_LifetimeObserver.OnAfterRemoveObject += instance =>
+            m_LifetimeObserver.AfterCreateObject += instance => OnAutoConstructed(factoryMethod(instance));
+            m_LifetimeObserver.AfterRemoveObject += instance =>
             {
                 lock (m_AutoWrappedInstances)
                 {

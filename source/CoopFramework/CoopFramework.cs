@@ -1,17 +1,33 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
+using JetBrains.Annotations;
 using NLog;
 
 namespace CoopFramework
 {
+    /// <summary>
+    ///     Main entry point to start up the coop framework.
+    /// </summary>
     public static class CoopFramework
     {
+        /// <summary>
+        ///     Evaluates whether the coop patches should be active or not.
+        /// </summary>
         public static bool IsEnabled => m_IsCoopEnabled?.Invoke() ?? true;
 
-        public static IObjectManager ObjectManager { get; private set; }
+        /// <summary>
+        ///     Adapter for the games object manager.
+        /// </summary>
+        [CanBeNull] public static IObjectManager ObjectManager { get; private set; }
 
-        public static void InitPatches(IObjectManager objectManager, Func<bool> isCoopEnabled)
+        /// <summary>
+        ///     Initializes all patches that are generated through <see cref="CoopManaged{TSelf,TExtended}"/>.
+        ///     To be called once on start up after all assemblies that need patching are loaded.
+        /// </summary>
+        /// <param name="objectManager">Instance of the adapter to the games object manager.</param>
+        /// <param name="isCoopEnabled">Function to evaluate whether the coop patches should be active or not.</param>
+        public static void InitPatches([CanBeNull] IObjectManager objectManager, Func<bool> isCoopEnabled)
         {
             ObjectManager = objectManager;
             m_IsCoopEnabled = isCoopEnabled;

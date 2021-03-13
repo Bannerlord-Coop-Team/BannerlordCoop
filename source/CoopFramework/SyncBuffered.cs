@@ -10,14 +10,14 @@ namespace CoopFramework
 {
     /// <summary>
     ///     Base class for synchronization implementations that store changes to fields in a buffer. The
-    ///     The buffer will be synchronized when <seealso cref="SynchronizationManager.ProcessBufferedChanges" />
+    ///     The buffer will be synchronized when <seealso cref="SSyncBufferManagerProcessBufferedChanges" />
     ///     is called, usually once at the end of a game tick.
     /// </summary>
     public abstract class SyncBuffered : ISynchronization, IUpdateable
     {
         protected SyncBuffered()
         {
-            SynchronizationManager.Register(this);
+            SyncBufferManager.Register(this);
         }
 
         #region Debug

@@ -259,7 +259,7 @@ namespace Coop.Mod.DebugUtil
                 
                 Imgui.NewLine();
                 
-                foreach (SyncBuffered sync in SynchronizationManager.SynchronizationInstances)
+                foreach (SyncBuffered sync in SyncBufferManager.SynchronizationInstances)
                 {
                     var history = sync.BroadcastHistory
                         .Where(c => (c.Call.HasValue && Equals(c.Call.Value, methodId)) ||
@@ -275,7 +275,7 @@ namespace Coop.Mod.DebugUtil
                     }
 
                     int length = m_LogEntrySize[sync];
-                    Imgui.Text($"History of {sync.GetType().FullName}");
+                    Imgui.Text($"Outgoing command history of {sync.GetType().FullName}");
                     
                     history = history
                         .Take(m_LogEntrySize[sync])

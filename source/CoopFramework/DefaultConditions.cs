@@ -3,6 +3,9 @@ using Sync.Behaviour;
 
 namespace CoopFramework
 {
+    /// <summary>
+    ///     Collection of useful <see cref="Condition"/> implementations.
+    /// </summary>
     public class DefaultConditions
     {
         /// <summary>

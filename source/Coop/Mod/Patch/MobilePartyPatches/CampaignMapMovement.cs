@@ -57,12 +57,14 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                     Setter(nameof(MobileParty.TargetPosition)))
                 .Broadcast(() => Sync);
 
-            // Capture the current position to a buffer and process it trough `Sync`.
+            // Capture the current position of all parties on the server to a buffer and
+            // distribute it to all clients trough `Sync`.
             When(GameLoop & CoopConditions.IsServer)
                 .Changes(MapPosition)
                 .Through(MapPositionSetter)
                 .Broadcast(() => Sync);
             
+            // Disabled all party movement calls for parties that are not controlled by this client
             /*When(GameLoop & Not(CoopConditions.ControlsParty))
                 .Calls(
                     Method(nameof(MobileParty.SetMoveBesiegeSettlement)),
