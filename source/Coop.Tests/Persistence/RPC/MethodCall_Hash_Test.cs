@@ -31,7 +31,12 @@ namespace Coop.Tests.Persistence.RPC
                 case EventArgType.StoreObjectId:
                     return new Argument(new ObjectId((uint) random.Next()));
                 case EventArgType.CurrentCampaign:
-                    return Argument.CurrentCampaign;
+                    return Argument.CurrentCampaign; 
+                case EventArgType.SmallObjectRaw:
+                    int[] intArray = {random.Next(), random.Next()};
+                    byte[] raw = new byte[intArray.Length * sizeof(int)];
+                    Buffer.BlockCopy(intArray, 0, raw, 0, raw.Length);
+                    return new Argument(raw);
                 default:
                     throw new ArgumentOutOfRangeException();
             }
