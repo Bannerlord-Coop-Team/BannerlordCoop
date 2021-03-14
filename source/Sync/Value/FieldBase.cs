@@ -6,19 +6,19 @@ namespace Sync.Value
     /// <summary>
     ///     Type-erased interface for setting and getting a value from an instance.
     /// </summary>
-    public abstract class Field
+    public abstract class FieldBase
     {
         [NotNull] public readonly Type DeclaringType;
         public readonly FieldId Id;
 
-        public Field(Type declaringType)
+        public FieldBase(Type declaringType)
         {
             Id = Registry.Register(this);
             DeclaringType = declaringType;
         }
 
         /// <summary>
-        ///     Returns the current value of an instance of this <see cref="Field" />.
+        ///     Returns the current value of an instance of this <see cref="FieldBase" />.
         /// </summary>
         /// <param name="target">Instance to get the value from.</param>
         /// <exception cref="ArgumentException">If the target or value are not of the expected type.</exception>
@@ -26,7 +26,7 @@ namespace Sync.Value
         public abstract object Get(object target);
 
         /// <summary>
-        ///     Sets the current value of an instance of this <see cref="Field" />.
+        ///     Sets the current value of an instance of this <see cref="FieldBase" />.
         /// </summary>
         /// <param name="target">Instance to set the value on.</param>
         /// <param name="value">Value to set.</param>

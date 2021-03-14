@@ -237,7 +237,7 @@ namespace Coop.Mod.DebugUtil
                 {
                     foreach (FieldId valueId in Registry.Relation[methodId])
                     {
-                        void PrintField(Field valueAccess, float indentF = 0f)
+                        void PrintField(FieldBase valueAccess, float indentF = 0f)
                         {
                             relatedFields.Add(valueAccess.Id);
                             Imgui.Text("Related FieldId:");
@@ -245,7 +245,7 @@ namespace Coop.Mod.DebugUtil
                             Imgui.Text($"{valueAccess.Id.InternalValue} [" + valueAccess + "]");
                         }
 
-                        Field field = Registry.IdToField[valueId];
+                        FieldBase field = Registry.IdToField[valueId];
                         PrintField(field);
                         if (field is FieldAccessGroup group)
                         {
@@ -307,7 +307,7 @@ namespace Coop.Mod.DebugUtil
                             else if (trace.Value.HasValue && arguments.Length > 0)
                             {
                                 object argument = arguments[0];
-                                Field field = Registry.IdToField[trace.Value.Value];
+                                FieldBase field = Registry.IdToField[trace.Value.Value];
                                 FieldChangeBuffer buffer = new FieldChangeBuffer();
                                 buffer.AddChange(field, new FieldData(field, instance, argument), argument);
                                 sync.Broadcast(buffer);

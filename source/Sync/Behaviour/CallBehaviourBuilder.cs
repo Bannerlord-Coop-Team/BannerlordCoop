@@ -8,7 +8,7 @@ namespace Sync.Behaviour
     /// <summary>
     ///     Builder class to define the behaviour of a patched method or property getter / setter.
     /// </summary>
-    public class CallBehaviourBuilder : ActionBehaviour
+    public class CallBehaviourBuilder : ConditionalBehaviour
     {
         #region Private
 

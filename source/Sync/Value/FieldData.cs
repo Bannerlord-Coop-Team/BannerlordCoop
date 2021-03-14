@@ -4,14 +4,14 @@ namespace Sync.Value
 {
     public class FieldData
     {
-        public FieldData([NotNull] Field access, object target, object value)
+        public FieldData([NotNull] FieldBase field, object target, object value)
         {
-            Access = access;
+            FieldBase = field;
             Target = target;
             Value = value;
         }
 
-        public Field Access { get; }
+        public FieldBase FieldBase { get; }
         public object Target { get; }
         public object Value { get; }
     }

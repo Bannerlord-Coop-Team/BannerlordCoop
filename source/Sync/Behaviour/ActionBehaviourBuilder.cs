@@ -10,56 +10,73 @@ namespace Sync.Behaviour
     ///     Builder class to define the behaviour of a patched method call, property getter / setter or monitored
     ///     field change.
     /// </summary>
-    public class ActionBehaviourBuilder
+    public class ActionBehaviourBuilder : ConditionalBehaviour
     {
-        public ActionBehaviourBuilder(Condition condition)
+        public ActionBehaviourBuilder([CamBeNull] Condition condition) : base(condition)
         {
-            m_Condition = condition;
         }
-
+        /// <summary>
+        ///     Constructs a new behaviour for method calls.
+        /// </summary>
+        /// <param name="methods">Methods that the behaviour applies to.</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
         public CallBehaviourBuilder Calls(params PatchedInvokable[] methods)
         {
             if (methods.Length == 0)
             {
                 throw new ArgumentOutOfRangeException();
             }
-            var behaviour = new CallBehaviourBuilder(methods.Select(m => m.Id), m_Condition);
+            var behaviour = new CallBehaviourBuilder(methods.Select(m => m.Id), Condition);
             foreach (var method in methods) Register(method.Id, behaviour);
             return behaviour;
         }
-
-        public FieldActionBehaviourBuilder Changes(params FieldAccess[] fields)
+        /// <summary>
+        ///     Constructs a new behaviour for monitored field changes.
+        /// </summary>
+        /// <param name="fields">Fields that the behaviour applies to.</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        public FieldAccessBehaviourBuilder Changes(params FieldAccess[] fields)
         {
             if (fields.Length == 0)
             {
                 throw new ArgumentOutOfRangeException();
             }
-            var fieldChangeAction = new FieldActionBehaviourBuilder(fields.Select(f => f.Id), m_Condition);
+            var fieldChangeAction = new FieldAccessBehaviourBuilder(fields.Select(f => f.Id), Condition);
             foreach (var field in fields) Register(field.Id, fieldChangeAction);
 
             return fieldChangeAction;
         }
-
-        public FieldActionBehaviourBuilder Changes(FieldAccessGroup accessGroup)
+        /// <summary>
+        ///     Constructs a new behaviour for a monitored field group.
+        /// </summary>
+        /// <param name="accessGroup">Field group that the behaviour applies to.</param>
+        /// <returns></returns>
+        public FieldAccessBehaviourBuilder Changes(FieldAccessGroup accessGroup)
         {
-            var fieldChangeAction = new FieldActionBehaviourBuilder(new List<FieldId> {accessGroup.Id}, m_Condition);
+            var fieldChangeAction = new FieldAccessBehaviourBuilder(new List<FieldId> {accessGroup.Id}, Condition);
             Register(accessGroup.Id, fieldChangeAction);
             return fieldChangeAction;
         }
 
         #region Getters
-
+        /// <summary>
+        ///     Returns all defined call behaviours.
+        /// </summary>
         public Dictionary<InvokableId, CallBehaviourBuilder> CallBehaviours { get; } =
             new Dictionary<InvokableId, CallBehaviourBuilder>();
 
-        public Dictionary<FieldId, FieldActionBehaviourBuilder> FieldChangeAction { get; } =
-            new Dictionary<FieldId, FieldActionBehaviourBuilder>();
+        /// <summary>
+        ///     Returns all defined monitored field change behaviours.
+        /// </summary>
+        public Dictionary<FieldId, FieldAccessBehaviourBuilder> FieldChangeAction { get; } =
+            new Dictionary<FieldId, FieldAccessBehaviourBuilder>();
 
         #endregion
 
 
         #region Private
-
         private void Register(InvokableId key, CallBehaviourBuilder behaviourBuilder)
         {
             if (CallBehaviours.ContainsKey(key))
@@ -68,7 +85,7 @@ namespace Sync.Behaviour
             CallBehaviours[key] = behaviourBuilder;
         }
 
-        private void Register(FieldId key, FieldActionBehaviourBuilder change)
+        private void Register(FieldId key, FieldAccessBehaviourBuilder change)
         {
             if (FieldChangeAction.ContainsKey(key))
                 throw new Exception($"There's already a behaviour registered for the field '{key}'.");
@@ -76,8 +93,10 @@ namespace Sync.Behaviour
             FieldChangeAction[key] = change;
         }
 
-        private readonly Condition m_Condition;
-
         #endregion
+    }
+
+    public class CamBeNullAttribute : Attribute
+    {
     }
 }

@@ -5,7 +5,10 @@ using Sync.Value;
 
 namespace Sync.Behaviour
 {
-    public class FieldBehaviourBuilder : ActionBehaviour
+    /// <summary>
+    ///     Builder class to define the behaviour of a managed field.
+    /// </summary>
+    public class FieldBehaviourBuilder : ConditionalBehaviour
     {
         #region Private
 

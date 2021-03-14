@@ -6,6 +6,9 @@ using Sync.Behaviour;
 
 namespace Sync.Call
 {
+    /// <summary>
+    ///     A postfix to a method call with configurable handlers.
+    /// </summary>
     public class Postfix
     {
         public delegate void GlobalHandlerDelegate(EOriginator eOrigin, object instance, object[] args);

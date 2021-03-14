@@ -38,7 +38,7 @@ namespace CoopFramework
         /// <inheritdoc cref="ISynchronization.Broadcast(FieldChangeBuffer)" />
         public virtual void Broadcast(FieldChangeBuffer buffer)
         {
-            m_Buffer.AddChanges(buffer);
+            m_Buffer.Merge(buffer);
         }
 
         /// <inheritdoc cref="IUpdateable.Update(TimeSpan)" />

@@ -77,7 +77,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                     return;
                 }
                 
-                Field field = change.Key;
+                FieldBase field = change.Key;
                 foreach (var instanceChange in change.Value)
                 {
                     var argInstance = ArgumentFactory.Create(

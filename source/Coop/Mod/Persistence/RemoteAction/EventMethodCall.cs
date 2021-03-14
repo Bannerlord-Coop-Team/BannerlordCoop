@@ -58,7 +58,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                 {
                     if (!IsValid())
                     {
-                        ActionValidatorRegistry.TryGet(Call.Id, out IActionValidator validator);
+                        ActionValidator.TryGet(Call.Id, out IActionValidator validator);
                         Logger.Info("[{EventId}] Broadcast SyncCall '{Call}' rejected by {Validator}: {Reason}", EventId, Call, validator.GetType().Name, validator.GetReasonForRejection());
                         return;
                     }

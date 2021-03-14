@@ -9,15 +9,20 @@ namespace Sync.Behaviour
     ///     Note that field changes cannot be intercepted (patched) directly, instead methods and property setters
     ///     that access the field are patched - these are referred to as 'accessors' to the field.
     /// </summary>
-    public class FieldActionBehaviourBuilder
+    public class FieldAccessBehaviourBuilder
     {
-        public FieldActionBehaviourBuilder(IEnumerable<FieldId> fieldIds, Condition condition)
+        public FieldAccessBehaviourBuilder(IEnumerable<FieldId> fieldIds, Condition condition)
         {
             m_FieldIds = fieldIds;
             m_Condition = condition;
         }
-
+        /// <summary>
+        ///     The patched invokable used to access the fields.
+        /// </summary>
         public List<PatchedInvokable> Accessors { get; } = new List<PatchedInvokable>();
+        /// <summary>
+        ///     The behaviour builder for the managed field itself.
+        /// </summary>
         public FieldBehaviourBuilder Behaviour { get; private set; }
 
         /// <summary>

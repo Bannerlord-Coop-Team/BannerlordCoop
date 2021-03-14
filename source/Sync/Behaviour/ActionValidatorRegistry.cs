@@ -6,18 +6,37 @@ using Sync.Value;
 
 namespace Sync.Behaviour
 {
-    public static class ActionValidatorRegistry
+    /// <summary>
+    ///     Registry for action validators. For internal use only, public access through <see cref="ActionValidator"/>.
+    /// </summary>
+    internal static class ActionValidatorRegistry
     {
+        /// <summary>
+        ///     Returns the validator for the given field (if one exists).
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="validator"></param>
+        /// <returns></returns>
         public static bool TryGet(FieldId id, out IActionValidator validator)
         {
             return m_FieldValidators.TryGetValue(id, out validator);
         }
-
+        /// <summary>
+        ///     Returns the validator for the given invokable (if one exists).
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="validator"></param>
+        /// <returns></returns>
         public static bool TryGet(InvokableId id, out IActionValidator validator)
         {
             return m_MethodValidators.TryGetValue(id, out validator);
         }
-
+        /// <summary>
+        ///     Registers a validator for a invokable.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="validator"></param>
+        /// <exception cref="ArgumentException"></exception>
         public static void Register(InvokableId id, [NotNull] IActionValidator validator)
         {
             lock (Lock)
@@ -28,7 +47,12 @@ namespace Sync.Behaviour
                 m_MethodValidators.Add(id, validator);
             }
         }
-
+        /// <summary>
+        ///     Registers a validator for a field.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="validator"></param>
+        /// <exception cref="ArgumentException"></exception>
         public static void Register(FieldId id, [NotNull] IActionValidator validator)
         {
             lock (Lock)
@@ -41,7 +65,6 @@ namespace Sync.Behaviour
         }
 
         #region Private
-
         private static readonly object Lock = new object();
 
         private static readonly Dictionary<InvokableId, IActionValidator> m_MethodValidators =

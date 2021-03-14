@@ -49,7 +49,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                 {
                     if (!IsValid())
                     {
-                        ActionValidatorRegistry.TryGet(Field.Id, out IActionValidator validator);
+                        ActionValidator.TryGet(Field.Id, out IActionValidator validator);
                         Logger.Info("[{EventId}] Broadcast FieldChange '{Field}' rejected by {Validator}: {Reason}", EventId, Field, validator.GetType().Name, validator.GetReasonForRejection());
                         return;
                     }

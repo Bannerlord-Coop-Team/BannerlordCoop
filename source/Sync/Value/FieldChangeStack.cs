@@ -6,8 +6,6 @@ namespace Sync.Value
     ///     Buffer for pending changes to a value. The changes are detected by creating a snapshot
     ///     of the value in a prefix to the trigger function and restoring that snapshot in a
     ///     postfix to the trigger function.
-    ///     The buffer <see cref="BufferedChanges" /> will never be cleared internally. The game
-    ///     loop is responsible to process the buffered changes and apply or discard them.
     /// </summary>
     public class FieldChangeStack
     {
@@ -31,14 +29,13 @@ namespace Sync.Value
         /// </summary>
         /// <param name="access">Access object to the field value</param>
         /// <param name="target">Instance that the field belongs to</param>
-        public void PushValue(Field access, object target)
+        public void PushValue(FieldBase access, object target)
         {
             m_ActiveFields.Push(new FieldData(access, target, access.Get(target)));
         }
 
         /// <summary>
-        ///     Pops all changes until a marker is encountered. The popped field changes are stored in the
-        ///     <see cref="BufferedChanges" />.
+        ///     Pops all changes until a marker is encountered and returns them.
         /// </summary>
         /// <param name="bRevertToOriginalValue"></param>
         public FieldChangeBuffer PopUntilMarker(bool bRevertToOriginalValue)
@@ -49,9 +46,9 @@ namespace Sync.Value
                 var data = m_ActiveFields.Pop();
                 if (data == null) break; // The marker
 
-                var access = data.Access;
+                var access = data.FieldBase;
 
-                var newValue = data.Access.Get(data.Target);
+                var newValue = data.FieldBase.Get(data.Target);
                 var changed = !Equals(newValue, data.Value);
 
                 if (!changed) continue;

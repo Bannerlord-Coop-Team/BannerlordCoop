@@ -94,7 +94,7 @@ namespace Sync.Value
     /// <summary>
     ///     Type erased base class for field groups.
     /// </summary>
-    public abstract class FieldAccessGroup : Field
+    public abstract class FieldAccessGroup : FieldBase
     {
         protected FieldAccessGroup(Type declaringType) : base(declaringType)
         {

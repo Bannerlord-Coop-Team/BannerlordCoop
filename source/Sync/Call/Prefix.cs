@@ -7,8 +7,7 @@ using Sync.Behaviour;
 namespace Sync.Call
 {
     /// <summary>
-    ///     Base class for class wrappers that notify when specific instances of the wrapped class
-    ///     change internal state.
+    ///     A prefix to a method call with configurable handlers.
     /// </summary>
     public class Prefix
     {

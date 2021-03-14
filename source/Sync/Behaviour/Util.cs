@@ -5,8 +5,16 @@ using Sync.Value;
 
 namespace Sync.Behaviour
 {
+    /// <summary>
+    ///     Utility functions to work with <see cref="Sync.Behaviour"/>.
+    /// </summary>
     public static class Util
     {
+        /// <summary>
+        ///     Sorts a behaviour list by the <see cref="InvokableId"/> of the methods they apply to.
+        /// </summary>
+        /// <param name="allBehaviours"></param>
+        /// <returns></returns>
         public static Dictionary<InvokableId, List<CallBehaviourBuilder>> SortByMethod(
             List<ActionBehaviourBuilder> allBehaviours)
         {
@@ -25,12 +33,16 @@ namespace Sync.Behaviour
 
             return applicableBehaviours;
         }
-
-        public static Dictionary<FieldId, List<FieldActionBehaviourBuilder>> SortByField(
+        /// <summary>
+        ///     Sorts a behaviour list by the <see cref="FieldId"/> of the fields they apply to.
+        /// </summary>
+        /// <param name="allBehaviours"></param>
+        /// <returns></returns>
+        public static Dictionary<FieldId, List<FieldAccessBehaviourBuilder>> SortByField(
             List<ActionBehaviourBuilder> allBehaviours)
         {
             var applicableBehaviours =
-                new Dictionary<FieldId, List<FieldActionBehaviourBuilder>>();
+                new Dictionary<FieldId, List<FieldAccessBehaviourBuilder>>();
 
             var patchedFields = allBehaviours
                 .SelectMany(b => b.FieldChangeAction.Keys).Distinct();

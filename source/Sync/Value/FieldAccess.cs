@@ -33,7 +33,7 @@ namespace Sync.Value
     /// <summary>
     ///     Type-erased interface to access an arbitrary field.
     /// </summary>
-    public abstract class FieldAccess : Field
+    public abstract class FieldAccess : FieldBase
     {
         [NotNull] public readonly FieldInfo MemberInfo;
 

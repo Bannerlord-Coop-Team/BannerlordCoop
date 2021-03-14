@@ -1,17 +1,26 @@
-﻿namespace Sync.Value
+﻿using System.Threading;
+
+namespace Sync.Value
 {
+    /// <summary>
+    ///     An ID of a field known to <see cref="Sync"/>.
+    /// </summary>
     public readonly struct FieldId
     {
+        /// <summary>
+        ///     The integer value of the id.
+        /// </summary>
         public int InternalValue { get; }
-
-        private static int _nextId = 1;
-
-        public static FieldId GetNextId()
+        /// <summary>
+        ///     Returns a new ID that has not been used so far.
+        /// </summary>
+        /// <returns></returns>
+        public static FieldId CreateUnique()
         {
-            return new FieldId(_nextId++);
+            return new FieldId(Interlocked.Increment(ref _nextId));
         }
 
-        public static FieldId Invalid { get; } = new FieldId(0);
+        public static FieldId Invalid { get; } = new FieldId(-1);
 
         public FieldId(int id)
         {
@@ -52,5 +61,7 @@
         {
             return !(f0 == f1);
         }
+        
+        private static int _nextId = 0;
     }
 }

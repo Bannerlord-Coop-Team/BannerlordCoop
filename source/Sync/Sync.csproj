@@ -72,7 +72,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Behaviour\ActionBehaviour.cs" />
+    <Compile Include="Behaviour\ConditionalBehaviour.cs" />
     <Compile Include="Behaviour\ActionValidator.cs" />
     <Compile Include="Behaviour\CallBehaviourBuilder.cs" />
     <Compile Include="Behaviour\ActionBehaviourBuilder.cs" />
@@ -80,7 +80,7 @@
     <Compile Include="Behaviour\ECallPropagation.cs" />
     <Compile Include="Behaviour\EFieldChangeAction.cs" />
     <Compile Include="Behaviour\EOriginator.cs" />
-    <Compile Include="Behaviour\FieldActionBehaviourBuilder.cs" />
+    <Compile Include="Behaviour\FieldAccessBehaviourBuilder.cs" />
     <Compile Include="Behaviour\FieldBehaviourBuilder.cs" />
     <Compile Include="Behaviour\IActionValidator.cs" />
     <Compile Include="Behaviour\IPendingMethodCall.cs" />
@@ -115,7 +115,7 @@
     <Compile Include="Value\FieldChangeBuffer.cs" />
     <Compile Include="Value\FieldChangeStack.cs" />
     <Compile Include="Value\FieldData.cs" />
-    <Compile Include="Value\Field.cs" />
+    <Compile Include="Value\FieldBase.cs" />
     <Compile Include="Value\FieldChangeRequest.cs" />
     <Compile Include="Value\FieldId.cs" />
   </ItemGroup>

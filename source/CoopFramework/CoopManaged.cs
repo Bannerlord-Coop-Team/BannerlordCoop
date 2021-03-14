@@ -217,7 +217,7 @@ namespace CoopFramework
             // Evaluate behaviours
             foreach (var behaviour in behaviours)
             {
-                if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) continue;
+                if (!behaviour.AppliesTo(eOriginator, instanceResolved)) continue;
                 if (behaviour.DoBroadcast)
                     behaviour.SynchronizationFactory()?.Broadcast(invokableId, instanceResolved, args);
 
@@ -426,7 +426,7 @@ namespace CoopFramework
         private static void SetupFieldHandlers(
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
             FieldId id,
-            [NotNull] List<FieldActionBehaviourBuilder> relevantBehaviours)
+            [NotNull] List<FieldAccessBehaviourBuilder> relevantBehaviours)
         {
             TExtended instanceResolved = null; // stays null for static calls
             if (self != null && !self.TryGetInstance(out instanceResolved)) return;
@@ -522,7 +522,7 @@ namespace CoopFramework
 
             foreach (var behaviour in behaviours)
             {
-                if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) return;
+                if (!behaviour.AppliesTo(eOriginator, instanceResolved)) return;
 
                 var changes = FieldStack.PopUntilMarker(behaviour.Action == EFieldChangeAction.Revert);
                 if (behaviour.DoBroadcast) behaviour.SynchronizationFactory()?.Broadcast(changes);
@@ -540,7 +540,7 @@ namespace CoopFramework
             [CanBeNull] CoopManaged<TSelf, TExtended> self,
             EOriginator eOriginator,
             IEnumerable<FieldBehaviourBuilder> behaviours,
-            Field field)
+            FieldBase field)
         {
             TExtended instanceResolved = null; // stays null for static calls
             if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
@@ -552,7 +552,7 @@ namespace CoopFramework
 
             foreach (var behaviour in behaviours)
             {
-                if (!behaviour.DoesBehaviourApply(eOriginator, instanceResolved)) return ECallPropagation.CallOriginal;
+                if (!behaviour.AppliesTo(eOriginator, instanceResolved)) return ECallPropagation.CallOriginal;
 
                 FieldStack.PushMarker();
                 FieldStack.PushValue(field, instanceResolved);

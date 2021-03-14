@@ -1,5 +1,8 @@
 ﻿namespace Sync.Value
 {
+    /// <summary>
+    ///     Represents a request to change a field value.
+    /// </summary>
     public class FieldChangeRequest
     {
         /// <summary>
