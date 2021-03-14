@@ -5,19 +5,11 @@ using Sync.Store;
 namespace RemoteAction
 {
     /// <summary>
-    ///     Serializer for <see cref="Argument" />. It's important to keep in mind, that the
+    ///     Railgun serializers for <see cref="Argument" />. It's important to keep in mind, that the
     ///     serialized payload may never exceed <see cref="RailgunNet.RailConfig.MAXSIZE_EVENT" />!
     /// </summary>
     public static class ArgumentSerializer
     {
-        private static int NumberOfBitsForArgType => GetNumberOfBitsForArgType();
-
-        private static int GetNumberOfBitsForArgType()
-        {
-            var numberOfValues = Enum.GetNames(typeof(EventArgType)).Length;
-            return Convert.ToInt32(Math.Ceiling(Math.Log(numberOfValues, 2)));
-        }
-
         [Encoder]
         public static void EncodeEventArg(this RailBitBuffer buffer, Argument arg)
         {
@@ -82,5 +74,15 @@ namespace RemoteAction
                     throw new ArgumentOutOfRangeException();
             }
         }
+        
+        #region Private
+        private static int NumberOfBitsForArgType => GetNumberOfBitsForArgType();
+
+        private static int GetNumberOfBitsForArgType()
+        {
+            var numberOfValues = Enum.GetNames(typeof(EventArgType)).Length;
+            return Convert.ToInt32(Math.Ceiling(Math.Log(numberOfValues, 2)));
+        }
+        #endregion
     }
 }

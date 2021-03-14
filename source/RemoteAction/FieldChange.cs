@@ -11,15 +11,26 @@ namespace RemoteAction
     /// </summary>
     public readonly struct FieldChange : ISynchronizedAction
     {
+        /// <summary>
+        ///     The id of the field that is changed.
+        /// </summary>
         public readonly FieldId Id;
-        public readonly Argument Instance; // Instance of the object containing the field.
-        public IEnumerable<Argument> Arguments { get; } // Length == 0. The new value of the field.
-
+        /// <summary>
+        ///     Instance containing the field.
+        /// </summary>
+        public readonly Argument Instance;
+        /// <summary>
+        ///     Arguments to the call. Always has length 1 and contains the new value of the field.
+        /// </summary>
+        public IEnumerable<Argument> Arguments { get; }
+        /// <summary>
+        ///     Evaluates whether this field change is valid.
+        /// </summary>
+        /// <returns></returns>
         public bool IsValid()
         {
             return ActionValidator.IsAllowed(Id);
         }
-
         public FieldChange(FieldId id, Argument instance, Argument value)
         {
             Id = id;

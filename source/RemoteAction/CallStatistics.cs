@@ -9,21 +9,45 @@ using Sync.Value;
 
 namespace RemoteAction
 {
+    /// <summary>
+    ///     Trace data for a method call or a field change.
+    /// </summary>
     public struct CallTrace
     {
+        /// <summary>
+        ///     The id of the field, if a field was changed. Otherwise null.
+        /// </summary>
         public FieldId? Value { get; set; }
+        /// <summary>
+        ///     The id of the call, if a call was made. Otherwise null.
+        /// </summary>
         public InvokableId? Call { get; set; }
+        /// <summary>
+        ///     The instance the call was made on / the field was changed on. Null for static.
+        /// </summary>
         [CanBeNull] public object Instance { get; set; }
+        /// <summary>
+        ///     The arguments to the method call. Null for field changes.
+        /// </summary>
         [CanBeNull] public object[] Arguments { get; set; }
+        /// <summary>
+        ///     The rooms tick the call was made on.
+        /// </summary>
         public Tick Tick { get; set; }
     }
-
+    /// <summary>
+    ///     Rolling buffer for call trace events. Only active in debug mode.
+    /// </summary>
     public class CallStatistics : DropoutStack<CallTrace>
     {
         public CallStatistics(int capacity) : base(capacity)
         {
         }
-
+        /// <summary>
+        ///     Creates a new trace for a method call.
+        /// </summary>
+        /// <param name="call"></param>
+        /// <param name="tick"></param>
         [Conditional("DEBUG")]
         public void Push(MethodCall call, Tick tick)
         {
@@ -35,7 +59,11 @@ namespace RemoteAction
                 Tick = tick
             });
         }
-
+        /// <summary>
+        ///     Create a new trace for a field change.
+        /// </summary>
+        /// <param name="change"></param>
+        /// <param name="tick"></param>
         [Conditional("DEBUG")]
         public void Push(FieldChange change, Tick tick)
         {

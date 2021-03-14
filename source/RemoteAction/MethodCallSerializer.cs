@@ -10,7 +10,7 @@ using Sync.Call;
 namespace RemoteAction
 {
     /// <summary>
-    ///     Railgun encoders and decoders for the remote procedure calls.
+    ///     Railgun serializer for <see cref="MethodCall"/>.
     /// </summary>
     public static class MethodCallSerializer
     {

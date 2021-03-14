@@ -12,15 +12,26 @@ namespace RemoteAction
     /// </summary>
     public readonly struct MethodCall : ISynchronizedAction
     {
+        /// <summary>
+        ///     Arguments to the method call.
+        /// </summary>
         public IEnumerable<Argument> Arguments { get; }
-
+        /// <summary>
+        ///     Evaluates whether this method call is valid.
+        /// </summary>
+        /// <returns></returns>
         public bool IsValid()
         {
             return ActionValidator.IsAllowed(Id);
         }
-
+        /// <summary>
+        ///     The id of the method call.
+        /// </summary>
         public readonly InvokableId Id;
-        public readonly Argument Instance; // Instance to call the method on.
+        /// <summary>
+        ///     Instance that the call was made on. Null for static.
+        /// </summary>
+        public readonly Argument Instance;
 
         public MethodCall(InvokableId id, Argument instance, IEnumerable<Argument> arguments)
         {
