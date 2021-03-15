@@ -182,7 +182,7 @@ namespace Coop.Mod.Persistence
         public void GrantPartyControl(MobileParty party, RailServerPeer peer)
         {
             peer.GrantControl(m_Parties[party]);
-            PlayerControllerParties.Add(peer, party);
+            AddControlledParty(peer, party);
         }
 
         private void OnClientAdded(RailServerPeer peer)
@@ -219,6 +219,18 @@ namespace Coop.Mod.Persistence
                     peer.RevokeControl(controlledEntity);
                     OnPlayerControlledEntityOrphaned?.Invoke(peer, controlledEntity);
                 }
+            }
+        }
+
+        private void AddControlledParty(RailServerPeer peer, MobileParty party)
+        {
+            if (!PlayerControllerParties.ContainsKey(peer))
+            {
+                
+            }
+            else if(PlayerControllerParties[peer] != party)
+            {
+                PlayerControllerParties[peer] = party;
             }
         }
 

@@ -23,6 +23,10 @@ using TaleWorlds.Localization;
 using Helpers;
 using Sync.Store;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
+using TaleWorlds.MountAndBlade.GauntletUI;
+using StoryMode.GauntletUI.CharacterCreationSystem;
+using TaleWorlds.MountAndBlade.ViewModelCollection;
+using System.Runtime;
 
 namespace Coop.Mod.Managers
 {
@@ -78,16 +82,22 @@ namespace Coop.Mod.Managers
         private void SkipCharacterCreation()
         {
             CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
-            bool flag = CharacterObject.PlayerCharacter.Culture == null;
+            bool flag = characterCreationState.CurrentStage is CharacterCreationCultureStage;
             if (flag)
             {
-                CultureObject culture = CharacterCreationContentBase.Instance.GetCultures().FirstOrDefault<CultureObject>();
+                CultureObject culture = CharacterCreationContentBase.Instance.GetCultures().GetRandomElementInefficiently();
                 CharacterCreationContentBase.Instance.SetSelectedCulture(culture, characterCreationState.CharacterCreation);
                 characterCreationState.NextStage();
             }
             bool flag2 = characterCreationState.CurrentStage is CharacterCreationFaceGeneratorStage;
             if (flag2)
             {
+                CharacterCreationFaceGeneratorView stageView = characterCreationState.CurrentStage.Listener as CharacterCreationFaceGeneratorView;
+                BodyGeneratorView bgv = (BodyGeneratorView)stageView.GetType().GetField("_faceGeneratorView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(stageView);
+
+                FaceGenVM facegen = bgv.DataSource;
+
+                facegen.FaceProperties.Randomize();
                 characterCreationState.NextStage();
             }
             bool flag3 = characterCreationState.CurrentStage is CharacterCreationGenericStage;
@@ -112,8 +122,6 @@ namespace Coop.Mod.Managers
             bool flag6 = characterCreationState.CurrentStage is CharacterCreationOptionsStage;
             if (flag6)
             {
-                (Game.Current.GameStateManager.ActiveState as CharacterCreationState).CharacterCreation.Name = "Jeff";
-                characterCreationState.NextStage();
             }
             characterCreationState = (GameStateManager.Current.ActiveState as CharacterCreationState);
         }
