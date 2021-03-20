@@ -207,6 +207,9 @@ namespace Network.Infrastructure
         {
             Updateables.UpdateAll(frameTime);
         }
+
+        public int Priority { get; } = UpdatePriority.ServerThread.Update;
+
         #endregion
     }
 }

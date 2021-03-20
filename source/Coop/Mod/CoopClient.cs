@@ -42,6 +42,7 @@ namespace Coop.Mod
         private readonly CoopClientSM m_CoopClientSM;
 
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
+        private readonly UpdateableList m_Updateables = new UpdateableList();
 
         /// <summary>
         ///     Internal data storage for <see cref="SyncedObjectStore" />.
@@ -64,6 +65,7 @@ namespace Coop.Mod
             Session = new GameSession(new GameData());
             Session.OnConnectionDestroyed += ConnectionDestroyed;
             m_NetManager = new LiteNetManagerClient(Session, config);
+            m_Updateables.Add(m_NetManager);
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
             Synchronization = new CoopSync(this);
@@ -127,9 +129,9 @@ namespace Coop.Mod
 
         public void Update(TimeSpan frameTime)
         {
-            m_NetManager.Update(frameTime);
-            Persistence?.Update(frameTime);
+            m_Updateables.UpdateAll(frameTime);
         }
+        public int Priority { get; } = UpdatePriority.MainLoop.Update;
 
         public string Connect(IPAddress ip, int iPort)
         {
@@ -158,6 +160,7 @@ namespace Coop.Mod
             if (Persistence == null)
             {
                 Persistence = new PersistenceClient(new GameEnvironmentClient());
+                m_Updateables.Add(Persistence);
                 OnPersistenceInitialized?.Invoke(Persistence);
             }
 

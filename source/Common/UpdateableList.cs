@@ -9,7 +9,7 @@ namespace Common
     /// </summary>
     public class UpdateableList
     {
-        private readonly List<IUpdateable> m_Updateables = new List<IUpdateable>();
+        private List<IUpdateable> m_UpdateablesSorted = new List<IUpdateable>();
 
         /// <summary>
         ///     Updates the whole list.
@@ -18,9 +18,9 @@ namespace Common
         public void UpdateAll(TimeSpan frameTime)
         {
             List<IUpdateable> iterationCopy;
-            lock (m_Updateables)
+            lock (m_UpdateablesSorted)
             {
-                iterationCopy = new List<IUpdateable>(m_Updateables);
+                iterationCopy = new List<IUpdateable>(m_UpdateablesSorted);
             }
 
             foreach (IUpdateable updateable in iterationCopy)
@@ -36,14 +36,15 @@ namespace Common
         /// <exception cref="ArgumentException"></exception>
         public void Add(IUpdateable updateable)
         {
-            lock (m_Updateables)
+            lock (m_UpdateablesSorted)
             {
-                if (m_Updateables.Contains(updateable))
+                if (m_UpdateablesSorted.Contains(updateable))
                 {
                     throw new ArgumentException($"duplicate entry for {updateable}.");
                 }
-
-                m_Updateables.Add(updateable);
+                
+                m_UpdateablesSorted.Add(updateable);
+                m_UpdateablesSorted = m_UpdateablesSorted.OrderBy(o => o.Priority).ToList();
             }
         }
 
@@ -53,9 +54,9 @@ namespace Common
         /// <param name="updateable"></param>
         public void Remove(IUpdateable updateable)
         {
-            lock (m_Updateables)
+            lock (m_UpdateablesSorted)
             {
-                m_Updateables.Remove(updateable);
+                m_UpdateablesSorted.Remove(updateable);
             }
         }
     }

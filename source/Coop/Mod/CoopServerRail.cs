@@ -21,6 +21,7 @@ namespace Coop.Mod
             new Dictionary<ConnectionServer, RailNetPeerWrapper>();
 
         [NotNull] private readonly Server m_Server;
+        private readonly UpdateableList m_Updateables = new UpdateableList();
 
         public CoopServerRail(
             [NotNull] Server server,
@@ -30,6 +31,7 @@ namespace Coop.Mod
         {
             m_Server = server;
             EventQueue = new EventBroadcastingQueue(store, eventTimeout);
+            m_Updateables.Add(EventQueue);
             m_Instance = new RailServer(registry);
             MobilePartyEntityManager = new MobilePartyEntityManager(m_Instance);
         }
@@ -49,6 +51,8 @@ namespace Coop.Mod
             m_Instance.Update();
             EventQueue.Update(frameTime);
         }
+        
+        public int Priority { get; } = UpdatePriority.ServerThread.RailGun;
 
         ~CoopServerRail()
         {

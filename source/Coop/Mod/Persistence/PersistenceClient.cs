@@ -40,6 +40,7 @@ namespace Coop.Mod.Persistence
         {
             m_RailClient.Update();
         }
+        public int Priority { get; } = UpdatePriority.MainLoop.RailGun;
 
         public void SetConnection([CanBeNull] ConnectionClient connection)
         {

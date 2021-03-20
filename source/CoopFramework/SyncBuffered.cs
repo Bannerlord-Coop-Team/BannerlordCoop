@@ -46,6 +46,7 @@ namespace CoopFramework
         {
             if (m_Buffer.Count() > 0) BroadcastBufferedChanges(m_Buffer);
         }
+        public int Priority { get; } = UpdatePriority.MainLoop.SyncBufferedFields;
 
         /// <summary>
         ///     Called when the buffered changes should be broadcast. Usually at the end of a game tick.

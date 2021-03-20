@@ -52,6 +52,7 @@ namespace Coop.Mod.DebugUtil
                 End();
             }
         }
+        public int Priority { get; } = UpdatePriority.MainLoop.DebugUI;
 
         private static void DisplayPersistenceMenu()
         {

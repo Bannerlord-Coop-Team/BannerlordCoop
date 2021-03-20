@@ -51,7 +51,9 @@ namespace Coop.Tests.Network
                     m_Timer.Restart();
                 }
             }
+            public int Priority { get; } = UpdatePriority.ServerThread.Update + 20;
         }
+        
 
         private readonly Server m_Server;
         private readonly TimingModule m_Module;

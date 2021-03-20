@@ -12,5 +12,9 @@ namespace Common
         /// </summary>
         /// <param name="frameTime">Time elapsed since the last call to this function.</param>
         void Update(TimeSpan frameTime);
+        /// <summary>
+        ///     The priority of this updateable. Highest priority is executed first. 
+        /// </summary>
+        int Priority { get; }
     }
 }

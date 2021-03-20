@@ -90,6 +90,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                 m_Queue.RemoveRange(0, numberOfBroadcastEvents);
             }
         }
+        public int Priority { get; } = UpdatePriority.ServerThread.ProcessBroadcasts;
 
         /// <summary>
         ///     Adds an event to be broadcast.

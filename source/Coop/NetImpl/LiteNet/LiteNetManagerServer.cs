@@ -70,6 +70,7 @@ namespace Coop.NetImpl.LiteNet
                 m_SinceLastKeepAlive = TimeSpan.Zero;
             }
         }
+        public int Priority { get; } = UpdatePriority.ServerThread.PollNetwork;
 
         private NetManager CreateNetManager(ISaveData worldData)
         {
