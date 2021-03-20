@@ -2,11 +2,9 @@
 using System.Collections.Generic;
 using Coop.Mod.Patch.MobilePartyPatches;
 using CoopFramework;
-using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
 using RemoteAction;
-using Sync.Behaviour;
 using Sync.Call;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
@@ -30,14 +28,20 @@ namespace Coop.Mod.Persistence.Party
     /// </summary>
     public class MobilePartySync : SyncBuffered
     {
+        /// <summary>
+        ///     Invoked when the movement data of a party was changed by the server.
+        /// </summary>
+        public Action<MobileParty, MovementData> OnRemoteMovementChanged;
+        /// <summary>
+        ///     Invoker when the map position of a mobile party was changed by the server.
+        /// </summary>
+        public Action<MobileParty, Vec2> OnRemoteMapPostionChanged;
         public MobilePartySync(
             [NotNull] FieldAccessGroup<MobileParty, MovementData> movementOrder,
-            [NotNull] FieldAccess<MobileParty, Vec2> mapPosition,
-            [NotNull] PatchedInvokable mapPositionSetter)
+            [NotNull] FieldAccess<MobileParty, Vec2> mapPosition)
         {
             m_MovementOrder = movementOrder ?? throw new ArgumentNullException();
             m_MapPosition = mapPosition ?? throw new ArgumentNullException();
-            m_MapPositionSetter = mapPositionSetter ?? throw new ArgumentNullException();
         }
 
         /// <summary>
@@ -128,20 +132,7 @@ namespace Coop.Mod.Persistence.Party
 #endif
             }
 
-            m_MovementOrder.SetTyped(party, data);
-            if (party.IsRemotePlayerMainParty())
-                // That is a remote player moving. We need to update the local MainParty as well
-                // because Campaign.Tick will otherwise not update the AI decisions and just
-                // ignore some actions (for example EngageParty).
-            {
-                m_DefaultBehaviorNeedsUpdate(Campaign.Current.MainParty) = true;
-            }
-            else
-            {
-                m_DefaultBehaviorNeedsUpdate(party) = Coop.IsController(party);
-            }
-
-            party.RecalculateShortTermAi();
+            OnRemoteMovementChanged?.Invoke(party, data);
         }
 
         /// <summary>
@@ -151,7 +142,7 @@ namespace Coop.Mod.Persistence.Party
         /// <param name="position"></param>
         public void SetAuthoritative(MobileParty party, Vec2 position)
         {
-            m_MapPositionSetter.Invoke(EOriginator.RemoteAuthority, party, new object[] {position});
+            OnRemoteMapPostionChanged?.Invoke(party, position);
         }
 
         #region Private
@@ -240,17 +231,12 @@ namespace Coop.Mod.Persistence.Party
                 }
             }
         }
-
-        private static readonly AccessTools.FieldRef<MobileParty, bool> m_DefaultBehaviorNeedsUpdate =
-            AccessTools.FieldRefAccess<MobileParty, bool>("_defaultBehaviorNeedsUpdate");
-
         private readonly Dictionary<MBGUID, IMovementHandler> m_Handlers =
             new Dictionary<MBGUID, IMovementHandler>();
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         [NotNull] private readonly FieldAccessGroup<MobileParty, MovementData> m_MovementOrder;
         [NotNull] private readonly FieldAccess<MobileParty, Vec2> m_MapPosition;
-        [NotNull] private readonly PatchedInvokable m_MapPositionSetter;
 
         #endregion
     }
