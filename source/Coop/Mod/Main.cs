@@ -217,8 +217,7 @@ namespace Coop.Mod
             }
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
-            SyncBufferManager.ProcessBufferedChanges(frameTime);
-            Updateables.UpdateAll(frameTime);
+            Updateables.MakeUnion(SyncBufferManager.ProcessBufferedChanges).UpdateAll(frameTime);
         }
 
         private void initLogger()

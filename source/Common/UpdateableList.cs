@@ -44,7 +44,7 @@ namespace Common
                 }
                 
                 m_UpdateablesSorted.Add(updateable);
-                m_UpdateablesSorted = m_UpdateablesSorted.OrderBy(o => o.Priority).ToList();
+                m_UpdateablesSorted = m_UpdateablesSorted.OrderBy(o => o.Priority).Reverse().ToList();
             }
         }
 
@@ -58,6 +58,30 @@ namespace Common
             {
                 m_UpdateablesSorted.Remove(updateable);
             }
+        }
+        /// <summary>
+        ///     Creates a new list containing the union of this list and the given list.
+        /// </summary>
+        /// <param name="other"></param>
+        /// <returns></returns>
+        public UpdateableList MakeUnion(UpdateableList other)
+        {
+            UpdateableList union = new UpdateableList();
+            lock (m_UpdateablesSorted)
+            {
+                lock (other.m_UpdateablesSorted)
+                {
+                    union.m_UpdateablesSorted.AddRange(m_UpdateablesSorted);
+                    union.m_UpdateablesSorted.AddRange(other.m_UpdateablesSorted);
+                    union.m_UpdateablesSorted = union.m_UpdateablesSorted
+                        .Distinct()
+                        .OrderBy(o => o.Priority)
+                        .Reverse()
+                        .ToList();
+                }
+            }
+
+            return union;
         }
     }
 }
