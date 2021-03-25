@@ -21,12 +21,12 @@ namespace Coop.Mod.DebugUtil
             roster.AddToCounts(obj, 5 - roster.TotalManCount);
             TroopRoster prisonerRoster = TroopRoster.CreateDummyTroopRoster();
             party.InitializeMobileParty(
-                new TextObject("testers"),
                 roster,
                 prisonerRoster,
                 nearbyParty.Position2D,
                 5f,
                 2f);
+            party.SetCustomName(new TextObject("testers"));
             party.Party.Owner = null;
             party.Party.Visuals.SetMapIconAsDirty();
 

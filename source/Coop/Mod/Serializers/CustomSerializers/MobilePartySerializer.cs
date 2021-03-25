@@ -103,6 +103,12 @@ namespace Coop.Mod.Serializers
                     case "_actualClan":
                         SNNSO.Add(fieldInfo, new ClanSerializer((Clan)value));
                         break;
+                    case "<StationaryStartTime>k__BackingField":
+                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        break;
+                    case "_partyComponent":
+                        // Handle on deserialize
+                        break;
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
                 }

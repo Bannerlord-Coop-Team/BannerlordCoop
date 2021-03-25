@@ -26,7 +26,7 @@ namespace Coop.Mod.UI
 			_onSelection = onSelection;
 		}
 
-		private void ExecuteDelete()
+		private new void ExecuteDelete()
 		{
 			this._onDelete(this);
 		}
@@ -71,14 +71,14 @@ namespace Coop.Mod.UI
 		private new SelectedGameVM CurrentSelectedSave;
 		public CoopLoadUI() : base(false)
 		{
-			SavedGamesList.Clear();
+			GetSavedGames().Clear();
 			SaveGameFileInfo[] saveFiles = MBSaveLoad.GetSaveFiles();
 			for (int i = 0; i < saveFiles.Length; i++)
 			{
 				SelectedGameVM item = new SelectedGameVM(saveFiles[i], this.IsSaving, new Action<SavedGameVM>(this.OnDeleteSavedGame), new Action<SavedGameVM>(OnSaveSelection), new Action(this.OnCancelLoadSave), new Action(ExecuteDone));
-				SavedGamesList.Add(item);
+				GetSavedGames().Add(item);
 			}
-			OnSaveSelection(SavedGamesList.FirstOrDefault<SavedGameVM>());
+			OnSaveSelection(GetSavedGames().FirstOrDefault<SavedGameVM>());
 			RefreshValues();
 		}
 
@@ -100,7 +100,7 @@ namespace Coop.Mod.UI
 			}
 		}
 
-		private void ExecuteLoadSave()
+		private new void ExecuteLoadSave()
 		{
 			SavedGameVM currentSelectedSave = CurrentSelectedSave;
 			if (currentSelectedSave == null)
@@ -110,7 +110,7 @@ namespace Coop.Mod.UI
 			currentSelectedSave.ExecuteSaveLoad();
 		}
 
-		private void ExecuteDone()
+		private new void ExecuteDone()
 		{
 			ScreenManager.PopScreen();
 		}
@@ -126,10 +126,13 @@ namespace Coop.Mod.UI
 			InformationManager.ShowInquiry(new InquiryData(titleText, text, true, true, new TextObject("{=aeouhelq}Yes", null).ToString(), new TextObject("{=8OkPHu4f}No", null).ToString(), delegate ()
 			{
 				MBSaveLoad.DeleteSaveGame(savedGame.Save.Name);
-				SavedGamesList.Remove(savedGame);
-				OnSaveSelection(SavedGamesList.FirstOrDefault());
+				GetSavedGames().Remove(savedGame);
+				OnSaveSelection(GetSavedGames().FirstOrDefault());
 			}, null, ""), false);
 		}
+
+		private MBBindingList<SavedGameVM> GetSavedGames() => SaveGroups.FirstOrDefault().SavedGamesList;
+		
 	}
 
 	class CoopLoadScreen : SaveLoadScreen

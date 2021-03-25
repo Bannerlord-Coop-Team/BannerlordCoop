@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Coop.Mod.Serializers;
 using SandBox;
 using StoryMode;
-using StoryMode.CharacterCreationSystem;
+using StoryMode.CharacterCreationContent;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine.Screens;
@@ -22,6 +22,7 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Helpers;
 using Sync.Store;
+using TaleWorlds.CampaignSystem.CharacterCreationContent;
 
 namespace Coop.Mod.Managers
 {
@@ -64,6 +65,9 @@ namespace Coop.Mod.Managers
                 SkipCharacterCreation();
             }
 
+            Settlement settlement = Settlement.Find("tutorial_training_field");
+            MobileParty.MainParty.Position2D = settlement.Position2D;
+
             OnGameLoadFinishedEvent?.Invoke(this, new HeroEventArgs(
                 MobileParty.MainParty.Name.ToString(),
                 CoopClient.Instance.SyncedObjectStore.Insert(Hero.MainHero)
@@ -74,12 +78,11 @@ namespace Coop.Mod.Managers
         private void SkipCharacterCreation()
         {
             CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
-            bool flag = CharacterCreationContent.Instance.Culture == null;
+            bool flag = CharacterObject.PlayerCharacter.Culture == null;
             if (flag)
             {
-                CultureObject culture = CharacterCreationContent.Instance.GetCultures().FirstOrDefault<CultureObject>();
-                CharacterCreationContent.Instance.Culture = culture;
-                CharacterCreationContent.CultureOnCondition(characterCreationState.CharacterCreation);
+                CultureObject culture = CharacterCreationContentBase.Instance.GetCultures().FirstOrDefault<CultureObject>();
+                CharacterCreationContentBase.Instance.SetSelectedCulture(culture, characterCreationState.CharacterCreation);
                 characterCreationState.NextStage();
             }
             bool flag2 = characterCreationState.CurrentStage is CharacterCreationFaceGeneratorStage;
