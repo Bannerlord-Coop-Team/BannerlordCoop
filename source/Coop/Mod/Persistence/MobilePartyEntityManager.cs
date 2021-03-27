@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.Patch.Party;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.World;
@@ -12,7 +11,6 @@ using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using RailgunNet.Util;
-using Sync.Value;
 using TaleWorlds.CampaignSystem;
 using Vec2 = TaleWorlds.Library.Vec2;
 
@@ -93,14 +91,15 @@ namespace Coop.Mod.Persistence
                 }
                 controller.Scope.Evaluator = new CoopRailScopeEvaluator(
                     room.Clients.Count == 1,    // the first client is always the arbiter.
-                    (() =>
+                    () =>
                 {
                     if (m_ClientControlledParties.TryGetValue((RailServerPeer) controller, out MobileParty party))
                     {
                         return m_Parties.ContainsKey(party) ? m_Parties[party] : null;
                     }
                     return null;
-                }));
+                },
+                GetScopeRange);
             };
             
             WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
@@ -121,6 +120,12 @@ namespace Coop.Mod.Persistence
             BanditsCampaignBehaviorPatch.OnBanditAdded += (sender, e) => OnPartyAdded(e);
 
             // Settlements
+        }
+
+        public float ClientRailScopeRange = 25f;
+        private float GetScopeRange(MobilePartyEntityServer entity)
+        {
+            return ClientRailScopeRange;
         }
         public void AddParty(MobileParty party)
         {

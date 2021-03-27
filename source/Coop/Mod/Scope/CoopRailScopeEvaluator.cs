@@ -16,14 +16,21 @@ namespace Coop.Mod.Scope
     {
         public delegate MobilePartyEntityServer PlayerEntityGetter();
 
+        public delegate float ScopeRangeGetter(MobilePartyEntityServer entity);
+
         /// <summary>
         ///     Creates a new scope evaluator.
         /// </summary>
         /// <param name="bIsForArbiter">True if this scope is for the arbiter client instance.</param>
-        /// <param name="getter">Getter for the clients main party.</param>
-        public CoopRailScopeEvaluator(bool bIsForArbiter, [NotNull] PlayerEntityGetter getter)
+        /// <param name="getPlayerParty">Getter for the clients main party.</param>
+        /// <param name="getRange">Getter for the range of the scope.</param>
+        public CoopRailScopeEvaluator(
+            bool bIsForArbiter, 
+            [NotNull] PlayerEntityGetter getPlayerParty, 
+            [NotNull] ScopeRangeGetter getRange)
         {
-            m_Getter = getter;
+            m_GetPlayerParty = getPlayerParty;
+            m_GetRange = getRange;
             m_isForArbiter = bIsForArbiter;
         }
         /// <summary>
@@ -67,7 +74,7 @@ namespace Coop.Mod.Scope
                 }
                 
                 // For parties we check if it is within range
-                MobilePartyEntityServer playerParty = m_Getter.Invoke();
+                MobilePartyEntityServer playerParty = m_GetPlayerParty.Invoke();
                 if (playerParty == null)
                 {
                     return false;
@@ -86,7 +93,8 @@ namespace Coop.Mod.Scope
                 
                 // set priority accordingly
                 priority = fDistSqr;
-                bool bShouldBeSynced = fDistSqr <= playerParty.ScopeRange * playerParty.ScopeRange;
+                float fRange = m_GetRange(playerParty);
+                bool bShouldBeSynced = fDistSqr <= fRange * fRange;
                 return bShouldBeSynced;
             }
 
@@ -94,7 +102,8 @@ namespace Coop.Mod.Scope
             return true;
         }
 
-        private PlayerEntityGetter m_Getter;
+        private PlayerEntityGetter m_GetPlayerParty;
+        private ScopeRangeGetter m_GetRange;
         private bool m_isForArbiter;
     }
 }

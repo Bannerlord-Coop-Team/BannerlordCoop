@@ -39,9 +39,9 @@ namespace Coop.Mod.Persistence.Party
                 throw new ArgumentException(nameof(data));
             }
 
-            if (Controller != null)
+            if (Controller != null && Room != null)
             {
-                Logger.Trace("[{tick}] Request player move entity {id} to '{position}'.", Room?.Tick, Id, data);
+                Logger.Trace("[{tick}] Request player move entity {id} to '{position}'.", Room.Tick, Id, data);
                 Room.RaiseEvent<EventPartyMoveTo>(
                     e =>
                     {

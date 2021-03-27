@@ -61,12 +61,6 @@ namespace Coop.Mod.Persistence.Party
             m_Environment.PartySync.Unregister(this);
             m_bIsRegisteredAsController = false;
         }
-
-        /// <summary>
-        ///     The range this party should be able to see (as in: receive sync updates for) other parties. 
-        /// </summary>
-        public float ScopeRange => 5f;    // TODO: consider party stats
-
         #region IMovementHandler
 
         public Tick Tick => Room?.Tick ?? Tick.INVALID;

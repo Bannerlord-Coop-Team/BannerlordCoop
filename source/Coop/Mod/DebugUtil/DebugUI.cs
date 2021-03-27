@@ -425,6 +425,9 @@ namespace Coop.Mod.DebugUtil
             else
             {
                 MobilePartyEntityManager manager = CoopServer.Instance.Persistence.MobilePartyEntityManager;
+
+                Imgui.SliderFloat("Client scope range", ref manager.ClientRailScopeRange, 0f, 100f);
+
                 Imgui.Columns(2);
                 Imgui.Separator();
                 Imgui.Text("ID");
@@ -534,7 +537,7 @@ namespace Coop.Mod.DebugUtil
                     int tickRate = (int) (TimeSpan.TicksPerSecond / ticksPerFrame);
                     Imgui.Text($"Tickrate [Hz]: {tickRate}");
                 }
-
+                
                 Imgui.Text(
                     $"LAN:   {server.ActiveConfig.NetworkConfiguration.LanAddress}:{server.ActiveConfig.NetworkConfiguration.LanPort}");
                 Imgui.Text(
