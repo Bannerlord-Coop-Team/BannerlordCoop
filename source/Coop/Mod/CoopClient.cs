@@ -68,7 +68,7 @@ namespace Coop.Mod
             m_Updateables.Add(m_NetManager);
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
-            Synchronization = new CoopSync(this);
+            Synchronization = new CoopSyncClient(this);
             
             #region State Machine Callbacks
             m_CoopClientSM.CharacterCreationState.OnEntry(CreateCharacter);

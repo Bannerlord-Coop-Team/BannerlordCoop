@@ -1,4 +1,5 @@
 ﻿using System;
+using Coop.Mod.Persistence;
 using CoopFramework;
 using JetBrains.Annotations;
 using RemoteAction;

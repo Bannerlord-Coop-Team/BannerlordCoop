@@ -5,23 +5,30 @@ using System.Reflection;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
+using Coop.Tests.Sync;
 using JetBrains.Annotations;
 using RailgunNet.Connection.Client;
 using RailgunNet.Factory;
 using RailgunNet.Logic;
 using RemoteAction;
 using Sync.Store;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
-namespace Coop.Tests.Sync
+namespace Coop.Tests.Persistence
 {
     public class TestEnvironment
     {
+        public Dictionary<MBGUID, MobileParty> Parties = new Dictionary<MBGUID, MobileParty>();
         public TestEnvironment(int iNumberOfClients)
         {
             ConnectionsRaw = new TestConnectionsRaw(iNumberOfClients);
             Connections = new TestConnections(ConnectionsRaw, false);
             Stores = new TestStores(Connections);
         }
+
+        public TestEnvironmentServer ServerEnvironment;
+        public readonly List<TestEnvironmentClient> ClientEnvironments = new List<TestEnvironmentClient>();
 
         public TestEnvironment(
             int iNumberOfClients,
@@ -34,9 +41,9 @@ namespace Coop.Tests.Sync
 
             // Railgun
             RailSynchronizedFactory.Detect(Assembly.GetAssembly(typeof(RailBitBufferExtensions)));
-            var serverEnvironment = new TestEnvironmentServer(StoreServer);
-            EventQueue = serverEnvironment.EventQueue;
-            var registryServer = serverRegistryCreator(serverEnvironment);
+            ServerEnvironment = new TestEnvironmentServer(StoreServer, Parties);
+            EventQueue = ServerEnvironment.EventQueue;
+            var registryServer = serverRegistryCreator(ServerEnvironment.Mock.Object);
             Persistence = new TestPersistence(registryServer);
 
             foreach (((RailNetPeerWrapper First, RailNetPeerWrapper Second) First, RemoteStore
@@ -46,8 +53,10 @@ namespace Coop.Tests.Sync
                 var server = it.First.Second;
                 var store = it.Second;
 
+                var clientEnvironment = new TestEnvironmentClient(store, Parties);
+                ClientEnvironments.Add(clientEnvironment);
                 var registryClient =
-                    clientRegistryCreator(new TestEnvironmentClient(store));
+                    clientRegistryCreator(clientEnvironment.Mock.Object);
                 Persistence.AddClient(registryClient, client, server);
             }
 
@@ -68,7 +77,7 @@ namespace Coop.Tests.Sync
 
         [NotNull] public TestStores Stores { get; private set; }
 
-        [CanBeNull] public TestPersistence Persistence { get; private set; }
+        [NotNull] public TestPersistence Persistence { get; private set; }
 
         public List<RemoteStore> StoresClient => Stores.StoresClient;
 

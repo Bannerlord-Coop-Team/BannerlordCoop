@@ -43,11 +43,11 @@ namespace Coop.Mod
             {
                 return false;
             }
-            
-            if (IsLocalPlayerMainParty(party))
+
+            if (IsAnyPlayerMainParty(party))
             {
-                // Main party of the local client
-                return true;
+                // Player parties can only be controlled by the owner.
+                return party == MobileParty.MainParty;
             }
 
             // Every other party is controlled by the arbiter.

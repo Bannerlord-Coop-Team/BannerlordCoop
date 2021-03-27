@@ -33,7 +33,7 @@ namespace Coop.Mod
         }
     }
 
-    public class CoopServer
+    public class CoopServer : IDisposable
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -187,6 +187,11 @@ namespace Coop.Mod
             }
 
             return Current.ToString();
+        }
+
+        public void Dispose()
+        {
+            ShutDownServer();
         }
 
         private void OnClientConnected(ConnectionServer connection)

@@ -10,6 +10,9 @@ namespace Coop.Mod.Persistence.Party
     /// </summary>
     public interface IMovementHandler
     {
+        /// <summary>
+        ///     Returns the current tick of the room.
+        /// </summary>
         Tick Tick { get; }
 
         /// <summary>

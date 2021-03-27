@@ -1,13 +1,13 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Coop.Mod.Persistence.Party;
 using JetBrains.Annotations;
-using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
-namespace RemoteAction
+namespace Coop.Mod.Persistence
 {
     /// <summary>
     ///     Provides an abstraction layer between the persistence and the game for clients.
@@ -64,5 +64,16 @@ namespace RemoteAction
         /// <returns></returns>
         [CanBeNull]
         MobileParty GetMobilePartyById(MBGUID guid);
+        /// <summary>
+        ///     Called when a party enter the scope of the local client.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <param name="movementData"></param>
+        void ScopeEntered([NotNull] MobileParty party, MovementData movementData);
+        /// <summary>
+        ///     Called when a party leaves the scope of the local client.
+        /// </summary>
+        /// <param name="party"></param>
+        void ScopeLeft([NotNull] MobileParty party);
     }
 }

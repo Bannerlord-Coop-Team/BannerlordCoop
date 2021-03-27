@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Patch.MobilePartyPatches;
+using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
-using RemoteAction;
+using Coop.Mod.Scope;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
@@ -21,15 +22,6 @@ namespace Coop.Mod
 
         public HashSet<MobileParty> PlayerControlledMainParties { get; } =
             new HashSet<MobileParty>();
-
-        public void SetAuthoritative(MobileParty party, MovementData data)
-        {
-            CampaignMapMovement.Sync.SetAuthoritative(party, data);
-        }
-        public void SetAuthoritative(MobileParty party, Vec2 position)
-        {
-            CampaignMapMovement.Sync.SetAuthoritative(party, position);
-        }
 
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;
 
@@ -58,11 +50,29 @@ namespace Coop.Mod
         public RemoteStore Store =>
             CoopClient.Instance.SyncedObjectStore ??
             throw new InvalidOperationException("Client not initialized.");
+        
+        public void ScopeEntered(MobileParty party, MovementData movementData)
+        {
+            MobilePartyScopeHelper.Enter(party, movementData);
+        }
+
+        public void ScopeLeft(MobileParty party)
+        {
+            MobilePartyScopeHelper.Leave(party);
+        }
 
         #region Game state access
         public MobileParty GetMobilePartyById(MBGUID guid)
         {
             return MobileParty.All.SingleOrDefault(p => p.Id == guid);
+        }
+        public void SetAuthoritative(MobileParty party, MovementData data)
+        {
+            CampaignMapMovement.Sync.SetAuthoritative(party, data);
+        }
+        public void SetAuthoritative(MobileParty party, Vec2 position)
+        {
+            CampaignMapMovement.Sync.SetAuthoritative(party, position);
         }
         #endregion
     }

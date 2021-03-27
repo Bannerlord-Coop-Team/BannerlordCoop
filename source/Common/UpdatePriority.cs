@@ -16,6 +16,8 @@
             
             public const int SyncBufferedFields = 1000;     // Processes pending synchronization of buffered field changes.
             
+            public const int ApplyAuthoritativeMobilePartyState = 500; // Applies the known serverside state of all MobileParty instances to the local game state.
+            
             public const int DebugUI = 1;                   // Update the Debug UI.
         }
 

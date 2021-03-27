@@ -8,7 +8,7 @@ namespace Sync.Call
     ///     Type erased invocation wrapper for patched methods. Every invokable instance is registered with
     ///     <see cref="Registry" /> on every client.
     /// </summary>
-    public abstract class Invokable
+    public class Invokable
     {
         public Invokable([NotNull] MethodBase original)
         {
@@ -39,7 +39,10 @@ namespace Sync.Call
         /// <param name="eOrigin">Originator of the call.</param>
         /// <param name="instance">Instance the call is being made on or null for static calls.</param>
         /// <param name="args">Arguments to the call.</param>
-        public abstract void Invoke(EOriginator eOrigin, [CanBeNull] object instance, [CanBeNull] object[] args);
+        public virtual void Invoke(EOriginator eOrigin, [CanBeNull] object instance, [CanBeNull] object[] args)
+        {
+            Original.Invoke(instance, args);
+        }
 
         /// <summary>
         ///     Adds a flag.

@@ -15,15 +15,15 @@ using Sync.Value;
 namespace Coop.Mod.Persistence.RemoteAction
 {
     /// <summary>
-    ///     Default synchronization implementation for remote procedure calls (RPC.
+    ///     Default synchronization implementation for remote procedure calls (RPC) on clients.
     ///
     ///     Uses the <see cref="ArgumentFactory"/> to serialize & broadcast all arguments as well as the instance.
     ///     After the instance & arguments have been received by all clients, the call is invoked on the next
     ///     game tick.
     /// </summary>
-    public class CoopSync : SyncBuffered
+    public class CoopSyncClient : SyncBuffered
     {
-        public CoopSync([NotNull] IClientAccess access)
+        public CoopSyncClient([NotNull] IClientAccess access)
         {
             m_ClientAccess = access;
         }

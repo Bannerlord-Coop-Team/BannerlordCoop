@@ -29,7 +29,7 @@ namespace Coop.Tests.Persistence.RPC
         {
             Persistence = m_Environment.Persistence ??
                           throw new Exception("Persistence may not be null. Error in test setup.");
-            sync0 = new CoopSync(m_Environment.GetClientAccess(ClientId0));
+            sync0 = new CoopSyncClient(m_Environment.GetClientAccess(ClientId0));
             ManagedFoo.Sync = sync0;
         }
 
