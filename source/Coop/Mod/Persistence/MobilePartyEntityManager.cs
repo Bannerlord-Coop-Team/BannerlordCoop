@@ -97,7 +97,7 @@ namespace Coop.Mod.Persistence
                 {
                     if (m_ClientControlledParties.TryGetValue((RailServerPeer) controller, out MobileParty party))
                     {
-                        return m_Parties[party];
+                        return m_Parties.ContainsKey(party) ? m_Parties[party] : null;
                     }
                     return null;
                 }));
