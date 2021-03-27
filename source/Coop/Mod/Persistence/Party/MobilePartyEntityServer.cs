@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
@@ -139,11 +139,15 @@ namespace Coop.Mod.Persistence.Party
             // Get initial state from the game object.
             MovementData movement = null;
             Vec2? position = null;
-            GameLoopRunner.RunOnMainThread(() =>
-            {
+            // TODO: this should really be done in the main thread, but it is currently not really feasible because
+            //       every party gets added individually to RailGun. This would result in thousands of separate calls
+            //       to this function, each waiting for the main game loop. This introduces seconds (!) of lag when
+            //       first unpausing the game. Fixed with the dedicated server.
+            // GameLoopRunner.RunOnMainThread(() =>
+            // {
                 movement = m_Instance.GetMovementData();
                 position = m_Instance.Position2D;
-            });
+            // });
             RequestMovement(movement);
             RequestPosition(position.Value);
         }

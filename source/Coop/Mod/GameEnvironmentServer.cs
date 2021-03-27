@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Coop.Mod.Patch;
 using Coop.Mod.Patch.MobilePartyPatches;
@@ -20,14 +21,20 @@ namespace Coop.Mod
 
         public EventBroadcastingQueue EventQueue => CoopServer.Instance.Persistence?.EventQueue;
 
+        private Dictionary<MBGUID, MobileParty> m_PartyCache = new Dictionary<MBGUID, MobileParty>();
+
         public MobileParty GetMobilePartyById(MBGUID guid)
         {
-            MobileParty ret = null;
-            GameLoopRunner.RunOnMainThread(
-                () =>
-                {
-                    ret = MobileParty.All.SingleOrDefault(p => p.Id == guid);
-                });
+            if (!m_PartyCache.TryGetValue(guid, out MobileParty ret))
+            {
+                GameLoopRunner.RunOnMainThread(
+                    () =>
+                    {
+                        // Update the whole cache since we're already in the game loop thread. Doesn't happen that often.
+                        m_PartyCache = MobileParty.All.ToDictionary(party => party.Id);
+                        ret = m_PartyCache[guid];
+                    });
+            }
             return ret;
         }
 
