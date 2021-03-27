@@ -25,7 +25,6 @@
       <ProjectReference Include="..\Common\Common.csproj" />
       <ProjectReference Include="..\Coop\Coop.csproj" />
       <ProjectReference Include="..\CoopFramework\CoopFramework.csproj" />
-      <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj" />
       <ProjectReference Include="..\Network\Network.csproj" />
       <ProjectReference Include="..\RailgunNet\RailgunNet\RailgunNet.csproj" />
       <ProjectReference Include="..\Sync\Sync.csproj" />

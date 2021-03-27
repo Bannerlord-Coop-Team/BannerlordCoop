@@ -52,6 +52,11 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 });
             MapPosition = Field<Vec2>("_position2D");
             MapPositionSetter = Setter(nameof(MobileParty.Position2D));
+            DefaultBehaviourSetter = Setter(nameof(MobileParty.DefaultBehavior));
+            TargetSettlementSetter = Setter(nameof(MobileParty.TargetSettlement));
+            TargetPartySetter = Setter(nameof(MobileParty.TargetParty));
+            TargetPositionSetter = Setter(nameof(MobileParty.TargetPosition));
+            TickAi = Method("TickAi");
             
             Sync = new MobilePartySync(MovementOrderGroup, MapPosition);
 
@@ -59,15 +64,16 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             When(GameLoop & CoopConditions.ControlsParty)
                 .Changes(MovementOrderGroup)
                 .Through(
-                    Setter(nameof(MobileParty.DefaultBehavior)),
-                    Setter(nameof(MobileParty.TargetSettlement)),
-                    Setter(nameof(MobileParty.TargetParty)),
-                    Setter(nameof(MobileParty.TargetPosition)))
+                    DefaultBehaviourSetter,
+                    TargetSettlementSetter,
+                    TargetPartySetter,
+                    TargetPositionSetter)
                 .Broadcast(() => Sync);
 
             AutoWrapAllInstances(party => new CampaignMapMovement(party));
         }
-        
+
+        #region Patched members
         /// <summary>
         ///     Synchronization instance for all movement data.
         /// </summary>
@@ -75,15 +81,18 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         /// <summary>
         ///     Field access group for all movement related data.
         /// </summary>
-        public static FieldAccessGroup<MobileParty, MovementData> MovementOrderGroup { get; }
+        private static FieldAccessGroup<MobileParty, MovementData> MovementOrderGroup { get; }
         /// <summary>
         ///     Field access for the position on the campaign map.
         /// </summary>
         public static FieldAccess<MobileParty, Vec2> MapPosition { get; }
-        /// <summary>
-        ///     Patched setter for the position on the campaign map. 
-        /// </summary>
         public static PatchedInvokable MapPositionSetter { get; }
+        public static PatchedInvokable TargetPositionSetter { get; }
+        public static PatchedInvokable TargetPartySetter { get; }
+        public static PatchedInvokable TargetSettlementSetter { get; }
+        public static PatchedInvokable DefaultBehaviourSetter { get; }
+        public static PatchedInvokable TickAi { get; }
+        #endregion
         /// <summary>
         ///     Field reference for the backing field of "DefaultBehaviourNeedsUpdate".
         /// </summary>
@@ -197,7 +206,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 }
             }
 
-            if (m_TargetMovementData == null)
+            if (m_TargetMovementData == null || !m_TargetMovementData.IsValid())
             {
                 return;
             }
@@ -206,6 +215,8 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             if (!currentMovementData.Equals(m_TargetMovementData))
             {
                 MovementOrderGroup.SetTyped(party, m_TargetMovementData);
+                DefaultBehaviorNeedsUpdate(party) = true;
+
                 if (party.IsRemotePlayerMainParty())
                     // That is a remote player moving. We need to update the local MainParty as well
                     // because Campaign.Tick will otherwise not update the AI decisions and just
@@ -213,12 +224,6 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 {
                     DefaultBehaviorNeedsUpdate(Campaign.Current.MainParty) = true;
                 }
-                else
-                {
-                    DefaultBehaviorNeedsUpdate(party) = Coop.IsController(party);
-                }
-
-                party.RecalculateShortTermAi();
             }
         }
 

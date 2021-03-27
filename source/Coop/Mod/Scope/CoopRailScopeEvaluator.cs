@@ -59,12 +59,6 @@ namespace Coop.Mod.Scope
         {
             priority = 0.0f;
 
-            const int minUpdateTicks = 500;
-            if (ticksSinceSend > minUpdateTicks)
-            {
-                return true;
-            }
-            
             if(entity is MobilePartyEntityServer partyToCheck)
             {
                 if (m_isForArbiter)

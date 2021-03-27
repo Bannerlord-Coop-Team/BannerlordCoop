@@ -25,6 +25,7 @@ namespace Coop.Mod.Scope
             // TODO: make sure the party visuals are correct
             CampaignMapMovement.RemoteMapPositionChanged(party, position);
             CampaignMapMovement.RemoteMovementChanged(party, currentMovementData);
+            party.IsActive = true;
         }
         /// <summary>
         ///     To be called when a <see cref="MobileParty"/> leaves the scope of this game instance.
@@ -32,7 +33,7 @@ namespace Coop.Mod.Scope
         /// <param name="party"></param>
         public static void Leave([NotNull] MobileParty party)
         {
-            // TODO: disable the party in the local game instance
+            party.IsActive = false;
         }
     }
 }
