@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="Lib.Harmony" Version="2.0.4" />
+    <PackageReference Include="LiteNetLib" Version="0.9.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.4.0" />
     <PackageReference Include="Moq" Version="4.14.1" />
     <PackageReference Include="NLog" Version="4.7.2" />
@@ -34,7 +35,6 @@
   <ItemGroup>
     <ProjectReference Include="..\CoopFramework\CoopFramework.csproj" />
     <ProjectReference Include="..\Coop\Coop.csproj" />
-    <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj" />
     <ProjectReference Include="..\RemoteAction\RemoteAction.csproj" />
   </ItemGroup>
 

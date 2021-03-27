@@ -49,6 +49,10 @@
     <Reference Include="GalaxyCSharp">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\GalaxyCSharp.dll</HintPath>
     </Reference>
+    <Reference Include="LiteNetLib, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\packages\LiteNetLib.0.9.4\lib\net35\LiteNetLib.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Mono.Reflection, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756, processorArchitecture=MSIL">
       <HintPath>..\packages\Mono.Reflection.2.0.0\lib\net40\Mono.Reflection.dll</HintPath>
     </Reference>
@@ -386,10 +390,6 @@
     <ProjectReference Include="..\CoopFramework\CoopFramework.csproj">
       <Project>{55b13456-9f7f-4724-9cf5-ae12aa3ce81b}</Project>
       <Name>CoopFramework</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj">
-      <Project>{d8f65198-a926-4c46-9599-2d5d4349486f}</Project>
-      <Name>LiteNetLib</Name>
     </ProjectReference>
     <ProjectReference Include="..\Network\Network.csproj">
       <Project>{b0ff5e24-4d98-4ec8-bbce-6cdb85cb685d}</Project>
