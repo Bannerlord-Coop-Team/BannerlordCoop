@@ -176,7 +176,7 @@ namespace Network.Infrastructure
             bool bRunning = true;
             while (bRunning)
             {
-                Update(m_FrameLimiter.LastFrameTime);
+                Update(m_FrameLimiter.LastThrottledFrameTime);
                 m_FrameLimiter.Throttle();
                 lock (m_StopRequestLock)
                 {

@@ -13,7 +13,7 @@ namespace Common
         /// <summary>
         ///     The elapsed time between the last call to <see cref="Throttle"/> and the call before that.
         /// </summary>
-        public TimeSpan LastFrameTime;
+        public TimeSpan LastThrottledFrameTime;
 
         /// <summary>
         ///     Create a new frame limiter with the given target frame time.
@@ -46,13 +46,14 @@ namespace Common
                 };
             }
 
-            m_Avg = new MovingAverage(32);
+            m_AverageActualFrameTime = new MovingAverage(32);
+            m_AverageThrottledFrameTime = new MovingAverage(32);
         }
 
         /// <summary>
         ///     Returns the average frame time measured over the last few <see cref="Throttle"/> calls.
         /// </summary>
-        public TimeSpan AverageFrameTime => TimeSpan.FromTicks((long) m_AverageTicksPerFrame);
+        public TimeSpan AverageFrameTime => TimeSpan.FromTicks((long) m_AverageThrottledTicksPerFrame);
 
         /// <summary>
         ///     Waits until the target frame time has passed since the last call to this method. Does nothing if the
@@ -61,23 +62,25 @@ namespace Common
         public void Throttle()
         {
             long elapsedTicks = m_Timer.Elapsed.Ticks;
-            m_AverageTicksPerFrame = m_Avg.Push(elapsedTicks);
-            if (m_AverageTicksPerFrame < m_TargetTicksPerFrame)
+            m_AverageActualTicksPerFrame = m_AverageActualFrameTime.Push(elapsedTicks);
+            long ticksAhead = m_TargetTicksPerFrame - (long) m_AverageActualTicksPerFrame;
+            if (ticksAhead > 0)
             {
-                m_WaitUntilTick(
-                    elapsedTicks + (m_TargetTicksPerFrame - (long) m_AverageTicksPerFrame));
+                m_WaitUntilTick(elapsedTicks + ticksAhead);
             }
-
-            LastFrameTime = m_Timer.Elapsed;
+            LastThrottledFrameTime = m_Timer.Elapsed;
+            m_AverageThrottledTicksPerFrame = m_AverageThrottledFrameTime.Push(LastThrottledFrameTime.Ticks);
             m_Timer.Restart();
         }
         
         #region Private
-        private readonly MovingAverage m_Avg;
+        private readonly MovingAverage m_AverageActualFrameTime;
+        private readonly MovingAverage m_AverageThrottledFrameTime;
         private readonly long m_TargetTicksPerFrame;
         private readonly Stopwatch m_Timer;
         private readonly Action<long> m_WaitUntilTick;
-        private double m_AverageTicksPerFrame;
+        private double m_AverageActualTicksPerFrame;
+        private double m_AverageThrottledTicksPerFrame;
         #endregion
     }
 }
