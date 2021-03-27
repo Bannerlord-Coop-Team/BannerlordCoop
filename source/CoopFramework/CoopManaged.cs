@@ -79,6 +79,28 @@ namespace CoopFramework
             return new MethodPatch<TSelf>(typeof(TExtended)).Intercept(sMethodName).Postfix(sMethodName).Methods
                 .First();
         }
+        /// <summary>
+        ///     Patches a method of an arbitrary class with a prefix.
+        /// </summary>
+        /// <param name="sMethodName"></param>
+        /// <typeparam name="TDeclaringClass"></typeparam>
+        /// <returns></returns>
+        protected static PatchedInvokable Method<TDeclaringClass>(string sMethodName) where TDeclaringClass : class
+        {
+            return new MethodPatch<TSelf>(typeof(TDeclaringClass)).Intercept(sMethodName).Postfix(sMethodName).Methods
+                .First();
+        }
+        /// <summary>
+        ///     Patches a method of an arbitrary class with a prefix.
+        /// </summary>
+        /// <param name="sMethodName"></param>
+        /// <typeparam name="TDeclaringClass"></typeparam>
+        /// <returns></returns>
+        protected static PatchedInvokable Method(Type declaringClass, string sMethodName)
+        {
+            return new MethodPatch<TSelf>(declaringClass).Intercept(sMethodName).Postfix(sMethodName).Methods
+                .First();
+        }
 
         /// <summary>
         ///     Sets up a field to be monitored for changes. Please of the nameof operator instead of raw
@@ -114,6 +136,7 @@ namespace CoopFramework
             m_DefinedBehaviours.Add(builder);
             return builder;
         }
+            
 
         #endregion
 

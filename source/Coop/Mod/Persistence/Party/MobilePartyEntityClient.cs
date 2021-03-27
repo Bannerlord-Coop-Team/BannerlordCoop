@@ -39,13 +39,16 @@ namespace Coop.Mod.Persistence.Party
                 throw new ArgumentException(nameof(data));
             }
 
-            Logger.Trace("[{tick}] Request move entity {id} to '{position}'.", Room?.Tick, Id, data);
-            Room.RaiseEvent<EventPartyMoveTo>(
-                e =>
-                {
-                    e.EntityId = Id;
-                    e.Movement = data.ToState();
-                });
+            if (Controller != null)
+            {
+                Logger.Trace("[{tick}] Request player move entity {id} to '{position}'.", Room?.Tick, Id, data);
+                Room.RaiseEvent<EventPartyMoveTo>(
+                    e =>
+                    {
+                        e.EntityId = Id;
+                        e.Movement = data.ToState();
+                    });
+            }
         }
 
         /// <summary>
@@ -134,7 +137,7 @@ namespace Coop.Mod.Persistence.Party
             {
                 return;
             }
-            m_Environment.ScopeEntered(party, State.Movement.ToData());
+            m_Environment.ScopeEntered(party, State.MapPosition, State.Movement.ToData());
         }
 
         #endregion

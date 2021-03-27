@@ -64,12 +64,14 @@ namespace Coop.Mod.Persistence
         /// <returns></returns>
         [CanBeNull]
         MobileParty GetMobilePartyById(MBGUID guid);
+
         /// <summary>
         ///     Called when a party enter the scope of the local client.
         /// </summary>
         /// <param name="party"></param>
+        /// <param name="mapPosition"></param>
         /// <param name="movementData"></param>
-        void ScopeEntered([NotNull] MobileParty party, MovementData movementData);
+        void ScopeEntered([NotNull] MobileParty party, Vec2 mapPosition, MovementData movementData);
         /// <summary>
         ///     Called when a party leaves the scope of the local client.
         /// </summary>

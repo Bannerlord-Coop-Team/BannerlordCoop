@@ -6,6 +6,7 @@ using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Patch;
+using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.UI;
 using CoopFramework;
 using HarmonyLib;
@@ -95,6 +96,7 @@ namespace Coop.Mod
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             Updateables.Add(CoopClient.Instance);
             Updateables.Add(GameLoopRunner.Instance);
+            Updateables.Add(new MobilePartyUpdatable());
         }
 
         public static Main Instance { get; private set; }

@@ -13,7 +13,7 @@ namespace Network.Infrastructure
             };
         }
         public uint MaxPlayerCount { get; set; } = 8;
-        public uint TickRate { get; set; } = 120; // in [Hz]. 0 for no limit.
+        public uint TickRate { get; set; } = 60; // in [Hz]. 0 for no limit.
         
         public NetworkConfiguration NetworkConfiguration { get; set; }
         

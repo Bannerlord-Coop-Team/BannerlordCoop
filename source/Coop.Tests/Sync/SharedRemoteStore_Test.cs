@@ -1,4 +1,5 @@
-﻿using Sync.Store;
+﻿using Coop.Tests.Persistence;
+using Sync.Store;
 using Xunit;
 
 namespace Coop.Tests.Sync

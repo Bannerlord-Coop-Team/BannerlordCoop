@@ -1,16 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.Patch.Party;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.World;
+using Coop.Mod.Scope;
 using NLog;
 using RailgunNet;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using RailgunNet.Util;
+using Sync.Value;
 using TaleWorlds.CampaignSystem;
+using Vec2 = TaleWorlds.Library.Vec2;
 
 namespace Coop.Mod.Persistence
 {
@@ -81,6 +85,24 @@ namespace Coop.Mod.Persistence
                     "Unable to initialize game entities: Unexpected state. No game loaded?");
             }
 
+            room.ClientJoined += controller =>
+            {
+                if (controller.Scope == null)
+                {
+                    throw new Exception("Connected clients should always be scoped!");
+                }
+                controller.Scope.Evaluator = new CoopRailScopeEvaluator(
+                    room.Clients.Count == 1,    // the first client is always the arbiter.
+                    (() =>
+                {
+                    if (m_ClientControlledParties.TryGetValue((RailServerPeer) controller, out MobileParty party))
+                    {
+                        return m_Parties[party];
+                    }
+                    return null;
+                }));
+            };
+            
             WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
 
             // Parties
@@ -115,7 +137,7 @@ namespace Coop.Mod.Persistence
 
         public void GrantPartyControl(MobileParty party, RailServerPeer peer)
         {
-            RailEntityServer correspondingEntity = null;
+            MobilePartyEntityServer correspondingEntity = null;
             lock (m_Lock)
             {
                 if (!m_Parties.TryGetValue(party, out correspondingEntity) || correspondingEntity == null)
@@ -134,7 +156,7 @@ namespace Coop.Mod.Persistence
             }
             peer.GrantControl(correspondingEntity);
             party.Ai.SetDoNotMakeNewDecisions(true);
-            Logger.Info("{Party} control granted to {Peer}", party, peer);
+            Logger.Info("{Party} control granted to {Peer}", party, peer.Identifier);
         }
 
         #region Private
@@ -275,8 +297,8 @@ namespace Coop.Mod.Persistence
 
         private readonly object m_Lock = new object();
 
-        private readonly Dictionary<MobileParty, RailEntityServer> m_Parties =
-            new Dictionary<MobileParty, RailEntityServer>();
+        private readonly Dictionary<MobileParty, MobilePartyEntityServer> m_Parties =
+            new Dictionary<MobileParty, MobilePartyEntityServer>();
         private readonly Dictionary<RailServerPeer, MobileParty> m_ClientControlledParties =
             new Dictionary<RailServerPeer, MobileParty>();
         private readonly List<MobileParty> m_PartiesToAdd = new List<MobileParty>();
@@ -285,5 +307,21 @@ namespace Coop.Mod.Persistence
         private readonly RailServer m_Server;
         
         #endregion
+
+        /// <summary>
+        ///     Updates the positions of all managed parties.
+        /// </summary>
+        /// <param name="buffer"></param>
+        public void UpdatePosition(List<Tuple<MobileParty, Vec2>> buffer)
+        {
+            foreach (var change in buffer)
+            {
+                if (m_Parties.TryGetValue(change.Item1, out MobilePartyEntityServer entity) && 
+                    entity != null)
+                {
+                    entity.State.MapPosition = change.Item2;
+                }
+            }
+        }
     }
 }

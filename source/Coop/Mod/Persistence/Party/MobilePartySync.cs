@@ -28,14 +28,6 @@ namespace Coop.Mod.Persistence.Party
     /// </summary>
     public class MobilePartySync : SyncBuffered
     {
-        /// <summary>
-        ///     Invoked when the movement data of a party was changed by the server.
-        /// </summary>
-        public Action<MobileParty, MovementData> OnRemoteMovementChanged;
-        /// <summary>
-        ///     Invoker when the map position of a mobile party was changed by the server.
-        /// </summary>
-        public Action<MobileParty, Vec2> OnRemoteMapPostionChanged;
         public MobilePartySync(
             [NotNull] FieldAccessGroup<MobileParty, MovementData> movementOrder,
             [NotNull] FieldAccess<MobileParty, Vec2> mapPosition)
@@ -111,40 +103,6 @@ namespace Coop.Mod.Persistence.Party
             }
         }
 
-        /// <summary>
-        ///     Set the movement data of a <see cref="MobileParty" /> as an authoritative action originating from the
-        ///     server.
-        /// </summary>
-        /// <param name="party">Instance to set the data on.</param>
-        /// <param name="data">Data to set.</param>
-        /// <param name="bIsPlayerControlled">`true` if the party is controlled by any player, local or remote.</param>
-        /// <exception cref="InvalidOperationException">When <paramref name="data" /> is inconsistent.</exception>
-        public void SetAuthoritative(MobileParty party, MovementData data)
-        {
-            if (!data.IsValid())
-            {
-                string sMessage = $"Received inconsistent data for {party}: {data}. Ignored";
-#if DEBUG
-                throw new InvalidStateException(sMessage);
-#else
-                Logger.Warn(sMessage);
-                return;
-#endif
-            }
-
-            OnRemoteMovementChanged?.Invoke(party, data);
-        }
-
-        /// <summary>
-        ///     Sets the parties 2d map position as an authoritative action.
-        /// </summary>
-        /// <param name="party"></param>
-        /// <param name="position"></param>
-        public void SetAuthoritative(MobileParty party, Vec2 position)
-        {
-            OnRemoteMapPostionChanged?.Invoke(party, position);
-        }
-
         #region Private
 
         /// <summary>
@@ -169,13 +127,13 @@ namespace Coop.Mod.Persistence.Party
                     continue;
                 }
 
-                MovementData before = change.Value.OriginalValue as MovementData;
-                if (!Coop.IsController(party))
-                {
-                    // Revert the local changes, we will receive the correct one from the server.
-                    SetAuthoritative(party, before);
-                    continue;
-                }
+                // MovementData before = change.Value.OriginalValue as MovementData;
+                // if (!Coop.IsController(party))
+                // {
+                //     // Revert the local changes, we will receive the correct one from the server.
+                //     SetAuthoritative(party, before);
+                //     continue;
+                // }
 
                 MovementData requested = change.Value.RequestedValue as MovementData;
                 BroadcastHistory.Push(new CallTrace

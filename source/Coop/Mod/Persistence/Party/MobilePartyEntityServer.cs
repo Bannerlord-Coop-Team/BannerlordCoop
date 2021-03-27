@@ -79,11 +79,14 @@ namespace Coop.Mod.Persistence.Party
         /// <exception cref="ArgumentException"></exception>
         public void RequestMovement(MovementData data)
         {
-            Logger.Trace(
-                "[{tick}] Server controlled entity move {id} to '{position}'.",
-                Room.Tick,
-                Id,
-                data);
+            if (State.IsPlayerControlled)
+            {
+                Logger.Trace(
+                    "[{tick}] Player controlled entity move {id} to '{position}'.",
+                    Room.Tick,
+                    Id,
+                    data);
+            }
 
             State.Movement.DefaultBehavior = data.DefaultBehaviour;
             State.Movement.TargetPosition = data.TargetPosition;
@@ -98,6 +101,14 @@ namespace Coop.Mod.Persistence.Party
         /// <param name="position"></param>
         public void RequestPosition(Vec2 position)
         {
+            if (State.IsPlayerControlled)
+            {
+                Logger.Trace(
+                    "[{tick}] Player controlled entity {id} position '{position}'.",
+                    Room.Tick,
+                    Id,
+                    position);
+            }
             State.MapPosition = position;
         }
 
