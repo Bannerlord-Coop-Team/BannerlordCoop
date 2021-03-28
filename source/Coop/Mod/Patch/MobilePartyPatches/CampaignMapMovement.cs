@@ -142,16 +142,18 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 wrapper.SetMovementGoal(party, data);
             }
         }
+
         /// <summary>
         ///     Callback when the world map position of a mobile party was changed by the server.
         /// </summary>
         /// <param name="party"></param>
-        /// <param name="pos"></param>
-        public static void RemoteMapPositionChanged(MobileParty party, Vec2 pos)
+        /// <param name="posCurrent"></param>
+        /// <param name="facingDirection"></param>
+        public static void RemoteMapPositionChanged(MobileParty party, Vec2 posCurrent, Vec2? facingDirection)
         {
             if (Instances.TryGetValue(party.Id, out CampaignMapMovement wrapper))
             {
-                wrapper.SetPosition(party, pos);
+                wrapper.SetPosition(party, posCurrent, facingDirection);
             }
         }
         
@@ -180,9 +182,10 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             m_TargetMovementData = data;
             ApplyServersideState(party);
         }
-        private void SetPosition(MobileParty party, Vec2 position)
+        private void SetPosition(MobileParty party, Vec2 position, Vec2? facingDirection)
         {
-            m_ActualPosition = position;
+            m_NextPosition = position;
+            m_FacingDirection = facingDirection;
             ApplyServersideState(party);
         }
 
@@ -195,14 +198,29 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 return;
             }
             
-            const float fAllowedLocalOffset = 1.0f;
-            if (m_ActualPosition.IsValid &&
-                !Compare.CoordinatesEqual(party.Position2D, m_ActualPosition))
+            const float fAllowedLocalOffsetPlayer = 2.0f;
+            const float fAllowedLocalOffsetNPC = 0.0001f;
+            if (m_NextPosition.IsValid &&
+                !Compare.CoordinatesEqual(party.Position2D, m_NextPosition))
             {
-                float fDistSqr = m_ActualPosition.DistanceSquared(party.Position2D);
-                if (fDistSqr > fAllowedLocalOffset)
+                float fDistSqr = m_NextPosition.DistanceSquared(party.Position2D);
+                float fDistSqrAllowed = party.IsAnyPlayerMainParty() ? fAllowedLocalOffsetPlayer : fAllowedLocalOffsetNPC;
+                fDistSqrAllowed *= fDistSqrAllowed;
+                if (fDistSqr > fDistSqrAllowed)
                 {
-                     MapPositionSetter.Invoke(EOriginator.RemoteAuthority, party, new object[] {m_ActualPosition});
+                     MapPositionSetter.Invoke(EOriginator.RemoteAuthority, party, new object[] {m_NextPosition});
+                }
+
+                if (m_FacingDirection.HasValue && m_FacingDirection.Value != Vec2.Zero)
+                {
+                    Vec2 predictedPos = m_NextPosition + (m_FacingDirection.Value * 5f);
+                    m_TargetMovementData = new MovementData()
+                    {
+                        DefaultBehaviour = AiBehavior.GoToPoint,
+                        TargetParty = null,
+                        TargetSettlement = null,
+                        TargetPosition = predictedPos
+                    };
                 }
             }
 
@@ -215,7 +233,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             if (!currentMovementData.Equals(m_TargetMovementData))
             {
                 MovementOrderGroup.SetTyped(party, m_TargetMovementData);
-                DefaultBehaviorNeedsUpdate(party) = true;
+                DefaultBehaviorNeedsUpdate(party) = Coop.IsServer;
 
                 if (party.IsRemotePlayerMainParty())
                     // That is a remote player moving. We need to update the local MainParty as well
@@ -224,6 +242,8 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 {
                     DefaultBehaviorNeedsUpdate(Campaign.Current.MainParty) = true;
                 }
+                party.Ai.SetDoNotMakeNewDecisions(true);
+                party.ComputeSpeed();
             }
         }
 
@@ -232,7 +252,8 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         /// </summary>
         [CanBeNull] private MovementData m_TargetMovementData;
 
-        private Vec2 m_ActualPosition = Vec2.Invalid;
+        private Vec2 m_NextPosition = Vec2.Invalid;
+        private Vec2? m_FacingDirection = null;
 
         #endregion
     }

@@ -137,7 +137,18 @@ namespace Coop.Mod.Persistence.Party
             {
                 return;
             }
-            m_Environment.ScopeEntered(party, State.MapPosition, State.Movement.ToData());
+
+            if (AuthState != null && IsValidCoordinate(AuthState.MapPosition))
+            {
+                // Remote controlled entity
+                Vec2 moveDir = (AuthState.MapPosition.Vec2 - State.MapPosition.Vec2).Normalized();
+                m_Environment.ScopeEntered(party, AuthState.MapPosition, moveDir, AuthState.Movement.ToData());
+            }
+            else
+            {
+                // We are the controller
+                m_Environment.ScopeEntered(party, State.MapPosition, null, State.Movement.ToData());
+            }
         }
 
         #endregion
@@ -179,16 +190,16 @@ namespace Coop.Mod.Persistence.Party
                 return;
             }
 
-            MovementData data = State.Movement.ToData();
+            MovementData data = AuthState != null ? AuthState.Movement.ToData() : State.Movement.ToData();
             m_Environment.SetAuthoritative(party, data);
             Replay.ReplayRecording?.Invoke(Id, party, data);
         }
-
+        /// <summary>
+        ///     Handler to apply a changed position from the server to the local game state.
+        /// </summary>
         private void UpdateLocalPosition()
         {
-            if (float.IsNaN(State.MapPosition.Vec2.x) ||
-                float.IsNaN(State.MapPosition.Vec2.y) ||
-                State.MapPosition.Vec2 == Vec2.Zero)
+            if (!IsValidCoordinate(State.MapPosition))
             {
                 return;
             }
@@ -197,10 +208,33 @@ namespace Coop.Mod.Persistence.Party
             {
                 return;
             }
-
-            m_Environment.SetAuthoritative(party, State.MapPosition);
+            
+            if (!State.IsPlayerControlled &&
+                AuthState != null && IsValidCoordinate(AuthState.MapPosition) && 
+                NextState != null && IsValidCoordinate(NextState.MapPosition))
+            {
+                // Remote controlled entity
+                Vec2 moveDir = (NextState.MapPosition.Vec2 - State.MapPosition.Vec2).Normalized();
+                m_Environment.SetAuthoritative(party, AuthState.MapPosition, moveDir);
+            }
+            else
+            {
+                // We are the controller
+                m_Environment.SetAuthoritative(party, State.MapPosition, null);
+            }
         }
-
+        /// <summary>
+        ///     Returns whether the given vector is a valid map coordinate.
+        /// </summary>
+        /// <param name="vec"></param>
+        /// <returns></returns>
+        private bool IsValidCoordinate(Vec2 vec)
+        {
+            return !float.IsNaN(vec.x) &&
+                   !float.IsNaN(vec.y) &&
+                   vec != Vec2.Zero;
+        }
+        
         /// <summary>
         ///     Handler to be called when the control of this party changes to or from any player.
         /// </summary>

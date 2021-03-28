@@ -16,15 +16,16 @@ namespace Coop.Mod.Scope
         /// </summary>
         /// <param name="party"></param>
         /// <param name="position"></param>
+        /// <param name="facingDirection"></param>
         /// <param name="currentMovementData"></param>
-        public static void Enter(
-            [NotNull] MobileParty party, 
+        public static void Enter([NotNull] MobileParty party,
             Vec2 position,
+            Vec2? facingDirection,
             MovementData currentMovementData)
         {
             // TODO: make sure the party visuals are correct
-            CampaignMapMovement.RemoteMapPositionChanged(party, position);
             CampaignMapMovement.RemoteMovementChanged(party, currentMovementData);
+            CampaignMapMovement.RemoteMapPositionChanged(party, position, facingDirection);
             party.IsActive = true;
         }
         /// <summary>
