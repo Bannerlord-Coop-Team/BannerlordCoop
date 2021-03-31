@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: .NETFramework
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the development branch
@@ -14,8 +14,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v1
-      name: Checkout Code
+    
+    - name: Checkout Code
+      uses: actions/checkout@v1
       with:
         submodules: recursive
         
