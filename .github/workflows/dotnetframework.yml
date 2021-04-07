@@ -2,7 +2,8 @@
 
 name: .NETFramework
 on:
-  workflow_dispatch:
+    push:
+      branches: [ CI ]
 
 
 # Controls when the action will run. Triggers the workflow on push or pull request
