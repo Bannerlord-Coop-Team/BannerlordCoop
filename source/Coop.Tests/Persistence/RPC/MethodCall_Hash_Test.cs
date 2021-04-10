@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.RemoteAction;
+using RemoteAction;
 using Sync;
+using Sync.Call;
 using Sync.Store;
 using TaleWorlds.ObjectSystem;
 using Xunit;
@@ -29,7 +31,12 @@ namespace Coop.Tests.Persistence.RPC
                 case EventArgType.StoreObjectId:
                     return new Argument(new ObjectId((uint) random.Next()));
                 case EventArgType.CurrentCampaign:
-                    return Argument.CurrentCampaign;
+                    return Argument.CurrentCampaign; 
+                case EventArgType.SmallObjectRaw:
+                    int[] intArray = {random.Next(), random.Next()};
+                    byte[] raw = new byte[intArray.Length * sizeof(int)];
+                    Buffer.BlockCopy(intArray, 0, raw, 0, raw.Length);
+                    return new Argument(raw);
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -50,7 +57,7 @@ namespace Coop.Tests.Persistence.RPC
         {
             int iNumberOfArguments = random.Next(0, 10);
             return new MethodCall(
-                new MethodId(random.Next()),
+                new InvokableId(random.Next()),
                 GetRandomArgument(random),
                 GetRandomArguments(random, iNumberOfArguments));
         }

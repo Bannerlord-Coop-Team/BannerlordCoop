@@ -1,74 +1,70 @@
 ﻿using System;
-using System.Linq;
 using Coop.Mod.Persistence;
-using HarmonyLib;
-using Mono.Reflection;
+using CoopFramework;
+using JetBrains.Annotations;
+using RemoteAction;
 using Sync;
+using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
 
-namespace Coop.Mod.Patch
+namespace Coop.Mod.Patch.World
 {
-    public static class TimeControl
+    /// <summary>
+    ///     Patches the time control in the local campaign instance and synchronizes it across all players.
+    /// </summary>
+    public class TimeControl : CoopManaged<TimeControl, Campaign>
     {
-        private static readonly PropertyPatch TimeControlPatch =
-            new PropertyPatch(typeof(Campaign)).InterceptSetter(nameof(Campaign.TimeControlMode));
-
-        private static readonly PropertyPatch TimeControlLockPatch =
-            new PropertyPatch(typeof(Campaign)).InterceptSetter(
-                nameof(Campaign.TimeControlModeLock));
-
-        private static readonly PropertyPatch IsMainPartyWaitingPatch =
-            new PropertyPatch(typeof(Campaign), EPatchBehaviour.NeverCallOriginal).InterceptSetter(
-                nameof(Campaign.IsMainPartyWaiting));
-
-        public static FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; } =
-            new FieldAccess<Campaign, CampaignTimeControlMode>(
-                AccessTools.Property(typeof(Campaign), nameof(Campaign.TimeControlMode))
-                           .GetBackingField());
-
-        public static FieldAccess<Campaign, bool> TimeControlModeLock { get; } =
-            new FieldAccess<Campaign, bool>(
-                AccessTools.Property(typeof(Campaign), nameof(Campaign.TimeControlModeLock))
-                           .GetBackingField());
-
         public static bool CanSyncTimeControlMode = false;
-
-        [PatchInitializer]
-        public static void Init()
+        static TimeControl()
         {
-            FieldChangeBuffer.Intercept(TimeControlMode, TimeControlPatch.Setters, DoSyncTimeControl);
-            FieldChangeBuffer.Intercept(
-                TimeControlModeLock,
-                TimeControlLockPatch.Setters,
-                DoSyncTimeControl);
-
-            MethodAccess mainPartyWaitingSetter = IsMainPartyWaitingPatch.Setters.First();
-            mainPartyWaitingSetter.Condition = o => Coop.DoSync();
-            mainPartyWaitingSetter.SetGlobalHandler(SetIsMainPartyWaiting);
+            When(GameLoop & CanChangeTimeClientside)
+                .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)))
+                .Broadcast(() => CoopClient.Instance.Synchronization, new CanChangeTimeServerside())
+                .Skip();
+            When(GameLoop)
+                .Calls(Setter(nameof(Campaign.IsMainPartyWaiting)))
+                .DelegateTo(SetIsMainPartyWaiting);
+            AutoWrapAllInstances(c => new TimeControl(c));
         }
+        
+        /// <summary>
+        ///     Serverside check if the time control mode can be changed right now.
+        /// </summary>
+        private class CanChangeTimeServerside : IActionValidator
+        {
+            public bool IsAllowed()
+            {
+                return CoopServer.Instance.AreAllClientsPlaying;
+            }
 
-        private static void SetIsMainPartyWaiting(object instance, object value)
+            public string GetReasonForRejection()
+            {
+                return "Some players are currently connecting";
+            }
+        }
+        public TimeControl([NotNull] Campaign instance) : base(instance)
+        {
+        }
+        
+        private static ECallPropagation SetIsMainPartyWaiting(IPendingMethodCall call)
         {
             IEnvironmentClient env = CoopClient.Instance?.Persistence?.Environment;
-            if (env == null) return;
-            if (!(value is object[] args)) throw new ArgumentException();
+            var args = call.Parameters;
+            if (env == null) return ECallPropagation.CallOriginal;
+            if (args.Length != 1) throw new ArgumentException();
             if (!(args[0] is bool isLocalMainPartyWaiting)) throw new ArgumentException();
-            if (!(instance is Campaign campaign)) throw new ArgumentException();
+            if (!(call.Instance is Campaign campaign)) throw new ArgumentException();
 
             bool isEveryMainPartyWaiting = isLocalMainPartyWaiting;
-            foreach (MobileParty party in env.PlayerControlledParties)
+            foreach (MobileParty party in env.PlayerMainParties)
             {
                 isEveryMainPartyWaiting = isEveryMainPartyWaiting && party.ComputeIsWaiting();
             }
 
-            IsMainPartyWaitingPatch
-                .Setters.First()
-                .CallOriginal(instance, new object[] { isEveryMainPartyWaiting });
+            // Override
+            return isEveryMainPartyWaiting ? ECallPropagation.CallOriginal : ECallPropagation.Skip;
         }
-
-        public static bool DoSyncTimeControl()
-        {
-            return Coop.DoSync() && CanSyncTimeControlMode;
-        }
+        
+        private static readonly Condition CanChangeTimeClientside = new Condition((eOrigin, _) => CanSyncTimeControlMode);
     }
 }

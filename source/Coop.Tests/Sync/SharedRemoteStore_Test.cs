@@ -1,4 +1,5 @@
-﻿using Sync.Store;
+﻿using Coop.Tests.Persistence;
+using Sync.Store;
 using Xunit;
 
 namespace Coop.Tests.Sync
@@ -8,13 +9,13 @@ namespace Coop.Tests.Sync
         [Fact]
         private void DataIsBroadcastToOtherClients()
         {
-            TestEnvironment env = new TestEnvironment(2);
-            string message = "Hello World";
+            var env = new TestEnvironment(2);
+            var message = "Hello World";
 
-            RemoteStore client0 = env.StoresClient[0];
-            RemoteStore client1 = env.StoresClient[1];
+            var client0 = env.StoresClient[0];
+            var client1 = env.StoresClient[1];
 
-            ObjectId id = client0.Insert(message);
+            var id = client0.Insert(message);
             Assert.Contains(id, client0.Data);
             Assert.DoesNotContain(id, client1.Data);
 
@@ -47,12 +48,12 @@ namespace Coop.Tests.Sync
         [Fact]
         private void DataIsReceivedFromClient()
         {
-            TestEnvironment env = new TestEnvironment(1);
-            string message = "Hello World";
+            var env = new TestEnvironment(1);
+            var message = "Hello World";
 
-            RemoteStore client0 = env.StoresClient[0];
+            var client0 = env.StoresClient[0];
 
-            ObjectId id = client0.Insert(message);
+            var id = client0.Insert(message);
             Assert.DoesNotContain(id, env.StoreServer.Data);
 
             env.ExecuteSendsClients();
@@ -64,13 +65,13 @@ namespace Coop.Tests.Sync
         [Fact]
         private void OnDistributedIsInvoked()
         {
-            TestEnvironment env = new TestEnvironment(2);
-            string message = "Hello World";
+            var env = new TestEnvironment(2);
+            var message = "Hello World";
 
-            RemoteStore client0 = env.StoresClient[0];
-            RemoteStore client1 = env.StoresClient[1];
+            var client0 = env.StoresClient[0];
+            var client1 = env.StoresClient[1];
 
-            ObjectId id = client0.Insert(message);
+            var id = client0.Insert(message);
 
             ObjectId? handlerArgument = null;
             env.StoreServer.OnObjectDistributed += objectId => { handlerArgument = objectId; };
@@ -94,11 +95,11 @@ namespace Coop.Tests.Sync
         [Fact]
         private void ServerAckIsDelayedWithMultipleClients()
         {
-            TestEnvironment env = new TestEnvironment(2);
-            string message = "Hello World";
+            var env = new TestEnvironment(2);
+            var message = "Hello World";
 
-            RemoteStore client0 = env.StoresClient[0];
-            ObjectId id = client0.Insert(message);
+            var client0 = env.StoresClient[0];
+            var id = client0.Insert(message);
             Assert.True(client0.State[id].Sent);
             Assert.False(client0.State[id].Acknowledged);
 
@@ -108,35 +109,35 @@ namespace Coop.Tests.Sync
 
             // Server Add -> Client1
             env.ExecuteSendsServer();
-            RemoteStore client1 = env.StoresClient[1];
+            var client1 = env.StoresClient[1];
             Assert.Contains(id, client1.State);
             Assert.False(
                 client0.State[id]
-                       .Acknowledged); // Delayed until client 1 ACK is processed by server
+                    .Acknowledged); // Delayed until client 1 ACK is processed by server
 
             // Client1 ACK -> Server
             env.ExecuteSendsClients();
             Assert.False(
                 client0.State[id]
-                       .Acknowledged); // Delayed until client 1 ACK is processed by server
+                    .Acknowledged); // Delayed until client 1 ACK is processed by server
 
             // Server ACK -> Client 0
             env.ExecuteSendsServer();
             Assert.True(
                 client0.State[id]
-                       .Acknowledged); // Delayed until client 1 ACK is processed by server
+                    .Acknowledged); // Delayed until client 1 ACK is processed by server
         }
 
         [Fact]
         private void ServerCanAddObject()
         {
-            TestEnvironment env = new TestEnvironment(2);
-            string message = "Hello World";
+            var env = new TestEnvironment(2);
+            var message = "Hello World";
 
-            RemoteStore client0 = env.StoresClient[0];
-            RemoteStore client1 = env.StoresClient[1];
+            var client0 = env.StoresClient[0];
+            var client1 = env.StoresClient[1];
 
-            ObjectId id = env.StoreServer.Insert(message);
+            var id = env.StoreServer.Insert(message);
             Assert.Contains(id, env.StoreServer.Data);
             Assert.DoesNotContain(id, client0.Data);
             Assert.DoesNotContain(id, client1.Data);
@@ -150,11 +151,11 @@ namespace Coop.Tests.Sync
         [Fact]
         private void ServerSendsAckWithOneClient()
         {
-            TestEnvironment env = new TestEnvironment(1);
-            string message = "Hello World";
+            var env = new TestEnvironment(1);
+            var message = "Hello World";
 
-            RemoteStore client0 = env.StoresClient[0];
-            ObjectId id = client0.Insert(message);
+            var client0 = env.StoresClient[0];
+            var id = client0.Insert(message);
             Assert.True(client0.State[id].Sent);
             Assert.False(client0.State[id].Acknowledged);
 

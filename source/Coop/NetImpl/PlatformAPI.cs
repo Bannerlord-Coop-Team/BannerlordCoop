@@ -1,8 +1,4 @@
-﻿using Coop.NetImpl.Steam;
-using Epic.OnlineServices;
-using Galaxy.Api;
-using Network.Infrastructure;
-using NLog;
+﻿using NLog;
 using Steamworks;
 using System;
 using System.Text;

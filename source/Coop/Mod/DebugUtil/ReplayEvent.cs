@@ -2,6 +2,7 @@
 using RailgunNet.System.Encoding;
 using RailgunNet.System.Types;
 using Coop.Mod.Persistence.Party;
+using RemoteAction;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 

@@ -125,21 +125,21 @@ namespace Coop.Mod.DebugUtil
                 return help;
             }
 
-            EntityManager entityManager = CoopServer.Instance?.Persistence?.EntityManager;
-            if (entityManager == null)
+            MobilePartyEntityManager mobilePartyEntityManager = CoopServer.Instance?.Persistence?.MobilePartyEntityManager;
+            if (mobilePartyEntityManager == null)
             {
                 return "Server not started.";
             }
 
             if (parameters[0] == "1")
             {
-                entityManager.SuppressInconsistentStateWarnings = true;
+                mobilePartyEntityManager.SuppressInconsistentStateWarnings = true;
                 return "Inconsistent state warnings disabled.";
             }
 
             if (parameters[0] == "0")
             {
-                entityManager.SuppressInconsistentStateWarnings = false;
+                mobilePartyEntityManager.SuppressInconsistentStateWarnings = false;
                 return "Inconsistent state warnings enabled.";
             }
 

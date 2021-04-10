@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Patch;
+using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.UI;
+using CoopFramework;
 using HarmonyLib;
 using ModTestingFramework;
 using Network.Infrastructure;
@@ -29,10 +30,8 @@ namespace Coop.Mod
 {
     internal class Main : NoHarmonyLoader
     {
-        // Debug symbols
-        public static readonly bool DEBUG = true;
         // Test Symbols
-        public static readonly bool TESTING_ENABLED = true;
+        public static readonly bool TESTING_ENABLED = false;
 
         public static readonly string LOAD_GAME = "MP";
 
@@ -50,7 +49,7 @@ namespace Coop.Mod
                 {
                     string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
-                    if (DEBUG)
+                    if (Globals.DEBUG)
                     {
                         foreach (string argument in array)
                         {
@@ -97,6 +96,7 @@ namespace Coop.Mod
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             Updateables.Add(CoopClient.Instance);
             Updateables.Add(GameLoopRunner.Instance);
+            Updateables.Add(new MobilePartyUpdatable());
         }
 
         public static Main Instance { get; private set; }
@@ -113,24 +113,10 @@ namespace Coop.Mod
             AddBehavior<GameLoadedBehaviour>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
-            IEnumerable<MethodInfo> patchInitializers =
-                from t in Assembly.GetExecutingAssembly().GetTypes()
-                from m in t.GetMethods()
-                where m.IsDefined(typeof(PatchInitializerAttribute))
-                select m;
-            foreach (MethodInfo initializer in patchInitializers)
-            {
-                if (!initializer.IsStatic)
-                {
-                    throw new Exception("Invalid [PatchInitializer]. Has to be static.");
-                }
-                
-                Logger.Info("Init patch {}", initializer.DeclaringType);
-                initializer.Invoke(null, null);
-            }
+            CoopFramework.CoopFramework.InitPatches(ObjectManagerAdapter.Instance, Coop.IsCoopGameSession);
 
             // Skip startup splash screen
-            if (DEBUG)
+            if (Globals.DEBUG) 
             {
                 typeof(Module).GetField(
                                   "_splashScreenPlayed",
@@ -156,7 +142,7 @@ namespace Coop.Mod
                     {
                         string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
-                        if (DEBUG)
+                        if (Globals.DEBUG)
                         {
                             foreach (string argument in array)
                             {
@@ -204,6 +190,13 @@ namespace Coop.Mod
             base.OnSubModuleUnloaded();
         }
 
+        public Action<Game> OnGameInit;
+        public override void OnGameInitializationFinished(Game game)
+        {
+            base.OnGameInitializationFinished(game);
+            OnGameInit?.Invoke(game);
+        }
+
         public override void OnGameEnd(Game game)
         {
             base.OnGameEnd(game);
@@ -225,7 +218,8 @@ namespace Coop.Mod
                 // DebugConsole.Toggle();
             }
 
-            Updateables.UpdateAll(TimeSpan.FromSeconds(dt));
+            TimeSpan frameTime = TimeSpan.FromSeconds(dt);
+            Updateables.MakeUnion(SyncBufferManager.ProcessBufferedChanges).UpdateAll(frameTime);
         }
 
         private void initLogger()

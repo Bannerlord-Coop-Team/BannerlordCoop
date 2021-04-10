@@ -15,6 +15,7 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.SaveSystem.Load;
 using System.Reflection;
+using Common;
 using NetworkMessages.FromClient;
 using Module = TaleWorlds.MountAndBlade.Module;
 using TaleWorlds.CampaignSystem.Actions;
@@ -60,7 +61,7 @@ namespace Coop.Mod.Managers
 
             OnCharacterCreationLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
 
-            if (Main.DEBUG)
+            if (Globals.DEBUG)
             {
                 SkipCharacterCreation();
             }

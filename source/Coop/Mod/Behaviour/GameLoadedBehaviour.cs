@@ -16,8 +16,6 @@ namespace Coop.Mod.Behaviour
         private static void GameLoaded(CampaignGameStarter gameStarter)
         {
             CoopClient.Instance.Events.OnGameLoaded.Invoke();
-
-            CoopClient.Instance.GameState.AddPlayerControllerParty(MobileParty.MainParty);
             CoopClient.Instance.Events.OnBeforePlayerPartySpawned.Invoke(MobileParty.MainParty);
         }
     }
