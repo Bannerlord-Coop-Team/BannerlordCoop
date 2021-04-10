@@ -21,9 +21,6 @@ using Stateless;
 using Common;
 using System.Linq;
 using TaleWorlds.ObjectSystem;
-using Coop.Mod.Persistence.Party;
-using RailgunNet.Logic;
-using Coop.Mod.Patch.World;
 
 namespace Coop.Mod
 {
@@ -36,7 +33,7 @@ namespace Coop.Mod
         }
     }
 
-    public class CoopServer
+    public class CoopServer : IDisposable
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -138,7 +135,7 @@ namespace Coop.Mod
 
         public void StartGame(string saveName)
         {
-            if (Main.DEBUG)
+            if (Globals.DEBUG)
             {
                 try
                 {
@@ -192,6 +189,11 @@ namespace Coop.Mod
             return Current.ToString();
         }
 
+        public void Dispose()
+        {
+            ShutDownServer();
+        }
+
         private void OnClientConnected(ConnectionServer connection)
         {
             CoopServerSM coopServerSM = new CoopServerSM();
@@ -210,7 +212,6 @@ namespace Coop.Mod
             OnServerSentWorldData += m_GameEnvironmentServer.UnlockTimeControl;
 
             // Packet Handler Registration
-            connection.Dispatcher.RegisterPacketHandler(ReceiveClientRequestParty);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientRequestWorldData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientDeclineWorldData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientLoaded);
@@ -227,26 +228,6 @@ namespace Coop.Mod
             connection.OnClientJoined -= Persistence.ClientJoined;
             connection.OnDisconnected -= Persistence.Disconnected;
             SyncedObjectStore?.RemoveConnection(connection);
-        }
-
-        [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestParty)]
-        private void ReceiveClientRequestParty(ConnectionBase connection, Packet packet)
-        {
-            Client_Request_Party info =
-                Client_Request_Party.Deserialize(new ByteReader(packet.Payload));
-
-            if (CoopSaveManager.PlayerParties.ContainsKey(info.m_ClientId))
-            {
-                MBGUID guid = CoopSaveManager.PlayerParties[info.m_ClientId];
-                MobileParty clientParty = ((Hero)MBObjectManager.Instance.GetObject(guid)).PartyBelongedTo;
-                Persistence.EntityManager.RemoveParty(clientParty);
-                connection.Send(new Packet(EPacket.Server_NotifyCharacterExists, new Server_NotifyParty(
-                    CoopSaveManager.PlayerParties[info.m_ClientId].InternalValue).Serialize()));
-            }
-            else
-            {
-                connection.Send(new Packet(EPacket.Server_RequireCharacterCreation, new Server_RequireCharacterCreation().Serialize()));
-            }
         }
 
         [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestWorldData)]
@@ -284,9 +265,9 @@ namespace Coop.Mod
             party.Party.UpdateVisibilityAndInspected(false);
 
             // Add party to persistance since manual creation of party is not handled
-            Persistence.EntityManager.AddParty(party);
+            Persistence.MobilePartyEntityManager.AddParty(party);
 
-            Persistence.EntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
+            Persistence.MobilePartyEntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
         }
 
         private void SendInitialWorldData(ConnectionServer connection)

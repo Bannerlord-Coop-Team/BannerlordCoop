@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Common;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
 using JetBrains.Annotations;
 using Network.Infrastructure;
@@ -21,6 +21,7 @@ namespace Coop.Mod
             new Dictionary<ConnectionServer, RailNetPeerWrapper>();
 
         [NotNull] private readonly Server m_Server;
+        private readonly UpdateableList m_Updateables = new UpdateableList();
 
         public CoopServerRail(
             [NotNull] Server server,
@@ -30,8 +31,9 @@ namespace Coop.Mod
         {
             m_Server = server;
             EventQueue = new EventBroadcastingQueue(store, eventTimeout);
+            m_Updateables.Add(EventQueue);
             m_Instance = new RailServer(registry);
-            EntityManager = new EntityManager(m_Instance);
+            MobilePartyEntityManager = new MobilePartyEntityManager(m_Instance);
         }
 
         [CanBeNull] public RailServerRoom Room => m_Instance.Room;
@@ -41,7 +43,7 @@ namespace Coop.Mod
 
         public EventBroadcastingQueue EventQueue { get; }
 
-        [NotNull] public EntityManager EntityManager { get; }
+        [NotNull] public MobilePartyEntityManager MobilePartyEntityManager { get; }
 
         public void Update(TimeSpan frameTime)
         {
@@ -49,6 +51,8 @@ namespace Coop.Mod
             m_Instance.Update();
             EventQueue.Update(frameTime);
         }
+        
+        public int Priority { get; } = UpdatePriority.ServerThread.RailGun;
 
         ~CoopServerRail()
         {

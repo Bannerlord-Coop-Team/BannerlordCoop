@@ -5,10 +5,11 @@ using System.Net;
 using Common;
 using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.RemoteAction;
 using Coop.Mod.Serializers;
 using Coop.NetImpl;
 using Coop.NetImpl.LiteNet;
+using CoopFramework;
 using JetBrains.Annotations;
 using Network;
 using Network.Infrastructure;
@@ -16,11 +17,8 @@ using Network.Protocol;
 using NLog;
 using RailgunNet.Connection.Client;
 using RailgunNet.Logic;
-using StoryMode;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
@@ -38,6 +36,7 @@ namespace Coop.Mod
 
     public class CoopClient : IUpdateable, IClientAccess
     {
+        #region Private
         private const int MaxReconnectAttempts = 2;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -46,6 +45,7 @@ namespace Coop.Mod
         private readonly CoopClientSM m_CoopClientSM;
 
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
+        private readonly UpdateableList m_Updateables = new UpdateableList();
 
         /// <summary>
         ///     Internal data storage for <see cref="SyncedObjectStore" />.
@@ -59,6 +59,7 @@ namespace Coop.Mod
         private Hero m_Hero;
         private MBGUID m_HeroGUID;
         private ObjectId m_HeroId;
+        #endregion
         public Action<PersistenceClient> OnPersistenceInitialized;
 
         public Action<RemoteStore> RemoteStoreCreated;
@@ -68,9 +69,10 @@ namespace Coop.Mod
             Session = new GameSession(new GameData());
             Session.OnConnectionDestroyed += ConnectionDestroyed;
             m_NetManager = new LiteNetManagerClient(Session, config);
-            GameState = new CoopGameState();
+            m_Updateables.Add(m_NetManager);
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
+            Synchronization = new CoopSyncClient(this);
             
             #region State Machine Callbacks
             m_CoopClientSM.CharacterCreationState.OnEntry(CreateCharacter);
@@ -90,12 +92,12 @@ namespace Coop.Mod
         public RemoteStore SyncedObjectStore { get; private set; }
 
         [CanBeNull] public PersistenceClient Persistence { get; private set; }
+        
+        [NotNull] public SyncBuffered Synchronization { get; }
 
         [NotNull] public GameSession Session { get; }
 
         public static CoopClient Instance => m_Instance.Value;
-
-        public CoopGameState GameState { get; }
         public CoopEvents Events { get; }
 
         public bool ClientConnected
@@ -131,9 +133,9 @@ namespace Coop.Mod
 
         public void Update(TimeSpan frameTime)
         {
-            m_NetManager.Update(frameTime);
-            Persistence?.Update(frameTime);
+            m_Updateables.UpdateAll(frameTime);
         }
+        public int Priority { get; } = UpdatePriority.MainLoop.Update;
 
         public string Connect(IPAddress ip, int iPort)
         {
@@ -162,6 +164,7 @@ namespace Coop.Mod
             if (Persistence == null)
             {
                 Persistence = new PersistenceClient(new GameEnvironmentClient());
+                m_Updateables.Add(Persistence);
                 OnPersistenceInitialized?.Invoke(Persistence);
             }
 

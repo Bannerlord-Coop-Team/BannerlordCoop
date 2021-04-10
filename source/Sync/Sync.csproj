@@ -13,15 +13,6 @@
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
@@ -51,8 +42,9 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony, Version=2.0.1.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Lib.Harmony.2.0.1\lib\net472\0Harmony.dll</HintPath>
+    <Reference Include="0Harmony, Version=2.0.4.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\packages\Lib.Harmony.2.0.4\lib\net472\0Harmony.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="Extensions.Data.xxHash, Version=1.0.2.0, Culture=neutral, PublicKeyToken=null">
       <HintPath>..\packages\xxHash.NET.1.0.2\lib\net40\Extensions.Data.xxHash.dll</HintPath>
@@ -80,36 +72,61 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="EPatchBehaviour.cs"/>
-    <Compile Include="MethodPatch.cs"/>
-    <Compile Include="EMethodPatchFlag.cs"/>
-    <Compile Include="Store\ISerializableFactory.cs"/>
-    <Compile Include="Store\IStore.cs"/>
-    <Compile Include="Store\RemoteStore.cs"/>
-    <Compile Include="Store\SharedRemoteStore.cs"/>
-    <Compile Include="Store\StoreSerializer.cs"/>
-    <Compile Include="ValueChangeRequest.cs"/>
-    <Compile Include="FieldChangeBuffer.cs"/>
-    <Compile Include="MethodId.cs"/>
-    <Compile Include="MethodPatchFactory.cs"/>
-    <Compile Include="MethodRegistry.cs"/>
-    <Compile Include="PropertyPatch.cs"/>
-    <Compile Include="ValueAccess.cs" />
-    <Compile Include="Tracker.cs" />
+    <Compile Include="Behaviour\ConditionalBehaviour.cs" />
+    <Compile Include="Behaviour\ActionValidator.cs" />
+    <Compile Include="Behaviour\CallBehaviourBuilder.cs" />
+    <Compile Include="Behaviour\ActionBehaviourBuilder.cs" />
+    <Compile Include="Behaviour\Condition.cs" />
+    <Compile Include="Behaviour\ECallPropagation.cs" />
+    <Compile Include="Behaviour\EFieldChangeAction.cs" />
+    <Compile Include="Behaviour\EOriginator.cs" />
+    <Compile Include="Behaviour\FieldAccessBehaviourBuilder.cs" />
+    <Compile Include="Behaviour\FieldBehaviourBuilder.cs" />
+    <Compile Include="Behaviour\IActionValidator.cs" />
+    <Compile Include="Behaviour\IPendingMethodCall.cs" />
+    <Compile Include="Behaviour\ActionValidatorRegistry.cs" />
+    <Compile Include="Behaviour\ISynchronization.cs" />
+    <Compile Include="Behaviour\Util.cs" />
+    <Compile Include="Call\EInvokableFlag.cs" />
+    <Compile Include="Call\Invokable.cs" />
+    <Compile Include="Call\InvokableId.cs" />
+    <Compile Include="Call\PatchedInvokable.cs" />
+    <Compile Include="Call\Postfix.cs" />
+    <Compile Include="Call\Prefix.cs" />
+    <Compile Include="Patch\ConstructorPatch.cs" />
+    <Compile Include="Patch\DestructorPatch.cs" />
+    <Compile Include="Patch\GetPrefixBuilder.cs" />
+    <Compile Include="Patch\MethodPatch.cs" />
+    <Compile Include="Patch\MethodPatchFactory.cs" />
+    <Compile Include="Patch\Patcher.cs" />
+    <Compile Include="Patch\PropertyPatch.cs" />
+    <Compile Include="Store\ISerializableFactory.cs" />
+    <Compile Include="Store\IStore.cs" />
+    <Compile Include="Store\RemoteStore.cs" />
+    <Compile Include="Store\SharedRemoteStore.cs" />
+    <Compile Include="Store\StoreSerializer.cs" />
+    <Compile Include="Registry.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Reflection\Extensions.cs" />
     <Compile Include="Reflection\InvokableFactory.cs" />
-    <Compile Include="Patcher.cs" />
-    <Compile Include="ValueData.cs" />
-    <Compile Include="FieldAccess.cs" />
-    <Compile Include="FieldAccessGroup.cs" />
-    <Compile Include="MethodAccess.cs" />
     <Compile Include="SyncPriority.cs" />
+    <Compile Include="Value\FieldAccess.cs" />
+    <Compile Include="Value\FieldAccessGroup.cs" />
+    <Compile Include="Value\FieldChangeBuffer.cs" />
+    <Compile Include="Value\FieldChangeStack.cs" />
+    <Compile Include="Value\FieldData.cs" />
+    <Compile Include="Value\FieldBase.cs" />
+    <Compile Include="Value\FieldChangeRequest.cs" />
+    <Compile Include="Value\FieldId.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Network\Network.csproj">
       <Project>{b0ff5e24-4d98-4ec8-bbce-6cdb85cb685d}</Project>
       <Name>Network</Name>

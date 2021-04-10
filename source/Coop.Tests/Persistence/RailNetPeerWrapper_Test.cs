@@ -38,7 +38,7 @@ namespace Coop.Tests.Persistence
         private void SendRawPrependsPersistenceFlag(int iPayloadLength)
         {
             byte[] payload = Enumerable.Range(7, iPayloadLength).Select(i => (byte) i).ToArray();
-            m_Instance.SendPayload(payload);
+            m_Instance.SendPayload(new ArraySegment<byte>(payload));
 
             ByteWriter writer = new ByteWriter();
             writer.Binary.Write(PacketWriter.EncodePacketType(EPacket.Persistence));
@@ -59,7 +59,7 @@ namespace Coop.Tests.Persistence
 
             ByteWriter writer = new ByteWriter();
             writer.Binary.Write(PacketWriter.EncodePacketType(EPacket.Persistence));
-            writer.Binary.Write(buffer);
+            writer.Binary.Write(buffer.ToArray());
             Assert.Equal(writer.ToArray(), m_SendRawParam);
         }
     }

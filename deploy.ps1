@@ -1,7 +1,6 @@
 # arguments
 param([string]$SolutionDir,
       [string]$TargetDir,
-      [string]$TargetFileName,
       [string[]] $Libs);
 
 $Libs = $Libs -split ','
@@ -9,7 +8,6 @@ $Libs = $Libs -split ','
 Write-Output "*** deploy.ps1 ***"
 Write-Output "SolutionDir:   ${SolutionDir}"
 Write-Output "TargetDir:     ${TargetDir}"
-Write-Output "TargetName:    ${TargetFileName}"
 Write-Output "3rdPartyLibs:  ${Libs}"
 
 # path to required files
@@ -40,7 +38,7 @@ $subModuleContent | Out-File -Encoding utf8 -FilePath $DeployDir\SubModule.xml
 
 
 # copy mod dll
-$filesToCopy = @(${TargetFileName}) + ${Libs}
+$filesToCopy = ${Libs}
 foreach ($file in $filesToCopy) 
 {
     Copy-item -Force ${TargetDir}${file} -Destination $DeployBinDir

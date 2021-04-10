@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using RailgunNet.System.Encoding;
+using RemoteAction;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
@@ -75,28 +76,58 @@ namespace Coop.Mod.Persistence.Party
             return Values.GetEnumerator();
         }
 
-        public override int GetHashCode()
-        {
-            return base.GetHashCode();
-        }
-
         IEnumerator IEnumerable.GetEnumerator()
         {
             return Values.GetEnumerator();
         }
 
-        public override bool Equals(Object obj)
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
+
+        public override bool Equals(object obj)
         {
             if (!(obj is MovementData))
             {
                 return false;
             }
 
-            MovementData other = (MovementData)obj;
+            MovementData other = (MovementData) obj;
             return DefaultBehaviour == other.DefaultBehaviour &&
                    TargetPosition.NearlyEquals(other.TargetPosition, Compare.COORDINATE_PRECISION) &&
                    TargetParty?.Id == other.TargetParty?.Id &&
                    TargetSettlement?.Id == other.TargetSettlement?.Id;
+        }
+
+        public override string ToString()
+        {
+            return
+                $"{TargetPosition}, {TargetParty}, {TargetSettlement}, {DefaultBehaviour}, {NumberOfFleeingsAtLastTravel}";
+        }
+
+        public bool IsValid()
+        {
+            bool bRequiresTargetParty = DefaultBehaviour == AiBehavior.EngageParty ||
+                                        DefaultBehaviour == AiBehavior.EscortParty ||
+                                        DefaultBehaviour == AiBehavior.JoinParty ||
+                                        DefaultBehaviour == AiBehavior.GoAroundParty;
+            if (bRequiresTargetParty && TargetParty == null)
+            {
+                return false;
+            }
+
+            bool bRequiresTargetSettlement = DefaultBehaviour == AiBehavior.AssaultSettlement ||
+                                             DefaultBehaviour == AiBehavior.BesiegeSettlement ||
+                                             DefaultBehaviour == AiBehavior.DefendSettlement ||
+                                             DefaultBehaviour == AiBehavior.RaidSettlement ||
+                                             DefaultBehaviour == AiBehavior.GoToSettlement;
+            if (bRequiresTargetSettlement && TargetSettlement == null)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private enum Field
@@ -119,13 +150,9 @@ namespace Coop.Mod.Persistence.Party
         {
             buffer.WriteByte((byte) movementData.DefaultBehaviour);
             buffer.WriteMBGUID(
-                movementData.TargetSettlement != null ?
-                    movementData.TargetSettlement.Id :
-                    MovementState.InvalidIndex);
+                movementData.TargetSettlement != null ? movementData.TargetSettlement.Id : Coop.InvalidId);
             buffer.WriteMBGUID(
-                movementData.TargetParty != null ?
-                    movementData.TargetParty.Id :
-                    MovementState.InvalidIndex);
+                movementData.TargetParty != null ? movementData.TargetParty.Id : Coop.InvalidId);
             MovementStateSerializer.CoordinateCompressor.WriteVec2(
                 buffer,
                 movementData.TargetPosition);
@@ -139,12 +166,12 @@ namespace Coop.Mod.Persistence.Party
             return new MovementData
             {
                 DefaultBehaviour = (AiBehavior) buffer.ReadByte(),
-                TargetSettlement = (id = buffer.ReadMBGUID()) != MovementState.InvalidIndex ?
-                    (Settlement) MBObjectManager.Instance.GetObject(id) :
-                    null,
-                TargetParty = (id = buffer.ReadMBGUID()) != MovementState.InvalidIndex ?
-                    (MobileParty) MBObjectManager.Instance.GetObject(id) :
-                    null,
+                TargetSettlement = (id = buffer.ReadMBGUID()) != Coop.InvalidId
+                    ? (Settlement) MBObjectManager.Instance.GetObject(id)
+                    : null,
+                TargetParty = (id = buffer.ReadMBGUID()) != Coop.InvalidId
+                    ? (MobileParty) MBObjectManager.Instance.GetObject(id)
+                    : null,
                 TargetPosition = MovementStateSerializer.CoordinateCompressor.ReadVec2(buffer),
                 NumberOfFleeingsAtLastTravel = buffer.ReadInt()
             };

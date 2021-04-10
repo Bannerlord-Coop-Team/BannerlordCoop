@@ -18,7 +18,10 @@ namespace Coop.Mod.Persistence.Party
 
         protected override void Execute(RailRoom room, RailController sender)
         {
-            if (!TryFind(EntityId, out MobilePartyEntityServer entity)) return;
+            if (!TryFind(EntityId, out MobilePartyEntityServer entity))
+            {
+                return;
+            }
 
             if (sender.ControlledEntities.Contains(entity))
             {
