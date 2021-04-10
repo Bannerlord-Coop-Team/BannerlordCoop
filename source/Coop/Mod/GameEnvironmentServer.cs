@@ -31,7 +31,7 @@ namespace Coop.Mod
                     () =>
                     {
                         // Update the whole cache since we're already in the game loop thread. Doesn't happen that often.
-                        m_PartyCache = MobileParty.All.ToDictionary(party => party.Id);
+                        m_PartyCache = MobileParty.All.AsParallel().ToDictionary(party => party.Id);
                         ret = m_PartyCache[guid];
                     });
             }
