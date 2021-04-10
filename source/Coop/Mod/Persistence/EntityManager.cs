@@ -224,11 +224,8 @@ namespace Coop.Mod.Persistence
 
         private void AddControlledParty(RailServerPeer peer, MobileParty party)
         {
-            if (!PlayerControllerParties.ContainsKey(peer))
-            {
-                
-            }
-            else if(PlayerControllerParties[peer] != party)
+            if(PlayerControllerParties.ContainsKey(peer) &&
+               PlayerControllerParties[peer] != party)
             {
                 PlayerControllerParties[peer] = party;
             }

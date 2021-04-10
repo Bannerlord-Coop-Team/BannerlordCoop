@@ -64,10 +64,9 @@ namespace Coop.Mod.Managers
 
             OnCharacterCreationLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
 
-            if (Main.DEBUG)
-            {
-                SkipCharacterCreation();
-            }
+#if DEBUG
+            SkipCharacterCreation();
+#endif
 
             Settlement settlement = Settlement.Find("tutorial_training_field");
             MobileParty.MainParty.Position2D = settlement.Position2D;
@@ -82,26 +81,25 @@ namespace Coop.Mod.Managers
         private void SkipCharacterCreation()
         {
             CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
-            bool flag = characterCreationState.CurrentStage is CharacterCreationCultureStage;
-            if (flag)
+            if (characterCreationState.CurrentStage is CharacterCreationCultureStage)
             {
                 CultureObject culture = CharacterCreationContentBase.Instance.GetCultures().GetRandomElementInefficiently();
                 CharacterCreationContentBase.Instance.SetSelectedCulture(culture, characterCreationState.CharacterCreation);
                 characterCreationState.NextStage();
             }
-            bool flag2 = characterCreationState.CurrentStage is CharacterCreationFaceGeneratorStage;
-            if (flag2)
+
+            if (characterCreationState.CurrentStage is CharacterCreationFaceGeneratorStage)
             {
-                CharacterCreationFaceGeneratorView stageView = characterCreationState.CurrentStage.Listener as CharacterCreationFaceGeneratorView;
-                BodyGeneratorView bgv = (BodyGeneratorView)stageView.GetType().GetField("_faceGeneratorView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(stageView);
+                ICharacterCreationStageListener listener = characterCreationState.CurrentStage.Listener;
+                BodyGeneratorView bgv = (BodyGeneratorView)listener.GetType().GetField("_faceGeneratorView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(listener);
 
                 FaceGenVM facegen = bgv.DataSource;
 
                 facegen.FaceProperties.Randomize();
                 characterCreationState.NextStage();
             }
-            bool flag3 = characterCreationState.CurrentStage is CharacterCreationGenericStage;
-            if (flag3)
+
+            if (characterCreationState.CurrentStage is CharacterCreationGenericStage)
             {
                 for (int i = 0; i < characterCreationState.CharacterCreation.CharacterCreationMenuCount; i++)
                 {
@@ -114,15 +112,12 @@ namespace Coop.Mod.Managers
                 }
                 characterCreationState.NextStage();
             }
-            bool flag5 = characterCreationState.CurrentStage is CharacterCreationReviewStage;
-            if (flag5)
+
+            if (characterCreationState.CurrentStage is CharacterCreationReviewStage)
             {
                 characterCreationState.NextStage();
             }
-            bool flag6 = characterCreationState.CurrentStage is CharacterCreationOptionsStage;
-            if (flag6)
-            {
-            }
+
             characterCreationState = (GameStateManager.Current.ActiveState as CharacterCreationState);
         }
     }
