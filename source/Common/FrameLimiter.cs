@@ -13,7 +13,7 @@ namespace Common
         /// <summary>
         ///     The elapsed time between the last call to <see cref="Throttle"/> and the call before that.
         /// </summary>
-        public TimeSpan LastThrottledFrameTime;
+        public TimeSpan LastThrottledFrameTime { get; private set; }
 
         /// <summary>
         ///     Create a new frame limiter with the given target frame time.
@@ -46,8 +46,8 @@ namespace Common
                 };
             }
 
-            m_AverageActualFrameTime = new MovingAverage(32);
-            m_AverageThrottledFrameTime = new MovingAverage(32);
+            m_AverageActualFrameTime = new MovingAverage(RollingBufferSize);
+            m_AverageThrottledFrameTime = new MovingAverage(RollingBufferSize);
         }
 
         /// <summary>
@@ -74,6 +74,7 @@ namespace Common
         }
         
         #region Private
+        private const int RollingBufferSize = 32;
         private readonly MovingAverage m_AverageActualFrameTime;
         private readonly MovingAverage m_AverageThrottledFrameTime;
         private readonly long m_TargetTicksPerFrame;
