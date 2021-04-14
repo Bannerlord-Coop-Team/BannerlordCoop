@@ -8,6 +8,9 @@ using System.Reflection;
 
 namespace Coop.Mod.Serializers
 {
+    /// <summary>
+    /// Used as a part of the ClanSerializer to break down the PartyTemplateObject field
+    /// </summary>
     [Serializable]
     public class DefaultPartyTemplateSerializer : ICustomSerializer
     {
