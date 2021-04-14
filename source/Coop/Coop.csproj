@@ -330,6 +330,7 @@
     <Compile Include="Mod\Serializers\CustomSerializers\CampaignTimeSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CharacterObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ClanSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\DefaultPartyTemplateSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CultureObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\DeterministicRandomSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\EquipmentElementSerializer.cs" />
@@ -411,7 +412,7 @@
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />  
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
