@@ -9,8 +9,6 @@ on:
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the development branch
 
-
-
 jobs:
   build:
 
@@ -30,7 +28,7 @@ jobs:
       uses: NuGet/setup-nuget@latest
       
     - name: Restore NuGet Package
-    - uses: nuget/setup-nuget@v1
+      uses: nuget/setup-nuget@v1
       run: nuget restore source/Coop.sln
  
     - name: Build Mod
