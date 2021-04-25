@@ -61,8 +61,8 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup>
-	<!-- Default path to tools.dll -->
-	<BannerlordPath Condition="'$(BannerlordPath)'==''">..\..\mb2</BannerlordPath>
+    <!-- Default path to tools.dll -->
+    <BannerlordPath Condition="'$(BannerlordPath)'==''">..\..\mb2</BannerlordPath>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony, Version=2.0.1.0, Culture=neutral, processorArchitecture=MSIL">
@@ -140,8 +140,6 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
-
-	
     <Reference Include="TaleWorlds.BattlEye.Client">
       <HintPath>$(BannerlordPath)\bin\Win64_Shipping_Client\TaleWorlds.BattlEye.Client.dll</HintPath>
     </Reference>
@@ -427,7 +425,7 @@
       <Project>{d8f65198-a926-4c46-9599-2d5d4349486f}</Project>
       <Name>LiteNetLib</Name>
     </ProjectReference>
-    <ProjectReference Include="..\ModTestingUtils\ModTestingUtils.csproj">
+    <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingFramework\BannerlordSystemTestingFramework.csproj">
       <Project>{68cefb0c-37f7-4f86-8e8d-1d3baf1e7277}</Project>
       <Name>ModTestingUtils</Name>
     </ProjectReference>
