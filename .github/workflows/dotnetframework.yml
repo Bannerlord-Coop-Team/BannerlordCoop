@@ -30,7 +30,8 @@ jobs:
       uses: NuGet/setup-nuget@v1.0.2
       
     - name: Restore NuGet Package
-      run: nuget.exe restore source/Coop.sln
+    - uses: nuget/setup-nuget@v1
+      run: nuget restore source/Coop.sln
  
     - name: Build Mod
       run: msbuild source/Coop.sln /p:Configuration=Release /p:PublishProfile=FolderProfile /p:SolutionDir="%cd%source/Coop/"
