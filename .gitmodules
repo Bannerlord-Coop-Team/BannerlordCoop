@@ -3,7 +3,7 @@
 	url = https://github.com/araex/RailgunNet.git
 [submodule "source/LiteNetLib"]
 	path = source/LiteNetLib
-	url = https://RevenantX/LiteNetLib.git
+	url = https://github.com/RevenantX/LiteNetLib.git
 [submodule "source/BannerlordTestingEssentials"]
 	path = source/BannerlordTestingEssentials
-	url = https://Bannerlord-Coop-Team/BannerlordTestingEssentials.git
+	url = https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
