@@ -24,10 +24,10 @@ jobs:
         submodules: recursive
         
     - name: Setup MSBuild Path
-      uses: microsoft/setup-msbuild@v1.0.2
+      uses: microsoft/setup-msbuild@latest
 
     - name: Setup NuGet
-      uses: NuGet/setup-nuget@v1.0.2
+      uses: NuGet/setup-nuget@latest
       
     - name: Restore NuGet Package
     - uses: nuget/setup-nuget@v1
