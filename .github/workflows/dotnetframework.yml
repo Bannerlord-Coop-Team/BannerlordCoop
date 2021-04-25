@@ -26,9 +26,6 @@ jobs:
 
     - name: Setup NuGet
       uses: NuGet/setup-nuget@latest
-      
-    - name: Setup NuGet Package
-      uses: nuget/setup-nuget@v1
 
     - name: Run Nuget Restoration  
       run: nuget restore source/Coop.sln
