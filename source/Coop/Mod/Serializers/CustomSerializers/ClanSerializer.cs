@@ -81,6 +81,9 @@ namespace Coop.Mod.Serializers
                     case "<NotAttackableByPlayerUntilTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
+                    case "_defaultPartyTemplate":
+                        SNNSO.Add(fieldInfo, new DefaultPartyTemplateSerializer((PartyTemplateObject)value));
+                        break;
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
                 }
