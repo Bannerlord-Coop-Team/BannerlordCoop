@@ -4,9 +4,9 @@ using TaleWorlds.Engine.Screens;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade.View.Screen;
 using TaleWorlds.Core.ViewModelCollection;
-using StoryMode.ViewModelCollection.CharacterCreationSystem;
+using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterCreation;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
-using StoryMode.GauntletUI.CharacterCreationSystem;
+using SandBox.GauntletUI.CharacterCreation;
 
 namespace Coop.Client.UI.CharacterCreationVM
 {
