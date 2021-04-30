@@ -116,7 +116,7 @@ namespace Coop.Mod.Persistence
             CampaignEvents.OnPartyRemovedEvent.AddNonSerializedListener(this, OnPartyRemoved);
             
             CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, OnPartyAdded);
-            CampaignEvents.OnLordPartySpawnedEvent.AddNonSerializedListener(this, OnPartyAdded);
+            LordPartyComponentPatch.OnLordPartySpawned += (sender, e) => OnPartyAdded(e);
             BanditsCampaignBehaviorPatch.OnBanditAdded += (sender, e) => OnPartyAdded(e);
 
             // Settlements
