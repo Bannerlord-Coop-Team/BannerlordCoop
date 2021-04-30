@@ -22,7 +22,7 @@ namespace Coop.Mod
 	{
         private CoopConnectMenuVM _dataSource;
         private GauntletLayer _gauntletLayer;
-        private GauntletMovie _gauntletMovie;
+        private IGauntletMovie _gauntletMovie;
 
         protected override void OnInitialize()
         {
