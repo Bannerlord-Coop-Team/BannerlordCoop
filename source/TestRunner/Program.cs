@@ -28,8 +28,8 @@ namespace TestRunner
 
         static List<GameInstance> instances = new List<GameInstance>
             {
-                host,
-                client,
+                //host,
+                //client,
             };
 
         static TestEnvironment environment;
