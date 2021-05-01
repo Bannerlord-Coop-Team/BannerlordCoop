@@ -42,6 +42,7 @@ namespace Coop.Mod
                 task.Item2?.Set();
             }
         }
+        public int Priority { get; } = UpdatePriority.MainLoop.GameLoopRunner;
 
         public static void RunOnMainThread(Action action, bool bBlocking = true)
         {

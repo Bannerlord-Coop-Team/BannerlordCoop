@@ -21,8 +21,6 @@ using Stateless;
 using Common;
 using System.Linq;
 using TaleWorlds.ObjectSystem;
-using Coop.Mod.Persistence.Party;
-using RailgunNet.Logic;
 
 namespace Coop.Mod
 {
@@ -35,7 +33,7 @@ namespace Coop.Mod
         }
     }
 
-    public class CoopServer
+    public class CoopServer : IDisposable
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -190,6 +188,11 @@ namespace Coop.Mod
             return Current.ToString();
         }
 
+        public void Dispose()
+        {
+            ShutDownServer();
+        }
+
         private void OnClientConnected(ConnectionServer connection)
         {
             CoopServerSM coopServerSM = new CoopServerSM();
@@ -261,9 +264,9 @@ namespace Coop.Mod
             party.Party.UpdateVisibilityAndInspected(false);
 
             // Add party to persistance since manual creation of party is not handled
-            Persistence.EntityManager.AddParty(party);
+            Persistence.MobilePartyEntityManager.AddParty(party);
 
-            Persistence.EntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
+            Persistence.MobilePartyEntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
         }
 
         private void SendInitialWorldData(ConnectionServer connection)

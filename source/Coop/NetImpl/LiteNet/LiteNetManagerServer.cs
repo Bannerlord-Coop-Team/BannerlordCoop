@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Net;
-using System.Text;
 using Common;
 using LiteNetLib;
 using Network;
@@ -70,6 +69,7 @@ namespace Coop.NetImpl.LiteNet
                 m_SinceLastKeepAlive = TimeSpan.Zero;
             }
         }
+        public int Priority { get; } = UpdatePriority.ServerThread.PollNetwork;
 
         private NetManager CreateNetManager(ISaveData worldData)
         {

@@ -15,6 +15,7 @@ using NLog;
 using NLog.Config;
 using NLog.Targets;
 using Sync;
+using Sync.Value;
 using Xunit;
 
 namespace Coop.Tests
@@ -163,7 +164,7 @@ namespace Coop.Tests
             MemoryStream stream = new MemoryStream();
             BinaryWriter writer = new BinaryWriter(stream);
             new PacketWriter(packet).Write(writer);
-            return stream.ToArray();
+            return new ArraySegment<byte>(stream.ToArray());
         }
 
         public static ArraySegment<byte> MakeKeepAlive(int iKeepAliveID)
@@ -177,7 +178,7 @@ namespace Coop.Tests
             ByteWriter writer = new ByteWriter();
             writer.Binary.Write(PacketWriter.EncodePacketType(EPacket.Persistence));
             writer.Binary.Write(payload);
-            return writer.ToArray();
+            return new ArraySegment<byte>(writer.ToArray());
         }
 
         public static long GetSerializedSize(object o)
@@ -284,7 +285,7 @@ namespace Coop.Tests
             set
             {
                 ValueHistory.Add(value);
-                m_Latest = ValueHistory[^1];
+                m_Latest = ValueHistory[ValueHistory.Count - 1];
             }
         }
     }

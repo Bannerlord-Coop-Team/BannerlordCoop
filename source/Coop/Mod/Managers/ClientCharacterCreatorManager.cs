@@ -15,6 +15,7 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.SaveSystem.Load;
 using System.Reflection;
+using Common;
 using NetworkMessages.FromClient;
 using Module = TaleWorlds.MountAndBlade.Module;
 using TaleWorlds.CampaignSystem.Actions;
@@ -67,7 +68,6 @@ namespace Coop.Mod.Managers
 #if DEBUG
             SkipCharacterCreation();
 #endif
-
             Settlement settlement = Settlement.Find("tutorial_training_field");
             MobileParty.MainParty.Position2D = settlement.Position2D;
 

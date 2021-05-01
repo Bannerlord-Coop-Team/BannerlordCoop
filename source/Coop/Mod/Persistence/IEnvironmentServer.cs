@@ -1,9 +1,9 @@
 ﻿using Coop.Mod.Persistence.Party;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.RemoteAction;
 using JetBrains.Annotations;
-using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence
 {
@@ -12,15 +12,6 @@ namespace Coop.Mod.Persistence
     /// </summary>
     public interface IEnvironmentServer
     {
-        /// <summary>
-        ///     Access to the movement data for all parties in the clients game world.
-        /// </summary>
-        FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
-
-        /// <summary>
-        ///     Determines if the campaign time control mode could be changed right now.
-        /// </summary>
-        bool CanChangeTimeControlMode { get; }
 
         /// <summary>
         ///     Returns the shared object store for this server.
@@ -35,11 +26,16 @@ namespace Coop.Mod.Persistence
         EventBroadcastingQueue EventQueue { get; }
 
         /// <summary>
-        ///     Returns a party given its party index.
+        ///     Returns a party given its guid.
         /// </summary>
-        /// <param name="iPartyIndex"></param>
+        /// <param name="guid"></param>
         /// <returns></returns>
         [CanBeNull]
-        MobileParty GetMobilePartyByIndex(int iPartyIndex);
+        MobileParty GetMobilePartyById(MBGUID guid);
+        
+        /// <summary>
+        ///     Gets the synchronization for <see cref="MobileParty"/> instances.
+        /// </summary>
+        MobilePartySync PartySync { get; }
     }
 }

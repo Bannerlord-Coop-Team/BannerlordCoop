@@ -1,13 +1,17 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Coop.Mod.Patch;
+using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.RemoteAction;
 using NLog;
+using RemoteAction;
 using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod
 {
@@ -15,23 +19,26 @@ namespace Coop.Mod
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public FieldAccessGroup<MobileParty, MovementData> TargetPosition =>
-            CampaignMapMovement.Movement;
-
-        public bool CanChangeTimeControlMode => CoopServer.Instance.AreAllClientsPlaying;
-
         public EventBroadcastingQueue EventQueue => CoopServer.Instance.Persistence?.EventQueue;
 
-        public MobileParty GetMobilePartyByIndex(int iPartyIndex)
+        private Dictionary<MBGUID, MobileParty> m_PartyCache = new Dictionary<MBGUID, MobileParty>();
+
+        public MobileParty GetMobilePartyById(MBGUID guid)
         {
-            MobileParty ret = null;
-            GameLoopRunner.RunOnMainThread(
-                () =>
-                {
-                    ret = MobileParty.All.SingleOrDefault(p => p.Party.Index == iPartyIndex);
-                });
+            if (!m_PartyCache.TryGetValue(guid, out MobileParty ret))
+            {
+                GameLoopRunner.RunOnMainThread(
+                    () =>
+                    {
+                        // Update the whole cache since we're already in the game loop thread. Doesn't happen that often.
+                        m_PartyCache = MobileParty.All.AsParallel().ToDictionary(party => party.Id);
+                        ret = m_PartyCache[guid];
+                    });
+            }
             return ret;
         }
+
+        public MobilePartySync PartySync { get; } = CampaignMapMovement.Sync;
 
         public SharedRemoteStore Store =>
             CoopServer.Instance.SyncedObjectStore ??

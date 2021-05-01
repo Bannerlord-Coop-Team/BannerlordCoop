@@ -38,48 +38,23 @@
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <DebugType>full</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <LangVersion>7.3</LangVersion>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <Optimize>true</Optimize>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <DebugType>pdbonly</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <LangVersion>7.3</LangVersion>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony, Version=2.0.1.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Lib.Harmony.2.0.1\lib\net472\0Harmony.dll</HintPath>
+    <Reference Include="0Harmony, Version=2.0.4.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\packages\Lib.Harmony.2.0.4\lib\net472\0Harmony.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="DistributedLock, Version=1.5.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\DistributedLock.1.5.0\lib\net45\DistributedLock.dll</HintPath>
     </Reference>
-    <Reference Include="EOSSDK-CSharp, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\EOSSDK-CSharp.dll</HintPath>
-    </Reference>
     <Reference Include="GalaxyCSharp">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\GalaxyCSharp.dll</HintPath>
     </Reference>
+    <Reference Include="LiteNetLib, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\packages\LiteNetLib.0.9.4\lib\net35\LiteNetLib.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Mono.Reflection, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756, processorArchitecture=MSIL">
       <HintPath>..\packages\Mono.Reflection.2.0.0\lib\net40\Mono.Reflection.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
       <HintPath>..\packages\NLog.4.7.2\lib\net45\NLog.dll</HintPath>
@@ -246,9 +221,6 @@
     <Reference Include="TaleWorlds.PlatformService.Epic">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Epic.dll</HintPath>
     </Reference>
-    <Reference Include="TaleWorlds.PlatformService.GOG">
-      <HintPath>..\..\..\..\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.GOG.dll</HintPath>
-    </Reference>
     <Reference Include="TaleWorlds.PlatformService.Steam">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Steam.dll</HintPath>
     </Reference>
@@ -277,6 +249,8 @@
   <ItemGroup>
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Mod\CoopClientSM.cs" />
+    <Compile Include="Mod\CoopConditions.cs" />
+    <Compile Include="Mod\ObjectManagerAdapter.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />
     <Compile Include="Mod\DebugUtil\CLICommands.cs" />
     <Compile Include="Mod\DebugUtil\DebugConsole.cs" />
@@ -294,6 +268,10 @@
     <Compile Include="Mod\Managers\ClientManager.cs" />
     <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
+    <Compile Include="Mod\Patch\MobilePartyPatches\CampaignMapMovement.cs" />
+    <Compile Include="Mod\Patch\MobilePartyPatches\CampaignMapPositions.cs" />
+    <Compile Include="Mod\Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />
+    <Compile Include="Mod\Patch\MobilePartyPatches\MobilePartyUpdatable.cs" />
     <Compile Include="Mod\Patch\Party\BanditsCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyFoodCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyHorseCampaignBehavior.cs" />
@@ -306,57 +284,53 @@
     <Compile Include="Mod\Patch\MobilePartyPatches\ComputeIsWaitingPatch.cs" />
     <Compile Include="Mod\Patch\Debugging.cs" />
     <Compile Include="Mod\Patch\Exceptions.cs" />
-    <Compile Include="Mod\Patch\PatchInitializerAttribute.cs" />
     <Compile Include="Mod\Patch\World\TimeControl.cs" />
     <Compile Include="Mod\Patch\Utils.cs" />
     <Compile Include="Mod\Persistence\Compare.cs" />
     <Compile Include="Mod\Persistence\Compression.cs" />
     <Compile Include="Mod\Persistence\IEnvironmentClient.cs" />
     <Compile Include="Mod\Persistence\IEnvironmentServer.cs" />
+    <Compile Include="Mod\Persistence\Party\IMovementHandler.cs" />
+    <Compile Include="Mod\Persistence\Party\MobilePartySync.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\CoopSyncServer.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\EventFieldChange.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\EventActionBase.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\CoopSyncClient.cs" />
     <Compile Include="Mod\Persistence\Party\EventPartyMoveTo.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityClient.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyEntityServer.cs" />
     <Compile Include="Mod\Persistence\Party\MobilePartyState.cs" />
     <Compile Include="Mod\Persistence\Party\MovementData.cs" />
     <Compile Include="Mod\Persistence\PersistenceClient.cs" />
-    <Compile Include="Mod\Persistence\EntityManager.cs" />
-    <Compile Include="Mod\Persistence\RailBitBufferExtensions.cs" />
+    <Compile Include="Mod\Persistence\MobilePartyEntityManager.cs" />
     <Compile Include="Mod\Persistence\Registry.cs" />
-    <Compile Include="Mod\Persistence\RPC\Argument.cs" />
-    <Compile Include="Mod\Persistence\RPC\ArgumentFactory.cs" />
-    <Compile Include="Mod\Persistence\RPC\EventBroadcastingQueue.cs" />
-    <Compile Include="Mod\Persistence\RPC\IClientAccess.cs" />
-    <Compile Include="Mod\Persistence\RPC\MethodCall.cs" />
-    <Compile Include="Mod\Persistence\RPC\MethodCallSerializer.cs" />
-    <Compile Include="Mod\Persistence\RPC\ArgumentSerializer.cs" />
-    <Compile Include="Mod\Persistence\RPC\EventMethodCall.cs" />
-    <Compile Include="Mod\Persistence\RPC\MethodCallSyncHandler.cs" />
-    <Compile Include="Mod\Persistence\RPC\PendingRequests.cs" />
-    <Compile Include="Mod\Persistence\RPC\RPCSyncHandlers.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\EventBroadcastingQueue.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\EventMethodCall.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\IClientAccess.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityClient.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityServer.cs" />
-    <Compile Include="Mod\Persistence\World\EventTimeControl.cs" />
     <Compile Include="Mod\Persistence\World\WorldState.cs" />
     <Compile Include="Mod\CoopServerRail.cs" />
     <Compile Include="Mod\SaveGameData.cs" />
     <Compile Include="Mod\SaveLoad.cs" />
     <Compile Include="Mod\GameData.cs" />
     <Compile Include="Mod\CoopEvents.cs" />
-    <Compile Include="Mod\CoopGameState.cs" />
     <Compile Include="Mod\CoopClient.cs" />
     <Compile Include="Mod\CoopServer.cs" />
     <Compile Include="Mod\Extensions.cs" />
-    <Compile Include="Mod\Patch\Party\CampaignMapMovement.cs" />
     <Compile Include="Mod\Behaviour\GameLoadedBehaviour.cs" />
     <Compile Include="Mod\GameEnvironmentServer.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Mod\Main.cs" />
+    <Compile Include="Mod\Scope\CoopRailScopeEvaluator.cs" />
+    <Compile Include="Mod\Scope\MobilePartyScopeHelper.cs" />
     <Compile Include="Mod\Serializers\CustomSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\BannerSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\BasicTroopSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CampaignTimeSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CharacterObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ClanSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\DefaultPartyTemplateSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CultureObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\DeterministicRandomSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\EquipmentElementSerializer.cs" />
@@ -414,9 +388,9 @@
       <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
       <Name>Common</Name>
     </ProjectReference>
-    <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj">
-      <Project>{d8f65198-a926-4c46-9599-2d5d4349486f}</Project>
-      <Name>LiteNetLib</Name>
+    <ProjectReference Include="..\CoopFramework\CoopFramework.csproj">
+      <Project>{55b13456-9f7f-4724-9cf5-ae12aa3ce81b}</Project>
+      <Name>CoopFramework</Name>
     </ProjectReference>
     <ProjectReference Include="..\Network\Network.csproj">
       <Project>{b0ff5e24-4d98-4ec8-bbce-6cdb85cb685d}</Project>
@@ -426,6 +400,10 @@
       <Project>{d8389325-85ae-4a1d-9b8e-e4742349a531}</Project>
       <Name>RailgunNet</Name>
     </ProjectReference>
+    <ProjectReference Include="..\RemoteAction\RemoteAction.csproj">
+      <Project>{d6e8252c-8ede-4e01-9a61-6fb92b50fb6f}</Project>
+      <Name>RemoteAction</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Sync\Sync.csproj">
       <Project>{79b189c9-b667-4997-a361-ab9c7c014184}</Project>
       <Name>Sync</Name>
@@ -434,11 +412,7 @@
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\"  -TargetDir "$(TargetDir)\" -TargetFileName "$(TargetFileName) " -Libs Common.dll,Network.dll,Sync.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll</PostBuildEvent>
-  </PropertyGroup>
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
