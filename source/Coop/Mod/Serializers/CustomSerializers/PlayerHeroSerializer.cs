@@ -179,9 +179,10 @@ namespace Coop.Mod.Serializers
                 .GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null,
                     new Type[] { typeof(Hero) }, new ParameterModifier[0]);
             LordPartyComponent lordPartyComponent = (LordPartyComponent)ctorInfo.Invoke(new object[] { Hero.MainHero });
-            // lordPartyComponent.MobileParty = hero.PartyBelongedTo; <- This needs to happen somehow to fix the error
-            Campaign.Current.MainParty.PartyComponent = lordPartyComponent;
 
+            Campaign.Current.MainParty.ActualClan = Clan.PlayerClan;
+            Campaign.Current.MainParty.PartyComponent = lordPartyComponent;
+            
             // Invoke party visual onstartup to initialize properly
             typeof(PartyVisual).GetMethod("TaleWorlds.CampaignSystem.IPartyVisual.OnStartup", BindingFlags.Instance | BindingFlags.NonPublic)
             .Invoke(hero.PartyBelongedTo.Party.Visuals, new object[] { hero.PartyBelongedTo.Party });
