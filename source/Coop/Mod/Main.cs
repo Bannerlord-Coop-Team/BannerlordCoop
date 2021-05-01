@@ -39,7 +39,7 @@ namespace Coop.Mod
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
-        #region MainMenuButtons
+#region MainMenuButtons
         public static InitialStateOption CoopCampaign =
             new InitialStateOption(
                 "CoOp Campaign",
@@ -72,7 +72,8 @@ namespace Coop.Mod
                             new object[] { }));
 #endif
                 },
-                () => { return false; });
+                () => { return false; }
+            );
 
         public static InitialStateOption JoinCoopGame =
             new InitialStateOption(
@@ -121,7 +122,7 @@ namespace Coop.Mod
 #endif
 
             if (TESTING_ENABLED)
-		    }
+            {
                 TestingFramework suite = TestingFramework.Instance;
             }
 
