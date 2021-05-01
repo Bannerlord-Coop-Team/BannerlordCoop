@@ -135,9 +135,8 @@ namespace Coop.Mod
 
         public void StartGame(string saveName)
         {
-            if (Globals.DEBUG)
-            {
-                try
+#if DEBUG
+            try
                 {
                     LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(
                         saveName,
@@ -148,7 +147,7 @@ namespace Coop.Mod
                 {
                     Logger.Error("Save file not found: " + ex.Message);
                 }
-            }
+#endif
         }
 
         public ServerGameManager CreateGameManager(LoadGameResult saveGameData = null)

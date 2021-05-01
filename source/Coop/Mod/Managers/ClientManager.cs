@@ -64,6 +64,9 @@ namespace Coop.Mod.Managers
                 // Might need to adjust IsClientPlayersParty
                 throw new Exception("Transferred player party could not be found");
             }
+
+            // Switch current player party from host to client party
+            ChangePlayerCharacterAction.Apply(m_PlayerInCampaign);
         }
 
         public new void OnTick(float dt)

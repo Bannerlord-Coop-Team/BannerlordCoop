@@ -1,5 +1,5 @@
 ﻿using ModTestingFramework;
-using Network.Infrastructure;
+using TaleWorlds.MountAndBlade;
 using TaleWorlds.Engine;
 
 namespace Coop.Mod
@@ -8,7 +8,7 @@ namespace Coop.Mod
     {
         public static void StartCoop()
         {
-            TaleWorlds.MountAndBlade.Module.CurrentModule.ExecuteInitialStateOptionWithId(Main.CoopCampaign.Id);
+            Module.CurrentModule.ExecuteInitialStateOptionWithId(Main.CoopCampaign.Id);
         }
     }
 }

@@ -23,7 +23,11 @@ namespace Coop.Mod.Persistence.RemoteAction
         ///     DEBUG to identify situations where events are starving in the queue. Might need
         ///     to be adjusted depending on how much is done using events.
         /// </summary>
-        public static readonly int MaximumQueueSize = Globals.DEBUG ? 512 : 8192;
+#if DEBUG
+        public static readonly int MaximumQueueSize = 512;
+#else
+        public static readonly int MaximumQueueSize = 8192;
+#endif
 
         private readonly OrderedHashSet<ObjectId> m_DistributedObjects =
             new OrderedHashSet<ObjectId>();
@@ -109,19 +113,20 @@ namespace Coop.Mod.Persistence.RemoteAction
                 if (m_Queue.Count >= MaximumQueueSize)
                 {
                     Logger.Error("Event queue is full!");
-                    if (Globals.DEBUG)
-                        // Events seem to starve in the queue. This indicates an underlying issue.
-                        // Do one of the following:
-                        // 1. Did you change anything that increases the number of generated events
-                        //    in a single frame?
-                        //    yes -> Increase MaximumQueueSize accordingly.
-                        // 2. Did you introduce an event with very large payloads that is blocking
-                        //    the queue while other events are occuring?
-                        //    yes -> Maybe the game should be be paused while we that event is
-                        //           transferred? Remember that the queue is always executed in
-                        //           sequence to guarantee a consistent state.
-                        // 3. Open a bug.
-                        throw new IndexOutOfRangeException();
+#if DEBUG
+                    // Events seem to starve in the queue. This indicates an underlying issue.
+                    // Do one of the following:
+                    // 1. Did you change anything that increases the number of generated events
+                    //    in a single frame?
+                    //    yes -> Increase MaximumQueueSize accordingly.
+                    // 2. Did you introduce an event with very large payloads that is blocking
+                    //    the queue while other events are occuring?
+                    //    yes -> Maybe the game should be be paused while we that event is
+                    //           transferred? Remember that the queue is always executed in
+                    //           sequence to guarantee a consistent state.
+                    // 3. Open a bug.
+                    throw new IndexOutOfRangeException();
+#endif
                 }
 
                 m_Queue.Add(call);

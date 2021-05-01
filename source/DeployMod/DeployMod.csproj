@@ -15,7 +15,7 @@
     </PropertyGroup>
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="powershell -ExecutionPolicy Unrestricted ^&#xD;&#xA;            -File &quot;$(SolutionDir)..\deploy.ps1&quot; -SolutionDir &quot;$(SolutionDir)\&quot; ^&#xD;&#xA;            -TargetDir &quot;$(SolutionDir)Coop\bin\$(Configuration)\\&quot; ^&#xD;&#xA;            -Libs &quot;Coop.dll,CoopFramework.dll,Common.dll,Network.dll,Sync.dll,RemoteAction.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll&quot;" />
+        <Exec Command="powershell -ExecutionPolicy Unrestricted ^&#xD;&#xA;            -File &quot;$(SolutionDir)..\deploy.ps1&quot; -SolutionDir &quot;$(SolutionDir)\&quot; ^&#xD;&#xA;            -TargetDir &quot;$(SolutionDir)Coop\bin\$(Configuration)\\&quot; ^&#xD;&#xA;            -Libs Coop.dll,CoopFramework.dll,Common.dll,Network.dll,Sync.dll,RemoteAction.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll" />
     </Target>
 
     <ItemGroup>
