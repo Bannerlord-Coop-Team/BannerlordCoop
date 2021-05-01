@@ -63,6 +63,7 @@ namespace Coop.Client.UI.CharacterCreationVM
 					getFurthestIndexAction, 
 					goToIndexAction)
 		{ }
+		/*
 		public override IEnumerable<ScreenLayer> GetLayers()
 		{
 			throw new NotImplementedException();
@@ -82,6 +83,7 @@ namespace Coop.Client.UI.CharacterCreationVM
 		{
 			throw new NotImplementedException();
 		}
+		*/
 	}
 
 }
