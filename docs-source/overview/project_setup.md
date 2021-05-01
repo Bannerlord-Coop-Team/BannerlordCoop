@@ -1,6 +1,6 @@
 # Project Setup
 1. Clone the [repository](https://github.com/Bannerlord-Coop-Team/BannerlordCoop) somewhere on your machine.<br/>
-2. Submodules will have to be updated using the command `git submodule update --recursive --force`.<br/>
+2. Submodules will have to be initialized and updated using the command `git submodule init && git submodule update --recursive --force`.<br/>
 3. Run the `runmefirst.cmd` to dynamically attach your Bannerlord path and resolve references.<br/>
 4. If references in projects did not resolved automatically do the following. This can be done in Visual Studio by right-clicking references, going to browse, navigating to your Bannerlord directory through the mb2 shortcut, and selecting all TaleWorld.* .dlls. There are additional .dlls in the Modules folder, being the Native and StoryMode.<br/>
 5. Go to project settings for the Coop project and click debug. <br/>
