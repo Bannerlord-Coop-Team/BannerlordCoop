@@ -212,28 +212,6 @@ namespace Network.Protocol
         }
     }
 
-    public class Server_NotifyParty
-    {
-        public readonly uint m_PartyId;
-
-        public Server_NotifyParty(uint partyId)
-        {
-            m_PartyId = partyId;
-        }
-
-        public byte[] Serialize()
-        {
-            ByteWriter writer = new ByteWriter();
-            writer.Binary.Write(m_PartyId);
-            return writer.ToArray();
-        }
-
-        public static Server_NotifyParty Deserialize(ByteReader reader)
-        {
-            return new Server_NotifyParty(reader.Binary.ReadUInt32());
-        }
-    }
-
     public class Server_RequireCharacterCreation
     {
         public byte[] Serialize()

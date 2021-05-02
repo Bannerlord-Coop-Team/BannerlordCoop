@@ -76,8 +76,17 @@ namespace Coop.Mod.Patch.World
                     uint partyId = uint.Parse(data[1]);
 
                     MBGUID partyGUID = new MBGUID(partyId);
-
-                    CoopSaveManager.PlayerParties.Add(clientId, partyGUID);
+                    if (CoopSaveManager.PlayerParties.ContainsKey(clientId))
+                    {
+                        if(CoopSaveManager.PlayerParties[clientId] != partyGUID)
+                        {
+                            throw new Exception("Party GUID does not equal saved ID when loading from file.");
+                        }
+                    }
+                    else
+                    {
+                        CoopSaveManager.PlayerParties.Add(clientId, partyGUID);
+                    }
                 }
             }
         }

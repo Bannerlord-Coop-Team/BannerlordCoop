@@ -431,7 +431,7 @@ namespace Coop.Mod.DebugUtil
                 Imgui.Columns(2);
                 Imgui.Separator();
                 Imgui.Text("ID");
-                var parties = manager.Parties.ToList();
+                var parties = manager.ServerPartyEntities.ToList();
                 foreach (RailEntityServer entity in parties)
                 {
                     if (entity != null)

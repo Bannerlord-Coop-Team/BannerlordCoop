@@ -31,7 +31,7 @@ namespace Coop.Mod
     internal class Main : NoHarmonyLoader
     {
         // Test Symbols
-        public static readonly bool TESTING_ENABLED = false;
+        public static readonly bool TESTING_ENABLED = true;
 
         public static readonly string LOAD_GAME = "MP";
 

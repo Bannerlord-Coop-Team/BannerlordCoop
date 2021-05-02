@@ -279,9 +279,8 @@ namespace Coop.Mod
         [GameClientPacketHandler(ECoopClientState.MainManu, EPacket.Server_NotifyCharacterExists)]
         private void ReceiveCharacterExists(ConnectionBase connection, Packet packet)
         {
-            uint guid = Server_NotifyParty.Deserialize(new ByteReader(packet.Payload)).m_PartyId;
-            m_HeroGUID = new MBGUID(guid);
-            m_Hero = (Hero)MBObjectManager.Instance.GetObject(m_HeroGUID);
+            m_HeroGUID = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
+            //m_Hero = (Hero)MBObjectManager.Instance.GetObject(m_HeroGUID);
             m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
         }
         #endregion
