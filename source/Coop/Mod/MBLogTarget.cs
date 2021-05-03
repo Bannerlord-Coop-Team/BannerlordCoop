@@ -8,16 +8,18 @@ namespace Coop.Mod
     [Target("MbLog")]
     public class MbLogTarget : TargetWithLayout
     {
+        private static readonly Color Yellow = Color.FromUint(0xFFFF00);
+        private static readonly Color Red = Color.FromUint(0xFF0000);
         protected override void Write(LogEventInfo logEvent)
         {
             Color textColor = Color.White;
             if (logEvent.Level == LogLevel.Warn)
             {
-                textColor = Color.FromUint(0xFF0000);
+                textColor = Yellow;
             }
             else if (logEvent.Level >= LogLevel.Error)
             {
-                textColor = Color.FromUint(0xFFFF00);
+                textColor = Red;
             }
 
             InformationManager.DisplayMessage(

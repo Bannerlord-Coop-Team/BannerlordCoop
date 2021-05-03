@@ -61,6 +61,9 @@ namespace Coop.Mod.Serializers
                     case "_owner":
                         // Not needed, populated at deserialize
                         break;
+                    case "_leader":
+                        // Not needed, populated at deserialize
+                        break;
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
                 }
@@ -100,6 +103,7 @@ namespace Coop.Mod.Serializers
 
             newPartyBase.AddElementToMemberRoster(hero.CharacterObject, 1);
             newPartyBase.GetType().GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, hero);
+            newPartyBase.GetType().GetField("_leader", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, hero.CharacterObject);
             newPartyBase.GetType().GetField("<MobileParty>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, mobileParty);
 
             IPartyVisual newVisual = Campaign.Current.VisualCreator.PartyVisualCreator.CreatePartyVisual();

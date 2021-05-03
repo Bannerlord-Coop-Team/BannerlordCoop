@@ -1,12 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
+using System.Reflection;
 using Common;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.Party;
+using Coop.Mod.Persistence.RemoteAction;
+using Coop.Mod.Persistence.World;
 using Coop.NetImpl.LiteNet;
+using CoopFramework;
+using HarmonyLib;
 using JetBrains.Annotations;
 using Network.Infrastructure;
 using NLog;
@@ -14,9 +21,14 @@ using RailgunNet.Connection;
 using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
-using Sync;
+using RemoteAction;
+using Sync.Call;
+using Sync.Value;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using Registry = Sync.Registry;
+using Logger = NLog.Logger;
 
 namespace Coop.Mod.DebugUtil
 {
@@ -35,11 +47,12 @@ namespace Coop.Mod.DebugUtil
                 AddButtons();
                 DisplayDiscovery();
                 DisplayConnectionInfo();
-                DisplayMethodRegistry();
+                DisplayHarmonyPatches();
                 DisplayPersistenceMenu();
                 End();
             }
         }
+        public int Priority { get; } = UpdatePriority.MainLoop.DebugUI;
 
         private static void DisplayPersistenceMenu()
         {
@@ -105,69 +118,227 @@ namespace Coop.Mod.DebugUtil
             Imgui.Columns();
         }
 
-        private static void DisplayMethodRegistry()
+        private static void DisplayHarmonyPatches()
         {
-            if (!Imgui.TreeNode("Patched method registry"))
+            if (!Imgui.TreeNode("Harmony patches"))
             {
                 return;
             }
-
-            foreach (KeyValuePair<MethodId, MethodAccess> registrar in MethodRegistry.IdToMethod)
+            
+            Dictionary<MethodBase, List<InvokableId>> coopPatchMethods = new Dictionary<MethodBase, List<InvokableId>>();
+            foreach (KeyValuePair<InvokableId, Invokable> registrar in Registry.IdToInvokable)
             {
-                MethodAccess access = registrar.Value;
-                string sName = $"{registrar.Key} {access}";
+                var key = registrar.Value.Original;
+                if (!coopPatchMethods.ContainsKey(key))
+                {
+                    coopPatchMethods[key] = new List<InvokableId>();
+                }
+                coopPatchMethods[key].Add(registrar.Key);
+            }
+            
+            foreach (MethodBase method in Harmony.GetAllPatchedMethods())
+            {
+                string sName = $"{method.DeclaringType?.Name}.{method.Name}";
                 if (!Imgui.TreeNode(sName))
                 {
                     continue;
                 }
-
+                
 #if DEBUG
-                Imgui.Columns(2);
-                Imgui.Separator();
-                Imgui.Text("Instance");
-
-                // first line: global handler
-                Imgui.Text("global");
-
-                // instance specific handlers
-                foreach (KeyValuePair<object, Action<object>> handler in access
-                    .InstanceSpecificHandlers)
+                var patches = Harmony.GetPatchInfo(method);
+                ShowPatches(nameof(patches.Prefixes), patches.Prefixes);
+                ShowPatches(nameof(patches.Postfixes), patches.Postfixes);
+                ShowPatches(nameof(patches.Transpilers), patches.Transpilers);
+                ShowPatches(nameof(patches.Finalizers), patches.Finalizers);
+                
+                if (coopPatchMethods.ContainsKey(method))
                 {
-                    Imgui.Text(handler.Key.ToString());
+                    if (Imgui.TreeNode("Coop synchronization"))
+                    {
+                        ShowCoopPatchInfo(coopPatchMethods[method]);
+                        Imgui.TreePop();
+                    }
                 }
-
-                Imgui.NextColumn();
-                Imgui.Text("Handler");
-                Imgui.Separator();
-
-                // first line: global handler
-                Imgui.Text(
-                    access.GlobalHandler != null ?
-                        access.GlobalHandler.Target + "." + access.GlobalHandler.Method.Name :
-                        "-");
-
-                // instance specific handlers
-                foreach (KeyValuePair<object, Action<object>> handler in access
-                    .InstanceSpecificHandlers)
-                {
-                    Imgui.Text(handler.Value.Target + "." + handler.Value.Method.Name);
-                }
-
-                Imgui.Columns();
-                Imgui.TreePop();
 #else
                 DisplayDebugDisabledText();
 #endif
+                Imgui.TreePop();
             }
 
             Imgui.TreePop();
+        }
+
+        private static void ShowPatches(string name, 
+            ReadOnlyCollection<HarmonyLib.Patch> patches)
+        {
+            List<HarmonyLib.Patch> list = patches.ToList();
+            if (list.Count == 0)
+            {
+                return;
+            }
+            
+            if (!Imgui.TreeNode($"{name} ({list.Count})"))
+            {
+                return;
+            }
+
+            foreach (HarmonyLib.Patch patch in list)
+            {
+                string header = patch.PatchMethod.DeclaringType?.FullName;
+                if (Imgui.TreeNode(header))
+                {
+                    const float tabWidth = 200;
+                    Imgui.Text("Patch method:");
+                    Imgui.SameLine(tabWidth);
+                    Imgui.Text(patch.PatchMethod.Name);
+                    
+                    Imgui.Text("Priority:");
+                    Imgui.SameLine(tabWidth);
+                    Imgui.Text($"{patch.priority}");
+                    
+                    Imgui.Text("Owner:");
+                    Imgui.SameLine(tabWidth);
+                    Imgui.Text(patch.owner);
+                    
+                    if (patch.before.Length > 0)
+                    {
+                        Imgui.Text("Before:");
+                        Imgui.SameLine(tabWidth);
+                        Imgui.Text(string.Join(",", patch.before));
+                    }
+                    
+                    if (patch.after.Length > 0)
+                    {
+                        Imgui.Text("After:");
+                        Imgui.SameLine(tabWidth);
+                        Imgui.Text(string.Join(",", patch.after));
+                    }
+
+                    Imgui.NewLine();
+                    Imgui.TreePop();
+                }
+            }
+            Imgui.TreePop();
+        }
+
+        private static Dictionary<SyncBuffered, int> m_LogEntrySize = new Dictionary<SyncBuffered, int>();
+
+        private static void ShowCoopPatchInfo(List<InvokableId> coopPatch)
+        {
+            const float indent = 50f;
+            const float tabWidth = 200f;
+            foreach (InvokableId methodId in coopPatch)
+            {
+                Imgui.Text("MethodId:");
+                Imgui.SameLine(tabWidth);
+                Imgui.Text("" + methodId.InternalValue);
+
+                HashSet<FieldId> relatedFields = new HashSet<FieldId>();
+                if (Registry.Relation.ContainsKey(methodId))
+                {
+                    foreach (FieldId valueId in Registry.Relation[methodId])
+                    {
+                        void PrintField(FieldBase valueAccess, float indentF = 0f)
+                        {
+                            relatedFields.Add(valueAccess.Id);
+                            Imgui.Text("Related FieldId:");
+                            Imgui.SameLine(tabWidth + indentF);
+                            Imgui.Text($"{valueAccess.Id.InternalValue} [" + valueAccess + "]");
+                        }
+
+                        FieldBase field = Registry.IdToField[valueId];
+                        PrintField(field);
+                        if (field is FieldAccessGroup group)
+                        {
+                            foreach (FieldAccess groupMember in group.Fields)
+                            {
+                                PrintField(groupMember, indent);
+                            }
+                        }
+                    }
+                }
+                
+                Imgui.NewLine();
+                
+                foreach (SyncBuffered sync in SyncBufferManager.SynchronizationInstances)
+                {
+                    var history = sync.BroadcastHistory
+                        .Where(c => (c.Call.HasValue && Equals(c.Call.Value, methodId)) ||
+                                    (c.Value.HasValue && relatedFields.Contains(c.Value.Value)));
+                    if (history.IsEmpty())
+                    {
+                        continue;
+                    }
+                    
+                    if (!m_LogEntrySize.ContainsKey(sync))
+                    {
+                        m_LogEntrySize[sync] = 8;
+                    }
+
+                    int length = m_LogEntrySize[sync];
+                    Imgui.Text($"Outgoing command history of {sync.GetType().FullName}");
+                    
+                    history = history
+                        .Take(m_LogEntrySize[sync])
+                        .ToList();
+
+                    int iButton = 0;
+                    foreach (CallTrace trace in history)
+                    {
+                        object instance = trace.Instance;
+                        if (instance is Argument arg)
+                        {
+                            instance = ArgumentFactory.Resolve(CoopClient.Instance.GetStore(), arg);
+                        }
+
+                        object[] arguments = trace.Arguments;
+                        if (!arguments.IsEmpty() && arguments.All(a => a is Argument))
+                        {
+                            arguments = ArgumentFactory.Resolve(CoopClient.Instance.GetStore(), arguments.Select(a=>(Argument) a));
+                        }
+                        
+                        Imgui.Text($"{trace.Tick}:");
+                        Imgui.SameLine(200f); 
+                        if (Imgui.SmallButton($"Resend this action {iButton++}"))
+                        {
+                            if (trace.Call.HasValue)
+                            {
+                                sync.Broadcast(trace.Call.Value, instance, arguments);
+                            }
+                            else if (trace.Value.HasValue && arguments.Length > 0)
+                            {
+                                object argument = arguments[0];
+                                FieldBase field = Registry.IdToField[trace.Value.Value];
+                                FieldChangeBuffer buffer = new FieldChangeBuffer();
+                                buffer.AddChange(field, new FieldData(field, instance, argument), argument);
+                                sync.Broadcast(buffer);
+                            }
+                        }
+
+                        
+                        Imgui.Text("Instance: ");
+                        Imgui.SameLine(tabWidth);
+                        Imgui.Text($"{instance ?? "null"}");
+                        
+                        
+                        Imgui.Text("Arguments: ");
+                        Imgui.SameLine(tabWidth);
+                        Imgui.Text($"{string.Join(",", arguments.Select(a => a.ToString()))}");
+                    }
+                    Imgui.InputInt($"Show more of {sync.GetType().Name}", ref length);
+                    if (length > sync.BroadcastHistory.Count)
+                    {
+                        length = sync.BroadcastHistory.Count;
+                    }
+                    m_LogEntrySize[sync] = length;
+                }
+            }
         }
 
         private void Begin()
         {
             Imgui.BeginMainThreadScope();
             Imgui.Begin(m_WindowTitle);
-            Imgui.Text("DO NOT MOVE THIS WINDOW IN MAIN MENU! It will crash the game.");
         }
 
         private void AddButtons()
@@ -180,12 +351,6 @@ namespace Coop.Mod.DebugUtil
             if (Imgui.SmallButton("Close DebugUI"))
             {
                 Visible = false;
-            }
-
-            Imgui.SameLine(130);
-            if (Imgui.SmallButton("Toggle console"))
-            {
-                DebugConsole.Toggle();
             }
 
             if (CoopServer.Instance.Current == null && !CoopClient.Instance.ClientConnected)
@@ -221,6 +386,9 @@ namespace Coop.Mod.DebugUtil
                     CoopClient.Instance.Disconnect();
                 }
             }
+            
+            Imgui.SameLine(400);
+            Imgui.Checkbox("Show whole map", ref DebugShowWholeMapPatch.IsCheatEnabled);
 
             if (startServerResult != null)
             {
@@ -240,27 +408,47 @@ namespace Coop.Mod.DebugUtil
                 return;
             }
 
-            if (CoopServer.Instance?.Persistence?.EntityManager == null)
+            if (CoopServer.Instance?.Persistence?.MobilePartyEntityManager == null)
             {
-                Imgui.Text("No coop server running.");
+                RailClientRoom clientRoom = CoopClient.Instance?.Persistence?.Room;
+                if (clientRoom != null)
+                {
+                    var entities = clientRoom.Entities
+                        .OfType<MobilePartyEntityClient>()
+                        .ToList().OrderBy(o => o.State.PartyId);
+                    foreach (MobilePartyEntityClient entity in entities)
+                    {
+                        Imgui.Text(entity.ToString());
+                    }
+                }
             }
             else
             {
-                EntityManager manager = CoopServer.Instance.Persistence.EntityManager;
+                MobilePartyEntityManager manager = CoopServer.Instance.Persistence.MobilePartyEntityManager;
+
+                Imgui.SliderFloat("Client scope range", ref manager.ClientRailScopeRange, 0f, 100f);
+
                 Imgui.Columns(2);
                 Imgui.Separator();
                 Imgui.Text("ID");
-                foreach (RailEntityServer entity in manager.Parties)
+                var parties = manager.Parties.ToList();
+                foreach (RailEntityServer entity in parties)
                 {
-                    Imgui.Text(entity.Id.ToString());
+                    if (entity != null)
+                    {
+                        Imgui.Text(entity.Id.ToString());
+                    }
                 }
 
                 Imgui.NextColumn();
                 Imgui.Text("Entity");
                 Imgui.Separator();
-                foreach (RailEntityServer entity in manager.Parties)
+                foreach (RailEntityServer entity in parties)
                 {
-                    Imgui.Text(entity.ToString());
+                    if (entity != null)
+                    {
+                        Imgui.Text(entity.ToString());
+                    }
                 }
 
                 Imgui.Columns();
@@ -288,7 +476,13 @@ namespace Coop.Mod.DebugUtil
             {
                 foreach (IPEndPoint ipEndPoint in servers)
                 {
-                    Imgui.Text($"{ipEndPoint}");
+                    if (Imgui.Button($"Connect to {ipEndPoint}"))
+                    {
+                        ServerConfiguration defaultConfiguration = new ServerConfiguration();
+                        CoopClient.Instance.Connect(
+                            defaultConfiguration.NetworkConfiguration.LanAddress,
+                            defaultConfiguration.NetworkConfiguration.LanPort);
+                    }
                 }
             }
             Imgui.Text("Scanning...");
@@ -343,7 +537,7 @@ namespace Coop.Mod.DebugUtil
                     int tickRate = (int) (TimeSpan.TicksPerSecond / ticksPerFrame);
                     Imgui.Text($"Tickrate [Hz]: {tickRate}");
                 }
-
+                
                 Imgui.Text(
                     $"LAN:   {server.ActiveConfig.NetworkConfiguration.LanAddress}:{server.ActiveConfig.NetworkConfiguration.LanPort}");
                 Imgui.Text(
@@ -379,14 +573,12 @@ namespace Coop.Mod.DebugUtil
                 return;
             }
 
-            if (CoopClient.Instance?.Persistence?.RpcSyncHandlers == null)
+            if (CoopClient.Instance?.Synchronization.BroadcastHistory == null)
             {
                 Imgui.Text("Coop client not connected.");
             }
             else
             {
-                RPCSyncHandlers manager = CoopClient.Instance?.Persistence?.RpcSyncHandlers;
-
                 EventBroadcastingQueue queue = CoopServer.Instance.Environment?.EventQueue;
                 if (queue != null)
                 {
@@ -396,40 +588,31 @@ namespace Coop.Mod.DebugUtil
                         $"Event queue {queue.Count}/{EventBroadcastingQueue.MaximumQueueSize}.");
                     Imgui.Text(
                         $"    min {m_AverageEventsInQueue.AllTimeMin} / avg {Math.Round(m_AverageEventsInQueue.Average)} / max {m_AverageEventsInQueue.AllTimeMax}.");
-                    Imgui.Text(
-                        $"Pending RPC: {PendingRequests.Instance.PendingRequestCount()}");
                 }
 
-                foreach (MethodCallSyncHandler handler in manager.Handlers)
-                {
-                    if (!Imgui.TreeNode(handler.MethodAccess.ToString()))
-                    {
-                        continue;
-                    }
 #if DEBUG
-                    Imgui.Columns(2);
-                    Imgui.Separator();
-                    Imgui.Text("Requested on");
-
-                    foreach (MethodCallSyncHandler.Statistics.Trace trace in handler.Stats.History)
-                    {
-                        Imgui.Text(trace.Tick.ToString());
-                    }
-
-                    Imgui.NextColumn();
-                    Imgui.Text("Request");
-                    Imgui.Separator();
-                    foreach (MethodCallSyncHandler.Statistics.Trace trace in handler.Stats.History)
-                    {
-                        Imgui.Text(trace.Call.ToString());
-                    }
-
-                    Imgui.Columns();
-                    Imgui.TreePop();
+                CallStatistics history = CoopClient.Instance?.Synchronization.BroadcastHistory;
+                Imgui.Columns(2);
+                
+                Imgui.Text("Tick");
+                foreach (CallTrace trace in history)
+                {
+                    Imgui.Text(trace.Tick.ToString());
+                }
+                
+                Imgui.NextColumn();
+                Imgui.Text("Call");
+                foreach (CallTrace trace in history)
+                {
+                    Imgui.Text(trace.Call.ToString());
+                }
+                
+                Imgui.Columns();
+                
+                
 #else
                     DisplayDebugDisabledText();
 #endif
-                }
             }
 
             Imgui.TreePop();
@@ -460,5 +643,24 @@ namespace Coop.Mod.DebugUtil
 
             public int Slack => Peer.RemoteClock.LatestRemote - Peer.RemoteClock.EstimatedRemote;
         }
+        
+        [HarmonyPatch(typeof(MobileParty))]
+        [HarmonyPatch(nameof(MobileParty.SeeingRange), MethodType.Getter)]
+        private static class DebugShowWholeMapPatch
+        {
+            public static bool IsCheatEnabled = false;
+            static bool Prefix(MobileParty __instance, ref float __result)
+            {
+                if (IsCheatEnabled && __instance == MobileParty.MainParty)
+                {
+                    __result = Single.MaxValue;
+                    return false;
+                }
+                return true;
+            }
+        }
+        
     }
+    
+    
 }

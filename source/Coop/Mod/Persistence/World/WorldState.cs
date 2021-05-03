@@ -7,20 +7,14 @@ namespace Coop.Mod.Persistence.World
     /// <summary>
     ///     Global world state.
     /// </summary>
-    public class WorldState : RailState, INotifyPropertyChanged
+    public class WorldState : RailState
     {
-#pragma warning disable 67
-        public event PropertyChangedEventHandler PropertyChanged;
-#pragma warning restore 67
         public override string ToString()
         {
-            return $"{CampaignTimeTicks} :: {TimeControl} {TimeControlLock}";
+            return $"{CampaignTimeTicks}";
         }
 
         #region synced data
-        [Mutable] public CampaignTimeControlMode TimeControl { get; set; }
-
-        [Mutable] public bool TimeControlLock { get; set; }
 
         [Mutable] public long CampaignTimeTicks { get; set; }
         #endregion

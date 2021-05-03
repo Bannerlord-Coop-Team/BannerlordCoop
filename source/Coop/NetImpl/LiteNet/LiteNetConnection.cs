@@ -31,7 +31,6 @@ namespace Coop.NetImpl.LiteNet
 
         public void Close(EDisconnectReason eReason)
         {
-            m_Peer.Flush();
             m_Peer.NetManager.DisconnectPeer(m_Peer, new[] {Convert.ToByte(eReason)});
         }
 

@@ -1,7 +1,6 @@
 # arguments
 param([string]$SolutionDir,
       [string]$TargetDir,
-      [string]$TargetFileName,
       [string[]] $Libs);
 
 $Libs = $Libs -split ','
@@ -9,7 +8,6 @@ $Libs = $Libs -split ','
 Write-Output "*** deploy.ps1 ***"
 Write-Output "SolutionDir:   ${SolutionDir}"
 Write-Output "TargetDir:     ${TargetDir}"
-Write-Output "TargetName:    ${TargetFileName}"
 Write-Output "3rdPartyLibs:  ${Libs}"
 
 # path to required files
@@ -17,7 +15,7 @@ $BaseDir        = "${SolutionDir}..\"
 $DeployDir      = "${BaseDir}deploy\"
 $ConfigPath     = "${BaseDir}config.json"
 $TemplateDir    = "${BaseDir}template"
-$UIMovieDir    = "${BaseDir}UIMovies"
+$UIMovieDir     = "${BaseDir}UIMovies"
 
 # create output directory structure
 $DeployBinDir = "$DeployDir\bin\Win64_Shipping_Client"
@@ -35,11 +33,12 @@ Write-Output $config
 $subModuleContent = Get-Content -path $TemplateDir\SubModule.xml -Raw
 $subModuleContent = $subModuleContent.replace('${name}', $config.name)
 $subModuleContent = $subModuleContent.replace('${version}', $config.version)
-$subModuleContent | Out-File -FilePath $DeployDir\SubModule.xml
+$subModuleContent = $subModuleContent.replace('${game_version}', $config.game_version)
+$subModuleContent | Out-File -Encoding utf8 -FilePath $DeployDir\SubModule.xml
 
 
 # copy mod dll
-$filesToCopy = @(${TargetFileName}) + ${Libs}
+$filesToCopy = ${Libs}
 foreach ($file in $filesToCopy) 
 {
     Copy-item -Force ${TargetDir}${file} -Destination $DeployBinDir

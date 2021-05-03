@@ -16,19 +16,19 @@ namespace Sync.Store
 
         public byte[] Serialize(object obj)
         {
-            object serializable = Factory != null ? Factory.Wrap(obj) : obj;
+            var serializable = Factory != null ? Factory.Wrap(obj) : obj;
             IFormatter formatter = new BinaryFormatter();
-            MemoryStream stream = new MemoryStream();
+            var stream = new MemoryStream();
             formatter.Serialize(stream, serializable);
             return stream.ToArray();
         }
 
         public object Deserialize(byte[] raw)
         {
-            MemoryStream buffer = new MemoryStream(raw);
-            return Factory == null ?
-                new BinaryFormatter().Deserialize(buffer) :
-                Factory.Unwrap(new BinaryFormatter().Deserialize(buffer));
+            var buffer = new MemoryStream(raw);
+            return Factory == null
+                ? new BinaryFormatter().Deserialize(buffer)
+                : Factory.Unwrap(new BinaryFormatter().Deserialize(buffer));
         }
     }
 }

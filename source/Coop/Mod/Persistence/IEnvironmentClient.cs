@@ -1,9 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Coop.Mod.Persistence.Party;
 using JetBrains.Annotations;
-using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence
 {
@@ -13,20 +15,18 @@ namespace Coop.Mod.Persistence
     public interface IEnvironmentClient
     {
         /// <summary>
-        ///     Access to the movement data for all parties in the clients game world.
+        ///     Set the movement data of the given party as an authoritative action.
         /// </summary>
-        FieldAccessGroup<MobileParty, MovementData> TargetPosition { get; }
+        void SetAuthoritative(MobileParty party, MovementData data);
 
         /// <summary>
-        ///     Access to the campaign time control mode in the clients game world.
+        ///     Set the current position of the given party as an authoritative action.
         /// </summary>
-        FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode { get; }
-
-        /// <summary>
-        ///     Access to the campaign time control lock in the clients game world.
-        /// </summary>
-        FieldAccess<Campaign, bool> TimeControlModeLock { get; }
-
+        /// <param name="mManagedParty"></param>
+        /// <param name="mapPosition"></param>
+        /// <param name="facingDirection"></param>
+        void SetAuthoritative(MobileParty mManagedParty, Vec2 mapPosition, Vec2? facingDirection);
+        
         /// <summary>
         ///     The master campaign time. On the host this equals to the local campaign time.
         ///     On remote clients this is the latest campaign time dictated by the host.
@@ -34,9 +34,14 @@ namespace Coop.Mod.Persistence
         CampaignTime AuthoritativeTime { get; set; }
 
         /// <summary>
-        ///     Returns all parties that are controlled by human players, local or remote.
+        ///     Returns all parties that are the main parties of human players, local or remote.
         /// </summary>
-        IEnumerable<MobileParty> PlayerControlledParties { get; }
+        IEnumerable<MobileParty> PlayerMainParties { get; }
+        
+        /// <summary>
+        ///     Gets the synchronization for <see cref="MobileParty"/> instances.
+        /// </summary>
+        MobilePartySync PartySync { get; }
 
         /// <summary>
         ///     Returns the object store shared with all other clients.
@@ -48,24 +53,32 @@ namespace Coop.Mod.Persistence
         ///     Sets whether a party is controlled by a human player (locally or remote). Called
         ///     by the persistence framework whenever the controller changes.
         /// </summary>
-        /// <param name="iPartyIndex">
-        ///     Party index, to be resolved using <see cref="GetMobilePartyByIndex" />
+        /// <param name="guid">
+        ///     Party guid, to be resolved using <see cref="GetMobilePartyById" />
         /// </param>
         /// <param name="isPlayerControlled"></param>
-        void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled);
+        void SetIsPlayerControlled(MBGUID guid, bool isPlayerControlled);
 
         /// <summary>
-        ///     Returns a party given its party index.
+        ///     Returns a party given its guid.
         /// </summary>
-        /// <param name="iPartyIndex"></param>
+        /// <param name="guid"></param>
         /// <returns></returns>
         [CanBeNull]
-        MobileParty GetMobilePartyByIndex(int iPartyIndex);
+        MobileParty GetMobilePartyById(MBGUID guid);
 
         /// <summary>
-        ///     Returns the active campaign of the client.
+        ///     Called when a party enter the scope of the local client.
         /// </summary>
-        /// <returns></returns>
-        Campaign GetCurrentCampaign();
+        /// <param name="party"></param>
+        /// <param name="mapPosition"></param>
+        /// <param name="facingDirection"></param>
+        /// <param name="movementData"></param>
+        void ScopeEntered([NotNull] MobileParty party, Vec2 mapPosition, Vec2? facingDirection, MovementData movementData);
+        /// <summary>
+        ///     Called when a party leaves the scope of the local client.
+        /// </summary>
+        /// <param name="party"></param>
+        void ScopeLeft([NotNull] MobileParty party);
     }
 }
