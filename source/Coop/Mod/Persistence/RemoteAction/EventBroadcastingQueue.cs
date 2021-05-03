@@ -92,7 +92,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                 }
 
                 m_Queue.RemoveRange(0, numberOfBroadcastEvents);
-                if(m_WasFull && m_Queue.Count - numberOfBroadcastEvents == 0)
+                if(m_WasFull && m_Queue.Count == 0)
                 {
                     m_WasFull = false;
                     m_EnvironmentServer.UnlockTimeControl();
@@ -131,6 +131,7 @@ namespace Coop.Mod.Persistence.RemoteAction
                         //           sequence to guarantee a consistent state.
                         // 3. Open a bug.
                         throw new IndexOutOfRangeException();
+                }
 
                 m_Queue.Add(call);
                 if (m_Queue.Count >= MaximumQueueSize)
@@ -141,7 +142,6 @@ namespace Coop.Mod.Persistence.RemoteAction
                 }
             }
         }
-
 
         private void OnObjectDistributed(ObjectId id)
         {
