@@ -31,7 +31,7 @@ namespace Coop.Mod.Persistence
         /// <param name="guid"></param>
         /// <returns></returns>
         [CanBeNull]
-        MobileParty GetMobilePartyByIndex(int iPartyIndex);
+        MobileParty GetMobilePartyById(MBGUID guid);
 
         /// <summary>
         ///     Gets the synchronization for <see cref="MobileParty"/> instances.
