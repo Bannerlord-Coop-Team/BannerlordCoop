@@ -273,6 +273,7 @@
     <Compile Include="Mod\Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />
     <Compile Include="Mod\Patch\MobilePartyPatches\MobilePartyUpdatable.cs" />
     <Compile Include="Mod\Patch\Party\BanditsCampaignBehavior.cs" />
+    <Compile Include="Mod\Patch\Party\GarrisonTroopsCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyFoodCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyHorseCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesSellLootCampaignBehavior.cs" />
