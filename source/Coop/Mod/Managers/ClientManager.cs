@@ -36,9 +36,6 @@ namespace Coop.Mod.Managers
             {
                 m_PlayerInCampaign = playerParty.LeaderHero;
 
-                // Switch current player party from host to client party
-                ChangePlayerCharacterAction.Apply(m_PlayerInCampaign);
-
                 // Start player at training field
                 Settlement settlement = Settlement.Find("tutorial_training_field");
                 Campaign.Current.HandleSettlementEncounter(MobileParty.MainParty, settlement);
@@ -49,6 +46,9 @@ namespace Coop.Mod.Managers
                 // Might need to adjust IsClientPlayersParty
                 throw new Exception("Transferred player party could not be found");
             }
+
+            // Switch current player party from host to client party
+            ChangePlayerCharacterAction.Apply(m_PlayerInCampaign);
         }
 
         public new void OnTick(float dt)
