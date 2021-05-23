@@ -279,6 +279,7 @@
     <Compile Include="Mod\Patch\Party\PartiesSellLootCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesSellPrisonerCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\RecruitmentCampaignBehavior.cs" />
+    <Compile Include="Mod\Patch\World\SettlementSync.cs" />
     <Compile Include="Mod\Patch\World\TimeSynchronization.cs" />
     <Compile Include="Mod\Patch\CampaignPatches\SetTimeSpeedPatch.cs" />
     <Compile Include="Mod\Patch\CampaignPatches\TimeControlModePatch.cs" />
@@ -287,6 +288,7 @@
     <Compile Include="Mod\Patch\Exceptions.cs" />
     <Compile Include="Mod\Patch\World\TimeControl.cs" />
     <Compile Include="Mod\Patch\Utils.cs" />
+    <Compile Include="Mod\Patch\World\TownSync.cs" />
     <Compile Include="Mod\Persistence\Compare.cs" />
     <Compile Include="Mod\Persistence\Compression.cs" />
     <Compile Include="Mod\Persistence\IEnvironmentClient.cs" />
@@ -422,4 +424,8 @@
     <Error Condition="!Exists('..\packages\Fody.6.1.1\build\Fody.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Fody.6.1.1\build\Fody.targets'))" />
     <Error Condition="!Exists('..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props'))" />
   </Target>
+  <PropertyGroup>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
 </Project>

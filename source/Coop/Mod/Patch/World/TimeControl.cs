@@ -21,6 +21,7 @@ namespace Coop.Mod.Patch.World
                 .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)))
                 .Broadcast(() => CoopClient.Instance.Synchronization, new CanChangeTimeServerside())
                 .Skip();
+
             When(GameLoop)
                 .Calls(Setter(nameof(Campaign.IsMainPartyWaiting)))
                 .DelegateTo(SetIsMainPartyWaiting);
