@@ -14,10 +14,10 @@ namespace Coop.Mod.GameSync
     {
         static MobilePartySync()
         {
-            When(GameLoop)
-                .Calls(Method(nameof(MobileParty.CreateParty)))
-                .Broadcast(() => CoopClient.Instance.Synchronization)
-                .DelegateTo(IsServer);
+            //When(GameLoop)
+            //    .Calls(Method(nameof(MobileParty.CreateParty)))
+            //    .Broadcast(() => CoopClient.Instance.Synchronization)
+            //    .DelegateTo(IsServer);
 
             ApplyStaticPatches();
             AutoWrapAllInstances(c => new MobilePartySync(c));

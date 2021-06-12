@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using JetBrains.Annotations;
 using NLog;
@@ -43,6 +44,8 @@ namespace RemoteAction
                     return arg.Int.Value;
                 case EventArgType.Float:
                     return arg.Float.Value;
+                case EventArgType.Bool:
+                    return arg.Bool.Value;
                 case EventArgType.StoreObjectId:
                     if (store == null) throw new ArgumentException($"Cannot resolve ${arg}, no store provided.");
 
@@ -56,10 +59,13 @@ namespace RemoteAction
                         arg.StoreObjectId.Value,
                         resolvedObject,
                         resolvedObject.GetType());
-                    store.Remove(arg.StoreObjectId.Value);
+                    // TODO find a way to remove without breaking everything
+                    //store.Remove(arg.StoreObjectId.Value);
                     return resolvedObject;
                 case EventArgType.CurrentCampaign:
                     return Campaign.Current;
+                case EventArgType.CampaignBehavior:
+                    return arg.CampaignBehavior;
                 case EventArgType.SmallObjectRaw:
                     if (store == null) throw new ArgumentException($"Cannot resolve ${arg}, no store provided.");
                     return store.Deserialize(arg.Raw);
@@ -100,6 +106,8 @@ namespace RemoteAction
             {
                 case null:
                     return Argument.Null;
+                case bool b:
+                    return new Argument(b);
                 case MBObjectManager _:
                     return Argument.MBObjectManager;
                 case MBGUID guid:
@@ -114,6 +122,10 @@ namespace RemoteAction
                     if (campaign == Campaign.Current) return Argument.CurrentCampaign;
                     // New campaign? Send by value
                     return new Argument(store.Insert(obj));
+
+                case CampaignBehaviorBase campaignBehavior:
+                    return new Argument(campaignBehavior);
+
                 default:
                     // Enums
                     if (obj.GetType().IsEnum)
@@ -130,7 +142,11 @@ namespace RemoteAction
                         // Small objects directly by value
                         return new Argument(raw);
                     }
-                    
+
+                    Logger.Debug(
+                        "No argument handler for: {type}",
+                        obj.GetType());
+
                     // Larger objects by store
                     return new Argument(store.Insert(obj, raw));
             }

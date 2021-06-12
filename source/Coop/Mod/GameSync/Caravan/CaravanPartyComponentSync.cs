@@ -9,10 +9,10 @@ namespace Coop.Mod.GameSync.Caravan
     {
         static CaravanPartyComponentSync()
         {
-            When(GameLoop)
-                .Calls(Method(nameof(CaravanPartyComponent.CreateCaravanParty)),
-                       Method(typeof(HeroCreator), nameof(HeroCreator.CreateSpecialHero)))
-                .DelegateTo(IsServer);
+            //When(GameLoop)
+            //    .Calls(Method(nameof(CaravanPartyComponent.CreateCaravanParty)),
+            //           Method(typeof(HeroCreator), nameof(HeroCreator.CreateSpecialHero)))
+            //    .DelegateTo(IsServer);
 
             ApplyStaticPatches();
             AutoWrapAllInstances(c => new CaravanPartyComponentSync(c));
