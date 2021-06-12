@@ -10,24 +10,33 @@ using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Patch.World
 {
-    class SettlementSync : CoopManaged<SettlementSync, Settlement>
+    class TownSync : CoopManaged<TownSync, Town>
     {
-        static SettlementSync()
+        static TownSync()
         {
             When(GameLoop)
-                .Calls(Method(nameof(Settlement.SetWallSectionHitPointsRatioAtIndex)))
+                .Calls(Setter(nameof(Town.Loyalty)))
                 .Broadcast(() => CoopClient.Instance.Synchronization)
                 .DelegateTo(IsServer);
 
             When(GameLoop)
-                .Calls(Setter(nameof(Settlement.Prosperity)))
+                .Calls(Setter(nameof(Town.Security)))
                 .Broadcast(() => CoopClient.Instance.Synchronization)
                 .DelegateTo(IsServer);
 
-            AutoWrapAllInstances(c => new SettlementSync(c));
+            When(GameLoop)
+                .Calls(Method("CheckDesertionInGarrison"))
+                .DelegateTo(IsServer);
+
+            When(GameLoop)
+                .Calls(Method("DesertOneTroopFromGarrison"))
+                .Broadcast(() => CoopClient.Instance.Synchronization)
+                .DelegateTo(IsServer);
+
+            AutoWrapAllInstances(c => new TownSync(c));
         }
 
-        public SettlementSync([NotNull] Settlement instance) : base(instance)
+        public TownSync([NotNull] Town instance) : base(instance)
         {
         }
 
