@@ -98,10 +98,6 @@
       <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
       <Name>Common</Name>
     </ProjectReference>
-    <ProjectReference Include="..\LiteNetLib\LiteNetLib\LiteNetLib.csproj">
-      <Project>{d8f65198-a926-4c46-9599-2d5d4349486f}</Project>
-      <Name>LiteNetLib</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

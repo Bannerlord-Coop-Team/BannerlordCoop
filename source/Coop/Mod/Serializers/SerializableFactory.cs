@@ -73,6 +73,8 @@ namespace Coop.Mod.Serializers
                     return new CharacterSkillsSerializer(characterSkills);
                 case CharacterTraits characterTraits:
                     return new CharacterTraitsSerializer(characterTraits);
+                case PartyComponent partyComponent:
+                    return new PartyComponentSerializer(partyComponent);
                 default:
                     return obj;
             }
