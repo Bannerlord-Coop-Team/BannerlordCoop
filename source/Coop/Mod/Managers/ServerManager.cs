@@ -2,6 +2,7 @@
 using Network.Infrastructure;
 using SandBox;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem.Load;
@@ -47,6 +48,10 @@ namespace Coop.Mod.Managers
                     {
                         // Hero received from client after character creation
                         Hero hero = (Hero)serializedPlayerHero.Deserialize();
+
+                        // TODO only do for new players
+                        Settlement settlement = Settlement.Find("tutorial_training_field");
+                        EnterSettlementAction.ApplyForParty(hero.PartyBelongedTo, settlement);
                     }
                 };
             };

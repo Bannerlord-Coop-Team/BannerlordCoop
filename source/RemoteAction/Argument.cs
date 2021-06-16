@@ -1,7 +1,11 @@
 ﻿using System;
+using System.Linq;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
+using System.Reflection;
+using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
+using System.Collections.Generic;
 
 namespace RemoteAction
 {
@@ -29,8 +33,11 @@ namespace RemoteAction
         MBObject,
         Int,
         Float,
+        Bool,
         StoreObjectId,
         CurrentCampaign,
+        CampaignBehavior,
+        PartyComponent,
         SmallObjectRaw
     }
 
@@ -68,9 +75,22 @@ namespace RemoteAction
         /// </summary>
         public float? Float { get; }
         /// <summary>
+        ///     The contained <see cref="float"/> for <see cref="EventArgType.Bool"/>, otherwise null. 
+        /// </summary>
+        public bool? Bool { get; }
+
+        /// <summary>
         ///     The contained <see cref="ObjectId"/> for <see cref="EventArgType.StoreObjectId"/>, otherwise null. 
         /// </summary>
         public ObjectId? StoreObjectId { get; }
+        /// <summary>
+        ///     The contained <see cref="CampaignBehaviorBase"/> for <see cref="EventArgType.CampaignBehavior"/>. 
+        /// </summary>
+        public CampaignBehaviorBase CampaignBehavior { get; }
+        /// <summary>
+        ///     The contained <see cref="PartyComponent"/> for <see cref="EventArgType.PartyComponent"/>. 
+        /// </summary>
+        public PartyComponent MobilePartyComponent { get; }
         /// <summary>
         ///     The contained byte buffer for <see cref="EventArgType.SmallObjectRaw"/>, otherwise null. 
         /// </summary>
@@ -94,6 +114,15 @@ namespace RemoteAction
             Float = f;
         }
         /// <summary>
+        ///     Constructs a new argument for <see cref="EventArgType.Bool"/>.
+        /// </summary>
+        /// <param name="i"></param>
+        public Argument(bool b) : this()
+        {
+            EventType = EventArgType.Bool;
+            Bool = b;
+        }
+        /// <summary>
         ///     Constructs a new argument for <see cref="EventArgType.MBObject"/>.
         /// </summary>
         /// <param name="i"></param>
@@ -111,6 +140,27 @@ namespace RemoteAction
             EventType = EventArgType.StoreObjectId;
             StoreObjectId = id;
         }
+
+        /// <summary>
+        ///     Constructs a new argument for <see cref="EventArgType.CampaignBehavior"/>.
+        /// </summary>
+        /// <param name="i"></param>
+        public Argument(CampaignBehaviorBase campaignBehavior) : this()
+        {
+            EventType = EventArgType.CampaignBehavior;
+            CampaignBehavior = campaignBehavior;
+        }
+
+        /// <summary>
+        ///     Constructs a new argument for <see cref="EventArgType.PartyComponent"/>.
+        /// </summary>
+        /// <param name="i"></param>
+        public Argument(PartyComponent component) : this()
+        {
+            EventType = EventArgType.PartyComponent;
+            MobilePartyComponent = component;
+        }
+
         /// <summary>
         ///     Constructs a new argument for <see cref="EventArgType.SmallObjectRaw"/>.
         /// </summary>
@@ -181,8 +231,10 @@ namespace RemoteAction
                     return Int.ToString();
                 case EventArgType.Float:
                     return Float.ToString();
+                case EventArgType.Bool:
+                    return Bool.ToString();
                 case EventArgType.StoreObjectId:
-                    return $"{StoreObjectId.ToString()}";
+                    return StoreObjectId.ToString();
                 case EventArgType.CurrentCampaign:
                     return "Campaign.Current";
                 case EventArgType.SmallObjectRaw:

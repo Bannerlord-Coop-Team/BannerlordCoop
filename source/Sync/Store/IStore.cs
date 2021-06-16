@@ -1,9 +1,19 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace Sync.Store
 {
     public readonly struct ObjectId
     {
+        /// <summary>
+        /// Overrides casting to byte array
+        /// </summary>
+        /// <param name="id">Object to cast</param>
+        public static implicit operator byte[](ObjectId id)
+        {
+            return BitConverter.GetBytes(id.Value);
+        }
+
         public bool Equals(ObjectId other)
         {
             return Value == other.Value;
@@ -24,6 +34,11 @@ namespace Sync.Store
         public ObjectId(uint id)
         {
             Value = id;
+        }
+
+        public ObjectId(byte[] bytes)
+        {
+            Value = BitConverter.ToUInt32(bytes, 0);
         }
 
         public override string ToString()
@@ -51,7 +66,7 @@ namespace Sync.Store
         ///     Access the stored data.
         /// </summary>
         IReadOnlyDictionary<ObjectId, object> Data { get; }
-        
+
         /// <summary>
         ///     Serialize an object.
         /// </summary>

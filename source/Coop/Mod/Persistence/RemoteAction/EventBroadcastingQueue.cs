@@ -24,7 +24,7 @@ namespace Coop.Mod.Persistence.RemoteAction
         ///     to be adjusted depending on how much is done using events.
         /// </summary>
 #if DEBUG
-        public static readonly int MaximumQueueSize = 512;
+        public static readonly int MaximumQueueSize = 1024;
 #else
         public static readonly int MaximumQueueSize = 8192;
 #endif

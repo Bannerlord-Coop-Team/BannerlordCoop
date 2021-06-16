@@ -164,11 +164,8 @@ namespace Sync.Store
             if (m_State[id].Origin == RemoteObjectState.EOrigin.Local)
                 throw new Exception(
                     "Invalid internal state for {id}: A locally added object cannot be acknowledged.");
-
-            var writer = new ByteWriter();
-            writer.Binary.Write(id.Value);
             m_State[id].Acknowledged = true;
-            m_Connection.Send(new Packet(EPacket.StoreAck, writer.ToArray()));
+            m_Connection.Send(new Packet(EPacket.StoreAck, id));
             Logger.Trace("[{id}] Sent ACK", id);
         }
 
@@ -177,7 +174,7 @@ namespace Sync.Store
         [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.StoreAck)]
         private void ReceiveAck(ConnectionBase connection, Packet packet)
         {
-            var id = new ObjectId(new ByteReader(packet.Payload).Binary.ReadUInt32());
+            var id = new ObjectId(packet.Payload.ToArray());
             if (!m_Data.ContainsKey(id) || !m_State.ContainsKey(id))
                 throw new Exception($"Received ACK for unknown object {id}.");
 

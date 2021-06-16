@@ -23,8 +23,8 @@ namespace Coop.Mod.Persistence
 
             // Events
             reg.AddEventType<EventPartyMoveTo>();
-            reg.AddEventType<EventMethodCall>(new object[] {environment});
-            reg.AddEventType<EventFieldChange>(new object[] {environment});
+            reg.AddEventType<EventMethodCall>(new[] {environment});
+            reg.AddEventType<EventFieldChange>(new[] {environment});
 
             return reg;
         }
@@ -40,8 +40,10 @@ namespace Coop.Mod.Persistence
 
             // Events
             reg.AddEventType<EventPartyMoveTo>();
-            reg.AddEventType<EventMethodCall>(new object[] {environment});
-            reg.AddEventType<EventFieldChange>(new object[] {environment});
+            reg.AddEventType<EventMethodCall>(new[] {environment});
+            reg.AddEventType<EventFieldChange>(new[] {environment});
+
+            // Town Events
 
             return reg;
         }

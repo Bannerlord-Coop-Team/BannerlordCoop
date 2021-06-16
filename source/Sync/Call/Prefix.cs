@@ -62,10 +62,13 @@ namespace Sync.Call
         /// <param name="handler"></param>
         public void SetHandler([NotNull] object instance, [NotNull] InstanceHandlerCallerIdDelegate handler)
         {
-            if (m_InstanceSpecificHandlers.Any(pair => pair.Key.TryGetTarget(out var o) && o == instance))
-                throw new ArgumentException($"Cannot have multiple sync handlers for {this}.");
+            lock (m_InstanceSpecificHandlers)
+            {
+                if (m_InstanceSpecificHandlers.Any(pair => pair.Key.TryGetTarget(out var o) && o == instance))
+                    throw new ArgumentException($"Cannot have multiple sync handlers for {this}.");
 
-            m_InstanceSpecificHandlers.Add(new WeakReference<object>(instance, true), handler);
+                m_InstanceSpecificHandlers.Add(new WeakReference<object>(instance, true), handler);
+            }
         }
 
         /// <summary>
@@ -78,10 +81,15 @@ namespace Sync.Call
             var bHasGlobalHandler = GlobalPrefixHandler != null;
             if (instance != null)
             {
-                var instanceHandlers = m_InstanceSpecificHandlers
-                    .Where(pair => pair.Key.TryGetTarget(out var o) && o == instance)
-                    .Select(pair => pair.Value)
-                    .ToList();
+                List<InstanceHandlerCallerIdDelegate> instanceHandlers;
+                lock (m_InstanceSpecificHandlers)
+                {
+                    instanceHandlers = m_InstanceSpecificHandlers
+                        .Where(pair => pair.Key.TryGetTarget(out var o) && o == instance)
+                        .Select(pair => pair.Value)
+                        .ToList();
+                }
+
                 if (instanceHandlers.Count > 0)
                 {
                     var instanceSpecificHandler = instanceHandlers[0];
@@ -108,11 +116,14 @@ namespace Sync.Call
         /// <param name="instance"></param>
         public void RemoveHandler(object instance)
         {
-            var key = m_InstanceSpecificHandlers
-                .Where(pair => pair.Key.TryGetTarget(out var o) && o == instance)
-                .Select(pair => pair.Key)
-                .FirstOrDefault();
-            if (key != null) m_InstanceSpecificHandlers.Remove(key);
+            lock (m_InstanceSpecificHandlers)
+            {
+                var key = m_InstanceSpecificHandlers
+                    .Where(pair => pair.Key.TryGetTarget(out var o) && o == instance)
+                    .Select(pair => pair.Key)
+                    .FirstOrDefault();
+                if (key != null) m_InstanceSpecificHandlers.Remove(key);
+            }
         }
 
         /// <summary>
