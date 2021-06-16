@@ -33,7 +33,7 @@ namespace SystemTests
             environment = new TestEnvironment(instances);
         }
 
-            [TestMethod]
+        [TestMethod]
         public void TestMethod1()
         {
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();

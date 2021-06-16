@@ -1,4 +1,5 @@
-﻿using Coop.Mod.Serializers;
+﻿using Coop.Mod.Patch.World;
+using Coop.Mod.Serializers;
 using Network.Infrastructure;
 using SandBox;
 using TaleWorlds.CampaignSystem;
@@ -48,7 +49,8 @@ namespace Coop.Mod.Managers
                     {
                         // Hero received from client after character creation
                         Hero hero = (Hero)serializedPlayerHero.Deserialize();
-
+                        CoopSaveManager.PlayerParties.Add(serializedPlayerHero.PlayerId, hero.Id);
+                        
                         // TODO only do for new players
                         Settlement settlement = Settlement.Find("tutorial_training_field");
                         EnterSettlementAction.ApplyForParty(hero.PartyBelongedTo, settlement);

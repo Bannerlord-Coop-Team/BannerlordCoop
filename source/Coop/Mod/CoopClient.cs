@@ -7,9 +7,11 @@ using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.Mod.Serializers;
+using Coop.NetImpl;
 using Coop.NetImpl.LiteNet;
 using CoopFramework;
 using JetBrains.Annotations;
+using Network;
 using Network.Infrastructure;
 using Network.Protocol;
 using NLog;
@@ -18,6 +20,7 @@ using RailgunNet.Logic;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
 
 namespace Coop.Mod
@@ -54,6 +57,7 @@ namespace Coop.Mod
 
         private int m_ReconnectAttempts = MaxReconnectAttempts;
         private Hero m_Hero;
+        private MBGUID m_HeroGUID;
         private ObjectId m_HeroId;
         #endregion
         public Action<PersistenceClient> OnPersistenceInitialized;
@@ -187,8 +191,13 @@ namespace Coop.Mod
                 }
                 else
                 {
-                    // TODO get if character exists on server
-                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.RequiresCharacterCreation);
+                    Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveRequireCreateCharacter);
+                    Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveCharacterExists);
+
+                    Session.Connection.Send(
+                        new Packet(
+                            EPacket.Client_RequestParty,
+                            new Client_Request_Party(new PlatformAPI().GetPlayerID().ToString()).Serialize()));
                 }
 
                 SyncedObjectStore = new RemoteStore(m_SyncedObjects, con, new SerializableFactory());
@@ -260,6 +269,22 @@ namespace Coop.Mod
             }
         }
 
+        #region MainMenu
+        [GameClientPacketHandler(ECoopClientState.MainManu, EPacket.Server_RequireCharacterCreation)]
+        private void ReceiveRequireCreateCharacter(ConnectionBase connection, Packet packet)
+        {
+            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.RequiresCharacterCreation);
+        }
+
+        [GameClientPacketHandler(ECoopClientState.MainManu, EPacket.Server_NotifyCharacterExists)]
+        private void ReceiveCharacterExists(ConnectionBase connection, Packet packet)
+        {
+            m_HeroGUID = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
+            //m_Hero = (Hero)MBObjectManager.Instance.GetObject(m_HeroGUID);
+            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
+        }
+        #endregion
+
         #region ClientCharacterCreation
 
         public void CharacterCreationOver()
@@ -319,7 +344,16 @@ namespace Coop.Mod
             if (bSuccess)
             {
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
-                gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_Hero);
+                if(m_HeroGUID == new MBGUID(0))
+                {
+                    gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_Hero);
+                }
+                else
+                {
+                    gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_HeroGUID);
+                }
+
+                
                 MBGameManager.StartNewGame(gameManager);
                 ClientManager.OnPreLoadFinishedEvent += (source, e) => {
                     CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, SendPlayerPartyChanged);
@@ -406,4 +440,6 @@ namespace Coop.Mod
             return sRet;
         }
     }
+
+    
 }

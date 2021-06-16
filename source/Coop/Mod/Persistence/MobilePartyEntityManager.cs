@@ -54,16 +54,30 @@ namespace Coop.Mod.Persistence
         public bool SuppressInconsistentStateWarnings { get; set; } = false;
 
         /// <summary>
-        ///     Returns a copy of all currently known <see cref="MobileParty"/> that have a corresponding entity.
+        ///     Returns a copy of all currently known <see cref="RailEntityServer"/>.
         ///     Attention: May contains null entries!
         /// </summary>
-        public IReadOnlyCollection<RailEntityServer> Parties
+        public IReadOnlyCollection<RailEntityServer> ServerPartyEntities
         {
             get
             {
                 lock (m_Lock)
                 {
                     return m_Parties.Values.ToList();
+                }
+            }
+        }
+
+        /// <summary>
+        ///     Returns a copy of all currently known <see cref="MobileParty"/> that have a corresponding entity.
+        /// </summary>
+        public IReadOnlyCollection<MobileParty> Parties
+        {
+            get
+            {
+                lock (m_Lock)
+                {
+                    return m_Parties.Keys.ToList();
                 }
             }
         }
@@ -129,6 +143,11 @@ namespace Coop.Mod.Persistence
         }
         public void AddParty(MobileParty party)
         {
+            if (m_Parties.ContainsKey(party))
+            {
+                return;
+            }
+
             MobilePartyEntityServer entity =
                 m_Room.AddNewEntity<MobilePartyEntityServer>(
                     e => e.State.PartyId = party.Id);
@@ -136,7 +155,7 @@ namespace Coop.Mod.Persistence
 
             lock (m_Lock)
             {
-                m_Parties.Add(party, entity);
+                 m_Parties.Add(party, entity);
             }
         }
 
@@ -157,7 +176,10 @@ namespace Coop.Mod.Persistence
                     m_PendingGrantControl[party] = peer;
                     return;
                 }
-                m_ClientControlledParties.Add(peer, party);
+                if (!m_ClientControlledParties.ContainsKey(peer))
+                {
+                    m_ClientControlledParties.Add(peer, party);
+                }
             }
             peer.GrantControl(correspondingEntity);
             party.Ai.SetDoNotMakeNewDecisions(true);
