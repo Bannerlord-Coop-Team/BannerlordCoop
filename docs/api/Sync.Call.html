@@ -1,0 +1,167 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Namespace Sync.Call
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Namespace Sync.Call
+   ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="Sync.Call">
+  
+  <h1 id="Sync_Call" data-uid="Sync.Call" class="text-break">Namespace Sync.Call
+  </h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">Classes
+  </h3>
+      <h4><a class="xref" href="Sync.Call.Invokable.html">Invokable</a></h4>
+      <section><p>Type erased invocation wrapper for patched methods. Every invokable instance is registered with
+<a class="xref" href="Sync.Registry.html">Registry</a> on every client.</p>
+</section>
+      <h4><a class="xref" href="Sync.Call.PatchedInvokable.html">PatchedInvokable</a></h4>
+      <section><p>Type erased invocation wrapper for patched methods. On creation, a snapshot of the IL
+representation of the method is stored internally. The snapshot includes all patches
+to the function already applied. The snapshot can be called using <a class="xref" href="Sync.Call.PatchedInvokable.html#Sync_Call_PatchedInvokable_InvokeOriginal_System_Object_System_Object___">InvokeOriginal(Object, Object[])</a>.</p>
+</section>
+      <h4><a class="xref" href="Sync.Call.Postfix.html">Postfix</a></h4>
+      <section><p>A postfix to a method call with configurable handlers.</p>
+</section>
+      <h4><a class="xref" href="Sync.Call.Prefix.html">Prefix</a></h4>
+      <section><p>A prefix to a method call with configurable handlers.</p>
+</section>
+    <h3 id="structs">Structs
+  </h3>
+      <h4><a class="xref" href="Sync.Call.InvokableId.html">InvokableId</a></h4>
+      <section><p>An ID of a callable object that is known to <a class="xref" href="Sync.html">Sync</a>. </p>
+</section>
+    <h3 id="enums">Enums
+  </h3>
+      <h4><a class="xref" href="Sync.Call.EInvokableFlag.html">EInvokableFlag</a></h4>
+      <section><p>Flags indicating the desired behaviour of a generated patch for a method.</p>
+</section>
+    <h3 id="delegates">Delegates
+  </h3>
+      <h4><a class="xref" href="Sync.Call.Postfix.GlobalHandlerDelegate.html">Postfix.GlobalHandlerDelegate</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Sync.Call.Postfix.InstanceHandlerDelegate.html">Postfix.InstanceHandlerDelegate</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Sync.Call.Prefix.GlobalHandlerCallerIdDelegate.html">Prefix.GlobalHandlerCallerIdDelegate</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Sync.Call.Prefix.GlobalHandlerDelegate.html">Prefix.GlobalHandlerDelegate</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Sync.Call.Prefix.InstanceHandlerCallerIdDelegate.html">Prefix.InstanceHandlerCallerIdDelegate</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Sync.Call.Prefix.InstanceHandlerDelegate.html">Prefix.InstanceHandlerDelegate</a></h4>
+      <section></section>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

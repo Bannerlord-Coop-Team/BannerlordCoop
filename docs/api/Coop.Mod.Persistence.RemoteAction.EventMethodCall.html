@@ -1,0 +1,453 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Class EventMethodCall
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Class EventMethodCall
+   ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall">
+  
+  
+  <h1 id="Coop_Mod_Persistence_RemoteAction_EventMethodCall" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall" class="text-break">Class EventMethodCall
+  </h1>
+  <div class="markdown level0 summary"><p>RailEvent used to initiate remote procedure calls. The way this event is processed
+differs between client and server:</p>
+<ul>
+<li>The server acts as a broadcasting relay station. Effectively receiving the event
+and forwarding it to all clients (INCLUDING the client that sent the event!).
+Note that the server will delay event execution until all arguments have been
+transferred to all clients.</li>
+<li>Clients will resolve the call and arguments locally and execute it.</li>
+</ul>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><a class="xref" href="Coop.Mod.Persistence.RemoteAction.EventActionBase.html">EventActionBase</a></div>
+    <div class="level2"><span class="xref">EventMethodCall</span></div>
+  </div>
+  <div classs="implements">
+    <h5>Implements</h5>
+    <div><span class="xref">ISynchronizedAction</span></div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="Coop.Mod.Persistence.RemoteAction.html">Coop.Mod.Persistence.RemoteAction</a></h6>
+  <h6><strong>Assembly</strong>: Coop.dll</h6>
+  <h5 id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class EventMethodCall : EventActionBase, ISynchronizedAction</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_RemoteAction_EventMethodCall__ctor_Coop_Mod_Persistence_IEnvironmentClient_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.RemoteAction.EventMethodCall.%23ctor(Coop.Mod.Persistence.IEnvironmentClient)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/RemoteAction/EventMethodCall.cs/#L33">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_RemoteAction_EventMethodCall__ctor_" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.#ctor*"></a>
+  <h4 id="Coop_Mod_Persistence_RemoteAction_EventMethodCall__ctor_Coop_Mod_Persistence_IEnvironmentClient_" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.#ctor(Coop.Mod.Persistence.IEnvironmentClient)">EventMethodCall(IEnvironmentClient)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public EventMethodCall([NotNull] IEnvironmentClient environment)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Coop.Mod.Persistence.IEnvironmentClient.html">IEnvironmentClient</a></td>
+        <td><span class="parametername">environment</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_RemoteAction_EventMethodCall__ctor_Coop_Mod_Persistence_IEnvironmentServer_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.RemoteAction.EventMethodCall.%23ctor(Coop.Mod.Persistence.IEnvironmentServer)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/RemoteAction/EventMethodCall.cs/#L39">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_RemoteAction_EventMethodCall__ctor_" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.#ctor*"></a>
+  <h4 id="Coop_Mod_Persistence_RemoteAction_EventMethodCall__ctor_Coop_Mod_Persistence_IEnvironmentServer_" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.#ctor(Coop.Mod.Persistence.IEnvironmentServer)">EventMethodCall(IEnvironmentServer)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public EventMethodCall([NotNull] IEnvironmentServer environment)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Coop.Mod.Persistence.IEnvironmentServer.html">IEnvironmentServer</a></td>
+        <td><span class="parametername">environment</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_RemoteAction_EventMethodCall_Logger.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.RemoteAction.EventMethodCall.Logger%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/RemoteAction/EventMethodCall.cs/#L27">View Source</a>
+  </span>
+  <h4 id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_Logger" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.Logger">Logger</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static readonly Logger Logger</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">NLog.Logger</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_RemoteAction_EventMethodCall_m_EnvironmentClient.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.RemoteAction.EventMethodCall.m_EnvironmentClient%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/RemoteAction/EventMethodCall.cs/#L29">View Source</a>
+  </span>
+  <h4 id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_m_EnvironmentClient" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.m_EnvironmentClient">m_EnvironmentClient</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[CanBeNull]
+readonly IEnvironmentClient m_EnvironmentClient</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Coop.Mod.Persistence.IEnvironmentClient.html">IEnvironmentClient</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_RemoteAction_EventMethodCall_m_EnvironmentServer.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.RemoteAction.EventMethodCall.m_EnvironmentServer%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/RemoteAction/EventMethodCall.cs/#L31">View Source</a>
+  </span>
+  <h4 id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_m_EnvironmentServer" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.m_EnvironmentServer">m_EnvironmentServer</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[CanBeNull]
+readonly IEnvironmentServer m_EnvironmentServer</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Coop.Mod.Persistence.IEnvironmentServer.html">IEnvironmentServer</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_RemoteAction_EventMethodCall_Arguments.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.RemoteAction.EventMethodCall.Arguments%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/RemoteAction/EventMethodCall.cs/#L46">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_Arguments_" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.Arguments*"></a>
+  <h4 id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_Arguments" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.Arguments">Arguments</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override IEnumerable&lt;Argument&gt; Arguments { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.IEnumerable</span>&lt;<span class="xref">Argument</span>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="Coop.Mod.Persistence.RemoteAction.EventActionBase.html#Coop_Mod_Persistence_RemoteAction_EventActionBase_Arguments">EventActionBase.Arguments</a></div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_RemoteAction_EventMethodCall_Call.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.RemoteAction.EventMethodCall.Call%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/RemoteAction/EventMethodCall.cs/#L45">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_Call_" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.Call*"></a>
+  <h4 id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_Call" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.Call">Call</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public MethodCall Call { get; set; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">MethodCall</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_RemoteAction_EventMethodCall_Execute_RailRoom_RailController_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.RemoteAction.EventMethodCall.Execute(RailRoom%2CRailController)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/RemoteAction/EventMethodCall.cs/#L53">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_Execute_" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.Execute*"></a>
+  <h4 id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_Execute_RailRoom_RailController_" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.Execute(RailRoom,RailController)">Execute(RailRoom, RailController)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override void Execute(RailRoom room, RailController sender)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">RailRoom</span></td>
+        <td><span class="parametername">room</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">RailController</span></td>
+        <td><span class="parametername">sender</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_RemoteAction_EventMethodCall_IsValid.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.RemoteAction.EventMethodCall.IsValid%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/RemoteAction/EventMethodCall.cs/#L48">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_IsValid_" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.IsValid*"></a>
+  <h4 id="Coop_Mod_Persistence_RemoteAction_EventMethodCall_IsValid" data-uid="Coop.Mod.Persistence.RemoteAction.EventMethodCall.IsValid">IsValid()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override bool IsValid()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="Coop.Mod.Persistence.RemoteAction.EventActionBase.html#Coop_Mod_Persistence_RemoteAction_EventActionBase_IsValid">EventActionBase.IsValid()</a></div>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <span class="xref">ISynchronizedAction</span>
+  </div>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_RemoteAction_EventMethodCall.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.RemoteAction.EventMethodCall%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/RemoteAction/EventMethodCall.cs/#L25" class="contribution-link">View Source</a>
+                  </li>
+                </ul>
+              </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

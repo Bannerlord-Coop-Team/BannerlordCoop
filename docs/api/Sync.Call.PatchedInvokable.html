@@ -1,0 +1,664 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Class PatchedInvokable
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Class PatchedInvokable
+   ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="Sync.Call.PatchedInvokable">
+  
+  
+  <h1 id="Sync_Call_PatchedInvokable" data-uid="Sync.Call.PatchedInvokable" class="text-break">Class PatchedInvokable
+  </h1>
+  <div class="markdown level0 summary"><p>Type erased invocation wrapper for patched methods. On creation, a snapshot of the IL
+representation of the method is stored internally. The snapshot includes all patches
+to the function already applied. The snapshot can be called using <a class="xref" href="Sync.Call.PatchedInvokable.html#Sync_Call_PatchedInvokable_InvokeOriginal_System_Object_System_Object___">InvokeOriginal(Object, Object[])</a>.</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><a class="xref" href="Sync.Call.Invokable.html">Invokable</a></div>
+    <div class="level2"><span class="xref">PatchedInvokable</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="Sync.Call.Invokable.html#Sync_Call_Invokable_Original">Invokable.Original</a>
+    </div>
+    <div>
+      <a class="xref" href="Sync.Call.Invokable.html#Sync_Call_Invokable_Id">Invokable.Id</a>
+    </div>
+    <div>
+      <a class="xref" href="Sync.Call.Invokable.html#Sync_Call_Invokable_Flags">Invokable.Flags</a>
+    </div>
+    <div>
+      <a class="xref" href="Sync.Call.Invokable.html#Sync_Call_Invokable_AddFlags_Sync_Call_EInvokableFlag_">Invokable.AddFlags(EInvokableFlag)</a>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetHashCode()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetType()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.MemberwiseClone()</span>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="Sync.Call.html">Sync.Call</a></h6>
+  <h6><strong>Assembly</strong>: Sync.dll</h6>
+  <h5 id="Sync_Call_PatchedInvokable_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class PatchedInvokable : Invokable</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable__ctor_System_Reflection_MethodBase_System_Type_.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.%23ctor(System.Reflection.MethodBase%2CSystem.Type)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L24">View Source</a>
+  </span>
+  <a id="Sync_Call_PatchedInvokable__ctor_" data-uid="Sync.Call.PatchedInvokable.#ctor*"></a>
+  <h4 id="Sync_Call_PatchedInvokable__ctor_System_Reflection_MethodBase_System_Type_" data-uid="Sync.Call.PatchedInvokable.#ctor(System.Reflection.MethodBase,System.Type)">PatchedInvokable(MethodBase, Type)</h4>
+  <div class="markdown level1 summary"><p>Creates a new invocation wrapper.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public PatchedInvokable([NotNull] MethodBase original, [NotNull] Type patcherType)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Reflection.MethodBase</span></td>
+        <td><span class="parametername">original</span></td>
+        <td><p>The method that is being patched.</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Type</span></td>
+        <td><span class="parametername">patcherType</span></td>
+        <td><p>The type info of the class that declared the patch. Used for debugging purposes.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_m_Call.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.m_Call%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L122">View Source</a>
+  </span>
+  <h4 id="Sync_Call_PatchedInvokable_m_Call" data-uid="Sync.Call.PatchedInvokable.m_Call">m_Call</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[CanBeNull]
+readonly Action&lt;object, object[]&gt; m_Call</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Action</span>&lt;<span class="xref">System.Object</span>, <span class="xref">System.Object</span>[]&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_m_CallStatic.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.m_CallStatic%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L123">View Source</a>
+  </span>
+  <h4 id="Sync_Call_PatchedInvokable_m_CallStatic" data-uid="Sync.Call.PatchedInvokable.m_CallStatic">m_CallStatic</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[CanBeNull]
+readonly Action&lt;object[]&gt; m_CallStatic</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Action</span>&lt;<span class="xref">System.Object</span>[]&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_m_StandIn.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.m_StandIn%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L125">View Source</a>
+  </span>
+  <h4 id="Sync_Call_PatchedInvokable_m_StandIn" data-uid="Sync.Call.PatchedInvokable.m_StandIn">m_StandIn</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly DynamicMethod m_StandIn</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Reflection.Emit.DynamicMethod</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_DeclaringType.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.DeclaringType%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L50">View Source</a>
+  </span>
+  <a id="Sync_Call_PatchedInvokable_DeclaringType_" data-uid="Sync.Call.PatchedInvokable.DeclaringType*"></a>
+  <h4 id="Sync_Call_PatchedInvokable_DeclaringType" data-uid="Sync.Call.PatchedInvokable.DeclaringType">DeclaringType</h4>
+  <div class="markdown level1 summary"><p>The type that declares this callable.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[NotNull]
+public Type DeclaringType { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Type</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_Postfix.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.Postfix%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L44">View Source</a>
+  </span>
+  <a id="Sync_Call_PatchedInvokable_Postfix_" data-uid="Sync.Call.PatchedInvokable.Postfix*"></a>
+  <h4 id="Sync_Call_PatchedInvokable_Postfix" data-uid="Sync.Call.PatchedInvokable.Postfix">Postfix</h4>
+  <div class="markdown level1 summary"><p>Get the postfix for this method call.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[NotNull]
+public Postfix Postfix { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Call.Postfix.html">Postfix</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_Prefix.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.Prefix%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L38">View Source</a>
+  </span>
+  <a id="Sync_Call_PatchedInvokable_Prefix_" data-uid="Sync.Call.PatchedInvokable.Prefix*"></a>
+  <h4 id="Sync_Call_PatchedInvokable_Prefix" data-uid="Sync.Call.PatchedInvokable.Prefix">Prefix</h4>
+  <div class="markdown level1 summary"><p>Get the prefix for this method call.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[NotNull]
+public Prefix Prefix { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Call.Prefix.html">Prefix</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_InitOriginal_System_Reflection_Emit_DynamicMethod_.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.InitOriginal(System.Reflection.Emit.DynamicMethod)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L108">View Source</a>
+  </span>
+  <a id="Sync_Call_PatchedInvokable_InitOriginal_" data-uid="Sync.Call.PatchedInvokable.InitOriginal*"></a>
+  <h4 id="Sync_Call_PatchedInvokable_InitOriginal_System_Reflection_Emit_DynamicMethod_" data-uid="Sync.Call.PatchedInvokable.InitOriginal(System.Reflection.Emit.DynamicMethod)">InitOriginal(DynamicMethod)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InitOriginal(DynamicMethod toPatch)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Reflection.Emit.DynamicMethod</span></td>
+        <td><span class="parametername">toPatch</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_Invoke_Sync_Behaviour_EOriginator_System_Object_System_Object___.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.Invoke(Sync.Behaviour.EOriginator%2CSystem.Object%2CSystem.Object%5B%5D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L60">View Source</a>
+  </span>
+  <a id="Sync_Call_PatchedInvokable_Invoke_" data-uid="Sync.Call.PatchedInvokable.Invoke*"></a>
+  <h4 id="Sync_Call_PatchedInvokable_Invoke_Sync_Behaviour_EOriginator_System_Object_System_Object___" data-uid="Sync.Call.PatchedInvokable.Invoke(Sync.Behaviour.EOriginator,System.Object,System.Object[])">Invoke(EOriginator, Object, Object[])</h4>
+  <div class="markdown level1 summary"><p>Invokes the method. Note that the prefixes decide on whether the original is called or not.
+<a class="xref" href="Sync.Call.PatchedInvokable.html">PatchedInvokable</a>.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override void Invoke(EOriginator eOrigin, [CanBeNull] object instance, [CanBeNull] object[] args)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Behaviour.EOriginator.html">EOriginator</a></td>
+        <td><span class="parametername">eOrigin</span></td>
+        <td><p>Who triggered this call?</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span></td>
+        <td><span class="parametername">instance</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span>[]</td>
+        <td><span class="parametername">args</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="Sync.Call.Invokable.html#Sync_Call_Invokable_Invoke_Sync_Behaviour_EOriginator_System_Object_System_Object___">Invokable.Invoke(EOriginator, Object, Object[])</a></div>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_InvokeOriginal_System_Object_System_Object___.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.InvokeOriginal(System.Object%2CSystem.Object%5B%5D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L71">View Source</a>
+  </span>
+  <a id="Sync_Call_PatchedInvokable_InvokeOriginal_" data-uid="Sync.Call.PatchedInvokable.InvokeOriginal*"></a>
+  <h4 id="Sync_Call_PatchedInvokable_InvokeOriginal_System_Object_System_Object___" data-uid="Sync.Call.PatchedInvokable.InvokeOriginal(System.Object,System.Object[])">InvokeOriginal(Object, Object[])</h4>
+  <div class="markdown level1 summary"><p>Calls the original function without the prefixes or applied.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void InvokeOriginal([CanBeNull] object instance, [CanBeNull] object[] args)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Object</span></td>
+        <td><span class="parametername">instance</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span>[]</td>
+        <td><span class="parametername">args</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_InvokePostfix_Sync_Behaviour_EOriginator_System_Object_System_Object___.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.InvokePostfix(Sync.Behaviour.EOriginator%2CSystem.Object%2CSystem.Object%5B%5D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L95">View Source</a>
+  </span>
+  <a id="Sync_Call_PatchedInvokable_InvokePostfix_" data-uid="Sync.Call.PatchedInvokable.InvokePostfix*"></a>
+  <h4 id="Sync_Call_PatchedInvokable_InvokePostfix_Sync_Behaviour_EOriginator_System_Object_System_Object___" data-uid="Sync.Call.PatchedInvokable.InvokePostfix(Sync.Behaviour.EOriginator,System.Object,System.Object[])">InvokePostfix(EOriginator, Object, Object[])</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void InvokePostfix(EOriginator eOrigin, object instance, object[] args)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Behaviour.EOriginator.html">EOriginator</a></td>
+        <td><span class="parametername">eOrigin</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span></td>
+        <td><span class="parametername">instance</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span>[]</td>
+        <td><span class="parametername">args</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_InvokePrefix_Sync_Behaviour_EOriginator_System_Object_System_Object___.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.InvokePrefix(Sync.Behaviour.EOriginator%2CSystem.Object%2CSystem.Object%5B%5D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L84">View Source</a>
+  </span>
+  <a id="Sync_Call_PatchedInvokable_InvokePrefix_" data-uid="Sync.Call.PatchedInvokable.InvokePrefix*"></a>
+  <h4 id="Sync_Call_PatchedInvokable_InvokePrefix_Sync_Behaviour_EOriginator_System_Object_System_Object___" data-uid="Sync.Call.PatchedInvokable.InvokePrefix(Sync.Behaviour.EOriginator,System.Object,System.Object[])">InvokePrefix(EOriginator, Object, Object[])</h4>
+  <div class="markdown level1 summary"><p>Invokes registered handlers for the given instance.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool InvokePrefix(EOriginator eOrigin, [CanBeNull] object instance, params object[] args)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Behaviour.EOriginator.html">EOriginator</a></td>
+        <td><span class="parametername">eOrigin</span></td>
+        <td><p>Who triggered this call?</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span></td>
+        <td><span class="parametername">instance</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span>[]</td>
+        <td><span class="parametername">args</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td><p>true if the invoked prefix wants the original function to be called as well. False otherwise.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable_ToString.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable.ToString%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L101">View Source</a>
+  </span>
+  <a id="Sync_Call_PatchedInvokable_ToString_" data-uid="Sync.Call.PatchedInvokable.ToString*"></a>
+  <h4 id="Sync_Call_PatchedInvokable_ToString" data-uid="Sync.Call.PatchedInvokable.ToString">ToString()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override string ToString()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.String</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><span class="xref">System.Object.ToString()</span></div>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Call_PatchedInvokable.md&amp;value=---%0Auid%3A%20Sync.Call.PatchedInvokable%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Call/PatchedInvokable.cs/#L17" class="contribution-link">View Source</a>
+                  </li>
+                </ul>
+              </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

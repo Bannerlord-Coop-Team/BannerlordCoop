@@ -95,7 +95,7 @@
       <a class="xref" href="Network.Infrastructure.ConnectionBase.html#Network_Infrastructure_ConnectionBase_SendFragmented_Network_Protocol_Packet_">ConnectionBase.SendFragmented(Packet)</a>
     </div>
     <div>
-      <a class="xref" href="Network.Infrastructure.ConnectionBase.html#Network_Infrastructure_ConnectionBase_Receive_System_ArraySegment_System_Byte__">ConnectionBase.Receive(ArraySegment&lt;Byte&gt;)</a>
+      <a class="xref" href="Network.Infrastructure.ConnectionBase.html#Network_Infrastructure_ConnectionBase_Receive_ArraySegment_System_Byte__">ConnectionBase.Receive(ArraySegment&lt;Byte&gt;)</a>
     </div>
     <div>
       <a class="xref" href="Network.Infrastructure.ConnectionBase.html#Network_Infrastructure_ConnectionBase_Network">ConnectionBase.Network</a>
@@ -111,24 +111,6 @@
     </div>
     <div>
       <a class="xref" href="Network.Infrastructure.ConnectionBase.html#Network_Infrastructure_ConnectionBase_m_PackageReader">ConnectionBase.m_PackageReader</a>
-    </div>
-    <div>
-      <span class="xref">System.Object.Equals(System.Object)</span>
-    </div>
-    <div>
-      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
-    </div>
-    <div>
-      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
-    </div>
-    <div>
-      <span class="xref">System.Object.GetHashCode()</span>
-    </div>
-    <div>
-      <span class="xref">System.Object.GetType()</span>
-    </div>
-    <div>
-      <span class="xref">System.Object.MemberwiseClone()</span>
     </div>
   </div>
   <h6><strong>Namespace</strong>: <a class="xref" href="Network.Infrastructure.html">Network.Infrastructure</a></h6>
@@ -234,7 +216,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Action</span>&lt;<a class="xref" href="Network.Infrastructure.ConnectionClient.html">ConnectionClient</a>&gt;</td>
+        <td><span class="xref">Action</span>&lt;<a class="xref" href="Network.Infrastructure.ConnectionClient.html">ConnectionClient</a>&gt;</td>
         <td></td>
       </tr>
     </tbody>
@@ -264,7 +246,7 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Enum</span></td>
+        <td><span class="xref">Enum</span></td>
         <td></td>
       </tr>
     </tbody>
@@ -382,8 +364,7 @@
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">[ConnectionClientPacketHandler(EClientConnectionState.JoinRequesting, EPacket.Server_RequestClientInfo)]
-void receiveClientInfoRequest(ConnectionBase connection, Packet packet)</code></pre>
+    <pre><code class="lang-csharp hljs">void receiveClientInfoRequest(ConnectionBase connection, Packet packet)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -420,8 +401,7 @@ void receiveClientInfoRequest(ConnectionBase connection, Packet packet)</code></
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">[ConnectionClientPacketHandler(EClientConnectionState.JoinRequesting, EPacket.Server_JoinRequestAccepted)]
-void receiveJoinRequestAccepted(ConnectionBase connection, Packet packet)</code></pre>
+    <pre><code class="lang-csharp hljs">void receiveJoinRequestAccepted(ConnectionBase connection, Packet packet)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -458,8 +438,7 @@ void receiveJoinRequestAccepted(ConnectionBase connection, Packet packet)</code>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">[ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.KeepAlive)]
-void receiveServerKeepAlive(ConnectionBase connection, Packet packet)</code></pre>
+    <pre><code class="lang-csharp hljs">void receiveServerKeepAlive(ConnectionBase connection, Packet packet)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -539,7 +518,7 @@ void receiveServerKeepAlive(ConnectionBase connection, Packet packet)</code></pr
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Action</span>&lt;<a class="xref" href="Network.Infrastructure.ConnectionClient.html">ConnectionClient</a>&gt;</td>
+        <td><span class="xref">Action</span>&lt;<a class="xref" href="Network.Infrastructure.ConnectionClient.html">ConnectionClient</a>&gt;</td>
         <td></td>
       </tr>
     </tbody>
@@ -568,7 +547,7 @@ void receiveServerKeepAlive(ConnectionBase connection, Packet packet)</code></pr
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Action</span>&lt;<a class="xref" href="Network.Infrastructure.EDisconnectReason.html">EDisconnectReason</a>&gt;</td>
+        <td><span class="xref">Action</span>&lt;<a class="xref" href="Network.Infrastructure.EDisconnectReason.html">EDisconnectReason</a>&gt;</td>
         <td></td>
       </tr>
     </tbody>

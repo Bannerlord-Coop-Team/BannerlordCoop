@@ -80,16 +80,30 @@
       <section><p>Event raised by clients if they want to move a party. The client may only send this
 event for parties that are under its control.</p>
 </section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.Party.MapPositionSerializer.html">MapPositionSerializer</a></h4>
+      <section></section>
       <h4><a class="xref" href="Coop.Mod.Persistence.Party.MobilePartyEntityClient.html">MobilePartyEntityClient</a></h4>
-      <section><p>Railgun: Mobile party implementation for clients. One instance for each mobile party
-that is registered in the Railgun room.</p>
+      <section><p>Represents a clientside <span class="xref">TaleWorlds.CampaignSystem.MobileParty</span> entity that is currently active in the game world.</p>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.Party.MobilePartyEntityServer.html">MobilePartyEntityServer</a></h4>
-      <section><p>Railgun: Mobile party implementation for the server. One instance for each mobile party
-that is registered in the Railgun room.</p>
+      <section><p>Represents a serverside <span class="xref">TaleWorlds.CampaignSystem.MobileParty</span> entity that is currently active in the game world.</p>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.Party.MobilePartyState.html">MobilePartyState</a></h4>
       <section><p>State for a mobile party entity.</p>
+</section>
+      <h4><a class="xref" href="Coop.Mod.Persistence.Party.MobilePartySync.html">MobilePartySync</a></h4>
+      <section><p>Synchronization implementation for <a class="xref" href="Coop.Mod.Patch.MobilePartyPatches.CampaignMapMovement.html">CampaignMapMovement</a>. It handles buffered changes to 2 different
+field groups:</p>
+<ol>
+<li>The captured <a class="xref" href="Coop.Mod.Persistence.Party.MovementData.html">MovementData</a>.</li>
+<li>The captured 2d position on the campaign map.
+These changes are forwarded to the responsible <a class="xref" href="Coop.Mod.Persistence.Party.IMovementHandler.html">IMovementHandler</a>. The following handlers are
+registered:</li>
+<li>On every client: <a class="xref" href="Coop.Mod.Persistence.Party.MobilePartyEntityClient.html">MobilePartyEntityClient</a> for every party that is directly controlled by
+this local client, i.e. its main party.</li>
+<li>On the server: <a class="xref" href="Coop.Mod.Persistence.Party.MobilePartyEntityServer.html">MobilePartyEntityServer</a> for every party that is not directly controlled by
+any client.</li>
+</ol>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.Party.MovementData.html">MovementData</a></h4>
       <section><p>Contains all data relevant to a movement command using local game objects.</p>
@@ -97,10 +111,21 @@ that is registered in the Railgun room.</p>
       <h4><a class="xref" href="Coop.Mod.Persistence.Party.MovementDataSerializer.html">MovementDataSerializer</a></h4>
       <section></section>
       <h4><a class="xref" href="Coop.Mod.Persistence.Party.MovementState.html">MovementState</a></h4>
-      <section><p>Contains all data relevant to a movement command in serializable format.</p>
+      <section><p>Contains all data relevant to a movement order in a Railgun serializable format.</p>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.Party.MovementStateSerializer.html">MovementStateSerializer</a></h4>
       <section></section>
+    <h3 id="structs">Structs
+  </h3>
+      <h4><a class="xref" href="Coop.Mod.Persistence.Party.MapPosition.html">MapPosition</a></h4>
+      <section><p>Describes a position on the campaign map. Basically just a wrapper around <a class="xref" href="Coop.Mod.Persistence.Party.MapPosition.html#Coop_Mod_Persistence_Party_MapPosition_Vec2">Vec2</a> so it can be
+used in Railgun with its own encoder / decoder and custom precision for campaign map coordinates.</p>
+</section>
+    <h3 id="interfaces">Interfaces
+  </h3>
+      <h4><a class="xref" href="Coop.Mod.Persistence.Party.IMovementHandler.html">IMovementHandler</a></h4>
+      <section><p>Interface for a synchronized handler of <span class="xref">TaleWorlds.CampaignSystem.MobileParty</span> movement changes.</p>
+</section>
     <h3 id="enums">Enums
   </h3>
       <h4><a class="xref" href="Coop.Mod.Persistence.Party.MovementData.Field.html">MovementData.Field</a></h4>

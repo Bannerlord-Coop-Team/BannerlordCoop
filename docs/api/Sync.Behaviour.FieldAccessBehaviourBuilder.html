@@ -1,0 +1,386 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Class FieldAccessBehaviourBuilder
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Class FieldAccessBehaviourBuilder
+   ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder">
+  
+  
+  <h1 id="Sync_Behaviour_FieldAccessBehaviourBuilder" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder" class="text-break">Class FieldAccessBehaviourBuilder
+  </h1>
+  <div class="markdown level0 summary"><p>Builder class to define the accessors to a field in order to define it&apos;s behaviour.
+Note that field changes cannot be intercepted (patched) directly, instead methods and property setters
+that access the field are patched - these are referred to as &apos;accessors&apos; to the field.</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><span class="xref">FieldAccessBehaviourBuilder</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <span class="xref">System.Object.ToString()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetHashCode()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.GetType()</span>
+    </div>
+    <div>
+      <span class="xref">System.Object.MemberwiseClone()</span>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="Sync.Behaviour.html">Sync.Behaviour</a></h6>
+  <h6><strong>Assembly</strong>: Sync.dll</h6>
+  <h5 id="Sync_Behaviour_FieldAccessBehaviourBuilder_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class FieldAccessBehaviourBuilder</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Behaviour_FieldAccessBehaviourBuilder__ctor_System_Collections_Generic_IEnumerable_Sync_Value_FieldId__Sync_Behaviour_Condition_.md&amp;value=---%0Auid%3A%20Sync.Behaviour.FieldAccessBehaviourBuilder.%23ctor(System.Collections.Generic.IEnumerable%7BSync.Value.FieldId%7D%2CSync.Behaviour.Condition)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Behaviour/FieldAccessBehaviourBuilder.cs/#L14">View Source</a>
+  </span>
+  <a id="Sync_Behaviour_FieldAccessBehaviourBuilder__ctor_" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder.#ctor*"></a>
+  <h4 id="Sync_Behaviour_FieldAccessBehaviourBuilder__ctor_System_Collections_Generic_IEnumerable_Sync_Value_FieldId__Sync_Behaviour_Condition_" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder.#ctor(System.Collections.Generic.IEnumerable{Sync.Value.FieldId},Sync.Behaviour.Condition)">FieldAccessBehaviourBuilder(IEnumerable&lt;FieldId&gt;, Condition)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public FieldAccessBehaviourBuilder(IEnumerable&lt;FieldId&gt; fieldIds, Condition condition)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.IEnumerable</span>&lt;<a class="xref" href="Sync.Value.FieldId.html">FieldId</a>&gt;</td>
+        <td><span class="parametername">fieldIds</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="Sync.Behaviour.Condition.html">Condition</a></td>
+        <td><span class="parametername">condition</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Behaviour_FieldAccessBehaviourBuilder_m_Condition.md&amp;value=---%0Auid%3A%20Sync.Behaviour.FieldAccessBehaviourBuilder.m_Condition%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Behaviour/FieldAccessBehaviourBuilder.cs/#L44">View Source</a>
+  </span>
+  <h4 id="Sync_Behaviour_FieldAccessBehaviourBuilder_m_Condition" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder.m_Condition">m_Condition</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly Condition m_Condition</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Behaviour.Condition.html">Condition</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Behaviour_FieldAccessBehaviourBuilder_m_FieldIds.md&amp;value=---%0Auid%3A%20Sync.Behaviour.FieldAccessBehaviourBuilder.m_FieldIds%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Behaviour/FieldAccessBehaviourBuilder.cs/#L43">View Source</a>
+  </span>
+  <h4 id="Sync_Behaviour_FieldAccessBehaviourBuilder_m_FieldIds" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder.m_FieldIds">m_FieldIds</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly IEnumerable&lt;FieldId&gt; m_FieldIds</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.IEnumerable</span>&lt;<a class="xref" href="Sync.Value.FieldId.html">FieldId</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Behaviour_FieldAccessBehaviourBuilder_Accessors.md&amp;value=---%0Auid%3A%20Sync.Behaviour.FieldAccessBehaviourBuilder.Accessors%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Behaviour/FieldAccessBehaviourBuilder.cs/#L22">View Source</a>
+  </span>
+  <a id="Sync_Behaviour_FieldAccessBehaviourBuilder_Accessors_" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder.Accessors*"></a>
+  <h4 id="Sync_Behaviour_FieldAccessBehaviourBuilder_Accessors" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder.Accessors">Accessors</h4>
+  <div class="markdown level1 summary"><p>The patched invokable used to access the fields.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public List&lt;PatchedInvokable&gt; Accessors { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.List</span>&lt;<a class="xref" href="Sync.Call.PatchedInvokable.html">PatchedInvokable</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Behaviour_FieldAccessBehaviourBuilder_Behaviour.md&amp;value=---%0Auid%3A%20Sync.Behaviour.FieldAccessBehaviourBuilder.Behaviour%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Behaviour/FieldAccessBehaviourBuilder.cs/#L26">View Source</a>
+  </span>
+  <a id="Sync_Behaviour_FieldAccessBehaviourBuilder_Behaviour_" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder.Behaviour*"></a>
+  <h4 id="Sync_Behaviour_FieldAccessBehaviourBuilder_Behaviour" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder.Behaviour">Behaviour</h4>
+  <div class="markdown level1 summary"><p>The behaviour builder for the managed field itself.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public FieldBehaviourBuilder Behaviour { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Behaviour.FieldBehaviourBuilder.html">FieldBehaviourBuilder</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Behaviour_FieldAccessBehaviourBuilder_Through_Sync_Call_PatchedInvokable___.md&amp;value=---%0Auid%3A%20Sync.Behaviour.FieldAccessBehaviourBuilder.Through(Sync.Call.PatchedInvokable%5B%5D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Behaviour/FieldAccessBehaviourBuilder.cs/#L34">View Source</a>
+  </span>
+  <a id="Sync_Behaviour_FieldAccessBehaviourBuilder_Through_" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder.Through*"></a>
+  <h4 id="Sync_Behaviour_FieldAccessBehaviourBuilder_Through_Sync_Call_PatchedInvokable___" data-uid="Sync.Behaviour.FieldAccessBehaviourBuilder.Through(Sync.Call.PatchedInvokable[])">Through(PatchedInvokable[])</h4>
+  <div class="markdown level1 summary"><p>Defines the accessors through which the field is changed. i.e. the methods and property setters
+that change the field. These will be patched in order to monitor the field for changes.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public FieldBehaviourBuilder Through(params PatchedInvokable[] accessors)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Call.PatchedInvokable.html">PatchedInvokable</a>[]</td>
+        <td><span class="parametername">accessors</span></td>
+        <td><p>List of all accessors.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Behaviour.FieldBehaviourBuilder.html">FieldBehaviourBuilder</a></td>
+        <td><p>Behaviour builder for the field.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Sync_Behaviour_FieldAccessBehaviourBuilder.md&amp;value=---%0Auid%3A%20Sync.Behaviour.FieldAccessBehaviourBuilder%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Sync/Behaviour/FieldAccessBehaviourBuilder.cs/#L12" class="contribution-link">View Source</a>
+                  </li>
+                </ul>
+              </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

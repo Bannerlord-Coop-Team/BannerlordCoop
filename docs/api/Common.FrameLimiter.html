@@ -72,7 +72,9 @@
   
   <h1 id="Common_FrameLimiter" data-uid="Common.FrameLimiter" class="text-break">Class FrameLimiter
   </h1>
-  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 summary"><p>Tries to achieve a minimum given frame time by waiting an appropriate amount of time each frame. Waiting
+is either done through a spin lock or sleep, depending on the amount of time that needs to be spent waiting.</p>
+</div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
     <h5>Inheritance</h5>
@@ -116,11 +118,12 @@
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter__ctor_System_TimeSpan_.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.%23ctor(System.TimeSpan)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L16">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L22">View Source</a>
   </span>
   <a id="Common_FrameLimiter__ctor_" data-uid="Common.FrameLimiter.#ctor*"></a>
   <h4 id="Common_FrameLimiter__ctor_System_TimeSpan_" data-uid="Common.FrameLimiter.#ctor(System.TimeSpan)">FrameLimiter(TimeSpan)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>Create a new frame limiter with the given target frame time.</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
@@ -147,75 +150,17 @@
   </h3>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_LastFrameTime.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.LastFrameTime%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_m_AverageActualFrameTime.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.m_AverageActualFrameTime%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L13">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L78">View Source</a>
   </span>
-  <h4 id="Common_FrameLimiter_LastFrameTime" data-uid="Common.FrameLimiter.LastFrameTime">LastFrameTime</h4>
+  <h4 id="Common_FrameLimiter_m_AverageActualFrameTime" data-uid="Common.FrameLimiter.m_AverageActualFrameTime">m_AverageActualFrameTime</h4>
   <div class="markdown level1 summary"></div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public TimeSpan LastFrameTime</code></pre>
-  </div>
-  <h5 class="fieldValue">Field Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.TimeSpan</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <span class="small pull-right mobile-hide">
-    <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_m_AverageTicksPerFrame.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.m_AverageTicksPerFrame%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
-  </span>
-  <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L14">View Source</a>
-  </span>
-  <h4 id="Common_FrameLimiter_m_AverageTicksPerFrame" data-uid="Common.FrameLimiter.m_AverageTicksPerFrame">m_AverageTicksPerFrame</h4>
-  <div class="markdown level1 summary"></div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">double m_AverageTicksPerFrame</code></pre>
-  </div>
-  <h5 class="fieldValue">Field Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Double</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <span class="small pull-right mobile-hide">
-    <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_m_Avg.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.m_Avg%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
-  </span>
-  <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L9">View Source</a>
-  </span>
-  <h4 id="Common_FrameLimiter_m_Avg" data-uid="Common.FrameLimiter.m_Avg">m_Avg</h4>
-  <div class="markdown level1 summary"></div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">readonly MovingAverage m_Avg</code></pre>
+    <pre><code class="lang-csharp hljs">readonly MovingAverage m_AverageActualFrameTime</code></pre>
   </div>
   <h5 class="fieldValue">Field Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -234,10 +179,97 @@
   </table>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_m_AverageActualTicksPerFrame.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.m_AverageActualTicksPerFrame%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L83">View Source</a>
+  </span>
+  <h4 id="Common_FrameLimiter_m_AverageActualTicksPerFrame" data-uid="Common.FrameLimiter.m_AverageActualTicksPerFrame">m_AverageActualTicksPerFrame</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">double m_AverageActualTicksPerFrame</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Double</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_m_AverageThrottledFrameTime.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.m_AverageThrottledFrameTime%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L79">View Source</a>
+  </span>
+  <h4 id="Common_FrameLimiter_m_AverageThrottledFrameTime" data-uid="Common.FrameLimiter.m_AverageThrottledFrameTime">m_AverageThrottledFrameTime</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly MovingAverage m_AverageThrottledFrameTime</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Common.MovingAverage.html">MovingAverage</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_m_AverageThrottledTicksPerFrame.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.m_AverageThrottledTicksPerFrame%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L84">View Source</a>
+  </span>
+  <h4 id="Common_FrameLimiter_m_AverageThrottledTicksPerFrame" data-uid="Common.FrameLimiter.m_AverageThrottledTicksPerFrame">m_AverageThrottledTicksPerFrame</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">double m_AverageThrottledTicksPerFrame</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Double</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_m_TargetTicksPerFrame.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.m_TargetTicksPerFrame%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L10">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L80">View Source</a>
   </span>
   <h4 id="Common_FrameLimiter_m_TargetTicksPerFrame" data-uid="Common.FrameLimiter.m_TargetTicksPerFrame">m_TargetTicksPerFrame</h4>
   <div class="markdown level1 summary"></div>
@@ -266,7 +298,7 @@
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_m_Timer.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.m_Timer%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L11">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L81">View Source</a>
   </span>
   <h4 id="Common_FrameLimiter_m_Timer" data-uid="Common.FrameLimiter.m_Timer">m_Timer</h4>
   <div class="markdown level1 summary"></div>
@@ -295,7 +327,7 @@
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_m_WaitUntilTick.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.m_WaitUntilTick%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L12">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L82">View Source</a>
   </span>
   <h4 id="Common_FrameLimiter_m_WaitUntilTick" data-uid="Common.FrameLimiter.m_WaitUntilTick">m_WaitUntilTick</h4>
   <div class="markdown level1 summary"></div>
@@ -319,6 +351,35 @@
       </tr>
     </tbody>
   </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_RollingBufferSize.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.RollingBufferSize%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L77">View Source</a>
+  </span>
+  <h4 id="Common_FrameLimiter_RollingBufferSize" data-uid="Common.FrameLimiter.RollingBufferSize">RollingBufferSize</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">const int RollingBufferSize = 32</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Int32</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h3 id="properties">Properties
   </h3>
   <span class="small pull-right mobile-hide">
@@ -326,15 +387,47 @@
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_AverageFrameTime.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.AverageFrameTime%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L46">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L56">View Source</a>
   </span>
   <a id="Common_FrameLimiter_AverageFrameTime_" data-uid="Common.FrameLimiter.AverageFrameTime*"></a>
   <h4 id="Common_FrameLimiter_AverageFrameTime" data-uid="Common.FrameLimiter.AverageFrameTime">AverageFrameTime</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>Returns the average frame time measured over the last few <a class="xref" href="Common.FrameLimiter.html#Common_FrameLimiter_Throttle">Throttle()</a> calls.</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public TimeSpan AverageFrameTime { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.TimeSpan</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_LastThrottledFrameTime.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.LastThrottledFrameTime%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L16">View Source</a>
+  </span>
+  <a id="Common_FrameLimiter_LastThrottledFrameTime_" data-uid="Common.FrameLimiter.LastThrottledFrameTime*"></a>
+  <h4 id="Common_FrameLimiter_LastThrottledFrameTime" data-uid="Common.FrameLimiter.LastThrottledFrameTime">LastThrottledFrameTime</h4>
+  <div class="markdown level1 summary"><p>The elapsed time between the last call to <a class="xref" href="Common.FrameLimiter.html#Common_FrameLimiter_Throttle">Throttle()</a> and the call before that.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan LastThrottledFrameTime { get; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -358,11 +451,13 @@
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter_Throttle.md&amp;value=---%0Auid%3A%20Common.FrameLimiter.Throttle%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L48">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L62">View Source</a>
   </span>
   <a id="Common_FrameLimiter_Throttle_" data-uid="Common.FrameLimiter.Throttle*"></a>
   <h4 id="Common_FrameLimiter_Throttle" data-uid="Common.FrameLimiter.Throttle">Throttle()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>Waits until the target frame time has passed since the last call to this method. Does nothing if the
+elapsed time is higher than the target time.</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
@@ -379,7 +474,7 @@
                     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Common_FrameLimiter.md&amp;value=---%0Auid%3A%20Common.FrameLimiter%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
                   </li>
                   <li>
-                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L7" class="contribution-link">View Source</a>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Common/FrameLimiter.cs/#L11" class="contribution-link">View Source</a>
                   </li>
                 </ul>
               </div>

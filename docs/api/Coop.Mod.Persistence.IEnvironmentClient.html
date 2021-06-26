@@ -117,19 +117,50 @@ On remote clients this is the latest campaign time dictated by the host.</p>
   </table>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_PlayerControlledParties.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.PlayerControlledParties%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_PartySync.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.PartySync%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L39">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L44">View Source</a>
   </span>
-  <a id="Coop_Mod_Persistence_IEnvironmentClient_PlayerControlledParties_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.PlayerControlledParties*"></a>
-  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_PlayerControlledParties" data-uid="Coop.Mod.Persistence.IEnvironmentClient.PlayerControlledParties">PlayerControlledParties</h4>
-  <div class="markdown level1 summary"><p>Returns all parties that are controlled by human players, local or remote.</p>
+  <a id="Coop_Mod_Persistence_IEnvironmentClient_PartySync_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.PartySync*"></a>
+  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_PartySync" data-uid="Coop.Mod.Persistence.IEnvironmentClient.PartySync">PartySync</h4>
+  <div class="markdown level1 summary"><p>Gets the synchronization for <span class="xref">TaleWorlds.CampaignSystem.MobileParty</span> instances.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">IEnumerable&lt;MobileParty&gt; PlayerControlledParties { get; }</code></pre>
+    <pre><code class="lang-csharp hljs">MobilePartySync PartySync { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Coop.Mod.Persistence.Party.MobilePartySync.html">MobilePartySync</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_PlayerMainParties.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.PlayerMainParties%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L39">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_IEnvironmentClient_PlayerMainParties_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.PlayerMainParties*"></a>
+  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_PlayerMainParties" data-uid="Coop.Mod.Persistence.IEnvironmentClient.PlayerMainParties">PlayerMainParties</h4>
+  <div class="markdown level1 summary"><p>Returns all parties that are the main parties of human players, local or remote.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IEnumerable&lt;MobileParty&gt; PlayerMainParties { get; }</code></pre>
   </div>
   <h5 class="propertyValue">Property Value</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -151,7 +182,7 @@ On remote clients this is the latest campaign time dictated by the host.</p>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_Store.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.Store%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L44">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L49">View Source</a>
   </span>
   <a id="Coop_Mod_Persistence_IEnvironmentClient_Store_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.Store*"></a>
   <h4 id="Coop_Mod_Persistence_IEnvironmentClient_Store" data-uid="Coop.Mod.Persistence.IEnvironmentClient.Store">Store</h4>
@@ -178,148 +209,24 @@ RemoteStore Store { get; }</code></pre>
       </tr>
     </tbody>
   </table>
-  <span class="small pull-right mobile-hide">
-    <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_TargetPosition.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.TargetPosition%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
-  </span>
-  <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L18">View Source</a>
-  </span>
-  <a id="Coop_Mod_Persistence_IEnvironmentClient_TargetPosition_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.TargetPosition*"></a>
-  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_TargetPosition" data-uid="Coop.Mod.Persistence.IEnvironmentClient.TargetPosition">TargetPosition</h4>
-  <div class="markdown level1 summary"><p>Access to the movement data for all parties in the clients game world.</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">FieldAccessGroup&lt;MobileParty, MovementData&gt; TargetPosition { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="Sync.FieldAccessGroup-2.html">FieldAccessGroup</a>&lt;<span class="xref">TaleWorlds.CampaignSystem.MobileParty</span>, <a class="xref" href="Coop.Mod.Persistence.Party.MovementData.html">MovementData</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <span class="small pull-right mobile-hide">
-    <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_TimeControlMode.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.TimeControlMode%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
-  </span>
-  <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L23">View Source</a>
-  </span>
-  <a id="Coop_Mod_Persistence_IEnvironmentClient_TimeControlMode_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.TimeControlMode*"></a>
-  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_TimeControlMode" data-uid="Coop.Mod.Persistence.IEnvironmentClient.TimeControlMode">TimeControlMode</h4>
-  <div class="markdown level1 summary"><p>Access to the campaign time control mode in the clients game world.</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">FieldAccess&lt;Campaign, CampaignTimeControlMode&gt; TimeControlMode { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="Sync.FieldAccess-2.html">FieldAccess</a>&lt;<span class="xref">TaleWorlds.CampaignSystem.Campaign</span>, <span class="xref">TaleWorlds.CampaignSystem.CampaignTimeControlMode</span>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <span class="small pull-right mobile-hide">
-    <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_TimeControlModeLock.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.TimeControlModeLock%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
-  </span>
-  <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L28">View Source</a>
-  </span>
-  <a id="Coop_Mod_Persistence_IEnvironmentClient_TimeControlModeLock_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.TimeControlModeLock*"></a>
-  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_TimeControlModeLock" data-uid="Coop.Mod.Persistence.IEnvironmentClient.TimeControlModeLock">TimeControlModeLock</h4>
-  <div class="markdown level1 summary"><p>Access to the campaign time control lock in the clients game world.</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">FieldAccess&lt;Campaign, bool&gt; TimeControlModeLock { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="Sync.FieldAccess-2.html">FieldAccess</a>&lt;<span class="xref">TaleWorlds.CampaignSystem.Campaign</span>, <span class="xref">System.Boolean</span>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
   <h3 id="methods">Methods
   </h3>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_GetCurrentCampaign.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.GetCurrentCampaign%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_GetMobilePartyById_TaleWorlds_ObjectSystem_MBGUID_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyById(TaleWorlds.ObjectSystem.MBGUID)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L69">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L67">View Source</a>
   </span>
-  <a id="Coop_Mod_Persistence_IEnvironmentClient_GetCurrentCampaign_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.GetCurrentCampaign*"></a>
-  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_GetCurrentCampaign" data-uid="Coop.Mod.Persistence.IEnvironmentClient.GetCurrentCampaign">GetCurrentCampaign()</h4>
-  <div class="markdown level1 summary"><p>Returns the active campaign of the client.</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">Campaign GetCurrentCampaign()</code></pre>
-  </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">TaleWorlds.CampaignSystem.Campaign</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <span class="small pull-right mobile-hide">
-    <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_GetMobilePartyByIndex_System_Int32_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyByIndex(System.Int32)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
-  </span>
-  <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L62">View Source</a>
-  </span>
-  <a id="Coop_Mod_Persistence_IEnvironmentClient_GetMobilePartyByIndex_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyByIndex*"></a>
-  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_GetMobilePartyByIndex_System_Int32_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyByIndex(System.Int32)">GetMobilePartyByIndex(Int32)</h4>
-  <div class="markdown level1 summary"><p>Returns a party given its party index.</p>
+  <a id="Coop_Mod_Persistence_IEnvironmentClient_GetMobilePartyById_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyById*"></a>
+  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_GetMobilePartyById_TaleWorlds_ObjectSystem_MBGUID_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.GetMobilePartyById(TaleWorlds.ObjectSystem.MBGUID)">GetMobilePartyById(MBGUID)</h4>
+  <div class="markdown level1 summary"><p>Returns a party given its guid.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">[CanBeNull]
-MobileParty GetMobilePartyByIndex(int iPartyIndex)</code></pre>
+MobileParty GetMobilePartyById(MBGUID guid)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -332,8 +239,8 @@ MobileParty GetMobilePartyByIndex(int iPartyIndex)</code></pre>
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><span class="parametername">iPartyIndex</span></td>
+        <td><span class="xref">TaleWorlds.ObjectSystem.MBGUID</span></td>
+        <td><span class="parametername">guid</span></td>
         <td></td>
       </tr>
     </tbody>
@@ -355,20 +262,19 @@ MobileParty GetMobilePartyByIndex(int iPartyIndex)</code></pre>
   </table>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_SetIsPlayerControlled_System_Int32_System_Boolean_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled(System.Int32%2CSystem.Boolean)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_ScopeEntered_TaleWorlds_CampaignSystem_MobileParty_TaleWorlds_Library_Vec2_System_Nullable_TaleWorlds_Library_Vec2__Coop_Mod_Persistence_Party_MovementData_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.ScopeEntered(TaleWorlds.CampaignSystem.MobileParty%2CTaleWorlds.Library.Vec2%2CSystem.Nullable%7BTaleWorlds.Library.Vec2%7D%2CCoop.Mod.Persistence.Party.MovementData)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L55">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L77">View Source</a>
   </span>
-  <a id="Coop_Mod_Persistence_IEnvironmentClient_SetIsPlayerControlled_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled*"></a>
-  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_SetIsPlayerControlled_System_Int32_System_Boolean_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled(System.Int32,System.Boolean)">SetIsPlayerControlled(Int32, Boolean)</h4>
-  <div class="markdown level1 summary"><p>Sets whether a party is controlled by a human player (locally or remote). Called
-by the persistence framework whenever the controller changes.</p>
+  <a id="Coop_Mod_Persistence_IEnvironmentClient_ScopeEntered_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.ScopeEntered*"></a>
+  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_ScopeEntered_TaleWorlds_CampaignSystem_MobileParty_TaleWorlds_Library_Vec2_System_Nullable_TaleWorlds_Library_Vec2__Coop_Mod_Persistence_Party_MovementData_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.ScopeEntered(TaleWorlds.CampaignSystem.MobileParty,TaleWorlds.Library.Vec2,System.Nullable{TaleWorlds.Library.Vec2},Coop.Mod.Persistence.Party.MovementData)">ScopeEntered(MobileParty, Vec2, Nullable&lt;Vec2&gt;, MovementData)</h4>
+  <div class="markdown level1 summary"><p>Called when a party enter the scope of the local client.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled)</code></pre>
+    <pre><code class="lang-csharp hljs">void ScopeEntered([NotNull] MobileParty party, Vec2 mapPosition, Vec2? facingDirection, MovementData movementData)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -381,9 +287,172 @@ by the persistence framework whenever the controller changes.</p>
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Int32</span></td>
-        <td><span class="parametername">iPartyIndex</span></td>
-        <td><p>Party index, to be resolved using <a class="xref" href="Coop.Mod.Persistence.IEnvironmentClient.html#Coop_Mod_Persistence_IEnvironmentClient_GetMobilePartyByIndex_System_Int32_">GetMobilePartyByIndex(Int32)</a></p>
+        <td><span class="xref">TaleWorlds.CampaignSystem.MobileParty</span></td>
+        <td><span class="parametername">party</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Library.Vec2</span></td>
+        <td><span class="parametername">mapPosition</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Nullable</span>&lt;<span class="xref">TaleWorlds.Library.Vec2</span>&gt;</td>
+        <td><span class="parametername">facingDirection</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="Coop.Mod.Persistence.Party.MovementData.html">MovementData</a></td>
+        <td><span class="parametername">movementData</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_ScopeLeft_TaleWorlds_CampaignSystem_MobileParty_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.ScopeLeft(TaleWorlds.CampaignSystem.MobileParty)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L82">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_IEnvironmentClient_ScopeLeft_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.ScopeLeft*"></a>
+  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_ScopeLeft_TaleWorlds_CampaignSystem_MobileParty_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.ScopeLeft(TaleWorlds.CampaignSystem.MobileParty)">ScopeLeft(MobileParty)</h4>
+  <div class="markdown level1 summary"><p>Called when a party leaves the scope of the local client.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void ScopeLeft([NotNull] MobileParty party)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.CampaignSystem.MobileParty</span></td>
+        <td><span class="parametername">party</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_SetAuthoritative_TaleWorlds_CampaignSystem_MobileParty_Coop_Mod_Persistence_Party_MovementData_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.SetAuthoritative(TaleWorlds.CampaignSystem.MobileParty%2CCoop.Mod.Persistence.Party.MovementData)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L20">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_IEnvironmentClient_SetAuthoritative_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.SetAuthoritative*"></a>
+  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_SetAuthoritative_TaleWorlds_CampaignSystem_MobileParty_Coop_Mod_Persistence_Party_MovementData_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.SetAuthoritative(TaleWorlds.CampaignSystem.MobileParty,Coop.Mod.Persistence.Party.MovementData)">SetAuthoritative(MobileParty, MovementData)</h4>
+  <div class="markdown level1 summary"><p>Set the movement data of the given party as an authoritative action.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void SetAuthoritative(MobileParty party, MovementData data)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.CampaignSystem.MobileParty</span></td>
+        <td><span class="parametername">party</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="Coop.Mod.Persistence.Party.MovementData.html">MovementData</a></td>
+        <td><span class="parametername">data</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_SetAuthoritative_TaleWorlds_CampaignSystem_MobileParty_TaleWorlds_Library_Vec2_System_Nullable_TaleWorlds_Library_Vec2__.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.SetAuthoritative(TaleWorlds.CampaignSystem.MobileParty%2CTaleWorlds.Library.Vec2%2CSystem.Nullable%7BTaleWorlds.Library.Vec2%7D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L28">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_IEnvironmentClient_SetAuthoritative_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.SetAuthoritative*"></a>
+  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_SetAuthoritative_TaleWorlds_CampaignSystem_MobileParty_TaleWorlds_Library_Vec2_System_Nullable_TaleWorlds_Library_Vec2__" data-uid="Coop.Mod.Persistence.IEnvironmentClient.SetAuthoritative(TaleWorlds.CampaignSystem.MobileParty,TaleWorlds.Library.Vec2,System.Nullable{TaleWorlds.Library.Vec2})">SetAuthoritative(MobileParty, Vec2, Nullable&lt;Vec2&gt;)</h4>
+  <div class="markdown level1 summary"><p>Set the current position of the given party as an authoritative action.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void SetAuthoritative(MobileParty mManagedParty, Vec2 mapPosition, Vec2? facingDirection)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.CampaignSystem.MobileParty</span></td>
+        <td><span class="parametername">mManagedParty</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TaleWorlds.Library.Vec2</span></td>
+        <td><span class="parametername">mapPosition</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Nullable</span>&lt;<span class="xref">TaleWorlds.Library.Vec2</span>&gt;</td>
+        <td><span class="parametername">facingDirection</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient_SetIsPlayerControlled_TaleWorlds_ObjectSystem_MBGUID_System_Boolean_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled(TaleWorlds.ObjectSystem.MBGUID%2CSystem.Boolean)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L60">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_IEnvironmentClient_SetIsPlayerControlled_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled*"></a>
+  <h4 id="Coop_Mod_Persistence_IEnvironmentClient_SetIsPlayerControlled_TaleWorlds_ObjectSystem_MBGUID_System_Boolean_" data-uid="Coop.Mod.Persistence.IEnvironmentClient.SetIsPlayerControlled(TaleWorlds.ObjectSystem.MBGUID,System.Boolean)">SetIsPlayerControlled(MBGUID, Boolean)</h4>
+  <div class="markdown level1 summary"><p>Sets whether a party is controlled by a human player (locally or remote). Called
+by the persistence framework whenever the controller changes.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void SetIsPlayerControlled(MBGUID guid, bool isPlayerControlled)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.ObjectSystem.MBGUID</span></td>
+        <td><span class="parametername">guid</span></td>
+        <td><p>Party guid, to be resolved using <a class="xref" href="Coop.Mod.Persistence.IEnvironmentClient.html#Coop_Mod_Persistence_IEnvironmentClient_GetMobilePartyById_TaleWorlds_ObjectSystem_MBGUID_">GetMobilePartyById(MBGUID)</a></p>
 </td>
       </tr>
       <tr>
@@ -404,7 +473,7 @@ by the persistence framework whenever the controller changes.</p>
                     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_IEnvironmentClient.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.IEnvironmentClient%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
                   </li>
                   <li>
-                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L13" class="contribution-link">View Source</a>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/IEnvironmentClient.cs/#L15" class="contribution-link">View Source</a>
                   </li>
                 </ul>
               </div>

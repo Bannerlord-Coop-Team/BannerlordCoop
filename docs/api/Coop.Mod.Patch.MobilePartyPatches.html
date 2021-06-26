@@ -76,9 +76,36 @@
   <div class="markdown level0 remarks"></div>
     <h3 id="classes">Classes
   </h3>
+      <h4><a class="xref" href="Coop.Mod.Patch.MobilePartyPatches.CampaignMapMovement.html">CampaignMapMovement</a></h4>
+      <section><p>Handles synchronization of campaign map movement data of a <span class="xref">TaleWorlds.CampaignSystem.MobileParty</span> instance. It records
+all changes made to the relevant fields during one frame. At the end of a frame, the changes are accumulated
+and sent to all clients. Two categories of fields are synchronized this way:</p>
+<ol>
+<li>Movement order data. See <a class="xref" href="Coop.Mod.Persistence.Party.MovementData.html">MovementData</a>. These are different fields of a party that are
+relevant to it&apos;s movement behaviour on the map. Specifically it contains the <span class="xref">TaleWorlds.CampaignSystem.AiBehavior</span>
+that defines the &quot;long term&quot; movement goal and all its related information.</li>
+</ol>
+<p>The movement order data is buffered for each frame. The buffered data is then passed onto the
+<a class="xref" href="Coop.Mod.Persistence.Party.MobilePartySync.html">MobilePartySync</a> instance which in turn decides what to do with the captured data.</p>
+<ol>
+<li>Position data. This is the 2D position on the campaign map of the party. It is captured into a buffer
+on the server only. The positions captured on the server will be sent to all clients. This will overwrite
+whatever the client is doing locally and acts as a ground truth for all parties, regardless of movement
+orders.</li>
+</ol>
+</section>
+      <h4><a class="xref" href="Coop.Mod.Patch.MobilePartyPatches.CampaignMapPositions.html">CampaignMapPositions</a></h4>
+      <section><p>On the server, this patch writes all changes to the <span class="xref">TaleWorlds.CampaignSystem.MobileParty</span> positions during one tick to
+a buffer. The buffer will then be written to the authoritative state at the end of a tick.</p>
+</section>
       <h4><a class="xref" href="Coop.Mod.Patch.MobilePartyPatches.ComputeIsWaitingPatch.html">ComputeIsWaitingPatch</a></h4>
       <section><p>Patch that alter <span class="xref">TaleWorlds.CampaignSystem.MobileParty.ComputeIsWaiting</span> method so that the player&apos;s party is never waiting.
 <p> For more information see <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/133">issue #133</a></p></p>
+</section>
+      <h4><a class="xref" href="Coop.Mod.Patch.MobilePartyPatches.DisablePartyDecisionMaking.html">DisablePartyDecisionMaking</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Coop.Mod.Patch.MobilePartyPatches.MobilePartyUpdatable.html">MobilePartyUpdatable</a></h4>
+      <section><p>Updatable that applies all known serverside state of a mobile party to the local game state.</p>
 </section>
 </article>
           </div>

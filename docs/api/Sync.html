@@ -76,66 +76,9 @@
   <div class="markdown level0 remarks"></div>
     <h3 id="classes">Classes
   </h3>
-      <h4><a class="xref" href="Sync.FieldAccess.html">FieldAccess</a></h4>
-      <section><p>Type-erased interface to access an arbitrary field.</p>
-</section>
-      <h4><a class="xref" href="Sync.FieldAccess-2.html">FieldAccess&lt;TDeclaring, TFieldType&gt;</a></h4>
-      <section><p>Typed interface to access an arbitrary field.</p>
-</section>
-      <h4><a class="xref" href="Sync.FieldAccessGroup-2.html">FieldAccessGroup&lt;TDeclaring, TValueObject&gt;</a></h4>
-      <section><p>A collection of <a class="xref" href="Sync.FieldAccess.html">FieldAccess</a> that are declared in the same class. All fields of
-the group are manipulated as a single unit. The value of each individual field is stored in an
-<code data-dev-comment-type="typeparamref" class="typeparamref">TValueObject</code> instance.</p>
-</section>
-      <h4><a class="xref" href="Sync.FieldChangeBuffer.html">FieldChangeBuffer</a></h4>
-      <section><p>Buffer for pending changes to a value. The changes are detected by creating a snapshot
-of the value in a prefix to the trigger function and restoring that snapshot in a
-postfix to the trigger function.
-The buffer <a class="xref" href="Sync.FieldChangeBuffer.html#Sync_FieldChangeBuffer_BufferedChanges">BufferedChanges</a> will never be cleared internally. The game
-loop is responsible to process the buffered changes and apply or discard them.</p>
-</section>
-      <h4><a class="xref" href="Sync.MethodAccess.html">MethodAccess</a></h4>
-      <section><p>Type erased invocation wrapper for patched methods. On creation, a snapshot of the IL
-representation of the method is stored internally. The snapshot includes all patches
-to the function already applied. The snapshot can be called using <a class="xref" href="Sync.MethodAccess.html#Sync_MethodAccess_CallOriginal_System_Object_System_Object___">CallOriginal(Object, Object[])</a>.</p>
-</section>
-      <h4><a class="xref" href="Sync.MethodPatch.html">MethodPatch</a></h4>
-      <section><p>Patch generator for method calls.</p>
-</section>
-      <h4><a class="xref" href="Sync.MethodPatchFactory.html">MethodPatchFactory</a></h4>
+      <h4><a class="xref" href="Sync.Registry.html">Registry</a></h4>
       <section></section>
-      <h4><a class="xref" href="Sync.MethodRegistry.html">MethodRegistry</a></h4>
-      <section></section>
-      <h4><a class="xref" href="Sync.Patcher.html">Patcher</a></h4>
-      <section></section>
-      <h4><a class="xref" href="Sync.PropertyPatch.html">PropertyPatch</a></h4>
-      <section><p>Patch generator for properties.</p>
-</section>
       <h4><a class="xref" href="Sync.SyncPriority.html">SyncPriority</a></h4>
-      <section></section>
-      <h4><a class="xref" href="Sync.Tracker.html">Tracker</a></h4>
-      <section><p>Base class for class wrappers that notify when specific instances of the wrapped class
-change internal state.</p>
-</section>
-      <h4><a class="xref" href="Sync.ValueAccess.html">ValueAccess</a></h4>
-      <section><p>Type-erased interface for setting and getting a value from an instance.</p>
-</section>
-      <h4><a class="xref" href="Sync.ValueChangeRequest.html">ValueChangeRequest</a></h4>
-      <section></section>
-      <h4><a class="xref" href="Sync.ValueData.html">ValueData</a></h4>
-      <section></section>
-    <h3 id="structs">Structs
-  </h3>
-      <h4><a class="xref" href="Sync.MethodId.html">MethodId</a></h4>
-      <section></section>
-      <h4><a class="xref" href="Sync.MethodPatchFactory.SMethodParameter.html">MethodPatchFactory.SMethodParameter</a></h4>
-      <section></section>
-    <h3 id="enums">Enums
-  </h3>
-      <h4><a class="xref" href="Sync.EMethodPatchFlag.html">EMethodPatchFlag</a></h4>
-      <section><p>Flags indicating the desired behaviour of a generated patch for a method.</p>
-</section>
-      <h4><a class="xref" href="Sync.EPatchBehaviour.html">EPatchBehaviour</a></h4>
       <section></section>
 </article>
           </div>

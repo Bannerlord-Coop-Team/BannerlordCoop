@@ -1,0 +1,582 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Class MobilePartySync
+   </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Class MobilePartySync
+   ">
+    <meta name="generator" content="docfx 2.56.6.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    
+    
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="Coop.Mod.Persistence.Party.MobilePartySync">
+  
+  
+  <h1 id="Coop_Mod_Persistence_Party_MobilePartySync" data-uid="Coop.Mod.Persistence.Party.MobilePartySync" class="text-break">Class MobilePartySync
+  </h1>
+  <div class="markdown level0 summary"><p>Synchronization implementation for <a class="xref" href="Coop.Mod.Patch.MobilePartyPatches.CampaignMapMovement.html">CampaignMapMovement</a>. It handles buffered changes to 2 different
+field groups:</p>
+<ol>
+<li>The captured <a class="xref" href="Coop.Mod.Persistence.Party.MovementData.html">MovementData</a>.</li>
+<li>The captured 2d position on the campaign map.
+These changes are forwarded to the responsible <a class="xref" href="Coop.Mod.Persistence.Party.IMovementHandler.html">IMovementHandler</a>. The following handlers are
+registered:</li>
+<li>On every client: <a class="xref" href="Coop.Mod.Persistence.Party.MobilePartyEntityClient.html">MobilePartyEntityClient</a> for every party that is directly controlled by
+this local client, i.e. its main party.</li>
+<li>On the server: <a class="xref" href="Coop.Mod.Persistence.Party.MobilePartyEntityServer.html">MobilePartyEntityServer</a> for every party that is not directly controlled by
+any client.</li>
+</ol>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level1"><span class="xref">MobilePartySync</span></div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="Coop.Mod.Persistence.Party.html">Coop.Mod.Persistence.Party</a></h6>
+  <h6><strong>Assembly</strong>: Coop.dll</h6>
+  <h5 id="Coop_Mod_Persistence_Party_MobilePartySync_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class MobilePartySync : SyncBuffered</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync__ctor_Sync_Value_FieldAccessGroup_TaleWorlds_CampaignSystem_MobileParty_Coop_Mod_Persistence_Party_MovementData__Sync_Value_FieldAccess_TaleWorlds_CampaignSystem_MobileParty_TaleWorlds_Library_Vec2__.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync.%23ctor(Sync.Value.FieldAccessGroup%7BTaleWorlds.CampaignSystem.MobileParty%2CCoop.Mod.Persistence.Party.MovementData%7D%2CSync.Value.FieldAccess%7BTaleWorlds.CampaignSystem.MobileParty%2CTaleWorlds.Library.Vec2%7D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L31">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_Party_MobilePartySync__ctor_" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.#ctor*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartySync__ctor_Sync_Value_FieldAccessGroup_TaleWorlds_CampaignSystem_MobileParty_Coop_Mod_Persistence_Party_MovementData__Sync_Value_FieldAccess_TaleWorlds_CampaignSystem_MobileParty_TaleWorlds_Library_Vec2__" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.#ctor(Sync.Value.FieldAccessGroup{TaleWorlds.CampaignSystem.MobileParty,Coop.Mod.Persistence.Party.MovementData},Sync.Value.FieldAccess{TaleWorlds.CampaignSystem.MobileParty,TaleWorlds.Library.Vec2})">MobilePartySync(FieldAccessGroup&lt;MobileParty, MovementData&gt;, FieldAccess&lt;MobileParty, Vec2&gt;)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public MobilePartySync([NotNull] FieldAccessGroup&lt;MobileParty, MovementData&gt; movementOrder, [NotNull] FieldAccess&lt;MobileParty, Vec2&gt; mapPosition)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Value.FieldAccessGroup-2.html">FieldAccessGroup</a>&lt;<span class="xref">TaleWorlds.CampaignSystem.MobileParty</span>, <a class="xref" href="Coop.Mod.Persistence.Party.MovementData.html">MovementData</a>&gt;</td>
+        <td><span class="parametername">movementOrder</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="Sync.Value.FieldAccess-2.html">FieldAccess</a>&lt;<span class="xref">TaleWorlds.CampaignSystem.MobileParty</span>, <span class="xref">TaleWorlds.Library.Vec2</span>&gt;</td>
+        <td><span class="parametername">mapPosition</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="fields">Fields
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync_Logger.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync.Logger%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L195">View Source</a>
+  </span>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartySync_Logger" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.Logger">Logger</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">static readonly Logger Logger</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">NLog.Logger</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync_m_Handlers.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync.m_Handlers%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L192">View Source</a>
+  </span>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartySync_m_Handlers" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.m_Handlers">m_Handlers</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">readonly Dictionary&lt;MBGUID, IMovementHandler&gt; m_Handlers</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Dictionary</span>&lt;<span class="xref">TaleWorlds.ObjectSystem.MBGUID</span>, <a class="xref" href="Coop.Mod.Persistence.Party.IMovementHandler.html">IMovementHandler</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync_m_MapPosition.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync.m_MapPosition%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L197">View Source</a>
+  </span>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartySync_m_MapPosition" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.m_MapPosition">m_MapPosition</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[NotNull]
+readonly FieldAccess&lt;MobileParty, Vec2&gt; m_MapPosition</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Value.FieldAccess-2.html">FieldAccess</a>&lt;<span class="xref">TaleWorlds.CampaignSystem.MobileParty</span>, <span class="xref">TaleWorlds.Library.Vec2</span>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync_m_MovementOrder.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync.m_MovementOrder%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L196">View Source</a>
+  </span>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartySync_m_MovementOrder" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.m_MovementOrder">m_MovementOrder</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[NotNull]
+readonly FieldAccessGroup&lt;MobileParty, MovementData&gt; m_MovementOrder</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Value.FieldAccessGroup-2.html">FieldAccessGroup</a>&lt;<span class="xref">TaleWorlds.CampaignSystem.MobileParty</span>, <a class="xref" href="Coop.Mod.Persistence.Party.MovementData.html">MovementData</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync_Broadcast_Sync_Call_InvokableId_System_Object_System_Object___.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync.Broadcast(Sync.Call.InvokableId%2CSystem.Object%2CSystem.Object%5B%5D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L47">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_Party_MobilePartySync_Broadcast_" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.Broadcast*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartySync_Broadcast_Sync_Call_InvokableId_System_Object_System_Object___" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.Broadcast(Sync.Call.InvokableId,System.Object,System.Object[])">Broadcast(InvokableId, Object, Object[])</h4>
+  <div class="markdown level1 summary"><p>No implementation provided as <a class="xref" href="Coop.Mod.Patch.MobilePartyPatches.CampaignMapMovement.html">CampaignMapMovement</a> does not define any method patch
+that need to be synchronized.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override void Broadcast(InvokableId id, object instance, object[] args)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Call.InvokableId.html">InvokableId</a></td>
+        <td><span class="parametername">id</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span></td>
+        <td><span class="parametername">instance</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Object</span>[]</td>
+        <td><span class="parametername">args</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.NotImplementedException</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync_BroadcastBufferedChanges_Sync_Value_FieldChangeBuffer_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync.BroadcastBufferedChanges(Sync.Value.FieldChangeBuffer)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L57">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_Party_MobilePartySync_BroadcastBufferedChanges_" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.BroadcastBufferedChanges*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartySync_BroadcastBufferedChanges_Sync_Value_FieldChangeBuffer_" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.BroadcastBufferedChanges(Sync.Value.FieldChangeBuffer)">BroadcastBufferedChanges(FieldChangeBuffer)</h4>
+  <div class="markdown level1 summary"><p>Broadcasts the buffered changes.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override void BroadcastBufferedChanges(FieldChangeBuffer buffer)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Sync.Value.FieldChangeBuffer.html">FieldChangeBuffer</a></td>
+        <td><span class="parametername">buffer</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync_BroadcastMovementOrder_System_Collections_Generic_Dictionary_System_Object_Sync_Value_FieldChangeRequest__.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync.BroadcastMovementOrder(System.Collections.Generic.Dictionary%7BSystem.Object%2CSync.Value.FieldChangeRequest%7D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L114">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_Party_MobilePartySync_BroadcastMovementOrder_" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.BroadcastMovementOrder*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartySync_BroadcastMovementOrder_System_Collections_Generic_Dictionary_System_Object_Sync_Value_FieldChangeRequest__" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.BroadcastMovementOrder(System.Collections.Generic.Dictionary{System.Object,Sync.Value.FieldChangeRequest})">BroadcastMovementOrder(Dictionary&lt;Object, FieldChangeRequest&gt;)</h4>
+  <div class="markdown level1 summary"><p>Broadcasts the buffered changes to <a class="xref" href="Coop.Mod.Persistence.Party.MovementData.html">MovementData</a>.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void BroadcastMovementOrder(Dictionary&lt;object, FieldChangeRequest&gt; changes)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Dictionary</span>&lt;<span class="xref">System.Object</span>, <a class="xref" href="Sync.Value.FieldChangeRequest.html">FieldChangeRequest</a>&gt;</td>
+        <td><span class="parametername">changes</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Exception</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync_BroadcastPosition_System_Collections_Generic_Dictionary_System_Object_Sync_Value_FieldChangeRequest__.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync.BroadcastPosition(System.Collections.Generic.Dictionary%7BSystem.Object%2CSync.Value.FieldChangeRequest%7D)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L162">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_Party_MobilePartySync_BroadcastPosition_" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.BroadcastPosition*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartySync_BroadcastPosition_System_Collections_Generic_Dictionary_System_Object_Sync_Value_FieldChangeRequest__" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.BroadcastPosition(System.Collections.Generic.Dictionary{System.Object,Sync.Value.FieldChangeRequest})">BroadcastPosition(Dictionary&lt;Object, FieldChangeRequest&gt;)</h4>
+  <div class="markdown level1 summary"><p>Broadcasts the buffered changes to the 2d map positions.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void BroadcastPosition(Dictionary&lt;object, FieldChangeRequest&gt; changes)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Collections.Generic.Dictionary</span>&lt;<span class="xref">System.Object</span>, <a class="xref" href="Sync.Value.FieldChangeRequest.html">FieldChangeRequest</a>&gt;</td>
+        <td><span class="parametername">changes</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Exception</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync_RegisterLocalHandler_TaleWorlds_CampaignSystem_MobileParty_Coop_Mod_Persistence_Party_IMovementHandler_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync.RegisterLocalHandler(TaleWorlds.CampaignSystem.MobileParty%2CCoop.Mod.Persistence.Party.IMovementHandler)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L78">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_Party_MobilePartySync_RegisterLocalHandler_" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.RegisterLocalHandler*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartySync_RegisterLocalHandler_TaleWorlds_CampaignSystem_MobileParty_Coop_Mod_Persistence_Party_IMovementHandler_" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.RegisterLocalHandler(TaleWorlds.CampaignSystem.MobileParty,Coop.Mod.Persistence.Party.IMovementHandler)">RegisterLocalHandler(MobileParty, IMovementHandler)</h4>
+  <div class="markdown level1 summary"><p>Register a handler to be called when the movement data of a <span class="xref">TaleWorlds.CampaignSystem.MobileParty</span> was changed.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterLocalHandler(MobileParty party, IMovementHandler handler)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.CampaignSystem.MobileParty</span></td>
+        <td><span class="parametername">party</span></td>
+        <td><p>The instance the handler is for.</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="Coop.Mod.Persistence.Party.IMovementHandler.html">IMovementHandler</a></td>
+        <td><span class="parametername">handler</span></td>
+        <td><p>The handler.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync_Unregister_Coop_Mod_Persistence_Party_IMovementHandler_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync.Unregister(Coop.Mod.Persistence.Party.IMovementHandler)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L92">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_Party_MobilePartySync_Unregister_" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.Unregister*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartySync_Unregister_Coop_Mod_Persistence_Party_IMovementHandler_" data-uid="Coop.Mod.Persistence.Party.MobilePartySync.Unregister(Coop.Mod.Persistence.Party.IMovementHandler)">Unregister(IMovementHandler)</h4>
+  <div class="markdown level1 summary"><p>Removes a handler.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Unregister(IMovementHandler railEntity)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Coop.Mod.Persistence.Party.IMovementHandler.html">IMovementHandler</a></td>
+        <td><span class="parametername">railEntity</span></td>
+        <td><p>The handler to remove.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartySync.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartySync%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartySync.cs/#L29" class="contribution-link">View Source</a>
+                  </li>
+                </ul>
+              </div>
+              <div class="toggle-mode">
+                <div class="icon">
+                  <i aria-hidden="true">☀</i>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="switch-style">
+                  <span class="slider round"></span>
+                </label>
+                <div class="icon">
+                  <i aria-hidden="true">☾</i>
+                </div>
+                <script type="text/javascript" src="../styles/toggle-theme.js"></script>
+              </div>
+          
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>

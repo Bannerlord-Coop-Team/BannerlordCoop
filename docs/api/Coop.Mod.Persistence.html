@@ -85,18 +85,17 @@
       <h4><a class="xref" href="Coop.Mod.Persistence.Compression.Coordinate2d.html">Compression.Coordinate2d</a></h4>
       <section><p>Map size is limited, we do not need the full float range.</p>
 </section>
-      <h4><a class="xref" href="Coop.Mod.Persistence.EntityManager.html">EntityManager</a></h4>
-      <section><p>Makes sure that each game entity that requires synchronization has a corresponding
+      <h4><a class="xref" href="Coop.Mod.Persistence.MobilePartyEntityManager.html">MobilePartyEntityManager</a></h4>
+      <section><p>Makes sure that each <span class="xref">TaleWorlds.CampaignSystem.MobileParty</span> that requires synchronization has a corresponding
 entity in the persistence framework.</p>
+<p>This manager is used server side. The entities will be synchronized to the clients through RailGun.</p>
 </section>
       <h4><a class="xref" href="Coop.Mod.Persistence.PersistenceClient.html">PersistenceClient</a></h4>
-      <section><p>Manages the <a class="xref" href="Sync.FieldChangeBuffer.html">FieldChangeBuffer</a>, that is it calls the responsible handlers
+      <section><p>Manages the <a class="xref" href="Sync.Value.FieldChangeStack.html">FieldChangeStack</a>, that is it calls the responsible handlers
 for all requested changes once per <a class="xref" href="Coop.Mod.Persistence.PersistenceClient.html#Coop_Mod_Persistence_PersistenceClient_Update_System_TimeSpan_">Update(TimeSpan)</a>. As the server is currently
 running in the host client, this class is also responsible for triggering the serverside
 field updates!</p>
 </section>
-      <h4><a class="xref" href="Coop.Mod.Persistence.RailBitBufferExtensions.html">RailBitBufferExtensions</a></h4>
-      <section></section>
       <h4><a class="xref" href="Coop.Mod.Persistence.Registry.html">Registry</a></h4>
       <section></section>
     <h3 id="interfaces">Interfaces

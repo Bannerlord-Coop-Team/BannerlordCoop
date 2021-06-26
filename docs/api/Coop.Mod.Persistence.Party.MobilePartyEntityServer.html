@@ -72,8 +72,7 @@
   
   <h1 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer" class="text-break">Class MobilePartyEntityServer
   </h1>
-  <div class="markdown level0 summary"><p>Railgun: Mobile party implementation for the server. One instance for each mobile party
-that is registered in the Railgun room.</p>
+  <div class="markdown level0 summary"><p>Represents a serverside <span class="xref">TaleWorlds.CampaignSystem.MobileParty</span> entity that is currently active in the game world.</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
@@ -81,11 +80,15 @@ that is registered in the Railgun room.</p>
     <div class="level0"><span class="xref">System.Object</span></div>
     <div class="level1"><span class="xref">MobilePartyEntityServer</span></div>
   </div>
+  <div classs="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="Coop.Mod.Persistence.Party.IMovementHandler.html">IMovementHandler</a></div>
+  </div>
   <h6><strong>Namespace</strong>: <a class="xref" href="Coop.Mod.Persistence.Party.html">Coop.Mod.Persistence.Party</a></h6>
   <h6><strong>Assembly</strong>: Coop.dll</h6>
   <h5 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_syntax">Syntax</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public class MobilePartyEntityServer : RailEntityServer&lt;MobilePartyState&gt;</code></pre>
+    <pre><code class="lang-csharp hljs">public class MobilePartyEntityServer : RailEntityServer&lt;MobilePartyState&gt;, IMovementHandler</code></pre>
   </div>
   <h3 id="constructors">Constructors
   </h3>
@@ -94,7 +97,7 @@ that is registered in the Railgun room.</p>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer__ctor_Coop_Mod_Persistence_IEnvironmentServer_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.%23ctor(Coop.Mod.Persistence.IEnvironmentServer)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L19">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L22">View Source</a>
   </span>
   <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer__ctor_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.#ctor*"></a>
   <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer__ctor_Coop_Mod_Persistence_IEnvironmentServer_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.#ctor(Coop.Mod.Persistence.IEnvironmentServer)">MobilePartyEntityServer(IEnvironmentServer)</h4>
@@ -128,7 +131,7 @@ that is registered in the Railgun room.</p>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_Logger.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.Logger%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L15">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L17">View Source</a>
   </span>
   <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_Logger" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.Logger">Logger</h4>
   <div class="markdown level1 summary"></div>
@@ -154,10 +157,39 @@ that is registered in the Railgun room.</p>
   </table>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_m_bIsRegisteredAsController.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.m_bIsRegisteredAsController%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L19">View Source</a>
+  </span>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_m_bIsRegisteredAsController" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.m_bIsRegisteredAsController">m_bIsRegisteredAsController</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool m_bIsRegisteredAsController</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Boolean</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_m_Environment.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.m_Environment%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L16">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L18">View Source</a>
   </span>
   <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_m_Environment" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.m_Environment">m_Environment</h4>
   <div class="markdown level1 summary"></div>
@@ -187,7 +219,7 @@ readonly IEnvironmentServer m_Environment</code></pre>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_m_Instance.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.m_Instance%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L17">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L20">View Source</a>
   </span>
   <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_m_Instance" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.m_Instance">m_Instance</h4>
   <div class="markdown level1 summary"></div>
@@ -212,6 +244,38 @@ MobileParty m_Instance</code></pre>
       </tr>
     </tbody>
   </table>
+  <h3 id="properties">Properties
+  </h3>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_Tick.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.Tick%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L66">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_Tick_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.Tick*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_Tick" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.Tick">Tick</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Tick Tick { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">Tick</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
   <h3 id="methods">Methods
   </h3>
   <span class="small pull-right mobile-hide">
@@ -219,11 +283,11 @@ MobileParty m_Instance</code></pre>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_OnAdded.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.OnAdded%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L42">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L133">View Source</a>
   </span>
   <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_OnAdded_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.OnAdded*"></a>
   <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_OnAdded" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.OnAdded">OnAdded()</h4>
-  <div class="markdown level1 summary"><p>Called when this party is added to the Railgun room.</p>
+  <div class="markdown level1 summary"><p>Called when this party is added to the room.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -235,7 +299,7 @@ MobileParty m_Instance</code></pre>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_OnControllerChanged.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.OnControllerChanged%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L27">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L116">View Source</a>
   </span>
   <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_OnControllerChanged_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.OnControllerChanged*"></a>
   <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_OnControllerChanged" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.OnControllerChanged">OnControllerChanged()</h4>
@@ -251,11 +315,11 @@ MobileParty m_Instance</code></pre>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_OnRemoved.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.OnRemoved%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L50">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L168">View Source</a>
   </span>
   <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_OnRemoved_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.OnRemoved*"></a>
   <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_OnRemoved" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.OnRemoved">OnRemoved()</h4>
-  <div class="markdown level1 summary"><p>Called when this party is removed from the Railgun room.</p>
+  <div class="markdown level1 summary"><p>Called when this party is removed from the room.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
@@ -264,51 +328,20 @@ MobileParty m_Instance</code></pre>
   </div>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_Register.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.Register%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_RegisterAsDefaultController_TaleWorlds_CampaignSystem_MobileParty_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.RegisterAsDefaultController(TaleWorlds.CampaignSystem.MobileParty)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L60">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L36">View Source</a>
   </span>
-  <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_Register_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.Register*"></a>
-  <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_Register" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.Register">Register()</h4>
+  <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_RegisterAsDefaultController_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.RegisterAsDefaultController*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_RegisterAsDefaultController_TaleWorlds_CampaignSystem_MobileParty_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.RegisterAsDefaultController(TaleWorlds.CampaignSystem.MobileParty)">RegisterAsDefaultController(MobileParty)</h4>
   <div class="markdown level1 summary"><p>Registers handlers to intercept issued movement commands to this party and apply them
 the authoritative state.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">void Register()</code></pre>
-  </div>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Exception</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <span class="small pull-right mobile-hide">
-    <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_SetMovement_System_Object_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.SetMovement(System.Object)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
-  </span>
-  <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L95">View Source</a>
-  </span>
-  <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_SetMovement_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.SetMovement*"></a>
-  <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_SetMovement_System_Object_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.SetMovement(System.Object)">SetMovement(Object)</h4>
-  <div class="markdown level1 summary"><p>Handler to apply a movement command to the authoritative state.</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">void SetMovement(object val)</code></pre>
+    <pre><code class="lang-csharp hljs">void RegisterAsDefaultController([NotNull] MobileParty party)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -321,10 +354,42 @@ the authoritative state.</p>
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Object</span></td>
-        <td><span class="parametername">val</span></td>
-        <td><p>MovementData</p>
-</td>
+        <td><span class="xref">TaleWorlds.CampaignSystem.MobileParty</span></td>
+        <td><span class="parametername">party</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_RequestMovement_Coop_Mod_Persistence_Party_MovementData_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.RequestMovement(Coop.Mod.Persistence.Party.MovementData)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L74">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_RequestMovement_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.RequestMovement*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_RequestMovement_Coop_Mod_Persistence_Party_MovementData_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.RequestMovement(Coop.Mod.Persistence.Party.MovementData)">RequestMovement(MovementData)</h4>
+  <div class="markdown level1 summary"><p>Handler to apply a movement command to the authoritative state.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RequestMovement(MovementData data)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="Coop.Mod.Persistence.Party.MovementData.html">MovementData</a></td>
+        <td><span class="parametername">data</span></td>
+        <td></td>
       </tr>
     </tbody>
   </table>
@@ -345,10 +410,43 @@ the authoritative state.</p>
   </table>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_RequestPosition_TaleWorlds_Library_Vec2_.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.RequestPosition(TaleWorlds.Library.Vec2)%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+  </span>
+  <span class="small pull-right mobile-hide">
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L96">View Source</a>
+  </span>
+  <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_RequestPosition_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.RequestPosition*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_RequestPosition_TaleWorlds_Library_Vec2_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.RequestPosition(TaleWorlds.Library.Vec2)">RequestPosition(Vec2)</h4>
+  <div class="markdown level1 summary"><p>Requests a change of the current position of the managed party on the campaign map.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RequestPosition(Vec2 position)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TaleWorlds.Library.Vec2</span></td>
+        <td><span class="parametername">position</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <span class="small pull-right mobile-hide">
+    <span class="divider">|</span>
     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_ToString.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.ToString%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L116">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L27">View Source</a>
   </span>
   <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_ToString_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.ToString*"></a>
   <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_ToString" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.ToString">ToString()</h4>
@@ -375,19 +473,23 @@ the authoritative state.</p>
   </table>
   <span class="small pull-right mobile-hide">
     <span class="divider">|</span>
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_Unregister.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.Unregister%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer_UnregisterAsController.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer.UnregisterAsController%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">Improve this Doc</a>
   </span>
   <span class="small pull-right mobile-hide">
-    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L81">View Source</a>
+    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L59">View Source</a>
   </span>
-  <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_Unregister_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.Unregister*"></a>
-  <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_Unregister" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.Unregister">Unregister()</h4>
+  <a id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_UnregisterAsController_" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.UnregisterAsController*"></a>
+  <h4 id="Coop_Mod_Persistence_Party_MobilePartyEntityServer_UnregisterAsController" data-uid="Coop.Mod.Persistence.Party.MobilePartyEntityServer.UnregisterAsController">UnregisterAsController()</h4>
   <div class="markdown level1 summary"><p>Unregisters all handlers.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">void Unregister()</code></pre>
+    <pre><code class="lang-csharp hljs">void UnregisterAsController()</code></pre>
+  </div>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="Coop.Mod.Persistence.Party.IMovementHandler.html">IMovementHandler</a>
   </div>
 </article>
           </div>
@@ -400,7 +502,7 @@ the authoritative state.</p>
                     <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/new/readthedocs/apiSpec/new?filename=Coop_Mod_Persistence_Party_MobilePartyEntityServer.md&amp;value=---%0Auid%3A%20Coop.Mod.Persistence.Party.MobilePartyEntityServer%0Asummary%3A%20'*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax'%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A" class="contribution-link">Improve this Doc</a>
                   </li>
                   <li>
-                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L13" class="contribution-link">View Source</a>
+                    <a href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/blob/readthedocs/source/Coop/Mod/Persistence/Party/MobilePartyEntityServer.cs/#L15" class="contribution-link">View Source</a>
                   </li>
                 </ul>
               </div>

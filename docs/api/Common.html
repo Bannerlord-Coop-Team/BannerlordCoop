@@ -81,18 +81,34 @@
       <h4><a class="xref" href="Common.CoopStateMachine-2.html">CoopStateMachine&lt;T, U&gt;</a></h4>
       <section></section>
       <h4><a class="xref" href="Common.DropoutStack-1.html">DropoutStack&lt;T&gt;</a></h4>
-      <section></section>
+      <section><p>Implements a drop out stack (circular array / ring buffer).</p>
+</section>
       <h4><a class="xref" href="Common.FrameLimiter.html">FrameLimiter</a></h4>
-      <section></section>
+      <section><p>Tries to achieve a minimum given frame time by waiting an appropriate amount of time each frame. Waiting
+is either done through a spin lock or sleep, depending on the amount of time that needs to be spent waiting.</p>
+</section>
+      <h4><a class="xref" href="Common.Globals.html">Globals</a></h4>
+      <section><p>Global values</p>
+</section>
       <h4><a class="xref" href="Common.HashHelpers.html">HashHelpers</a></h4>
       <section><p>Purpose: Hash table implementation</p>
 </section>
       <h4><a class="xref" href="Common.MovingAverage.html">MovingAverage</a></h4>
-      <section></section>
+      <section><p>Data structure to compute a moving average over a fixed number of values.</p>
+</section>
       <h4><a class="xref" href="Common.OrderedHashSet-1.html">OrderedHashSet&lt;T&gt;</a></h4>
       <section><p>Represents an ordered set of values.</p>
 </section>
       <h4><a class="xref" href="Common.UpdateableList.html">UpdateableList</a></h4>
+      <section><p>Manages a list of <a class="xref" href="Common.IUpdateable.html">IUpdateable</a>.</p>
+</section>
+      <h4><a class="xref" href="Common.UpdatePriority.html">UpdatePriority</a></h4>
+      <section><p>Priorities when processing a <a class="xref" href="Common.UpdateableList.html">UpdateableList</a>. Higher priorities get updated first. Note that
+the priorities are only considered within one <a class="xref" href="Common.UpdateableList.html">UpdateableList</a>.</p>
+</section>
+      <h4><a class="xref" href="Common.UpdatePriority.MainLoop.html">UpdatePriority.MainLoop</a></h4>
+      <section></section>
+      <h4><a class="xref" href="Common.UpdatePriority.ServerThread.html">UpdatePriority.ServerThread</a></h4>
       <section></section>
     <h3 id="structs">Structs
   </h3>
@@ -119,7 +135,8 @@ Returns empty enumeration when specified item is not in collection.</p>
     <h3 id="interfaces">Interfaces
   </h3>
       <h4><a class="xref" href="Common.IUpdateable.html">IUpdateable</a></h4>
-      <section></section>
+      <section><p>Something that expects an update call in regular intervals.</p>
+</section>
 </article>
           </div>
           
