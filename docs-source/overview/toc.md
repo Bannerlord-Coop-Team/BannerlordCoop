@@ -1,6 +1,7 @@
 #[Overview](overview.md)
 #[Bannerlord Modding Introduction](bannerlord_modding_intro.md)
 #[Project Setup for Developers](project_setup.md)
+#[Syncing Code](syncing.md)
 #[Github](github.md)
 #[Tools](tools.md)
 ##[Reading Bannerlord Code](Tools/dnspy.md)
