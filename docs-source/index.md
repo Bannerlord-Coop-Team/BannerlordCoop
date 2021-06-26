@@ -2,7 +2,7 @@
 Mod to enjoy the Mount & Blade II: Bannerlord campaign with other players.
 
 ## Aspiring Contributors
-See [overview](BannerlordCoop/overview/overview.html).
+See [overview](overview/overview.html).
 
 # Mod Information
 ## Is the mod playable?
