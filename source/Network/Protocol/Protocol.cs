@@ -8,12 +8,15 @@ namespace Network.Protocol
         Client_Hello, // Introduces the client to the server.
         Client_Info, // Contains ClientInfo.
         Client_RequestWorldData, // Client wants to be sent a save game of the current state.
+        Client_RequestParty, // Client wants to know if they already created a party.
         Client_DeclineWorldData, // Client does not need world data
         Client_Loaded, // Sent once the client has loaded the initial world state.
         Client_PartyChanged, // When the player party is switched
 
         Server_RequestClientInfo, // Instructs the client to send its ClientInfo.
         Server_JoinRequestAccepted, // Client is allowed to join the server.
+        Server_RequireCharacterCreation, // Instructs the client to create a character.
+        Server_NotifyCharacterExists, // Notifies the client a party already exists for that player id.
         Server_WorldData, // Contains the initial state of the game world.
 
         Sync,
@@ -92,6 +95,28 @@ namespace Network.Protocol
         public static Client_Info Deserialize(ByteReader reader)
         {
             return new Client_Info(new Player(reader.Binary.ReadString()));
+        }
+    }
+
+    public class Client_Request_Party
+    {
+        public readonly string m_ClientId;
+
+        public Client_Request_Party(string clientId)
+        {
+            m_ClientId = clientId;
+        }
+
+        public byte[] Serialize()
+        {
+            ByteWriter writer = new ByteWriter();
+            writer.Binary.Write(m_ClientId);
+            return writer.ToArray();
+        }
+
+        public static Client_Request_Party Deserialize(ByteReader reader)
+        {
+            return new Client_Request_Party(reader.Binary.ReadString());
         }
     }
 
@@ -184,6 +209,21 @@ namespace Network.Protocol
         {
             // Empty
             return new Server_RequestClientInfo();
+        }
+    }
+
+    public class Server_RequireCharacterCreation
+    {
+        public byte[] Serialize()
+        {
+            // Empty
+            return new byte[0];
+        }
+
+        public static Server_RequireCharacterCreation Deserialize(ByteReader reader)
+        {
+            // Empty
+            return new Server_RequireCharacterCreation();
         }
     }
 

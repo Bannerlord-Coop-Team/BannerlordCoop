@@ -21,8 +21,7 @@ using Stateless;
 using Common;
 using System.Linq;
 using TaleWorlds.ObjectSystem;
-using Coop.Mod.Persistence.Party;
-using RailgunNet.Logic;
+using Coop.Mod.Patch.World;
 
 namespace Coop.Mod
 {
@@ -35,7 +34,7 @@ namespace Coop.Mod
         }
     }
 
-    public class CoopServer
+    public class CoopServer : IDisposable
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -137,9 +136,8 @@ namespace Coop.Mod
 
         public void StartGame(string saveName)
         {
-            if (Main.DEBUG)
-            {
-                try
+#if DEBUG
+            try
                 {
                     LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(
                         saveName,
@@ -150,7 +148,7 @@ namespace Coop.Mod
                 {
                     Logger.Error("Save file not found: " + ex.Message);
                 }
-            }
+#endif
         }
 
         public ServerGameManager CreateGameManager(LoadGameResult saveGameData = null)
@@ -191,6 +189,11 @@ namespace Coop.Mod
             return Current.ToString();
         }
 
+        public void Dispose()
+        {
+            ShutDownServer();
+        }
+
         private void OnClientConnected(ConnectionServer connection)
         {
             CoopServerSM coopServerSM = new CoopServerSM();
@@ -216,6 +219,27 @@ namespace Coop.Mod
 
             // State Machine Registration
             connection.Dispatcher.RegisterStateMachine(connection, coopServerSM);
+            connection.OnPlayerPartyRequest += Connection_OnPlayerPartyRequest;
+        }
+
+        private void Connection_OnPlayerPartyRequest(object sender, RequestPlayerParty e)
+        {
+            string clientId = e.ClientId;
+
+            ConnectionServer connection = (ConnectionServer)sender;
+
+            // if saved party exists
+            if (CoopSaveManager.PlayerParties.ContainsKey(clientId))
+            {
+                // skip character creation on client
+                MBGUID guid = CoopSaveManager.PlayerParties[clientId];
+                connection.Send(new Packet(EPacket.Server_NotifyCharacterExists, new MBGUIDSerializer(guid).Serialize()));
+            }
+            else
+            {
+                // else do character creation
+                connection.Send(new Packet(EPacket.Server_RequireCharacterCreation, new byte[0]));
+            }
         }
 
         private void OnClientDisconnected(ConnectionServer connection, EDisconnectReason eReason)
@@ -261,10 +285,13 @@ namespace Coop.Mod
 
             party.Party.UpdateVisibilityAndInspected(false);
 
-            // Add party to persistance since manual creation of party is not handled
-            Persistence.EntityManager.AddParty(party);
+            if (!Persistence.MobilePartyEntityManager.Parties.Contains(party))
+            {
+                // Add party to persistance since manual creation of party is not handled
+                Persistence.MobilePartyEntityManager.AddParty(party);
+            }
 
-            Persistence.EntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
+            Persistence.MobilePartyEntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
         }
 
         private void SendInitialWorldData(ConnectionServer connection)

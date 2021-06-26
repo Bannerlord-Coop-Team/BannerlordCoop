@@ -17,16 +17,14 @@ namespace Sync.Reflection
         }
 
         /// <summary>
-        /// Try to get the current value in the dictionary, if not exists, it creates a new <typeparamref name="TValue"/> and it's added to the dictionary with key <typeparamref name="TKey"/>
+        ///     Try to get the current value in the dictionary, if not exists, it creates a new <typeparamref name="TValue" /> and
+        ///     it's added to the dictionary with key <typeparamref name="TKey" />
         /// </summary>
-        /// <returns>Current value or the added object of type <typeparamref name="TValue"/></returns>
+        /// <returns>Current value or the added object of type <typeparamref name="TValue" /></returns>
         public static TValue Assert<TKey, TValue>(this IDictionary<TKey, TValue> dict, TKey key)
             where TValue : new()
         {
-            if (dict.TryGetValue(key, out TValue val))
-            {
-                return val;
-            }
+            if (dict.TryGetValue(key, out var val)) return val;
 
             val = new TValue();
             dict.Add(key, val);

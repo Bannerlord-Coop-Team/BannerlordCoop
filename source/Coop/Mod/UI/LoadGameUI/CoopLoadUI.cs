@@ -26,7 +26,7 @@ namespace Coop.Mod.UI
 			_onSelection = onSelection;
 		}
 
-		private void ExecuteDelete()
+		private new void ExecuteDelete()
 		{
 			this._onDelete(this);
 		}
@@ -100,7 +100,7 @@ namespace Coop.Mod.UI
 			}
 		}
 
-		private void ExecuteLoadSave()
+		private new void ExecuteLoadSave()
 		{
 			SavedGameVM currentSelectedSave = CurrentSelectedSave;
 			if (currentSelectedSave == null)
@@ -110,7 +110,7 @@ namespace Coop.Mod.UI
 			currentSelectedSave.ExecuteSaveLoad();
 		}
 
-		private void ExecuteDone()
+		private new void ExecuteDone()
 		{
 			ScreenManager.PopScreen();
 		}

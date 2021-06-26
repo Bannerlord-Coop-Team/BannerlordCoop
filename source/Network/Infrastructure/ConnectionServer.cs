@@ -13,6 +13,12 @@ namespace Network.Infrastructure
             Type = eType;
         }
     }
+
+    public class RequestPlayerParty : EventArgs
+    {
+        public string ClientId { get; set; }
+    }
+
     public class ConnectionServer : ConnectionBase
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -38,6 +44,7 @@ namespace Network.Infrastructure
             Dispatcher.RegisterPacketHandler(ReceiveClientHello);
             Dispatcher.RegisterPacketHandler(ReceiveClientInfo);
             Dispatcher.RegisterPacketHandler(ReceiveClientJoined);
+            Dispatcher.RegisterPacketHandler(ReceiveRequestParty);
             Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
             Dispatcher.RegisterPacketHandler(ReceiveClientKeepAlive);
 
@@ -47,6 +54,7 @@ namespace Network.Infrastructure
         public override Enum State => m_ServerSM.StateMachine.State;
         public event Action<ConnectionServer> OnClientJoined;
         public event Action<ConnectionServer> OnDisconnected;
+        public event EventHandler<RequestPlayerParty> OnPlayerPartyRequest;
 
         ~ConnectionServer()
         {
@@ -129,6 +137,14 @@ namespace Network.Infrastructure
         {
             Client_Joined payload = Client_Joined.Deserialize(new ByteReader(packet.Payload));
             m_ServerSM.StateMachine.Fire(EServerConnectionTrigger.ClientReady);
+        }
+
+        [ConnectionServerPacketHandler(EServerConnectionState.ClientJoining, EPacket.Client_RequestParty)]
+        private void ReceiveRequestParty(ConnectionBase connection, Packet packet)
+        {
+            RequestPlayerParty playerPartyRequestArgs = new RequestPlayerParty();
+            playerPartyRequestArgs.ClientId = Client_Request_Party.Deserialize(new ByteReader(packet.Payload)).m_ClientId;
+            OnPlayerPartyRequest?.Invoke(this, playerPartyRequestArgs);
         }
 
         [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.Sync)]

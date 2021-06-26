@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Moq;
 using Network.Infrastructure;
 using Network.Protocol;
@@ -54,7 +55,7 @@ namespace Coop.Tests.Network
             ArraySegment<byte> response = TestUtils.MakeRaw(
                 EPacket.Server_RequestClientInfo,
                 new Server_RequestClientInfo().Serialize());
-            Assert.Equal(response, m_SendRawParams[^1]);
+            Assert.Equal(response, m_SendRawParams[m_SendRawParams.Count - 1]);
             Assert.Equal(EServerConnectionState.AwaitingClient, m_Connection.State);
 
             // Respond with client info
@@ -67,7 +68,7 @@ namespace Coop.Tests.Network
             ArraySegment<byte> joinRequestAccepted = TestUtils.MakeRaw(
                 EPacket.Server_JoinRequestAccepted,
                 new Server_JoinRequestAccepted().Serialize());
-            Assert.Equal(joinRequestAccepted, m_SendRawParams[^1]);
+            Assert.Equal(joinRequestAccepted, m_SendRawParams[m_SendRawParams.Count - 1]);
 
             ArraySegment<byte> clientJoined = TestUtils.MakeRaw(
                 EPacket.Client_Loaded,

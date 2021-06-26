@@ -3,13 +3,11 @@ using Network.Infrastructure;
 
 namespace Network.Protocol
 {
-    // TODO add class summary
     /// <summary>
-    /// Defines packet handlers
-    /// 
+    ///     Attribute to mark methods that handle incoming packets. 
     /// </summary>
     /// <remarks>
-    /// Used by PacketDispatcher
+    ///     Used by PacketDispatcher
     /// </remarks>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
     public abstract class PacketHandlerAttribute : Attribute

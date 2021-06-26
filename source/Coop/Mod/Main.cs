@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
 using Coop.Mod.Patch;
+using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.UI;
+using CoopFramework;
 using HarmonyLib;
 using ModTestingFramework;
 using Network.Infrastructure;
@@ -29,8 +30,6 @@ namespace Coop.Mod
 {
     internal class Main : NoHarmonyLoader
     {
-        // Debug symbols
-        public static readonly bool DEBUG = true;
         // Test Symbols
         public static readonly bool TESTING_ENABLED = true;
 
@@ -40,8 +39,8 @@ namespace Coop.Mod
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
-        #region MainMenuButtons
-        public static InitialStateOption CoopCampaign = 
+#region MainMenuButtons
+        public static InitialStateOption CoopCampaign =
             new InitialStateOption(
                 "CoOp Campaign",
                 new TextObject("Host Co-op Campaign"),
@@ -50,33 +49,31 @@ namespace Coop.Mod
                 {
                     string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
-                    if (DEBUG)
+#if DEBUG
+                    foreach (string argument in array)
                     {
-                        foreach (string argument in array)
+                        if (argument.ToLower() == "/server")
                         {
-                            if (argument.ToLower() == "/server")
-                            {
-                                //TODO add name to args
-                                CoopServer.Instance.StartGame("MP");
-                            }
-                            else if (argument.ToLower() == "/client")
-                            {
-                                ServerConfiguration defaultConfiguration =
-                                    new ServerConfiguration();
-                                CoopClient.Instance.Connect(
-                                    defaultConfiguration.NetworkConfiguration.LanAddress,
-                                    defaultConfiguration.NetworkConfiguration.LanPort);
-                            }
+                            //TODO add name to args
+                            CoopServer.Instance.StartGame("MP");
+                        }
+                        else if (argument.ToLower() == "/client")
+                        {
+                            ServerConfiguration defaultConfiguration =
+                                new ServerConfiguration();
+                            CoopClient.Instance.Connect(
+                                defaultConfiguration.NetworkConfiguration.LanAddress,
+                                defaultConfiguration.NetworkConfiguration.LanPort);
                         }
                     }
-                    else
-                    {
-                        ScreenManager.PushScreen(
-                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                                new object[] { }));
-                    }
+#else
+                    ScreenManager.PushScreen(
+                        ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                            new object[] { }));
+#endif
                 },
-                false);
+                () => { return false; }
+            );
 
         public static InitialStateOption JoinCoopGame =
             new InitialStateOption(
@@ -84,9 +81,9 @@ namespace Coop.Mod
               new TextObject("Join Co-op Campaign"),
               9991,
               JoinWindow,
-              false
+              () => { return false; }
             );
-        #endregion
+#endregion
 
         public Main()
         {
@@ -97,6 +94,7 @@ namespace Coop.Mod
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             Updateables.Add(CoopClient.Instance);
             Updateables.Add(GameLoopRunner.Instance);
+            Updateables.Add(new MobilePartyUpdatable());
         }
 
         public static Main Instance { get; private set; }
@@ -113,30 +111,15 @@ namespace Coop.Mod
             AddBehavior<GameLoadedBehaviour>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
-            IEnumerable<MethodInfo> patchInitializers =
-                from t in Assembly.GetExecutingAssembly().GetTypes()
-                from m in t.GetMethods()
-                where m.IsDefined(typeof(PatchInitializerAttribute))
-                select m;
-            foreach (MethodInfo initializer in patchInitializers)
-            {
-                if (!initializer.IsStatic)
-                {
-                    throw new Exception("Invalid [PatchInitializer]. Has to be static.");
-                }
-                
-                Logger.Info("Init patch {}", initializer.DeclaringType);
-                initializer.Invoke(null, null);
-            }
+            CoopFramework.CoopFramework.InitPatches(ObjectManagerAdapter.Instance, Coop.IsCoopGameSession);
 
             // Skip startup splash screen
-            if (DEBUG)
-            {
-                typeof(Module).GetField(
-                                  "_splashScreenPlayed",
-                                  BindingFlags.Instance | BindingFlags.NonPublic)
-                              .SetValue(Module.CurrentModule, true);
-            }
+#if DEBUG
+            typeof(Module).GetField(
+                                "_splashScreenPlayed",
+                                BindingFlags.Instance | BindingFlags.NonPublic)
+                            .SetValue(Module.CurrentModule, true);
+#endif
 
             if (TESTING_ENABLED)
             {
@@ -146,7 +129,7 @@ namespace Coop.Mod
             // Apply all patches via harmony
             harmony.PatchAll();
 
-            #region ButtonAssignment
+#region ButtonAssignment
             CoopCampaign =
                 new InitialStateOption(
                     "CoOp Campaign",
@@ -156,33 +139,32 @@ namespace Coop.Mod
                     {
                         string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
-                        if (DEBUG)
+
+#if DEBUG
+                        
+                        foreach (string argument in array)
                         {
-                            foreach (string argument in array)
+                            if (argument.ToLower() == "/server")
                             {
-                                if (argument.ToLower() == "/server")
-                                {
-                                    //TODO add name to args
-                                    CoopServer.Instance.StartGame("MP");
-                                }
-                                else if (argument.ToLower() == "/client")
-                                {
-                                    ServerConfiguration defaultConfiguration =
-                                        new ServerConfiguration();
-                                    CoopClient.Instance.Connect(
-                                        defaultConfiguration.NetworkConfiguration.LanAddress,
-                                        defaultConfiguration.NetworkConfiguration.LanPort);
-                                }
+                                //TODO add name to args
+                                CoopServer.Instance.StartGame("MP");
+                            }
+                            else if (argument.ToLower() == "/client")
+                            {
+                                ServerConfiguration defaultConfiguration =
+                                    new ServerConfiguration();
+                                CoopClient.Instance.Connect(
+                                    defaultConfiguration.NetworkConfiguration.LanAddress,
+                                    defaultConfiguration.NetworkConfiguration.LanPort);
                             }
                         }
-                        else
-                        {
-                            ScreenManager.PushScreen(
-                                ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                                    new object[] { }));
-                        }
+#else
+                        ScreenManager.PushScreen(
+                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                                new object[] { }));
+#endif
                     },
-                    false);
+                    () => { return false; });
 
             JoinCoopGame =
                 new InitialStateOption(
@@ -190,18 +172,25 @@ namespace Coop.Mod
                   new TextObject("Join Co-op Campaign"),
                   9991,
                   JoinWindow,
-                  false
+                  () => { return false; }
                 );
 
             Module.CurrentModule.AddInitialStateOption(CoopCampaign);
 
             Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
-            #endregion
+#endregion
         }
 
         protected override void OnSubModuleUnloaded()
         {
             base.OnSubModuleUnloaded();
+        }
+
+        public Action<Game> OnGameInit;
+        public override void OnGameInitializationFinished(Game game)
+        {
+            base.OnGameInitializationFinished(game);
+            OnGameInit?.Invoke(game);
         }
 
         public override void OnGameEnd(Game game)
@@ -225,7 +214,8 @@ namespace Coop.Mod
                 // DebugConsole.Toggle();
             }
 
-            Updateables.UpdateAll(TimeSpan.FromSeconds(dt));
+            TimeSpan frameTime = TimeSpan.FromSeconds(dt);
+            Updateables.MakeUnion(SyncBufferManager.ProcessBufferedChanges).UpdateAll(frameTime);
         }
 
         private void initLogger()

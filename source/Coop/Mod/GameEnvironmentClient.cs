@@ -2,11 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using Coop.Mod.Patch;
+using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
-using Sync;
+using Coop.Mod.Scope;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod
 {
@@ -17,22 +20,14 @@ namespace Coop.Mod
             TimeSynchronization.GetAuthoritativeTime += () => AuthoritativeTime;
         }
 
-        public HashSet<MobileParty> PlayerControlledMobileParties { get; } =
+        public HashSet<MobileParty> PlayerControlledMainParties { get; } =
             new HashSet<MobileParty>();
-
-        public FieldAccessGroup<MobileParty, MovementData> TargetPosition =>
-            CampaignMapMovement.Movement;
-
-        public FieldAccess<Campaign, CampaignTimeControlMode> TimeControlMode =>
-            TimeControl.TimeControlMode;
-
-        public FieldAccess<Campaign, bool> TimeControlModeLock => TimeControl.TimeControlModeLock;
 
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;
 
-        public void SetIsPlayerControlled(int iPartyIndex, bool isPlayerControlled)
+        public void SetIsPlayerControlled(MBGUID guid, bool isPlayerControlled)
         {
-            MobileParty party = GetMobilePartyByIndex(iPartyIndex);
+            MobileParty party = GetMobilePartyById(guid);
 
             if(party == null)
             {
@@ -41,29 +36,43 @@ namespace Coop.Mod
 
             if (isPlayerControlled)
             {
-                PlayerControlledMobileParties.Add(party);
+                PlayerControlledMainParties.Add(party);
             }
             else
             {
-                PlayerControlledMobileParties.Remove(party);
+                PlayerControlledMainParties.Remove(party);
             }
         }
 
-        public IEnumerable<MobileParty> PlayerControlledParties => PlayerControlledMobileParties;
+        public IEnumerable<MobileParty> PlayerMainParties => PlayerControlledMainParties;
+        public MobilePartySync PartySync { get; } = CampaignMapMovement.Sync;
 
         public RemoteStore Store =>
             CoopClient.Instance.SyncedObjectStore ??
             throw new InvalidOperationException("Client not initialized.");
-
-        #region Game state access
-        public MobileParty GetMobilePartyByIndex(int iPartyIndex)
+        
+        public void ScopeEntered(MobileParty party, Vec2 mapPosition, Vec2? facingDirection, MovementData movementData)
         {
-            return MobileParty.All.SingleOrDefault(p => p.Party.Index == iPartyIndex);
+            MobilePartyScopeHelper.Enter(party, mapPosition, facingDirection, movementData);
         }
 
-        public Campaign GetCurrentCampaign()
+        public void ScopeLeft(MobileParty party)
         {
-            return Campaign.Current;
+            MobilePartyScopeHelper.Leave(party);
+        }
+
+        #region Game state access
+        public MobileParty GetMobilePartyById(MBGUID guid)
+        {
+            return MobileParty.All.SingleOrDefault(p => p.Id == guid);
+        }
+        public void SetAuthoritative(MobileParty party, MovementData data)
+        {
+            CampaignMapMovement.RemoteMovementChanged(party, data);
+        }
+        public void SetAuthoritative(MobileParty party, Vec2 position, Vec2? facingDirection)
+        {
+            CampaignMapMovement.RemoteMapPositionChanged(party, position, facingDirection);
         }
         #endregion
     }

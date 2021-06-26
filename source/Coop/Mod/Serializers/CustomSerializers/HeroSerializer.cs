@@ -1,6 +1,8 @@
-﻿using System;
+﻿using Coop.NetImpl;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.PlayerServices;
 
 namespace Coop.Mod.Serializers
 {

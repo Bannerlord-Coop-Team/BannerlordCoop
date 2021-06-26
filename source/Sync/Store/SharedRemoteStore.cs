@@ -34,18 +34,29 @@ namespace Sync.Store
             m_Serializer = new StoreSerializer(serializableFactory);
         }
 
+        public byte[] Serialize(object obj)
+        {
+            return m_Serializer.Serialize(obj);
+        }
+
+        public object Deserialize(byte[] raw)
+        {
+            return m_Serializer.Deserialize(raw);
+        }
+
         public ObjectId Insert(object obj)
         {
-            byte[] raw = m_Serializer.Serialize(obj);
-            ObjectId id = new ObjectId(XXHash.XXH32(raw));
+            return Insert(obj, Serialize(obj));
+        }
+
+        public ObjectId Insert(object obj, byte[] serialized)
+        {
+            var id = new ObjectId(XXHash.XXH32(serialized));
             m_Data[id] = obj;
-            Logger.Trace("[{id}] Insert: {object}", id, obj);
+            Logger.Trace("[{Id}] Insert: {Object}", id, obj);
 
             m_PendingAcks[id] = new PendingResponse(null, m_Stores.Values.ToList());
-            foreach (RemoteStore store in m_Stores.Values)
-            {
-                store.SendAdd(id, raw);
-            }
+            foreach (var store in m_Stores.Values) store.SendAdd(id, serialized);
 
             return id;
         }
@@ -53,12 +64,9 @@ namespace Sync.Store
         public bool Remove(ObjectId id)
         {
             m_PendingAcks.Remove(id);
-            bool bRemoved = m_Data.Remove(id);
+            var bRemoved = m_Data.Remove(id);
 
-            foreach (RemoteStore store in m_Stores.Values)
-            {
-                store.Remove(id);
-            }
+            foreach (var store in m_Stores.Values) store.Remove(id);
 
             return bRemoved;
         }
@@ -68,12 +76,10 @@ namespace Sync.Store
         public void AddConnection(ConnectionBase connection)
         {
             if (m_Stores.ContainsKey(connection))
-            {
                 throw new Exception(
                     $"Cannot create two stores for the same connection {connection}.");
-            }
 
-            RemoteStore store = new RemoteStore(m_Data, connection, m_Serializer.Factory);
+            var store = new RemoteStore(m_Data, connection, m_Serializer.Factory);
             store.OnPacketAddDeserialized += (id, payload, obj) =>
                 RemoteObjectAdded(connection, id, payload, obj);
             store.OnObjectAcknowledged += (id, obj) => { ObjectAcknowledged(connection, id); };
@@ -82,10 +88,7 @@ namespace Sync.Store
 
         private void ObjectAcknowledged(ConnectionBase sender, ObjectId id)
         {
-            if (!m_Stores.ContainsKey(sender))
-            {
-                throw new Exception($"Unknown origin: {sender}.");
-            }
+            if (!m_Stores.ContainsKey(sender)) throw new Exception($"Unknown origin: {sender}.");
 
             if (!m_PendingAcks.ContainsKey(id))
             {
@@ -97,7 +100,7 @@ namespace Sync.Store
             }
 
             Logger.Trace("[{id}] Received ACK for from {sender}.", id, sender);
-            PendingResponse pending = m_PendingAcks[id];
+            var pending = m_PendingAcks[id];
             pending.OnAckFrom(m_Stores[sender]);
             if (pending.AllDone())
             {
@@ -114,13 +117,10 @@ namespace Sync.Store
             byte[] payload,
             object obj)
         {
-            if (!m_Stores.ContainsKey(sender))
-            {
-                throw new Exception($"Unknown origin: {sender}.");
-            }
+            if (!m_Stores.ContainsKey(sender)) throw new Exception($"Unknown origin: {sender}.");
 
             Logger.Debug("[{id}] Client added: {object}.", id, obj);
-            List<RemoteStore> otherStores =
+            var otherStores =
                 m_Stores.Where(s => s.Key != sender).Select(p => p.Value).ToList();
             if (otherStores.Count == 0)
             {
@@ -130,7 +130,7 @@ namespace Sync.Store
             }
 
             m_PendingAcks[id] = new PendingResponse(m_Stores[sender], otherStores);
-            foreach (RemoteStore store in otherStores)
+            foreach (var store in otherStores)
             {
                 Logger.Trace("[{id}] Distributing to {store}.", id, store);
                 store.SendAdd(id, payload);

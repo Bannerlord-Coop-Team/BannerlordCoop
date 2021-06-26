@@ -7,6 +7,7 @@ using TaleWorlds.SaveSystem.Load;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Actions;
 using JetBrains.Annotations;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Managers
 {
@@ -15,13 +16,22 @@ namespace Coop.Mod.Managers
         /// <summary>
         /// The clients hero as it was sent to the server. Note that the server may change some fields when introducing the hero to the campaign.
         /// </summary>
-        [NotNull] private readonly Hero m_PlayerAsSerialized;
+        [CanBeNull] private readonly Hero m_PlayerAsSerialized;
+        [CanBeNull] private readonly MBGUID m_HeroGUID;
 
         /// <summary>
         /// The clients hero as it exists in the server side campaign.
         /// </summary>
         [CanBeNull] Hero m_PlayerInCampaign;
-        public ClientManager(LoadResult saveGameData, Hero playerAsSerialized) : base(saveGameData) { m_PlayerAsSerialized = playerAsSerialized; }
+        public ClientManager(LoadResult saveGameData, Hero playerAsSerialized) : base(saveGameData) 
+        { 
+            m_PlayerAsSerialized = playerAsSerialized;
+        }
+
+        public ClientManager(LoadResult saveGameData,  MBGUID heroGUID) : base(saveGameData)
+        {
+            m_HeroGUID = heroGUID;
+        }
 
         public static event EventHandler OnPreLoadFinishedEvent;
         public static event EventHandler OnPostLoadFinishedEvent;
@@ -31,24 +41,32 @@ namespace Coop.Mod.Managers
             base.OnLoadFinished();
             OnPostLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
 
-            MobileParty playerParty = MobileParty.All.AsParallel().SingleOrDefault(IsClientPlayersParty);
-            if(playerParty != null)
-            {
-                m_PlayerInCampaign = playerParty.LeaderHero;
 
-                // Switch current player party from host to client party
-                ChangePlayerCharacterAction.Apply(m_PlayerInCampaign);
+            if (m_PlayerAsSerialized != null)
+            {
+                MobileParty playerParty = MobileParty.All.AsParallel().SingleOrDefault(IsClientPlayersParty);
+                m_PlayerInCampaign = playerParty.LeaderHero;
 
                 // Start player at training field
                 Settlement settlement = Settlement.Find("tutorial_training_field");
                 Campaign.Current.HandleSettlementEncounter(MobileParty.MainParty, settlement);
                 PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(LocationComplex.Current.GetLocationWithId("training_field"), null, null, null);
             }
+            else if(m_HeroGUID != null)
+            {
+                m_PlayerInCampaign = (Hero)MBObjectManager.Instance.GetObject(m_HeroGUID);
+
+                // Switch current player party from host to client party
+                ChangePlayerCharacterAction.Apply(m_PlayerInCampaign);
+            }
             else
             {
                 // Might need to adjust IsClientPlayersParty
                 throw new Exception("Transferred player party could not be found");
             }
+
+            // Switch current player party from host to client party
+            ChangePlayerCharacterAction.Apply(m_PlayerInCampaign);
         }
 
         public new void OnTick(float dt)

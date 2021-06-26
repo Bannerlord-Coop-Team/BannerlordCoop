@@ -5,21 +5,22 @@ using System.Net;
 using Common;
 using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.RPC;
+using Coop.Mod.Persistence.RemoteAction;
 using Coop.Mod.Serializers;
+using Coop.NetImpl;
 using Coop.NetImpl.LiteNet;
+using CoopFramework;
 using JetBrains.Annotations;
+using Network;
 using Network.Infrastructure;
 using Network.Protocol;
 using NLog;
 using RailgunNet.Connection.Client;
 using RailgunNet.Logic;
-using StoryMode;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
 
 namespace Coop.Mod
@@ -35,6 +36,7 @@ namespace Coop.Mod
 
     public class CoopClient : IUpdateable, IClientAccess
     {
+        #region Private
         private const int MaxReconnectAttempts = 2;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -43,6 +45,7 @@ namespace Coop.Mod
         private readonly CoopClientSM m_CoopClientSM;
 
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
+        private readonly UpdateableList m_Updateables = new UpdateableList();
 
         /// <summary>
         ///     Internal data storage for <see cref="SyncedObjectStore" />.
@@ -54,7 +57,9 @@ namespace Coop.Mod
 
         private int m_ReconnectAttempts = MaxReconnectAttempts;
         private Hero m_Hero;
+        private MBGUID m_HeroGUID;
         private ObjectId m_HeroId;
+        #endregion
         public Action<PersistenceClient> OnPersistenceInitialized;
 
         public Action<RemoteStore> RemoteStoreCreated;
@@ -64,9 +69,10 @@ namespace Coop.Mod
             Session = new GameSession(new GameData());
             Session.OnConnectionDestroyed += ConnectionDestroyed;
             m_NetManager = new LiteNetManagerClient(Session, config);
-            GameState = new CoopGameState();
+            m_Updateables.Add(m_NetManager);
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
+            Synchronization = new CoopSyncClient(this);
             
             #region State Machine Callbacks
             m_CoopClientSM.CharacterCreationState.OnEntry(CreateCharacter);
@@ -86,12 +92,12 @@ namespace Coop.Mod
         public RemoteStore SyncedObjectStore { get; private set; }
 
         [CanBeNull] public PersistenceClient Persistence { get; private set; }
+        
+        [NotNull] public SyncBuffered Synchronization { get; }
 
         [NotNull] public GameSession Session { get; }
 
         public static CoopClient Instance => m_Instance.Value;
-
-        public CoopGameState GameState { get; }
         public CoopEvents Events { get; }
 
         public bool ClientConnected
@@ -127,9 +133,9 @@ namespace Coop.Mod
 
         public void Update(TimeSpan frameTime)
         {
-            m_NetManager.Update(frameTime);
-            Persistence?.Update(frameTime);
+            m_Updateables.UpdateAll(frameTime);
         }
+        public int Priority { get; } = UpdatePriority.MainLoop.Update;
 
         public string Connect(IPAddress ip, int iPort)
         {
@@ -158,6 +164,7 @@ namespace Coop.Mod
             if (Persistence == null)
             {
                 Persistence = new PersistenceClient(new GameEnvironmentClient());
+                m_Updateables.Add(Persistence);
                 OnPersistenceInitialized?.Invoke(Persistence);
             }
 
@@ -184,8 +191,13 @@ namespace Coop.Mod
                 }
                 else
                 {
-                    // TODO get if character exists on server
-                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.RequiresCharacterCreation);
+                    Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveRequireCreateCharacter);
+                    Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveCharacterExists);
+
+                    Session.Connection.Send(
+                        new Packet(
+                            EPacket.Client_RequestParty,
+                            new Client_Request_Party(new PlatformAPI().GetPlayerID().ToString()).Serialize()));
                 }
 
                 SyncedObjectStore = new RemoteStore(m_SyncedObjects, con, new SerializableFactory());
@@ -257,6 +269,22 @@ namespace Coop.Mod
             }
         }
 
+        #region MainMenu
+        [GameClientPacketHandler(ECoopClientState.MainManu, EPacket.Server_RequireCharacterCreation)]
+        private void ReceiveRequireCreateCharacter(ConnectionBase connection, Packet packet)
+        {
+            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.RequiresCharacterCreation);
+        }
+
+        [GameClientPacketHandler(ECoopClientState.MainManu, EPacket.Server_NotifyCharacterExists)]
+        private void ReceiveCharacterExists(ConnectionBase connection, Packet packet)
+        {
+            m_HeroGUID = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
+            //m_Hero = (Hero)MBObjectManager.Instance.GetObject(m_HeroGUID);
+            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
+        }
+        #endregion
+
         #region ClientCharacterCreation
 
         public void CharacterCreationOver()
@@ -316,7 +344,16 @@ namespace Coop.Mod
             if (bSuccess)
             {
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
-                gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_Hero);
+                if(m_HeroGUID == new MBGUID(0))
+                {
+                    gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_Hero);
+                }
+                else
+                {
+                    gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_HeroGUID);
+                }
+
+                
                 MBGameManager.StartNewGame(gameManager);
                 ClientManager.OnPreLoadFinishedEvent += (source, e) => {
                     CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, SendPlayerPartyChanged);
@@ -403,4 +440,6 @@ namespace Coop.Mod
             return sRet;
         }
     }
+
+    
 }

@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.Reflection;
 using Coop.Mod.Patch;
+using Coop.Mod.Persistence.Party;
 using Sync.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 
@@ -12,25 +14,85 @@ namespace Coop.Mod
 {
     public static class Extensions
     {
-        public static T GetGameModel<T>(this Game game)
-            where T : GameModel
+        /// <summary>
+        ///     Conversion from a RailGun <see cref="MovementState"/>.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <returns></returns>
+        public static MovementData ToData(this MovementState state)
         {
-            foreach (GameModel model in game.BasicModels.GetGameModels())
+            return new MovementData
             {
-                if (model is T t)
-                {
-                    return t;
-                }
-            }
-
-            return null;
+                DefaultBehaviour = state.DefaultBehavior,
+                TargetPosition = state.TargetPosition,
+                TargetParty = state.TargetPartyIndex != Coop.InvalidId
+                    ? MBObjectManager.Instance.GetObject(state.TargetPartyIndex) as
+                        MobileParty
+                    : null,
+                TargetSettlement = state.SettlementIndex != Coop.InvalidId
+                    ? MBObjectManager.Instance.GetObject(
+                        state.SettlementIndex) as Settlement
+                    : null
+            };
         }
-
-        public static bool IsPlayerControlled(this MobileParty party)
+        /// <summary>
+        ///     Conversion to a RailGun <see cref="MovementState"/>.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <returns></returns>
+        public static MovementState ToState(this MovementData data)
         {
-            return CoopClient.Instance.GameState.IsPlayerControlledParty(party);
+            return new MovementState
+            {
+                DefaultBehavior = data.DefaultBehaviour,
+                TargetPosition = data.TargetPosition,
+                TargetPartyIndex = data.TargetParty?.Id ?? Coop.InvalidId,
+                SettlementIndex = data.TargetSettlement?.Id ?? Coop.InvalidId
+            };
         }
-
+        /// <summary>
+        ///     Returns the set of movement relevant data.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <returns></returns>
+        public static MovementData GetMovementData(this MobileParty party)
+        {
+            return new MovementData()
+            {
+                DefaultBehaviour = party.DefaultBehavior,
+                TargetParty = party.TargetParty,
+                TargetSettlement =  party.TargetSettlement,
+                TargetPosition = party.TargetPosition,
+                NumberOfFleeingsAtLastTravel = party.NumberOfFleeingsAtLastTravel
+            };
+        }
+        /// <summary>
+        ///     Returns whether the given <see cref="MobileParty"/> is the main party of any player, remote or local.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <returns></returns>
+        public static bool IsAnyPlayerMainParty(this MobileParty party)
+        {
+            return Coop.IsAnyPlayerMainParty(party);
+        }
+        /// <summary>
+        ///     Returns whether the given <see cref="MobileParty"/> is the main party of the local game instance.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <returns></returns>
+        public static bool IsLocalPlayerMainParty(this MobileParty party)
+        {
+            return Coop.IsLocalPlayerMainParty(party);
+        }
+        /// <summary>
+        ///     Returns whether the given <see cref="MobileParty"/> is the main party of a remote game instance.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <returns></returns>
+        public static bool IsRemotePlayerMainParty(this MobileParty party)
+        {
+            return Coop.IsRemotePlayerMainParty(party);
+        }
         public static string ToFriendlyString(this LoadGameResult loadResult)
         {
             if (!loadResult.LoadResult.Successful)

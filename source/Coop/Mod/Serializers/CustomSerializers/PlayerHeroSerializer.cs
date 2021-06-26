@@ -1,4 +1,5 @@
-﻿using SandBox.View.Map;
+﻿using Coop.NetImpl;
+using SandBox.View.Map;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -6,6 +7,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.PlayerServices;
 
 namespace Coop.Mod.Serializers
 {
@@ -17,17 +19,22 @@ namespace Coop.Mod.Serializers
         /// </summary>
         [NonSerialized]
         public Hero hero;
+        
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
         public CharacterObjectSerializer CharacterObject { get; private set; }
+        public string PlayerId { get; }
+
         readonly List<HeroSerializer> ExSpouses = new List<HeroSerializer>();
 
         public PlayerHeroSerializer(Hero hero) : base(hero)
         {
-            foreach(FieldInfo fieldInfo in NonSerializableObjects)
+            PlayerId = new PlatformAPI().GetPlayerID().ToString();
+
+            foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
                 // Get value from fieldInfo
                 object value = fieldInfo.GetValue(hero);
@@ -171,14 +178,14 @@ namespace Coop.Mod.Serializers
 
             base.Deserialize(hero);
 
-            List<PartyBase> ownedParties = (List<PartyBase>)hero.GetType()
-                .GetField("_ownedParties", BindingFlags.NonPublic | BindingFlags.Instance)
-                .GetValue(hero);
-
-            ownedParties.Add(hero.PartyBelongedTo.Party);
-
             // Update health due to member starting as injured
             hero.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(hero);
+
+
+            ConstructorInfo ctorInfo = typeof(LordPartyComponent)
+                .GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null,
+                    new Type[] { typeof(Clan), typeof(Hero) }, new ParameterModifier[0]);
+            Campaign.Current.MainParty.PartyComponent = (LordPartyComponent)ctorInfo.Invoke(new object[] { Clan.PlayerClan, Hero.MainHero });
 
             // Invoke party visual onstartup to initialize properly
             typeof(PartyVisual).GetMethod("TaleWorlds.CampaignSystem.IPartyVisual.OnStartup", BindingFlags.Instance | BindingFlags.NonPublic)

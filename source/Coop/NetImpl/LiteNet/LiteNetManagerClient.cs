@@ -31,6 +31,8 @@ namespace Coop.NetImpl.LiteNet
             m_NetManager?.PollEvents();
         }
 
+        public int Priority { get; } = UpdatePriority.MainLoop.PollNetwork;
+
         public void Reconnect()
         {
             if (m_Peer == null)

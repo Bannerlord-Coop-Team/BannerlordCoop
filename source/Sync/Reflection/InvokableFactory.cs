@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
+using Sync.Call;
 
 namespace Sync.Reflection
 {
@@ -20,13 +21,10 @@ namespace Sync.Reflection
         public static Func<TDeclaring, object> CreateUntypedGetter<TDeclaring>(
             MemberInfo memberInfo)
         {
-            Type instanceType = memberInfo.DeclaringType;
-            if (instanceType == null)
-            {
-                throw new ArgumentNullException(nameof(memberInfo.DeclaringType));
-            }
+            var instanceType = memberInfo.DeclaringType;
+            if (instanceType == null) throw new ArgumentNullException(nameof(memberInfo.DeclaringType));
 
-            ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
+            var arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
 
             // `TDeclaring` might be a base class or interface of `instanceType`.
             MemberExpression memberAccess;
@@ -37,12 +35,12 @@ namespace Sync.Reflection
             else
             {
                 // The member resides in `targetType` => convert
-                UnaryExpression arg0Converted = Expression.Convert(arg0, instanceType);
+                var arg0Converted = Expression.Convert(arg0, instanceType);
                 memberAccess = Expression.MakeMemberAccess(arg0Converted, memberInfo);
             }
 
-            UnaryExpression body = Expression.Convert(memberAccess, typeof(object));
-            Expression<Func<TDeclaring, object>> lambda =
+            var body = Expression.Convert(memberAccess, typeof(object));
+            var lambda =
                 Expression.Lambda<Func<TDeclaring, object>>(body, arg0);
             return lambda.Compile();
         }
@@ -56,13 +54,10 @@ namespace Sync.Reflection
         public static Action<TDeclaring, object> CreateUntypedSetter<TDeclaring>(
             MemberInfo memberInfo)
         {
-            Type instanceType = memberInfo.DeclaringType;
-            if (instanceType == null)
-            {
-                throw new ArgumentNullException(nameof(memberInfo.DeclaringType));
-            }
+            var instanceType = memberInfo.DeclaringType;
+            if (instanceType == null) throw new ArgumentNullException(nameof(memberInfo.DeclaringType));
 
-            ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
+            var arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
 
             MemberExpression memberAccess;
             // `TDeclaring` might be a base class or interface of `instanceType`.
@@ -73,16 +68,16 @@ namespace Sync.Reflection
             else
             {
                 // The member resides in `targetType` => convert
-                UnaryExpression arg0Converted = Expression.Convert(arg0, instanceType);
+                var arg0Converted = Expression.Convert(arg0, instanceType);
                 memberAccess = Expression.MakeMemberAccess(arg0Converted, memberInfo);
             }
 
-            ParameterExpression arg1 = Expression.Parameter(typeof(object), "arg1");
-            UnaryExpression exConvertToUnderlying = Expression.Convert(
+            var arg1 = Expression.Parameter(typeof(object), "arg1");
+            var exConvertToUnderlying = Expression.Convert(
                 arg1,
                 memberInfo.GetUnderlyingType());
-            BinaryExpression body = Expression.Assign(memberAccess, exConvertToUnderlying);
-            Expression<Action<TDeclaring, object>> lambda =
+            var body = Expression.Assign(memberAccess, exConvertToUnderlying);
+            var lambda =
                 Expression.Lambda<Action<TDeclaring, object>>(body, arg0, arg1);
             return lambda.Compile();
         }
@@ -95,8 +90,8 @@ namespace Sync.Reflection
         /// <returns></returns>
         public static Func<TDeclaring, object> CreateCallWithReturn<TDeclaring>(MethodInfo method)
         {
-            Type instanceType = method.DeclaringType;
-            ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
+            var instanceType = method.DeclaringType;
+            var arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
 
             MethodCallExpression exCall;
             // `TDeclaring` might be a base class or interface of `instanceType`.
@@ -111,13 +106,13 @@ namespace Sync.Reflection
             else
             {
                 // The member resides in `targetType` => convert
-                UnaryExpression arg0Converted = Expression.Convert(arg0, instanceType);
+                var arg0Converted = Expression.Convert(arg0, instanceType);
                 exCall = Expression.Call(arg0Converted, method);
             }
 
-            UnaryExpression body = Expression.Convert(exCall, typeof(object));
+            var body = Expression.Convert(exCall, typeof(object));
 
-            Expression<Func<TDeclaring, object>> lambda =
+            var lambda =
                 Expression.Lambda<Func<TDeclaring, object>>(body, arg0);
             return lambda.Compile();
         }
@@ -131,11 +126,11 @@ namespace Sync.Reflection
         /// <returns></returns>
         public static Action<TDeclaring, TParam> CreateCall<TDeclaring, TParam>(MethodInfo method)
         {
-            Type instanceType = method.DeclaringType;
-            ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
-            ParameterExpression arg1 = Expression.Parameter(typeof(TParam), "arg1");
+            var instanceType = method.DeclaringType;
+            var arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
+            var arg1 = Expression.Parameter(typeof(TParam), "arg1");
 
-            UnaryExpression exConvertToParam0 = Expression.Convert(
+            var exConvertToParam0 = Expression.Convert(
                 arg1,
                 method.GetParameters()[0].ParameterType);
 
@@ -147,7 +142,7 @@ namespace Sync.Reflection
             }
             else if (method.IsDefined(typeof(ExtensionAttribute), false))
             {
-                UnaryExpression exConvertToParam1 = Expression.Convert(
+                var exConvertToParam1 = Expression.Convert(
                     arg1,
                     method.GetParameters()[1].ParameterType);
                 exCall = Expression.Call(null, method, arg0, exConvertToParam1);
@@ -155,11 +150,11 @@ namespace Sync.Reflection
             else
             {
                 // The member resides in `targetType` => convert
-                UnaryExpression arg0Converted = Expression.Convert(arg0, instanceType);
+                var arg0Converted = Expression.Convert(arg0, instanceType);
                 exCall = Expression.Call(arg0Converted, method, exConvertToParam0);
             }
 
-            Expression<Action<TDeclaring, TParam>> lambda =
+            var lambda =
                 Expression.Lambda<Action<TDeclaring, TParam>>(exCall, arg0, arg1);
             return lambda.Compile();
         }
@@ -175,13 +170,13 @@ namespace Sync.Reflection
             MethodInfo method,
             object instance)
         {
-            ConstantExpression exInstance = Expression.Constant(instance);
-            ParameterExpression exParameter0 = Expression.Parameter(typeof(TDeclaring), "buffer");
+            var exInstance = Expression.Constant(instance);
+            var exParameter0 = Expression.Parameter(typeof(TDeclaring), "buffer");
 
-            MethodCallExpression exBody = Expression.Call(exInstance, method, exParameter0);
-            UnaryExpression exConvertToObject = Expression.Convert(exBody, typeof(object));
+            var exBody = Expression.Call(exInstance, method, exParameter0);
+            var exConvertToObject = Expression.Convert(exBody, typeof(object));
 
-            Expression<Func<TDeclaring, object>> lambda =
+            var lambda =
                 Expression.Lambda<Func<TDeclaring, object>>(exConvertToObject, exParameter0);
             return lambda.Compile();
         }
@@ -197,117 +192,119 @@ namespace Sync.Reflection
             MethodInfo method,
             object instance)
         {
-            ConstantExpression exInstance = Expression.Constant(instance);
-            ParameterExpression exParameter0 = Expression.Parameter(typeof(TDeclaring), "buffer");
-            ParameterExpression exParameter1 = Expression.Parameter(typeof(object), "p1");
-            UnaryExpression exConvertParam1 = Expression.Convert(
+            var exInstance = Expression.Constant(instance);
+            var exParameter0 = Expression.Parameter(typeof(TDeclaring), "buffer");
+            var exParameter1 = Expression.Parameter(typeof(object), "p1");
+            var exConvertParam1 = Expression.Convert(
                 exParameter1,
                 method.GetParameters()[1].ParameterType);
-            MethodCallExpression exBody = Expression.Call(
+            var exBody = Expression.Call(
                 exInstance,
                 method,
                 exParameter0,
                 exConvertParam1);
-            Expression<Action<TDeclaring, object>> lambda =
+            var lambda =
                 Expression.Lambda<Action<TDeclaring, object>>(exBody, exParameter0, exParameter1);
             return lambda.Compile();
         }
 
         public static Func<TValue> CreateGetter<TValue>(MemberInfo memberInfo, object instance)
         {
-            ConstantExpression exInstance = Expression.Constant(instance);
-            MemberExpression exMemberAccess = Expression.MakeMemberAccess(exInstance, memberInfo);
-            UnaryExpression body = Expression.Convert(exMemberAccess, typeof(TValue));
+            var exInstance = Expression.Constant(instance);
+            var exMemberAccess = Expression.MakeMemberAccess(exInstance, memberInfo);
+            var body = Expression.Convert(exMemberAccess, typeof(TValue));
             return Expression.Lambda<Func<TValue>>(body).Compile();
         }
-        
+
         public static Func<TDeclaring, TValue> CreateGetter<TDeclaring, TValue>(MemberInfo memberInfo)
         {
-            Type instanceType = memberInfo.DeclaringType;
-            ParameterExpression arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
-            MemberExpression exMemberAccess = Expression.MakeMemberAccess(arg0, memberInfo);
-            UnaryExpression body = Expression.Convert(exMemberAccess, typeof(TValue));
+            var instanceType = memberInfo.DeclaringType;
+            var arg0 = Expression.Parameter(typeof(TDeclaring), "arg0");
+            var exMemberAccess = Expression.MakeMemberAccess(arg0, memberInfo);
+            var body = Expression.Convert(exMemberAccess, typeof(TValue));
             return Expression.Lambda<Func<TDeclaring, TValue>>(body, arg0).Compile();
         }
 
         public static Action<object, object[]> CreateStandInCaller(MethodInfo method)
         {
-            ParameterInfo[] parameters = method.GetParameters();
-            ParameterExpression argInstance = Expression.Parameter(typeof(object), "instance");
-            UnaryExpression argInstanceConverted = Expression.Convert(
+            var parameters = method.GetParameters();
+            var argInstance = Expression.Parameter(typeof(object), "instance");
+            var argInstanceConverted = Expression.Convert(
                 argInstance,
                 parameters[0].ParameterType);
-            ParameterExpression args = Expression.Parameter(typeof(object[]), "args");
+            var args = Expression.Parameter(typeof(object[]), "args");
 
             // Unpack parameters
-            List<Expression> exArgs = new List<Expression>
+            var exArgs = new List<Expression>
             {
                 argInstanceConverted
             };
-            for (int i = 1; i < method.GetParameters().Length; ++i)
+            for (var i = 1; i < method.GetParameters().Length; ++i)
             {
-                ParameterInfo param = method.GetParameters()[i];
-                BinaryExpression arrayElement = Expression.ArrayIndex(
+                var param = method.GetParameters()[i];
+                var arrayElement = Expression.ArrayIndex(
                     args,
                     Expression.Constant(i - 1));
-                UnaryExpression arrayElementConverted =
+                var arrayElementConverted =
                     Expression.Convert(arrayElement, param.ParameterType);
                 exArgs.Add(arrayElementConverted);
             }
 
             // Standins are always static with the first argument being the instance.
-            MethodCallExpression exCall = Expression.Call(null, method, exArgs);
+            var exCall = Expression.Call(null, method, exArgs);
 
-            Expression<Action<object, object[]>> lambda =
+            var lambda =
                 Expression.Lambda<Action<object, object[]>>(exCall, argInstance, args);
             return lambda.Compile();
         }
 
         public static Action<object[]> CreateStaticStandInCaller(MethodInfo method)
         {
-            ParameterExpression args = Expression.Parameter(typeof(object[]), "args");
+            var args = Expression.Parameter(typeof(object[]), "args");
 
             // Unpack parameters
-            List<Expression> exArgs = new List<Expression>();
-            for (int i = 0; i < method.GetParameters().Length; ++i)
+            var exArgs = new List<Expression>();
+            for (var i = 0; i < method.GetParameters().Length; ++i)
             {
-                ParameterInfo param = method.GetParameters()[i];
-                BinaryExpression arrayElement = Expression.ArrayIndex(args, Expression.Constant(i));
-                UnaryExpression arrayElementConverted =
+                var param = method.GetParameters()[i];
+                var arrayElement = Expression.ArrayIndex(args, Expression.Constant(i));
+                var arrayElementConverted =
                     Expression.Convert(arrayElement, param.ParameterType);
                 exArgs.Add(arrayElementConverted);
             }
 
             // Standins are always static with the first argument being the instance.
-            MethodCallExpression exCall = Expression.Call(null, method, exArgs);
+            var exCall = Expression.Call(null, method, exArgs);
 
-            Expression<Action<object[]>> lambda = Expression.Lambda<Action<object[]>>(exCall, args);
+            var lambda = Expression.Lambda<Action<object[]>>(exCall, args);
             return lambda.Compile();
         }
 
-        public static DynamicMethod CreateStandIn(MethodAccess methodAccess)
+        public static DynamicMethod CreateStandIn(PatchedInvokable patchedInvokable)
         {
-            List<Type> parameters = methodAccess.MemberInfo.GetParameters()
-                                                .Select(info => info.ParameterType)
-                                                .ToList();
-            if (!methodAccess.MemberInfo.IsStatic)
-            {
+            var parameters = patchedInvokable.Original.GetParameters()
+                .Select(info => info.ParameterType)
+                .ToList();
+            if (!patchedInvokable.Original.IsStatic)
                 parameters.Insert(
                     0,
-                    methodAccess.MemberInfo.DeclaringType); // First argument is the instance
-            }
+                    patchedInvokable.Original.DeclaringType); // First argument is the instance
 
-            DynamicMethod dyn = new DynamicMethod(
+            var returnType = patchedInvokable.Original is MethodInfo methodInfo
+                ? methodInfo.ReturnType
+                : typeof(void);
+
+            var dyn = new DynamicMethod(
                 "Original",
                 MethodAttributes.Static | MethodAttributes.Public,
                 CallingConventions.Standard,
-                methodAccess.MemberInfo.ReturnType,
+                returnType,
                 parameters.ToArray(),
-                methodAccess.MemberInfo.DeclaringType,
+                patchedInvokable.Original.DeclaringType,
                 true);
 
             // The standin as it is will never be called. But it still needs a body for the reverse patching.
-            ILGenerator il = dyn.GetILGenerator();
+            var il = dyn.GetILGenerator();
             il.ThrowException(typeof(StandInNotPatchedException));
 
             return dyn;

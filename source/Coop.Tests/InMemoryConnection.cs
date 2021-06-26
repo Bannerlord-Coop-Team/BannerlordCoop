@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Network.Infrastructure;
 
 namespace Coop.Tests
@@ -28,7 +29,7 @@ namespace Coop.Tests
 
         public void ExecuteSends()
         {
-            SendBuffer.ForEach(buffer => OnSend?.Invoke(buffer));
+            SendBuffer.ForEach(buffer => OnSend?.Invoke(new ArraySegment<byte>(buffer)));
             SendBuffer.Clear();
         }
     }

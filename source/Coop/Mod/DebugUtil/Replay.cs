@@ -181,17 +181,18 @@ namespace Coop.Mod.DebugUtil
             }
 
             PlaybackMainPartyList =
-                PlaybackEventList.Where(q => q.party.IsPlayerControlled()).ToList();
+                PlaybackEventList.Where(q => q.party.IsAnyPlayerMainParty()).ToList();
             RecordingEventList = new List<ReplayEvent>();
 
             currentFilename = filename;
             state = ReplayState.Playback;
             ReplayPlayback += OnEventPlayback;
 
-            CoopServer.Instance.Persistence.EntityManager.WorldEntityServer.State.TimeControl =
-                CampaignTimeControlMode.UnstoppablePlay;
-            CoopServer.Instance.Persistence.EntityManager.WorldEntityServer.State.TimeControlLock =
-                false;
+            // TODO
+            // CoopServer.Instance.Persistence.EntityManager.WorldEntityServer.State.TimeControl =
+            //     CampaignTimeControlMode.UnstoppablePlay;
+            // CoopServer.Instance.Persistence.EntityManager.WorldEntityServer.State.TimeControlLock =
+            //     false;
 
             return $"Playback file '{filename}' started.";
         }
@@ -274,7 +275,7 @@ namespace Coop.Mod.DebugUtil
                     party = party,
                     movement = movement
                 });
-            if (party.IsPlayerControlled())
+            if (party.IsAnyPlayerMainParty())
             {
                 Logger.Info("[REPLAY] Yet one player's moving recorded.");
             }
@@ -308,13 +309,13 @@ namespace Coop.Mod.DebugUtil
                     entity.State.Movement = new MovementState
                     {
                         DefaultBehavior = replay.movement.DefaultBehaviour,
-                        Position = replay.movement.TargetPosition,
+                        TargetPosition = replay.movement.TargetPosition,
                         SettlementIndex = replay.movement.TargetSettlement != null ?
                             replay.movement.TargetSettlement.Id :
-                            MovementState.InvalidIndex,
+                            Coop.InvalidId,
                         TargetPartyIndex = replay.movement.TargetParty != null ?
                             replay.movement.TargetParty.Id :
-                            MovementState.InvalidIndex
+                            Coop.InvalidId
                     };
                 }
 
