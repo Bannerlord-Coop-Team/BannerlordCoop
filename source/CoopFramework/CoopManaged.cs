@@ -124,8 +124,8 @@ namespace CoopFramework
         /// <summary>
         ///     Declares a Coop patch that is active when the
         ///     <param name="condition"></param>
-        ///     evaluates
-        ///     to true. See <see cref="DefaultConditions" /> for predefined conditions.
+        ///     evaluates to true.
+        ///     See <see cref="DefaultConditions" /> for predefined conditions.
         ///     The condition is evaluated when the patched action is executed.
         /// </summary>
         /// <param name="condition"></param>

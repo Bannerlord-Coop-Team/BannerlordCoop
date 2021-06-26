@@ -5110,7 +5110,7 @@
           "hash": "xuYuIaPAkiQS5uEBfS+aKA=="
         }
       },
-      "is_incremental": false,
+      "is_incremental": true,
       "version": ""
     },
     {
@@ -5266,10 +5266,10 @@
       "output": {
         ".html": {
           "relative_path": "overview/bannerlord_modding_intro.html",
-          "hash": "rVLNz5/amjsm/z6afpQ20w=="
+          "hash": "hFmK620+fmwT9pyjYTPkng=="
         }
       },
-      "is_incremental": true,
+      "is_incremental": false,
       "version": ""
     },
     {
