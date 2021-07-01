@@ -31,7 +31,7 @@ namespace Coop.Mod.UI
 			this._onDelete(this);
 		}
 
-		private void ExecuteSelection()
+		private new void ExecuteSelection()
 		{
 			this._onSelection(this);
 		}
