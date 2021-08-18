@@ -97,6 +97,8 @@ namespace Coop.Mod
             Updateables.Add(new MobilePartyUpdatable());
         }
 
+        private static string ClientServerModeMessage = ""; 
+
         public static Main Instance { get; private set; }
         public UpdateableList Updateables { get; } = new UpdateableList();
 
@@ -146,11 +148,13 @@ namespace Coop.Mod
                         {
                             if (argument.ToLower() == "/server")
                             {
+                                ClientServerModeMessage = "Started Bannerlord Co-op in server mode";
                                 //TODO add name to args
                                 CoopServer.Instance.StartGame("MP");
                             }
                             else if (argument.ToLower() == "/client")
                             {
+                                ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
                                 ServerConfiguration defaultConfiguration =
                                     new ServerConfiguration();
                                 CoopClient.Instance.Connect(
@@ -184,6 +188,12 @@ namespace Coop.Mod
         protected override void OnSubModuleUnloaded()
         {
             base.OnSubModuleUnloaded();
+        }
+
+        protected override void OnBeforeInitialModuleScreenSetAsRoot()
+        {
+            base.OnBeforeInitialModuleScreenSetAsRoot();
+            InformationManager.DisplayMessage(new InformationMessage(ClientServerModeMessage));
         }
 
         public Action<Game> OnGameInit;
