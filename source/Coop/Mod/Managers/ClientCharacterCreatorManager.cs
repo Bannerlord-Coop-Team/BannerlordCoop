@@ -1,33 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Security.Permissions;
-using System.Text;
-using System.Threading.Tasks;
-using Coop.Mod.Serializers;
-using SandBox;
 using StoryMode;
-using StoryMode.CharacterCreationContent;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.Engine.Screens;
-using TaleWorlds.MountAndBlade;
-using TaleWorlds.ObjectSystem;
 using TaleWorlds.SaveSystem.Load;
 using System.Reflection;
-using Common;
-using NetworkMessages.FromClient;
-using Module = TaleWorlds.MountAndBlade.Module;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Library;
-using TaleWorlds.Localization;
-using Helpers;
 using Sync.Store;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
 using TaleWorlds.MountAndBlade.GauntletUI;
-using StoryMode.GauntletUI.CharacterCreationSystem;
 using TaleWorlds.MountAndBlade.ViewModelCollection;
-using System.Runtime;
 
 namespace Coop.Mod.Managers
 {
