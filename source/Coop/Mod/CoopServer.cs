@@ -283,7 +283,7 @@ namespace Coop.Mod
             MBGUID guid = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
             MobileParty party = (MobileParty)MBObjectManager.Instance.GetObject(guid);
 
-            party.Party.UpdateVisibilityAndInspected(false);
+            party.Party.UpdateVisibilityAndInspected(0, false);
 
             if (!Persistence.MobilePartyEntityManager.Parties.Contains(party))
             {

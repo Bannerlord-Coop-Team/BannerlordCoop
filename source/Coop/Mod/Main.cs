@@ -39,7 +39,7 @@ namespace Coop.Mod
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
-#region MainMenuButtons
+        #region MainMenuButtons
         public static InitialStateOption CoopCampaign =
             new InitialStateOption(
                 "CoOp Campaign",
@@ -72,7 +72,7 @@ namespace Coop.Mod
                             new object[] { }));
 #endif
                 },
-                () => { return false; }
+                () => { return (false, new TextObject()); }
             );
 
         public static InitialStateOption JoinCoopGame =
@@ -81,9 +81,9 @@ namespace Coop.Mod
               new TextObject("Join Co-op Campaign"),
               9991,
               JoinWindow,
-              () => { return false; }
+              () => { return (false, new TextObject()); }
             );
-#endregion
+        #endregion
 
         public Main()
         {
@@ -129,7 +129,7 @@ namespace Coop.Mod
             // Apply all patches via harmony
             harmony.PatchAll();
 
-#region ButtonAssignment
+            #region ButtonAssignment
             CoopCampaign =
                 new InitialStateOption(
                     "CoOp Campaign",
@@ -141,7 +141,7 @@ namespace Coop.Mod
 
 
 #if DEBUG
-                        
+
                         foreach (string argument in array)
                         {
                             if (argument.ToLower() == "/server")
@@ -164,21 +164,21 @@ namespace Coop.Mod
                                 new object[] { }));
 #endif
                     },
-                    () => { return false; });
-
+                    () => { return (false, new TextObject()); }
+                );
             JoinCoopGame =
                 new InitialStateOption(
                   "Join Coop Game",
                   new TextObject("Join Co-op Campaign"),
                   9991,
                   JoinWindow,
-                  () => { return false; }
+              () => { return (false, new TextObject()); }
                 );
 
             Module.CurrentModule.AddInitialStateOption(CoopCampaign);
 
             Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
-#endregion
+            #endregion
         }
 
         protected override void OnSubModuleUnloaded()
@@ -237,7 +237,7 @@ namespace Coop.Mod
 
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            Exception ex = (Exception) e.ExceptionObject;
+            Exception ex = (Exception)e.ExceptionObject;
             Logger.Fatal(ex, "Unhandled exception");
         }
 

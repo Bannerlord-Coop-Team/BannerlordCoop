@@ -13,7 +13,7 @@ namespace Coop.Mod.Managers
     /// <summary>
     /// Dedicated server game manager.
     /// </summary>
-    public class ServerGameManager : CampaignGameManager
+    public class ServerGameManager : SandBoxGameManager
     {
         public ServerGameManager() : base() { }
         public ServerGameManager(LoadResult saveGameData) : base(saveGameData) { }

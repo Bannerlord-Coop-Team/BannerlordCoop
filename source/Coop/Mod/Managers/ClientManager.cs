@@ -11,7 +11,7 @@ using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Managers
 {
-    public class ClientManager : CampaignGameManager
+    public class ClientManager : SandBoxGameManager
     {
         /// <summary>
         /// The clients hero as it was sent to the server. Note that the server may change some fields when introducing the hero to the campaign.
@@ -49,7 +49,8 @@ namespace Coop.Mod.Managers
 
                 // Start player at training field
                 Settlement settlement = Settlement.Find("tutorial_training_field");
-                Campaign.Current.HandleSettlementEncounter(MobileParty.MainParty, settlement);
+                // TODO: Does this work?
+                EncounterManager.StartSettlementEncounter(playerParty, settlement);
                 PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(LocationComplex.Current.GetLocationWithId("training_field"), null, null, null);
             }
             else if(m_HeroGUID != null)
