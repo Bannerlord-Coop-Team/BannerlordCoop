@@ -10,6 +10,7 @@ using Sync.Store;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
 using TaleWorlds.MountAndBlade.GauntletUI;
 using TaleWorlds.MountAndBlade.ViewModelCollection;
+using TaleWorlds.MountAndBlade;
 
 namespace Coop.Mod.Managers
 {
@@ -60,6 +61,11 @@ namespace Coop.Mod.Managers
 
         private void SkipCharacterCreation()
         {
+            if (GameStateManager.Current.ActiveState is VideoPlaybackState videoPlaybackState)
+            {
+                // TODO #190? - Figure out how to skip the cutscene if it plays
+            }
+            
             CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
             if (characterCreationState.CurrentStage is CharacterCreationCultureStage)
             {

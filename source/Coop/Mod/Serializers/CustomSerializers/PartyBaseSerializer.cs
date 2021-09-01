@@ -102,6 +102,7 @@ namespace Coop.Mod.Serializers
             }
 
             newPartyBase.AddElementToMemberRoster(hero.CharacterObject, 1);
+            // TODO #190 PartyComponent isn't being synced, _owner no longer exists. 
             newPartyBase.GetType().GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, hero);
             newPartyBase.GetType().GetField("_leader", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, hero.CharacterObject);
             newPartyBase.GetType().GetField("<MobileParty>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, mobileParty);

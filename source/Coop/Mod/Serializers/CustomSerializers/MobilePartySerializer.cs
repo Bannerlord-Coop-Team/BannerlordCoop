@@ -109,6 +109,9 @@ namespace Coop.Mod.Serializers
                     case "_partyComponent":
                         // Handle on deserialize
                         break;
+                    case "_pureSpeedExplainer":
+                        // TODO Joke Fix this
+                        break;
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
                 }

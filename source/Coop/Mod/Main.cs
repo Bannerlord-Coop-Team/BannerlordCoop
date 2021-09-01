@@ -147,7 +147,7 @@ namespace Coop.Mod
                             if (argument.ToLower() == "/server")
                             {
                                 //TODO add name to args
-                                CoopServer.Instance.StartGame("MP");
+                                CoopServer.Instance.StartGame(LOAD_GAME);
                             }
                             else if (argument.ToLower() == "/client")
                             {

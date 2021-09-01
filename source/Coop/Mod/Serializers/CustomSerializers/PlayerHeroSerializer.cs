@@ -121,6 +121,9 @@ namespace Coop.Mod.Serializers
                         // Can reinstantiate on recipient as this is hero data loaded at start of game.
                         SNNSO.Add(fieldInfo, new HeroDeveloperSerializer((HeroDeveloper)value));
                         break;
+                    case "_characterAttributes":
+                        // TODO: Fix this joke
+                        break;
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
 

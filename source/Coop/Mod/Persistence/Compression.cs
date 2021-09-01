@@ -22,7 +22,8 @@ namespace Coop.Mod.Persistence
             {
                 m_Compressor = new RailFloatCompressor(
                     0.0f,
-                    Math.Max(Campaign.MapWidth, Campaign.MapHeight),
+                    // TODO #190 - not sure what this does.... probably fine.
+                    Campaign.MapMaximumHeight,
                     Compare.COORDINATE_PRECISION / 10.0f);
             }
 
