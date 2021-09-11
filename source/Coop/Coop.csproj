@@ -26,6 +26,10 @@
     <LangVersion>7.3</LangVersion>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <StartAction>Program</StartAction>
+    <StartWorkingDirectory>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client</StartWorkingDirectory>
+    <StartProgram>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
+    <StartArguments>/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
@@ -440,7 +444,9 @@
     <Error Condition="!Exists('..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props'))" />
   </Target>
   <PropertyGroup>
-    <PostBuildEvent>
-    </PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted ^
+        -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\" ^
+        -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\\" ^
+        -Libs Coop.dll,CoopFramework.dll,Common.dll,Network.dll,Sync.dll,RemoteAction.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll</PostBuildEvent>
   </PropertyGroup>
 </Project>
