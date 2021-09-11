@@ -8,6 +8,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Actions;
 using JetBrains.Annotations;
 using TaleWorlds.ObjectSystem;
+using StoryMode;
 
 namespace Coop.Mod.Managers
 {
@@ -49,8 +50,14 @@ namespace Coop.Mod.Managers
 
                 // Start player at training field
                 Settlement settlement = Settlement.Find("tutorial_training_field");
-                // TODO: Does this work?
+
+                ChangePlayerCharacterAction.Apply(m_PlayerInCampaign);
+
                 EncounterManager.StartSettlementEncounter(playerParty, settlement);
+
+                PlayerEncounter.EnterSettlement();
+                PlayerEncounter.LocationEncounter = new TrainingFieldEncounter(settlement);
+                LocationComplex complex = LocationComplex.Current;
                 PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(LocationComplex.Current.GetLocationWithId("training_field"), null, null, null);
             }
             else if(m_HeroGUID != null)
@@ -90,7 +97,7 @@ namespace Coop.Mod.Managers
             }
 
             // Hero itself is always sent
-            if (candidateHero.Name.ToString() != m_PlayerAsSerialized.Name.ToString())
+            if (candidateHero.FirstName.ToString() != m_PlayerAsSerialized.FirstName.ToString())
             {
                 return false;
             }

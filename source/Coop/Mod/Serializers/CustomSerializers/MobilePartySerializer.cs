@@ -107,7 +107,7 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_partyComponent":
-                        // Handle on deserialize
+                        SNNSO.Add(fieldInfo, new PartyComponentSerializer((PartyComponent)value));
                         break;
                     case "_pureSpeedExplainer":
                         // TODO Joke Fix this
@@ -158,11 +158,19 @@ namespace Coop.Mod.Serializers
                     case ClanSerializer clanSerializer:
                         clanSerializer.SetHeroReference(hero);
                         break;
+                    case PartyComponentSerializer partyComponentSerializer:
+                        partyComponentSerializer.SetHeroReference(hero);
+                        entry.Key.SetValue(newMobileParty, partyComponentSerializer.Deserialize());
+                        break;
                     default:
                         entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
                         break;
                 }
             }
+
+
+            typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(Campaign.Current.CampaignObjectManager, new object[] { newMobileParty });
 
             return base.Deserialize(newMobileParty);
         }

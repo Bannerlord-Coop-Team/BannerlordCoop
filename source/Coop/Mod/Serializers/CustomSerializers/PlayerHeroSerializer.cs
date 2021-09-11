@@ -6,6 +6,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.PlayerServices;
 
@@ -140,6 +141,7 @@ namespace Coop.Mod.Serializers
         public override object Deserialize()
         {
             hero = MBObjectManager.Instance.CreateObject<Hero>();
+
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
                 // Pass references to specified serializers

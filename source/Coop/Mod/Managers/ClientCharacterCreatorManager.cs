@@ -11,6 +11,9 @@ using TaleWorlds.CampaignSystem.CharacterCreationContent;
 using TaleWorlds.MountAndBlade.GauntletUI;
 using TaleWorlds.MountAndBlade.ViewModelCollection;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.Engine.Screens;
+using TaleWorlds.Engine;
+using TaleWorlds.Localization;
 
 namespace Coop.Mod.Managers
 {
@@ -63,10 +66,20 @@ namespace Coop.Mod.Managers
         {
             if (GameStateManager.Current.ActiveState is VideoPlaybackState videoPlaybackState)
             {
-                // TODO #190? - Figure out how to skip the cutscene if it plays
+                if (ScreenManager.TopScreen is VideoPlaybackGauntletScreen)
+                {
+                    VideoPlaybackGauntletScreen videoPlaybackScreen = ScreenManager.TopScreen as VideoPlaybackGauntletScreen;
+                    FieldInfo fieldInfo = typeof(VideoPlaybackGauntletScreen).GetField("_videoPlayerView", BindingFlags.NonPublic | BindingFlags.Instance);
+                    VideoPlayerView videoPlayerView = (VideoPlayerView)fieldInfo.GetValue(videoPlaybackScreen);
+                    videoPlayerView.StopVideo();
+                    videoPlaybackState.OnVideoFinished();
+                    videoPlayerView.SetEnable(false);
+                    fieldInfo.SetValue(videoPlaybackScreen, null);
+                }
             }
-            
-            CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
+
+
+                CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
             if (characterCreationState.CurrentStage is CharacterCreationCultureStage)
             {
                 CultureObject culture = CharacterCreationContentBase.Instance.GetCultures().GetRandomElementInefficiently();
