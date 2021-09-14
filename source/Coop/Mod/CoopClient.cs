@@ -355,10 +355,11 @@ namespace Coop.Mod
 
                 
                 MBGameManager.StartNewGame(gameManager);
-                ClientManager.OnPreLoadFinishedEvent += (source, e) => {
-                    CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, SendPlayerPartyChanged);
-                };
+                //ClientManager.OnPreLoadFinishedEvent += (source, e) => {
+                //};
                 ClientManager.OnPostLoadFinishedEvent += (source, e) => {
+                    CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, SendPlayerPartyChanged);
+
                     m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded); 
                 };
             }

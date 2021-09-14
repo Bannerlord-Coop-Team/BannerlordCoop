@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
@@ -129,43 +130,55 @@ namespace Coop.Mod
             // Apply all patches via harmony
             harmony.PatchAll();
 
-            #region ButtonAssignment
-            CoopCampaign =
-                new InitialStateOption(
-                    "CoOp Campaign",
-                    new TextObject("Host Co-op Campaign"),
-                    9990,
-                    () =>
-                    {
-                        string[] array = Utilities.GetFullCommandLineString().Split(' ');
+            var isServer = false;
+
+            var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
 
 
 #if DEBUG
 
-                        foreach (string argument in array)
-                        {
-                            if (argument.ToLower() == "/server")
-                            {
-                                //TODO add name to args
-                                CoopServer.Instance.StartGame(LOAD_GAME);
-                            }
-                            else if (argument.ToLower() == "/client")
-                            {
-                                ServerConfiguration defaultConfiguration =
-                                    new ServerConfiguration();
-                                CoopClient.Instance.Connect(
-                                    defaultConfiguration.NetworkConfiguration.LanAddress,
-                                    defaultConfiguration.NetworkConfiguration.LanPort);
-                            }
-                        }
+
+            if (args.Contains("/server"))
+            {
+                isServer = true;
+                //TODO add name to args
+                
+            }
+            else if (args.Contains("/client"))
+            {
+                isServer = false;
+            }
+
 #else
                         ScreenManager.PushScreen(
                             ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
                                 new object[] { }));
 #endif
+            #region ButtonAssignment
+            CoopCampaign =
+                new InitialStateOption(
+                    "CoOp Campaign",
+                    new TextObject(isServer ? "Host Co-op Campaign" : "Join Co-op Campaign"),
+                    9990,
+                    () =>
+                    {
+                        if (isServer)
+                        {
+                            CoopServer.Instance.StartGame(LOAD_GAME);
+                        }
+                        else
+                        {
+                            ServerConfiguration defaultConfiguration =
+                            new ServerConfiguration();
+                            CoopClient.Instance.Connect(
+                                defaultConfiguration.NetworkConfiguration.LanAddress,
+                                defaultConfiguration.NetworkConfiguration.LanPort);
+                        }
                     },
+
                     () => { return (false, new TextObject()); }
                 );
+        
             JoinCoopGame =
                 new InitialStateOption(
                   "Join Coop Game",
@@ -177,7 +190,7 @@ namespace Coop.Mod
 
             Module.CurrentModule.AddInitialStateOption(CoopCampaign);
 
-            Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
+            //Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
             #endregion
         }
 
