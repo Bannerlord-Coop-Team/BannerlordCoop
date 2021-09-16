@@ -9,6 +9,7 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.PlayerServices;
+using Debug = System.Diagnostics.Debug;
 
 namespace Coop.Mod.Serializers
 {
@@ -29,11 +30,15 @@ namespace Coop.Mod.Serializers
         public CharacterObjectSerializer CharacterObject { get; private set; }
         public string PlayerId { get; }
 
+        private MBGUIDSerializer guid;
+
         readonly List<HeroSerializer> ExSpouses = new List<HeroSerializer>();
 
         public PlayerHeroSerializer(Hero hero) : base(hero)
         {
             PlayerId = new PlatformAPI().GetPlayerID().ToString();
+
+            guid = new MBGUIDSerializer(hero.Id);
 
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
@@ -137,6 +142,8 @@ namespace Coop.Mod.Serializers
             // They are marked as nonserializable in CustomSerializer but still tries to serialize???
             NonSerializableCollections.Clear();
             NonSerializableObjects.Clear();
+
+            Debug.WriteLine($"{hero.Id}");
         }
         public override object Deserialize()
         {
@@ -198,6 +205,10 @@ namespace Coop.Mod.Serializers
             // Invoke party visual onstartup to initialize properly
             typeof(PartyVisual).GetMethod("TaleWorlds.CampaignSystem.IPartyVisual.OnStartup", BindingFlags.Instance | BindingFlags.NonPublic)
             .Invoke(hero.PartyBelongedTo.Party.Visuals, new object[] { hero.PartyBelongedTo.Party });
+
+            CoopObjectManager.ObjectIdMap.Add((MBGUID)guid.Deserialize(), hero.Id);
+
+            Debug.WriteLine($"{hero.Id}");
 
             return hero;
         }

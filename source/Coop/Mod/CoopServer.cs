@@ -281,7 +281,10 @@ namespace Coop.Mod
         private void ReceiveClientPlayerPartyChanged(ConnectionBase connection, Packet packet)
         {
             MBGUID guid = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
-            MobileParty party = (MobileParty)MBObjectManager.Instance.GetObject(guid);
+            MBGUID resolvedGuid = CoopObjectManager.ObjectIdMap[guid];
+            Hero clientHero = (Hero)MBObjectManager.Instance.GetObject(resolvedGuid);
+
+            MobileParty party = clientHero.PartyBelongedTo;
 
             party.Party.UpdateVisibilityAndInspected(0, false);
 

@@ -396,10 +396,20 @@ namespace Coop.Mod
 
         private void SendPlayerPartyChanged(Hero hero, MobileParty party)
         {
+            MBGUID guid;
+            if (m_HeroGUID == new MBGUID(0))
+            {
+                guid = m_Hero.Id;
+            }
+            else
+            {
+                guid = m_HeroGUID;
+            }
+
             Session.Connection.Send(
                 new Packet(
                     EPacket.Client_PartyChanged,
-                    new MBGUIDSerializer(party.Id).Serialize()));
+                    new MBGUIDSerializer(guid).Serialize()));
         }
 
 
