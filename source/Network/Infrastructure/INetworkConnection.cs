@@ -13,6 +13,8 @@ namespace Network.Infrastructure
         Unknown,
         Unreachable,
         WrongProtocolVersion,
+        WrongGameVersion,
+        IncompatibleMods,
         WorldDataTransferIssue,
         ServerShutDown
     }

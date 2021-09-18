@@ -48,8 +48,15 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
+    <Reference Include="TaleWorlds.Library">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.ModuleManager">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ModuleManager.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CompatibilityInfo.cs" />
     <Compile Include="CoopStateMachine.cs" />
     <Compile Include="DropoutStack.cs" />
     <Compile Include="FrameLimiter.cs" />

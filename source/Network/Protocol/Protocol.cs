@@ -1,4 +1,5 @@
-﻿using Network.Infrastructure;
+﻿using Common;
+using Network.Infrastructure;
 using System;
 
 namespace Network.Protocol
@@ -58,21 +59,27 @@ namespace Network.Protocol
     {
         public readonly int m_Version;
 
-        public Client_Hello(int version)
+        public readonly CompatibilityInfo m_CompatibilityInfo;
+
+        public Client_Hello(int version, CompatibilityInfo compatibilityInfo)
         {
             m_Version = version;
+            m_CompatibilityInfo = compatibilityInfo;
         }
 
         public byte[] Serialize()
         {
             ByteWriter writer = new ByteWriter();
             writer.Binary.Write(m_Version);
+            writer.Binary.Write(m_CompatibilityInfo.Serialize());
             return writer.ToArray();
         }
 
         public static Client_Hello Deserialize(ByteReader reader)
         {
-            return new Client_Hello(reader.Binary.ReadInt32());
+            var version = reader.Binary.ReadInt32();
+            var compatibilityInfo = CompatibilityInfo.Deserialize (reader.Binary.ReadBytes((int)reader.RemainingBytes));
+            return new Client_Hello(version, compatibilityInfo);
         }
     }
 
