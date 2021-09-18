@@ -113,6 +113,15 @@ namespace Common
             return GameVersion().Equals(other.GameVersion());
         }
 
+        public override bool Equals(object obj)
+        {
+            if (obj is CompatibilityInfo)
+            {
+                return CompatibleWith(obj as CompatibilityInfo);
+            }
+            return false;
+        }
+
         public static CompatibilityInfo Deserialize(byte[] serialized)
         {
             var serializedString = System.Text.Encoding.ASCII.GetString(serialized);
