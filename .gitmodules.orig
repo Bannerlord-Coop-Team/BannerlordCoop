@@ -1,9 +1,12 @@
 [submodule "source/RailgunNet"]
 	path = source/RailgunNet
 	url = https://github.com/araex/RailgunNet.git
+<<<<<<< HEAD
+=======
 [submodule "source/LiteNetLib"]
 	path = source/LiteNetLib
 	url = https://github.com/RevenantX/LiteNetLib.git
+>>>>>>> d79ea3a43399719cee3a4478072991514e8a7b66
 [submodule "source/BannerlordTestingEssentials"]
 	path = source/BannerlordTestingEssentials
 	url = https://github.com/Bannerlord-Coop-Team/BannerlordTestingEssentials.git
