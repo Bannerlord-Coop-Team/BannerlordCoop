@@ -394,7 +394,7 @@ namespace Coop.Mod
             TryInitPersistence();
         }
 
-        private void SendPlayerPartyChanged(Hero hero, MobileParty party)
+        private void SendPlayerPartyChanged(Hero oldPlayer, Hero newPlayer, MobileParty newMobileParty)
         {
             MBGUID guid;
             if (m_HeroGUID == new MBGUID(0))
