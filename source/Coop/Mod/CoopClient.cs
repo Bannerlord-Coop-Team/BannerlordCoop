@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.Serialization.Formatters.Binary;
 using Common;
+using Coop.Mod.Config;
 using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
@@ -55,6 +58,8 @@ namespace Coop.Mod
 
         private MBGameManager gameManager;
 
+        private CoopObjectManager objectManager;
+
         private int m_ReconnectAttempts = MaxReconnectAttempts;
         private Hero m_Hero;
         private MBGUID m_HeroGUID;
@@ -73,14 +78,14 @@ namespace Coop.Mod
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
             Synchronization = new CoopSyncClient(this);
-            
+            objectManager = new CoopObjectManager();
+
             #region State Machine Callbacks
             m_CoopClientSM.CharacterCreationState.OnEntry(CreateCharacter);
             m_CoopClientSM.ReceivingWorldDataState.OnEntry(SendClientRequestInitialWorldData);
             m_CoopClientSM.LoadingState.OnEntry(SendGameLoading);
             m_CoopClientSM.PlayingState.OnEntry(SendGameLoaded);
             #endregion
-
 
             Init();
         }
@@ -209,6 +214,7 @@ namespace Coop.Mod
 
                 // Handler Registration
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
+                Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyId);
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
 
                 Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
@@ -393,8 +399,15 @@ namespace Coop.Mod
                     new Client_Joined().Serialize()));
             TryInitPersistence();
         }
+		
 
-        private void SendPlayerPartyChanged(Hero oldPlayer, Hero newPlayer, MobileParty newMobileParty)
+        [GameClientPacketHandler(ECoopClientState.CharacterCreation, EPacket.Server_HeroId)]
+        private void ReceivePartyId(ConnectionBase connection, Packet packet)
+        {
+            m_HeroGUID = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
+        }
+
+        private void SendPlayerPartyChanged(Hero hero, MobileParty party)
         {
             MBGUID guid;
             if (m_HeroGUID == new MBGUID(0))
@@ -451,6 +464,4 @@ namespace Coop.Mod
             return sRet;
         }
     }
-
-    
 }

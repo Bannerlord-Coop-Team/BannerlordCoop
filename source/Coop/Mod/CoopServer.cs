@@ -22,6 +22,7 @@ using Common;
 using System.Linq;
 using TaleWorlds.ObjectSystem;
 using Coop.Mod.Patch.World;
+using System.Diagnostics;
 
 namespace Coop.Mod
 {
@@ -115,6 +116,8 @@ namespace Coop.Mod
                 m_NetManager.StartListening();
                 Logger.Debug("Setup network connection for server.");
             }
+
+            SyncedObjectStore.OnObjectRecieved += SendHeroId;
 
             return null;
         }
@@ -281,8 +284,8 @@ namespace Coop.Mod
         private void ReceiveClientPlayerPartyChanged(ConnectionBase connection, Packet packet)
         {
             MBGUID guid = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
-            MBGUID resolvedGuid = CoopObjectManager.ObjectIdMap[guid];
-            Hero clientHero = (Hero)MBObjectManager.Instance.GetObject(resolvedGuid);
+            Debug.WriteLine($"Requested GUID {guid}");
+            Hero clientHero = (Hero)MBObjectManager.Instance.GetObject(guid);
 
             MobileParty party = clientHero.PartyBelongedTo;
 
@@ -295,6 +298,15 @@ namespace Coop.Mod
             }
 
             Persistence.MobilePartyEntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
+        }
+
+        private void SendHeroId(ConnectionBase connection, object obj)
+        {
+            if(obj is PlayerHeroSerializer heroSerializer)
+            {
+                Hero hero = (Hero)heroSerializer.Deserialize();
+                connection.Send(new Packet(EPacket.Server_HeroId, new MBGUIDSerializer(hero.Id).Serialize()));
+            }
         }
 
         private void SendInitialWorldData(ConnectionServer connection)

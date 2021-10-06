@@ -17,13 +17,16 @@ namespace Network.Protocol
         Server_JoinRequestAccepted, // Client is allowed to join the server.
         Server_RequireCharacterCreation, // Instructs the client to create a character.
         Server_NotifyCharacterExists, // Notifies the client a party already exists for that player id.
+        Server_HeroId, // Contains the clients party id.
         Server_WorldData, // Contains the initial state of the game world.
 
         Sync,
         StoreAdd, // Adds an object to the global object store
         StoreAck, // Sent after receiving an object via StoreAdd
         KeepAlive,
-        Persistence // Will be forwarded to the game state persistence layer.
+        Persistence, // Will be forwarded to the game state persistence layer.
+
+        CreateObject,
     }
 
     public static class Version

@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using JetBrains.Annotations;
 using TaleWorlds.ObjectSystem;
 using StoryMode;
+using System.Diagnostics;
 
 namespace Coop.Mod.Managers
 {
@@ -47,6 +48,8 @@ namespace Coop.Mod.Managers
             {
                 MobileParty playerParty = MobileParty.All.AsParallel().SingleOrDefault(IsClientPlayersParty);
                 m_PlayerInCampaign = playerParty.LeaderHero;
+
+                Debug.WriteLine($"{playerParty.Id}");
 
                 // Start player at training field
                 Settlement settlement = Settlement.Find("tutorial_training_field");

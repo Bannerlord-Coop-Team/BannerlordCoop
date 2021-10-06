@@ -29,6 +29,11 @@ namespace Sync.Store
         /// </summary>
         public Action<ObjectId> OnObjectDistributed;
 
+        /// <summary>
+        ///     Triggered when an object has been distributed to all clients.
+        /// </summary>
+        public Action<ConnectionBase, object> OnObjectRecieved;
+
         public SharedRemoteStore([NotNull] ISerializableFactory serializableFactory)
         {
             m_Serializer = new StoreSerializer(serializableFactory);
@@ -118,6 +123,8 @@ namespace Sync.Store
             object obj)
         {
             if (!m_Stores.ContainsKey(sender)) throw new Exception($"Unknown origin: {sender}.");
+
+            OnObjectRecieved?.Invoke(sender, obj);
 
             Logger.Debug("[{id}] Client added: {object}.", id, obj);
             var otherStores =

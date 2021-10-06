@@ -31,7 +31,7 @@ namespace Coop.Mod.Serializers
 
         List<string> attachedPartiesNames = new List<string>();
         string stringId;
-        
+
         public MobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
         {
             stringId = mobileParty.StringId;
