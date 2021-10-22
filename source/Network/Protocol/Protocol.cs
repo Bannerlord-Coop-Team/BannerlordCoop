@@ -19,6 +19,7 @@ namespace Network.Protocol
         Server_NotifyCharacterExists, // Notifies the client a party already exists for that player id.
         Server_HeroId, // Contains the clients party id.
         Server_WorldData, // Contains the initial state of the game world.
+        Server_ValidateParties, // Contains data for each party to identify them
 
         Sync,
         StoreAdd, // Adds an object to the global object store

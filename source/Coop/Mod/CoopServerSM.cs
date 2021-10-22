@@ -20,6 +20,11 @@ namespace Coop.Mod
         /// A client is playing.
         /// </summary>
         Playing,
+
+        /// <summary>
+        /// A client requires validation
+        /// </summary>
+        ClientValidation,
     }
 
     enum ECoopServerTrigger {
@@ -37,6 +42,7 @@ namespace Coop.Mod
         /// A client has recieved world data.
         /// </summary>
         ClientLoaded,
+        ClientValidated,
     }
 
     /// <summary>
@@ -46,9 +52,12 @@ namespace Coop.Mod
     {
         public readonly StateConfiguration PreparingState;
         public readonly StateConfiguration SendingWorldDataState;
+        public readonly StateConfiguration ClientValidationState;
         public readonly StateConfiguration PlayingState;
         public readonly StateMachine<ECoopServerState, ECoopServerTrigger>.TriggerWithParameters<ConnectionServer> 
             SendWorldDataTrigger;
+        public readonly StateMachine<ECoopServerState, ECoopServerTrigger>.TriggerWithParameters<ConnectionServer>
+            SendPartyValidationTrigger;
 
         public CoopServerSM() : base(ECoopServerState.Preparing)
         {
@@ -63,7 +72,14 @@ namespace Coop.Mod
             SendWorldDataTrigger = StateMachine.SetTriggerParameters<ConnectionServer>(ECoopServerTrigger.RequiresWorldData);
 
             SendingWorldDataState = StateMachine.Configure(ECoopServerState.SendingWorldData);
-            SendingWorldDataState.Permit(ECoopServerTrigger.ClientLoaded, ECoopServerState.Playing);
+
+            SendingWorldDataState.Permit(ECoopServerTrigger.ClientLoaded, ECoopServerState.ClientValidation);
+
+            ClientValidationState = StateMachine.Configure(ECoopServerState.ClientValidation);
+
+            SendPartyValidationTrigger = StateMachine.SetTriggerParameters<ConnectionServer>(ECoopServerTrigger.ClientLoaded);
+
+            ClientValidationState.Permit(ECoopServerTrigger.ClientValidated, ECoopServerState.Playing);
 
             // Server playing
             PlayingState = StateMachine.Configure(ECoopServerState.Playing);

@@ -265,7 +265,7 @@ namespace Coop.Mod
         }
 
         #region GarbageCollection
-        static Task ManualGCTask = Task.Run(ManualGC);
+        //static Task ManualGCTask = Task.Run(ManualGC);
 
         async static void ManualGC()
         {

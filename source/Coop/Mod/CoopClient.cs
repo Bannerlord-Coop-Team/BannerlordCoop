@@ -58,8 +58,6 @@ namespace Coop.Mod
 
         private MBGameManager gameManager;
 
-        private CoopObjectManager objectManager;
-
         private int m_ReconnectAttempts = MaxReconnectAttempts;
         private Hero m_Hero;
         private MBGUID m_HeroGUID;
@@ -78,7 +76,6 @@ namespace Coop.Mod
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
             Synchronization = new CoopSyncClient(this);
-            objectManager = new CoopObjectManager();
 
             #region State Machine Callbacks
             m_CoopClientSM.CharacterCreationState.OnEntry(CreateCharacter);

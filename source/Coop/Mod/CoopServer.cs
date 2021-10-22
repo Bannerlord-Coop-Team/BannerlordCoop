@@ -23,6 +23,9 @@ using System.Linq;
 using TaleWorlds.ObjectSystem;
 using Coop.Mod.Patch.World;
 using System.Diagnostics;
+using Coop.Mod.Data;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization;
 
 namespace Coop.Mod
 {
@@ -204,6 +207,7 @@ namespace Coop.Mod
 
             #region State Machine Callbacks
             coopServerSM.SendingWorldDataState.OnEntryFrom(coopServerSM.SendWorldDataTrigger, SendInitialWorldData);
+            coopServerSM.ClientValidationState.OnEntryFrom(coopServerSM.SendPartyValidationTrigger, ValidateClientParties);
             #endregion
 
             SyncedObjectStore.AddConnection(connection);
@@ -280,6 +284,12 @@ namespace Coop.Mod
             m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.ClientLoaded);
         }
 
+        [GameServerPacketHandler(ECoopServerState.ClientValidation, EPacket.Client_PartyChanged)]
+        private void ReceivePartyValidationResponse(ConnectionBase connection, Packet packet)
+        {
+        }
+
+
         [GameServerPacketHandler(ECoopServerState.Playing, EPacket.Client_PartyChanged)]
         private void ReceiveClientPlayerPartyChanged(ConnectionBase connection, Packet packet)
         {
@@ -314,6 +324,21 @@ namespace Coop.Mod
             OnServerSendingWorldData?.Invoke();
             connection.SendWorldData();
             OnServerSentWorldData?.Invoke();
+        }
+
+        private void ValidateClientParties(ConnectionServer connection)
+        {
+            List<PartyData> parties = new List<PartyData>();
+            foreach (MobileParty party in MobileParty.All)
+            {
+                parties.Add(new PartyData(party));
+            }
+
+            IFormatter formatter = new BinaryFormatter();
+            var stream = new MemoryStream();
+            formatter.Serialize(stream, parties);
+
+            connection.Send(new Packet(EPacket.Server_ValidateParties, stream.ToArray()));
         }
     }
 }
