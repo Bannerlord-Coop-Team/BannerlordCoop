@@ -6,6 +6,7 @@ using System.Net;
 using System.Runtime.Serialization.Formatters.Binary;
 using Common;
 using Coop.Mod.Config;
+using Coop.Mod.Data;
 using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
@@ -62,6 +63,7 @@ namespace Coop.Mod
         private Hero m_Hero;
         private MBGUID m_HeroGUID;
         private ObjectId m_HeroId;
+        private readonly Dictionary<PartyData, MobileParty> m_Parties = new Dictionary<PartyData, MobileParty>();
         #endregion
         public Action<PersistenceClient> OnPersistenceInitialized;
 
@@ -212,6 +214,8 @@ namespace Coop.Mod
                 // Handler Registration
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyId);
+                Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyValidation);
+                Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyResponse);
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
 
                 Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
@@ -402,6 +406,46 @@ namespace Coop.Mod
         private void ReceivePartyId(ConnectionBase connection, Packet packet)
         {
             m_HeroGUID = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
+        }
+
+        [GameClientPacketHandler(ECoopClientState.Playing, EPacket.Server_ValidateParties)]
+        private void ReceivePartyValidation(ConnectionBase connection, Packet packet)
+        {
+            // NOTE: could be more efficient
+            BinaryFormatter formatter = new BinaryFormatter();
+            var stream = new MemoryStream(packet.Payload.Array);
+            List<PartyData> hostParties = (List<PartyData>)formatter.Deserialize(stream);
+
+            foreach (MobileParty party in MobileParty.All)
+            {
+                m_Parties.Add(new PartyData(party), party);
+            }
+
+            // O(N^2)
+            List<PartyData> partiesNeeded = hostParties.Where(party => { return !m_Parties.Keys.Contains(party, new PartyDataComparer()); }).ToList();
+            stream = new MemoryStream();
+            formatter.Serialize(stream, partiesNeeded);
+            connection.Send(new Packet(EPacket.Client_RequestParties, stream.ToArray()));
+
+            // Remove parties that exist on client and not on server.
+            List<PartyData> partiesToRemove = m_Parties.Keys.Where(party => { return !hostParties.Contains(party, new PartyDataComparer()); }).ToList();
+            partiesToRemove.ForEach(party => m_Parties[party].RemoveParty());
+        }
+
+        
+
+        [GameClientPacketHandler(ECoopClientState.Playing, EPacket.Server_RespondParties)]
+        private void ReceivePartyResponse(ConnectionBase connection, Packet packet)
+        {
+            BinaryFormatter formatter = new BinaryFormatter();
+            var stream = new MemoryStream(packet.Payload.Array);
+
+            // Instantiate parties
+            List<MobilePartySerializer> parties = (List<MobilePartySerializer>)formatter.Deserialize(stream);
+            parties.ForEach(party => party.Deserialize());
+
+
+            connection.Send(new Packet(EPacket.Client_RecievedParties, new byte[0]));
         }
 
         private void SendPlayerPartyChanged(Hero hero, MobileParty party)

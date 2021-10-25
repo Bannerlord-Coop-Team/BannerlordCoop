@@ -21,4 +21,17 @@ namespace Coop.Mod.Data
             return name == other.name;
         }
     }
+
+    class PartyDataComparer : IEqualityComparer<PartyData>
+    {
+        public bool Equals(PartyData x, PartyData y)
+        {
+            return x.Equals(y);
+        }
+
+        public int GetHashCode(PartyData obj)
+        {
+            return obj.GetHashCode();
+        }
+    }
 }

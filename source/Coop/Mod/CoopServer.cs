@@ -144,16 +144,16 @@ namespace Coop.Mod
         {
 #if DEBUG
             try
-                {
-                    LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(
-                        saveName,
-                        Utilities.GetModulesNames());
-                    MBGameManager.StartNewGame(CreateGameManager(saveGameData));
-                }
-                catch (IOException ex)
-                {
-                    Logger.Error("Save file not found: " + ex.Message);
-                }
+            {
+                LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(
+                    saveName,
+                    Utilities.GetModulesNames());
+                MBGameManager.StartNewGame(CreateGameManager(saveGameData));
+            }
+            catch (IOException ex)
+            {
+                Logger.Error("Save file not found: " + ex.Message);
+            }
 #endif
         }
 
@@ -222,6 +222,8 @@ namespace Coop.Mod
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientRequestWorldData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientDeclineWorldData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientLoaded);
+            connection.Dispatcher.RegisterPacketHandler(ReceivePartyValidationResponse);
+            connection.Dispatcher.RegisterPacketHandler(ReceivePartyValidationComplete);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientPlayerPartyChanged);
 
             // State Machine Registration
@@ -281,12 +283,57 @@ namespace Coop.Mod
         [GameServerPacketHandler(ECoopServerState.SendingWorldData, EPacket.Client_Loaded)]
         private void ReceiveClientLoaded(ConnectionBase connection, Packet packet)
         {
-            m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.ClientLoaded);
+            ConnectionServer connectionServer = (ConnectionServer)connection;
+            m_CoopServerSMs[connectionServer].StateMachine.Fire(
+                m_CoopServerSMs[connectionServer].SendPartyValidationTrigger,
+                connectionServer);
         }
 
-        [GameServerPacketHandler(ECoopServerState.ClientValidation, EPacket.Client_PartyChanged)]
+        private void ValidateClientParties(ConnectionServer connection)
+        {
+            List<PartyData> parties = new List<PartyData>();
+            foreach (MobileParty party in MobileParty.All)
+            {
+                parties.Add(new PartyData(party));
+            }
+
+            IFormatter formatter = new BinaryFormatter();
+            var stream = new MemoryStream();
+            formatter.Serialize(stream, parties);
+
+            connection.Send(new Packet(EPacket.Server_ValidateParties, stream.ToArray()));
+        }
+
+        [GameServerPacketHandler(ECoopServerState.ClientValidation, EPacket.Client_RequestParties)]
         private void ReceivePartyValidationResponse(ConnectionBase connection, Packet packet)
         {
+            BinaryFormatter formatter = new BinaryFormatter();
+            var stream = new MemoryStream(packet.Payload.Array);
+            List<PartyData> partiesToSend = (List<PartyData>)formatter.Deserialize(stream);
+
+            Dictionary<PartyData, MobileParty> parties = new Dictionary<PartyData, MobileParty>();
+
+            foreach (MobileParty party in MobileParty.All)
+            {
+                parties.Add(new PartyData(party), party);
+            }
+
+            List<MobilePartySerializer> serializedParties = new List<MobilePartySerializer>();
+            foreach (PartyData party in partiesToSend)
+            {
+                serializedParties.Add(new MobilePartySerializer(parties[party]));
+            }
+
+            stream = new MemoryStream();
+            formatter.Serialize(stream, serializedParties);
+
+            connection.Send(new Packet(EPacket.Server_RespondParties, stream.ToArray()));
+        }
+
+        [GameServerPacketHandler(ECoopServerState.ClientValidation, EPacket.Client_RecievedParties)]
+        private void ReceivePartyValidationComplete(ConnectionBase connection, Packet packet)
+        {
+            m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.ClientValidated);
         }
 
 
@@ -312,7 +359,7 @@ namespace Coop.Mod
 
         private void SendHeroId(ConnectionBase connection, object obj)
         {
-            if(obj is PlayerHeroSerializer heroSerializer)
+            if (obj is PlayerHeroSerializer heroSerializer)
             {
                 Hero hero = (Hero)heroSerializer.Deserialize();
                 connection.Send(new Packet(EPacket.Server_HeroId, new MBGUIDSerializer(hero.Id).Serialize()));
@@ -324,21 +371,6 @@ namespace Coop.Mod
             OnServerSendingWorldData?.Invoke();
             connection.SendWorldData();
             OnServerSentWorldData?.Invoke();
-        }
-
-        private void ValidateClientParties(ConnectionServer connection)
-        {
-            List<PartyData> parties = new List<PartyData>();
-            foreach (MobileParty party in MobileParty.All)
-            {
-                parties.Add(new PartyData(party));
-            }
-
-            IFormatter formatter = new BinaryFormatter();
-            var stream = new MemoryStream();
-            formatter.Serialize(stream, parties);
-
-            connection.Send(new Packet(EPacket.Server_ValidateParties, stream.ToArray()));
         }
     }
 }

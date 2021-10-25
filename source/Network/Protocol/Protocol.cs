@@ -11,6 +11,8 @@ namespace Network.Protocol
         Client_RequestParty, // Client wants to know if they already created a party.
         Client_DeclineWorldData, // Client does not need world data
         Client_Loaded, // Sent once the client has loaded the initial world state.
+        Client_RequestParties, // Parties the client needs to be in sync with host
+        Client_RecievedParties, // Parties were loaded on client
         Client_PartyChanged, // When the player party is switched
 
         Server_RequestClientInfo, // Instructs the client to send its ClientInfo.
@@ -20,6 +22,7 @@ namespace Network.Protocol
         Server_HeroId, // Contains the clients party id.
         Server_WorldData, // Contains the initial state of the game world.
         Server_ValidateParties, // Contains data for each party to identify them
+        Server_RespondParties, // Contains Missing Parties from client
 
         Sync,
         StoreAdd, // Adds an object to the global object store
