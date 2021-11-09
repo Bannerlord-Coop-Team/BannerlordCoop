@@ -44,6 +44,33 @@ namespace Coop.Mod.Managers
             // Removes main party on server.
             MobileParty.MainParty.RemoveParty();
 
+            foreach(Hero hero in Campaign.Current.AliveHeroes)
+            {
+                CoopObjectManager.AddObject(hero.CharacterObject);
+                CoopObjectManager.AddObject(hero);
+            }
+
+            foreach(Hero hero in Campaign.Current.DeadOrDisabledHeroes)
+            {
+                CoopObjectManager.AddObject(hero.CharacterObject);
+                CoopObjectManager.AddObject(hero);
+            }
+
+            foreach(Settlement settlement in Campaign.Current.Settlements)
+            {
+                CoopObjectManager.AddObject(settlement);
+            }
+
+            foreach(IFaction faction in Campaign.Current.Factions)
+            {
+                CoopObjectManager.AddObject(faction);
+            }
+
+            foreach (MobileParty party in Campaign.Current.MobileParties)
+            {
+                CoopObjectManager.AddObject(party);
+            }
+
             //CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {
             //    remoteStore.OnObjectReceived += (objId, obj) =>
             //    {

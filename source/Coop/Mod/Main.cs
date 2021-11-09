@@ -113,7 +113,6 @@ namespace Coop.Mod
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
             CoopFramework.CoopFramework.InitPatches(ObjectManagerAdapter.Instance, Coop.IsCoopGameSession);
-            ManagedTypesInitializer.InitializeTypes(harmony);
 
             // Skip startup splash screen
 #if DEBUG

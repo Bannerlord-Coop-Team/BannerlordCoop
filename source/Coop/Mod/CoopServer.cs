@@ -292,9 +292,19 @@ namespace Coop.Mod
         private void ValidateClientParties(ConnectionServer connection)
         {
             List<PartyData> parties = new List<PartyData>();
+
+
+
             foreach (MobileParty party in MobileParty.All)
             {
-                parties.Add(new PartyData(party));
+                try
+                {
+                    parties.Add(new PartyData(party));
+                }
+                catch(NullReferenceException)
+                {
+
+                }
             }
 
             IFormatter formatter = new BinaryFormatter();
@@ -337,6 +347,7 @@ namespace Coop.Mod
         }
 
 
+        [GameServerPacketHandler(ECoopServerState.ClientValidation, EPacket.Client_PartyChanged)]
         [GameServerPacketHandler(ECoopServerState.Playing, EPacket.Client_PartyChanged)]
         private void ReceiveClientPlayerPartyChanged(ConnectionBase connection, Packet packet)
         {

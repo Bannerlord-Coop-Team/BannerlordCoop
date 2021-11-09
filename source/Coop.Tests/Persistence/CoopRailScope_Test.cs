@@ -1,4 +1,5 @@
 ﻿using System;
+using Coop.Mod.Data;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using Moq;
@@ -34,7 +35,7 @@ namespace Coop.Tests.Persistence
         {
             MobileParty party = (MobileParty) Activator.CreateInstance(typeof(MobileParty));
             Persistence.Server.Room.AddNewEntity<MobilePartyEntityServer>(
-                e => e.State.PartyId = party.Id);
+                e => e.State.PartyId = new PartyData(party));
             
             m_Environment.Persistence.UpdateServer();
             m_Environment.ExecuteSendsServer();

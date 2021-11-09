@@ -112,6 +112,14 @@ namespace Coop.Mod.Serializers
                     case "_pureSpeedExplainer":
                         // TODO Joke Fix this
                         break;
+                    case "<TaleWorlds.CampaignSystem.ILocatable<TaleWorlds.CampaignSystem.MobileParty>.NextLocatable>k__BackingField":
+                        // TODO Joke Fix this
+                        break;
+                    case "_targetSettlement":
+                        // TODO Joke Fix this
+                        break;
+                    case "<AiBehaviorObject>k__BackingField":
+                        break;
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
                 }

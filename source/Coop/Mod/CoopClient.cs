@@ -63,7 +63,6 @@ namespace Coop.Mod
         private Hero m_Hero;
         private MBGUID m_HeroGUID;
         private ObjectId m_HeroId;
-        private readonly Dictionary<PartyData, MobileParty> m_Parties = new Dictionary<PartyData, MobileParty>();
         #endregion
         public Action<PersistenceClient> OnPersistenceInitialized;
 
@@ -416,20 +415,16 @@ namespace Coop.Mod
             var stream = new MemoryStream(packet.Payload.Array);
             List<PartyData> hostParties = (List<PartyData>)formatter.Deserialize(stream);
 
-            foreach (MobileParty party in MobileParty.All)
-            {
-                m_Parties.Add(new PartyData(party), party);
-            }
-
             // O(N^2)
-            List<PartyData> partiesNeeded = hostParties.Where(party => { return !m_Parties.Keys.Contains(party, new PartyDataComparer()); }).ToList();
+            // List<PartyData> partiesNeeded = hostParties.Where(party => { return !Persistence.Environment.Parties.Keys.Contains(party, new PartyDataComparer()); }).ToList();
+            List<PartyData> partiesNeeded = new List<PartyData>();
             stream = new MemoryStream();
             formatter.Serialize(stream, partiesNeeded);
             connection.Send(new Packet(EPacket.Client_RequestParties, stream.ToArray()));
 
-            // Remove parties that exist on client and not on server.
-            List<PartyData> partiesToRemove = m_Parties.Keys.Where(party => { return !hostParties.Contains(party, new PartyDataComparer()); }).ToList();
-            partiesToRemove.ForEach(party => m_Parties[party].RemoveParty());
+            //// Remove parties that exist on client and not on server.
+            //List<PartyData> partiesToRemove = Persistence.Environment.Parties.Keys.Where(party => { return !hostParties.Contains(party, new PartyDataComparer()); }).ToList();
+            //partiesToRemove.ForEach(party => Persistence.Environment.Parties[party].RemoveParty());
         }
 
         
@@ -448,7 +443,7 @@ namespace Coop.Mod
             connection.Send(new Packet(EPacket.Client_RecievedParties, new byte[0]));
         }
 
-        private void SendPlayerPartyChanged(Hero hero, MobileParty party)
+        private void SendPlayerPartyChanged(Hero h1, Hero h2, MobileParty party)
         {
             MBGUID guid;
             if (m_HeroGUID == new MBGUID(0))

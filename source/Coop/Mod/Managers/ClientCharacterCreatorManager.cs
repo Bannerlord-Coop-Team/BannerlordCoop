@@ -14,6 +14,8 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.Engine.Screens;
 using TaleWorlds.Engine;
 using TaleWorlds.Localization;
+using System.Collections.Generic;
+using Coop.Mod.Extentions;
 
 namespace Coop.Mod.Managers
 {
@@ -22,10 +24,8 @@ namespace Coop.Mod.Managers
 
         public ObjectId HeroId { get; private set; }
         public string PartyName { get; private set; }
-        public HeroEventArgs(string PartyName, ObjectId HeroId)
+        public HeroEventArgs()
         {
-            this.PartyName = PartyName;
-            this.HeroId = HeroId;
         }
     }
     public class ClientCharacterCreatorManager : StoryModeGameManager
@@ -55,11 +55,32 @@ namespace Coop.Mod.Managers
             Settlement settlement = Settlement.Find("tutorial_training_field");
             MobileParty.MainParty.Position2D = settlement.Position2D;
 
-            OnGameLoadFinishedEvent?.Invoke(this, new HeroEventArgs(
-                MobileParty.MainParty.Name.ToString(),
-                CoopClient.Instance.SyncedObjectStore.Insert(Hero.MainHero)
-            ));
-            EndGame();
+            OnGameLoadFinishedEvent?.Invoke(this, new HeroEventArgs());
+
+            RemoveAllObjectsExceptPlayer();
+        }
+
+        private void RemoveAllObjectsExceptPlayer()
+        {
+            CampaignObjectManager campaignObjectManager = Campaign.Current.CampaignObjectManager;
+
+            MobileParty playerParty = MobileParty.MainParty;
+            Hero playerHero = Hero.MainHero;
+            Clan playerClan = Hero.MainHero.Clan;
+            Settlement playerSettlment = playerParty.CurrentSettlement;
+
+            campaignObjectManager.GetMobileParties().RemoveAll(x => x != playerParty);
+            campaignObjectManager.GetDeadOrDisabledHeros().RemoveAll(x => x != playerHero);
+            campaignObjectManager.GetAliveHeros().RemoveAll(x => x != playerHero);
+            campaignObjectManager.GetClans().RemoveAll(x => x != playerClan);
+            campaignObjectManager.GetKingdoms().RemoveAll(x => true);
+            
+            List<Settlement> settlements = campaignObjectManager.Settlements.ToList();
+            settlements.ForEach(x => {
+                if (x != playerSettlment) {
+                    Campaign.Current.ObjectManager.UnregisterObject(x);
+                } 
+            });
         }
 
         private void SkipCharacterCreation()

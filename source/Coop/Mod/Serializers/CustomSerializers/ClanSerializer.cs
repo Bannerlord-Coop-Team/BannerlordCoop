@@ -84,6 +84,9 @@ namespace Coop.Mod.Serializers
                     case "_defaultPartyTemplate":
                         SNNSO.Add(fieldInfo, new DefaultPartyTemplateSerializer((PartyTemplateObject)value));
                         break;
+                    case "_kingdom":
+                        // TODO fix
+                        break;
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
                 }
