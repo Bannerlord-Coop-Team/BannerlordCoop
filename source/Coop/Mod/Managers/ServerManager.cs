@@ -1,7 +1,9 @@
 ﻿using Coop.Mod.Patch.World;
 using Coop.Mod.Serializers;
 using Network.Infrastructure;
+using Network.Protocol;
 using SandBox;
+using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Core;
@@ -42,21 +44,20 @@ namespace Coop.Mod.Managers
             // Removes main party on server.
             MobileParty.MainParty.RemoveParty();
 
-            CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {
-                remoteStore.OnObjectReceived += (objId, obj) =>
-                {
-                    if (obj is PlayerHeroSerializer serializedPlayerHero)
-                    {
-                        // Hero received from client after character creation
-                        Hero hero = (Hero)serializedPlayerHero.Deserialize();
-                        CoopSaveManager.PlayerParties.Add(serializedPlayerHero.PlayerId, hero.Id);
-                        
-                        // TODO only do for new players
-                        Settlement settlement = Settlement.Find("tutorial_training_field");
-                        EnterSettlementAction.ApplyForParty(hero.PartyBelongedTo, settlement);
-                    }
-                };
-            };
+            //CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {
+            //    remoteStore.OnObjectReceived += (objId, obj) =>
+            //    {
+            //        if (obj is PlayerHeroSerializer serializedPlayerHero)
+            //        {
+            //            // Hero received from client after character creation
+            //            Hero hero = (Hero)serializedPlayerHero.Deserialize();
+            //            CoopSaveManager.PlayerParties.Add(serializedPlayerHero.PlayerId, hero.Id);
+
+            //            Settlement settlement = Settlement.Find("tutorial_training_field");
+            //            EnterSettlementAction.ApplyForParty(hero.PartyBelongedTo, settlement);
+            //        }
+            //    };
+            //};
         }
     }
 }

@@ -206,8 +206,6 @@ namespace Coop.Mod.Serializers
             typeof(PartyVisual).GetMethod("TaleWorlds.CampaignSystem.IPartyVisual.OnStartup", BindingFlags.Instance | BindingFlags.NonPublic)
             .Invoke(hero.PartyBelongedTo.Party.Visuals, new object[] { hero.PartyBelongedTo.Party });
 
-            CoopObjectManager.ObjectIdMap.Add((MBGUID)guid.Deserialize(), hero.Id);
-
             Debug.WriteLine($"{hero.Id}");
 
             return hero;

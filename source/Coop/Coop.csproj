@@ -247,13 +247,18 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CoopObjectManager.cs" />
+    <Compile Include="Config\RequiredSyncTypes.cs" />
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
+    <Compile Include="Mod\Config\ManagedTypesConfig.cs" />
+    <Compile Include="Mod\Data\ClanData.cs" />
+    <Compile Include="Mod\Data\HeroData.cs" />
+    <Compile Include="Mod\ManagedTypesInitializer.cs" />
     <Compile Include="Mod\CoopClientSM.cs" />
     <Compile Include="Mod\CoopConditions.cs" />
     <Compile Include="Mod\GameSync\Bandit\BanditPartyComponentSync.cs" />
     <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
+    <Compile Include="Mod\CoopObjectManager.cs" />
     <Compile Include="Mod\ObjectManagerAdapter.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />
     <Compile Include="Mod\DebugUtil\CLICommands.cs" />
@@ -272,6 +277,7 @@
     <Compile Include="Mod\Managers\ClientManager.cs" />
     <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
+    <Compile Include="Mod\Data\PartyData.cs" />
     <Compile Include="Mod\Patch\Hack\MBObjectManagerPatch.cs" />
     <Compile Include="Mod\Patch\MobilePartyPatches\CampaignMapMovement.cs" />
     <Compile Include="Mod\Patch\MobilePartyPatches\CampaignMapPositions.cs" />

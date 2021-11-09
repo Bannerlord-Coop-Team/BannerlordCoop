@@ -12,19 +12,26 @@ namespace Network.Protocol
         Client_RequestParty, // Client wants to know if they already created a party.
         Client_DeclineWorldData, // Client does not need world data
         Client_Loaded, // Sent once the client has loaded the initial world state.
+        Client_RequestParties, // Parties the client needs to be in sync with host
+        Client_RecievedParties, // Parties were loaded on client
         Client_PartyChanged, // When the player party is switched
 
         Server_RequestClientInfo, // Instructs the client to send its ClientInfo.
         Server_JoinRequestAccepted, // Client is allowed to join the server.
         Server_RequireCharacterCreation, // Instructs the client to create a character.
         Server_NotifyCharacterExists, // Notifies the client a party already exists for that player id.
+        Server_HeroId, // Contains the clients party id.
         Server_WorldData, // Contains the initial state of the game world.
+        Server_ValidateParties, // Contains data for each party to identify them
+        Server_RespondParties, // Contains Missing Parties from client
 
         Sync,
         StoreAdd, // Adds an object to the global object store
         StoreAck, // Sent after receiving an object via StoreAdd
         KeepAlive,
-        Persistence // Will be forwarded to the game state persistence layer.
+        Persistence, // Will be forwarded to the game state persistence layer.
+
+        CreateObject,
     }
 
     public static class Version
