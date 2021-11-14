@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using Moq;
 using Network.Infrastructure;
 using Network.Protocol;
@@ -24,6 +25,7 @@ namespace Coop.Tests.Network
             m_Connection = new ConnectionClient(
                 m_NetworkConnection.Object,
                 m_GamePersistence.Object);
+            CompatibilityInfo.ModuleProvider = new ModuleInfoProviderMock();
         }
 
         private readonly Mock<INetworkConnection> m_NetworkConnection =
@@ -51,7 +53,7 @@ namespace Coop.Tests.Network
                 Times.Once);
             ArraySegment<byte> expectedSentData = TestUtils.MakeRaw(
                 EPacket.Client_Hello,
-                new Client_Hello(Version.Number).Serialize());
+                new Client_Hello(Version.Number, CompatibilityInfo.Get()).Serialize());
             Assert.Equal(expectedSentData, m_SendRawParam);
 
             // Ack client hello

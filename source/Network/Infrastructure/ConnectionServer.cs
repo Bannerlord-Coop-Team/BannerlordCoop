@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using Network.Protocol;
 using NLog;
 using Version = Network.Protocol.Version;
@@ -90,8 +91,14 @@ namespace Network.Infrastructure
         [ConnectionServerPacketHandler(EServerConnectionState.AwaitingClient, EPacket.Client_Hello)]
         private void ReceiveClientHello(ConnectionBase connection, Packet packet)
         {
-            Client_Hello payload = Client_Hello.Deserialize(new ByteReader(packet.Payload));
-            if (payload.m_Version == Version.Number)
+            var ourCompatibilityInfo = CompatibilityInfo.Get();
+            var payload = Client_Hello.Deserialize(new ByteReader(packet.Payload));
+            var gameVersionMatches = payload.m_CompatibilityInfo.GameVersionMatches(ourCompatibilityInfo);
+            var isClientCompatible = payload.m_CompatibilityInfo.CompatibleWith(ourCompatibilityInfo);
+
+            if (payload.m_Version == Version.Number &&
+                isClientCompatible &&
+                gameVersionMatches)
             {
                 SendRequestClientInfo();
             }
@@ -102,7 +109,14 @@ namespace Network.Infrastructure
                     packet.Type,
                     payload,
                     Version.Number);
-                Disconnect(EDisconnectReason.WrongProtocolVersion);
+                var reason = EDisconnectReason.WrongProtocolVersion;
+                
+                if (!gameVersionMatches)
+                  reason = EDisconnectReason.WrongGameVersion;
+                else if(!isClientCompatible)
+                  reason = EDisconnectReason.IncompatibleMods;
+
+                Disconnect(reason);
             }
         }
 
