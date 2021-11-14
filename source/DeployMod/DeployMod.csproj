@@ -4,6 +4,8 @@
         <TargetFramework>net4.7.2</TargetFramework>
         <OutputType>Module</OutputType>
         <IsPackable>false</IsPackable>
+        <Configurations>Debug;Release;Jetbrains debug x64</Configurations>
+        <Platforms>AnyCPU;x64</Platforms>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">

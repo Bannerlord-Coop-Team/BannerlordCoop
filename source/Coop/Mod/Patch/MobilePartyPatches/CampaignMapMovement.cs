@@ -132,7 +132,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
 #if DEBUG
                 throw new InvalidStateException(sMessage);
 #else
-                Logger.Warn(sMessage);
+                // Logger.Warn(sMessage);
                 return;
 #endif
             }

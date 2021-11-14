@@ -3,6 +3,8 @@
       <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
       <OutputType>Library</OutputType>
       <TargetFramework>net472</TargetFramework>
+      <Configurations>Debug;Release;Jetbrains debug x64</Configurations>
+      <Platforms>AnyCPU;x64</Platforms>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
       <PlatformTarget>x64</PlatformTarget>

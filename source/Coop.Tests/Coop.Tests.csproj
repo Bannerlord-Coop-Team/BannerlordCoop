@@ -7,7 +7,7 @@
 
     <Platforms>x64</Platforms>
 
-    <Configurations>Debug;Release</Configurations>
+    <Configurations>Debug;Release;Jetbrains debug x64</Configurations>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
