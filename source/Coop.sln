@@ -37,6 +37,7 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoteAction", "RemoteAction\RemoteAction.csproj", "{D6E8252C-8EDE-4E01-9A61-6FB92B50FB6F}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DeployMod", "DeployMod\DeployMod.csproj", "{46709532-7DCC-4C7C-89CE-103E8E0F456F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Tests", "Common.Tests\Common.Tests.csproj", "{52CC5E00-CAA6-4B05-A713-4D387B60B138}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -155,6 +156,10 @@ Global
 		{46709532-7DCC-4C7C-89CE-103E8E0F456F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{46709532-7DCC-4C7C-89CE-103E8E0F456F}.Release|x64.ActiveCfg = Release|Any CPU
 		{46709532-7DCC-4C7C-89CE-103E8E0F456F}.Release|x64.Build.0 = Release|Any CPU
+		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Debug|x64.ActiveCfg = Debug|x64
+		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Debug|x64.Build.0 = Debug|x64
+		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Release|x64.ActiveCfg = Release|x64
+		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

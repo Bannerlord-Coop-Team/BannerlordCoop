@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading;
+using Common;
 using Coop.NetImpl.LiteNet;
 using LiteNetLib;
 using Moq;
@@ -40,6 +41,7 @@ namespace Coop.Tests.Network
                 IPAddress.Parse(m_sServerIP),
                 IPAddress.IPv6Any,
                 m_iServerPort);
+            CompatibilityInfo.ModuleProvider = new ModuleInfoProviderMock();
         }
 
         private const string m_sServerIP = "127.0.0.1";

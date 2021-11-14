@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Moq;
@@ -37,6 +38,7 @@ namespace Coop.Tests.Network
                 m_NetworkConnection.Object,
                 m_GamePersistence.Object,
                 m_WorldData.Object);
+            CompatibilityInfo.ModuleProvider = new ModuleInfoProviderMock();
         }
 
         [Fact]
@@ -48,7 +50,7 @@ namespace Coop.Tests.Network
             // Send client hello
             ArraySegment<byte> clientHello = TestUtils.MakeRaw(
                 EPacket.Client_Hello,
-                new Client_Hello(Version.Number).Serialize());
+                new Client_Hello(Version.Number, CompatibilityInfo.Get()).Serialize());
             m_Connection.Receive(clientHello);
 
             // Expect server request client info
