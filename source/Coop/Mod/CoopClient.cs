@@ -61,7 +61,7 @@ namespace Coop.Mod
 
         private int m_ReconnectAttempts = MaxReconnectAttempts;
         private Hero m_Hero = null;
-        private MBGUID m_HeroGUID;
+        private Guid m_HeroGUID;
         private ObjectId m_HeroId;
         #endregion
         public Action<PersistenceClient> OnPersistenceInitialized;
@@ -213,8 +213,6 @@ namespace Coop.Mod
                 // Handler Registration
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyId);
-                Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyValidation);
-                Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyResponse);
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
 
                 Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
@@ -285,7 +283,7 @@ namespace Coop.Mod
         [GameClientPacketHandler(ECoopClientState.MainManu, EPacket.Server_NotifyCharacterExists)]
         private void ReceiveCharacterExists(ConnectionBase connection, Packet packet)
         {
-            m_HeroGUID = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
+            m_HeroGUID = CommonSerializer.Deserialize<Guid>(packet.Payload);
             //m_Hero = (Hero)MBObjectManager.Instance.GetObject(m_HeroGUID);
             m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
         }
@@ -355,7 +353,7 @@ namespace Coop.Mod
             if (bSuccess)
             {
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
-                if(m_HeroGUID == new MBGUID(0))
+                if(m_HeroGUID == Guid.Empty)
                 {
                     gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_Hero);
                 }
@@ -369,7 +367,8 @@ namespace Coop.Mod
                 //ClientManager.OnPreLoadFinishedEvent += (source, e) => {
                 //};
                 ClientManager.OnPostLoadFinishedEvent += (source, e) => {
-                    CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, SendPlayerPartyChanged);
+                    // TODO fix
+                    //CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, SendPlayerPartyChanged);
 
                     m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded); 
                 };
@@ -382,6 +381,8 @@ namespace Coop.Mod
                 Session.Connection.Disconnect(EDisconnectReason.WorldDataTransferIssue);
             }
         }
+
+
         #endregion
 
         #region  ClientLoading
@@ -409,61 +410,7 @@ namespace Coop.Mod
         [GameClientPacketHandler(ECoopClientState.CharacterCreation, EPacket.Server_HeroId)]
         private void ReceivePartyId(ConnectionBase connection, Packet packet)
         {
-            m_HeroGUID = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
-        }
-
-        [GameClientPacketHandler(ECoopClientState.Playing, EPacket.Server_ValidateParties)]
-        private void ReceivePartyValidation(ConnectionBase connection, Packet packet)
-        {
-            // NOTE: could be more efficient
-            BinaryFormatter formatter = new BinaryFormatter();
-            var stream = new MemoryStream(packet.Payload.Array);
-            List<PartyData> hostParties = (List<PartyData>)formatter.Deserialize(stream);
-
-            // O(N^2)
-            // List<PartyData> partiesNeeded = hostParties.Where(party => { return !Persistence.Environment.Parties.Keys.Contains(party, new PartyDataComparer()); }).ToList();
-            List<PartyData> partiesNeeded = new List<PartyData>();
-            stream = new MemoryStream();
-            formatter.Serialize(stream, partiesNeeded);
-            connection.Send(new Packet(EPacket.Client_RequestParties, stream.ToArray()));
-
-            //// Remove parties that exist on client and not on server.
-            //List<PartyData> partiesToRemove = Persistence.Environment.Parties.Keys.Where(party => { return !hostParties.Contains(party, new PartyDataComparer()); }).ToList();
-            //partiesToRemove.ForEach(party => Persistence.Environment.Parties[party].RemoveParty());
-        }
-
-        
-
-        [GameClientPacketHandler(ECoopClientState.Playing, EPacket.Server_RespondParties)]
-        private void ReceivePartyResponse(ConnectionBase connection, Packet packet)
-        {
-            BinaryFormatter formatter = new BinaryFormatter();
-            var stream = new MemoryStream(packet.Payload.Array);
-
-            // Instantiate parties
-            List<MobilePartySerializer> parties = (List<MobilePartySerializer>)formatter.Deserialize(stream);
-            parties.ForEach(party => party.Deserialize());
-
-
-            connection.Send(new Packet(EPacket.Client_RecievedParties, new byte[0]));
-        }
-
-        private void SendPlayerPartyChanged(Hero h1, Hero h2, MobileParty party)
-        {
-            MBGUID guid;
-            if (m_HeroGUID == new MBGUID(0))
-            {
-                guid = m_Hero.Id;
-            }
-            else
-            {
-                guid = m_HeroGUID;
-            }
-
-            Session.Connection.Send(
-                new Packet(
-                    EPacket.Client_PartyChanged,
-                    new MBGUIDSerializer(guid).Serialize()));
+            m_HeroGUID = CommonSerializer.Deserialize<Guid>(packet.Payload);
         }
 
 

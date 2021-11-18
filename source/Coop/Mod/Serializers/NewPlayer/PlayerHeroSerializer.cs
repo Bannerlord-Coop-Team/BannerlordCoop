@@ -30,7 +30,7 @@ namespace Coop.Mod.Serializers
         public CharacterObjectSerializer CharacterObject { get; private set; }
         public string PlayerId { get; }
 
-        private MBGUIDSerializer guid;
+        private Guid guid;
 
         readonly List<HeroSerializer> ExSpouses = new List<HeroSerializer>();
 
@@ -38,7 +38,7 @@ namespace Coop.Mod.Serializers
         {
             PlayerId = new PlatformAPI().GetPlayerID().ToString();
 
-            guid = new MBGUIDSerializer(hero.Id);
+            guid = CoopObjectManager.GetGuid(hero);
 
             List<string> UnmanagedFields = new List<string>();
 

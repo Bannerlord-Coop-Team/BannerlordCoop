@@ -209,7 +209,6 @@ namespace Coop.Mod
 
             #region State Machine Callbacks
             coopServerSM.SendingWorldDataState.OnEntryFrom(coopServerSM.SendWorldDataTrigger, SendInitialWorldData);
-            coopServerSM.ClientValidationState.OnEntryFrom(coopServerSM.SendPartyValidationTrigger, ValidateClientParties);
             #endregion
 
             SyncedObjectStore.AddConnection(connection);
@@ -242,8 +241,8 @@ namespace Coop.Mod
             if (CoopSaveManager.PlayerParties.ContainsKey(clientId))
             {
                 // skip character creation on client
-                MBGUID guid = CoopSaveManager.PlayerParties[clientId];
-                connection.Send(new Packet(EPacket.Server_NotifyCharacterExists, new MBGUIDSerializer(guid).Serialize()));
+                Guid guid = CoopSaveManager.PlayerParties[clientId];
+                connection.Send(new Packet(EPacket.Server_NotifyCharacterExists, CommonSerializer.Serialize(guid)));
             }
             else
             {
@@ -290,57 +289,6 @@ namespace Coop.Mod
                 connectionServer);
         }
 
-        private void ValidateClientParties(ConnectionServer connection)
-        {
-            List<PartyData> parties = new List<PartyData>();
-
-
-
-            foreach (MobileParty party in MobileParty.All)
-            {
-                try
-                {
-                    parties.Add(new PartyData(party));
-                }
-                catch(NullReferenceException)
-                {
-
-                }
-            }
-
-            IFormatter formatter = new BinaryFormatter();
-            var stream = new MemoryStream();
-            formatter.Serialize(stream, parties);
-
-            connection.Send(new Packet(EPacket.Server_ValidateParties, stream.ToArray()));
-        }
-
-        [GameServerPacketHandler(ECoopServerState.ClientValidation, EPacket.Client_RequestParties)]
-        private void ReceivePartyValidationResponse(ConnectionBase connection, Packet packet)
-        {
-            BinaryFormatter formatter = new BinaryFormatter();
-            var stream = new MemoryStream(packet.Payload.Array);
-            List<PartyData> partiesToSend = (List<PartyData>)formatter.Deserialize(stream);
-
-            Dictionary<PartyData, MobileParty> parties = new Dictionary<PartyData, MobileParty>();
-
-            foreach (MobileParty party in MobileParty.All)
-            {
-                parties.Add(new PartyData(party), party);
-            }
-
-            List<MobilePartySerializer> serializedParties = new List<MobilePartySerializer>();
-            foreach (PartyData party in partiesToSend)
-            {
-                serializedParties.Add(new MobilePartySerializer(parties[party]));
-            }
-
-            stream = new MemoryStream();
-            formatter.Serialize(stream, serializedParties);
-
-            connection.Send(new Packet(EPacket.Server_RespondParties, stream.ToArray()));
-        }
-
         [GameServerPacketHandler(ECoopServerState.ClientValidation, EPacket.Client_RecievedParties)]
         private void ReceivePartyValidationComplete(ConnectionBase connection, Packet packet)
         {
@@ -363,9 +311,9 @@ namespace Coop.Mod
         [GameServerPacketHandler(ECoopServerState.Playing, EPacket.Client_PartyChanged)]
         private void ReceiveClientPlayerPartyChanged(ConnectionBase connection, Packet packet)
         {
-            MBGUID guid = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
+            Guid guid = CommonSerializer.Deserialize<Guid>(packet.Payload);
             Debug.WriteLine($"Requested GUID {guid}");
-            Hero clientHero = (Hero)MBObjectManager.Instance.GetObject(guid);
+            Hero clientHero = CoopObjectManager.GetObject<Hero>(guid);
 
             MobileParty party = clientHero.PartyBelongedTo;
 
@@ -385,7 +333,8 @@ namespace Coop.Mod
             if (obj is PlayerHeroSerializer heroSerializer)
             {
                 Hero hero = (Hero)heroSerializer.Deserialize();
-                connection.Send(new Packet(EPacket.Server_HeroId, new MBGUIDSerializer(hero.Id).Serialize()));
+                Guid guid = CoopObjectManager.AddObject(hero);
+                connection.Send(new Packet(EPacket.Server_HeroId, CommonSerializer.Serialize(guid)));
             }
         }
 

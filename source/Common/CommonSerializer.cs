@@ -21,7 +21,7 @@ namespace Common
             }
         }
 
-        public static object Deserialize(byte[] bytes)
+        private static object DeserializeBytes(byte[] bytes)
         {
             using (MemoryStream ms = new MemoryStream(bytes))
             {
@@ -30,9 +30,24 @@ namespace Common
             }
         }
 
+        public static T Deserialize<T>(ArraySegment<byte> bytes)
+        {
+            return (T)Deserialize(bytes.Array);
+        }
+
+        public static T Deserialize<T>(byte[] bytes)
+        {
+            return (T)DeserializeBytes(bytes);
+        }
+
         public static object Deserialize(ArraySegment<byte> bytes)
         {
             return Deserialize(bytes.Array);
+        }
+
+        public static object Deserialize(byte[] bytes)
+        {
+            return DeserializeBytes(bytes);
         }
     }
 }

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.30002.166
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31825.309
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Coop", "Coop\Coop.csproj", "{442B73F2-B103-4EF6-8B4B-A2F36F169515}"
 EndProject
@@ -37,6 +37,7 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoteAction", "RemoteAction\RemoteAction.csproj", "{D6E8252C-8EDE-4E01-9A61-6FB92B50FB6F}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DeployMod", "DeployMod\DeployMod.csproj", "{46709532-7DCC-4C7C-89CE-103E8E0F456F}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Tests", "Common.Tests\Common.Tests.csproj", "{52CC5E00-CAA6-4B05-A713-4D387B60B138}"
 EndProject
 Global
@@ -156,8 +157,12 @@ Global
 		{46709532-7DCC-4C7C-89CE-103E8E0F456F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{46709532-7DCC-4C7C-89CE-103E8E0F456F}.Release|x64.ActiveCfg = Release|Any CPU
 		{46709532-7DCC-4C7C-89CE-103E8E0F456F}.Release|x64.Build.0 = Release|Any CPU
+		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Debug|Any CPU.Build.0 = Debug|x64
 		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Debug|x64.ActiveCfg = Debug|x64
 		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Debug|x64.Build.0 = Debug|x64
+		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Release|Any CPU.ActiveCfg = Release|x64
+		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Release|Any CPU.Build.0 = Release|x64
 		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Release|x64.ActiveCfg = Release|x64
 		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection

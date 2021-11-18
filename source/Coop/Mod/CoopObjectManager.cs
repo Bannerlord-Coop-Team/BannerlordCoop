@@ -32,13 +32,15 @@ namespace Coop.Mod
             }
         }
 
-        public static void AddObject(object obj)
+        public static Guid AddObject(object obj)
         {
             Guid newId = Guid.NewGuid();
 
             Objects.Add(newId, obj);
 
             AddTypeEntry(obj, newId);
+
+            return newId;
         }
 
         public static object GetObject(Guid id)
@@ -83,7 +85,7 @@ namespace Coop.Mod
             return result;
         }
 
-        public T GetObject<T>(Guid id)
+        public static T GetObject<T>(Guid id)
         {
             object obj = Objects[id];
             if (obj.GetType() != typeof(T))
