@@ -37,5 +37,10 @@ namespace Coop.Mod.Serializers
             XmlNode node = doc.ReadNode(xmlReader);
             return node;
         }
+
+        public void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

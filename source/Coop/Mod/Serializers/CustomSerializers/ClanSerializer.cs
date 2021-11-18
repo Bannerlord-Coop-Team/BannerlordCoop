@@ -69,7 +69,7 @@ namespace Coop.Mod.Serializers
                         }
                         break;
                     case "_basicTroop":
-                        SNNSO.Add(fieldInfo, new BasicTroopSerializer((CharacterObject)value));
+                        SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value));
                         break;
                     case "_leader":
                         // Assigned by SetHeroReference on deserialization
@@ -85,6 +85,9 @@ namespace Coop.Mod.Serializers
                         break;
                     case "_defaultPartyTemplate":
                         SNNSO.Add(fieldInfo, new DefaultPartyTemplateSerializer((PartyTemplateObject)value));
+                        break;
+                    case "_kingdom":
+                        // TODO fix
                         break;
                     default:
                         UnmanagedFields.Add(fieldInfo.Name);

@@ -47,8 +47,6 @@ namespace Coop.Mod.Serializers
                     
                 case ItemRoster itemRoster:
                     return new ItemRosterSerializer(itemRoster);
-                case MBGUID mbguid:
-                    return new MBGUIDSerializer(mbguid);
                 case MobilePartiesAroundPositionList partiesAroundPosition:
                     return new MobilePartiesAroundPositionListSerializer(partiesAroundPosition);
                 case MobileParty mobileParty:

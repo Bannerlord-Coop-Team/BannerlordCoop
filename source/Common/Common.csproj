@@ -50,6 +50,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BinarySerializer.cs" />
     <Compile Include="CoopStateMachine.cs" />
     <Compile Include="DropoutStack.cs" />
     <Compile Include="FrameLimiter.cs" />
