@@ -56,7 +56,7 @@ namespace Coop.Mod
         private MBGameManager gameManager;
 
         private int m_ReconnectAttempts = MaxReconnectAttempts;
-        private Hero m_Hero;
+        private Hero m_Hero = null;
         private MBGUID m_HeroGUID;
         private ObjectId m_HeroId;
         #endregion
@@ -209,6 +209,7 @@ namespace Coop.Mod
 
                 // Handler Registration
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
+                Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyId);
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
 
                 Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
@@ -289,17 +290,22 @@ namespace Coop.Mod
 
         public void CharacterCreationOver()
         {
-            GetStore().OnObjectAcknowledged += (id, obj) =>
+            PlayerHeroSerializer playerHeroSerialized = new PlayerHeroSerializer(Hero.MainHero);
+            byte[] data = SyncedObjectStore.Serialize(playerHeroSerialized);
+            Session.Connection.Send(
+                new Packet(
+                    EPacket.Client_RequestGameData,
+                    data));
+        }
+
+        [GameClientPacketHandler(ECoopClientState.CharacterCreation, EPacket.Server_HeroData)]
+        public void RecieveHeros(ConnectionBase connection, Packet packet)
+        {
+            object data = SyncedObjectStore.Deserialize(packet.Payload.Array);
+            if(data.GetType() == typeof(HeroSerializer[]))
             {
-                if (id == m_HeroId)
-                {
-                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterCreated);
-                    if (obj is Hero hero)
-                    {
-                        m_Hero = hero;
-                    }
-                }
-            };
+                int x = 1;
+            }
         }
         #endregion
 
@@ -392,9 +398,26 @@ namespace Coop.Mod
                     new Client_Joined().Serialize()));
             TryInitPersistence();
         }
+		
 
-        private void SendPlayerPartyChanged(Hero hero, MobileParty party)
+        [GameClientPacketHandler(ECoopClientState.CharacterCreation, EPacket.Server_HeroId)]
+        private void ReceivePartyId(ConnectionBase connection, Packet packet)
         {
+            m_HeroGUID = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
+        }
+
+        private void SendPlayerPartyChanged(Hero h1, Hero h2, MobileParty party)
+        {
+            MBGUID guid;
+            if (m_HeroGUID == new MBGUID(0))
+            {
+                guid = m_Hero.Id;
+            }
+            else
+            {
+                guid = m_HeroGUID;
+            }
+
             Session.Connection.Send(
                 new Packet(
                     EPacket.Client_PartyChanged,

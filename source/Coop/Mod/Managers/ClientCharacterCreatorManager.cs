@@ -53,11 +53,39 @@ namespace Coop.Mod.Managers
             Settlement settlement = Settlement.Find("tutorial_training_field");
             MobileParty.MainParty.Position2D = settlement.Position2D;
 
-            OnGameLoadFinishedEvent?.Invoke(this, new HeroEventArgs(
-                MobileParty.MainParty.Name.ToString(),
-                CoopClient.Instance.SyncedObjectStore.Insert(Hero.MainHero)
-            ));
-            EndGame();
+            OnGameLoadFinishedEvent?.Invoke(this, new HeroEventArgs());
+
+            RemoveAllObjectsExceptPlayer();
+        }
+
+        private void RemoveAllObjectsExceptPlayer()
+        {
+            CampaignObjectManager campaignObjectManager = Campaign.Current.CampaignObjectManager;
+
+            MobileParty playerParty = MobileParty.MainParty;
+            Hero playerHero = Hero.MainHero;
+            Clan playerClan = Hero.MainHero.Clan;
+            Settlement playerSettlment = playerParty.CurrentSettlement;
+
+            campaignObjectManager.GetMobileParties().RemoveAll(x => x != playerParty);
+            campaignObjectManager.GetDeadOrDisabledHeros().RemoveAll(x => x != playerHero);
+            campaignObjectManager.GetAliveHeros().RemoveAll(x => x != playerHero);
+            campaignObjectManager.GetClans().RemoveAll(x => x != playerClan);
+            campaignObjectManager.GetKingdoms().RemoveAll(x => true);
+            
+            List<Settlement> settlements = campaignObjectManager.Settlements.ToList();
+            settlements.ForEach(x => {
+                if (x != playerSettlment) {
+                    Campaign.Current.ObjectManager.UnregisterObject(x);
+                } 
+            });
+            
+            List<Settlement> settlements = campaignObjectManager.Settlements.ToList();
+            settlements.ForEach(x => {
+                if (x != playerSettlment) {
+                    Campaign.Current.ObjectManager.UnregisterObject(x);
+                } 
+            });
         }
 
         private void SkipCharacterCreation()

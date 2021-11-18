@@ -21,6 +21,11 @@ namespace Coop.Mod.Serializers
             id = (item != null) ? item.Id.InternalValue : 0U;
         }
 
+        public void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
+
         public ICustomSerializer Serialize(object obj)
         {
             return new EquipmentElementSerializer((EquipmentElement)obj);

@@ -286,6 +286,8 @@
     <Compile Include="Mod\Patch\Party\PartiesSellLootCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesSellPrisonerCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\RecruitmentCampaignBehavior.cs" />
+    <Compile Include="Mod\Patch\Quest\BannerInvestigationQuestPatch.cs" />
+    <Compile Include="Mod\Patch\TemporaryTypesPatch.cs" />
     <Compile Include="Mod\Patch\World\SaveManager.cs" />
     <Compile Include="Mod\GameSync\Caravan\CaravanPartyComponentSync.cs" />
     <Compile Include="Mod\GameSync\FiefSync.cs" />
@@ -356,7 +358,6 @@
     <Compile Include="Mod\Serializers\CustomSerializers\HeroSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ItemRosterSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MBCharacterSkillsSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\MBGUIDSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MobilePartiesAroundPositionListSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MobilePartySerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\NavigationPathSerializer.cs" />
@@ -367,7 +368,6 @@
     <Compile Include="Mod\Serializers\CustomSerializers\SettlementSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\TraitObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\TroopRosterSerializer.cs" />
-    <Compile Include="Mod\Serializers\MBObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\PartyComponentSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterFeatsSerializer.cs" />
@@ -375,6 +375,7 @@
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterSkillsSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterTraitsSerializer.cs" />
     <Compile Include="Mod\Serializers\SerializableFactory.cs" />
+    <Compile Include="Mod\Serializers\SerializerConfig.cs" />
     <Compile Include="Mod\UI\CharacterCreationUI\CharacterCreationUI.cs" />
     <Compile Include="Mod\UI\CoopConnectMenuVM.cs" />
     <Compile Include="Mod\UI\CoopConnectionUI.cs" />

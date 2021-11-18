@@ -12,6 +12,7 @@ namespace Coop.Mod.Serializers
     public interface ICustomSerializer
     {
         object Deserialize();
+        void ResolveReferenceGuids();
     }
 
     [Serializable]
@@ -51,7 +52,7 @@ namespace Coop.Mod.Serializers
                         }
                         
                     }
-                    else if (field.FieldType.IsSerializable)
+                    else if (IsSerializable(field.FieldType))
                     {
                         SerializableObjects.Add(field, field.GetValue(obj));
                     }
@@ -86,6 +87,11 @@ namespace Coop.Mod.Serializers
             }
             return newObj;
         }
+
+        /// <summary>
+        /// Any assigned Guids are replaced with actual object references.
+        /// </summary>
+        public abstract void ResolveReferenceGuids();
 
         /// <summary>
         /// Get all fields from type
@@ -123,10 +129,15 @@ namespace Coop.Mod.Serializers
                 }
                 else
                 {
-                    return elementType.IsSerializable;
+                    return IsSerializable(elementType);
                 }
             }
             return result;
+        }
+
+        private bool IsSerializable(Type type)
+        {
+            return !SerializerConfig.MarkAsNonSerializable.Contains(type) && type.IsSerializable;
         }
     }
 }

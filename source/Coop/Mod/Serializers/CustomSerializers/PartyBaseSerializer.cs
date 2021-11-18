@@ -116,5 +116,10 @@ namespace Coop.Mod.Serializers
         {
             throw new NotImplementedException();
         }
+
+        public override void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

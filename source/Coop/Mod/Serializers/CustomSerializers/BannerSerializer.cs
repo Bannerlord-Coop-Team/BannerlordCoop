@@ -18,5 +18,10 @@ namespace Coop.Mod.Serializers
             Banner newBanner = new Banner(data);
             return newBanner;
         }
+
+        public void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

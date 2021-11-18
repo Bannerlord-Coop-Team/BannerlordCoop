@@ -23,5 +23,10 @@ namespace Coop.Mod.Serializers
             TraitObject newTraitObject = new TraitObject(StringId);
             return base.Deserialize(newTraitObject);
         }
+
+        public override void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

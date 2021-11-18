@@ -22,6 +22,11 @@ using Common;
 using System.Linq;
 using TaleWorlds.ObjectSystem;
 using Coop.Mod.Patch.World;
+using System.Diagnostics;
+using Coop.Mod.Data;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization;
+using TaleWorlds.TwoDimension;
 
 namespace Coop.Mod
 {
@@ -74,6 +79,7 @@ namespace Coop.Mod
 
         public string StartServer()
         {
+
             if (Campaign.Current == null)
             {
                 string msg = "Campaign is not loaded. Could not start server.";
@@ -215,6 +221,7 @@ namespace Coop.Mod
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientRequestWorldData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientDeclineWorldData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientLoaded);
+            connection.Dispatcher.RegisterPacketHandler(SendGameData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientPlayerPartyChanged);
 
             // State Machine Registration
@@ -277,6 +284,19 @@ namespace Coop.Mod
             m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.ClientLoaded);
         }
 
+        [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestGameData)]
+        private void SendGameData(ConnectionBase connection, Packet packet)
+        {
+            
+            HeroSerializer[] heros = CoopObjectManager.GetObjects<Hero>().Select(hero => new HeroSerializer(hero)).ToArray();
+
+            byte[] data = SyncedObjectStore.Serialize(heros);
+
+            connection.Send(new Packet(EPacket.Server_HeroData, data));
+        }
+
+
+        [GameServerPacketHandler(ECoopServerState.ClientValidation, EPacket.Client_PartyChanged)]
         [GameServerPacketHandler(ECoopServerState.Playing, EPacket.Client_PartyChanged)]
         private void ReceiveClientPlayerPartyChanged(ConnectionBase connection, Packet packet)
         {

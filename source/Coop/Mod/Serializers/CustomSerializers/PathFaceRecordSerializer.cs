@@ -22,5 +22,10 @@ namespace Coop.Mod.Serializers
         {
             return new PathFaceRecord(pathFaceIndex, pathFaceGroupIndex, pathFaceIslandIndex);
         }
+
+        public void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

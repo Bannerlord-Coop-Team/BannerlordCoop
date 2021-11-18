@@ -111,5 +111,10 @@ namespace Coop.Mod.Serializers
 
             return base.Deserialize(characterObject);
         }
+
+        public override void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

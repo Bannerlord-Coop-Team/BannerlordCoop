@@ -52,5 +52,10 @@ namespace Coop.Mod.Serializers
 
             return newRoster;
             }
+
+        public void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
         }
+    }
 }

@@ -25,5 +25,10 @@ namespace Coop.Mod.Serializers
             
             return base.Deserialize(newDeterministicRandom);
         }
+
+        public override void ResolveReferenceGuids()
+        {
+            // No references
+        }
     }
 }

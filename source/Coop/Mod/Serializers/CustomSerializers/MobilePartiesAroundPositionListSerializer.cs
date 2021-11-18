@@ -39,5 +39,10 @@ namespace Coop.Mod.Serializers
 
             return newPositionList;
         }
+
+        public void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

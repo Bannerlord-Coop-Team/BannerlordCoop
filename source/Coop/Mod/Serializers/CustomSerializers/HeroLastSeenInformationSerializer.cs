@@ -26,5 +26,10 @@ namespace Coop.Mod.Serializers
                 IsNearbySettlement = isSettlementNearby,
             };
         }
+
+        public void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

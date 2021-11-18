@@ -34,6 +34,10 @@ namespace Coop.Mod.Serializers
         {
             PlayerId = new PlatformAPI().GetPlayerID().ToString();
 
+            guid = new MBGUIDSerializer(hero.Id);
+
+            List<string> UnmanagedFields = new List<string>();
+
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
                 // Get value from fieldInfo
@@ -106,10 +110,10 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
                         break;
                     case "_father":
-                        SNNSO.Add(fieldInfo, new HeroSerializer((Hero)value));
+                        SNNSO.Add(fieldInfo, null);
                         break;
                     case "_mother":
-                        SNNSO.Add(fieldInfo, new HeroSerializer((Hero)value));
+                        SNNSO.Add(fieldInfo, null);
                         break;
                     case "ExSpouses":
                         foreach (Hero exSpouse in (MBReadOnlyList<Hero>)value)
@@ -122,9 +126,14 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new HeroDeveloperSerializer((HeroDeveloper)value));
                         break;
                     default:
-                        throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
-
+                        UnmanagedFields.Add(fieldInfo.Name);
+                        break;
                 }
+            }
+
+            if (!UnmanagedFields.IsEmpty())
+            {
+                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
             }
 
             // TODO manage collections
@@ -195,6 +204,11 @@ namespace Coop.Mod.Serializers
             .Invoke(hero.PartyBelongedTo.Party.Visuals, new object[] { hero.PartyBelongedTo.Party });
 
             return hero;
+        }
+
+        public override void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
         }
     }
 }

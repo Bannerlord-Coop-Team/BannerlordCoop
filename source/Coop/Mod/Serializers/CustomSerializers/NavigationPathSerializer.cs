@@ -30,5 +30,10 @@ namespace Coop.Mod.Serializers
 
             return newNavigationPath;
         }
+
+        public void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

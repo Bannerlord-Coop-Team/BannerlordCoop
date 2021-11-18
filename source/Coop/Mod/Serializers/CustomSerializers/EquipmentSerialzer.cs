@@ -25,5 +25,10 @@ namespace Coop.Mod.Serializers
         {
             return Equipment.CreateFromEquipmentCode(equipmentCode);
         }
+
+        public void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

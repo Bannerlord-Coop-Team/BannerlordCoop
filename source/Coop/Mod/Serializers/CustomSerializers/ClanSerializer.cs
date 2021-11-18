@@ -25,9 +25,11 @@ namespace Coop.Mod.Serializers
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
-       
+
         public ClanSerializer(Clan clan) : base(clan)
         {
+            List<string> UnmanagedFields = new List<string>();
+
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
                 // Get value from fieldInfo
@@ -85,8 +87,14 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new DefaultPartyTemplateSerializer((PartyTemplateObject)value));
                         break;
                     default:
-                        throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
+                        UnmanagedFields.Add(fieldInfo.Name);
+                        break;
                 }
+            }
+
+            if (!UnmanagedFields.IsEmpty())
+            {
+                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
             }
 
             // TODO manage collections
@@ -127,6 +135,11 @@ namespace Coop.Mod.Serializers
             }
             
             return base.Deserialize(newClan);
+        }
+
+        public override void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
         }
     }
 }

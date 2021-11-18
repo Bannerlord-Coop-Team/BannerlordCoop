@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
+using Common;
 using JetBrains.Annotations;
 
 namespace Sync.Store
@@ -17,18 +18,18 @@ namespace Sync.Store
         public byte[] Serialize(object obj)
         {
             var serializable = Factory != null ? Factory.Wrap(obj) : obj;
-            IFormatter formatter = new BinaryFormatter();
-            var stream = new MemoryStream();
-            formatter.Serialize(stream, serializable);
-            return stream.ToArray();
+            return CommonSerializer.Serialize(serializable);
         }
 
         public object Deserialize(byte[] raw)
         {
-            var buffer = new MemoryStream(raw);
-            return Factory == null
-                ? new BinaryFormatter().Deserialize(buffer)
-                : Factory.Unwrap(new BinaryFormatter().Deserialize(buffer));
+            using(MemoryStream buffer = new MemoryStream(raw))
+            {
+                return Factory == null
+                   ? new BinaryFormatter().Deserialize(buffer)
+                   : Factory.Unwrap(new BinaryFormatter().Deserialize(buffer));
+            }
+            
         }
     }
 }

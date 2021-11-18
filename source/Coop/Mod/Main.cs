@@ -87,6 +87,7 @@ namespace Coop.Mod
 
         public Main()
         {
+
             Debug.DebugManager = Debugging.DebugManager;
             MBDebug.DisableLogging = false;
 

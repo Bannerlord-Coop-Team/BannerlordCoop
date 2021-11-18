@@ -22,5 +22,10 @@ namespace Coop.Mod.Serializers
                 .SetValue(skills, characterSkillsSerializer.Deserialize(), BindingFlags.NonPublic | BindingFlags.Instance, null, null, null);
             return skills;
         }
+
+        public void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

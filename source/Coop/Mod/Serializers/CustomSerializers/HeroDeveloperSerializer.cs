@@ -5,8 +5,21 @@ using TaleWorlds.ObjectSystem;
 namespace Coop.Mod.Serializers
 {
     [Serializable]
-    internal class HeroDeveloperSerializer : MBObjectSerializer
+    internal class HeroDeveloperSerializer : CustomSerializer
     {
-        public HeroDeveloperSerializer(HeroDeveloper value) : base(value) { }
+        public HeroDeveloperSerializer(HeroDeveloper value) : base(value) 
+        {
+            // TODO HeroDeveloperSerializer
+        }
+
+        public override object Deserialize()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

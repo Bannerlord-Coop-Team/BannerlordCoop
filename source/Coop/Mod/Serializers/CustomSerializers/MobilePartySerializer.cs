@@ -155,6 +155,9 @@ namespace Coop.Mod.Serializers
                     case ClanSerializer clanSerializer:
                         clanSerializer.SetHeroReference(hero);
                         break;
+                    case PartyComponentSerializer partyComponentSerializer:
+                        entry.Key.SetValue(newMobileParty, partyComponentSerializer.Deserialize());
+                        break;
                     default:
                         entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
                         break;
@@ -162,6 +165,11 @@ namespace Coop.Mod.Serializers
             }
 
             return base.Deserialize(newMobileParty);
+        }
+
+        public override void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
         }
     }
 }

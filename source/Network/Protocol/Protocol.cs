@@ -10,6 +10,7 @@ namespace Network.Protocol
         Client_RequestWorldData, // Client wants to be sent a save game of the current state.
         Client_RequestParty, // Client wants to know if they already created a party.
         Client_DeclineWorldData, // Client does not need world data
+        Client_RequestGameData, // Client requires all game data
         Client_Loaded, // Sent once the client has loaded the initial world state.
         Client_PartyChanged, // When the player party is switched
 
@@ -18,6 +19,7 @@ namespace Network.Protocol
         Server_RequireCharacterCreation, // Instructs the client to create a character.
         Server_NotifyCharacterExists, // Notifies the client a party already exists for that player id.
         Server_WorldData, // Contains the initial state of the game world.
+        Server_HeroData, // Contains data for all current heros
 
         Sync,
         StoreAdd, // Adds an object to the global object store
