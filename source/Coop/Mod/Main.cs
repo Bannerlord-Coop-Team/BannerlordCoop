@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
@@ -39,7 +40,7 @@ namespace Coop.Mod
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
-#region MainMenuButtons
+        #region MainMenuButtons
         public static InitialStateOption CoopCampaign =
             new InitialStateOption(
                 "CoOp Campaign",
@@ -72,7 +73,7 @@ namespace Coop.Mod
                             new object[] { }));
 #endif
                 },
-                () => { return false; }
+                () => { return (false, new TextObject()); }
             );
 
         public static InitialStateOption JoinCoopGame =
@@ -81,9 +82,9 @@ namespace Coop.Mod
               new TextObject("Join Co-op Campaign"),
               9991,
               JoinWindow,
-              () => { return false; }
+              () => { return (false, new TextObject()); }
             );
-#endregion
+        #endregion
 
         public Main()
         {
@@ -132,11 +133,35 @@ namespace Coop.Mod
             // Apply all patches via harmony
             harmony.PatchAll();
 
-#region ButtonAssignment
+            var isServer = false;
+
+            var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
+
+
+#if DEBUG
+
+
+            if (args.Contains("/server"))
+            {
+                isServer = true;
+                //TODO add name to args
+                
+            }
+            else if (args.Contains("/client"))
+            {
+                isServer = false;
+            }
+
+#else
+                        ScreenManager.PushScreen(
+                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                                new object[] { }));
+#endif
+            #region ButtonAssignment
             CoopCampaign =
                 new InitialStateOption(
                     "CoOp Campaign",
-                    new TextObject("Host Co-op Campaign"),
+                    new TextObject(isServer ? "Host Co-op Campaign" : "Join Co-op Campaign"),
                     9990,
                     () =>
                     {
@@ -169,21 +194,23 @@ namespace Coop.Mod
                                 new object[] { }));
 #endif
                     },
-                    () => { return false; });
 
+                    () => { return (false, new TextObject()); }
+                );
+        
             JoinCoopGame =
                 new InitialStateOption(
                   "Join Coop Game",
                   new TextObject("Join Co-op Campaign"),
                   9991,
                   JoinWindow,
-                  () => { return false; }
+              () => { return (false, new TextObject()); }
                 );
 
             Module.CurrentModule.AddInitialStateOption(CoopCampaign);
 
-            Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
-#endregion
+            //Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
+            #endregion
         }
 
         protected override void OnSubModuleUnloaded()
@@ -248,7 +275,7 @@ namespace Coop.Mod
 
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            Exception ex = (Exception) e.ExceptionObject;
+            Exception ex = (Exception)e.ExceptionObject;
             Logger.Fatal(ex, "Unhandled exception");
         }
 

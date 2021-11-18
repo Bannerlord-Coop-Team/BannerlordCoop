@@ -52,13 +52,10 @@ namespace Coop.Tests.Persistence
     public class TestEnvironmentClient
     {
         public Mock<IEnvironmentClient> Mock { get; }
-        private readonly Dictionary<MBGUID, MobileParty> Parties;
-        public TestEnvironmentClient(RemoteStore store, Dictionary<MBGUID, MobileParty> mobileParties)
+        public TestEnvironmentClient(RemoteStore store)
         {
-            Parties = mobileParties;
             Mock = new Mock<IEnvironmentClient>();
             Mock.Setup(env => env.Store).Returns(store);
-            Mock.Setup(env => env.GetMobilePartyById(It.IsAny<MBGUID>())).Returns((MBGUID id) => Parties[id]);
         }
     }
 
@@ -66,16 +63,13 @@ namespace Coop.Tests.Persistence
     {
         public Mock<IEnvironmentServer> Mock { get; }
         public EventBroadcastingQueue EventQueue { get; }
-        private readonly Dictionary<MBGUID, MobileParty> Parties;
 
-        public TestEnvironmentServer(SharedRemoteStore store, Dictionary<MBGUID, MobileParty> mobileParties)
+        public TestEnvironmentServer(SharedRemoteStore store)
         {
-            Parties = mobileParties;
             EventQueue = new EventBroadcastingQueue(store, TimeSpan.FromSeconds(5));
             Mock = new Mock<IEnvironmentServer>();
             Mock.Setup(env => env.Store).Returns(store);
             Mock.Setup(env => env.EventQueue).Returns(EventQueue);
-            Mock.Setup(env => env.GetMobilePartyById(It.IsAny<MBGUID>())).Returns((MBGUID id) => Parties[id]);
         }
     }
 }

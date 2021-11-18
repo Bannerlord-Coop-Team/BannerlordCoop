@@ -31,7 +31,7 @@ namespace Coop.Mod.Serializers
 
         List<string> attachedPartiesNames = new List<string>();
         string stringId;
-        
+
         public MobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
         {
             stringId = mobileParty.StringId;
@@ -107,7 +107,18 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_partyComponent":
-                        // Handle on deserialize
+                        SNNSO.Add(fieldInfo, new PartyComponentSerializer((PartyComponent)value));
+                        break;
+                    case "_pureSpeedExplainer":
+                        // TODO Joke Fix this
+                        break;
+                    case "<TaleWorlds.CampaignSystem.ILocatable<TaleWorlds.CampaignSystem.MobileParty>.NextLocatable>k__BackingField":
+                        // TODO Joke Fix this
+                        break;
+                    case "_targetSettlement":
+                        // TODO Joke Fix this
+                        break;
+                    case "<AiBehaviorObject>k__BackingField":
                         break;
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
@@ -155,14 +166,15 @@ namespace Coop.Mod.Serializers
                     case ClanSerializer clanSerializer:
                         clanSerializer.SetHeroReference(hero);
                         break;
-                    case PartyComponentSerializer partyComponentSerializer:
-                        entry.Key.SetValue(newMobileParty, partyComponentSerializer.Deserialize());
-                        break;
                     default:
                         entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
                         break;
                 }
             }
+
+
+            typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(Campaign.Current.CampaignObjectManager, new object[] { newMobileParty });
 
             return base.Deserialize(newMobileParty);
         }

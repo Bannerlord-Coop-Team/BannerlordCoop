@@ -6,8 +6,10 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.PlayerServices;
+using Debug = System.Diagnostics.Debug;
 
 namespace Coop.Mod.Serializers
 {
@@ -27,6 +29,8 @@ namespace Coop.Mod.Serializers
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
         public CharacterObjectSerializer CharacterObject { get; private set; }
         public string PlayerId { get; }
+
+        private MBGUIDSerializer guid;
 
         readonly List<HeroSerializer> ExSpouses = new List<HeroSerializer>();
 
@@ -125,6 +129,9 @@ namespace Coop.Mod.Serializers
                         // Can reinstantiate on recipient as this is hero data loaded at start of game.
                         SNNSO.Add(fieldInfo, new HeroDeveloperSerializer((HeroDeveloper)value));
                         break;
+                    case "_characterAttributes":
+                        // TODO: Fix this joke
+                        break;
                     default:
                         UnmanagedFields.Add(fieldInfo.Name);
                         break;
@@ -142,10 +149,13 @@ namespace Coop.Mod.Serializers
             // They are marked as nonserializable in CustomSerializer but still tries to serialize???
             NonSerializableCollections.Clear();
             NonSerializableObjects.Clear();
+
+            Debug.WriteLine($"{hero.Id}");
         }
         public override object Deserialize()
         {
             hero = MBObjectManager.Instance.CreateObject<Hero>();
+
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
                 // Pass references to specified serializers
@@ -202,6 +212,8 @@ namespace Coop.Mod.Serializers
             // Invoke party visual onstartup to initialize properly
             typeof(PartyVisual).GetMethod("TaleWorlds.CampaignSystem.IPartyVisual.OnStartup", BindingFlags.Instance | BindingFlags.NonPublic)
             .Invoke(hero.PartyBelongedTo.Party.Visuals, new object[] { hero.PartyBelongedTo.Party });
+
+            Debug.WriteLine($"{hero.Id}");
 
             return hero;
         }

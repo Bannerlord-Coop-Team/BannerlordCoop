@@ -38,7 +38,7 @@ namespace Coop.Tests.NetImpl
         [Fact]
         public void GetPlayerID_ForSteam_ReturnsValidPlayerID()
         {
-            friendListService.Setup(fls => fls.GetServiceName()).Returns("Steam");
+            friendListService.Setup(fls => fls.GetServiceCodeName ()).Returns("Steam");
             platformServices.SetupGet(ps => ps.UserId).Returns("76561198025172135");
             PlayerId playerId = m_PlatformAPI.GetPlayerID();
 

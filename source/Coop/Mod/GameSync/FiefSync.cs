@@ -14,10 +14,10 @@ namespace Coop.Mod.Patch.World
     {
         static FiefSync()
         {
-            When(GameLoop)
-                .Calls(Setter(nameof(Fief.FoodStocks)))
-                .Broadcast(() => CoopClient.Instance.Synchronization)
-                .DelegateTo(IsServer);
+            //When(GameLoop)
+            //    .Calls(Setter(nameof(Fief.FoodStocks)))
+            //    .Broadcast(() => CoopClient.Instance.Synchronization)
+            //    .DelegateTo(IsServer);
 
             AutoWrapAllInstances(c => new FiefSync(c));
         }

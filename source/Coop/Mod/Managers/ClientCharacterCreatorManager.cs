@@ -10,6 +10,12 @@ using Sync.Store;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
 using TaleWorlds.MountAndBlade.GauntletUI;
 using TaleWorlds.MountAndBlade.ViewModelCollection;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.Engine.Screens;
+using TaleWorlds.Engine;
+using TaleWorlds.Localization;
+using System.Collections.Generic;
+using Coop.Mod.Extentions;
 
 namespace Coop.Mod.Managers
 {
@@ -18,16 +24,12 @@ namespace Coop.Mod.Managers
 
         public ObjectId HeroId { get; private set; }
         public string PartyName { get; private set; }
-        public HeroEventArgs(string PartyName, ObjectId HeroId)
+        public HeroEventArgs()
         {
-            this.PartyName = PartyName;
-            this.HeroId = HeroId;
         }
     }
     public class ClientCharacterCreatorManager : StoryModeGameManager
     {
-        public ClientCharacterCreatorManager(LoadResult saveGameData) : base(saveGameData) { }
-
         public ClientCharacterCreatorManager()
         {
         }
@@ -79,18 +81,26 @@ namespace Coop.Mod.Managers
                     Campaign.Current.ObjectManager.UnregisterObject(x);
                 } 
             });
-            
-            List<Settlement> settlements = campaignObjectManager.Settlements.ToList();
-            settlements.ForEach(x => {
-                if (x != playerSettlment) {
-                    Campaign.Current.ObjectManager.UnregisterObject(x);
-                } 
-            });
         }
 
         private void SkipCharacterCreation()
         {
-            CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
+            if (GameStateManager.Current.ActiveState is VideoPlaybackState videoPlaybackState)
+            {
+                if (ScreenManager.TopScreen is VideoPlaybackGauntletScreen)
+                {
+                    VideoPlaybackGauntletScreen videoPlaybackScreen = ScreenManager.TopScreen as VideoPlaybackGauntletScreen;
+                    FieldInfo fieldInfo = typeof(VideoPlaybackGauntletScreen).GetField("_videoPlayerView", BindingFlags.NonPublic | BindingFlags.Instance);
+                    VideoPlayerView videoPlayerView = (VideoPlayerView)fieldInfo.GetValue(videoPlaybackScreen);
+                    videoPlayerView.StopVideo();
+                    videoPlaybackState.OnVideoFinished();
+                    videoPlayerView.SetEnable(false);
+                    fieldInfo.SetValue(videoPlaybackScreen, null);
+                }
+            }
+
+
+                CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
             if (characterCreationState.CurrentStage is CharacterCreationCultureStage)
             {
                 CultureObject culture = CharacterCreationContentBase.Instance.GetCultures().GetRandomElementInefficiently();

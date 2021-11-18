@@ -150,5 +150,10 @@ namespace Coop.Mod.DebugUtil
         {
             Logger.Debug("{message}", message);
         }
+
+        public void ShowError(string message)
+        {
+            Logger.Error("{message}", message);
+        }
     }
 }
