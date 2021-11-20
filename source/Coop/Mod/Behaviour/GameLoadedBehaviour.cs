@@ -51,9 +51,8 @@ namespace Coop.Mod.Behaviour
                     string[] data = line.Split(' ');
 
                     string clientId = data[0];
-                    uint partyId = uint.Parse(data[1]);
+                    Guid partyGUID = Guid.Parse(data[1]);
 
-                    MBGUID partyGUID = new MBGUID(partyId);
                     if (CoopSaveManager.PlayerParties.ContainsKey(clientId))
                     {
                         if (CoopSaveManager.PlayerParties[clientId] != partyGUID)

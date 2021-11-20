@@ -9,10 +9,9 @@ namespace Coop.Mod.Serializers
     internal class PartyComponentSerializer : ICustomSerializer
     {
         [NonSerialized]
-        private Hero hero;
+        private PartyComponent component;
 
         private ICustomSerializer partyComponentSerializer;
-        private Guid hero;
         private Guid party;
         
 
@@ -172,110 +171,6 @@ namespace Coop.Mod.Serializers
                 .SetValue(CustomPartyComponent, CoopObjectManager.GetObject(owner));
             typeof(CustomPartyComponent).GetField("_homeSettlement", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(CustomPartyComponent, CoopObjectManager.GetObject(settlement));
-        }
-
-        public void SetHeroReference(Hero hero)
-        {
-            this.hero = hero;
-        }
-    }
-
-    [Serializable]
-    class BanditPartyComponentSerializer : ICustomSerializer
-    {
-        MBObjectSerializer hideout;
-        bool isBossParty;
-
-        public BanditPartyComponentSerializer(BanditPartyComponent component)
-        {
-            hideout = new MBObjectSerializer(component.Hideout);
-            isBossParty = component.IsBossParty;
-        }
-
-        public object Deserialize()
-        {
-            Hideout hideout = (Hideout)this.hideout.Deserialize();
-
-            return Activator.CreateInstance(
-                typeof(BanditPartyComponent),
-                BindingFlags.Instance | BindingFlags.NonPublic,
-                null,
-                new object[] { hideout, isBossParty },
-                null);
-        }
-    }
-
-    [Serializable]
-    class LordPartyComponentSerializer : ICustomSerializer
-    {
-        [NonSerialized]
-        private Hero hero;
-
-        MBObjectSerializer owner;
-        
-
-        public LordPartyComponentSerializer(LordPartyComponent component)
-        {
-            owner = new MBObjectSerializer(component.Owner);
-        }
-
-        public object Deserialize()
-        {
-            Hero owner = (Hero)this.owner.Deserialize();
-
-            if(owner == null)
-            {
-                owner = hero;
-            }
-
-            return Activator.CreateInstance(
-                typeof(LordPartyComponent),
-                BindingFlags.Instance | BindingFlags.NonPublic,
-                null,
-                new object[] { owner },
-                null);
-        }
-
-        public void SetHeroReference(Hero hero)
-        {
-            this.hero = hero; 
-        }
-    }
-
-    [Serializable]
-    class CustomPartyComponentSerializer : ICustomSerializer
-    {
-        private MBObjectSerializer owner;
-        private string name;
-        private MBObjectSerializer settlement;
-        public CustomPartyComponentSerializer(CustomPartyComponent customPartyComponent)
-        {
-            owner = new MBObjectSerializer(customPartyComponent.PartyOwner);
-            settlement = new MBObjectSerializer(customPartyComponent.HomeSettlement);
-            name = customPartyComponent.Name.ToString();
-        }
-
-        public object Deserialize()
-        {
-            CustomPartyComponent component = (CustomPartyComponent)
-                Activator.CreateInstance(
-                typeof(CustomPartyComponent),
-                BindingFlags.Instance | BindingFlags.NonPublic,
-                null,
-                new object[0],
-                null);
-
-            typeof(CustomPartyComponent).GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(component, owner.Deserialize());
-            typeof(CustomPartyComponent).GetField("_homeSettlement", BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(component, settlement.Deserialize());
-
-            TextObject newName = new TextObject(name);
-
-            typeof(CustomPartyComponent).GetField("_name", BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(component, newName);
-
-            return component;
         }
     }
 

@@ -56,7 +56,7 @@ namespace Coop.Mod.Serializers
                 switch (fieldInfo.Name)
                 {
                     case "_characterObject":
-                        SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value));
+                        SNNSO.Add(fieldInfo, new PlayerCharacterObjectSerializer((CharacterObject)value));
                         break;
                     case "<BattleEquipment>k__BackingField":
                         SNNSO.Add(fieldInfo, new EquipmentSerializer((Equipment)value));
@@ -92,14 +92,14 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_clan":
-                        SNNSO.Add(fieldInfo, new ClanSerializer((Clan)value));
+                        SNNSO.Add(fieldInfo, new PlayerClanSerializer((Clan)value));
                         break;
                     case "Culture":
                         // NOTE: May want to read from server before character creation
                         SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)value));
                         break;
                     case "_partyBelongedTo":
-                        SNNSO.Add(fieldInfo, new MobilePartySerializer((MobileParty)value));
+                        SNNSO.Add(fieldInfo, new PlayerMobilePartySerializer((MobileParty)value));
                         break;
                     case "<LastMeetingTimeWithPlayer>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
@@ -122,12 +122,12 @@ namespace Coop.Mod.Serializers
                     case "ExSpouses":
                         foreach (Hero exSpouse in (MBReadOnlyList<Hero>)value)
                         {
-                            ExSpouses.Add(new HeroSerializer((Hero)value));
+                            ExSpouses.Add(new HeroSerializer(exSpouse));
                         }
                         break;
                     case "_heroDeveloper":
                         // Can reinstantiate on recipient as this is hero data loaded at start of game.
-                        SNNSO.Add(fieldInfo, new HeroDeveloperSerializer((HeroDeveloper)value));
+                        SNNSO.Add(fieldInfo, new PlayerHeroDeveloperSerializer((HeroDeveloper)value));
                         break;
                     case "_characterAttributes":
                         // TODO: Fix this joke
@@ -161,13 +161,13 @@ namespace Coop.Mod.Serializers
                 // Pass references to specified serializers
                 switch (entry.Value)
                 {
-                    case CharacterObjectSerializer characterObjectSerializer:
+                    case PlayerCharacterObjectSerializer characterObjectSerializer:
                         characterObjectSerializer.SetHeroReference(hero);
                         break;
-                    case ClanSerializer clanSerializer:
+                    case PlayerClanSerializer clanSerializer:
                         clanSerializer.SetHeroReference(hero);
                         break;
-                    case MobilePartySerializer mobilePartySerializer:
+                    case PlayerMobilePartySerializer mobilePartySerializer:
                         mobilePartySerializer.SetHeroReference(hero);
                         break;
                 }

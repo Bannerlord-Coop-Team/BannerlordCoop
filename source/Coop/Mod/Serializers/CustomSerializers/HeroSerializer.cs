@@ -14,8 +14,6 @@ namespace Coop.Mod.Serializers
     [Serializable]
     internal class HeroSerializer : CustomSerializer
     {
-        private string name;
-
         [NonSerialized]
         Hero newHero;
 
@@ -101,19 +99,19 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_bornSettlement":
-                        bornSettlement = CoopObjectManager.GetGuid((Settlement)value);
+                        bornSettlement = CoopObjectManager.GetGuid(value);
                         break;
                     case "<HomeSettlement>k__BackingField":
                         // Do nothing, public getter
                         break;
                     case "_homeSettlement":
-                        homeSettlement = CoopObjectManager.GetGuid((Settlement)value);
+                        homeSettlement = CoopObjectManager.GetGuid(value);
                         break;
                     case "_father":
-                        SNNSO.Add(fieldInfo, null);
+                        father = CoopObjectManager.GetGuid(value);
                         break;
                     case "_mother":
-                        SNNSO.Add(fieldInfo, null);
+                        mother = CoopObjectManager.GetGuid(value);
                         break;
                     case "ExSpouses":
                         // Do nothing, public getter
