@@ -10,7 +10,7 @@ using TaleWorlds.ObjectSystem;
 namespace Coop.Mod.Serializers
 {
     [Serializable]
-    public class MobilePartySerializer : CustomSerializer
+    public class PlayerMobilePartySerializer : CustomSerializer
     {
         /// <summary>
         /// Used for circular reference
@@ -32,7 +32,7 @@ namespace Coop.Mod.Serializers
         List<string> attachedPartiesNames = new List<string>();
         string stringId;
 
-        public MobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
+        public PlayerMobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
         {
             stringId = mobileParty.StringId;
 
@@ -101,7 +101,7 @@ namespace Coop.Mod.Serializers
                         }
                         break;
                     case "_actualClan":
-                        SNNSO.Add(fieldInfo, new ClanSerializer((Clan)value));
+                        SNNSO.Add(fieldInfo, new PlayerClanSerializer((Clan)value));
                         break;
                     case "<StationaryStartTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
@@ -163,7 +163,7 @@ namespace Coop.Mod.Serializers
                         partyBaseSerializer.SetMobilePartyReference(newMobileParty);
                         entry.Key.SetValue(newMobileParty, partyBaseSerializer.Deserialize(newMobileParty.Party));
                         break;
-                    case PlayerClanSerializer clanSerializer:
+                    case ClanSerializer clanSerializer:
                         clanSerializer.SetHeroReference(hero);
                         break;
                     default:
