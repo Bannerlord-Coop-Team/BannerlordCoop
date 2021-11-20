@@ -31,6 +31,8 @@ namespace Coop.Mod.Serializers
         Guid home;
         Guid basictroop;
         Guid culture;
+        Guid leader;
+        Guid kingdom;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
@@ -80,17 +82,17 @@ namespace Coop.Mod.Serializers
                         }
                         break;
                     case "_basicTroop":
-                        basictroop=CoopObjectManager.GetGuid((CharacterObject)value);
+                        basictroop = CoopObjectManager.GetGuid(value);
                         break;
                     case "_leader":
                         // Assigned by SetHeroReference on deserialization
-                        //I think this is okay don't need a guid for that, maybe later, when the PlayerHeroSerializer and MobilePartySerializer is updated. -Wakoo
+                        leader = CoopObjectManager.GetGuid(value);
                         break;
                     case "_banner":
                         SNNSO.Add(fieldInfo, new BannerSerializer((Banner)value));
                         break;
                     case "_home":
-                        home= CoopObjectManager.GetGuid((Settlement)value);
+                        home = CoopObjectManager.GetGuid(value);
                         break;
                     case "<NotAttackableByPlayerUntilTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
@@ -99,7 +101,7 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new DefaultPartyTemplateSerializer((PartyTemplateObject)value));
                         break;
                     case "_kingdom":
-                        // TODO fix
+                        kingdom = CoopObjectManager.GetGuid(value);
                         break;
                     default:
                         UnmanagedFields.Add(fieldInfo.Name);
@@ -120,25 +122,10 @@ namespace Coop.Mod.Serializers
             NonSerializableObjects.Clear();
         }
 
-        /// <summary>
-        /// For assigning PlayerHeroSerializer reference for deserialization
-        /// </summary>
-        /// <param name="leader">PlayerHeroSerializer used by _leader</param>
-        public void SetHeroReference(Hero leader)
-        {
-            _leader = leader;
-        }
-
         public override object Deserialize()
         {
 
             newClan = MBObjectManager.Instance.CreateObject<Clan>();
-
-            // Circular referenced object needs assignment before deserialize
-            if (_leader == null)
-            {
-                throw new SerializationException("Must set hero reference before deserializing. Use SetHeroReference()");
-            }
 
             // Circular referenced objects
             newClan.GetType().GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(newClan, _leader);
@@ -179,10 +166,16 @@ namespace Coop.Mod.Serializers
 
             newClan.GetType()
                 .GetField("_home", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newClan, home);
+                .SetValue(newClan, CoopObjectManager.GetObject(home));
             newClan.GetType()
                 .GetField("_basicTroop", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newClan, basictroop);
+                .SetValue(newClan, CoopObjectManager.GetObject(basictroop));
+            newClan.GetType()
+                .GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(newClan, CoopObjectManager.GetObject(leader));
+            newClan.GetType()
+                .GetField("_kingdom", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(newClan, CoopObjectManager.GetObject(kingdom));
             newClan.GetType()
                 .GetField("<Companions>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(newClan,lCompanions);
