@@ -30,6 +30,7 @@ namespace Coop.Mod.Serializers
         Guid bornSettlement;
         Guid homeSettlement;
         Guid culture;
+        Guid characterobject;
 
         public HeroSerializer(Hero hero)
         {
@@ -50,7 +51,7 @@ namespace Coop.Mod.Serializers
                 switch (fieldInfo.Name)
                 {
                     case "_characterObject":
-                        SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value));
+                        characterobject = CoopObjectManager.GetGuid((CharacterObject)value);
                         break;
                     case "<BattleEquipment>k__BackingField":
                         SNNSO.Add(fieldInfo, new EquipmentSerializer((Equipment)value));
