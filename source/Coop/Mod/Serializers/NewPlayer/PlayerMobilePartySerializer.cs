@@ -23,6 +23,8 @@ namespace Coop.Mod.Serializers
         /// </summary>
         [NonSerialized]
         Hero hero;
+        [NonSerialized]
+        Clan clan;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
@@ -31,6 +33,7 @@ namespace Coop.Mod.Serializers
 
         List<string> attachedPartiesNames = new List<string>();
         string stringId;
+        
 
         public PlayerMobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
         {
@@ -101,13 +104,12 @@ namespace Coop.Mod.Serializers
                         }
                         break;
                     case "_actualClan":
-                        SNNSO.Add(fieldInfo, new PlayerClanSerializer((Clan)value));
                         break;
                     case "<StationaryStartTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_partyComponent":
-                        SNNSO.Add(fieldInfo, new PartyComponentSerializer((PartyComponent)value));
+                        SNNSO.Add(fieldInfo, new PlayerLordPartyComponentSerializer((LordPartyComponent)value));
                         break;
                     case "_pureSpeedExplainer":
                         // TODO Joke Fix this
@@ -142,6 +144,15 @@ namespace Coop.Mod.Serializers
             this.hero = hero;
         }
 
+        /// <summary>
+        /// For assigning PlayerClanSerializer reference for deserialization
+        /// </summary>
+        /// <param name="hero">PlayerClanSerializer used by partyBaseSerializer</param>
+        public void SetClanReference(Clan clan)
+        {
+            this.clan = clan;
+        }
+
         public override object Deserialize()
         {
             MobileParty newMobileParty = MBObjectManager.Instance.CreateObject<MobileParty>(stringId);
@@ -150,6 +161,12 @@ namespace Coop.Mod.Serializers
             if (hero == null)
             {
                 throw new SerializationException("Must set hero reference before deserializing. Use SetHeroReference()");
+            }
+
+            // Circular referenced object needs assignment before deserialize
+            if (clan == null)
+            {
+                throw new SerializationException("Must set clan reference before deserializing. Use SetClanReference()");
             }
 
             // Objects requiring a custom serializer
@@ -163,8 +180,9 @@ namespace Coop.Mod.Serializers
                         partyBaseSerializer.SetMobilePartyReference(newMobileParty);
                         entry.Key.SetValue(newMobileParty, partyBaseSerializer.Deserialize(newMobileParty.Party));
                         break;
-                    case ClanSerializer clanSerializer:
-                        clanSerializer.SetHeroReference(hero);
+                    case PlayerLordPartyComponentSerializer lordPartyComponentSerializer:
+                        lordPartyComponentSerializer.SetHeroReference(hero);
+                        entry.Key.SetValue(newMobileParty, lordPartyComponentSerializer.Deserialize());
                         break;
                     default:
                         entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
@@ -172,6 +190,8 @@ namespace Coop.Mod.Serializers
                 }
             }
 
+
+            typeof(MobileParty).GetField("_actualClan", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(newMobileParty, clan);
 
             typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(Campaign.Current.CampaignObjectManager, new object[] { newMobileParty });

@@ -376,8 +376,10 @@
     <Compile Include="Mod\Serializers\NewPlayer\PlayerCharacterObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerClanSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerHeroDeveloperSerializer.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerLordPartyComponentSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerMobilePartySerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerHeroSerializer.cs" />
+    <Compile Include="Mod\Serializers\TextObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\PartyComponentSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterFeatsSerializer.cs" />
@@ -455,7 +457,9 @@
     <Error Condition="!Exists('..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\PropertyChanged.Fody.3.2.8\build\PropertyChanged.Fody.props'))" />
   </Target>
   <PropertyGroup>
-    <PostBuildEvent>
-    </PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted ^
+            -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\" ^
+            -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\\" ^
+            -Libs Coop.dll,CoopFramework.dll,Common.dll,Network.dll,Sync.dll,RemoteAction.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll</PostBuildEvent>
   </PropertyGroup>
 </Project>

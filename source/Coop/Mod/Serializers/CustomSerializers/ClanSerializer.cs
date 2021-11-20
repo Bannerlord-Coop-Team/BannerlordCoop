@@ -18,13 +18,6 @@ namespace Coop.Mod.Serializers
         [NonSerialized]
         Clan newClan;
 
-        /// <summary>
-        /// Used for circular reference
-        /// </summary>
-        /// 
-        [NonSerialized]
-        Hero _leader;
-
         List<Guid> Supporters = new List<Guid>();
         List<Guid> Companions = new List<Guid>(); 
         List<Guid> CommanderHeroes = new List<Guid>(); //Does it refer to the lordscache or the heroescache in Bannerlord code? Which is missing from the switch case?
@@ -128,7 +121,7 @@ namespace Coop.Mod.Serializers
             newClan = MBObjectManager.Instance.CreateObject<Clan>();
 
             // Circular referenced objects
-            newClan.GetType().GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(newClan, _leader);
+            newClan.GetType().GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(newClan, null);
 
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
@@ -164,25 +157,33 @@ namespace Coop.Mod.Serializers
 
             newClan.Culture = (CultureObject)CoopObjectManager.GetObject(culture);
 
-            newClan.GetType()
+            Type clanType = newClan.GetType();
+
+            clanType
                 .GetField("_home", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(newClan, CoopObjectManager.GetObject(home));
-            newClan.GetType()
+
+            clanType
                 .GetField("_basicTroop", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(newClan, CoopObjectManager.GetObject(basictroop));
-            newClan.GetType()
+
+            clanType
                 .GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(newClan, CoopObjectManager.GetObject(leader));
-            newClan.GetType()
+
+            clanType
                 .GetField("_kingdom", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(newClan, CoopObjectManager.GetObject(kingdom));
-            newClan.GetType()
+
+            clanType
                 .GetField("<Companions>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(newClan,lCompanions);
-            newClan.GetType()
+
+            clanType
                 .GetField("<CommanderHeroes>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(newClan,lCommanderHeroes);
-            newClan.GetType()
+
+            clanType
                 .GetField("<SupporterNotables>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(newClan,lSupporters);
         }

@@ -30,15 +30,11 @@ namespace Coop.Mod.Serializers
         public CharacterObjectSerializer CharacterObject { get; private set; }
         public string PlayerId { get; }
 
-        private Guid guid;
-
         readonly List<HeroSerializer> ExSpouses = new List<HeroSerializer>();
 
         public PlayerHeroSerializer(Hero hero) : base(hero)
         {
             PlayerId = new PlatformAPI().GetPlayerID().ToString();
-
-            guid = CoopObjectManager.GetGuid(hero);
 
             List<string> UnmanagedFields = new List<string>();
 
@@ -55,6 +51,11 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "_firstName":
+                    case "_name":
+                    case "<EncyclopediaText>k__BackingField":
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
+                        break;
                     case "_characterObject":
                         SNNSO.Add(fieldInfo, new PlayerCharacterObjectSerializer((CharacterObject)value));
                         break;
@@ -140,7 +141,7 @@ namespace Coop.Mod.Serializers
 
             if (!UnmanagedFields.IsEmpty())
             {
-                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
+              throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
             }
 
             // TODO manage collections
@@ -169,10 +170,14 @@ namespace Coop.Mod.Serializers
                         break;
                     case PlayerMobilePartySerializer mobilePartySerializer:
                         mobilePartySerializer.SetHeroReference(hero);
+                        mobilePartySerializer.SetClanReference(hero.Clan);
+                        break;
+                    case PlayerHeroDeveloperSerializer heroDeveloperSerializer:
+                        heroDeveloperSerializer.SetHeroReference(hero);
                         break;
                 }
 
-                entry.Key.SetValue(hero, entry.Value.Deserialize());
+                entry.Key.SetValue(hero, entry.Value?.Deserialize());
             }
 
             // Deserialize exSpouse list

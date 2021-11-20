@@ -27,6 +27,7 @@ using Coop.Mod.Data;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization;
 using TaleWorlds.TwoDimension;
+using System.Reflection;
 
 namespace Coop.Mod
 {
@@ -222,8 +223,10 @@ namespace Coop.Mod
             // Packet Handler Registration
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientRequestWorldData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientDeclineWorldData);
+            connection.Dispatcher.RegisterPacketHandler(ReceiveClientParty);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientLoaded);
-            connection.Dispatcher.RegisterPacketHandler(SendGameData);
+            //connection.Dispatcher.RegisterPacketHandler(SendGameData);
+            
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientPlayerPartyChanged);
 
             // State Machine Registration
@@ -278,6 +281,14 @@ namespace Coop.Mod
         private void ReceiveClientDeclineWorldData(ConnectionBase connection, Packet packet)
         {
             m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.DeclineWorldData);
+        }
+
+        [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_SendParty)]
+        private void ReceiveClientParty(ConnectionBase connection, Packet packet)
+        {
+            PlayerHeroSerializer serializer = (PlayerHeroSerializer)CommonSerializer.Deserialize(packet.Payload);
+            Hero newParty = (Hero)serializer.Deserialize();
+            CoopObjectManager.AddObject(newParty);
         }
 
         [GameServerPacketHandler(ECoopServerState.SendingWorldData, EPacket.Client_Loaded)]

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Serializers
@@ -44,6 +45,12 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Name>k__BackingField":
+                    case "<InformalName>k__BackingField":
+                    case "<EncyclopediaText>k__BackingField":
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
+                        break;
+
                     case "<Culture>k__BackingField":
                         SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)value));
                         break;
@@ -134,6 +141,13 @@ namespace Coop.Mod.Serializers
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
+                switch (entry.Value)
+                {
+                    case PlayerCharacterObjectSerializer characterObjectSerializer:
+                        characterObjectSerializer.SetHeroReference(_leader);
+                        break;
+                }
+
                 entry.Key.SetValue(newClan, entry.Value.Deserialize());
             }
             

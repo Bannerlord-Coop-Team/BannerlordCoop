@@ -16,6 +16,7 @@ namespace Network.Protocol
         Client_RequestParties, // Parties the client needs to be in sync with host
         Client_RecievedParties, // Parties were loaded on client
         Client_PartyChanged, // When the player party is switched
+        Client_SendParty, // When the player party is switched
 
         Server_RequestClientInfo, // Instructs the client to send its ClientInfo.
         Server_JoinRequestAccepted, // Client is allowed to join the server.

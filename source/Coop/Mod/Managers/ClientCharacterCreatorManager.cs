@@ -16,17 +16,13 @@ using TaleWorlds.Engine;
 using TaleWorlds.Localization;
 using System.Collections.Generic;
 using Coop.Mod.Extentions;
+using Coop.Mod.Serializers;
 
 namespace Coop.Mod.Managers
 {
     public class HeroEventArgs : EventArgs
     {
-
-        public ObjectId HeroId { get; private set; }
-        public string PartyName { get; private set; }
-        public HeroEventArgs()
-        {
-        }
+        public PlayerHeroSerializer SerializedHero { get; private set; }
     }
     public class ClientCharacterCreatorManager : StoryModeGameManager
     {
@@ -57,7 +53,7 @@ namespace Coop.Mod.Managers
 
             OnGameLoadFinishedEvent?.Invoke(this, new HeroEventArgs());
 
-            RemoveAllObjectsExceptPlayer();
+            //RemoveAllObjectsExceptPlayer();
         }
 
         private void RemoveAllObjectsExceptPlayer()

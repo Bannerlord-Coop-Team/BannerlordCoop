@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -10,6 +11,18 @@ namespace Coop.Mod.Serializers
     [Serializable]
     internal class PlayerHeroDeveloperSerializer : CustomSerializer
     {
+        /// <summary>
+        /// Used for circular reference
+        /// </summary>
+        [NonSerialized]
+        public Hero hero;
+
+
+        /// <summary>
+        /// Serialized Natively Non Serializable Objects (SNNSO)
+        /// </summary>
+        Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+
         public PlayerHeroDeveloperSerializer(HeroDeveloper heroDeveloper) : base(heroDeveloper) 
         {
             List<string> UnmanagedFields = new List<string>();
@@ -28,6 +41,11 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "_newFocuses":
+                        SNNSO.Add(fieldInfo, new CharacterSkillsSerializer((CharacterSkills)value));
+                        break;
+                    case "<Hero>k__BackingField":
+                        break;
                     default:
                         UnmanagedFields.Add(fieldInfo.Name);
                         break;
@@ -47,14 +65,33 @@ namespace Coop.Mod.Serializers
             NonSerializableObjects.Clear();
         }
 
+        public void SetHeroReference(Hero hero)
+        {
+            this.hero = hero;
+        }
+
         public override object Deserialize()
         {
-            throw new NotImplementedException();
+            // Circular referenced object needs assignment before deserialize
+            if (hero == null)
+            {
+                throw new SerializationException("Must set hero reference before deserializing. Use SetHeroReference()");
+            }
+
+            ConstructorInfo ctor = typeof(HeroDeveloper).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, new[] { typeof(Hero) }, null);
+            HeroDeveloper newHeroDeveloper = (HeroDeveloper)ctor.Invoke(new object[] { hero });
+
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Key.SetValue(newHeroDeveloper, entry.Value.Deserialize());
+            }
+
+            return newHeroDeveloper;
         }
 
         public override void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            // Do nothing
         }
     }
 }

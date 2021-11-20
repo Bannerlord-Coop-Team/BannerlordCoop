@@ -19,12 +19,6 @@ namespace Coop.Mod.Serializers
         public MobileParty mobileParty;
 
         /// <summary>
-        /// Used for circular reference
-        /// </summary>
-        [NonSerialized]
-        Hero hero;
-
-        /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
@@ -133,45 +127,15 @@ namespace Coop.Mod.Serializers
             NonSerializableObjects.Clear();
         }
 
-        /// <summary>
-        /// For assigning PlayerHeroSerializer reference for deserialization
-        /// </summary>
-        /// <param name="hero">PlayerHeroSerializer used by partyBaseSerializer</param>
-        public void SetHeroReference(Hero hero)
-        {
-            this.hero = hero;
-        }
-
         public override object Deserialize()
         {
             MobileParty newMobileParty = MBObjectManager.Instance.CreateObject<MobileParty>(stringId);
 
-            // Circular referenced object needs assignment before deserialize
-            if (hero == null)
-            {
-                throw new SerializationException("Must set hero reference before deserializing. Use SetHeroReference()");
-            }
-
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
-                // Pass references to specified serializers
-                switch (entry.Value)
-                {
-                    case PartyBaseSerializer partyBaseSerializer:
-                        partyBaseSerializer.SetHeroReference(hero);
-                        partyBaseSerializer.SetMobilePartyReference(newMobileParty);
-                        entry.Key.SetValue(newMobileParty, partyBaseSerializer.Deserialize(newMobileParty.Party));
-                        break;
-                    case PlayerClanSerializer clanSerializer:
-                        clanSerializer.SetHeroReference(hero);
-                        break;
-                    default:
-                        entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
-                        break;
-                }
+                entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
             }
-
 
             typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(Campaign.Current.CampaignObjectManager, new object[] { newMobileParty });

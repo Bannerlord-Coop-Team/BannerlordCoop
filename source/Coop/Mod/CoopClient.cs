@@ -62,7 +62,6 @@ namespace Coop.Mod
         private int m_ReconnectAttempts = MaxReconnectAttempts;
         private Hero m_Hero = null;
         private Guid m_HeroGUID;
-        private ObjectId m_HeroId;
         #endregion
         public Action<PersistenceClient> OnPersistenceInitialized;
 
@@ -230,8 +229,6 @@ namespace Coop.Mod
                 {
                     if(e is HeroEventArgs args)
                     {
-                        m_HeroId = args.HeroId;
-
                         CharacterCreationOver();
                     }
                     else
@@ -294,10 +291,10 @@ namespace Coop.Mod
         public void CharacterCreationOver()
         {
             PlayerHeroSerializer playerHeroSerialized = new PlayerHeroSerializer(Hero.MainHero);
-            byte[] data = SyncedObjectStore.Serialize(playerHeroSerialized);
+            byte[] data = CommonSerializer.Serialize(playerHeroSerialized);
             Session.Connection.Send(
                 new Packet(
-                    EPacket.Client_RequestGameData,
+                    EPacket.Client_SendParty,
                     data));
         }
 
