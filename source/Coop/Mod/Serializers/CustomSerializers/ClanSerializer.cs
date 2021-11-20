@@ -15,11 +15,22 @@ namespace Coop.Mod.Serializers
     [Serializable]
     class ClanSerializer : CustomSerializer
     {
+        [NonSerialized]
+        Clan newClan;
+
         /// <summary>
         /// Used for circular reference
         /// </summary>
+        /// 
         [NonSerialized]
         Hero _leader;
+
+        List<Guid> Supporters = new List<Guid>();
+        List<Guid> Companions = new List<Guid>(); 
+        List<Guid> CommanderHeroes = new List<Guid>(); //Does it refer to the lordscache or the heroescache in Bannerlord code? Which is missing from the switch case?
+        Guid home;
+        Guid basictroop;
+        Guid culture;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
@@ -45,40 +56,41 @@ namespace Coop.Mod.Serializers
                 switch (fieldInfo.Name)
                 {
                     case "<Culture>k__BackingField":
-                        SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)value));
+                        culture = CoopObjectManager.GetGuid((CultureObject)value);
                         break;
                     case "<LastFactionChangeTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "<SupporterNotables>k__BackingField":
-                        foreach (Hero hero in (MBReadOnlyList<Hero>)value)
+                        foreach (Guid supporters in CoopObjectManager.GetGuids((MBReadOnlyList<Hero>)value))
                         {
-                            throw new Exception("Should be no Supporters");
+                            Supporters.Add(supporters);
                         }
                         break;
                     case "<Companions>k__BackingField":
-                        foreach (Hero hero in (MBReadOnlyList<Hero>)value)
+                        foreach (Guid companions in CoopObjectManager.GetGuids((MBReadOnlyList<Hero>)value))
                         {
-                            throw new Exception("Should be no compainions");
+                            Companions.Add(companions);
                         }
                         break;
                     case "<CommanderHeroes>k__BackingField":
-                        foreach (Hero hero in (MBReadOnlyList<Hero>)value)
+                        foreach (Guid commanderheroes in CoopObjectManager.GetGuids((MBReadOnlyList<Hero>)value))
                         {
-                            throw new Exception("Should be no Commanders");
+                            CommanderHeroes.Add(commanderheroes);
                         }
                         break;
                     case "_basicTroop":
-                        SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value));
+                        basictroop=CoopObjectManager.GetGuid((CharacterObject)value);
                         break;
                     case "_leader":
                         // Assigned by SetHeroReference on deserialization
+                        //I think this is okay don't need a guid for that, maybe later, when the PlayerHeroSerializer and MobilePartySerializer is updated. -Wakoo
                         break;
                     case "_banner":
                         SNNSO.Add(fieldInfo, new BannerSerializer((Banner)value));
                         break;
                     case "_home":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        home= CoopObjectManager.GetGuid((Settlement)value);
                         break;
                     case "<NotAttackableByPlayerUntilTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
@@ -120,7 +132,7 @@ namespace Coop.Mod.Serializers
         public override object Deserialize()
         {
 
-            Clan newClan = MBObjectManager.Instance.CreateObject<Clan>();
+            newClan = MBObjectManager.Instance.CreateObject<Clan>();
 
             // Circular referenced object needs assignment before deserialize
             if (_leader == null)
@@ -142,7 +154,44 @@ namespace Coop.Mod.Serializers
 
         public override void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            if (newClan == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+            //Deserialize the lists
+            List<Hero> lCompanions= new List<Hero>();
+            List<Hero> lSupporters = new List<Hero>();
+            List<Hero> lCommanderHeroes = new List<Hero>();
+            foreach (Guid companionId in Companions)
+            {
+                lCompanions.Add((Hero)CoopObjectManager.GetObject(companionId));
+            }
+            foreach (Guid supporterId in Supporters)
+            {
+                lSupporters.Add((Hero)CoopObjectManager.GetObject(supporterId));
+            }
+            foreach (Guid commanderheroesId in CommanderHeroes)
+            {
+                lCommanderHeroes.Add((Hero)CoopObjectManager.GetObject(commanderheroesId));
+            }
+
+            newClan.Culture = (CultureObject)CoopObjectManager.GetObject(culture);
+
+            newClan.GetType()
+                .GetField("_home", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(newClan, home);
+            newClan.GetType()
+                .GetField("_basicTroop", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(newClan, basictroop);
+            newClan.GetType()
+                .GetField("<Companions>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(newClan,lCompanions);
+            newClan.GetType()
+                .GetField("<CommanderHeroes>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(newClan,lCommanderHeroes);
+            newClan.GetType()
+                .GetField("<SupporterNotables>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(newClan,lSupporters);
         }
     }
 }
