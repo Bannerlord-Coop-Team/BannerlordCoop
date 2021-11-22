@@ -373,7 +373,6 @@
     <Compile Include="Mod\Serializers\CustomSerializers\SettlementSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\TraitObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\TroopRosterSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\VillageTypeSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerCharacterObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerClanSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerHeroDeveloperSerializer.cs" />

@@ -1,28 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
-using static TaleWorlds.CampaignSystem.Village;
 
 namespace Coop.Mod.Serializers
 {
     [Serializable]
-    internal class VillageSerializer : CustomSerializer
+    internal class VillageSerializer : ICustomSerializer
     {
-        [NonSerialized]
-        Village newvillage;
-
-        Guid bound;
-        VillageStates state;
-
-        /// <summary>
-        /// Serialized Natively Non Serializable Objects (SNNSO)
-        /// </summary>
-        Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
-
+        Guid culture;
         public VillageSerializer(Village village) : base(village)
         {
             List<string> UnmanagedFields = new List<string>();
@@ -41,14 +25,51 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
-                    case "_bound":
-                        bound = CoopObjectManager.GetGuid((Settlement)value);
+                    case "<Culture>k__BackingField":
+                        culture = CoopObjectManager.GetGuid((CultureObject)value);
                         break;
-                    case "VillageType":
-                        SNNSO.Add(fieldInfo,new VillageTypeSerializer((VillageType)value));
+                    case "<ClaimedBy>k__BackingField":
+                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
-                    case "_villageState":
-                        state = (VillageStates)value;
+                    case "_nextLocatable":
+                        foreach (Guid supporters in CoopObjectManager.GetGuids((MBReadOnlyList<Hero>)value))
+                        {
+                            Supporters.Add(supporters);
+                        }
+                        break;
+                    case "_settlementComponents":
+                        foreach (Guid companions in CoopObjectManager.GetGuids((MBReadOnlyList<Hero>)value))
+                        {
+                            Companions.Add(companions);
+                        }
+                        break;
+                    case "_boundVillages":
+                        foreach (Guid commanderheroes in CoopObjectManager.GetGuids((MBReadOnlyList<Hero>)value))
+                        {
+                            CommanderHeroes.Add(commanderheroes);
+                        }
+                        break;
+                    case "_name":
+                        basictroop = CoopObjectManager.GetGuid(value);
+                        break;
+                    case "_lastAttackerParty":
+                        // Assigned by SetHeroReference on deserialization
+                        leader = CoopObjectManager.GetGuid(value);
+                        break;
+                    case "_siegeEngineMissiles":
+                        SNNSO.Add(fieldInfo, new BannerSerializer((Banner)value));
+                        break;
+                    case "<Town>k_BackingField":
+                        home = CoopObjectManager.GetGuid(value);
+                        break;
+                    case "<Village>k__BackingField":
+                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        break;
+                    case "<Hideout>k_BackingField":
+                        SNNSO.Add(fieldInfo, new DefaultPartyTemplateSerializer((PartyTemplateObject)value));
+                        break;
+                    case "<SiegeLanes>k_BackingField":
+                        kingdom = CoopObjectManager.GetGuid(value);
                         break;
                     default:
                         UnmanagedFields.Add(fieldInfo.Name);
@@ -70,36 +91,19 @@ namespace Coop.Mod.Serializers
 
         }
 
-        public override object Deserialize()
+        public object Deserialize()
         {
-            //It calls the base constructor so it creates the VillagemarketData object in it in theory
-            newvillage = MBObjectManager.Instance.CreateObject<Village>();
-
-            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
-            { 
-                entry.Key.SetValue(newvillage, entry.Value.Deserialize());
+            if(villageId != null)
+            {
+                return Settlement.Find(villageId);
             }
 
-            newvillage.GetType()
-                .GetField("_villageState", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newvillage, state);
-
-            base.Deserialize(newvillage);
-
-            return newvillage;
+            return null;
         }
 
-
-        public override void ResolveReferenceGuids()
+        public void ResolveReferenceGuids()
         {
-            if (newvillage == null)
-            {
-                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
-            }
-
-            newvillage.GetType()
-                .GetField("_bound", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newvillage,CoopObjectManager.GetObject(bound));
+            throw new NotImplementedException();
         }
     }
 }
