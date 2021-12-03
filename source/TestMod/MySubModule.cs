@@ -26,6 +26,14 @@ using System.Text;
 using System.Threading;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.Engine.InputSystem;
+using TaleWorlds.MountAndBlade.View.Screen;
+using SandBox.GauntletUI;
+using TaleWorlds.MountAndBlade.GauntletUI;
+using System.Runtime.InteropServices;
+using System.Diagnostics;
+using System.Windows.Forms;
 
 namespace CoopTestMod
 {
@@ -56,15 +64,11 @@ namespace CoopTestMod
     //    }
     //}
 
-   
+
 
 
     public class MySubModule : MBSubModuleBase
     {
-
-
-
-        private Settlement _settlement;
         private Agent _otherAgent;
         private Agent _player;
 
@@ -82,16 +86,13 @@ namespace CoopTestMod
         float t;
         AgentBuildData agentBuildData;
         AgentBuildData agentBuildData2;
-
-
+        bool subModuleLoaded = false;
+        bool battleLoaded = false;
 
         // custom delegate is needed since SetPosition uses a ref Vec3
         delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
 
-
-
-
-
+        // utility to keep trying to connect to server if it fails
         public bool ClientConnect(IPEndPoint remoteEP)
         {
             try
@@ -104,6 +105,8 @@ namespace CoopTestMod
                 return false;
             }
         }
+
+        // thread to allow connections and handle data sent by the client
         public void StartServer()
         {
             // Get Host IP Address that is used to establish a connection
@@ -159,7 +162,7 @@ namespace CoopTestMod
 
                             }
 
-                            
+
                             //_otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
                             _otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
                             _otherAgent.AttackDirectionToMovementFlag(direction);
@@ -194,16 +197,13 @@ namespace CoopTestMod
             }
         }
 
+        // thread to receive the data as the client
         public void StartClient()
         {
             byte[] bytes = new byte[1024];
 
             try
             {
-                // Connect to a Remote server
-                // Get Host IP Address that is used to establish a connection
-                // In this case, we get one IP address of localhost that is IP : 127.0.0.1
-                // If a host has multiple addresses, you will get a list of addresses
                 IPHostEntry host = Dns.GetHostEntry("localhost");
                 IPAddress ipAddress = host.AddressList[0];
                 remoteEP = new IPEndPoint(ipAddress, 11000);
@@ -306,16 +306,16 @@ namespace CoopTestMod
 
 
 
-
-
         protected override void OnSubModuleLoad()
         {
             base.OnSubModuleLoad();
 
+            //skip intro
+            FieldInfo splashScreen = TaleWorlds.MountAndBlade.Module.CurrentModule.GetType().GetField("_splashScreenPlayed", BindingFlags.Instance | BindingFlags.NonPublic);
+            splashScreen.SetValue(TaleWorlds.MountAndBlade.Module.CurrentModule, true);
 
-            
 
-
+            // pass /server or /client to start as either or
             Thread thread = null;
             string[] array = Utilities.GetFullCommandLineString().Split(' ');
             foreach (string argument in array)
@@ -334,14 +334,12 @@ namespace CoopTestMod
             thread.Start();
 
 
+
+
+
         }
 
-        public override void OnGameLoaded(Game game, object initializerObject)
-        {
-            base.OnGameLoaded(game, initializerObject);
-        }
-
-
+        // ripped straight out of arena spawns
         private Agent SpawnArenaAgent(CharacterObject character, MatrixFrame frame, bool isMain)
         {
             agentBuildData = new AgentBuildData(character);
@@ -375,91 +373,34 @@ namespace CoopTestMod
 
 
 
-        public override void OnAfterGameInitializationFinished(Game game, object starterObject)
-        {
-            base.OnAfterGameInitializationFinished(game, starterObject);
-        }
 
         protected override void OnApplicationTick(float dt)
         {
-            // Press K first to load the Poros arena
-            if (Input.IsKeyReleased(InputKey.K))
+            if (!subModuleLoaded && Module.CurrentModule.LoadingFinished)
             {
-                // get the settlement first
-                this._settlement = Settlement.Find("town_ES3");
+                // sub module is loaded. Isnt there a proper callback for this?
+                subModuleLoaded = true;
+                
+                //Get all the save sames
+                SaveGameFileInfo[] games = MBSaveLoad.GetSaveFiles();
 
-                // get its arena
-                Location locationWithId = _settlement.LocationComplex.GetLocationWithId("arena");
 
-                CharacterObject characterObject = CharacterObject.PlayerCharacter;
-                LocationEncounter locationEncounter = new TownEncounter(_settlement);
+                // just load the first one. 
+                LoadResult result = SaveManager.Load(games[0].Name, new AsyncFileSaveDriver(), true);
 
-                // create an encounter of the town with the player
-                EncounterManager.StartSettlementEncounter(MobileParty.MainParty, _settlement);
+                // Create our own game manager. This will help us override the OnLoaded callback and load the town
+                CustomSandboxGame manager = new CustomSandboxGame(result);
 
-                //Set our encounter to the created encounter
-                PlayerEncounter.LocationEncounter = locationEncounter;
-
-                //return arena scenae name of current town
-                int upgradeLevel = _settlement.IsTown ? _settlement.Town.GetWallLevel() : 1;
-
-                //Open a new arena mission with the scene
-                MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(locationWithId.GetSceneName(upgradeLevel), "", false), (Mission mission) => new MissionBehaviour[]
-                   {
-                                new MissionOptionsComponent(),
-                                //new ArenaDuelMissionController(CharacterObject.PlayerCharacter, false, false, null, 1), //this was the default controller that spawned the player and 1 opponent. Not very useful
-                                new MissionFacialAnimationHandler(),
-                                new MissionDebugHandler(),
-                                new MissionAgentPanicHandler(),
-                                new AgentBattleAILogic(),
-                                new ArenaAgentStateDeciderLogic(),
-                                new VisualTrackerMissionBehavior(),
-                                new CampaignMissionComponent(),
-                                new EquipmentControllerLeaveLogic(),
-                                new MissionAgentHandler(locationWithId, null)
-                   }, true, true);
-
+                //start it
+                MBGameManager.StartNewGame(manager);
             }
-
-            if (Input.IsKeyDownImmediate(InputKey.Numpad1))
-            {
-               
-            }
-            
-            if (Input.IsKeyDown(InputKey.Numpad1))
-            {
-                //_player.MovementFlags = Agent.MovementControlFlag.DefendDown;
-                //_player.EnforceShieldUsage(Agent.MovementFlagToDirection(Agent.MovementControlFlag.DefendDown));
-                //_player.EventControlFlag = Agent.EventControlFlag.
-                InformationManager.DisplayMessage(new InformationMessage(_player.GetCurrentAction(1).Name.ToString() + ", " + _player.GetCurrentAction(1).Index.ToString()));
-                //ActionIndexCache action = ActionIndexCache.Create("act_defend_shield_up_1h_passive_down");
-                //AgentBuildData buildData = new AgentBuildData(CharacterObject.PlayerCharacter);
-                //MBActionSet set = MBGlobals.GetActionSet("defend_up");
-                //_player.SetActionChannel(1, action);
-                try
-                {
-                    //AnimationSystemData animationSystemData = agentBuildData.AgentMonster.FillAnimationSystemData(MBGlobals.GetActionSet("as_human_warrior"), CharacterObject.PlayerCharacter.GetStepSize(), false);
-                    //AgentVisualsNativeData agentVisualsNativeData = agentBuildData.AgentMonster.FillAgentVisualsNativeData();
-                    //_player.SetActionSet(ref agentVisualsNativeData, ref animationSystemData);
-                    MBAnimation.GetActionNameWithCode((int)Agent.ActionCodeType.DefendForward1h);
-                    //InformationManager.DisplayMessage(new InformationMessage(_player.GetCurrentAction(1).Index.ToString()));
-                    //InformationManager.DisplayMessage(new InformationMessage(MBAnimation.GetActionNameWithCode((int)Agent.ActionCodeType.DefendForward1h)));
-                    ActionIndexCache cache = ActionIndexCache.Create("act_guard_up_1h");
-                    InformationManager.DisplayMessage(new InformationMessage("Name: " + cache.Name.ToString() + " | Index: " + cache.Index.ToString()));
-                    _player.SetActionChannel(1, cache);
-                } catch (Exception ex)
-                {
-                    File.AppendAllText("wouterror.txt", ex.Message);
-                }
-                //_player.SetCurrentActionProgress(1, 1);
-                //_player.SetCurrentActionSpeed(1, 1);
-
-            }
-
 
             // Press slash next to spawn in the arena
-            else if (Input.IsKeyReleased(InputKey.Slash))
+            if (!battleLoaded && Mission.Current != null && Mission.Current.IsLoadingFinished)
             {
+                // again theres gotta be a better way to check if missions finish loading? A custom mission maybe in the future
+                battleLoaded = true;
+                
                 //two teams are created
                 Mission.Current.Teams.Add(BattleSideEnum.Defender, Hero.MainHero.MapFaction.Color, Hero.MainHero.MapFaction.Color2, null, true, false, true);
                 Mission.Current.Teams.Add(BattleSideEnum.Attacker, Hero.MainHero.MapFaction.Color2, Hero.MainHero.MapFaction.Color, null, true, false, true);
@@ -518,7 +459,7 @@ namespace CoopTestMod
                 MethodInfo setPositionMethod = IMBAgentField.GetValue(null).GetType().GetMethod("SetPosition");
 
 
-
+                // set the delegates to the method pointers. In case Agent class isn't enough we can invoke IMAgent directly.
                 getPosition = (Func<UIntPtr, Vec3>)Delegate.CreateDelegate
                     (typeof(Func<UIntPtr, Vec3>), IMBAgentField.GetValue(null), getPositionMethod);
 
@@ -531,20 +472,27 @@ namespace CoopTestMod
 
 
 
-
+            // Mission is loaded
             if (Mission.Current != null && playerPtr != UIntPtr.Zero)
             {
-                if (t + 0.01 > Time.ApplicationTime)
+                // every 0.1 tick send an update to other endpoint
+                if (t + 0.1 > Time.ApplicationTime)
                 {
                     return;
                 }
+                // update time
                 t = Time.ApplicationTime;
+
+                // create a memory stream
                 MemoryStream stream = new MemoryStream();
+
+                // get all the values needed to sync character (there is more for actions, weapon switching, etc).
                 Vec3 myPos = getPosition(playerPtr);
                 uint movementFlag = (uint)_player.MovementFlags;
                 uint eventFlag = (uint)_player.EventControlFlags;
                 Vec2 movementDirection = _player.GetMovementDirection();
                 Vec2 lookDirection = _player.MovementInputVector;
+
                 if (myPos.IsValid)
                 {
                     using (System.IO.BinaryWriter writer = new System.IO.BinaryWriter(stream))
