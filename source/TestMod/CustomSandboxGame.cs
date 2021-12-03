@@ -27,7 +27,6 @@ namespace CoopTestMod
         public override void OnLoadFinished()
         {
             base.OnLoadFinished();
-            InformationManager.DisplayMessage(new InformationMessage("Here!"));
             // get the settlement first
             Settlement settlement = Settlement.Find("town_ES3");
 

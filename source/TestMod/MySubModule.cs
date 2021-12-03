@@ -163,11 +163,11 @@ namespace CoopTestMod
                             }
 
 
-                            //_otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+                            _otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
                             _otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
                             _otherAgent.AttackDirectionToMovementFlag(direction);
                             _otherAgent.DefendDirectionToMovementFlag(direction);
-                            //_otherAgent.MovementInputVector = new Vec2(looX, lookY);
+                            _otherAgent.MovementInputVector = new Vec2(looX, lookY);
 
                         }
                     }
@@ -260,11 +260,11 @@ namespace CoopTestMod
                                 }
 
 
-                                //_otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+                                _otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
                                 _otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
                                 _otherAgent.AttackDirectionToMovementFlag(direction);
                                 _otherAgent.DefendDirectionToMovementFlag(direction);
-                                //_otherAgent.MovementInputVector = new Vec2(looX, lookY);
+                                _otherAgent.MovementInputVector = new Vec2(looX, lookY);
 
                             }
                         }
@@ -476,7 +476,7 @@ namespace CoopTestMod
             if (Mission.Current != null && playerPtr != UIntPtr.Zero)
             {
                 // every 0.1 tick send an update to other endpoint
-                if (t + 0.1 > Time.ApplicationTime)
+                if (t + 0.05 > Time.ApplicationTime)
                 {
                     return;
                 }
