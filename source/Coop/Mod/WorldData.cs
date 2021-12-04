@@ -16,7 +16,7 @@ namespace Coop.Mod
     }
 
     // TODO rename interface to more relevant name
-    internal class GameData : ISaveData
+    internal class WorldData : ISaveData
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         // TODO determine if client needs to create a character

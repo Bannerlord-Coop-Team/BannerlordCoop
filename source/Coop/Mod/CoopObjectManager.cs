@@ -97,7 +97,9 @@ namespace Coop.Mod
 
         public static IEnumerable<T> GetObjects<T>()
         {
-            return Objects.Where(x => AssosiatedGuids[typeof(T)]?.Contains(x.Key) ?? false).Select(kvp => kvp.Value).GetEnumerator() as IEnumerable<T>;
+            // Go through Objects and if object type exists in AssosiatedGuids select all items of that type
+            return Objects.Where(x => AssosiatedGuids[typeof(T)].Contains(x.Key))
+                          .Select(kvp => (T)kvp.Value);
         }
 
         public static void RemoveObject(Guid id)

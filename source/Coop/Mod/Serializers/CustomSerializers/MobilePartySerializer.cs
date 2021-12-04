@@ -129,22 +129,24 @@ namespace Coop.Mod.Serializers
 
         public override object Deserialize()
         {
-            MobileParty newMobileParty = MBObjectManager.Instance.CreateObject<MobileParty>(stringId);
+            mobileParty = MBObjectManager.Instance.CreateObject<MobileParty>(stringId);
 
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
-                entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
+                entry.Key.SetValue(mobileParty, entry.Value.Deserialize());
             }
 
             typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
-                .Invoke(Campaign.Current.CampaignObjectManager, new object[] { newMobileParty });
+                .Invoke(Campaign.Current.CampaignObjectManager, new object[] { mobileParty });
 
-            return base.Deserialize(newMobileParty);
+            return base.Deserialize(mobileParty);
         }
 
         public override void ResolveReferenceGuids()
         {
+
+            mobileParty.MemberRoster.OnHeroHealthStatusChanged(mobileParty.LeaderHero);
             throw new NotImplementedException();
         }
     }

@@ -69,7 +69,7 @@ namespace Coop.Mod
 
         public CoopClient(ClientConfiguration config)
         {
-            Session = new GameSession(new GameData());
+            Session = new GameSession(new WorldData());
             Session.OnConnectionDestroyed += ConnectionDestroyed;
             m_NetManager = new LiteNetManagerClient(Session, config);
             m_Updateables.Add(m_NetManager);
@@ -79,8 +79,7 @@ namespace Coop.Mod
 
             #region State Machine Callbacks
             m_CoopClientSM.CharacterCreationState.OnEntry(CreateCharacter);
-            m_CoopClientSM.ReceivingWorldDataState.OnEntry(SendClientRequestInitialWorldData);
-            m_CoopClientSM.LoadingState.OnEntry(SendGameLoading);
+            m_CoopClientSM.ReceivingGameDataState.OnEntry(SendClientRequestInitialWorldData);
             m_CoopClientSM.PlayingState.OnEntry(SendGameLoaded);
             #endregion
 
@@ -189,7 +188,7 @@ namespace Coop.Mod
             {
                 if (Coop.IsServer)
                 {
-                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
+                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.IsServer);
                 }
                 else
                 {
@@ -210,9 +209,10 @@ namespace Coop.Mod
                 #endregion
 
                 // Handler Registration
-                Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
+                //Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyId);
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
+                Session.Connection.Dispatcher.RegisterPacketHandler(RecieveGameData);
 
                 Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
             }
@@ -292,20 +292,24 @@ namespace Coop.Mod
         {
             PlayerHeroSerializer playerHeroSerialized = new PlayerHeroSerializer(Hero.MainHero);
             byte[] data = CommonSerializer.Serialize(playerHeroSerialized);
+
             Session.Connection.Send(
                 new Packet(
-                    EPacket.Client_SendParty,
+                    EPacket.Client_RequestGameData,
                     data));
+
+            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterCreated);
         }
 
-        [GameClientPacketHandler(ECoopClientState.CharacterCreation, EPacket.Server_HeroData)]
-        public void RecieveHeros(ConnectionBase connection, Packet packet)
+        [GameClientPacketHandler(ECoopClientState.ReceivingGameData, EPacket.Server_GameData)]
+        public void RecieveGameData(ConnectionBase connection, Packet packet)
         {
-            object data = SyncedObjectStore.Deserialize(packet.Payload.Array);
-            if(data.GetType() == typeof(HeroSerializer[]))
-            {
-                int x = 1;
-            }
+            GameData gameData = (GameData)SyncedObjectStore.Deserialize(packet.Payload.Array);
+            gameData.Unpack();
+
+            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
+
+            connection.Send(new Packet(EPacket.Client_Loaded));
         }
         #endregion
 
@@ -318,7 +322,7 @@ namespace Coop.Mod
                 new Packet(
                     EPacket.Client_DeclineWorldData,
                     new Client_DeclineWorldData().Serialize()));
-                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
+                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded);
             }
             else
@@ -331,7 +335,7 @@ namespace Coop.Mod
             
         }
 
-        [GameClientPacketHandler(ECoopClientState.ReceivingWorldData, EPacket.Server_WorldData)]
+        [GameClientPacketHandler(ECoopClientState.ReceivingGameData, EPacket.Server_WorldData)]
         private void ReceiveInitialWorldData(ConnectionBase connection, Packet packet)
         {
             bool bSuccess = false;
@@ -349,14 +353,14 @@ namespace Coop.Mod
 
             if (bSuccess)
             {
-                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
+                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
                 if(m_HeroGUID == Guid.Empty)
                 {
-                    gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_Hero);
+                    gameManager = new ClientManager(((WorldData)Session.World).LoadResult, m_Hero);
                 }
                 else
                 {
-                    gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_HeroGUID);
+                    gameManager = new ClientManager(((WorldData)Session.World).LoadResult, m_HeroGUID);
                 }
 
                 

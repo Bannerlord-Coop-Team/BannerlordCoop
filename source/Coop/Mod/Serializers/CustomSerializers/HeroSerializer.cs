@@ -169,9 +169,6 @@ namespace Coop.Mod.Serializers
 
             base.Deserialize(newHero);
 
-            // Update health due to member starting as injured
-            newHero.PartyBelongedTo.Party.MemberRoster.OnHeroHealthStatusChanged(newHero);
-
             return newHero;
         }
 

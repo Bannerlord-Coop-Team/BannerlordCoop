@@ -30,6 +30,10 @@ namespace Network.Protocol
         {
         }
 
+        public Packet(EPacket eType) : this(eType, new byte[0])
+        {
+        }
+
         public EPacket Type { get; }
 
         public int Length => MetaDataLength + Payload.Count;
