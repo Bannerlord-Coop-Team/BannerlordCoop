@@ -96,17 +96,30 @@ namespace CoopTestMod
                 {
 
                     otherAgent.TeleportToPosition(pos);
-                    //InformationManager.DisplayMessage(new InformationMessage("Direction: " + direction.ToString()));
-                    ///InformationManager.DisplayMessage(new InformationMessage("Movement: " + ((Agent.MovementControlFlag)movementFlag).ToString()));
 
 
-                    //InformationManager.DisplayMessage(new InformationMessage(otherAgent.GetCurrentAction(1).Name));
-                    //if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none)
-                    //{
-                    //    otherAgent.SetActionChannel(1, otherAgent.GetCurrentAction(1), additionalFlags: (ulong)flags2, startProgress: progress2);
-                    //    //therAgent.SetCurrentActionProgress(1, progress2);
+                    // we either don't have an action so set it to the new one or the receive action is different than our current action
+                    if (otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(0).Index != cacheIndex1)
+                    {
+                        string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
+                        otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
+                        
+                    }
+                    else
+                    {
+                        otherAgent.SetCurrentActionProgress(0, progress1);
+                    }
 
-                    //}
+                    if (otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(1).Index != cacheIndex2)
+                    {
+                        string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
+                        otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
+
+                    }
+                    else
+                    {
+                        otherAgent.SetCurrentActionProgress(0, progress1);
+                    }
                     //else
                     //{
                     //    string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
@@ -125,11 +138,9 @@ namespace CoopTestMod
                     otherAgent.DefendDirectionToMovementFlag(direction);
                     otherAgent.MovementInputVector = new Vec2(inputVectorX, inputVectorY);
 
-                    string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
-                    otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
+                    
 
-                    string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
-                    otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
+                    
 
                     //InformationManager.DisplayMessage(new InformationMessage("Received : X: " +  lookDirectionX + " Y: " + lookDirectionY + " | Z: " + lookDirectionZ));
 
@@ -154,7 +165,6 @@ namespace CoopTestMod
 
         private Socket sender;
         private Socket receiver;
-        private bool isServer = false;
         private UIntPtr playerPtr;
         private UIntPtr otherAgentPtr;
         private const int bufSize = 1024;
@@ -303,7 +313,6 @@ namespace CoopTestMod
             {
                 if (argument.ToLower() == "/server")
                 {
-                    isServer = true;
                     thread = new Thread(StartServer);
                 }
                 else if (argument.ToLower() == "/client")
