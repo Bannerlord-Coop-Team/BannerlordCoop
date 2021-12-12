@@ -57,6 +57,7 @@ namespace CoopTestMod
                                 new ArenaAgentStateDeciderLogic(),
                                 new VisualTrackerMissionBehavior(),
                                 new CampaignMissionComponent(),
+                                new MissionNetworkComponent(),
                                 new EquipmentControllerLeaveLogic(),
                                 new MissionAgentHandler(locationWithId, null)
                }, true, true);

@@ -2,38 +2,20 @@
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
-using TaleWorlds.Engine.Screens;
-using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.CampaignSystem;
 using Module = TaleWorlds.MountAndBlade.Module;
 using TaleWorlds.SaveSystem;
-using TaleWorlds.MountAndBlade.View.Missions;
-using TaleWorlds.MountAndBlade.GauntletUI.Widgets.SaveLoad;
-using SandBox;
 using TaleWorlds.InputSystem;
 using System.IO;
 using TaleWorlds.Library;
 using System.Linq;
 using TaleWorlds.Engine;
-using TaleWorlds.MountAndBlade.Source.Missions;
-using SandBox.Source.Missions;
-using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
-using SandBox.Source.Missions.Handlers;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using TaleWorlds.ObjectSystem;
-using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.SaveSystem.Load;
-using TaleWorlds.Engine.InputSystem;
-using TaleWorlds.MountAndBlade.View.Screen;
-using SandBox.GauntletUI;
-using TaleWorlds.MountAndBlade.GauntletUI;
-using System.Runtime.InteropServices;
-using System.Diagnostics;
-using System.Windows.Forms;
 
 namespace CoopTestMod
 {
@@ -66,28 +48,129 @@ namespace CoopTestMod
 
 
 
-
+   
     public class MySubModule : MBSubModuleBase
     {
+
+        public class MessageParser
+        {
+            public void parseMessage(byte[] bytes, Agent otherAgent)
+            {
+                float x = BitConverter.ToSingle(bytes, 0);
+                float y = BitConverter.ToSingle(bytes, 4);
+                float z = BitConverter.ToSingle(bytes, 8);
+                uint movementFlag = BitConverter.ToUInt32(bytes, 12);
+                uint eventFlag = BitConverter.ToUInt32(bytes, 16);
+                float moveX = BitConverter.ToSingle(bytes, 20);
+                float moveY = BitConverter.ToSingle(bytes, 24);
+                float inputVectorX = BitConverter.ToSingle(bytes, 28);
+                float inputVectorY = BitConverter.ToSingle(bytes, 32);
+                int cacheIndex1 = BitConverter.ToInt32(bytes, 36);
+                float progress1 = BitConverter.ToSingle(bytes, 40);
+                AnimFlags flags1 = (AnimFlags)BitConverter.ToUInt64(bytes, 44);
+                int cacheIndex2 = BitConverter.ToInt32(bytes, 52);
+                float progress2 = BitConverter.ToSingle(bytes, 56);
+                AnimFlags flags2 = (AnimFlags)BitConverter.ToUInt64(bytes, 60);
+                //int cacheIndex3 = BitConverter.ToInt32(bytes, 68);
+                //float progress3 = BitConverter.ToSingle(bytes, 72);
+                //AnimFlags flags3 = (AnimFlags)BitConverter.ToUInt64(bytes, 76);
+                float lookDirectionX = BitConverter.ToSingle(bytes, 68);
+                float lookDirectionY = BitConverter.ToSingle(bytes, 72);
+                float lookDirectionZ = BitConverter.ToSingle(bytes, 76);
+
+                //float targetPositionX = BitConverter.ToSingle(bytes, 80);
+                //float targetPositionY = BitConverter.ToSingle(bytes, 84);
+                //float targetDirectionX = BitConverter.ToSingle(bytes, 88);
+                //float targetDirectionY = BitConverter.ToSingle(bytes, 92);
+                //float targetDirectionZ = BitConverter.ToSingle(bytes, 96);
+
+
+                Vec3 pos = new Vec3(x, y, z);
+                //Vec2 targetPosition = new Vec2(targetPositionX, targetPositionY);
+                //Vec3 targetDirection = new Vec3(targetDirectionX, targetDirectionY, targetDirectionZ);
+                Agent.UsageDirection direction = Agent.MovementFlagToDirection((Agent.MovementControlFlag)movementFlag);
+
+
+
+                if (Mission.Current != null && otherAgent != null)
+                {
+
+                    otherAgent.TeleportToPosition(pos);
+                    //InformationManager.DisplayMessage(new InformationMessage("Direction: " + direction.ToString()));
+                    ///InformationManager.DisplayMessage(new InformationMessage("Movement: " + ((Agent.MovementControlFlag)movementFlag).ToString()));
+
+
+                    //InformationManager.DisplayMessage(new InformationMessage(otherAgent.GetCurrentAction(1).Name));
+                    //if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none)
+                    //{
+                    //    otherAgent.SetActionChannel(1, otherAgent.GetCurrentAction(1), additionalFlags: (ulong)flags2, startProgress: progress2);
+                    //    //therAgent.SetCurrentActionProgress(1, progress2);
+
+                    //}
+                    //else
+                    //{
+                    //    string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
+                    //    otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2));
+                    //}
+
+                    //if (movementFlag != 0)
+                    //{
+                    //    otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
+
+                    //}
+
+                    otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+                    otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
+                    otherAgent.AttackDirectionToMovementFlag(direction);
+                    otherAgent.DefendDirectionToMovementFlag(direction);
+                    otherAgent.MovementInputVector = new Vec2(inputVectorX, inputVectorY);
+
+                    string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
+                    otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
+
+                    string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
+                    otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
+
+                    //InformationManager.DisplayMessage(new InformationMessage("Received : X: " +  lookDirectionX + " Y: " + lookDirectionY + " | Z: " + lookDirectionZ));
+
+                    otherAgent.LookDirection = new Vec3(lookDirectionX, lookDirectionY, lookDirectionZ);
+                    
+                    //otherAgent.SetTargetPositionAndDirection(targetPosition, targetDirection);
+
+
+                    //otherAgent.SetCurrentActionProgress(1, progress2);
+
+                    //string actionName3 = MBAnimation.GetActionNameWithCode(cacheIndex3);
+                    //otherAgent.SetActionChannel(2, ActionIndexCache.Create(actionName3), additionalFlags: (ulong)flags3, startProgress: progress3);
+                    //otherAgent.SetCurrentActionProgress(2, progress3);
+
+
+                }
+            }
+        }
+
         private Agent _otherAgent;
         private Agent _player;
 
         private Socket sender;
-        private Socket listener;
-        private Socket handler;
+        private Socket receiver;
         private bool isServer = false;
         private UIntPtr playerPtr;
         private UIntPtr otherAgentPtr;
+        private const int bufSize = 1024;
+
         Func<UIntPtr, Vec3> getPosition;
         PositionRefDelegate setPosition;
         List<MatrixFrame> _initialSpawnFrames;
-        IPEndPoint remoteEP;
         MatrixFrame randomElement2;
         float t;
         AgentBuildData agentBuildData;
         AgentBuildData agentBuildData2;
         bool subModuleLoaded = false;
         bool battleLoaded = false;
+        EndPoint epFrom;
+        EndPoint epTo;
+
 
         // custom delegate is needed since SetPosition uses a ref Vec3
         delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
@@ -107,28 +190,31 @@ namespace CoopTestMod
         }
 
         // thread to allow connections and handle data sent by the client
+
+        public void initSockets(string ipAddress, int sendPort, int recvPort)
+        {
+             sender = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+             receiver = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+
+            receiver.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.ReuseAddress, true);
+            receiver.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), recvPort));
+
+            sender.Connect(IPAddress.Parse(ipAddress), sendPort);
+        }
+
+
         public void StartServer()
         {
-            // Get Host IP Address that is used to establish a connection
-            // In this case, we get one IP address of localhost that is IP : 127.0.0.1
-            // If a host has multiple addresses, you will get a list of addresses
-            IPHostEntry host = Dns.GetHostEntry("localhost");
-            IPAddress ipAddress = host.AddressList[0];
-            IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 11000);
+            initSockets("127.0.0.1", 14905, 14906);
+            MessageParser messageParser = new MessageParser();
+            IPAddress ipAddress = IPAddress.Parse("127.0.0.1");
+            epTo = new IPEndPoint(ipAddress, 14905);
+            epFrom = new IPEndPoint(ipAddress, 14906);
 
             try
             {
 
-                // Create a Socket that will use Tcp protocol
-                listener = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-                // A Socket must be associated with an endpoint using the Bind method
-                listener.Bind(localEndPoint);
-                // Specify how many requests a Socket can listen before it gives Server busy response.
-                // We will listen 10 requests at a time
-                listener.Listen(1000);
-
-                Console.WriteLine("Waiting for a connection...");
-                handler = listener.Accept();
+                
 
                 // Incoming data from the client.
 
@@ -139,37 +225,8 @@ namespace CoopTestMod
                     try
                     {
                         bytes = new byte[1024];
-                        int bytesRec = handler.Receive(bytes);
-                        float x = BitConverter.ToSingle(bytes, 0);
-                        float y = BitConverter.ToSingle(bytes, 4);
-                        float z = BitConverter.ToSingle(bytes, 8);
-                        uint movementFlag = BitConverter.ToUInt32(bytes, 12);
-                        uint eventFlag = BitConverter.ToUInt32(bytes, 16);
-                        float moveX = BitConverter.ToSingle(bytes, 20);
-                        float moveY = BitConverter.ToSingle(bytes, 24);
-                        float looX = BitConverter.ToSingle(bytes, 28);
-                        float lookY = BitConverter.ToSingle(bytes, 32);
-                        Vec3 pos = new Vec3(x, y, z);
-                        Agent.UsageDirection direction = Agent.MovementFlagToDirection((Agent.MovementControlFlag)movementFlag);
-                        if (Mission.Current != null && playerPtr != UIntPtr.Zero && otherAgentPtr != UIntPtr.Zero)
-                        {
-
-
-                            setPosition(otherAgentPtr, ref pos);
-                            if (movementFlag != 0)
-                            {
-                                _otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-
-                            }
-
-
-                            _otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-                            _otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
-                            _otherAgent.AttackDirectionToMovementFlag(direction);
-                            _otherAgent.DefendDirectionToMovementFlag(direction);
-                            _otherAgent.MovementInputVector = new Vec2(looX, lookY);
-
-                        }
+                        int bytesRec = receiver.ReceiveFrom(bytes, ref epFrom);
+                        messageParser.parseMessage(bytes, _otherAgent);
                     }
                     catch (Exception ex)
                     {
@@ -192,114 +249,38 @@ namespace CoopTestMod
             }
             finally
             {
-                handler.Shutdown(SocketShutdown.Both);
-                handler.Close();
+                sender.Close();
+                receiver.Close();
             }
         }
 
         // thread to receive the data as the client
         public void StartClient()
         {
-            byte[] bytes = new byte[1024];
-
+            byte[] bytes = null;
+            MessageParser messageParser = new MessageParser();
+            initSockets("127.0.0.1", 14906, 14905);
+            IPAddress ipAddress = System.Net.IPAddress.Parse("127.0.0.1");
+            epTo = new IPEndPoint(ipAddress, 14906);
+            epFrom = new IPEndPoint(ipAddress, 14905);
             try
             {
-                IPHostEntry host = Dns.GetHostEntry("localhost");
-                IPAddress ipAddress = host.AddressList[0];
-                remoteEP = new IPEndPoint(ipAddress, 11000);
-
-                // Create a TCP/IP  socket.
-                sender = new Socket(ipAddress.AddressFamily,
-                    SocketType.Stream, ProtocolType.Tcp);
-
-                // Connect the socket to the remote endpoint. Catch any errors.
-                try
+                while (true)
                 {
-                    // Connect to Remote EndPoint
-                    while (!ClientConnect(remoteEP))
-                    {
-                        Console.WriteLine("Unable to connect to server, waiting 5 seconds and trying again");
-                        Thread.Sleep(5000);
-                    }
-
-                    Console.WriteLine("Socket connected to {0}",
-                        sender.RemoteEndPoint.ToString());
-
-                    // Encode the data string into a byte array.
-                    byte[] msg = Encoding.ASCII.GetBytes("This is a test");
-
-
-                    // Receive the response from the remote device.
-                    while (true)
-                    {
-                        try
-                        {
-
-
-                            bytes = new byte[1024];
-                            int bytesRec = sender.Receive(bytes);
-                            float x = BitConverter.ToSingle(bytes, 0);
-                            float y = BitConverter.ToSingle(bytes, 4);
-                            float z = BitConverter.ToSingle(bytes, 8);
-                            uint movementFlag = BitConverter.ToUInt32(bytes, 12);
-                            uint eventFlag = BitConverter.ToUInt32(bytes, 16);
-                            float moveX = BitConverter.ToSingle(bytes, 20);
-                            float moveY = BitConverter.ToSingle(bytes, 24);
-                            float looX = BitConverter.ToSingle(bytes, 28);
-                            float lookY = BitConverter.ToSingle(bytes, 32);
-                            Vec3 pos = new Vec3(x, y, z);
-                            Agent.UsageDirection direction = Agent.MovementFlagToDirection((Agent.MovementControlFlag)movementFlag);
-                            if (Mission.Current != null && playerPtr != UIntPtr.Zero && otherAgentPtr != UIntPtr.Zero)
-                            {
-
-
-                                setPosition(otherAgentPtr, ref pos);
-                                if (movementFlag != 0)
-                                {
-                                    _otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-                                }
-
-
-                                _otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-                                _otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
-                                _otherAgent.AttackDirectionToMovementFlag(direction);
-                                _otherAgent.DefendDirectionToMovementFlag(direction);
-                                _otherAgent.MovementInputVector = new Vec2(looX, lookY);
-
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            File.AppendAllText("wouterror.txt", ex.Message);
-                        }
-                    }
-
-
-
-
+                    bytes = new byte[1024];
+                    int bytesRec = receiver.ReceiveFrom(bytes, ref epFrom);
+                    messageParser.parseMessage(bytes, _otherAgent);
                 }
-                catch (ArgumentNullException ane)
-                {
-                    Console.WriteLine("ArgumentNullException : {0}", ane.ToString());
-                }
-                catch (SocketException se)
-                {
-                    Console.WriteLine("SocketException : {0}", se.ToString());
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine("Unexpected exception : {0}", e.ToString());
-                }
-                finally
-                {
-                    sender.Shutdown(SocketShutdown.Both);
-                    sender.Close();
-                }
+              
+            }
+            catch(Exception e)
+            {
 
             }
-            catch (Exception e)
+            finally
             {
-                Console.WriteLine(e.ToString());
+                sender.Close();
+                receiver.Close();
             }
         }
 
@@ -380,7 +361,7 @@ namespace CoopTestMod
             {
                 // sub module is loaded. Isnt there a proper callback for this?
                 subModuleLoaded = true;
-                
+
                 //Get all the save sames
                 SaveGameFileInfo[] games = MBSaveLoad.GetSaveFiles();
 
@@ -400,7 +381,7 @@ namespace CoopTestMod
             {
                 // again theres gotta be a better way to check if missions finish loading? A custom mission maybe in the future
                 battleLoaded = true;
-                
+
                 //two teams are created
                 Mission.Current.Teams.Add(BattleSideEnum.Defender, Hero.MainHero.MapFaction.Color, Hero.MainHero.MapFaction.Color2, null, true, false, true);
                 Mission.Current.Teams.Add(BattleSideEnum.Attacker, Hero.MainHero.MapFaction.Color2, Hero.MainHero.MapFaction.Color, null, true, false, true);
@@ -471,12 +452,69 @@ namespace CoopTestMod
             }
 
 
+            if (Input.IsKeyReleased(InputKey.Slash))
+            {
+                //FieldInfo IMBNetwork = typeof(MBAPI).GetField("IMBNetwork", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+
+                if(sender != null)
+                {
+                    sender.SendTo(Encoding.ASCII.GetBytes("Hello!"), epTo);
+                }
+                
+
+                //if (isServer)
+                //{
+                //    InformationManager.DisplayMessage(new InformationMessage("I am Server"));
+                //    //MethodInfo initServer = IMBNetwork.GetValue(null).GetType().GetMethod("InitializeServerSide");
+                //    //initServer.Invoke(IMBNetwork.GetValue(null), new object[] { 14890 });
+                //    try
+                //    {
+                //        GameNetwork.Initialize(new CustomGameNetworkHandler());
+                //        GameNetwork.InitializeCompressionInfos();
+                //        GameNetwork.StartMultiplayerOnServer(15801);
+                //    }catch(Exception ex)
+                //    {
+                //        File.AppendAllText("wouterror.txt", ex.Message);
+                //    }
+                    
+                //}
+                //else
+                //{
+                //    InformationManager.DisplayMessage(new InformationMessage("I am client"));
+                //    //MethodInfo initServer = IMBNetwork.GetValue(null).GetType().GetMethod("InitializeClientSide");
+                //    //initServer.Invoke(IMBNetwork.GetValue(null), new object[] { "127.0.0.1", 14890, 0, 0 });
+                //    GameNetwork.Initialize(new GameNetworkHandler());
+                //    GameNetwork.InitializeCompressionInfos();
+                //    GameNetwork.StartMultiplayerOnClient("127.0.0.1", 14890, 1, 1);
+
+                //}
+
+
+            }
+
+            if (Input.IsKeyReleased(InputKey.BackSlash))
+            {
+                FieldInfo IMBNetwork = typeof(MBAPI).GetField("IMBNetwork", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                //MethodInfo ping = IMBNetwork.GetValue(null).GetType().GetMethod("ServerPing");
+                //ping.Invoke(IMBNetwork.GetValue(null), new object[] { "127.0.0.1", 14890 });
+                MethodInfo dedicated = IMBNetwork.GetValue(null).GetType().GetMethod("IsDedicatedServer");
+                MethodInfo multiplayerDisaplyed = IMBNetwork.GetValue(null).GetType().GetMethod("GetMultiplayerDisabled");
+
+                bool dedicatedB = (bool)dedicated.Invoke(IMBNetwork.GetValue(null), null);
+                bool multiplayerDisplayedB = (bool)multiplayerDisaplyed.Invoke(IMBNetwork.GetValue(null), null);
+
+                InformationManager.DisplayMessage(new InformationMessage("Dedicated? " + dedicatedB));
+                InformationManager.DisplayMessage(new InformationMessage("Multiplayer enabled? " + multiplayerDisplayedB));
+            }
+
+
+
 
             // Mission is loaded
             if (Mission.Current != null && playerPtr != UIntPtr.Zero)
             {
                 // every 0.1 tick send an update to other endpoint
-                if (t + 0.05 > Time.ApplicationTime)
+                if (t + 0.01 > Time.ApplicationTime)
                 {
                     return;
                 }
@@ -491,7 +529,18 @@ namespace CoopTestMod
                 uint movementFlag = (uint)_player.MovementFlags;
                 uint eventFlag = (uint)_player.EventControlFlags;
                 Vec2 movementDirection = _player.GetMovementDirection();
-                Vec2 lookDirection = _player.MovementInputVector;
+                Vec2 inputVector = _player.MovementInputVector;
+                ActionIndexCache cache1 = _player.GetCurrentAction(0);
+                float progress1 = _player.GetCurrentActionProgress(0);
+                AnimFlags flags1 = _player.GetCurrentAnimationFlag(0);
+                ActionIndexCache cache2 = _player.GetCurrentAction(1);
+                float progress2 = _player.GetCurrentActionProgress(1);
+                AnimFlags flags2 = _player.GetCurrentAnimationFlag(1);
+                Vec3 lookDirection = _player.LookDirection;
+                //Vec2 targetPosition = _player.GetTargetPosition();
+                //Vec3 targetDirection = _player.GetTargetDirection();
+                //InformationManager.DisplayMessage(new InformationMessage("Sending: X: " + lookDirection.x + " Y: " + lookDirection.y + " | Z: " + lookDirection.z));
+
 
                 if (myPos.IsValid)
                 {
@@ -504,22 +553,27 @@ namespace CoopTestMod
                         writer.Write(eventFlag);
                         writer.Write(movementDirection.x);
                         writer.Write(movementDirection.y);
+                        writer.Write(inputVector.x);
+                        writer.Write(inputVector.y);
+                        writer.Write(cache1.Index);
+                        writer.Write(progress1);
+                        writer.Write((ulong)flags1);
+                        writer.Write(cache2.Index);
+                        writer.Write(progress2);
+                        writer.Write((ulong)flags2);
                         writer.Write(lookDirection.x);
                         writer.Write(lookDirection.y);
+                        writer.Write(lookDirection.z);
+                        //writer.Write(targetPosition.x);
+                        //writer.Write(targetPosition.y);
+                        //writer.Write(targetDirection.x);
+                        //writer.Write(targetDirection.y);
+                        //writer.Write(targetDirection.z);
                     }
                     byte[] bytes = stream.ToArray();
-                    if (isServer && handler != null && handler.Connected)
-                    {
-                        handler.Send(bytes);
-                    }
-                    else if (sender != null && sender.Connected)
+                    if (sender != null && sender.Connected)
                     {
                         sender.Send(bytes);
-                    }
-                    else
-                    {
-                        //InformationManager.DisplayMessage(new InformationMessage("Somehow disconnected"));
-                        ClientConnect(remoteEP);
                     }
 
                 }
