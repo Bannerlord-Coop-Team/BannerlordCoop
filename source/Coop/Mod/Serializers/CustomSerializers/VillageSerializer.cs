@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.CampaignSystem.Village;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    internal class VillageSerializer : CustomSerializer
+    public class VillageSerializer : CustomSerializer
     {
         [NonSerialized]
         Village newvillage;
@@ -45,10 +44,16 @@ namespace Coop.Mod.Serializers
                         bound = CoopObjectManager.GetGuid((Settlement)value);
                         break;
                     case "VillageType":
-                        SNNSO.Add(fieldInfo,new VillageTypeSerializer((VillageType)value));
+                        SNNSO.Add(fieldInfo, new VillageTypeSerializer((VillageType)value));
+                        break;
+                    case "VillagerPartyComponent":
+                        SNNSO.Add(fieldInfo, new PartyComponentSerializer((PartyComponent)value));
                         break;
                     case "_villageState":
                         state = (VillageStates)value;
+                        break;
+                    case "_marketData":
+                        SNNSO.Add(fieldInfo, new VillageMarketDataSerializer((VillageMarketData)value));
                         break;
                     default:
                         UnmanagedFields.Add(fieldInfo.Name);
@@ -97,9 +102,14 @@ namespace Coop.Mod.Serializers
                 throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
             }
 
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
+            }
+
             newvillage.GetType()
                 .GetField("_bound", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newvillage,CoopObjectManager.GetObject(bound));
+                .SetValue(newvillage, CoopObjectManager.GetObject(bound));
         }
     }
 }

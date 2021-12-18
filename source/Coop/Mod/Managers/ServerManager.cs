@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem.Load;
+using System.Linq;
 
 namespace Coop.Mod.Managers
 {
@@ -61,7 +62,22 @@ namespace Coop.Mod.Managers
                 CoopObjectManager.AddObject(settlement);
             }
 
-            foreach(IFaction faction in Campaign.Current.Factions)
+            foreach (Town town in Town.AllFiefs)
+            {
+                CoopObjectManager.AddObject(town);
+                town.Buildings.ForEach(building => CoopObjectManager.AddObject(building));
+                foreach(Building building in town.BuildingsInProgress)
+                {
+                    CoopObjectManager.AddObject(building);
+                }
+            }
+
+            foreach (Village village in Village.All)
+            {
+                CoopObjectManager.AddObject(village);
+            }
+
+            foreach (IFaction faction in Campaign.Current.Factions)
             {
                 CoopObjectManager.AddObject(faction);
             }
@@ -69,6 +85,7 @@ namespace Coop.Mod.Managers
             foreach (MobileParty party in Campaign.Current.MobileParties)
             {
                 CoopObjectManager.AddObject(party);
+                CoopObjectManager.AddObject(party.Party);
             }
 
             //CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {

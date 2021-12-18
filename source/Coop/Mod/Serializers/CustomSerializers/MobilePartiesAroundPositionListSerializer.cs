@@ -1,14 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
     public class MobilePartiesAroundPositionListSerializer : ICustomSerializer
     {
-        private List<string> partyNames = new List<string>();
+        [NonSerialized]
+        MobilePartiesAroundPositionList partiesList;
+
+        private List<Guid> parties;
 
         public MobilePartiesAroundPositionListSerializer(MobilePartiesAroundPositionList mobilePartiesAroundPositionList)
         {
@@ -16,33 +20,27 @@ namespace Coop.Mod.Serializers
                 .GetField("_partyList", BindingFlags.Instance | BindingFlags.NonPublic)
                 .GetValue(mobilePartiesAroundPositionList);
 
-            foreach (MobileParty mobileParty in partyList)
-            {
-                partyNames.Add(mobileParty.Name.ToString());
-            }
+            parties = new List<Guid>(CoopObjectManager.GetGuids(partyList));
         }
 
         public object Deserialize()
         {
-            MobilePartiesAroundPositionList newPositionList = new MobilePartiesAroundPositionList(partyNames.Count > 32 ? partyNames.Count : 32);
-            List<MobileParty> partyList = (List<MobileParty>)typeof(MobilePartiesAroundPositionList)
-                .GetField("_partyList", BindingFlags.Instance | BindingFlags.NonPublic)
-                .GetValue(newPositionList);
-            foreach (MobileParty mobileParty in MobileParty.All)
-            {
-                if (partyNames.Contains(mobileParty.Name.ToString()))
-                {
-                    partyNames.Remove(mobileParty.Name.ToString());
-                    partyList.Add(mobileParty);
-                }
-            }
-
-            return newPositionList;
+            partiesList = new MobilePartiesAroundPositionList();
+            return partiesList;
         }
 
         public void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            if (partiesList == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            List<MobileParty> partiesAroundParty = parties.Select(x => (MobileParty)CoopObjectManager.GetObject(x)).ToList();
+
+            typeof(MobilePartiesAroundPositionList)
+                .GetField("_partyList", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(partiesList, partiesAroundParty);
         }
     }
 }

@@ -52,10 +52,10 @@ namespace Coop.Mod.Serializers
                         break;
 
                     case "<Culture>k__BackingField":
-                        SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)value));
+                        SNNSO.Add(fieldInfo, new PlayerCultureObjectSerializer((CultureObject)value));
                         break;
                     case "<LastFactionChangeTime>k__BackingField":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "<SupporterNotables>k__BackingField":
                         foreach (Hero hero in (MBReadOnlyList<Hero>)value)
@@ -82,17 +82,23 @@ namespace Coop.Mod.Serializers
                         // Assigned by SetHeroReference on deserialization
                         break;
                     case "_banner":
-                        SNNSO.Add(fieldInfo, new BannerSerializer((Banner)value));
+                        SNNSO.Add(fieldInfo, new Custom.BannerSerializer((Banner)value));
                         break;
                     case "_home":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        SNNSO.Add(fieldInfo, new PlayerSettlementSerializer((Settlement)value));
                         break;
                     case "<NotAttackableByPlayerUntilTime>k__BackingField":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_defaultPartyTemplate":
-                        SNNSO.Add(fieldInfo, new DefaultPartyTemplateSerializer((PartyTemplateObject)value));
+                        SNNSO.Add(fieldInfo, new Custom.DefaultPartyTemplateSerializer((PartyTemplateObject)value));
                         break;
+                    case "<Fiefs>k__BackingField":
+                    case "_villagesReadOnlyCache":
+                    case "_settlementsReadOnlyCache":
+                    case "<Lords>k__BackingField":
+                    case "<Heroes>k__BackingField":
+                    case "<WarPartyComponents>k__BackingField":
                     case "_kingdom":
                         // TODO fix
                         break;

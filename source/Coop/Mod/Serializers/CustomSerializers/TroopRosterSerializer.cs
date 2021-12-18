@@ -2,15 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.ServiceModel.Channels;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    internal class TroopRosterSerializer : ICustomSerializer
+    public class TroopRosterSerializer : ICustomSerializer
     {
         [NonSerialized]
         readonly FieldInfo rosterDataField = typeof(TroopRoster).GetField("data", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -72,7 +70,7 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            // No references
         }
     }
 }

@@ -54,47 +54,47 @@ namespace Coop.Mod.Serializers
                 switch (fieldInfo.Name)
                 {
                     case "_currentSettlement":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        SNNSO.Add(fieldInfo, new PlayerSettlementSerializer((Settlement)value));
                         break;
                     case "<LastVisitedSettlement>k__BackingField":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        SNNSO.Add(fieldInfo, new PlayerSettlementSerializer((Settlement)value));
                         break;
                     case "<Ai>k__BackingField":
                         // PartyAi
                         // NOTE may not be needed due to player control
                         break;
                     case "<Party>k__BackingField":
-                        SNNSO.Add(fieldInfo, new PartyBaseSerializer((PartyBase)value));
+                        SNNSO.Add(fieldInfo, new PlayerPartyBaseSerializer((PartyBase)value));
                         break;
                     case "_disorganizedUntilTime":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_ignoredUntilTime":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_initiativeRestoreTime":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_targetAiFaceIndex":
-                        SNNSO.Add(fieldInfo, new PathFaceRecordSerializer((PathFaceRecord)value));
+                        SNNSO.Add(fieldInfo, new Custom.PathFaceRecordSerializer((PathFaceRecord)value));
                         break;
                     case "_moveTargetAiFaceIndex":
-                        SNNSO.Add(fieldInfo, new PathFaceRecordSerializer((PathFaceRecord)value));
+                        SNNSO.Add(fieldInfo, new Custom.PathFaceRecordSerializer((PathFaceRecord)value));
                         break;
                     case "_aiPathLastFace":
-                        SNNSO.Add(fieldInfo, new PathFaceRecordSerializer((PathFaceRecord)value));
+                        SNNSO.Add(fieldInfo, new Custom.PathFaceRecordSerializer((PathFaceRecord)value));
                         break;
                     case "<Path>k__BackingField":
-                        SNNSO.Add(fieldInfo, new NavigationPathSerializer((NavigationPath)value));
+                        SNNSO.Add(fieldInfo, new Custom.NavigationPathSerializer((NavigationPath)value));
                         break;
                     case "_partiesAroundPosition":
-                        SNNSO.Add(fieldInfo, new MobilePartiesAroundPositionListSerializer((MobilePartiesAroundPositionList)value));
+                        SNNSO.Add(fieldInfo, new PlayerMobilePartiesAroundPositionListSerializer((MobilePartiesAroundPositionList)value));
                         break;
                     case "_nextAiCheckTime":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "<CurrentNavigationFace>k__BackingField":
-                        SNNSO.Add(fieldInfo, new PathFaceRecordSerializer((PathFaceRecord)value));
+                        SNNSO.Add(fieldInfo, new Custom.PathFaceRecordSerializer((PathFaceRecord)value));
                         break;
                     case "<AttachedParties>k__BackingField":
                         MBReadOnlyList<MobileParty> attachedParties = (MBReadOnlyList<MobileParty>)value;
@@ -106,7 +106,7 @@ namespace Coop.Mod.Serializers
                     case "_actualClan":
                         break;
                     case "<StationaryStartTime>k__BackingField":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_partyComponent":
                         SNNSO.Add(fieldInfo, new PlayerLordPartyComponentSerializer((LordPartyComponent)value));
@@ -175,7 +175,7 @@ namespace Coop.Mod.Serializers
                 // Pass references to specified serializers
                 switch (entry.Value)
                 {
-                    case PartyBaseSerializer partyBaseSerializer:
+                    case PlayerPartyBaseSerializer partyBaseSerializer:
                         partyBaseSerializer.SetHeroReference(hero);
                         partyBaseSerializer.SetMobilePartyReference(newMobileParty);
                         entry.Key.SetValue(newMobileParty, partyBaseSerializer.Deserialize(newMobileParty.Party));

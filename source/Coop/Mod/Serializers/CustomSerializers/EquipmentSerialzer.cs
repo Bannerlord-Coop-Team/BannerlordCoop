@@ -1,14 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.Core;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    class EquipmentSerializer : ICustomSerializer
+    public class EquipmentSerializer : ICustomSerializer
     {
         string equipmentCode;
         public EquipmentSerializer() { }
@@ -28,7 +24,7 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            // No references
         }
     }
 }

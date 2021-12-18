@@ -11,6 +11,7 @@ using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.Mod.Serializers;
+using Coop.Mod.Serializers.Custom;
 using Coop.NetImpl;
 using Coop.NetImpl.LiteNet;
 using CoopFramework;
@@ -23,6 +24,8 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Logic;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
@@ -60,7 +63,6 @@ namespace Coop.Mod
         private MBGameManager gameManager;
 
         private int m_ReconnectAttempts = MaxReconnectAttempts;
-        private Hero m_Hero = null;
         private Guid m_HeroGUID;
         #endregion
         public Action<PersistenceClient> OnPersistenceInitialized;
@@ -69,7 +71,7 @@ namespace Coop.Mod
 
         public CoopClient(ClientConfiguration config)
         {
-            Session = new GameSession(new WorldData());
+            Session = new GameSession();
             Session.OnConnectionDestroyed += ConnectionDestroyed;
             m_NetManager = new LiteNetManagerClient(Session, config);
             m_Updateables.Add(m_NetManager);
@@ -211,7 +213,6 @@ namespace Coop.Mod
                 // Handler Registration
                 //Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyId);
-                Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
                 Session.Connection.Dispatcher.RegisterPacketHandler(RecieveGameData);
 
                 Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
@@ -305,11 +306,19 @@ namespace Coop.Mod
         public void RecieveGameData(ConnectionBase connection, Packet packet)
         {
             GameData gameData = (GameData)SyncedObjectStore.Deserialize(packet.Payload.Array);
+
+            ClientCharacterCreatorManager manager = (ClientCharacterCreatorManager)gameManager;
+
+            manager.RemoveAllObjects();
+
             gameData.Unpack();
 
-            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
+            Hero newPlayer = CoopObjectManager.GetObject<Hero>(gameData.PlayerPartyId);
 
-            connection.Send(new Packet(EPacket.Client_Loaded));
+            Game.Current.PlayerTroop = newPlayer.CharacterObject;
+            ChangePlayerCharacterAction.Apply(newPlayer);
+
+            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
         }
         #endregion
 
@@ -328,72 +337,9 @@ namespace Coop.Mod
             else
             {
                 Session.Connection.Send(
-                new Packet(
-                    EPacket.Client_RequestWorldData,
-                    new Client_RequestWorldData().Serialize()));
+                    new Packet(EPacket.Client_RequestWorldData));
             }
             
-        }
-
-        [GameClientPacketHandler(ECoopClientState.ReceivingGameData, EPacket.Server_WorldData)]
-        private void ReceiveInitialWorldData(ConnectionBase connection, Packet packet)
-        {
-            bool bSuccess = false;
-            try
-            {
-                bSuccess = Session.World.Receive(packet.Payload);
-            }
-            catch (Exception e)
-            {
-                Logger.Error(
-                    e,
-                    "World data received from server could not be parsed . Disconnect {client}.",
-                    this);
-            }
-
-            if (bSuccess)
-            {
-                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
-                if(m_HeroGUID == Guid.Empty)
-                {
-                    gameManager = new ClientManager(((WorldData)Session.World).LoadResult, m_Hero);
-                }
-                else
-                {
-                    gameManager = new ClientManager(((WorldData)Session.World).LoadResult, m_HeroGUID);
-                }
-
-                
-                MBGameManager.StartNewGame(gameManager);
-                //ClientManager.OnPreLoadFinishedEvent += (source, e) => {
-                //};
-                ClientManager.OnPostLoadFinishedEvent += (source, e) => {
-                    // TODO fix
-                    //CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, SendPlayerPartyChanged);
-
-                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded); 
-                };
-            }
-            else
-            {
-                Logger.Error(
-                    "World data received from server could not be parsed. Disconnect {client}.",
-                    this);
-                Session.Connection.Disconnect(EDisconnectReason.WorldDataTransferIssue);
-            }
-        }
-
-
-        #endregion
-
-        #region  ClientLoading
-        private void SendGameLoading()
-        {
-            // TODO add loading and loaded messages
-            //Session.Connection.Send(
-            //    new Packet(
-            //        EPacket.Client_Joined,
-            //        new Client_GameLoading().Serialize()));
         }
         #endregion
 
@@ -401,9 +347,7 @@ namespace Coop.Mod
         public void SendGameLoaded()
         {
             Session.Connection.Send(
-                new Packet(
-                    EPacket.Client_Loaded,
-                    new Client_Joined().Serialize()));
+                new Packet(EPacket.Client_Loaded));
             TryInitPersistence();
         }
 		
@@ -412,20 +356,6 @@ namespace Coop.Mod
         private void ReceivePartyId(ConnectionBase connection, Packet packet)
         {
             m_HeroGUID = CommonSerializer.Deserialize<Guid>(packet.Payload);
-        }
-
-
-        [GameClientPacketHandler(ECoopClientState.Playing, EPacket.Sync)]
-        private void ReceiveSyncPacket(ConnectionBase connection, Packet packet)
-        {
-            try
-            {
-                Session.World.Receive(packet.Payload);
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Sync data received from server could not be parsed. Ignored.");
-            }
         }
         #endregion
 

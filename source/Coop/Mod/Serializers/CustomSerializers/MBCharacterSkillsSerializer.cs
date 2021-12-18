@@ -1,13 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    internal class MBCharacterSkillsSerializer : ICustomSerializer
+    public class MBCharacterSkillsSerializer : ICustomSerializer
     {
         CharacterSkillsSerializer characterSkillsSerializer;
         public MBCharacterSkillsSerializer(MBCharacterSkills value)
@@ -25,7 +24,7 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            // No references
         }
     }
 }

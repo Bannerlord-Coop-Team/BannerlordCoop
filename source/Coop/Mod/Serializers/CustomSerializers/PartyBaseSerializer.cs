@@ -1,29 +1,27 @@
-﻿using SandBox.View.Map;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    public class PartyBaseSerializer : CustomSerializer
+    public class PartyBaseSerializer : CustomSerializerWithGuid
     {
         [NonSerialized]
-        MobileParty mobileParty;
-        [NonSerialized]
-        Hero hero;
+        PartyBase partyBase;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, Guid> references = new Dictionary<FieldInfo, Guid>();
 
         public PartyBaseSerializer(PartyBase partyBase) : base(partyBase)
         {
+            List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
+
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
                 object value = fieldInfo.GetValue(partyBase);
@@ -40,7 +38,10 @@ namespace Coop.Mod.Serializers
                         // Generate on server
                         break;
                     case "<MobileParty>k__BackingField":
-                        // Not needed, populated at deserialize
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+                        break;
+                    case "<Settlement>k__BackingField":
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     case "<MemberRoster>k__BackingField":
                         // TroopRoster
@@ -58,15 +59,18 @@ namespace Coop.Mod.Serializers
                         // DeterministicRandom
                         SNNSO.Add(fieldInfo, new DeterministicRandomSerializer((DeterministicRandom)value));
                         break;
-                    case "_owner":
-                        // Not needed, populated at deserialize
-                        break;
                     case "_leader":
-                        // Not needed, populated at deserialize
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     default:
-                        throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
+                        UnmanagedFields.Add(fieldInfo);
+                        break;
                 }
+            }
+
+            if (!UnmanagedFields.IsEmpty())
+            {
+                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
             }
 
             FieldInfo indexField = partyBase.GetType().GetField("_index", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -75,50 +79,39 @@ namespace Coop.Mod.Serializers
             NonSerializableObjects.Clear();
         }
 
-        public void SetHeroReference(Hero hero)
+        public override object Deserialize()
         {
-            this.hero = hero;
-        }
-
-        public void SetMobilePartyReference(MobileParty mobileParty)
-        {
-            this.mobileParty = mobileParty;
-        }
-
-        public object Deserialize(PartyBase newPartyBase)
-        {
-            if (hero == null)
-            {
-                throw new SerializationException("Must set hero reference before deserializing. Use SetHeroReference()");
-            }
-            else if(mobileParty == null)
-            {
-                throw new SerializationException("Must set mobileParty reference before deserializing. Use SetMobilePartyReference()");
-            }
+            partyBase = new PartyBase((MobileParty)null);
 
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
-                entry.Key.SetValue(newPartyBase, entry.Value.Deserialize());
+                entry.Key.SetValue(partyBase, entry.Value.Deserialize());
             }
 
-            newPartyBase.AddElementToMemberRoster(hero.CharacterObject, 1);
-            newPartyBase.GetType().GetField("_leader", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, hero.CharacterObject);
-            newPartyBase.GetType().GetField("<MobileParty>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, mobileParty);
-
-            IPartyVisual newVisual = Campaign.Current.VisualCreator.PartyVisualCreator.CreatePartyVisual();
-            newPartyBase.GetType().GetField("_visual", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, newVisual);
-
-            return base.Deserialize(newPartyBase);
-        }
-
-        public override object Deserialize()
-        {
-            throw new NotImplementedException();
+            return base.Deserialize(partyBase);
         }
 
         public override void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            if (partyBase == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            foreach (KeyValuePair<FieldInfo, Guid> entry in references)
+            {
+                FieldInfo field = entry.Key;
+                Guid id = entry.Value;
+
+                field.SetValue(partyBase, CoopObjectManager.GetObject(id));
+            }
+
+            partyBase.AddElementToMemberRoster(partyBase.LeaderHero.CharacterObject, 1);
+
+            
+
+            IPartyVisual newVisual = Campaign.Current.VisualCreator.PartyVisualCreator.CreatePartyVisual();
+            partyBase.GetType().GetField("_visual", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(partyBase, newVisual);
         }
     }
 }

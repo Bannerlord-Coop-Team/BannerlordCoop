@@ -27,10 +27,8 @@ namespace Coop.Mod.Serializers
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
-        public CharacterObjectSerializer CharacterObject { get; private set; }
+        public PlayerCharacterObjectSerializer CharacterObject { get; private set; }
         public string PlayerId { get; }
-
-        readonly List<HeroSerializer> ExSpouses = new List<HeroSerializer>();
 
         public PlayerHeroSerializer(Hero hero) : base(hero)
         {
@@ -60,13 +58,13 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new PlayerCharacterObjectSerializer((CharacterObject)value));
                         break;
                     case "<BattleEquipment>k__BackingField":
-                        SNNSO.Add(fieldInfo, new EquipmentSerializer((Equipment)value));
+                        SNNSO.Add(fieldInfo, new Custom.EquipmentSerializer((Equipment)value));
                         break;
                     case "<CivilianEquipment>k__BackingField":
-                        SNNSO.Add(fieldInfo, new EquipmentSerializer((Equipment)value));
+                        SNNSO.Add(fieldInfo, new Custom.EquipmentSerializer((Equipment)value));
                         break;
                     case "<CaptivityStartTime>k__BackingField":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_heroTraits":
                         SNNSO.Add(fieldInfo, new CharacterTraitsSerializer((CharacterTraits)value));
@@ -78,41 +76,41 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new CharacterSkillsSerializer((CharacterSkills)value));
                         break;
                     case "_cachedLastSeenInformation":
-                        SNNSO.Add(fieldInfo, new HeroLastSeenInformationSerializer((Hero.HeroLastSeenInformation)value));
+                        SNNSO.Add(fieldInfo, new PlayerHeroLastSeenInformationSerializer((Hero.HeroLastSeenInformation)value));
                         break;
                     case "_lastSeenInformationKnownToPlayer":
-                        SNNSO.Add(fieldInfo, new HeroLastSeenInformationSerializer((Hero.HeroLastSeenInformation)value));
+                        SNNSO.Add(fieldInfo, new PlayerHeroLastSeenInformationSerializer((Hero.HeroLastSeenInformation)value));
                         break;
                     case "_birthDay":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_deathDay":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "<LastCommentTime>k__BackingField":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_clan":
                         SNNSO.Add(fieldInfo, new PlayerClanSerializer((Clan)value));
                         break;
                     case "Culture":
                         // NOTE: May want to read from server before character creation
-                        SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)value));
+                        SNNSO.Add(fieldInfo, new PlayerCultureObjectSerializer((CultureObject)value));
                         break;
                     case "_partyBelongedTo":
                         SNNSO.Add(fieldInfo, new PlayerMobilePartySerializer((MobileParty)value));
                         break;
                     case "<LastMeetingTimeWithPlayer>k__BackingField":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_bornSettlement":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        SNNSO.Add(fieldInfo, new PlayerSettlementSerializer((Settlement)value));
                         break;
                     case "<HomeSettlement>k__BackingField":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        SNNSO.Add(fieldInfo, new PlayerSettlementSerializer((Settlement)value));
                         break;
                     case "_homeSettlement":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        SNNSO.Add(fieldInfo, new PlayerSettlementSerializer((Settlement)value));
                         break;
                     case "_father":
                         SNNSO.Add(fieldInfo, null);
@@ -121,10 +119,7 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, null);
                         break;
                     case "ExSpouses":
-                        foreach (Hero exSpouse in (MBReadOnlyList<Hero>)value)
-                        {
-                            ExSpouses.Add(new HeroSerializer(exSpouse));
-                        }
+                        // This starts empty
                         break;
                     case "_heroDeveloper":
                         // Can reinstantiate on recipient as this is hero data loaded at start of game.
@@ -180,16 +175,9 @@ namespace Coop.Mod.Serializers
                 entry.Key.SetValue(hero, entry.Value?.Deserialize());
             }
 
-            // Deserialize exSpouse list
-            List<Hero> lExSpouses = new List<Hero>();
-            foreach (HeroSerializer exSpouse in ExSpouses)
-            {
-                lExSpouses.Add((Hero)exSpouse.Deserialize());
-            }
-
             hero.GetType()
                 .GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(hero, lExSpouses);
+                .SetValue(hero, new List<Hero>());
 
 
             ConstructorInfo ctor = typeof(HeroDeveloper).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance,

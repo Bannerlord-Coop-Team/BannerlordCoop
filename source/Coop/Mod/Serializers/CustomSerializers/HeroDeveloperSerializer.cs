@@ -1,25 +1,89 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.ObjectSystem;
+using TaleWorlds.Core;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    internal class HeroDeveloperSerializer : CustomSerializer
+    public class HeroDeveloperSerializer : CustomSerializer
     {
-        public HeroDeveloperSerializer(HeroDeveloper value) : base(value) 
+        [NonSerialized]
+        HeroDeveloper heroDeveloper;
+
+        /// <summary>
+        /// Serialized Natively Non Serializable Objects (SNNSO)
+        /// </summary>
+        readonly Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, Guid> References = new Dictionary<FieldInfo, Guid>();
+        public HeroDeveloperSerializer(HeroDeveloper developer) : base(developer)
         {
-            // TODO HeroDeveloperSerializer
+            List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
+
+            foreach (FieldInfo fieldInfo in NonSerializableObjects)
+            {
+                // Get value from fieldInfo
+                object value = fieldInfo.GetValue(developer);
+
+                // If value is null, no need to serialize
+                if (value == null)
+                {
+                    continue;
+                }
+
+                // Assign serializer to nonserializable objects
+                switch (fieldInfo.Name)
+                {
+                    case "<Hero>k__BackingField":
+                        break;
+                    case "_newFocuses":
+                        break;
+                    default:
+                        UnmanagedFields.Add(fieldInfo);
+                        break;
+
+                }
+            }
+
+            if (!UnmanagedFields.IsEmpty())
+            {
+                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
+            }
+
         }
 
         public override object Deserialize()
         {
-            throw new NotImplementedException();
+            ConstructorInfo ctor = typeof(HeroDeveloper)
+                .GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(Hero) }, null);
+
+            heroDeveloper = (HeroDeveloper)ctor.Invoke(new[] { (Hero)null });
+
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Key.SetValue(heroDeveloper, entry.Value.Deserialize());
+            }
+
+            base.Deserialize(heroDeveloper);
+
+            return heroDeveloper;
         }
 
         public override void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            if (heroDeveloper == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            foreach (KeyValuePair<FieldInfo, Guid> entry in References)
+            {
+                FieldInfo field = entry.Key;
+                Guid id = entry.Value;
+
+                field.SetValue(heroDeveloper, CoopObjectManager.GetObject(id));
+            }
         }
     }
 }

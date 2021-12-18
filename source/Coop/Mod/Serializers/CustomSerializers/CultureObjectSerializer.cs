@@ -1,14 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    internal class CultureObjectSerializer : CustomSerializer
+    public class CultureObjectSerializer : CustomSerializer
     {
         string stringId;
         public CultureObjectSerializer(CultureObject culture) : base(culture) 
@@ -19,15 +16,13 @@ namespace Coop.Mod.Serializers
 
         public override object Deserialize()
         {
-
-
             CultureObject cultureObject = MBObjectManager.Instance.GetObject<CultureObject>(stringId);
             return cultureObject;
         }
 
         public override void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            // No references
         }
     }
 }

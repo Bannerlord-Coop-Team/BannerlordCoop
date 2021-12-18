@@ -14,8 +14,9 @@ namespace Coop.Mod
 {
     public class CoopObjectManager
     {
-        private static Dictionary<Guid, object> Objects = new Dictionary<Guid, object>();
-        private static Dictionary<Type, List<Guid>> AssosiatedGuids = new Dictionary<Type, List<Guid>>();
+        private static readonly Dictionary<Guid, object> Objects = new Dictionary<Guid, object>();
+        private static readonly Dictionary<object, Guid> Guids = new Dictionary<object, Guid>();
+        private static readonly Dictionary<Type, List<Guid>> AssosiatedGuids = new Dictionary<Type, List<Guid>>();
         
         
         
@@ -32,61 +33,124 @@ namespace Coop.Mod
             }
         }
 
+        private static bool ContainsElement(object obj)
+        {
+            return Guids.ContainsKey(obj);
+        }
+
+        private static bool ContainsElement(Guid guid)
+        {
+            return Objects.ContainsKey(guid);
+        }
+
+        private static bool AddObject(Guid guid, object obj)
+        {
+            if (ContainsElement(obj))
+            {
+                return false;
+            }
+            else
+            {
+                Guids.Add(obj, guid);
+                Objects.Add(guid, obj);
+                return true;
+            }
+        }
+
+        public static bool RegisterExistingObject(Guid guid, object obj)
+        {
+            if (ContainsElement(guid))
+            {
+                return false;
+            }
+            else if (ContainsElement(obj))
+            {
+                return false;
+            }
+            else
+            {
+                Objects.Add(guid, obj);
+                return true;
+            }
+        }
+
         public static Guid AddObject(object obj)
         {
             Guid newId = Guid.NewGuid();
 
-            Objects.Add(newId, obj);
+            if(AddObject(newId, obj))
+            {
+                AddTypeEntry(obj, newId);
+                return newId;
+            }
 
-            AddTypeEntry(obj, newId);
-
-            return newId;
+            return GetGuid(obj);
         }
 
         public static object GetObject(Guid id)
         {
-#if DEBUG
             if (id == null || id.Equals(Guid.Empty))
             {
-                throw new ArgumentException($"Guid is not valid: {id}");
+                return null;
             }
-#endif
+
             return Objects[id];
         }
 
 
         /// <summary>
-        /// SLOW - Try to avoid using when possible
+        /// Gets the registered Guid for a given object.
         /// </summary>
         /// <param name="obj">Object to get Guid</param>
         /// <returns>Key of object, Null if object is not registered in object manager.</returns>
         public static Guid GetGuid(object obj)
         {
-            return Objects.Single(x => x.Value == obj).Key;
+            if (Guids.ContainsKey(obj))
+            {
+                return Guids[obj];
+            }
+            return Guid.Empty;
         }
 
         /// <summary>
-        /// SLOW - Try to avoid using when possible
+        /// Gets a list of guids for the given list of objects.
         /// </summary>
         /// <param name="obj">Object to get Guid</param>
         /// <returns>Keys of object enumerable, Null if object is not registered in object manager.</returns>
         public static IEnumerable<Guid> GetGuids(IEnumerable<object> listOfObjects)
         {
-            HashSet<object> hashSet = listOfObjects.ToHashSet();
-            IEnumerable<Guid> result = Objects.AsParallel().Where(x => hashSet.Contains(x.Value)).Select(x => x.Key);
+            List<Guid> guids = new List<Guid>();
+            List<object> unresolvedObject = new List<object>();
 
-            // Edge case where not all objects exist in object manager.
-            if(hashSet.Count != result.Count())
+            foreach (object obj in listOfObjects)
             {
-                IEnumerable<object> exceptionResults = Objects.AsParallel().Where(x => !hashSet.Contains(x.Value)).Select(x => x.Value);
-                throw new Exception($"Not all objects have been registered by object manager. Objects in question {exceptionResults}");
+                if (ContainsElement(obj))
+                {
+                    guids.Add(Guids[obj]);
+                }
+                else
+                {
+                    unresolvedObject.Add(obj);
+                }
+                
             }
 
-            return result;
+            // Edge case where not all objects exist in object manager.
+            if(unresolvedObject.Count > 0)
+            {
+                throw new Exception($"Not all objects have been registered by object manager. Objects in question {unresolvedObject}");
+            }
+
+            return guids;
         }
 
         public static T GetObject<T>(Guid id)
         {
+            if(id == Guid.Empty)
+            {
+                return default(T);
+            }
+
             object obj = Objects[id];
             if (obj.GetType() != typeof(T))
             {
@@ -97,14 +161,63 @@ namespace Coop.Mod
 
         public static IEnumerable<T> GetObjects<T>()
         {
-            // Go through Objects and if object type exists in AssosiatedGuids select all items of that type
-            return Objects.Where(x => AssosiatedGuids[typeof(T)].Contains(x.Key))
-                          .Select(kvp => (T)kvp.Value);
+            return AssosiatedGuids[typeof(T)].Select(id => (T)Objects[id]);
         }
 
-        public static void RemoveObject(Guid id)
+        private static bool RemoveObjectFromType(Guid id, object obj)
         {
-            Objects.Remove(id);
+            bool result;
+
+            if (AssosiatedGuids.ContainsKey(obj.GetType()))
+            {
+                result = AssosiatedGuids[obj.GetType()].Remove(id);
+            }
+            else
+            {
+                result = false;
+            }
+
+            return result;
+        }
+
+        public static bool RemoveObject(Guid id)
+        {
+            bool result;
+
+            if (ContainsElement(id))
+            {
+                object obj = Objects[id];
+
+                result = RemoveObject(obj);
+
+                RemoveObjectFromType(id, obj);
+            }
+            else 
+            {
+                result = false; 
+            }
+
+            return result;            
+        }
+
+        public static bool RemoveObject(object obj)
+        {
+            bool result = true;
+
+            if (ContainsElement(obj))
+            {
+                Guid id = Guids[obj];
+                Guids.Remove(obj);
+                Objects.Remove(id);
+
+                RemoveObjectFromType(id, obj);
+            }
+            else
+            {
+                result = false;
+            }
+
+            return result;
         }
     }
 }

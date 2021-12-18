@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    class TraitObjectSerializer : CustomSerializer
+    public class TraitObjectSerializer : CustomSerializer
     {
         string StringId;
         public TraitObjectSerializer(MBObjectBase obj) : base(obj)
@@ -26,7 +26,7 @@ namespace Coop.Mod.Serializers
 
         public override void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            // No references
         }
     }
 }

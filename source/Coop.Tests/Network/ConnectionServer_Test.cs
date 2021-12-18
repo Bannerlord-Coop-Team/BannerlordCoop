@@ -20,7 +20,6 @@ namespace Coop.Tests.Network
 
         private readonly List<ArraySegment<byte>> m_SendRawParams = new List<ArraySegment<byte>>();
 
-        private readonly Mock<ISaveData> m_WorldData = TestUtils.CreateMockSaveData();
         private ArraySegment<byte> m_PersistenceReceiveParam;
 
         public ConnectionServer_Test()
@@ -36,8 +35,7 @@ namespace Coop.Tests.Network
                                  (ArraySegment<byte> arg) => m_PersistenceReceiveParam = arg);
             m_Connection = new ConnectionServer(
                 m_NetworkConnection.Object,
-                m_GamePersistence.Object,
-                m_WorldData.Object);
+                m_GamePersistence.Object);
             CompatibilityInfo.ModuleProvider = new ModuleInfoProviderMock();
         }
 

@@ -3,6 +3,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
+using Coop.Mod.Serializers.Custom;
 
 namespace Coop.Mod.Serializers
 {

@@ -52,31 +52,36 @@ namespace Coop.Mod.Managers
             MobileParty.MainParty.Position2D = settlement.Position2D;
 
             OnGameLoadFinishedEvent?.Invoke(this, new HeroEventArgs());
-
-            //RemoveAllObjectsExceptPlayer();
         }
 
-        private void RemoveAllObjectsExceptPlayer()
+        public void RemoveAllObjects()
         {
             CampaignObjectManager campaignObjectManager = Campaign.Current.CampaignObjectManager;
 
-            MobileParty playerParty = MobileParty.MainParty;
-            Hero playerHero = Hero.MainHero;
-            Clan playerClan = Hero.MainHero.Clan;
-            Settlement playerSettlment = playerParty.CurrentSettlement;
-
-            campaignObjectManager.GetMobileParties().RemoveAll(x => x != playerParty);
-            campaignObjectManager.GetDeadOrDisabledHeros().RemoveAll(x => x != playerHero);
-            campaignObjectManager.GetAliveHeros().RemoveAll(x => x != playerHero);
-            campaignObjectManager.GetClans().RemoveAll(x => x != playerClan);
+            campaignObjectManager.GetMobileParties().RemoveAll(x => true);
+            campaignObjectManager.GetDeadOrDisabledHeros().RemoveAll(x => true);
+            campaignObjectManager.GetAliveHeros().RemoveAll(x => true);
+            campaignObjectManager.GetClans().RemoveAll(x => true);
             campaignObjectManager.GetKingdoms().RemoveAll(x => true);
-            
+
+            typeof(Campaign)
+                .GetField("_towns", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(Campaign.Current, new List<Town>());
+            typeof(Campaign)
+                .GetField("_castles", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(Campaign.Current, new List<Town>());
+            typeof(Campaign)
+                .GetField("_villages", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(Campaign.Current, new List<Village>());
+            typeof(Campaign)
+                .GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(Campaign.Current, new List<Hideout>());
+
+
             List<Settlement> settlements = campaignObjectManager.Settlements.ToList();
-            settlements.ForEach(x => {
-                if (x != playerSettlment) {
-                    Campaign.Current.ObjectManager.UnregisterObject(x);
-                } 
-            });
+            settlements.ForEach(x => Campaign.Current.ObjectManager.UnregisterObject(x));
+
+            GC.Collect();
         }
 
         private void SkipCharacterCreation()

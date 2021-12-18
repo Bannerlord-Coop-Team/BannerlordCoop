@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using System.Reflection;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
     public class CampaignTimeSerializer : ICustomSerializer
@@ -35,7 +35,7 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            // No references
         }
     }
 }

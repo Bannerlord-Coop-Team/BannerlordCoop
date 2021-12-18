@@ -1,4 +1,4 @@
-﻿using Coop.Mod.Serializers;
+﻿using Coop.Mod.Serializers.Custom;
 using NLog;
 using System;
 using System.Linq;
@@ -12,6 +12,8 @@ namespace Coop.Mod.Data
         [NonSerialized]
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
+        public Guid PlayerPartyId { get; set; }
+
         public bool RequiresCharacterCreation => !Coop.IsServer;
 
         //CharacterObjectSerializer[] characterObjects;
@@ -19,12 +21,15 @@ namespace Coop.Mod.Data
 
         // TODO 
         //KingdomSerializer[] kingdoms;
-        //SettlementSerializer[] settlements;
+        SettlementSerializer[] settlements;
         HeroSerializer[] heros;
+
+        
 
         public GameData()
         {
             heros = CoopObjectManager.GetObjects<Hero>().Select(hero => new HeroSerializer(hero)).ToArray();
+            settlements = CoopObjectManager.GetObjects<Settlement>().Select(settlement => new SettlementSerializer(settlement)).ToArray();
         }
 
         public void Unpack()
@@ -35,11 +40,16 @@ namespace Coop.Mod.Data
                 hero.Deserialize();
             }
 
+            foreach (var settlement in settlements)
+            {
+                settlement.Deserialize();
+            }
+
             // Resolve all references
-            //foreach (var hero in heros)
-            //{
-            //    hero.ResolveReferenceGuids();
-            //}
+            foreach (var hero in heros)
+            {
+                hero.ResolveReferenceGuids();
+            }
         }
     }
 }

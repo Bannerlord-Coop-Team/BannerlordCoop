@@ -12,12 +12,10 @@ namespace Coop.NetImpl.LiteNet
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly Server m_Server;
-        private readonly ISaveData m_WorldData;
 
-        public LiteNetListenerServer(Server server, ISaveData worldData)
+        public LiteNetListenerServer(Server server)
         {
             m_Server = server;
-            m_WorldData = worldData;
         }
 
         public void OnConnectionRequest(ConnectionRequest request)
@@ -39,7 +37,7 @@ namespace Coop.NetImpl.LiteNet
         {
             LiteNetConnection network = new LiteNetConnection(peer);
             RailNetPeerWrapper persistence = new RailNetPeerWrapper(network);
-            ConnectionServer con = new ConnectionServer(network, persistence, m_WorldData);
+            ConnectionServer con = new ConnectionServer(network, persistence);
             peer.Tag = con;
             m_Server.Connected(con);
         }

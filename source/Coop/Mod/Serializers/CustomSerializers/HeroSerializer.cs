@@ -1,18 +1,16 @@
-﻿using Coop.NetImpl;
-using SandBox.View.Map;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
-using TaleWorlds.PlayerServices;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    internal class HeroSerializer : CustomSerializer
+    public class HeroSerializer : CustomSerializerWithGuid
     {
         [NonSerialized]
         Hero newHero;
@@ -20,21 +18,14 @@ namespace Coop.Mod.Serializers
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
-        Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, Guid> References = new Dictionary<FieldInfo, Guid>();
 
         readonly List<Guid> ExSpouses = new List<Guid>();
 
-        Guid clan;
-        Guid mother;
-        Guid father;
-        Guid bornSettlement;
-        Guid homeSettlement;
-        Guid culture;
-        Guid characterobject;
-
-        public HeroSerializer(Hero hero)
+        public HeroSerializer(Hero hero) : base(hero)
         {
-            List<string> UnmanagedFields = new List<string>();
+            List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
 
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
@@ -50,8 +41,10 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
-                    case "_characterObject":
-                        characterobject = CoopObjectManager.GetGuid((CharacterObject)value);
+                    case "_firstName":
+                    case "_name":
+                    case "<EncyclopediaText>k__BackingField":
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
                         break;
                     case "<BattleEquipment>k__BackingField":
                         SNNSO.Add(fieldInfo, new EquipmentSerializer((Equipment)value));
@@ -86,12 +79,9 @@ namespace Coop.Mod.Serializers
                     case "<LastCommentTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
-                    case "_clan":
-                        clan = CoopObjectManager.GetGuid((Clan)value);
-                        break;
                     case "Culture":
                         // NOTE: May want to read from server before character creation
-                        culture = CoopObjectManager.GetGuid((CultureObject)value);
+                        SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)value));
                         break;
                     case "_partyBelongedTo":
                         SNNSO.Add(fieldInfo, new MobilePartySerializer((MobileParty)value));
@@ -99,20 +89,8 @@ namespace Coop.Mod.Serializers
                     case "<LastMeetingTimeWithPlayer>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
-                    case "_bornSettlement":
-                        bornSettlement = CoopObjectManager.GetGuid(value);
-                        break;
                     case "<HomeSettlement>k__BackingField":
                         // Do nothing, public getter
-                        break;
-                    case "_homeSettlement":
-                        homeSettlement = CoopObjectManager.GetGuid(value);
-                        break;
-                    case "_father":
-                        father = CoopObjectManager.GetGuid(value);
-                        break;
-                    case "_mother":
-                        mother = CoopObjectManager.GetGuid(value);
                         break;
                     case "ExSpouses":
                         // Do nothing, public getter
@@ -130,8 +108,28 @@ namespace Coop.Mod.Serializers
                     case "_characterAttributes":
                         // TODO: Fix this joke
                         break;
+                    case "<Issue>k__BackingField":
+                        // TODO: Fix this joke
+                        break;
+                    case "_characterObject":
+                        SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value));
+                        break;
+
+                    case "<Template>k__BackingField":
+                    
+                    case "_clan":
+                    case "_bornSettlement":
+                    case "_homeSettlement":
+                    case "_stayingInSettlement":
+                    case "_father":
+                    case "_mother":
+                    case "_spouse":
+                    case "_supporterOf":
+                    case "_governorOf":
+                        References.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+                        break;
                     default:
-                        UnmanagedFields.Add(fieldInfo.Name);
+                        UnmanagedFields.Add(fieldInfo);
                         break;
                 }
             }
@@ -148,24 +146,8 @@ namespace Coop.Mod.Serializers
 
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
-                // Pass references to specified serializers
-                switch (entry.Value)
-                {
-                    case CharacterObjectSerializer characterObjectSerializer:
-                        characterObjectSerializer.SetHeroReference(newHero);
-                        break;
-                }
-
                 entry.Key.SetValue(newHero, entry.Value.Deserialize());
             }
-
-            ConstructorInfo ctor = typeof(HeroDeveloper).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance,
-                                    null, new Type[] { typeof(Hero) }, null);
-
-            HeroDeveloper newDeveloper = (HeroDeveloper)ctor.Invoke(new object[] { newHero });
-            newHero.GetType()
-                .GetField("_heroDeveloper", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newHero, newDeveloper);
 
             base.Deserialize(newHero);
 
@@ -179,6 +161,11 @@ namespace Coop.Mod.Serializers
                 throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
             }
 
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
+            }
+
             // Deserialize exSpouse list
             List<Hero> lExSpouses = new List<Hero>();
             foreach (Guid exSpouseId in ExSpouses)
@@ -186,27 +173,13 @@ namespace Coop.Mod.Serializers
                 lExSpouses.Add((Hero)CoopObjectManager.GetObject(exSpouseId));
             }
 
-            newHero.Culture = (CultureObject)CoopObjectManager.GetObject(culture);
+            foreach(KeyValuePair<FieldInfo, Guid> entry in References)
+            {
+                FieldInfo field = entry.Key;
+                Guid id = entry.Value;
 
-            newHero.GetType()
-                .GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newHero, lExSpouses);
-
-            newHero.GetType()
-                .GetField("_father", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newHero, CoopObjectManager.GetObject(this.father));
-
-            newHero.GetType()
-                .GetField("_mother", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newHero, CoopObjectManager.GetObject(mother));
-
-            newHero.GetType()
-                .GetField("_bornSettlement", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newHero, CoopObjectManager.GetObject(bornSettlement));
-
-            newHero.GetType()
-                .GetField("_homeSettlement", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newHero, CoopObjectManager.GetObject(homeSettlement));
+                field.SetValue(newHero, CoopObjectManager.GetObject(id));
+            }
         }
     }
 }

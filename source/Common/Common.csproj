@@ -60,6 +60,7 @@
     <Compile Include="CompatibilityInfo.cs" />
     <Compile Include="CoopStateMachine.cs" />
     <Compile Include="DropoutStack.cs" />
+    <Compile Include="Extentions.cs" />
     <Compile Include="FrameLimiter.cs" />
     <Compile Include="Globals.cs" />
     <Compile Include="IUpdatable.cs" />

@@ -40,7 +40,7 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            // No references
         }
     }
 }

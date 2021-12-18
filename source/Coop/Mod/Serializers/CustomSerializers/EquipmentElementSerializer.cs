@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    class EquipmentElementSerializer : ICustomSerializer
+    public class EquipmentElementSerializer : ICustomSerializer
     {
         string itemModifier;
         uint id;
@@ -21,17 +21,7 @@ namespace Coop.Mod.Serializers
             id = (item != null) ? item.Id.InternalValue : 0U;
         }
 
-        public void ResolveReferenceGuids()
-        {
-            throw new NotImplementedException();
-        }
-
-        public ICustomSerializer Serialize(object obj)
-        {
-            return new EquipmentElementSerializer((EquipmentElement)obj);
-        }
-
-        object ICustomSerializer.Deserialize()
+        public object Deserialize()
         {
             ItemModifier newItemModifier = null;
             if (itemModifier != "")
@@ -42,6 +32,11 @@ namespace Coop.Mod.Serializers
             ItemObject newItem = (MBObjectManager.Instance.GetObject(objectId) as ItemObject);
 
             return new EquipmentElement(newItem, newItemModifier);
+        }
+
+        public void ResolveReferenceGuids()
+        {
+            // No references
         }
     }
 }

@@ -41,7 +41,8 @@ namespace Coop.Mod.Serializers
                     if(field.FieldType.GetInterface(nameof(ICollection)) != null)
                     {
                         // If collection is serializable add to Collections list
-                        if(IsCollectionSerializableRecursive(field.FieldType))
+                        if(field.FieldType.IsSerializable &&
+                           IsCollectionSerializableRecursive(field.FieldType))
                         {
                             Collections.Add(field, (ICollection)field.GetValue(obj));
                         }

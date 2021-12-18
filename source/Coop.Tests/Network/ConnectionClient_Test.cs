@@ -32,7 +32,6 @@ namespace Coop.Tests.Network
             TestUtils.CreateMockConnection();
 
         private readonly Mock<IGameStatePersistence> m_GamePersistence;
-        private readonly Mock<ISaveData> m_WorldData = TestUtils.CreateMockSaveData();
         private readonly ConnectionClient m_Connection;
         private ArraySegment<byte> m_PersistenceReceiveParam;
 

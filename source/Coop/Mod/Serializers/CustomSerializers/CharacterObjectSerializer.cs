@@ -1,33 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using System.Reflection;
-using System.Xml;
 using TaleWorlds.Core;
-using System.IO;
-using System.Collections;
 using TaleWorlds.ObjectSystem;
-using System.Runtime.Serialization;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    public class CharacterObjectSerializer : CustomSerializer
+    public class CharacterObjectSerializer : CustomSerializerWithGuid
     {
-        /// <summary>
-        /// Used for circular reference
-        /// </summary>
         [NonSerialized]
-        private Hero heroObject;
+        CharacterObject characterObject;
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
-        
+
+        Guid hero;
 
         public CharacterObjectSerializer(CharacterObject characterObject) : base(characterObject)
         {
@@ -46,7 +37,7 @@ namespace Coop.Mod.Serializers
                 switch (fieldInfo.Name)
                 {
                     case "_heroObject":
-                        // Assigned by SetHeroReference on deserialization
+                        hero = CoopObjectManager.GetGuid(value);
                         break;
 
                     case "_characterTraits":
@@ -64,6 +55,9 @@ namespace Coop.Mod.Serializers
                     case "_persona":
                         SNNSO.Add(fieldInfo, new TraitObjectSerializer((TraitObject)value));
                         break;
+                    case "_originCharacter":
+                        // TODO
+                        break;
 
                     default:
                         throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
@@ -79,29 +73,9 @@ namespace Coop.Mod.Serializers
             NonSerializableObjects.Clear();
         }
 
-        /// <summary>
-        /// For assigning PlayerHeroSerializer reference for deserialization
-        /// </summary>
-        /// <param name="heroObject">PlayerHeroSerializer used by _heroObject</param>
-        public void SetHeroReference(Hero heroObject)
-        {
-            this.heroObject = heroObject;
-        }
-
         public override object Deserialize()
         {
-            CharacterObject characterObject = MBObjectManager.Instance.CreateObject<CharacterObject>();
-
-            // Circular referenced object needs assignment before deserialize
-            if(heroObject == null)
-            {
-                throw new SerializationException("Must set hero reference before deserializing. Use SetHeroReference()");
-            }
-
-            // Circular referenced objects
-            typeof(CharacterObject)
-                .GetField("_heroObject", BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(characterObject, heroObject);
+            characterObject = MBObjectManager.Instance.CreateObject<CharacterObject>();
 
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
@@ -114,7 +88,16 @@ namespace Coop.Mod.Serializers
 
         public override void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            if (characterObject == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            Hero hero = CoopObjectManager.GetObject<Hero>(this.hero);
+
+            typeof(CharacterObject)
+                .GetField("_heroObject", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(characterObject, hero);
         }
     }
 }

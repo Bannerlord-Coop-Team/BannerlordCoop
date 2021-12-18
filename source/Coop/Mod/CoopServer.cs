@@ -118,7 +118,7 @@ namespace Coop.Mod
 
             if (m_NetManager == null)
             {
-                m_NetManager = new LiteNetManagerServer(Current, new WorldData());
+                m_NetManager = new LiteNetManagerServer(Current);
                 m_NetManager.StartListening();
                 Logger.Debug("Setup network connection for server.");
             }
@@ -223,7 +223,6 @@ namespace Coop.Mod
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientRequestWorldData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientLoaded);
             connection.Dispatcher.RegisterPacketHandler(SendGameData);
-            
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientPlayerPartyChanged);
 
             // State Machine Registration
@@ -279,11 +278,16 @@ namespace Coop.Mod
         [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestGameData)]
         private void SendGameData(ConnectionBase connection, Packet packet)
         {
-            byte[] data = SyncedObjectStore.Serialize(new GameData());
+            
 
             PlayerHeroSerializer serializer = (PlayerHeroSerializer)CommonSerializer.Deserialize(packet.Payload);
             Hero newParty = (Hero)serializer.Deserialize();
-            CoopObjectManager.AddObject(newParty);
+            Guid partyGuid = CoopObjectManager.AddObject(newParty);
+
+            GameData gameData = new GameData();
+            gameData.PlayerPartyId = partyGuid;
+
+            byte[] data = SyncedObjectStore.Serialize(gameData);
 
             connection.Send(new Packet(EPacket.Server_GameData, data));
 

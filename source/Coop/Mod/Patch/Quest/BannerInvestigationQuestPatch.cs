@@ -19,5 +19,12 @@ namespace Coop.Mod.Patch
         {
             return false;
         }
+
+        [HarmonyPrefix]
+        [HarmonyPatch("SetDialogs")]
+        static bool PrefixSetDialogs()
+        {
+            return false;
+        }
     }
 }

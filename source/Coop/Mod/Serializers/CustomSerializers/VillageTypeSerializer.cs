@@ -1,15 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.CampaignSystem;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    class VillageTypeSerializer : CustomSerializer
+    public class VillageTypeSerializer : CustomSerializer
     {
         string StringId;
         public VillageTypeSerializer(MBObjectBase obj) : base(obj)
@@ -19,14 +15,13 @@ namespace Coop.Mod.Serializers
 
         public override object Deserialize()
         {
-
             VillageType newVillagerType = new VillageType(StringId);
             return base.Deserialize(newVillagerType);
         }
 
         public override void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            // No references
         }
     }
 }

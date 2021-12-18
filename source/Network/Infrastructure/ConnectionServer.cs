@@ -24,14 +24,11 @@ namespace Network.Infrastructure
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly ConnectionServerSM m_ServerSM;
-        private readonly ISaveData m_WorldData;
 
         public ConnectionServer(
             INetworkConnection network,
-            IGameStatePersistence persistence,
-            ISaveData worldData) : base(network, persistence)
+            IGameStatePersistence persistence) : base(network, persistence)
         {
-            m_WorldData = worldData;
             m_ServerSM = new ConnectionServerSM();
 
             #region State Machine Callbacks
@@ -46,7 +43,6 @@ namespace Network.Infrastructure
             Dispatcher.RegisterPacketHandler(ReceiveClientInfo);
             Dispatcher.RegisterPacketHandler(ReceiveClientJoined);
             Dispatcher.RegisterPacketHandler(ReceiveRequestParty);
-            Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
             Dispatcher.RegisterPacketHandler(ReceiveClientKeepAlive);
 
             Dispatcher.RegisterStateMachine(this, m_ServerSM);
@@ -60,10 +56,6 @@ namespace Network.Infrastructure
         ~ConnectionServer()
         {
             Dispatcher.UnregisterPacketHandlers(this);
-        }
-        public void SendWorldData()
-        {
-            Send(new Packet(EPacket.Server_WorldData, m_WorldData.SerializeInitialWorldState()));
         }
 
         public override void Disconnect(EDisconnectReason eReason)
@@ -159,22 +151,6 @@ namespace Network.Infrastructure
             RequestPlayerParty playerPartyRequestArgs = new RequestPlayerParty();
             playerPartyRequestArgs.ClientId = Client_Request_Party.Deserialize(new ByteReader(packet.Payload)).m_ClientId;
             OnPlayerPartyRequest?.Invoke(this, playerPartyRequestArgs);
-        }
-
-        [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.Sync)]
-        private void ReceiveSyncPacket(ConnectionBase connection, Packet packet)
-        {
-            try
-            {
-                m_WorldData.Receive(packet.Payload);
-            }
-            catch (Exception e)
-            {
-                Logger.Error(
-                    e,
-                    "Sync data received from {client} could not be parsed. Ignored.",
-                    this);
-            }
         }
 
         [ConnectionServerPacketHandler(EServerConnectionState.Ready, EPacket.KeepAlive)]
