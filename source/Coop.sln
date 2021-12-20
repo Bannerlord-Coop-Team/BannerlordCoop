@@ -41,8 +41,14 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestMod", "TestMod\TestMod.csproj", "{6C9B73DE-1B43-4BE8-B840-E095778A12AD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RunTestModClient", "RunTestModClient\RunTestModClient.csproj", "{C57D1804-E06D-42C9-ACA1-1ABB47D823DB}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6C9B73DE-1B43-4BE8-B840-E095778A12AD} = {6C9B73DE-1B43-4BE8-B840-E095778A12AD}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RunTestModServer", "RunTestModServer\RunTestModServer.csproj", "{03FBD481-0D1B-42B0-A480-02464BD25141}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6C9B73DE-1B43-4BE8-B840-E095778A12AD} = {6C9B73DE-1B43-4BE8-B840-E095778A12AD}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
