@@ -17,7 +17,7 @@
     <StartAction>Program</StartAction>
     <StartProgram>$(MSBuildProjectDirectory)/..\..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
     <StartWorkingDirectory>$(MSBuildProjectDirectory)\..\..\mb2\bin\Win64_Shipping_Client\</StartWorkingDirectory>
-    <StartArguments>/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*CoopTestMod*_MODULES_</StartArguments>
+    <StartArguments>/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*CoopTestMod*_MODULES_</StartArguments>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
