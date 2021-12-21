@@ -116,10 +116,6 @@ namespace CoopTestMod
                         otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
 
                     }
-                    else
-                    {
-                        otherAgent.SetCurrentActionProgress(0, progress1);
-                    }
                     //else
                     //{
                     //    string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
@@ -137,8 +133,7 @@ namespace CoopTestMod
                     otherAgent.AttackDirectionToMovementFlag(direction);
                     otherAgent.DefendDirectionToMovementFlag(direction);
                     otherAgent.MovementInputVector = new Vec2(inputVectorX, inputVectorY);
-
-                    
+                    otherAgent.EnforceShieldUsage(direction);
 
                     
 
@@ -322,7 +317,6 @@ namespace CoopTestMod
             }
             thread.IsBackground = true;
             thread.Start();
-
 
 
 
