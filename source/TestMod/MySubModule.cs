@@ -16,6 +16,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.MountAndBlade.Diamond;
 
 namespace CoopTestMod
 {
@@ -95,52 +96,52 @@ namespace CoopTestMod
                 if (Mission.Current != null && otherAgent != null)
                 {
 
-                    otherAgent.TeleportToPosition(pos);
+                    //otherAgent.TeleportToPosition(pos);
+                    
 
 
-                    // we either don't have an action so set it to the new one or the receive action is different than our current action
-                    if (otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(0).Index != cacheIndex1)
-                    {
-                        string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
-                        otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
-                        
-                    }
-                    else
-                    {
-                        otherAgent.SetCurrentActionProgress(0, progress1);
-                    }
+                    //// we either don't have an action so set it to the new one or the receive action is different than our current action
+                    //if (otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(0).Index != cacheIndex1)
+                    //{
+                    //    string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
+                    //    otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
 
-                    if (otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(1).Index != cacheIndex2)
-                    {
-                        string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
-                        otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
-
-                    }
+                    //}
                     //else
                     //{
-                    //    string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
-                    //    otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2));
+                    //    otherAgent.SetCurrentActionProgress(0, progress1);
                     //}
 
-                    //if (movementFlag != 0)
+                    //if (otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(1).Index != cacheIndex2)
                     //{
-                    //    otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
+                    //    string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
+                    //    otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
 
                     //}
+                    //else
+                    //{
+                    //    otherAgent.SetCurrentActionProgress(1, progress2);
+                    //}
 
-                    otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-                    otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
-                    otherAgent.AttackDirectionToMovementFlag(direction);
-                    otherAgent.DefendDirectionToMovementFlag(direction);
+                    otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
+                    otherAgent.EventControlFlags |= (Agent.EventControlFlag)eventFlag;
+
+                    //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+                    //otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
+                    //otherAgent.AttackDirectionToMovementFlag(direction);
+                    //otherAgent.DefendDirectionToMovementFlag(direction);
                     otherAgent.MovementInputVector = new Vec2(inputVectorX, inputVectorY);
-                    otherAgent.EnforceShieldUsage(direction);
+                   // otherAgent.EnforceShieldUsage(direction);
+                    //InformationManager.DisplayMessage(new InformationMessage("Received: " + ((Agent.EventControlFlag)eventFlag).ToString()));
 
-                    
+
 
                     //InformationManager.DisplayMessage(new InformationMessage("Received : X: " +  lookDirectionX + " Y: " + lookDirectionY + " | Z: " + lookDirectionZ));
 
                     otherAgent.LookDirection = new Vec3(lookDirectionX, lookDirectionY, lookDirectionZ);
-                    
+
+                    InformationManager.DisplayMessage(new InformationMessage("Receiving: " + ((Agent.EventControlFlag)eventFlag).ToString()));
+
                     //otherAgent.SetTargetPositionAndDirection(targetPosition, targetDirection);
 
 
@@ -175,7 +176,7 @@ namespace CoopTestMod
         bool battleLoaded = false;
         EndPoint epFrom;
         EndPoint epTo;
-
+        bool isServer = false;
 
         // custom delegate is needed since SetPosition uses a ref Vec3
         delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
@@ -215,6 +216,7 @@ namespace CoopTestMod
             IPAddress ipAddress = IPAddress.Parse("127.0.0.1");
             epTo = new IPEndPoint(ipAddress, 14905);
             epFrom = new IPEndPoint(ipAddress, 14906);
+
 
             try
             {
@@ -308,6 +310,7 @@ namespace CoopTestMod
             {
                 if (argument.ToLower() == "/server")
                 {
+                    isServer = true;
                     thread = new Thread(StartServer);
                 }
                 else if (argument.ToLower() == "/client")
@@ -329,7 +332,7 @@ namespace CoopTestMod
             agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             Mission mission = Mission.Current;
-            agentBuildData2 = agentBuildData.Team((character == CharacterObject.PlayerCharacter) ? Mission.Current.PlayerTeam : Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
+            agentBuildData2 = agentBuildData.Team(isMain ? Mission.Current.PlayerTeam : Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
             Agent agent = mission.SpawnAgent(agentBuildData2.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);
@@ -341,7 +344,9 @@ namespace CoopTestMod
             }
             else
             {
+                
                 agent.Controller = Agent.ControllerType.None;
+                
             }
             //if (agent.IsAIControlled)
             //{
@@ -357,7 +362,7 @@ namespace CoopTestMod
 
 
 
-
+        bool channel2HasSomething = false;
         protected override void OnApplicationTick(float dt)
         {
             if (!subModuleLoaded && Module.CurrentModule.LoadingFinished)
@@ -408,10 +413,11 @@ namespace CoopTestMod
                 //remove the point so no overlap
                 _initialSpawnFrames.Remove(randomElement);
                 //find another spawn point
-                randomElement2 = _initialSpawnFrames.GetRandomElement();
+                randomElement2 = randomElement;
 
 
                 // spawn an instance of the player (controlled by default)
+
                 _player = SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement, true);
 
 
@@ -435,6 +441,29 @@ namespace CoopTestMod
                 _player.WieldInitialWeapons();
                 _otherAgent.WieldInitialWeapons();
 
+
+                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).RemovePhysics();
+                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).RemoveEnginePhysics();
+                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).SetPhysicsState(false, true);
+
+
+                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).RemovePhysics();
+                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).RemoveEnginePhysics();
+                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).SetPhysicsState(false, true);
+
+                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).RemovePhysics();
+                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).RemoveEnginePhysics();
+                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).SetPhysicsState(false, true);
+
+
+
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon3).RemovePhysics();
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon3).RemoveEnginePhysics();
+
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon4).RemovePhysics();
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon4).RemoveEnginePhysics();
+
+
                 //// From MBAPI, get the private interface IMBAgent
                 FieldInfo IMBAgentField = typeof(MBAPI).GetField("IMBAgent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
 
@@ -455,59 +484,82 @@ namespace CoopTestMod
             }
 
 
+            
+
             if (Input.IsKeyReleased(InputKey.Slash))
             {
+                
                 //FieldInfo IMBNetwork = typeof(MBAPI).GetField("IMBNetwork", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
 
-                if(sender != null)
+
+                if (isServer)
                 {
-                    sender.SendTo(Encoding.ASCII.GetBytes("Hello!"), epTo);
+                    InformationManager.DisplayMessage(new InformationMessage("I am Server"));
+                    try
+                    {
+                        GameNetwork.Initialize(new GameNetworkHandler());
+                        GameNetwork.InitializeCompressionInfos();
+                        FieldInfo IMBAgentField = typeof(GameNetwork).GetField("IMBAgent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                        MethodInfo method2 = typeof(GameNetwork).GetMethod("PreStartMultiplayerOnServer", BindingFlags.Static | BindingFlags.NonPublic);
+                        MethodInfo method = typeof(GameNetwork).GetMethod("InitializeServerSide", BindingFlags.Static | BindingFlags.NonPublic);
+                       
+                        if (method != null)
+                        {
+                            //MBCommon.CurrentGameType = (GameNetwork.IsDedicatedServer ? MBCommon.GameType.MultiServer : MBCommon.GameType.MultiClientServer);
+                            GameNetwork.ClientPeerIndex = -1;
+                            
+                            
+                            method.Invoke(null, new object[] { 15801});
+                            //GameNetwork.StartMultiplayerOnClient("127.0.0.1", 15801, 1, 1);
+                            //BannerlordNetwork.StartMultiplayerLobbyMission(LobbyMissionType.Custom);
+                        }
+                        else
+                        {
+                            InformationManager.DisplayMessage(new InformationMessage("Not found!"));
+                        }
+                        
+                        //GameNetwork.StartMultiplayerOnServer(15801);
+                    }
+                    catch (Exception ex)
+                    {
+                        File.AppendAllText("wouterror.txt", ex.Message);
+                    }
+
                 }
-                
+                else
+                {
+                    InformationManager.DisplayMessage(new InformationMessage("I am client"));
+                    //MethodInfo initServer = IMBNetwork.GetValue(null).GetType().GetMethod("InitializeClientSide");
+                    //initServer.Invoke(IMBNetwork.GetValue(null), new object[] { "127.0.0.1", 14890, 0, 0 });
+                    GameNetwork.Initialize(new GameNetworkHandler());
+                    GameNetwork.InitializeCompressionInfos();
+                    GameNetwork.StartMultiplayerOnClient("127.0.0.1", 15801, 1, 1);
+                    BannerlordNetwork.StartMultiplayerLobbyMission(LobbyMissionType.Custom);
 
-                //if (isServer)
-                //{
-                //    InformationManager.DisplayMessage(new InformationMessage("I am Server"));
-                //    //MethodInfo initServer = IMBNetwork.GetValue(null).GetType().GetMethod("InitializeServerSide");
-                //    //initServer.Invoke(IMBNetwork.GetValue(null), new object[] { 14890 });
-                //    try
-                //    {
-                //        GameNetwork.Initialize(new CustomGameNetworkHandler());
-                //        GameNetwork.InitializeCompressionInfos();
-                //        GameNetwork.StartMultiplayerOnServer(15801);
-                //    }catch(Exception ex)
-                //    {
-                //        File.AppendAllText("wouterror.txt", ex.Message);
-                //    }
-                    
-                //}
-                //else
-                //{
-                //    InformationManager.DisplayMessage(new InformationMessage("I am client"));
-                //    //MethodInfo initServer = IMBNetwork.GetValue(null).GetType().GetMethod("InitializeClientSide");
-                //    //initServer.Invoke(IMBNetwork.GetValue(null), new object[] { "127.0.0.1", 14890, 0, 0 });
-                //    GameNetwork.Initialize(new GameNetworkHandler());
-                //    GameNetwork.InitializeCompressionInfos();
-                //    GameNetwork.StartMultiplayerOnClient("127.0.0.1", 14890, 1, 1);
 
-                //}
+
+                }
 
 
             }
 
             if (Input.IsKeyReleased(InputKey.BackSlash))
             {
-                FieldInfo IMBNetwork = typeof(MBAPI).GetField("IMBNetwork", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-                //MethodInfo ping = IMBNetwork.GetValue(null).GetType().GetMethod("ServerPing");
-                //ping.Invoke(IMBNetwork.GetValue(null), new object[] { "127.0.0.1", 14890 });
-                MethodInfo dedicated = IMBNetwork.GetValue(null).GetType().GetMethod("IsDedicatedServer");
-                MethodInfo multiplayerDisaplyed = IMBNetwork.GetValue(null).GetType().GetMethod("GetMultiplayerDisabled");
 
-                bool dedicatedB = (bool)dedicated.Invoke(IMBNetwork.GetValue(null), null);
-                bool multiplayerDisplayedB = (bool)multiplayerDisaplyed.Invoke(IMBNetwork.GetValue(null), null);
+                InformationManager.DisplayMessage(new InformationMessage("Peer Count: " + GameNetwork.NetworkPeerCount));
+                InformationManager.DisplayMessage(new InformationMessage("Game Type: " + MBCommon.CurrentGameType));
+                
 
-                InformationManager.DisplayMessage(new InformationMessage("Dedicated? " + dedicatedB));
-                InformationManager.DisplayMessage(new InformationMessage("Multiplayer enabled? " + multiplayerDisplayedB));
+            }
+            if (Input.IsReleased(InputKey.Numpad1))
+            {
+                //_player.SetAIBehaviorParams(HumanAIComponent.AISimpleBehaviorKind.AttackEntityMelee, 1f, 1f, 1f, 1f, 1f);
+                // _player.SetActionChannel(1, ActionIndexCache.Create("act_defend_shield_up_1h_passive_down"), ignorePriority: true, 0);
+                 InformationManager.DisplayMessage(new InformationMessage("Crouching?"));
+                _otherAgent.MovementFlags |= Agent.MovementControlFlag.DefendDown;
+                InformationManager.DisplayMessage(new InformationMessage(_otherAgent.EventControlFlags.ToString()));
+
+
             }
 
 
@@ -517,10 +569,10 @@ namespace CoopTestMod
             if (Mission.Current != null && playerPtr != UIntPtr.Zero)
             {
                 // every 0.1 tick send an update to other endpoint
-                if (t + 0.01 > Time.ApplicationTime)
-                {
-                    return;
-                }
+                //if (t + 0.01 > Time.ApplicationTime)
+                //{
+                //    return;
+                //}
                 // update time
                 t = Time.ApplicationTime;
 
@@ -540,10 +592,30 @@ namespace CoopTestMod
                 float progress2 = _player.GetCurrentActionProgress(1);
                 AnimFlags flags2 = _player.GetCurrentAnimationFlag(1);
                 Vec3 lookDirection = _player.LookDirection;
+
                 //Vec2 targetPosition = _player.GetTargetPosition();
                 //Vec3 targetDirection = _player.GetTargetDirection();
                 //InformationManager.DisplayMessage(new InformationMessage("Sending: X: " + lookDirection.x + " Y: " + lookDirection.y + " | Z: " + lookDirection.z));
 
+                if (!channel2HasSomething)
+                {
+                    ActionIndexCache cache3 = _player.GetCurrentAction(2);
+                    if(cache3 != null)
+                    {
+                        InformationManager.DisplayMessage(new InformationMessage(cache3.Name));
+                        channel2HasSomething = false;
+                    }
+                }
+
+                //InformationManager.ClearAllMessages();
+                //InformationManager.DisplayMessage(new InformationMessage("Sending: " + _player.EventControlFlags.ToString()));
+                //InformationManager.DisplayMessage(new InformationMessage(cache2.Name));
+                
+                //InformationManager.DisplayMessage(new InformationMessage(_player.GetActionChannelCurrentActionWeight(1).ToString()));
+                    
+                    //throw new Exception();
+                
+                InformationManager.DisplayMessage(new InformationMessage("Sending: " + _player.EventControlFlags.ToString()));
 
                 if (myPos.IsValid)
                 {
