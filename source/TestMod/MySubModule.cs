@@ -124,7 +124,7 @@ namespace CoopTestMod
                     //}
 
                     otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-                    if(eventFlag != 0)
+                    if(eventFlag != 0 && otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none)
                     {
                         otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
                     }
