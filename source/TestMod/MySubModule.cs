@@ -124,7 +124,10 @@ namespace CoopTestMod
                     //}
 
                     otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-                    otherAgent.EventControlFlags |= (Agent.EventControlFlag)eventFlag;
+                    if(eventFlag != 0)
+                    {
+                        otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+                    }
 
                     //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
                     //otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
@@ -140,7 +143,7 @@ namespace CoopTestMod
 
                     otherAgent.LookDirection = new Vec3(lookDirectionX, lookDirectionY, lookDirectionZ);
 
-                    InformationManager.DisplayMessage(new InformationMessage("Receiving: " + ((Agent.EventControlFlag)eventFlag).ToString()));
+                    //InformationManager.DisplayMessage(new InformationMessage("Receiving: " + ((Agent.EventControlFlag)eventFlag).ToString()));
 
                     //otherAgent.SetTargetPositionAndDirection(targetPosition, targetDirection);
 
@@ -442,18 +445,18 @@ namespace CoopTestMod
                 _otherAgent.WieldInitialWeapons();
 
 
-                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).RemovePhysics();
-                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).RemoveEnginePhysics();
-                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).SetPhysicsState(false, true);
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).RemovePhysics();
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).RemoveEnginePhysics();
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).SetPhysicsState(false, true);
 
 
-                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).RemovePhysics();
-                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).RemoveEnginePhysics();
-                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).SetPhysicsState(false, true);
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).RemovePhysics();
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).RemoveEnginePhysics();
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).SetPhysicsState(false, true);
 
-                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).RemovePhysics();
-                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).RemoveEnginePhysics();
-                _otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).SetPhysicsState(false, true);
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).RemovePhysics();
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).RemoveEnginePhysics();
+                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).SetPhysicsState(false, true);
 
 
 
@@ -556,10 +559,17 @@ namespace CoopTestMod
                 //_player.SetAIBehaviorParams(HumanAIComponent.AISimpleBehaviorKind.AttackEntityMelee, 1f, 1f, 1f, 1f, 1f);
                 // _player.SetActionChannel(1, ActionIndexCache.Create("act_defend_shield_up_1h_passive_down"), ignorePriority: true, 0);
                  InformationManager.DisplayMessage(new InformationMessage("Crouching?"));
-                _otherAgent.MovementFlags |= Agent.MovementControlFlag.DefendDown;
-                InformationManager.DisplayMessage(new InformationMessage(_otherAgent.EventControlFlags.ToString()));
+                _otherAgent.EventControlFlags = Agent.EventControlFlag.Crouch;
+                //InformationManager.DisplayMessage(new InformationMessage(_otherAgent.EventControlFlags.ToString()));
+            }
 
-
+            if (Input.IsReleased(InputKey.Numpad2))
+            {
+                //_player.SetAIBehaviorParams(HumanAIComponent.AISimpleBehaviorKind.AttackEntityMelee, 1f, 1f, 1f, 1f, 1f);
+                // _player.SetActionChannel(1, ActionIndexCache.Create("act_defend_shield_up_1h_passive_down"), ignorePriority: true, 0);
+                InformationManager.DisplayMessage(new InformationMessage("Crouching?"));
+                _otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
+               // InformationManager.DisplayMessage(new InformationMessage(_otherAgent.EventControlFlags.ToString()));
             }
 
 
@@ -615,7 +625,6 @@ namespace CoopTestMod
                     
                     //throw new Exception();
                 
-                InformationManager.DisplayMessage(new InformationMessage("Sending: " + _player.EventControlFlags.ToString()));
 
                 if (myPos.IsValid)
                 {
