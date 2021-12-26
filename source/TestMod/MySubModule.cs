@@ -17,6 +17,7 @@ using System.Text;
 using System.Threading;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.MountAndBlade.Diamond;
+using TaleWorlds.CampaignSystem.GameMenus;
 
 namespace CoopTestMod
 {
@@ -47,14 +48,14 @@ namespace CoopTestMod
     //    }
     //}
 
-
-
    
     public class MySubModule : MBSubModuleBase
     {
-
+        
         public class MessageParser
         {
+
+
             public void parseMessage(byte[] bytes, Agent otherAgent)
             {
                 float x = BitConverter.ToSingle(bytes, 0);
@@ -101,33 +102,55 @@ namespace CoopTestMod
 
 
                     //// we either don't have an action so set it to the new one or the receive action is different than our current action
-                    //if (otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(0).Index != cacheIndex1)
-                    //{
-                    //    string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
-                    //    otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
+                  /*  if (otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(0).Index != cacheIndex1)
+                    {
+                       string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
+                       otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
 
-                    //}
-                    //else
-                    //{
-                    //    otherAgent.SetCurrentActionProgress(0, progress1);
-                    //}
+                    }
+                    else
+                    {
+                        otherAgent.SetCurrentActionProgress(0, progress1);
+                    }
 
-                    //if (otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(1).Index != cacheIndex2)
-                    //{
-                    //    string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
-                    //    otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
+                    if (otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(1).Index != cacheIndex2)
+                    {
+                        string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
+                        otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
 
-                    //}
+                    } */
                     //else
                     //{
                     //    otherAgent.SetCurrentActionProgress(1, progress2);
                     //}
 
                     otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-                    if(eventFlag != 0 && otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none)
+                    
+                    if(eventFlag != 0)
                     {
                         otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+
                     }
+
+                    if(otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none && otherAgent.CurrentGuardMode == Agent.GuardMode.None)
+                    {
+                        otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
+                    }
+                   
+
+                    /*
+                    if (otherAgent == Agent.ActionCodeType.)
+                    {
+                        InformationManager.DisplayMessage(new InformationMessage(otherAgent.CrouchMode.ToString()));
+
+                        otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
+                    } */
+
+                    // if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none)
+                    // {
+                    //    InformationManager.DisplayMessage(new InformationMessage(otherAgent.GetCurrentActionType(1).ToString()));
+                    // }
+
 
                     //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
                     //otherAgent.SetMovementDirection(new Vec2(moveX, moveY));

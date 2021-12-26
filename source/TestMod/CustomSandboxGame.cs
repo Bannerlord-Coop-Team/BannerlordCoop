@@ -46,14 +46,15 @@ namespace CoopTestMod
             int upgradeLevel = settlement.IsTown ? settlement.Town.GetWallLevel() : 1;
 
             //Open a new arena mission with the scene
-            Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(locationWithId.GetSceneName(upgradeLevel), "", false), (Mission mission) => new MissionBehaviour[]
+            Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(locationWithId.GetSceneName(upgradeLevel), "", false), (Mission mission) => new MissionBehavior[]
                {
                                 new MissionOptionsComponent(),
                                 //new ArenaDuelMissionController(CharacterObject.PlayerCharacter, false, false, null, 1), //this was the default controller that spawned the player and 1 opponent. Not very useful
                                 new MissionFacialAnimationHandler(),
                                 new MissionDebugHandler(),
                                 new MissionAgentPanicHandler(),
-                                new AgentBattleAILogic(),
+                                new AgentCommonAILogic(),
+                                new AgentHumanAILogic(),
                                 new ArenaAgentStateDeciderLogic(),
                                 new VisualTrackerMissionBehavior(),
                                 new CampaignMissionComponent(),
