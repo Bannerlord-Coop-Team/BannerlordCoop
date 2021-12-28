@@ -52,6 +52,7 @@ namespace CoopTestMod
     public class MySubModule : MBSubModuleBase
     {
         
+
         public class MessageParser
         {
 
@@ -79,6 +80,7 @@ namespace CoopTestMod
                 float lookDirectionX = BitConverter.ToSingle(bytes, 68);
                 float lookDirectionY = BitConverter.ToSingle(bytes, 72);
                 float lookDirectionZ = BitConverter.ToSingle(bytes, 76);
+                float health = BitConverter.ToSingle(bytes, 80);
 
                 //float targetPositionX = BitConverter.ToSingle(bytes, 80);
                 //float targetPositionY = BitConverter.ToSingle(bytes, 84);
@@ -98,31 +100,41 @@ namespace CoopTestMod
                 {
 
                     //otherAgent.TeleportToPosition(pos);
-                    
+
 
 
                     //// we either don't have an action so set it to the new one or the receive action is different than our current action
-                  /*  if (otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(0).Index != cacheIndex1)
-                    {
-                       string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
-                       otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
+                    //if (otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(0).Index != cacheIndex1)
+                    // {
+                    //    string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
+                    //    otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
 
-                    }
-                    else
-                    {
-                        otherAgent.SetCurrentActionProgress(0, progress1);
-                    }
+                    // }
+                    // else
+                    // {
+                    //     otherAgent.SetCurrentActionProgress(0, progress1);
+                    // }
 
-                    if (otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(1).Index != cacheIndex2)
-                    {
-                        string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
-                        otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
+                    // if (otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(1).Index != cacheIndex2)
+                    // {
+                    //     string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
+                    //     otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
 
-                    } */
+                    // } 
                     //else
                     //{
                     //    otherAgent.SetCurrentActionProgress(1, progress2);
                     //}
+
+                    if (health != otherAgent.Health)
+                    {
+                        otherAgent.Health = health;
+                        if (otherAgent.Health < 0)
+                        {
+                            otherAgent.MakeDead(true, otherAgent.GetCurrentAction(1)); //Which action do we require or what does it do?
+                        }
+                    }
+                    
 
                     otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
                     
@@ -625,6 +637,7 @@ namespace CoopTestMod
                 float progress2 = _player.GetCurrentActionProgress(1);
                 AnimFlags flags2 = _player.GetCurrentAnimationFlag(1);
                 Vec3 lookDirection = _player.LookDirection;
+                float health = _player.Health;
 
                 //Vec2 targetPosition = _player.GetTargetPosition();
                 //Vec3 targetDirection = _player.GetTargetDirection();
@@ -671,6 +684,7 @@ namespace CoopTestMod
                         writer.Write(lookDirection.x);
                         writer.Write(lookDirection.y);
                         writer.Write(lookDirection.z);
+                        writer.Write(health);
                         //writer.Write(targetPosition.x);
                         //writer.Write(targetPosition.y);
                         //writer.Write(targetDirection.x);
