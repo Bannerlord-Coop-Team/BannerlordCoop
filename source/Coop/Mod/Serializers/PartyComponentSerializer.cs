@@ -3,7 +3,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
     internal class PartyComponentSerializer : ICustomSerializer
@@ -62,7 +62,17 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            typeof(PartyComponent).GetProperty(nameof(PartyComponent.MobileParty)).SetValue(component, CoopObjectManager.GetObject(party));
+            if (component == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            // TODO remove expanded code
+
+            typeof(PartyComponent)
+                .GetProperty("MobileParty")
+                .GetSetMethod(true)
+                .Invoke(component, new object[] { CoopObjectManager.GetObject(party) });
             partyComponentSerializer.ResolveReferenceGuids();
         }
     }
@@ -96,7 +106,15 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            typeof(CaravanPartyComponent).GetProperty("Hideout").GetSetMethod(true).Invoke(BanditPartyComponent, new object[] { CoopObjectManager.GetObject(hideout) });
+            if (BanditPartyComponent == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            BanditPartyComponent.GetType()
+                .GetProperty(nameof(BanditPartyComponent.Hideout))
+                .GetSetMethod(true)
+                .Invoke(BanditPartyComponent, new object[] { CoopObjectManager.GetObject(hideout) });
         }
     }
 
@@ -127,7 +145,15 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            typeof(CaravanPartyComponent).GetProperty("Owner").GetSetMethod(true).Invoke(LordPartyComponent, new object[] { CoopObjectManager.GetObject(owner) });
+            if (LordPartyComponent == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            LordPartyComponent.GetType()
+                .GetProperty(nameof(LordPartyComponent.Owner))
+                .GetSetMethod(true)
+                .Invoke(LordPartyComponent, new object[] { CoopObjectManager.GetObject(owner) });
         }
     }
 
@@ -149,8 +175,7 @@ namespace Coop.Mod.Serializers
 
         public object Deserialize()
         {
-            CustomPartyComponent = (CustomPartyComponent)
-                Activator.CreateInstance(
+            CustomPartyComponent = (CustomPartyComponent)Activator.CreateInstance(
                 typeof(CustomPartyComponent),
                 BindingFlags.Instance | BindingFlags.NonPublic,
                 null,
@@ -159,7 +184,8 @@ namespace Coop.Mod.Serializers
 
             TextObject newName = new TextObject(name);
 
-            typeof(CustomPartyComponent).GetField("_name", BindingFlags.Instance | BindingFlags.NonPublic)
+            CustomPartyComponent.GetType()
+                .GetField("_name", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(CustomPartyComponent, newName);
 
             return CustomPartyComponent;
@@ -167,9 +193,16 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            typeof(CustomPartyComponent).GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic)
+            if (CustomPartyComponent == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            CustomPartyComponent.GetType()
+                .GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(CustomPartyComponent, CoopObjectManager.GetObject(owner));
-            typeof(CustomPartyComponent).GetField("_homeSettlement", BindingFlags.Instance | BindingFlags.NonPublic)
+            CustomPartyComponent.GetType()
+                .GetField("_homeSettlement", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(CustomPartyComponent, CoopObjectManager.GetObject(settlement));
         }
     }
@@ -201,7 +234,15 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            typeof(CaravanPartyComponent).GetProperty("Settlement").GetSetMethod(true).Invoke(CaravanPartyComponent, new object[] { CoopObjectManager.GetObject(settlement) });
+            if (CaravanPartyComponent == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            CaravanPartyComponent.GetType()
+                .GetProperty(nameof(CaravanPartyComponent.Settlement))
+                .GetSetMethod(true)
+                .Invoke(CaravanPartyComponent, new object[] { CoopObjectManager.GetObject(settlement) });
             typeof(CaravanPartyComponent).GetProperty("Owner").GetSetMethod(true).Invoke(CaravanPartyComponent, new object[] { CoopObjectManager.GetObject(owner) });
         }
     }
@@ -230,25 +271,67 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            typeof(CaravanPartyComponent).GetProperty("Village").GetSetMethod(true).Invoke(VillagerPartyComponent, new object[] { CoopObjectManager.GetObject(village) });
+            if (VillagerPartyComponent == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            VillagerPartyComponent.GetType()
+                .GetProperty(nameof(VillagerPartyComponent.Village))
+                .GetSetMethod(true)
+                .Invoke(VillagerPartyComponent, new object[] { CoopObjectManager.GetObject(village) });
         }
     }
 
     [Serializable]
     class CommonAreaPartyComponentSerializer : ICustomSerializer
     {
+        [NonSerialized]
+        CommonAreaPartyComponent newCommonAreaPartyComponent;
+
+        CommonAreaSerializer commonArea;
+        Guid owner;
+        Guid settlement;
         public CommonAreaPartyComponentSerializer(CommonAreaPartyComponent commonAreaPartyComponent)
         {
+            commonArea = new CommonAreaSerializer(commonAreaPartyComponent.CommonArea);
+            owner = CoopObjectManager.GetGuid(commonAreaPartyComponent.Owner);
+            settlement = CoopObjectManager.GetGuid(commonAreaPartyComponent.Settlement);
         }
 
         public object Deserialize()
         {
-            throw new NotImplementedException();
+            newCommonAreaPartyComponent = (CommonAreaPartyComponent)Activator.CreateInstance(
+                typeof(CommonAreaPartyComponent),
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                null,
+                new object[] { null, null, commonArea.Deserialize() },
+                null);
+            return newCommonAreaPartyComponent;
         }
 
         public void ResolveReferenceGuids()
         {
-            throw new NotImplementedException();
+            if (newCommonAreaPartyComponent == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            newCommonAreaPartyComponent.GetType()
+                .GetProperty(nameof(newCommonAreaPartyComponent.Owner))
+                .GetSetMethod(true)
+                .Invoke(newCommonAreaPartyComponent, new object[]
+                {
+                    CoopObjectManager.GetObject<Hero>(owner)
+                });
+
+            newCommonAreaPartyComponent.GetType()
+                .GetProperty(nameof(newCommonAreaPartyComponent.Settlement))
+                .GetSetMethod(true)
+                .Invoke(newCommonAreaPartyComponent, new object[]
+                {
+                    CoopObjectManager.GetObject<Settlement>(settlement)
+                });
         }
     }
 
@@ -276,7 +359,15 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            typeof(CaravanPartyComponent).GetProperty("Settlement").GetSetMethod(true).Invoke(GarrisonPartyComponent, new object[] { CoopObjectManager.GetObject(settlement) });
+            if (GarrisonPartyComponent == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            GarrisonPartyComponent.GetType()
+                .GetProperty(nameof(GarrisonPartyComponent.Settlement))
+                .GetSetMethod(true)
+                .Invoke(GarrisonPartyComponent, new object[] { CoopObjectManager.GetObject(settlement) });
         }
     }
 
@@ -304,7 +395,10 @@ namespace Coop.Mod.Serializers
 
         public void ResolveReferenceGuids()
         {
-            typeof(CaravanPartyComponent).GetProperty("Settlement").GetSetMethod(true).Invoke(MilitiaPartyComponent, new object[] { CoopObjectManager.GetObject(settlement) });
+            MilitiaPartyComponent.GetType()
+                .GetProperty(nameof(MilitiaPartyComponent.Settlement))
+                .GetSetMethod(true)
+                .Invoke(MilitiaPartyComponent, new object[] { CoopObjectManager.GetObject(settlement) });
         }
     }
 }

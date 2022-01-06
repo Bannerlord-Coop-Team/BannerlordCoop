@@ -59,7 +59,23 @@ namespace Coop.Mod
 
         public static bool RegisterExistingObject(Guid guid, object obj)
         {
-            if (ContainsElement(guid))
+            if(obj == null)
+            {
+                if(guid != Guid.Empty)
+                {
+                    throw new ArgumentException($"Object not valid but guid is.");
+                }
+                return false;
+            }
+            else if(guid == Guid.Empty)
+            {
+                if(obj == null)
+                {
+                    throw new ArgumentException($"Guid not valid but object is.");
+                }
+                return false;
+            }
+            else if (ContainsElement(guid))
             {
                 return false;
             }
@@ -76,6 +92,11 @@ namespace Coop.Mod
 
         public static Guid AddObject(object obj)
         {
+            if(obj == null)
+            {
+                return Guid.Empty;
+            }
+
             Guid newId = Guid.NewGuid();
 
             if(AddObject(newId, obj))
@@ -105,7 +126,11 @@ namespace Coop.Mod
         /// <returns>Key of object, Null if object is not registered in object manager.</returns>
         public static Guid GetGuid(object obj)
         {
-            if (Guids.ContainsKey(obj))
+            if(obj == null)
+            {
+                return Guid.Empty;
+            }
+            else if (ContainsElement(obj))
             {
                 return Guids[obj];
             }
@@ -161,7 +186,12 @@ namespace Coop.Mod
 
         public static IEnumerable<T> GetObjects<T>()
         {
-            return AssosiatedGuids[typeof(T)].Select(id => (T)Objects[id]);
+            return AssosiatedGuids[typeof(T)].Select(guid => (T)GetObject(guid));
+        }
+
+        public static IEnumerable<Guid> GetTypeGuids<T>()
+        {
+            return AssosiatedGuids[typeof(T)];
         }
 
         private static bool RemoveObjectFromType(Guid id, object obj)

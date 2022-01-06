@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -83,9 +84,6 @@ namespace Coop.Mod.Serializers.Custom
                         // NOTE: May want to read from server before character creation
                         SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)value));
                         break;
-                    case "_partyBelongedTo":
-                        SNNSO.Add(fieldInfo, new MobilePartySerializer((MobileParty)value));
-                        break;
                     case "<LastMeetingTimeWithPlayer>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
@@ -126,6 +124,7 @@ namespace Coop.Mod.Serializers.Custom
                     case "_spouse":
                     case "_supporterOf":
                     case "_governorOf":
+                    case "_partyBelongedTo":
                         References.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     default:

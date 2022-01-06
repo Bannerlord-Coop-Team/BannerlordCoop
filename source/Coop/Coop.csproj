@@ -346,6 +346,7 @@
     <Compile Include="Mod\Main.cs" />
     <Compile Include="Mod\Scope\CoopRailScopeEvaluator.cs" />
     <Compile Include="Mod\Scope\MobilePartyScopeHelper.cs" />
+    <Compile Include="Mod\Serializers\CommonAreaSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\BannerSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\BuildingsSerializer.cs" />
@@ -357,6 +358,7 @@
     <Compile Include="Mod\Serializers\CustomSerializers\DeterministicRandomSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\EquipmentElementSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\EquipmentSerialzer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\FactionSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\HeroDeveloperSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\HeroLastSeenInformationSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\HeroSerializer.cs" />
@@ -364,6 +366,7 @@
     <Compile Include="Mod\Serializers\CustomSerializers\ItemCategorySerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ItemDataSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ItemRosterSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\KingdomSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\LocationComplexSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\LocationSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MBCharacterSkillsSerializer.cs" />

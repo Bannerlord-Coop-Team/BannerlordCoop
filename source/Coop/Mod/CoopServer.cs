@@ -278,16 +278,21 @@ namespace Coop.Mod
         [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestGameData)]
         private void SendGameData(ConnectionBase connection, Packet packet)
         {
-            
-
             PlayerHeroSerializer serializer = (PlayerHeroSerializer)CommonSerializer.Deserialize(packet.Payload);
-            Hero newParty = (Hero)serializer.Deserialize();
-            Guid partyGuid = CoopObjectManager.AddObject(newParty);
+            Hero newHero = (Hero)serializer.Deserialize();
+            Guid newHeroGuid = CoopObjectManager.AddObject(newHero);
+
+            CoopObjectManager.AddObject(newHero);
+            CoopObjectManager.AddObject(newHero.CharacterObject);
+            CoopObjectManager.AddObject(newHero.PartyBelongedTo);
+            CoopObjectManager.AddObject(newHero.PartyBelongedTo.Party);
+            CoopObjectManager.AddObject(newHero.Clan);
+            CoopObjectManager.AddObject(newHero.PartyBelongedTo.PartyComponent.HomeSettlement);
 
             GameData gameData = new GameData();
-            gameData.PlayerPartyId = partyGuid;
+            gameData.PlayerHeroId = newHeroGuid;
 
-            byte[] data = SyncedObjectStore.Serialize(gameData);
+            byte[] data = CommonSerializer.Serialize(gameData);
 
             connection.Send(new Packet(EPacket.Server_GameData, data));
 

@@ -53,6 +53,10 @@ namespace Coop.Mod.Serializers
                         }
                         
                     }
+                    else if (field.FieldType == typeof(Action))
+                    {
+                        NonSerializableObjects.Add(field);
+                    }
                     else if (IsSerializable(field.FieldType))
                     {
                         SerializableObjects.Add(field, field.GetValue(obj));

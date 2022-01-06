@@ -10,6 +10,7 @@ using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem.Load;
 using System.Linq;
+using System.Reflection;
 
 namespace Coop.Mod.Managers
 {
@@ -43,21 +44,29 @@ namespace Coop.Mod.Managers
             }
 
             // Removes main party on server.
-            MobileParty.MainParty.RemoveParty();
+            MobileParty mainParty = MobileParty.MainParty;
 
-            foreach(Hero hero in Campaign.Current.AliveHeroes)
+            mainParty.RemoveParty();
+
+
+            
+
+            
+
+
+            foreach(Hero hero in Hero.AllAliveHeroes)
             {
                 CoopObjectManager.AddObject(hero.CharacterObject);
                 CoopObjectManager.AddObject(hero);
             }
 
-            foreach(Hero hero in Campaign.Current.DeadOrDisabledHeroes)
+            foreach(Hero hero in Hero.DeadOrDisabledHeroes)
             {
                 CoopObjectManager.AddObject(hero.CharacterObject);
                 CoopObjectManager.AddObject(hero);
             }
 
-            foreach(Settlement settlement in Campaign.Current.Settlements)
+            foreach(Settlement settlement in Settlement.All)
             {
                 CoopObjectManager.AddObject(settlement);
             }
@@ -82,10 +91,15 @@ namespace Coop.Mod.Managers
                 CoopObjectManager.AddObject(faction);
             }
 
-            foreach (MobileParty party in Campaign.Current.MobileParties)
+            foreach (MobileParty party in MobileParty.All)
             {
                 CoopObjectManager.AddObject(party);
                 CoopObjectManager.AddObject(party.Party);
+            }
+
+            if (CoopObjectManager.GetGuid(mainParty) != System.Guid.Empty)
+            {
+                throw new System.Exception("WTF DUD");
             }
 
             //CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {

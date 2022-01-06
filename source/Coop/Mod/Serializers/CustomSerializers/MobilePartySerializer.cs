@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.Serializers.Custom
@@ -19,17 +20,15 @@ namespace Coop.Mod.Serializers.Custom
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
-        Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, Guid> references = new Dictionary<FieldInfo, Guid>();
 
         List<Guid> attachedParties = new List<Guid>();
-        Guid currentSettlement;
-        Guid lastVistedSettlement;
-        Guid partyBase;
-        Guid clan;
-        Guid targetSettlement;
 
         public MobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
         {
+            List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
+
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
                 // Get value from fieldInfo
@@ -44,18 +43,12 @@ namespace Coop.Mod.Serializers.Custom
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
-                    case "_currentSettlement":
-                        currentSettlement = CoopObjectManager.GetGuid(value);
-                        break;
-                    case "<LastVisitedSettlement>k__BackingField":
-                        lastVistedSettlement = CoopObjectManager.GetGuid(value);
-                        break;
                     case "<Ai>k__BackingField":
                         // PartyAi
                         // NOTE may not be needed due to player control
                         break;
                     case "<Party>k__BackingField":
-                        partyBase = CoopObjectManager.GetGuid(value);
+                        SNNSO.Add(fieldInfo, new PartyBaseSerializer((PartyBase)value));
                         break;
                     case "_disorganizedUntilTime":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
@@ -94,9 +87,6 @@ namespace Coop.Mod.Serializers.Custom
                             this.attachedParties.Add(CoopObjectManager.GetGuid(attachedParty));
                         }
                         break;
-                    case "_actualClan":
-                        clan = CoopObjectManager.GetGuid(value);
-                        break;
                     case "<StationaryStartTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
@@ -109,22 +99,26 @@ namespace Coop.Mod.Serializers.Custom
                     case "<TaleWorlds.CampaignSystem.ILocatable<TaleWorlds.CampaignSystem.MobileParty>.NextLocatable>k__BackingField":
                         // TODO Joke Fix this
                         break;
-                    case "_targetSettlement":
-                        targetSettlement = CoopObjectManager.GetGuid(value);
-                        break;
                     case "<AiBehaviorObject>k__BackingField":
                         break;
+                    case "<LastVisitedSettlement>k__BackingField":
+                    case "_currentSettlement":
+                    case "_actualClan":
+                    case "_targetSettlement":
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+                        break;
                     default:
-                        throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
+                        UnmanagedFields.Add(fieldInfo);
+                        break;
                 }
             }
 
             // TODO manage collections
 
-            // Remove non serializable objects before serialization
-            // They are marked as nonserializable in CustomSerializer but still tries to serialize???
-            NonSerializableCollections.Clear();
-            NonSerializableObjects.Clear();
+            if (!UnmanagedFields.IsEmpty())
+            {
+                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
+            }
         }
 
         public override object Deserialize()
@@ -147,34 +141,22 @@ namespace Coop.Mod.Serializers.Custom
                 throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
             }
 
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
+            }
+
+            foreach(KeyValuePair<FieldInfo, Guid> reference in references)
+            {
+                reference.Key.SetValue(mobileParty, CoopObjectManager.GetObject(reference.Value));
+            }
+
             List<MobileParty> attachedParties = this.attachedParties
                 .Select(x => CoopObjectManager.GetObject<MobileParty>(x)).ToList();
 
             mobileParty.GetType()
                 .GetField("<AttachedParties>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(mobileParty, new MBReadOnlyList<MobileParty>(attachedParties));
-
-            mobileParty.GetType()
-                .GetField("_currentSettlement", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(mobileParty, CoopObjectManager.GetObject(currentSettlement));
-
-            mobileParty.GetType()
-                .GetField("<LastVisitedSettlement>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(mobileParty, CoopObjectManager.GetObject(lastVistedSettlement));
-
-            mobileParty.GetType()
-                .GetField("<Party>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(mobileParty, CoopObjectManager.GetObject(partyBase));
-
-            mobileParty.GetType()
-                .GetField("_actualClan", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(mobileParty, CoopObjectManager.GetObject(clan));
-
-            mobileParty.GetType()
-                .GetField("_targetSettlement", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(mobileParty, CoopObjectManager.GetObject(targetSettlement));
-
-            mobileParty.MemberRoster.OnHeroHealthStatusChanged(mobileParty.LeaderHero);
         }
     }
 }

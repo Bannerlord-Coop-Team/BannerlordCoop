@@ -66,11 +66,6 @@ namespace Coop.Mod.Serializers.Custom
             }
 
             // TODO manage collections
-
-            // Remove non serializable objects before serialization
-            // They are marked as nonserializable in CustomSerializer but still tries to serialize???
-            NonSerializableCollections.Clear();
-            NonSerializableObjects.Clear();
         }
 
         public override object Deserialize()

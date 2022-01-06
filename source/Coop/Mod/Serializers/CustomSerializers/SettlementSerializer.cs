@@ -27,9 +27,12 @@ namespace Coop.Mod.Serializers.Custom
         readonly FieldInfo settlementComponentsFieldInfo;
         readonly FieldInfo valueForFactionFieldInfo;
         readonly Tuple<Guid, float>[] valueForFaction;
+        readonly string stringId;
         public SettlementSerializer(Settlement settlement) : base(settlement)
         {
             List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
+
+            stringId = settlement.StringId;
 
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
@@ -49,15 +52,7 @@ namespace Coop.Mod.Serializers.Custom
                     case "<EncyclopediaText>k__BackingField":
                         SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
                         break;
-                    case "Town":
-                        SNNSO.Add(fieldInfo, new TownSerializer((Town)value));
-                        break;
-                    case "Village":
-                        SNNSO.Add(fieldInfo, new VillageSerializer((Village)value));
-                        break;
-                    case "Hideout":
-                        SNNSO.Add(fieldInfo, new HideoutSerializer((Hideout)value));
-                        break;
+                    
                     case "SiegeLanes":
                         SNNSO.Add(fieldInfo, new SiegeLaneSerializer((SiegeLane)value));
                         break;
@@ -128,6 +123,9 @@ namespace Coop.Mod.Serializers.Custom
                     case "_ownerClan":
                     case "ClaimedBy":
                     case "_lastAttackerParty":
+                    case "Town":
+                    case "Village":
+                    case "Hideout":
                         references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     default:
@@ -140,23 +138,18 @@ namespace Coop.Mod.Serializers.Custom
             {
                 throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
             }
-
-            // Remove non serializable objects before serialization
-            // They are marked as nonserializable in CustomSerializer but still tries to serialize???
-            NonSerializableCollections.Clear();
-            NonSerializableObjects.Clear();
         }
 
         public override object Deserialize()
         {
-            newSettlement = MBObjectManager.Instance.CreateObject<Settlement>();
+            newSettlement = MBObjectManager.Instance.CreateObject<Settlement>(stringId);
 
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
                 entry.Key.SetValue(newSettlement, entry.Value.Deserialize());
             }
 
-            return newSettlement;
+            return base.Deserialize(newSettlement);
         }
 
         public override void ResolveReferenceGuids()

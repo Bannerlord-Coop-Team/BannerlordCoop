@@ -50,6 +50,10 @@ namespace Coop.Mod.Serializers
                 switch (fieldInfo.Name)
                 {
                     case "_firstName":
+#if DEBUG
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer(new TextObject("Client_Player")));
+                        break;
+#endif
                     case "_name":
                     case "<EncyclopediaText>k__BackingField":
                         SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
@@ -140,11 +144,6 @@ namespace Coop.Mod.Serializers
             }
 
             // TODO manage collections
-
-            // Remove non serializable objects before serialization
-            // They are marked as nonserializable in CustomSerializer but still tries to serialize???
-            NonSerializableCollections.Clear();
-            NonSerializableObjects.Clear();
 
             Debug.WriteLine($"{hero.Id}");
         }

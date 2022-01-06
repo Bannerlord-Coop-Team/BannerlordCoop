@@ -100,6 +100,7 @@ namespace Coop.Mod.Serializers
         public override object Deserialize()
         {
             CharacterObject characterObject = MBObjectManager.Instance.CreateObject<CharacterObject>();
+            CoopObjectManager.AddObject(characterObject);
 
             // Circular referenced object needs assignment before deserialize
             if(heroObject == null)

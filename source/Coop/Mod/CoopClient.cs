@@ -313,7 +313,7 @@ namespace Coop.Mod
 
             gameData.Unpack();
 
-            Hero newPlayer = CoopObjectManager.GetObject<Hero>(gameData.PlayerPartyId);
+            Hero newPlayer = CoopObjectManager.GetObject<Hero>(gameData.PlayerHeroId);
 
             Game.Current.PlayerTroop = newPlayer.CharacterObject;
             ChangePlayerCharacterAction.Apply(newPlayer);

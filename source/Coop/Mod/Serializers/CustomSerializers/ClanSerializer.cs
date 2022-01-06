@@ -1,9 +1,11 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Serializers.Custom
@@ -17,16 +19,14 @@ namespace Coop.Mod.Serializers.Custom
         List<Guid> Supporters = new List<Guid>();
         List<Guid> Companions = new List<Guid>(); 
         List<Guid> CommanderHeroes = new List<Guid>(); //Does it refer to the lordscache or the heroescache in Bannerlord code? Which is missing from the switch case?
-        Guid home;
-        Guid basictroop;
-        Guid culture;
-        Guid leader;
-        Guid kingdom;
+
+        
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
-        Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, Guid> references = new Dictionary<FieldInfo, Guid>();
 
         public ClanSerializer(Clan clan) : base(clan)
         {
@@ -46,8 +46,13 @@ namespace Coop.Mod.Serializers.Custom
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Name>k__BackingField":
+                    case "<InformalName>k__BackingField":
+                    case "<EncyclopediaText>k__BackingField":
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
+                        break;
                     case "<Culture>k__BackingField":
-                        culture = CoopObjectManager.GetGuid((CultureObject)value);
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     case "<LastFactionChangeTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
@@ -71,17 +76,17 @@ namespace Coop.Mod.Serializers.Custom
                         }
                         break;
                     case "_basicTroop":
-                        basictroop = CoopObjectManager.GetGuid(value);
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     case "_leader":
                         // Assigned by SetHeroReference on deserialization
-                        leader = CoopObjectManager.GetGuid(value);
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     case "_banner":
                         SNNSO.Add(fieldInfo, new BannerSerializer((Banner)value));
                         break;
                     case "_home":
-                        home = CoopObjectManager.GetGuid(value);
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     case "<NotAttackableByPlayerUntilTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
@@ -90,7 +95,10 @@ namespace Coop.Mod.Serializers.Custom
                         SNNSO.Add(fieldInfo, new DefaultPartyTemplateSerializer((PartyTemplateObject)value));
                         break;
                     case "_kingdom":
-                        kingdom = CoopObjectManager.GetGuid(value);
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+                        break;
+                    case "OnPartiesAndLordsCacheUpdated":
+                        // Event for clans, add for all clans on kingdom deserialize
                         break;
                     default:
                         UnmanagedFields.Add(fieldInfo.Name);
@@ -101,14 +109,7 @@ namespace Coop.Mod.Serializers.Custom
             if (!UnmanagedFields.IsEmpty())
             {
                 throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
-            }
-
-            // TODO manage collections
-
-            // Remove non serializable objects before serialization
-            // They are marked as nonserializable in CustomSerializer but still tries to serialize???
-            NonSerializableCollections.Clear();
-            NonSerializableObjects.Clear();
+            }            
         }
 
         public override object Deserialize()
@@ -151,37 +152,13 @@ namespace Coop.Mod.Serializers.Custom
                 lCommanderHeroes.Add((Hero)CoopObjectManager.GetObject(commanderheroesId));
             }
 
-            newClan.Culture = (CultureObject)CoopObjectManager.GetObject(culture);
+            foreach (KeyValuePair<FieldInfo, Guid> entry in references)
+            {
+                FieldInfo field = entry.Key;
+                Guid id = entry.Value;
 
-            Type clanType = newClan.GetType();
-
-            clanType
-                .GetField("_home", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newClan, CoopObjectManager.GetObject(home));
-
-            clanType
-                .GetField("_basicTroop", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newClan, CoopObjectManager.GetObject(basictroop));
-
-            clanType
-                .GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newClan, CoopObjectManager.GetObject(leader));
-
-            clanType
-                .GetField("_kingdom", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newClan, CoopObjectManager.GetObject(kingdom));
-
-            clanType
-                .GetField("<Companions>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newClan,lCompanions);
-
-            clanType
-                .GetField("<CommanderHeroes>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newClan,lCommanderHeroes);
-
-            clanType
-                .GetField("<SupporterNotables>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(newClan,lSupporters);
+                field.SetValue(newClan, CoopObjectManager.GetObject(id));
+            }
         }
     }
 }

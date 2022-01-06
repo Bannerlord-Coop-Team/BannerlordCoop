@@ -196,7 +196,9 @@ namespace Coop.Mod.Serializers
             typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(Campaign.Current.CampaignObjectManager, new object[] { newMobileParty });
 
-            return base.Deserialize(newMobileParty);
+            newMobileParty = (MobileParty)base.Deserialize(newMobileParty);
+
+            return newMobileParty;
         }
 
         public override void ResolveReferenceGuids()

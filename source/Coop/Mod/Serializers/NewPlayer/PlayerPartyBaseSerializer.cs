@@ -71,8 +71,6 @@ namespace Coop.Mod.Serializers
 
             FieldInfo indexField = partyBase.GetType().GetField("_index", BindingFlags.Instance | BindingFlags.NonPublic);
             SerializableObjects.Remove(indexField);
-            NonSerializableCollections.Clear();
-            NonSerializableObjects.Clear();
         }
 
         public void SetHeroReference(Hero hero)

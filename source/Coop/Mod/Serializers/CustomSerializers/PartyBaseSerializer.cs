@@ -37,12 +37,6 @@ namespace Coop.Mod.Serializers.Custom
                         // PartyVisual
                         // Generate on server
                         break;
-                    case "<MobileParty>k__BackingField":
-                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
-                        break;
-                    case "<Settlement>k__BackingField":
-                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
-                        break;
                     case "<MemberRoster>k__BackingField":
                         // TroopRoster
                         SNNSO.Add(fieldInfo, new TroopRosterSerializer((TroopRoster)value));
@@ -59,6 +53,9 @@ namespace Coop.Mod.Serializers.Custom
                         // DeterministicRandom
                         SNNSO.Add(fieldInfo, new DeterministicRandomSerializer((DeterministicRandom)value));
                         break;
+                    // References
+                    case "<MobileParty>k__BackingField":
+                    case "<Settlement>k__BackingField":
                     case "_leader":
                         references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
@@ -75,8 +72,6 @@ namespace Coop.Mod.Serializers.Custom
 
             FieldInfo indexField = partyBase.GetType().GetField("_index", BindingFlags.Instance | BindingFlags.NonPublic);
             SerializableObjects.Remove(indexField);
-            NonSerializableCollections.Clear();
-            NonSerializableObjects.Clear();
         }
 
         public override object Deserialize()
@@ -105,10 +100,6 @@ namespace Coop.Mod.Serializers.Custom
 
                 field.SetValue(partyBase, CoopObjectManager.GetObject(id));
             }
-
-            partyBase.AddElementToMemberRoster(partyBase.LeaderHero.CharacterObject, 1);
-
-            
 
             IPartyVisual newVisual = Campaign.Current.VisualCreator.PartyVisualCreator.CreatePartyVisual();
             partyBase.GetType().GetField("_visual", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(partyBase, newVisual);
