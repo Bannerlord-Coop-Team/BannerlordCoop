@@ -57,7 +57,7 @@ namespace CoopTestMod
         {
 
 
-            public void parseMessage(byte[] bytes, Agent otherAgent)
+            public void parseMessage(byte[] bytes, Agent otherAgent, ref uint currentId)
             {
                 float x = BitConverter.ToSingle(bytes, 0);
                 float y = BitConverter.ToSingle(bytes, 4);
@@ -81,7 +81,16 @@ namespace CoopTestMod
                 float lookDirectionY = BitConverter.ToSingle(bytes, 72);
                 float lookDirectionZ = BitConverter.ToSingle(bytes, 76);
                 float health = BitConverter.ToSingle(bytes, 80);
+                uint packetId = BitConverter.ToUInt32(bytes, 84);
+                Agent.ActionCodeType ch0 = (Agent.ActionCodeType)BitConverter.ToInt32(bytes, 88);
+                Agent.ActionCodeType ch1 = (Agent.ActionCodeType)BitConverter.ToInt32(bytes, 92);
+                bool crouchMode = BitConverter.ToBoolean(bytes, 96);
 
+
+
+
+                //InformationManager.DisplayMessage(new InformationMessage("CH0 Action: " + ch0));
+                //InformationManager.DisplayMessage(new InformationMessage("CH1 Action: " + ch1));
                 //float targetPositionX = BitConverter.ToSingle(bytes, 80);
                 //float targetPositionY = BitConverter.ToSingle(bytes, 84);
                 //float targetDirectionX = BitConverter.ToSingle(bytes, 88);
@@ -92,7 +101,7 @@ namespace CoopTestMod
                 Vec3 pos = new Vec3(x, y, z);
                 //Vec2 targetPosition = new Vec2(targetPositionX, targetPositionY);
                 //Vec3 targetDirection = new Vec3(targetDirectionX, targetDirectionY, targetDirectionZ);
-                Agent.UsageDirection direction = Agent.MovementFlagToDirection((Agent.MovementControlFlag)movementFlag);
+                //Agent.UsageDirection direction = Agent.MovementFlagToDirection((Agent.MovementControlFlag)movementFlag);
 
 
 
@@ -101,30 +110,85 @@ namespace CoopTestMod
 
                     //otherAgent.TeleportToPosition(pos);
 
+                    
+
+                    if (packetId < currentId)
+                    {
+                        return;
+                    }
+                    else
+                    {
+                        currentId = packetId;
+                    }
+
+                    if (otherAgent.GetPathDistanceToPoint(ref pos) > 0.3f)
+                    {
+                        otherAgent.TeleportToPosition(pos);
+                    }
+
+                    //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
+                    //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+
+                    InformationManager.DisplayMessage(new InformationMessage(ch1.ToString()));
+
+                    otherAgent.EventControlFlags = 0U;
+                    if (crouchMode)
+                    {
+                        otherAgent.EventControlFlags |= Agent.EventControlFlag.Crouch;
+                    }
+                    else
+                    {
+                        otherAgent.EventControlFlags |= Agent.EventControlFlag.Stand;
+                    }
+
+
+                    otherAgent.LookDirection = new Vec3(lookDirectionX, lookDirectionY, lookDirectionZ);
+                    otherAgent.MovementInputVector = new Vec2(inputVectorX, inputVectorY);
+
+                    if (otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(0).Index != cacheIndex1)
+                    {
+                        string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
+                        otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
+
+                    }
+                    else
+                    {
+                        otherAgent.SetCurrentActionProgress(0, progress1);
+                    }
+
+                    if (ch1 == Agent.ActionCodeType.DefendShield)
+                    {
+                        otherAgent.MovementFlags = 0U;
+                        otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
+                        return;
+                    }
+
 
 
                     //// we either don't have an action so set it to the new one or the receive action is different than our current action
-                    //if (otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(0).Index != cacheIndex1)
-                    // {
-                    //    string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
-                    //    otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
 
-                    // }
-                    // else
-                    // {
-                    //     otherAgent.SetCurrentActionProgress(0, progress1);
-                    // }
+                    if (ch1 != Agent.ActionCodeType.BlockedMelee)
+                    {
+                        if (otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(1).Index != cacheIndex2)
+                        {
+                            string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
+                            otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
 
-                    // if (otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(1).Index != cacheIndex2)
-                    // {
-                    //     string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
-                    //     otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
+                        }
+                        else
+                        {
+                            otherAgent.SetCurrentActionProgress(1, progress2);
+                        }
+                    }
+                    else
+                    {
 
-                    // } 
-                    //else
-                    //{
-                    //    otherAgent.SetCurrentActionProgress(1, progress2);
-                    //}
+                        otherAgent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
+                    }
+
+                    //otherAgent.MovementFlags = 0U;
+                    //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
+
 
                     if (health != otherAgent.Health)
                     {
@@ -135,20 +199,21 @@ namespace CoopTestMod
                         }
                     }
                     
-
-                    otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
                     
-                    if(eventFlag != 0)
-                    {
-                        otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
 
-                    }
+                    
 
-                    if(otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none && otherAgent.CurrentGuardMode == Agent.GuardMode.None)
-                    {
-                        otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
-                    }
-                   
+                    //if (eventFlag != 0)
+                    //{
+                    //    otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+
+                    //}
+
+                    //if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none && otherAgent.CurrentGuardMode == Agent.GuardMode.None)
+                    //{
+                    //    otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
+                    //}
+
 
                     /*
                     if (otherAgent == Agent.ActionCodeType.)
@@ -168,15 +233,15 @@ namespace CoopTestMod
                     //otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
                     //otherAgent.AttackDirectionToMovementFlag(direction);
                     //otherAgent.DefendDirectionToMovementFlag(direction);
-                    otherAgent.MovementInputVector = new Vec2(inputVectorX, inputVectorY);
-                   // otherAgent.EnforceShieldUsage(direction);
+                    
+                    // otherAgent.EnforceShieldUsage(direction);
                     //InformationManager.DisplayMessage(new InformationMessage("Received: " + ((Agent.EventControlFlag)eventFlag).ToString()));
 
 
 
                     //InformationManager.DisplayMessage(new InformationMessage("Received : X: " +  lookDirectionX + " Y: " + lookDirectionY + " | Z: " + lookDirectionZ));
 
-                    otherAgent.LookDirection = new Vec3(lookDirectionX, lookDirectionY, lookDirectionZ);
+                    
 
                     //InformationManager.DisplayMessage(new InformationMessage("Receiving: " + ((Agent.EventControlFlag)eventFlag).ToString()));
 
@@ -188,6 +253,8 @@ namespace CoopTestMod
                     //string actionName3 = MBAnimation.GetActionNameWithCode(cacheIndex3);
                     //otherAgent.SetActionChannel(2, ActionIndexCache.Create(actionName3), additionalFlags: (ulong)flags3, startProgress: progress3);
                     //otherAgent.SetCurrentActionProgress(2, progress3);
+
+
 
 
                 }
@@ -215,6 +282,8 @@ namespace CoopTestMod
         EndPoint epFrom;
         EndPoint epTo;
         bool isServer = false;
+        uint packetId = 1;
+        uint currentId = 0;
 
         // custom delegate is needed since SetPosition uses a ref Vec3
         delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
@@ -271,7 +340,7 @@ namespace CoopTestMod
                     {
                         bytes = new byte[1024];
                         int bytesRec = receiver.ReceiveFrom(bytes, ref epFrom);
-                        messageParser.parseMessage(bytes, _otherAgent);
+                        messageParser.parseMessage(bytes, _otherAgent, ref currentId);
                     }
                     catch (Exception ex)
                     {
@@ -314,7 +383,7 @@ namespace CoopTestMod
                 {
                     bytes = new byte[1024];
                     int bytesRec = receiver.ReceiveFrom(bytes, ref epFrom);
-                    messageParser.parseMessage(bytes, _otherAgent);
+                    messageParser.parseMessage(bytes, _otherAgent, ref currentId);
                 }
               
             }
@@ -614,10 +683,10 @@ namespace CoopTestMod
             if (Mission.Current != null && playerPtr != UIntPtr.Zero)
             {
                 // every 0.1 tick send an update to other endpoint
-                //if (t + 0.01 > Time.ApplicationTime)
-                //{
-                //    return;
-                //}
+                if (t + 0.03 > Time.ApplicationTime)
+                {
+                    return;
+                }
                 // update time
                 t = Time.ApplicationTime;
 
@@ -638,6 +707,11 @@ namespace CoopTestMod
                 AnimFlags flags2 = _player.GetCurrentAnimationFlag(1);
                 Vec3 lookDirection = _player.LookDirection;
                 float health = _player.Health;
+                Agent.ActionCodeType actionTypeCh0 = _player.GetCurrentActionType(0);
+                Agent.ActionCodeType actionTypeCh1 = _player.GetCurrentActionType(1);
+
+
+
 
                 //Vec2 targetPosition = _player.GetTargetPosition();
                 //Vec3 targetDirection = _player.GetTargetDirection();
@@ -685,6 +759,10 @@ namespace CoopTestMod
                         writer.Write(lookDirection.y);
                         writer.Write(lookDirection.z);
                         writer.Write(health);
+                        writer.Write(packetId++);
+                        writer.Write((int)actionTypeCh0);
+                        writer.Write((int)actionTypeCh1);
+                        writer.Write(_player.CrouchMode);
                         //writer.Write(targetPosition.x);
                         //writer.Write(targetPosition.y);
                         //writer.Write(targetDirection.x);
