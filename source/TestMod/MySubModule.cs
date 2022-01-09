@@ -17,7 +17,7 @@ using System.Text;
 using System.Threading;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.MountAndBlade.Diamond;
-using TaleWorlds.CampaignSystem.GameMenus;
+using HarmonyLib;
 
 namespace CoopTestMod
 {
@@ -86,7 +86,13 @@ namespace CoopTestMod
                 Agent.ActionCodeType ch1 = (Agent.ActionCodeType)BitConverter.ToInt32(bytes, 92);
                 bool crouchMode = BitConverter.ToBoolean(bytes, 96);
 
+                float mInputVectorX = BitConverter.ToSingle(bytes, 97);
+                float mInputVectorY = BitConverter.ToSingle(bytes, 101);
+                AnimFlags mFlags2 = (AnimFlags)BitConverter.ToUInt64(bytes, 105);
+                float mProgress2 = BitConverter.ToSingle(bytes, 113);
+                int mCacheIndex2 = BitConverter.ToInt32(bytes, 117);
 
+                //int damageTaken = BitConverter.ToInt32(bytes, 121);
 
 
                 //InformationManager.DisplayMessage(new InformationMessage("CH0 Action: " + ch0));
@@ -97,7 +103,7 @@ namespace CoopTestMod
                 //float targetDirectionY = BitConverter.ToSingle(bytes, 92);
                 //float targetDirectionZ = BitConverter.ToSingle(bytes, 96);
 
-
+                //otherAgent.UpdateSyncHealthToAllClients(true);
                 Vec3 pos = new Vec3(x, y, z);
                 //Vec2 targetPosition = new Vec2(targetPositionX, targetPositionY);
                 //Vec3 targetDirection = new Vec3(targetDirectionX, targetDirectionY, targetDirectionZ);
@@ -109,8 +115,6 @@ namespace CoopTestMod
                 {
 
                     //otherAgent.TeleportToPosition(pos);
-
-                    
 
                     if (packetId < currentId)
                     {
@@ -129,9 +133,11 @@ namespace CoopTestMod
                     //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
                     //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
 
-                    InformationManager.DisplayMessage(new InformationMessage(ch1.ToString()));
+                    //InformationManager.DisplayMessage(new InformationMessage(ch1.ToString()));
 
-                    otherAgent.EventControlFlags = 0U;
+
+
+                    //otherAgent.EventControlFlags = 0U;
                     if (crouchMode)
                     {
                         otherAgent.EventControlFlags |= Agent.EventControlFlag.Crouch;
@@ -144,6 +150,32 @@ namespace CoopTestMod
 
                     otherAgent.LookDirection = new Vec3(lookDirectionX, lookDirectionY, lookDirectionZ);
                     otherAgent.MovementInputVector = new Vec2(inputVectorX, inputVectorY);
+
+                    if (eventFlag == 1u)
+                    {
+                        otherAgent.EventControlFlags |= Agent.EventControlFlag.Dismount;
+                    }
+                    if (eventFlag == 2u)
+                    {
+                        otherAgent.EventControlFlags |= Agent.EventControlFlag.Mount;
+                    }
+
+                    if (otherAgent.HasMount)
+                    {
+                        otherAgent.MountAgent.SetMovementDirection(new Vec2(mInputVectorX, mInputVectorY));
+
+                        //Currently not doing anything afaik
+                        if (otherAgent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.MountAgent.GetCurrentAction(1).Index != mCacheIndex2)
+                        {
+                            string mActionName2 = MBAnimation.GetActionNameWithCode(mCacheIndex2);
+                            otherAgent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)mFlags2, startProgress: mProgress2);
+                        }
+                        else
+                        {
+                            otherAgent.MountAgent.SetCurrentActionProgress(1, mProgress2);
+                        }
+                    }
+
 
                     if (otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(0).Index != cacheIndex1)
                     {
@@ -189,18 +221,19 @@ namespace CoopTestMod
                     //otherAgent.MovementFlags = 0U;
                     //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
 
+                    //InformationManager.DisplayMessage(new InformationMessage(Agent.Main.Position + ""));
 
-                    if (health != otherAgent.Health)
-                    {
-                        otherAgent.Health = health;
-                        if (otherAgent.Health < 0)
-                        {
-                            otherAgent.MakeDead(true, otherAgent.GetCurrentAction(1)); //Which action do we require or what does it do?
-                        }
-                    }
-                    
-                    
+                    //if (health != otherAgent.Health)
+                    //{
+                    //    //InformationManager.DisplayMessage(new InformationMessage("otherAgent.Health: " + otherAgent.Health));
+                    //    //InformationManager.DisplayMessage(new InformationMessage("damageTaken: " + damageTaken));
+                    //    //InformationManager.DisplayMessage(new InformationMessage("health: " + health));
 
+                    //    if (otherAgent.Health < 0)
+                    //    {
+                    //        otherAgent.MakeDead(true, otherAgent.GetCurrentAction(1)); //Which action do we require or what does it do?
+                    //    }
+                    //}
                     
 
                     //if (eventFlag != 0)
@@ -284,6 +317,12 @@ namespace CoopTestMod
         bool isServer = false;
         uint packetId = 1;
         uint currentId = 0;
+
+        Vec2 mInputVector;
+        AnimFlags mFlags1;
+        float mProgress1;
+        ActionIndexCache mCache1;
+
 
         // custom delegate is needed since SetPosition uses a ref Vec3
         delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
@@ -399,11 +438,11 @@ namespace CoopTestMod
         }
 
 
-
-
         protected override void OnSubModuleLoad()
         {
             base.OnSubModuleLoad();
+
+            new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop").PatchAll();
 
             //skip intro
             FieldInfo splashScreen = TaleWorlds.MountAndBlade.Module.CurrentModule.GetType().GetField("_splashScreenPlayed", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -442,7 +481,7 @@ namespace CoopTestMod
             agentBuildData2 = agentBuildData.Team(isMain ? Mission.Current.PlayerTeam : Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
-            Agent agent = mission.SpawnAgent(agentBuildData2.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);
+            Agent agent = mission.SpawnAgent(agentBuildData2.InitialDirection(vec).NoHorses(false).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);
             agent.FadeIn();
             if (isMain)
             {
@@ -467,7 +506,24 @@ namespace CoopTestMod
             return agent;
         }
 
+        [HarmonyPatch(typeof(Mission), "OnAgentHit")]
+        public class MissionOnAgentHitPatch
+        {
+            private static int damageDone;
+            public static int DamageDone
+            {
+                get
+                {
+                    return damageDone;
+                }
+            }
 
+            public static void Postfix(int damage)
+            {
+                InformationManager.DisplayMessage(new InformationMessage(damage.ToString()));
+                damageDone = damage;
+            }
+        }
 
         bool channel2HasSomething = false;
         protected override void OnApplicationTick(float dt)
@@ -591,8 +647,6 @@ namespace CoopTestMod
             }
 
 
-            
-
             if (Input.IsKeyReleased(InputKey.Slash))
             {
                 
@@ -676,8 +730,11 @@ namespace CoopTestMod
                // InformationManager.DisplayMessage(new InformationMessage(_otherAgent.EventControlFlags.ToString()));
             }
 
-
-
+            if (Input.IsReleased(InputKey.CapsLock))
+            {
+                _player.UpdateSyncHealthToAllClients(true);
+                _player.Health -= 10;
+            }
 
             // Mission is loaded
             if (Mission.Current != null && playerPtr != UIntPtr.Zero)
@@ -710,7 +767,23 @@ namespace CoopTestMod
                 Agent.ActionCodeType actionTypeCh0 = _player.GetCurrentActionType(0);
                 Agent.ActionCodeType actionTypeCh1 = _player.GetCurrentActionType(1);
 
+                //int damage = MissionOnAgentHitPatch.DamageDone;
 
+                if (_player.HasMount)
+                {
+                    mInputVector = _player.MountAgent.GetMovementDirection();
+                    mFlags1 = _player.MountAgent.GetCurrentAnimationFlag(1);
+                    mProgress1 = _player.MountAgent.GetCurrentActionProgress(1);
+                    mCache1 = _player.MountAgent.GetCurrentAction(1);
+                }
+
+
+                //InformationManager.DisplayMessage(new InformationMessage("Horse flag: " + mFlags1 + "  Horse progress: " + mProgress1 + "  Horse cache: " + mCache1.Index));
+
+
+
+
+                //InformationManager.DisplayMessage(new InformationMessage(damageDone.ToString()));
 
 
                 //Vec2 targetPosition = _player.GetTargetPosition();
@@ -726,6 +799,9 @@ namespace CoopTestMod
                         channel2HasSomething = false;
                     }
                 }
+
+                
+
 
                 //InformationManager.ClearAllMessages();
                 //InformationManager.DisplayMessage(new InformationMessage("Sending: " + _player.EventControlFlags.ToString()));
@@ -763,6 +839,16 @@ namespace CoopTestMod
                         writer.Write((int)actionTypeCh0);
                         writer.Write((int)actionTypeCh1);
                         writer.Write(_player.CrouchMode);
+
+                        writer.Write(mInputVector.x);
+                        writer.Write(mInputVector.y);
+                        writer.Write((ulong)mFlags1);
+                        writer.Write(mProgress1);
+                        writer.Write(mCache1.Index);
+
+                       // writer.Write(damage);
+
+
                         //writer.Write(targetPosition.x);
                         //writer.Write(targetPosition.y);
                         //writer.Write(targetDirection.x);
@@ -779,6 +865,12 @@ namespace CoopTestMod
             }
 
         }
+
+
+
+
+
+
 
     }
 }
