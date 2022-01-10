@@ -48,16 +48,20 @@ namespace CoopTestMod
     //    }
     //}
 
-   
+    
+
     public class MySubModule : MBSubModuleBase
     {
         
 
         public class MessageParser
         {
+            private int bitExtracted(int number, int k, int p)
+            {
+                return (((1 << k) - 1) & (number >> (p - 1)));
+            }
 
-
-            public void parseMessage(byte[] bytes, Agent otherAgent, ref uint currentId)
+            public void parseMessage(byte[] bytes, Agent otherAgent, Agent playerAgent, ref uint currentId, ref float otherAgentHealth)
             {
                 float x = BitConverter.ToSingle(bytes, 0);
                 float y = BitConverter.ToSingle(bytes, 4);
@@ -91,6 +95,7 @@ namespace CoopTestMod
                 AnimFlags mFlags2 = (AnimFlags)BitConverter.ToUInt64(bytes, 105);
                 float mProgress2 = BitConverter.ToSingle(bytes, 113);
                 int mCacheIndex2 = BitConverter.ToInt32(bytes, 117);
+                float playerAgentHealth = BitConverter.ToSingle(bytes, 121);
 
                 //int damageTaken = BitConverter.ToInt32(bytes, 121);
 
@@ -113,10 +118,22 @@ namespace CoopTestMod
 
                 if (Mission.Current != null && otherAgent != null)
                 {
-
                     //otherAgent.TeleportToPosition(pos);
-
                     if (packetId < currentId)
+                    {
+                        return;
+                    }
+                    InformationManager.DisplayMessage(new InformationMessage(health.ToString()));
+                    if(playerAgentHealth < playerAgent.Health)
+                    {
+                        Blow b = new Blow(otherAgent.Index);
+                        b.InflictedDamage = (int)(playerAgent.Health - playerAgentHealth);
+                        playerAgent.RegisterBlow(b);
+                        
+                    }
+
+                    
+                    if(otherAgent.Health <= 0)
                     {
                         return;
                     }
@@ -136,8 +153,7 @@ namespace CoopTestMod
                     //InformationManager.DisplayMessage(new InformationMessage(ch1.ToString()));
 
 
-
-                    //otherAgent.EventControlFlags = 0U;
+                    otherAgent.EventControlFlags = 0U;
                     if (crouchMode)
                     {
                         otherAgent.EventControlFlags |= Agent.EventControlFlag.Crouch;
@@ -165,15 +181,15 @@ namespace CoopTestMod
                         otherAgent.MountAgent.SetMovementDirection(new Vec2(mInputVectorX, mInputVectorY));
 
                         //Currently not doing anything afaik
-                        if (otherAgent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.MountAgent.GetCurrentAction(1).Index != mCacheIndex2)
-                        {
-                            string mActionName2 = MBAnimation.GetActionNameWithCode(mCacheIndex2);
-                            otherAgent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)mFlags2, startProgress: mProgress2);
-                        }
-                        else
-                        {
-                            otherAgent.MountAgent.SetCurrentActionProgress(1, mProgress2);
-                        }
+                        //if (otherAgent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.MountAgent.GetCurrentAction(1).Index != mCacheIndex2)
+                        //{
+                        //    string mActionName2 = MBAnimation.GetActionNameWithCode(mCacheIndex2);
+                        //    otherAgent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)mFlags2, startProgress: mProgress2);
+                        //}
+                        //else
+                        //{
+                        //    otherAgent.MountAgent.SetCurrentActionProgress(1, mProgress2);
+                        //}
                     }
 
 
@@ -181,16 +197,17 @@ namespace CoopTestMod
                     {
                         string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
                         otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
-
+                        
                     }
                     else
                     {
                         otherAgent.SetCurrentActionProgress(0, progress1);
                     }
+                    otherAgent.MovementFlags = 0U;
 
-                    if (ch1 == Agent.ActionCodeType.DefendShield)
+                    if ((int)ch1 >= (int)Agent.ActionCodeType.DefendAllBegin && (int)ch1 <= (int)Agent.ActionCodeType.DefendAllEnd)
+                        
                     {
-                        otherAgent.MovementFlags = 0U;
                         otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
                         return;
                     }
@@ -323,6 +340,8 @@ namespace CoopTestMod
         float mProgress1;
         ActionIndexCache mCache1;
 
+        private float otherAgentHealth = 0;
+
 
         // custom delegate is needed since SetPosition uses a ref Vec3
         delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
@@ -379,7 +398,7 @@ namespace CoopTestMod
                     {
                         bytes = new byte[1024];
                         int bytesRec = receiver.ReceiveFrom(bytes, ref epFrom);
-                        messageParser.parseMessage(bytes, _otherAgent, ref currentId);
+                        messageParser.parseMessage(bytes, _otherAgent, _player, ref currentId, ref otherAgentHealth);
                     }
                     catch (Exception ex)
                     {
@@ -422,7 +441,7 @@ namespace CoopTestMod
                 {
                     bytes = new byte[1024];
                     int bytesRec = receiver.ReceiveFrom(bytes, ref epFrom);
-                    messageParser.parseMessage(bytes, _otherAgent, ref currentId);
+                    messageParser.parseMessage(bytes, _otherAgent, _player, ref currentId, ref otherAgentHealth);
                 }
               
             }
@@ -481,7 +500,7 @@ namespace CoopTestMod
             agentBuildData2 = agentBuildData.Team(isMain ? Mission.Current.PlayerTeam : Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
-            Agent agent = mission.SpawnAgent(agentBuildData2.InitialDirection(vec).NoHorses(false).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);
+            Agent agent = mission.SpawnAgent(agentBuildData2.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);
             agent.FadeIn();
             if (isMain)
             {
@@ -586,6 +605,8 @@ namespace CoopTestMod
 
                 //spawn another instance of the player, uncontroller (this should get synced when someone joins)
                 _otherAgent = SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement2, false);
+
+                otherAgentHealth = _otherAgent.Health;
 
 
                 // Our agent's pointer; set it to 0 first
@@ -704,12 +725,26 @@ namespace CoopTestMod
 
             }
 
-            if (Input.IsKeyReleased(InputKey.BackSlash))
+            if (Input.IsKeyReleased(InputKey.Numpad5))
             {
 
-                InformationManager.DisplayMessage(new InformationMessage("Peer Count: " + GameNetwork.NetworkPeerCount));
-                InformationManager.DisplayMessage(new InformationMessage("Game Type: " + MBCommon.CurrentGameType));
+                Blow b = new Blow(_otherAgent.Index);
+                b.InflictedDamage = 20;
+                //_player.Health = 0;
+                _player.RegisterBlow(b);
                 
+                
+
+            }
+            if (Input.IsKeyReleased(InputKey.Numpad6))
+            {
+
+                Blow b = new Blow(_player.Index);
+                b.InflictedDamage = 20;
+                //_player.Health = 0;
+                _otherAgent.RegisterBlow(b);
+
+
 
             }
             if (Input.IsReleased(InputKey.Numpad1))
@@ -756,25 +791,45 @@ namespace CoopTestMod
                 uint eventFlag = (uint)_player.EventControlFlags;
                 Vec2 movementDirection = _player.GetMovementDirection();
                 Vec2 inputVector = _player.MovementInputVector;
-                ActionIndexCache cache1 = _player.GetCurrentAction(0);
-                float progress1 = _player.GetCurrentActionProgress(0);
-                AnimFlags flags1 = _player.GetCurrentAnimationFlag(0);
-                ActionIndexCache cache2 = _player.GetCurrentAction(1);
-                float progress2 = _player.GetCurrentActionProgress(1);
-                AnimFlags flags2 = _player.GetCurrentAnimationFlag(1);
+                ActionIndexCache cache1 =  ActionIndexCache.act_none;
+                float progress1 =  0f;
+                AnimFlags flags1 = 0;
+                ActionIndexCache cache2 =  ActionIndexCache.act_none;
+                float progress2 = 0f;
+                AnimFlags flags2 =  0;
                 Vec3 lookDirection = _player.LookDirection;
                 float health = _player.Health;
-                Agent.ActionCodeType actionTypeCh0 = _player.GetCurrentActionType(0);
-                Agent.ActionCodeType actionTypeCh1 = _player.GetCurrentActionType(1);
+                Agent.ActionCodeType actionTypeCh0 =  Agent.ActionCodeType.Other;
+                Agent.ActionCodeType actionTypeCh1 =  Agent.ActionCodeType.Other;
 
                 //int damage = MissionOnAgentHitPatch.DamageDone;
+                mCache1 = ActionIndexCache.act_none;
 
-                if (_player.HasMount)
+
+                if (_player.Health > 0f)
                 {
-                    mInputVector = _player.MountAgent.GetMovementDirection();
-                    mFlags1 = _player.MountAgent.GetCurrentAnimationFlag(1);
-                    mProgress1 = _player.MountAgent.GetCurrentActionProgress(1);
-                    mCache1 = _player.MountAgent.GetCurrentAction(1);
+                    cache1 =  _player.GetCurrentAction(0);
+                    progress1 =  _player.GetCurrentActionProgress(0);
+                    flags1 =  _player.GetCurrentAnimationFlag(0);
+                    cache2 =  _player.GetCurrentAction(1);
+                    progress2 = _player.GetCurrentActionProgress(1);
+                    flags2 = _player.GetCurrentAnimationFlag(1);
+                    actionTypeCh0 = _player.GetCurrentActionType(0);
+                    actionTypeCh1 = _player.GetCurrentActionType(1);
+
+
+                    if (_player.HasMount)
+                    {
+                        mInputVector = _player.MountAgent.GetMovementDirection();
+                        mFlags1 = _player.MountAgent.GetCurrentAnimationFlag(1);
+                        mProgress1 = _player.MountAgent.GetCurrentActionProgress(1);
+                        mCache1 = _player.MountAgent.GetCurrentAction(1);
+                    }
+
+                }
+                else
+                {
+                    mCache1 = ActionIndexCache.act_none;
                 }
 
 
@@ -789,16 +844,8 @@ namespace CoopTestMod
                 //Vec2 targetPosition = _player.GetTargetPosition();
                 //Vec3 targetDirection = _player.GetTargetDirection();
                 //InformationManager.DisplayMessage(new InformationMessage("Sending: X: " + lookDirection.x + " Y: " + lookDirection.y + " | Z: " + lookDirection.z));
+                
 
-                if (!channel2HasSomething)
-                {
-                    ActionIndexCache cache3 = _player.GetCurrentAction(2);
-                    if(cache3 != null)
-                    {
-                        InformationManager.DisplayMessage(new InformationMessage(cache3.Name));
-                        channel2HasSomething = false;
-                    }
-                }
 
                 
 
@@ -806,10 +853,10 @@ namespace CoopTestMod
                 //InformationManager.ClearAllMessages();
                 //InformationManager.DisplayMessage(new InformationMessage("Sending: " + _player.EventControlFlags.ToString()));
                 //InformationManager.DisplayMessage(new InformationMessage(cache2.Name));
-                
+
                 //InformationManager.DisplayMessage(new InformationMessage(_player.GetActionChannelCurrentActionWeight(1).ToString()));
-                    
-                    //throw new Exception();
+
+                //throw new Exception();
                 
 
                 if (myPos.IsValid)
@@ -845,6 +892,7 @@ namespace CoopTestMod
                         writer.Write((ulong)mFlags1);
                         writer.Write(mProgress1);
                         writer.Write(mCache1.Index);
+                        writer.Write(_otherAgent.Health);
 
                        // writer.Write(damage);
 
