@@ -97,6 +97,9 @@ namespace CoopTestMod
                 int mCacheIndex2 = BitConverter.ToInt32(bytes, 117);
                 float playerAgentHealth = BitConverter.ToSingle(bytes, 121);
 
+                int wieldedMeleeWeaponIndex = BitConverter.ToInt32(bytes, 125);
+                int wieldedRangedWeaponIndex = BitConverter.ToInt32(bytes, 129);
+
                 //int damageTaken = BitConverter.ToInt32(bytes, 121);
 
 
@@ -119,7 +122,7 @@ namespace CoopTestMod
                 if (Mission.Current != null && otherAgent != null)
                 {
                     //otherAgent.TeleportToPosition(pos);
-                    InformationManager.DisplayMessage(new InformationMessage("Received ID: " + currentId.ToString()));
+                    //InformationManager.DisplayMessage(new InformationMessage("Received ID: " + currentId.ToString()));
                     if (packetId < currentId)
                     {
                         return;
@@ -128,7 +131,7 @@ namespace CoopTestMod
                     {
                         currentId = packetId;
                     }
-                    InformationManager.DisplayMessage(new InformationMessage("Processed ID: " + currentId.ToString()));
+                    //InformationManager.DisplayMessage(new InformationMessage("Processed ID: " + currentId.ToString()));
                     if(playerAgentHealth < playerAgent.Health)
                     {
                         Blow b = new Blow(otherAgent.Index);
@@ -137,8 +140,14 @@ namespace CoopTestMod
                         
                     }
 
-                    
-                    if(otherAgent.Health <= 0)
+                    //playerAgent.WieldedWeapon.CurrentUsageIndex != 
+                    if (wieldedMeleeWeaponIndex != otherAgent.WieldedWeapon.CurrentUsageIndex || wieldedRangedWeaponIndex != otherAgent.WieldedWeapon.GetRangedUsageIndex())
+                    {
+                        otherAgent.WieldNextWeapon(new Agent.HandIndex());
+                    }
+                    //InformationManager.DisplayMessage(new InformationMessage("Event Flag: " + eventFlag.ToString()));
+
+                    if (otherAgent.Health <= 0)
                     {
                         return;
                     }
@@ -175,6 +184,10 @@ namespace CoopTestMod
                     {
                         otherAgent.EventControlFlags |= Agent.EventControlFlag.Mount;
                     }
+
+
+
+                    
 
                     if (otherAgent.HasMount)
                     {
@@ -742,9 +755,12 @@ namespace CoopTestMod
 
             if (Input.IsReleased(InputKey.CapsLock))
             {
-                _player.UpdateSyncHealthToAllClients(true);
-                _player.Health -= 10;
+               // _otherAgent.WieldNextWeapon(new Agent.HandIndex());
+                 
+                InformationManager.DisplayMessage(new InformationMessage(_player.WieldedWeapon.CurrentUsageIndex.ToString()));
+                InformationManager.DisplayMessage(new InformationMessage(_player.WieldedWeapon.GetRangedUsageIndex().ToString()));
             }
+
 
             // Mission is loaded
             if (Mission.Current != null && playerPtr != UIntPtr.Zero)
@@ -776,6 +792,9 @@ namespace CoopTestMod
                 float health = _player.Health;
                 Agent.ActionCodeType actionTypeCh0 =  Agent.ActionCodeType.Other;
                 Agent.ActionCodeType actionTypeCh1 =  Agent.ActionCodeType.Other;
+                int wieldedMeleeWeaponIndex = _player.WieldedWeapon.CurrentUsageIndex;
+                int wieldedRangedWeaponIndex = _player.WieldedWeapon.GetRangedUsageIndex();
+
 
                 //int damage = MissionOnAgentHitPatch.DamageDone;
                 mCache1 = ActionIndexCache.act_none;
@@ -819,10 +838,10 @@ namespace CoopTestMod
                 //Vec2 targetPosition = _player.GetTargetPosition();
                 //Vec3 targetDirection = _player.GetTargetDirection();
                 //InformationManager.DisplayMessage(new InformationMessage("Sending: X: " + lookDirection.x + " Y: " + lookDirection.y + " | Z: " + lookDirection.z));
-                
 
 
-                
+
+
 
 
                 //InformationManager.ClearAllMessages();
@@ -832,7 +851,7 @@ namespace CoopTestMod
                 //InformationManager.DisplayMessage(new InformationMessage(_player.GetActionChannelCurrentActionWeight(1).ToString()));
 
                 //throw new Exception();
-                
+
 
                 if (myPos.IsValid)
                 {
@@ -868,6 +887,9 @@ namespace CoopTestMod
                         writer.Write(mProgress1);
                         writer.Write(mCache1.Index);
                         writer.Write(_otherAgent.Health);
+
+                        writer.Write(wieldedMeleeWeaponIndex);
+                        writer.Write(wieldedRangedWeaponIndex);
 
                        // writer.Write(damage);
 
