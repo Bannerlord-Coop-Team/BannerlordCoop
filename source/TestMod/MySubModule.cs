@@ -119,11 +119,16 @@ namespace CoopTestMod
                 if (Mission.Current != null && otherAgent != null)
                 {
                     //otherAgent.TeleportToPosition(pos);
+                    InformationManager.DisplayMessage(new InformationMessage("Received ID: " + currentId.ToString()));
                     if (packetId < currentId)
                     {
                         return;
                     }
-                    InformationManager.DisplayMessage(new InformationMessage(health.ToString()));
+                    else
+                    {
+                        currentId = packetId;
+                    }
+                    InformationManager.DisplayMessage(new InformationMessage("Processed ID: " + currentId.ToString()));
                     if(playerAgentHealth < playerAgent.Health)
                     {
                         Blow b = new Blow(otherAgent.Index);
@@ -137,11 +142,6 @@ namespace CoopTestMod
                     {
                         return;
                     }
-                    else
-                    {
-                        currentId = packetId;
-                    }
-
                     if (otherAgent.GetPathDistanceToPoint(ref pos) > 0.3f)
                     {
                         otherAgent.TeleportToPosition(pos);
@@ -491,6 +491,81 @@ namespace CoopTestMod
 
         }
 
+
+        private void StartArenaFight()
+        {
+            //reset teams if any exists
+
+            Mission.Current.ResetMission();
+
+            //
+            Mission.Current.Teams.Add(BattleSideEnum.Defender, Hero.MainHero.MapFaction.Color, Hero.MainHero.MapFaction.Color2, null, true, false, true);
+            Mission.Current.Teams.Add(BattleSideEnum.Attacker, Hero.MainHero.MapFaction.Color2, Hero.MainHero.MapFaction.Color, null, true, false, true);
+
+            //players is defender team
+            Mission.Current.PlayerTeam = Mission.Current.DefenderTeam;
+
+
+            //find areas of spawn
+
+            _initialSpawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
+                                   select e.GetGlobalFrame()).ToList();
+            for (int i = 0; i < _initialSpawnFrames.Count; i++)
+            {
+                MatrixFrame value = _initialSpawnFrames[i];
+                value.rotation.OrthonormalizeAccordingToForwardAndKeepUpAsZAxis();
+                _initialSpawnFrames[i] = value;
+            }
+            // get a random spawn point
+            MatrixFrame randomElement = _initialSpawnFrames.GetRandomElement();
+            //remove the point so no overlap
+            _initialSpawnFrames.Remove(randomElement);
+            //find another spawn point
+            randomElement2 = randomElement;
+
+
+            // spawn an instance of the player (controlled by default)
+
+            _player = SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement, true);
+
+
+            //spawn another instance of the player, uncontroller (this should get synced when someone joins)
+            _otherAgent = SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement2, false);
+
+            otherAgentHealth = _otherAgent.Health;
+
+
+            // Our agent's pointer; set it to 0 first
+            playerPtr = UIntPtr.Zero;
+
+
+            // other agent's pointer
+            otherAgentPtr = (UIntPtr)_otherAgent.GetType().GetField("_pointer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_otherAgent);
+
+
+            // Find out agent's pointer from our agent instance
+            playerPtr = (UIntPtr)_player.GetType().GetField("_pointer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_player);
+
+
+            // set the weapons to the available weapons
+            _player.WieldInitialWeapons();
+            _otherAgent.WieldInitialWeapons();
+
+            //// From MBAPI, get the private interface IMBAgent
+            FieldInfo IMBAgentField = typeof(MBAPI).GetField("IMBAgent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+
+            // get the set and get method of position
+            MethodInfo getPositionMethod = IMBAgentField.GetValue(null).GetType().GetMethod("GetPosition");
+            MethodInfo setPositionMethod = IMBAgentField.GetValue(null).GetType().GetMethod("SetPosition");
+
+
+            // set the delegates to the method pointers. In case Agent class isn't enough we can invoke IMAgent directly.
+            getPosition = (Func<UIntPtr, Vec3>)Delegate.CreateDelegate
+                (typeof(Func<UIntPtr, Vec3>), IMBAgentField.GetValue(null), getPositionMethod);
+
+            setPosition = (PositionRefDelegate)Delegate.CreateDelegate(typeof(PositionRefDelegate), IMBAgentField.GetValue(null), setPositionMethod);
+        }
+
         // ripped straight out of arena spawns
         private Agent SpawnArenaAgent(CharacterObject character, MatrixFrame frame, bool isMain)
         {
@@ -513,14 +588,6 @@ namespace CoopTestMod
                 agent.Controller = Agent.ControllerType.None;
                 
             }
-            //if (agent.IsAIControlled)
-            //{
-
-            //    agent.SetWatchState(Agent.WatchState.Alarmed);
-            //}
-            //agent.Health = this._customAgentHealth;
-            //agent.BaseHealthLimit = this._customAgentHealth;
-            //agent.HealthLimit = this._customAgentHealth;
 
             return agent;
         }
@@ -544,7 +611,6 @@ namespace CoopTestMod
             }
         }
 
-        bool channel2HasSomething = false;
         protected override void OnApplicationTick(float dt)
         {
             if (!subModuleLoaded && Module.CurrentModule.LoadingFinished)
@@ -571,100 +637,7 @@ namespace CoopTestMod
             {
                 // again theres gotta be a better way to check if missions finish loading? A custom mission maybe in the future
                 battleLoaded = true;
-
-                //two teams are created
-                Mission.Current.Teams.Add(BattleSideEnum.Defender, Hero.MainHero.MapFaction.Color, Hero.MainHero.MapFaction.Color2, null, true, false, true);
-                Mission.Current.Teams.Add(BattleSideEnum.Attacker, Hero.MainHero.MapFaction.Color2, Hero.MainHero.MapFaction.Color, null, true, false, true);
-
-                //players is defender team
-                Mission.Current.PlayerTeam = Mission.Current.DefenderTeam;
-
-
-                //find areas of spawn
-
-                _initialSpawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
-                                       select e.GetGlobalFrame()).ToList();
-                for (int i = 0; i < _initialSpawnFrames.Count; i++)
-                {
-                    MatrixFrame value = _initialSpawnFrames[i];
-                    value.rotation.OrthonormalizeAccordingToForwardAndKeepUpAsZAxis();
-                    _initialSpawnFrames[i] = value;
-                }
-                // get a random spawn point
-                MatrixFrame randomElement = _initialSpawnFrames.GetRandomElement();
-                //remove the point so no overlap
-                _initialSpawnFrames.Remove(randomElement);
-                //find another spawn point
-                randomElement2 = randomElement;
-
-
-                // spawn an instance of the player (controlled by default)
-
-                _player = SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement, true);
-
-
-                //spawn another instance of the player, uncontroller (this should get synced when someone joins)
-                _otherAgent = SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement2, false);
-
-                otherAgentHealth = _otherAgent.Health;
-
-
-                // Our agent's pointer; set it to 0 first
-                playerPtr = UIntPtr.Zero;
-
-
-                // other agent's pointer
-                otherAgentPtr = (UIntPtr)_otherAgent.GetType().GetField("_pointer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_otherAgent);
-
-
-                // Find out agent's pointer from our agent instance
-                playerPtr = (UIntPtr)_player.GetType().GetField("_pointer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_player);
-
-
-                // set the weapons to the available weapons
-                _player.WieldInitialWeapons();
-                _otherAgent.WieldInitialWeapons();
-
-
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).RemovePhysics();
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).RemoveEnginePhysics();
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon0).SetPhysicsState(false, true);
-
-
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).RemovePhysics();
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).RemoveEnginePhysics();
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon1).SetPhysicsState(false, true);
-
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).RemovePhysics();
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).RemoveEnginePhysics();
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon2).SetPhysicsState(false, true);
-
-
-
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon3).RemovePhysics();
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon3).RemoveEnginePhysics();
-
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon4).RemovePhysics();
-                //_otherAgent.GetWeaponEntityFromEquipmentSlot(EquipmentIndex.Weapon4).RemoveEnginePhysics();
-
-
-                //// From MBAPI, get the private interface IMBAgent
-                FieldInfo IMBAgentField = typeof(MBAPI).GetField("IMBAgent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-
-                // get the set and get method of position
-                MethodInfo getPositionMethod = IMBAgentField.GetValue(null).GetType().GetMethod("GetPosition");
-                MethodInfo setPositionMethod = IMBAgentField.GetValue(null).GetType().GetMethod("SetPosition");
-
-
-                // set the delegates to the method pointers. In case Agent class isn't enough we can invoke IMAgent directly.
-                getPosition = (Func<UIntPtr, Vec3>)Delegate.CreateDelegate
-                    (typeof(Func<UIntPtr, Vec3>), IMBAgentField.GetValue(null), getPositionMethod);
-
-                setPosition = (PositionRefDelegate)Delegate.CreateDelegate(typeof(PositionRefDelegate), IMBAgentField.GetValue(null), setPositionMethod);
-
-
-
-
+                StartArenaFight();
             }
 
 
@@ -743,9 +716,6 @@ namespace CoopTestMod
                 b.InflictedDamage = 20;
                 //_player.Health = 0;
                 _otherAgent.RegisterBlow(b);
-
-
-
             }
             if (Input.IsReleased(InputKey.Numpad1))
             {
@@ -765,6 +735,11 @@ namespace CoopTestMod
                // InformationManager.DisplayMessage(new InformationMessage(_otherAgent.EventControlFlags.ToString()));
             }
 
+            if (Input.IsReleased(InputKey.Numpad9))
+            {
+                StartArenaFight();
+            }
+
             if (Input.IsReleased(InputKey.CapsLock))
             {
                 _player.UpdateSyncHealthToAllClients(true);
@@ -775,7 +750,7 @@ namespace CoopTestMod
             if (Mission.Current != null && playerPtr != UIntPtr.Zero)
             {
                 // every 0.1 tick send an update to other endpoint
-                if (t + 0.03 > Time.ApplicationTime)
+                if (t + 0.015 > Time.ApplicationTime)
                 {
                     return;
                 }
