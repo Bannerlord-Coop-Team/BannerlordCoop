@@ -540,5 +540,6 @@ deploy/**
 mb2
 mb2/**
 source/.editorconfig
+**/out
 # Rider IDE
 source/.idea
