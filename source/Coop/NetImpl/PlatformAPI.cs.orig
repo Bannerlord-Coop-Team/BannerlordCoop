@@ -1,4 +1,7 @@
-using Coop.NetImpl.Steam;
+<<<<<<< HEAD
+﻿using NLog;
+=======
+﻿using Coop.NetImpl.Steam;
 using Galaxy.Api;
 using Network.Infrastructure;
 using NLog;

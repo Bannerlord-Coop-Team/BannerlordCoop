@@ -12,7 +12,7 @@ using System.Diagnostics;
 namespace SystemTests
 {
     [TestClass]
-    public class UnitTest1
+    public class ClientServerTest
     {
         GameInstance host = new GameInstance("/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
         GameInstance client = new GameInstance("/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_");
@@ -33,8 +33,8 @@ namespace SystemTests
             environment = new TestEnvironment(instances);
         }
 
-        [TestMethod]
-        public void TestMethod1()
+            [TestMethod]
+        public void ClientServer_IsConnected_StartSession()
         {
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
             environment.OnRegistrationFinished += (instance) =>

@@ -1,0 +1,34 @@
+# This is a basic workflow to help you get started with Actions
+
+name: .NETFramework
+on:
+    push:
+      branches: [ CI ]
+
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the development branch
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    
+    - name: Checkout Code
+      uses: actions/checkout@v1
+      with:
+        submodules: recursive
+        
+    - name: Setup MSBuild Path
+      uses: microsoft/setup-msbuild@v1.0.2
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1.0.5
+
+    - name: Run Nuget Restoration  
+      run: nuget restore source/Coop.sln
+ 
+    - name: Build Mod
+      run: msbuild source/Coop.sln /p:Configuration=Release /p:PublishProfile=FolderProfile /p:SolutionDir="%cd%source/Coop/"
