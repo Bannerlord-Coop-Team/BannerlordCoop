@@ -43,6 +43,9 @@ namespace Coop.Mod.Serializers.Custom
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
                     case "<Ai>k__BackingField":
                         // PartyAi
                         // NOTE may not be needed due to player control

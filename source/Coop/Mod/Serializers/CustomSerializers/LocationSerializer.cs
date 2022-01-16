@@ -50,10 +50,10 @@ namespace Coop.Mod.Serializers.Custom
                     case "ProsperityMax":
                         prosperityMax = (int)value;
                         break;
-                    case "StringId":
+                    case "<StringId>k__BackingField":
                         stringId = (string)value;
                         break;
-                    case "IsIndoor":
+                    case "<IsIndoor>k__BackingField":
                         isIndoor = (bool)value;
                         break;
                     case "_name":
@@ -62,7 +62,7 @@ namespace Coop.Mod.Serializers.Custom
                     case "_doorName":
                         doorName = new TextObjectSerializer((TextObject)value);
                         break;
-                    case "CanBeReserved":
+                    case "<CanBeReserved>k__BackingField":
                         canBeReserved = (bool)value;
                         break;
                     case "_aiCanEnter":
@@ -86,9 +86,9 @@ namespace Coop.Mod.Serializers.Custom
                         break;
 
                     case "_characterList":
-                    case "LocationsOfPassages":
-                    case "SpecialItems":
-                    case "IsReserved":
+                    case "<LocationsOfPassages>k__BackingField":
+                    case "<SpecialItems>k__BackingField":
+                    case "<IsReserved>k__BackingField":
                     case "_overriddenName":
                     case "_overriddenDoorName":
                         // Do nothing

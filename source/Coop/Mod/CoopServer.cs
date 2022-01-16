@@ -225,6 +225,10 @@ namespace Coop.Mod
             connection.Dispatcher.RegisterPacketHandler(SendGameData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientPlayerPartyChanged);
 
+#if DEBUG
+            connection.Dispatcher.RegisterPacketHandler(ReceiveClientBadId);
+#endif
+
             // State Machine Registration
             connection.Dispatcher.RegisterStateMachine(connection, coopServerSM);
             connection.OnPlayerPartyRequest += Connection_OnPlayerPartyRequest;
@@ -308,6 +312,17 @@ namespace Coop.Mod
 
             OnServerSentWorldData?.Invoke();
         }
+
+#if DEBUG
+        [GameServerPacketHandler(ECoopServerState.SendingGameData, EPacket.BadID)]
+        private void ReceiveClientBadId(ConnectionBase connection, Packet packet)
+        {
+            GameData gameData = new GameData();
+            
+            Guid id = (Guid)CommonSerializer.Deserialize(packet.Payload);
+            object badObj = CoopObjectManager.GetObject(id);
+        }
+#endif
 
         [GameServerPacketHandler(ECoopServerState.Playing, EPacket.Client_PartyChanged)]
         private void ReceiveClientPlayerPartyChanged(ConnectionBase connection, Packet packet)

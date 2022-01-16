@@ -12,8 +12,6 @@ namespace Coop.Mod.Serializers
     {
         public Guid Guid { get; private set; }
 
-        protected CustomSerializerWithGuid() { }
-
         protected CustomSerializerWithGuid(object obj) : base(obj)
         {
             Guid = CoopObjectManager.AddObject(obj);

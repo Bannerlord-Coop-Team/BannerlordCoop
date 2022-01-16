@@ -42,9 +42,12 @@ namespace Coop.Mod.Serializers.Custom
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
-                    case "Name":
-                    case "JobName":
-                    case "Description":
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
+                    case "<Name>k__BackingField":
+                    case "<JobName>k__BackingField":
+                    case "<Description>k__BackingField":
                         SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
                         break;
                     case "_productions":

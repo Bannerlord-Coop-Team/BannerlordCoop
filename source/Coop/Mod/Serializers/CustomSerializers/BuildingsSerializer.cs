@@ -38,7 +38,7 @@ namespace Coop.Mod.Serializers.Custom
                         typeId = ((BuildingType)value).StringId;
                         break;
                     // References
-                    case "Town":
+                    case "<Town>k__BackingField":
                         references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     default:
@@ -55,7 +55,8 @@ namespace Coop.Mod.Serializers.Custom
 
         public override object Deserialize()
         {
-            newBuilding = new Building(null, null);
+            BuildingType buildingType = Campaign.Current.ObjectManager.GetObject<BuildingType>(typeId);
+            newBuilding = new Building(buildingType, null);
             return base.Deserialize(newBuilding);
         }
 

@@ -41,6 +41,9 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
                     case "_newFocuses":
                         SNNSO.Add(fieldInfo, new CharacterSkillsSerializer((CharacterSkills)value));
                         break;

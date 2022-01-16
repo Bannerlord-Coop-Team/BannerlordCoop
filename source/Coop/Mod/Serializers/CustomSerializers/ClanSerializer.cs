@@ -11,7 +11,7 @@ using TaleWorlds.ObjectSystem;
 namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    class ClanSerializer : CustomSerializerWithGuid
+    public class ClanSerializer : CustomSerializerWithGuid
     {
         [NonSerialized]
         Clan newClan;
@@ -46,6 +46,9 @@ namespace Coop.Mod.Serializers.Custom
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
                     case "<Name>k__BackingField":
                     case "<InformalName>k__BackingField":
                     case "<EncyclopediaText>k__BackingField":
@@ -76,7 +79,7 @@ namespace Coop.Mod.Serializers.Custom
                         }
                         break;
                     case "_basicTroop":
-                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+                        SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value));
                         break;
                     case "_leader":
                         // Assigned by SetHeroReference on deserialization
@@ -114,7 +117,6 @@ namespace Coop.Mod.Serializers.Custom
 
         public override object Deserialize()
         {
-
             newClan = MBObjectManager.Instance.CreateObject<Clan>();
 
             // Circular referenced objects
@@ -125,7 +127,7 @@ namespace Coop.Mod.Serializers.Custom
             {
                 entry.Key.SetValue(newClan, entry.Value.Deserialize());
             }
-            
+
             return base.Deserialize(newClan);
         }
 
@@ -135,6 +137,20 @@ namespace Coop.Mod.Serializers.Custom
             {
                 throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
             }
+
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
+            }
+
+            foreach (KeyValuePair<FieldInfo, Guid> entry in references)
+            {
+                FieldInfo field = entry.Key;
+                Guid id = entry.Value;
+
+                field.SetValue(newClan, CoopObjectManager.GetObject(id));
+            }
+
             //Deserialize the lists
             List<Hero> lCompanions= new List<Hero>();
             List<Hero> lSupporters = new List<Hero>();
@@ -150,14 +166,6 @@ namespace Coop.Mod.Serializers.Custom
             foreach (Guid commanderheroesId in CommanderHeroes)
             {
                 lCommanderHeroes.Add((Hero)CoopObjectManager.GetObject(commanderheroesId));
-            }
-
-            foreach (KeyValuePair<FieldInfo, Guid> entry in references)
-            {
-                FieldInfo field = entry.Key;
-                Guid id = entry.Value;
-
-                field.SetValue(newClan, CoopObjectManager.GetObject(id));
             }
         }
     }

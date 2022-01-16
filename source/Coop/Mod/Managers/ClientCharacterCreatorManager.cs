@@ -17,6 +17,7 @@ using TaleWorlds.Localization;
 using System.Collections.Generic;
 using Coop.Mod.Extentions;
 using Coop.Mod.Serializers;
+using SandBox;
 
 namespace Coop.Mod.Managers
 {
@@ -24,7 +25,7 @@ namespace Coop.Mod.Managers
     {
         public PlayerHeroSerializer SerializedHero { get; private set; }
     }
-    public class ClientCharacterCreatorManager : StoryModeGameManager
+    public class ClientCharacterCreatorManager : SandBoxGameManager
     {
         public ClientCharacterCreatorManager()
         {
@@ -48,8 +49,8 @@ namespace Coop.Mod.Managers
 #if DEBUG
             SkipCharacterCreation();
 #endif
-            Settlement settlement = Settlement.Find("tutorial_training_field");
-            MobileParty.MainParty.Position2D = settlement.Position2D;
+            //Settlement settlement = Settlement.Find("tutorial_training_field");
+            //MobileParty.MainParty.Position2D = settlement.Position2D;
 
             OnGameLoadFinishedEvent?.Invoke(this, new HeroEventArgs());
         }

@@ -33,6 +33,9 @@ namespace Network.Protocol
         Persistence, // Will be forwarded to the game state persistence layer.
 
         CreateObject,
+#if DEBUG
+        BadID,
+#endif
     }
 
     public static class Version

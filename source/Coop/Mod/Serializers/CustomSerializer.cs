@@ -25,7 +25,7 @@ namespace Coop.Mod.Serializers
         [NonSerialized]
         public readonly List<FieldInfo> NonSerializableObjects = new List<FieldInfo>();
         [NonSerialized]
-        public readonly List<ICollection> NonSerializableCollections = new List<ICollection>();
+        public readonly List<FieldInfo> NonSerializableCollections = new List<FieldInfo>();
 
         protected CustomSerializer() { }
 
@@ -49,7 +49,7 @@ namespace Coop.Mod.Serializers
                         // otherwise, add to NonSerializableCollections list
                         else
                         {
-                            NonSerializableCollections.Add((ICollection)field.GetValue(obj));
+                            NonSerializableCollections.Add(field);
                         }
                         
                     }
@@ -104,7 +104,17 @@ namespace Coop.Mod.Serializers
         /// <returns>FieldInfo[]</returns>
         protected FieldInfo[] GetFields()
         {
-            return ObjectType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            return GetFields(ObjectType);
+        }
+
+        private FieldInfo[] GetFields(Type ObjectType)
+        {
+            List<FieldInfo> fields = new List<FieldInfo>(ObjectType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
+            if (ObjectType.BaseType != null)
+            {
+                fields.AddRange(GetFields(ObjectType.BaseType));
+            }
+            return fields.ToArray();
         }
 
         /// <summary>
@@ -134,7 +144,7 @@ namespace Coop.Mod.Serializers
                 }
                 else
                 {
-                    return IsSerializable(elementType);
+                    result &= IsSerializable(elementType);
                 }
             }
             return result;

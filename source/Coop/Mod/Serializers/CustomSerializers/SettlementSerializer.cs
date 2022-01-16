@@ -48,6 +48,9 @@ namespace Coop.Mod.Serializers.Custom
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
                     case "_name":
                     case "<EncyclopediaText>k__BackingField":
                         SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
@@ -113,9 +116,6 @@ namespace Coop.Mod.Serializers.Custom
                         Guid[] notablesCache = _notablesCache.Select(hero => CoopObjectManager.GetGuid(hero)).ToArray();
                         arrayOfReferences.Add(fieldInfo, notablesCache);
                         break;
-
-                    
-
                     case "_settlementComponents":
                         settlementComponentsFieldInfo = fieldInfo;
                         break;
@@ -159,7 +159,12 @@ namespace Coop.Mod.Serializers.Custom
                 throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
             }
 
-            foreach(KeyValuePair<FieldInfo, Guid[]> fieldArray in arrayOfReferences)
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
+            }
+
+            foreach (KeyValuePair<FieldInfo, Guid[]> fieldArray in arrayOfReferences)
             {
                 FieldInfo field = fieldArray.Key;
                 Guid[] guids = fieldArray.Value;
@@ -185,18 +190,21 @@ namespace Coop.Mod.Serializers.Custom
                 field.SetValue(newSettlement, CoopObjectManager.GetObject(id));
             }
 
-            List<SettlementComponent> settlementComponents = (List<SettlementComponent>)settlementComponentsFieldInfo.GetValue(newSettlement);
-            if (newSettlement.Village != null)
+            if (settlementComponentsFieldInfo != null)
             {
-                settlementComponents.Add(newSettlement.Village);
-            }
-            if(newSettlement.Town != null)
-            {
-                settlementComponents.Add(newSettlement.Town);
-            }
-            if(newSettlement.Hideout != null)
-            {
-                settlementComponents.Add(newSettlement.Hideout);
+                List<SettlementComponent> settlementComponents = (List<SettlementComponent>)settlementComponentsFieldInfo.GetValue(newSettlement);
+                if (newSettlement.Village != null)
+                {
+                    settlementComponents.Add(newSettlement.Village);
+                }
+                if (newSettlement.Town != null)
+                {
+                    settlementComponents.Add(newSettlement.Town);
+                }
+                if (newSettlement.Hideout != null)
+                {
+                    settlementComponents.Add(newSettlement.Hideout);
+                }
             }
         }
     }

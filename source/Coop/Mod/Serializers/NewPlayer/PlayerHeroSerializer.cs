@@ -49,6 +49,9 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
                     case "_firstName":
 #if DEBUG
                         SNNSO.Add(fieldInfo, new TextObjectSerializer(new TextObject("Client_Player")));

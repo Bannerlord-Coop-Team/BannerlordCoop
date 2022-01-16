@@ -5,7 +5,7 @@ using System;
 namespace Coop.Mod.Serializers
 {
     [Serializable]
-    class TextObjectSerializer : ICustomSerializer
+    public class TextObjectSerializer : ICustomSerializer
     {
 
         string text;

@@ -9,8 +9,10 @@ using static TaleWorlds.CampaignSystem.Village;
 namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    public class VillageSerializer : CustomSerializer
+    public class VillageSerializer : CustomSerializerWithGuid
     {
+        [NonSerialized]
+        public Village village;
         [NonSerialized]
         Village newvillage;
 
@@ -21,9 +23,12 @@ namespace Coop.Mod.Serializers.Custom
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, Guid> references = new Dictionary<FieldInfo, Guid>();
 
         public VillageSerializer(Village village) : base(village)
         {
+            this.village = village;
+
             List<string> UnmanagedFields = new List<string>();
 
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
@@ -40,6 +45,9 @@ namespace Coop.Mod.Serializers.Custom
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
                     case "_bound":
                         bound = CoopObjectManager.GetGuid((Settlement)value);
                         break;
@@ -54,6 +62,12 @@ namespace Coop.Mod.Serializers.Custom
                         break;
                     case "_marketData":
                         SNNSO.Add(fieldInfo, new VillageMarketDataSerializer((VillageMarketData)value));
+                        break;
+                    case "_owner":
+                        SNNSO.Add(fieldInfo, new PartyBaseSerializer((PartyBase)value));
+                        break;
+                    case "_tradeBound":
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     default:
                         UnmanagedFields.Add(fieldInfo.Name);
@@ -105,6 +119,14 @@ namespace Coop.Mod.Serializers.Custom
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
                 entry.Value.ResolveReferenceGuids();
+            }
+
+            foreach (KeyValuePair<FieldInfo, Guid> entry in references)
+            {
+                FieldInfo field = entry.Key;
+                Guid id = entry.Value;
+
+                field.SetValue(newvillage, CoopObjectManager.GetObject(id));
             }
 
             newvillage.GetType()

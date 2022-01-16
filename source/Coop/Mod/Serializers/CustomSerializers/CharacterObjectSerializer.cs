@@ -4,6 +4,7 @@ using TaleWorlds.CampaignSystem;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.Localization;
 
 namespace Coop.Mod.Serializers.Custom
 {
@@ -22,6 +23,8 @@ namespace Coop.Mod.Serializers.Custom
 
         public CharacterObjectSerializer(CharacterObject characterObject) : base(characterObject)
         {
+            List<string> UnmanagedFields = new List<string>();
+
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
                 // Get value from fieldInfo
@@ -36,6 +39,26 @@ namespace Coop.Mod.Serializers.Custom
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
+
+                    case "<BodyPropertyRange>k__BackingField":
+                        // Cached object
+                        break;
+
+                    case "_culture":
+                        // TODO create serializer
+                        break;
+
+                    case "_equipmentRoster":
+                        // TODO create serializer
+                        break;
+
+                    case "_basicName":
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
+                        break;
+
                     case "_heroObject":
                         hero = CoopObjectManager.GetGuid(value);
                         break;
@@ -60,12 +83,18 @@ namespace Coop.Mod.Serializers.Custom
                         break;
 
                     default:
-                        throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
-                    
+                        UnmanagedFields.Add(fieldInfo.Name);
+                        break;
+
                 }
             }
 
             // TODO manage collections
+
+            if (!UnmanagedFields.IsEmpty())
+            {
+                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
+            }
         }
 
         public override object Deserialize()

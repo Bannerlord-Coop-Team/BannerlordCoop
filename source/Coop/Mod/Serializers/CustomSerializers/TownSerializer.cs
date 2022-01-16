@@ -1,8 +1,10 @@
-﻿using System;
+﻿using SandBox;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using static TaleWorlds.CampaignSystem.Town;
@@ -45,6 +47,9 @@ namespace Coop.Mod.Serializers.Custom
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
                     case "_name":
                         SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
                         break;
@@ -58,6 +63,33 @@ namespace Coop.Mod.Serializers.Custom
                         SNNSO.Add(fieldInfo, new PartyComponentSerializer((PartyComponent)value));
                         break;
 
+                    // References
+                    case "LastCapturedBy":
+                    case "_owner":
+                    case "_ownerClan":
+                    case "_governor":
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+                        break;
+                    default:
+                        UnmanagedFields.Add(fieldInfo);
+                        break;
+                }
+            }
+
+            foreach (FieldInfo fieldInfo in NonSerializableCollections)
+            {
+                // Get value from fieldInfo
+                object value = fieldInfo.GetValue(town);
+
+                // If value is null, no need to serialize
+                if (value == null)
+                {
+                    continue;
+                }
+
+                // Assign serializer to nonserializable objects
+                switch (fieldInfo.Name)
+                {
                     // Caches are needed as they hold existing companions and parties in settlement
                     case "Buildings":
                         buildingsField = fieldInfo;
@@ -70,17 +102,13 @@ namespace Coop.Mod.Serializers.Custom
                             .Select(building => CoopObjectManager.AddObject(building)).ToArray();
                         arrayOfReferences.Add(fieldInfo, buildingsInProgress);
                         break;
-                    case "Workshops":
+                    case "<Workshops>k__BackingField":
                         workshopsField = fieldInfo;
                         Workshop[] Workshops = (Workshop[])value;
                         workshopSerializers = Workshops.Select(workshop => new WorkshopSerializer(workshop)).ToArray();
                         break;
-
-                    // References
-                    case "LastCapturedBy":
-                    case "_ownerClan":
-                    case "_governor":
-                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+                    case "_soldItems":
+                        //TODO figure out
                         break;
                     default:
                         UnmanagedFields.Add(fieldInfo);
@@ -117,6 +145,16 @@ namespace Coop.Mod.Serializers.Custom
 
             base.Deserialize(town);
 
+            CraftingCampaignBehavior behavior = Campaign.Current.CampaignBehaviorManager.GetBehavior<CraftingCampaignBehavior>();
+            Dictionary<Town, CraftingCampaignBehavior.CraftingOrderSlots> _craftingOrders = (Dictionary<Town, CraftingCampaignBehavior.CraftingOrderSlots>)typeof(CraftingCampaignBehavior)
+                .GetField("_craftingOrders", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(behavior);
+
+            if (!_craftingOrders.ContainsKey(town))
+            {
+                _craftingOrders.Add(town, new CraftingCampaignBehavior.CraftingOrderSlots());
+            }
+
             return town;
         }
 
@@ -127,6 +165,21 @@ namespace Coop.Mod.Serializers.Custom
                 throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
             }
 
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
+            }
+
+            foreach (var building in buildingsSerializers)
+            {
+                building.ResolveReferenceGuids();
+            }
+
+            foreach (var workshop in workshopSerializers)
+            {
+                workshop.ResolveReferenceGuids();
+            }
+
             foreach (KeyValuePair<FieldInfo, Guid[]> fieldArray in arrayOfReferences)
             {
                 FieldInfo field = fieldArray.Key;
@@ -135,7 +188,8 @@ namespace Coop.Mod.Serializers.Custom
 
                 // This is insane
                 object fieldList = Activator.CreateInstance(field.FieldType);
-                MethodInfo listAdd = field.FieldType.GetMethod("Add");
+                MethodInfo listAdd = field.FieldType.GetMethod("Add") ??
+                                     field.FieldType.GetMethod("Enqueue");
 
                 foreach (object item in precast)
                 {

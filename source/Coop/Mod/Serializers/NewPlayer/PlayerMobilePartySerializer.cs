@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
@@ -39,6 +40,8 @@ namespace Coop.Mod.Serializers
         {
             stringId = mobileParty.StringId;
 
+            List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
+
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
                 // Get value from fieldInfo
@@ -53,6 +56,9 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
                     case "_currentSettlement":
                         SNNSO.Add(fieldInfo, new PlayerSettlementSerializer((Settlement)value));
                         break;
@@ -123,16 +129,17 @@ namespace Coop.Mod.Serializers
                     case "<AiBehaviorObject>k__BackingField":
                         break;
                     default:
-                        throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
+                        UnmanagedFields.Add(fieldInfo);
+                        break;
                 }
             }
 
             // TODO manage collections
 
-            // Remove non serializable objects before serialization
-            // They are marked as nonserializable in CustomSerializer but still tries to serialize???
-            NonSerializableCollections.Clear();
-            NonSerializableObjects.Clear();
+            if (!UnmanagedFields.IsEmpty())
+            {
+                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
+            }
         }
 
         /// <summary>

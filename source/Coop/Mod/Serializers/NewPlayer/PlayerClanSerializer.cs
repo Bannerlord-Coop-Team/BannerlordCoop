@@ -27,9 +27,13 @@ namespace Coop.Mod.Serializers
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
 
+        string stringId;
+
         public PlayerClanSerializer(Clan clan) : base(clan)
         {
             List<string> UnmanagedFields = new List<string>();
+
+            stringId = clan.StringId;
 
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
@@ -45,6 +49,9 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
                     case "<Name>k__BackingField":
                     case "<InformalName>k__BackingField":
                     case "<EncyclopediaText>k__BackingField":
@@ -132,8 +139,7 @@ namespace Coop.Mod.Serializers
 
         public override object Deserialize()
         {
-
-            Clan newClan = MBObjectManager.Instance.CreateObject<Clan>();
+            Clan newClan = Clan.CreateClan(stringId);
 
             // Circular referenced object needs assignment before deserialize
             if (_leader == null)

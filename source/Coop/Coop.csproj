@@ -365,7 +365,9 @@
     <Compile Include="Mod\Serializers\CustomSerializers\HideoutSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ItemCategorySerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ItemDataSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\ItemObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ItemRosterSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\KingdomDecisionSerialzer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\KingdomSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\LocationComplexSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\LocationSerializer.cs" />

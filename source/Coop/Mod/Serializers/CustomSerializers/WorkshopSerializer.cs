@@ -19,7 +19,7 @@ namespace Coop.Mod.Serializers.Custom
         readonly Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
         readonly Dictionary<FieldInfo, Guid> references = new Dictionary<FieldInfo, Guid>();
 
-        public WorkshopSerializer(Workshop workshop)
+        public WorkshopSerializer(Workshop workshop) : base(workshop)
         {
             List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
 
@@ -40,7 +40,7 @@ namespace Coop.Mod.Serializers.Custom
                     case "_customName":
                         SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
                         break;
-                    case "WorkshopType":
+                    case "<WorkshopType>k__BackingField":
                         SNNSO.Add(fieldInfo, new WorkshopTypeSerializer((WorkshopType)value));
                         break;
 

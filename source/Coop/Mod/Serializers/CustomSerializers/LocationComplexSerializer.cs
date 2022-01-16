@@ -15,11 +15,11 @@ namespace Coop.Mod.Serializers.Custom
 
         FieldInfo locationsFieldInfo;
         Dictionary<string, LocationSerializer> locations = new Dictionary<string, LocationSerializer>();
-        public LocationComplexSerializer(LocationComplex locationComplex)
+        public LocationComplexSerializer(LocationComplex locationComplex) : base(locationComplex)
         {
             List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
 
-            foreach (FieldInfo fieldInfo in NonSerializableObjects)
+            foreach (FieldInfo fieldInfo in NonSerializableCollections)
             {
                 // Get value from fieldInfo
                 object value = fieldInfo.GetValue(locationComplex);

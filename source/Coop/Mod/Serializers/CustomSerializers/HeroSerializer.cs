@@ -42,6 +42,9 @@ namespace Coop.Mod.Serializers.Custom
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
                     case "_firstName":
                     case "_name":
                     case "<EncyclopediaText>k__BackingField":

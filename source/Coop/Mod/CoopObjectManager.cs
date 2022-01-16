@@ -115,7 +115,21 @@ namespace Coop.Mod
                 return null;
             }
 
-            return Objects[id];
+            Objects.TryGetValue(id, out object obj);
+
+#if DEBUG
+            if(obj == null)
+            {
+                CoopClient.Instance.Session.Connection.Send(
+                    new Network.Protocol.Packet(
+                        Network.Protocol.EPacket.BadID, 
+                        Common.CommonSerializer.Serialize(id)) 
+                    );
+            }
+#endif
+
+
+            return obj;
         }
 
 

@@ -29,6 +29,8 @@ namespace Coop.Mod.Serializers.Custom
 
         public void ResolveReferenceGuids()
         {
+            Village village = (Village)CoopObjectManager.GetObject(this.village);
+
             if (newVillageMarketData == null)
             {
                 throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");

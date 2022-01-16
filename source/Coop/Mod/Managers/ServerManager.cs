@@ -91,15 +91,15 @@ namespace Coop.Mod.Managers
                 CoopObjectManager.AddObject(faction);
             }
 
+            foreach (Kingdom kingdom in Campaign.Current.Kingdoms)
+            {
+                CoopObjectManager.AddObject(kingdom);
+            }
+
             foreach (MobileParty party in MobileParty.All)
             {
                 CoopObjectManager.AddObject(party);
                 CoopObjectManager.AddObject(party.Party);
-            }
-
-            if (CoopObjectManager.GetGuid(mainParty) != System.Guid.Empty)
-            {
-                throw new System.Exception("WTF DUD");
             }
 
             //CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {

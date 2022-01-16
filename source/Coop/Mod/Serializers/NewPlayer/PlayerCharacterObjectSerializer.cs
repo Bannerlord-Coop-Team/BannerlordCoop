@@ -11,6 +11,7 @@ using System.IO;
 using System.Collections;
 using TaleWorlds.ObjectSystem;
 using System.Runtime.Serialization;
+using TaleWorlds.Localization;
 
 namespace Coop.Mod.Serializers
 {
@@ -47,8 +48,29 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
+
                     case "_heroObject":
                         // Assigned by SetHeroReference on deserialization
+                        break;
+
+                    case "<BodyPropertyRange>k__BackingField":
+                        // Cached object
+                        break;
+
+                    case "_culture":
+                        // TODO create serializer
+                        break;
+
+                    case "_equipmentRoster":
+                        // TODO create serializer
+                        break;
+
+
+                    case "_basicName":
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
                         break;
 
                     case "_characterTraits":
@@ -73,11 +95,11 @@ namespace Coop.Mod.Serializers
                         
 
                 }
+            }
 
-                if (!UnmanagedFields.IsEmpty())
-                {
-                    throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
-                }
+            if (!UnmanagedFields.IsEmpty())
+            {
+                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
             }
 
             // TODO manage collections
