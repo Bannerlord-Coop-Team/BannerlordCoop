@@ -97,9 +97,8 @@ namespace CoopTestMod
                 int mCacheIndex2 = BitConverter.ToInt32(bytes, 117);
                 float playerAgentHealth = BitConverter.ToSingle(bytes, 121);
 
-                int wieldedMeleeWeaponIndex = BitConverter.ToInt32(bytes, 125);
-                int wieldedOffHandWeapon = BitConverter.ToInt32(bytes, 129);
-                int wieldedRangedWeaponIndex = BitConverter.ToInt32(bytes, 133);
+                EquipmentIndex wieldedMeleeWeaponIndex = (EquipmentIndex)BitConverter.ToInt32(bytes, 125);
+                EquipmentIndex wieldedOffHandWeapon = (EquipmentIndex)BitConverter.ToInt32(bytes, 129);
 
                 //int damageTaken = BitConverter.ToInt32(bytes, 121);
 
@@ -143,7 +142,7 @@ namespace CoopTestMod
 
 
 
-                    InformationManager.DisplayMessage(new InformationMessage("OffHandWeapon: " + wieldedOffHandWeapon.ToString()));
+                    //InformationManager.DisplayMessage(new InformationMessage("OffHandWeapon: " + wieldedOffHandWeapon.ToString()));
 
 
                     //if (wieldedWeapon != Convert.ToInt32(otherAgent.WieldedWeapon.RawDataForNetwork))
@@ -152,18 +151,14 @@ namespace CoopTestMod
                     //    otherAgent.WieldNextWeapon(Agent.HandIndex.MainHand);
 
                     //}
+                    //InformationManager.DisplayMessage(new InformationMessage("wMWI: " + wieldedMeleeWeaponIndex.ToString() + " oA CUI: " + otherAgent.WieldedWeapon.CurrentUsageIndex));
 
-                    if (wieldedMeleeWeaponIndex != otherAgent.WieldedWeapon.CurrentUsageIndex)
+                    if (wieldedMeleeWeaponIndex != otherAgent.GetWieldedItemIndex(Agent.HandIndex.MainHand))
                     {
                         otherAgent.WieldNextWeapon(Agent.HandIndex.MainHand);
                     }
 
-                    if (wieldedRangedWeaponIndex != otherAgent.WieldedWeapon.GetRangedUsageIndex())
-                    {
-                        otherAgent.WieldNextWeapon(Agent.HandIndex.MainHand);
-                    }
-
-                    if (wieldedOffHandWeapon != Convert.ToInt32(otherAgent.WieldedOffhandWeapon.RawDataForNetwork))
+                    if (wieldedOffHandWeapon != otherAgent.GetWieldedItemIndex(Agent.HandIndex.OffHand))
                     {
                         otherAgent.WieldNextWeapon(Agent.HandIndex.OffHand);
                     }
@@ -559,12 +554,12 @@ namespace CoopTestMod
 
 
             // spawn an instance of the player (controlled by default)
-
             _player = SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement, true);
 
 
             //spawn another instance of the player, uncontroller (this should get synced when someone joins)
             _otherAgent = SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement2, false);
+
 
             otherAgentHealth = _otherAgent.Health;
 
@@ -584,6 +579,7 @@ namespace CoopTestMod
             // set the weapons to the available weapons
             _player.WieldInitialWeapons();
             _otherAgent.WieldInitialWeapons();
+
 
             //// From MBAPI, get the private interface IMBAgent
             FieldInfo IMBAgentField = typeof(MBAPI).GetField("IMBAgent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
@@ -776,9 +772,19 @@ namespace CoopTestMod
 
             if (Input.IsReleased(InputKey.Numpad7))
             {
-                //InformationManager.DisplayMessage(new InformationMessage("Offhand is shield: " + _player.WieldedOffhandWeapon.CurrentUsageItem.IsShield.ToString()));
-                InformationManager.DisplayMessage(new InformationMessage(_player.WieldedWeapon.CurrentUsageIndex.ToString()));
-                _player.WieldNextWeapon(Agent.HandIndex.OffHand);
+                _otherAgent.WieldNextWeapon(Agent.HandIndex.MainHand);
+            }
+
+            if (Input.IsReleased(InputKey.Numpad3))
+            {
+
+
+                _otherAgent.WieldNextWeapon(Agent.HandIndex.OffHand);
+            }
+            if (Input.IsReleased(InputKey.Numpad4))
+            {
+                InformationManager.DisplayMessage(new InformationMessage());
+                
             }
 
             if (Input.IsReleased(InputKey.CapsLock))
@@ -822,9 +828,8 @@ namespace CoopTestMod
                 float health = _player.Health;
                 Agent.ActionCodeType actionTypeCh0 =  Agent.ActionCodeType.Other;
                 Agent.ActionCodeType actionTypeCh1 =  Agent.ActionCodeType.Other;
-                int wieldedMeleeWeaponIndex = _player.WieldedWeapon.CurrentUsageIndex;
-                short wieldedOffHandWeapon = _player.WieldedOffhandWeapon.RawDataForNetwork;
-                int wieldedRangedWeaponIndex = _player.WieldedWeapon.GetRangedUsageIndex();
+                EquipmentIndex wieldedWeaponIndex = _player.GetWieldedItemIndex(Agent.HandIndex.MainHand);
+                EquipmentIndex wieldedOffHandWeapon = _player.GetWieldedItemIndex(Agent.HandIndex.OffHand);
                 
 
 
@@ -920,9 +925,8 @@ namespace CoopTestMod
                         writer.Write(mCache1.Index);
                         writer.Write(_otherAgent.Health);
 
-                        writer.Write(wieldedMeleeWeaponIndex);
-                        writer.Write(Convert.ToInt32(wieldedOffHandWeapon));
-                        writer.Write(wieldedRangedWeaponIndex);
+                        writer.Write((int)wieldedWeaponIndex);
+                        writer.Write((int)wieldedOffHandWeapon);
 
                        // writer.Write(damage);
 
