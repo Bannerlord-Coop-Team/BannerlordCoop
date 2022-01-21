@@ -51,8 +51,7 @@ namespace CoopTestMod
     
 
     public class MySubModule : MBSubModuleBase
-    {
-        
+    { 
 
         public class MessageParser
         {
@@ -99,7 +98,7 @@ namespace CoopTestMod
 
                 EquipmentIndex wieldedMeleeWeaponIndex = (EquipmentIndex)BitConverter.ToInt32(bytes, 125);
                 EquipmentIndex wieldedOffHandWeapon = (EquipmentIndex)BitConverter.ToInt32(bytes, 129);
-
+                short ShieldHealth = BitConverter.ToInt16(bytes,133);
                 //int damageTaken = BitConverter.ToInt32(bytes, 121);
 
 
@@ -139,8 +138,11 @@ namespace CoopTestMod
                         playerAgent.RegisterBlow(b);
                         
                     }
-
-
+                    MissionWeapon OffHandWeapon = playerAgent.WieldedOffhandWeapon;
+                    if (ShieldHealth != -1 && !OffHandWeapon.IsEmpty && !OffHandWeapon.Equals(MissionWeapon.Invalid) && OffHandWeapon.IsShield()&&OffHandWeapon.HitPoints>ShieldHealth)
+                    {
+                        OffHandWeapon.HitPoints = ShieldHealth;
+                    }
 
                     //InformationManager.DisplayMessage(new InformationMessage("OffHandWeapon: " + wieldedOffHandWeapon.ToString()));
 
@@ -168,6 +170,9 @@ namespace CoopTestMod
                     {
                         return;
                     }
+
+
+
                     if (otherAgent.GetPathDistanceToPoint(ref pos) > 0.3f)
                     {
                         otherAgent.TeleportToPosition(pos);
@@ -777,14 +782,12 @@ namespace CoopTestMod
 
             if (Input.IsReleased(InputKey.Numpad3))
             {
-
-
                 _otherAgent.WieldNextWeapon(Agent.HandIndex.OffHand);
             }
             if (Input.IsReleased(InputKey.Numpad4))
             {
-                InformationManager.DisplayMessage(new InformationMessage());
-                
+                InformationManager.DisplayMessage(new InformationMessage(_player.WieldedOffhandWeapon.HitPoints.ToString()));
+                InformationManager.DisplayMessage(new InformationMessage(_otherAgent.WieldedOffhandWeapon.HitPoints.ToString()));
             }
 
             if (Input.IsReleased(InputKey.CapsLock))
@@ -796,7 +799,6 @@ namespace CoopTestMod
                     InformationManager.DisplayMessage(new InformationMessage(co.Name.ToString() + " " + co.StringId.ToString()));
 
             }
-
 
             // Mission is loaded
             if (Mission.Current != null && playerPtr != UIntPtr.Zero)
@@ -830,6 +832,12 @@ namespace CoopTestMod
                 Agent.ActionCodeType actionTypeCh1 =  Agent.ActionCodeType.Other;
                 EquipmentIndex wieldedWeaponIndex = _player.GetWieldedItemIndex(Agent.HandIndex.MainHand);
                 EquipmentIndex wieldedOffHandWeapon = _player.GetWieldedItemIndex(Agent.HandIndex.OffHand);
+                short ShieldHealth = -1;
+                MissionWeapon OffHandWeapon = _otherAgent.WieldedOffhandWeapon;
+                if (!OffHandWeapon.IsEmpty&&!OffHandWeapon.Equals(MissionWeapon.Invalid)&&OffHandWeapon.IsShield())
+                {
+                    ShieldHealth = OffHandWeapon.HitPoints;
+                }
                 
 
 
@@ -847,7 +855,6 @@ namespace CoopTestMod
                     flags2 = _player.GetCurrentAnimationFlag(1);
                     actionTypeCh0 = _player.GetCurrentActionType(0);
                     actionTypeCh1 = _player.GetCurrentActionType(1);
-
 
                     if (_player.HasMount)
                     {
@@ -927,7 +934,7 @@ namespace CoopTestMod
 
                         writer.Write((int)wieldedWeaponIndex);
                         writer.Write((int)wieldedOffHandWeapon);
-
+                        writer.Write(ShieldHealth);
                        // writer.Write(damage);
 
 
