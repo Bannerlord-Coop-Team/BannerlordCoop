@@ -21,6 +21,19 @@ using HarmonyLib;
 
 namespace CoopTestMod
 {
+    struct EquipmentHitPoint
+    {
+        public bool IsShield {get; private set;} 
+        public short HitPoint { get; private set; }
+        public EquipmentIndex Index { get; private set; }
+
+        public EquipmentHitPoint(bool _isShield, short _hitPoint, EquipmentIndex _index) 
+        {
+            IsShield=_isShield;
+            HitPoint = _hitPoint;
+            Index = _index;
+        }
+    }
 
     //[Serializable]
     //public class AgentSerilizer : CustomSerializer
@@ -48,10 +61,10 @@ namespace CoopTestMod
     //    }
     //}
 
-    
+
 
     public class MySubModule : MBSubModuleBase
-    { 
+    {
 
         public class MessageParser
         {
@@ -98,7 +111,19 @@ namespace CoopTestMod
 
                 EquipmentIndex wieldedMeleeWeaponIndex = (EquipmentIndex)BitConverter.ToInt32(bytes, 125);
                 EquipmentIndex wieldedOffHandWeapon = (EquipmentIndex)BitConverter.ToInt32(bytes, 129);
-                short ShieldHealth = BitConverter.ToInt16(bytes,133);
+                EquipmentHitPoint[] HitPoints = new EquipmentHitPoint[4];
+                if (playerAgent != null)
+                {
+                    for (int i = 0; i < 4; i++)
+                    {
+                        EquipmentIndex Index = (EquipmentIndex)BitConverter.ToInt32(bytes, 133 + i * 4 + i * 2);
+                        short ShieldHealth = BitConverter.ToInt16(bytes, 137 + i * 4 + i * 2);
+                        HitPoints[i] = new EquipmentHitPoint(playerAgent.Equipment[Index].IsShield(), ShieldHealth, Index);
+                    }
+                }
+                //Next StartIndex: 157
+
+
                 //int damageTaken = BitConverter.ToInt32(bytes, 121);
 
 
@@ -131,20 +156,20 @@ namespace CoopTestMod
                         currentId = packetId;
                     }
                     //InformationManager.DisplayMessage(new InformationMessage("Processed ID: " + currentId.ToString()));
-                    if(playerAgentHealth < playerAgent.Health)
+                    if (playerAgentHealth < playerAgent.Health)
                     {
                         Blow b = new Blow(otherAgent.Index);
                         b.InflictedDamage = (int)(playerAgent.Health - playerAgentHealth);
                         playerAgent.RegisterBlow(b);
-                        
-                    }
-                    MissionWeapon OffHandWeapon = playerAgent.WieldedOffhandWeapon;
-                    if (ShieldHealth != -1 && !OffHandWeapon.IsEmpty && !OffHandWeapon.Equals(MissionWeapon.Invalid) && OffHandWeapon.IsShield()&&OffHandWeapon.HitPoints>ShieldHealth)
-                    {
-                        playerAgent.ChangeWeaponHitPoints(playerAgent.GetWieldedItemIndex(Agent.HandIndex.OffHand), ShieldHealth);
-                        
+
                     }
 
+                    for (int i = 0; i < 4; i++)
+                    { 
+                    }
+                    foreach (EquipmentHitPoint HitPoint in HitPoints)
+                        if (HitPoint.IsShield && playerAgent.Equipment[HitPoint.Index].HitPoints > HitPoint.HitPoint)
+                            playerAgent.ChangeWeaponHitPoints(HitPoint.Index, HitPoint.HitPoint);
                     //InformationManager.DisplayMessage(new InformationMessage("OffHandWeapon: " + wieldedOffHandWeapon.ToString()));
 
 
@@ -232,7 +257,7 @@ namespace CoopTestMod
                     {
                         string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
                         otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
-                        
+
                     }
                     else
                     {
@@ -241,7 +266,7 @@ namespace CoopTestMod
                     otherAgent.MovementFlags = 0U;
 
                     if ((int)ch1 >= (int)Agent.ActionCodeType.DefendAllBegin && (int)ch1 <= (int)Agent.ActionCodeType.DefendAllEnd)
-                        
+
                     {
                         otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
                         return;
@@ -286,7 +311,7 @@ namespace CoopTestMod
                     //        otherAgent.MakeDead(true, otherAgent.GetCurrentAction(1)); //Which action do we require or what does it do?
                     //    }
                     //}
-                    
+
 
                     //if (eventFlag != 0)
                     //{
@@ -318,7 +343,7 @@ namespace CoopTestMod
                     //otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
                     //otherAgent.AttackDirectionToMovementFlag(direction);
                     //otherAgent.DefendDirectionToMovementFlag(direction);
-                    
+
                     // otherAgent.EnforceShieldUsage(direction);
                     //InformationManager.DisplayMessage(new InformationMessage("Received: " + ((Agent.EventControlFlag)eventFlag).ToString()));
 
@@ -326,7 +351,7 @@ namespace CoopTestMod
 
                     //InformationManager.DisplayMessage(new InformationMessage("Received : X: " +  lookDirectionX + " Y: " + lookDirectionY + " | Z: " + lookDirectionZ));
 
-                    
+
 
                     //InformationManager.DisplayMessage(new InformationMessage("Receiving: " + ((Agent.EventControlFlag)eventFlag).ToString()));
 
@@ -399,8 +424,8 @@ namespace CoopTestMod
 
         public void initSockets(string ipAddress, int sendPort, int recvPort)
         {
-             sender = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-             receiver = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            sender = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            receiver = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
 
             receiver.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.ReuseAddress, true);
             receiver.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), recvPort));
@@ -421,7 +446,7 @@ namespace CoopTestMod
             try
             {
 
-                
+
 
                 // Incoming data from the client.
 
@@ -478,9 +503,9 @@ namespace CoopTestMod
                     int bytesRec = receiver.ReceiveFrom(bytes, ref epFrom);
                     messageParser.parseMessage(bytes, _otherAgent, _player, ref currentId, ref otherAgentHealth);
                 }
-              
+
             }
-            catch(Exception e)
+            catch (Exception e)
             {
 
             }
@@ -620,9 +645,9 @@ namespace CoopTestMod
             }
             else
             {
-                
+
                 agent.Controller = Agent.ControllerType.None;
-                
+
             }
 
             return agent;
@@ -679,7 +704,7 @@ namespace CoopTestMod
 
             if (Input.IsKeyReleased(InputKey.Slash))
             {
-                
+
                 //FieldInfo IMBNetwork = typeof(MBAPI).GetField("IMBNetwork", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
 
 
@@ -693,14 +718,14 @@ namespace CoopTestMod
                         FieldInfo IMBAgentField = typeof(GameNetwork).GetField("IMBAgent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
                         MethodInfo method2 = typeof(GameNetwork).GetMethod("PreStartMultiplayerOnServer", BindingFlags.Static | BindingFlags.NonPublic);
                         MethodInfo method = typeof(GameNetwork).GetMethod("InitializeServerSide", BindingFlags.Static | BindingFlags.NonPublic);
-                       
+
                         if (method != null)
                         {
                             //MBCommon.CurrentGameType = (GameNetwork.IsDedicatedServer ? MBCommon.GameType.MultiServer : MBCommon.GameType.MultiClientServer);
                             GameNetwork.ClientPeerIndex = -1;
-                            
-                            
-                            method.Invoke(null, new object[] { 15801});
+
+
+                            method.Invoke(null, new object[] { 15801 });
                             //GameNetwork.StartMultiplayerOnClient("127.0.0.1", 15801, 1, 1);
                             //BannerlordNetwork.StartMultiplayerLobbyMission(LobbyMissionType.Custom);
                         }
@@ -708,7 +733,7 @@ namespace CoopTestMod
                         {
                             InformationManager.DisplayMessage(new InformationMessage("Not found!"));
                         }
-                        
+
                         //GameNetwork.StartMultiplayerOnServer(15801);
                     }
                     catch (Exception ex)
@@ -741,8 +766,8 @@ namespace CoopTestMod
                 b.InflictedDamage = 20;
                 //_player.Health = 0;
                 _player.RegisterBlow(b);
-                
-                
+
+
 
             }
             if (Input.IsKeyReleased(InputKey.Numpad6))
@@ -757,7 +782,7 @@ namespace CoopTestMod
             {
                 //_player.SetAIBehaviorParams(HumanAIComponent.AISimpleBehaviorKind.AttackEntityMelee, 1f, 1f, 1f, 1f, 1f);
                 // _player.SetActionChannel(1, ActionIndexCache.Create("act_defend_shield_up_1h_passive_down"), ignorePriority: true, 0);
-                 InformationManager.DisplayMessage(new InformationMessage("Crouching?"));
+                InformationManager.DisplayMessage(new InformationMessage("Crouching?"));
                 _otherAgent.EventControlFlags = Agent.EventControlFlag.Crouch;
                 //InformationManager.DisplayMessage(new InformationMessage(_otherAgent.EventControlFlags.ToString()));
             }
@@ -768,7 +793,7 @@ namespace CoopTestMod
                 // _player.SetActionChannel(1, ActionIndexCache.Create("act_defend_shield_up_1h_passive_down"), ignorePriority: true, 0);
                 InformationManager.DisplayMessage(new InformationMessage("Crouching?"));
                 _otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
-               // InformationManager.DisplayMessage(new InformationMessage(_otherAgent.EventControlFlags.ToString()));
+                // InformationManager.DisplayMessage(new InformationMessage(_otherAgent.EventControlFlags.ToString()));
             }
 
             if (Input.IsReleased(InputKey.Numpad9))
@@ -821,25 +846,24 @@ namespace CoopTestMod
                 uint eventFlag = (uint)_player.EventControlFlags;
                 Vec2 movementDirection = _player.GetMovementDirection();
                 Vec2 inputVector = _player.MovementInputVector;
-                ActionIndexCache cache1 =  ActionIndexCache.act_none;
-                float progress1 =  0f;
+                ActionIndexCache cache1 = ActionIndexCache.act_none;
+                float progress1 = 0f;
                 AnimFlags flags1 = 0;
-                ActionIndexCache cache2 =  ActionIndexCache.act_none;
+                ActionIndexCache cache2 = ActionIndexCache.act_none;
                 float progress2 = 0f;
-                AnimFlags flags2 =  0;
+                AnimFlags flags2 = 0;
                 Vec3 lookDirection = _player.LookDirection;
                 float health = _player.Health;
-                Agent.ActionCodeType actionTypeCh0 =  Agent.ActionCodeType.Other;
-                Agent.ActionCodeType actionTypeCh1 =  Agent.ActionCodeType.Other;
+                Agent.ActionCodeType actionTypeCh0 = Agent.ActionCodeType.Other;
+                Agent.ActionCodeType actionTypeCh1 = Agent.ActionCodeType.Other;
                 EquipmentIndex wieldedWeaponIndex = _player.GetWieldedItemIndex(Agent.HandIndex.MainHand);
                 EquipmentIndex wieldedOffHandWeapon = _player.GetWieldedItemIndex(Agent.HandIndex.OffHand);
-                short ShieldHealth = -1;
-                MissionWeapon OffHandWeapon = _otherAgent.WieldedOffhandWeapon;
-                if (!OffHandWeapon.IsEmpty&&!OffHandWeapon.Equals(MissionWeapon.Invalid)&&OffHandWeapon.IsShield())
+                EquipmentHitPoint[] HitPoints = new EquipmentHitPoint[4];
+                for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.Weapon4; equipmentIndex++)
                 {
-                    ShieldHealth = OffHandWeapon.HitPoints;
+                    HitPoints[(int)equipmentIndex] = new EquipmentHitPoint(_otherAgent.Equipment[equipmentIndex].IsShield(), _otherAgent.Equipment[equipmentIndex].HitPoints, equipmentIndex);
                 }
-                
+
 
 
                 //int damage = MissionOnAgentHitPatch.DamageDone;
@@ -848,10 +872,10 @@ namespace CoopTestMod
 
                 if (_player.Health > 0f)
                 {
-                    cache1 =  _player.GetCurrentAction(0);
-                    progress1 =  _player.GetCurrentActionProgress(0);
-                    flags1 =  _player.GetCurrentAnimationFlag(0);
-                    cache2 =  _player.GetCurrentAction(1);
+                    cache1 = _player.GetCurrentAction(0);
+                    progress1 = _player.GetCurrentActionProgress(0);
+                    flags1 = _player.GetCurrentAnimationFlag(0);
+                    cache2 = _player.GetCurrentAction(1);
                     progress2 = _player.GetCurrentActionProgress(1);
                     flags2 = _player.GetCurrentAnimationFlag(1);
                     actionTypeCh0 = _player.GetCurrentActionType(0);
@@ -935,8 +959,12 @@ namespace CoopTestMod
 
                         writer.Write((int)wieldedWeaponIndex);
                         writer.Write((int)wieldedOffHandWeapon);
-                        writer.Write(ShieldHealth);
-                       // writer.Write(damage);
+                        for (int i = 0; i < 4; i++)
+                        {
+                            writer.Write((int)HitPoints[i].Index);
+                            writer.Write(HitPoints[i].HitPoint);
+                        }
+                        // writer.Write(damage);
 
 
                         //writer.Write(targetPosition.x);
@@ -955,12 +983,5 @@ namespace CoopTestMod
             }
 
         }
-
-
-
-
-
-
-
     }
 }
