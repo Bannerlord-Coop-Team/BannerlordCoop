@@ -141,7 +141,8 @@ namespace CoopTestMod
                     MissionWeapon OffHandWeapon = playerAgent.WieldedOffhandWeapon;
                     if (ShieldHealth != -1 && !OffHandWeapon.IsEmpty && !OffHandWeapon.Equals(MissionWeapon.Invalid) && OffHandWeapon.IsShield()&&OffHandWeapon.HitPoints>ShieldHealth)
                     {
-                        OffHandWeapon.HitPoints = ShieldHealth;
+                        playerAgent.ChangeWeaponHitPoints(playerAgent.GetWieldedItemIndex(Agent.HandIndex.OffHand), ShieldHealth);
+                        
                     }
 
                     //InformationManager.DisplayMessage(new InformationMessage("OffHandWeapon: " + wieldedOffHandWeapon.ToString()));
