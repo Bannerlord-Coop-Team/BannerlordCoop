@@ -163,13 +163,14 @@ namespace CoopTestMod
                         playerAgent.RegisterBlow(b);
 
                     }
-
-                    for (int i = 0; i < 4; i++)
-                    { 
-                    }
+                    //We are going through the EquipmentSlots and change the HitPoint if it's damaged and there is a shield in the slot.
                     foreach (EquipmentHitPoint HitPoint in HitPoints)
                         if (HitPoint.IsShield && playerAgent.Equipment[HitPoint.Index].HitPoints > HitPoint.HitPoint)
+                        { 
                             playerAgent.ChangeWeaponHitPoints(HitPoint.Index, HitPoint.HitPoint);
+                            if (HitPoint.HitPoint == 0)
+                                playerAgent.RemoveEquippedWeapon(HitPoint.Index);
+                        }
                     //InformationManager.DisplayMessage(new InformationMessage("OffHandWeapon: " + wieldedOffHandWeapon.ToString()));
 
 
