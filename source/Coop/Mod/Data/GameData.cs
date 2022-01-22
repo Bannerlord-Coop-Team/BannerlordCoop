@@ -18,11 +18,6 @@ namespace Coop.Mod.Data
 
         public bool RequiresCharacterCreation => !Coop.IsServer;
 
-        //CharacterObjectSerializer[] characterObjects;
-        //ClanSerializer[] clans;
-
-        // TODO 
-        //KingdomSerializer[] kingdoms;
         public SettlementSerializer[] settlements;
         public TownSerializer[] towns;
         public VillageSerializer[] villages;
@@ -52,6 +47,7 @@ namespace Coop.Mod.Data
 
         public void Unpack()
         {
+            // Deserialize everything
             foreach (var settlement in settlements)
             {
                 settlement.Deserialize();
@@ -66,8 +62,7 @@ namespace Coop.Mod.Data
             {
                 village.Deserialize();
             }
-
-            // Deserialize everything
+            
             foreach (var hero in heros)
             {
                 hero.Deserialize();

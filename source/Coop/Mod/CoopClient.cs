@@ -28,6 +28,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
+using System.Reflection;
 using Logger = NLog.Logger;
 
 namespace Coop.Mod
@@ -226,18 +227,7 @@ namespace Coop.Mod
                 gameManager = new ClientCharacterCreatorManager();
                 MBGameManager.StartNewGame(gameManager);
 
-                ClientCharacterCreatorManager.OnGameLoadFinishedEvent += (object source, EventArgs e) =>
-                {
-                    if(e is HeroEventArgs args)
-                    {
-                        CharacterCreationOver();
-                    }
-                    else
-                    {
-                        throw new Exception("EventArgs not of type HeroEventArgs");
-                    }
-                    
-                };
+                ClientCharacterCreatorManager.OnCharacterCreationFinishedEvent += CharacterCreationOver;
             }
         }
 

@@ -32,7 +32,7 @@ namespace Coop.Mod.Managers
         }
 
         public delegate void OnLoadFinishedEventHandler(object source, EventArgs e);
-        public static event OnLoadFinishedEventHandler OnCharacterCreationLoadFinishedEvent;
+        public static event Action OnCharacterCreationFinishedEvent;
         public static event OnLoadFinishedEventHandler OnGameLoadFinishedEvent;
 
         public MobileParty ClientParty { get; private set; }
@@ -44,7 +44,7 @@ namespace Coop.Mod.Managers
         {
             base.OnLoadFinished();
 
-            OnCharacterCreationLoadFinishedEvent?.Invoke(this, EventArgs.Empty);
+            CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, () => { OnCharacterCreationFinishedEvent?.Invoke(); });
 
 #if DEBUG
             SkipCharacterCreation();
