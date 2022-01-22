@@ -18,7 +18,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>..\..\..\..\..\Programok\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\CoopTestMod\bin\Win64_Shipping_Client\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -226,6 +226,7 @@
   <ItemGroup>
     <Compile Include="CustomGameNetworkHandler.cs" />
     <Compile Include="CustomSandboxGame.cs" />
+    <Compile Include="IOCreateMissile.cs" />
     <Compile Include="MySubModule.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

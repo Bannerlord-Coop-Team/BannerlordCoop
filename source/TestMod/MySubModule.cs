@@ -18,6 +18,9 @@ using System.Threading;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.MountAndBlade.Diamond;
 using HarmonyLib;
+using NetworkMessages.FromServer;
+using TaleWorlds.MountAndBlade.ComponentInterfaces;
+using SandBox;
 
 namespace CoopTestMod
 {
@@ -34,6 +37,7 @@ namespace CoopTestMod
             Index = _index;
         }
     }
+
 
     //[Serializable]
     //public class AgentSerilizer : CustomSerializer
@@ -122,6 +126,10 @@ namespace CoopTestMod
                     }
                 }
                 //Next StartIndex: 157
+                bool EnemyAgentShot = BitConverter.ToBoolean(bytes, 157);
+                CreateMissile message = null;
+                if (EnemyAgentShot)
+                    message = IOCreateMissile.Read(bytes,otherAgent,158);
 
 
                 //int damageTaken = BitConverter.ToInt32(bytes, 121);
@@ -166,11 +174,19 @@ namespace CoopTestMod
                     //We are going through the EquipmentSlots and change the HitPoint if it's damaged and there is a shield in the slot.
                     foreach (EquipmentHitPoint HitPoint in HitPoints)
                         if (HitPoint.IsShield && playerAgent.Equipment[HitPoint.Index].HitPoints > HitPoint.HitPoint)
-                        { 
+                        {
                             playerAgent.ChangeWeaponHitPoints(HitPoint.Index, HitPoint.HitPoint);
                             if (HitPoint.HitPoint == 0)
                                 playerAgent.RemoveEquippedWeapon(HitPoint.Index);
                         }
+
+                    if (message != null)
+                    {
+                        Vec3 velocity = message.Direction * message.Speed;
+                        OnAgentShootMissileMethod.Invoke(Mission.Current,new object[] { message.Agent, message.WeaponIndex, message.Position, velocity, message.Orientation, message.HasRigidBody, message.IsPrimaryWeaponShot, message.MissileIndex });
+                    }
+                    
+                    
                     //InformationManager.DisplayMessage(new InformationMessage("OffHandWeapon: " + wieldedOffHandWeapon.ToString()));
 
 
@@ -380,6 +396,7 @@ namespace CoopTestMod
         private UIntPtr playerPtr;
         private UIntPtr otherAgentPtr;
         private const int bufSize = 1024;
+        private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile",BindingFlags.NonPublic|BindingFlags.Instance);
 
         Func<UIntPtr, Vec3> getPosition;
         PositionRefDelegate setPosition;
@@ -403,6 +420,9 @@ namespace CoopTestMod
 
         private float otherAgentHealth = 0;
 
+        public static bool MyAgentShot = false;
+
+        public static object MyAgent { get; private set; }
 
         // custom delegate is needed since SetPosition uses a ref Vec3
         delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
@@ -587,6 +607,7 @@ namespace CoopTestMod
 
             // spawn an instance of the player (controlled by default)
             _player = SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement, true);
+            MyAgent = _player;
 
 
             //spawn another instance of the player, uncontroller (this should get synced when someone joins)
@@ -637,7 +658,8 @@ namespace CoopTestMod
             agentBuildData2 = agentBuildData.Team(isMain ? Mission.Current.PlayerTeam : Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
-            Agent agent = mission.SpawnAgent(agentBuildData2.InitialDirection(vec).NoHorses(true).Equipment(CharacterObject.Find("conspiracy_guardian").Equipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);
+            Agent agent = mission.SpawnAgent(agentBuildData2.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);                             //this spawns an archer
+            //Agent agent = mission.SpawnAgent(agentBuildData2.InitialDirection(vec).NoHorses(true).Equipment(CharacterObject.Find("conspiracy_guardian").Equipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);    //this spawns a spearman
             agent.FadeIn();
             if (isMain)
             {
@@ -670,6 +692,43 @@ namespace CoopTestMod
             {
                 InformationManager.DisplayMessage(new InformationMessage(damage.ToString()));
                 damageDone = damage;
+            }
+        }
+
+        [HarmonyPatch(typeof(SandboxAgentApplyDamageModel), "CalculateEffectiveMissileSpeed")]
+        public class CalculateEffectiveMissileSpeedPatch
+        {
+            public static void Postfix(float __result)
+            {
+                OnAgentShootMissilePatch.num = __result;
+            }
+        }
+
+        [HarmonyPatch(typeof(Mission), "AddMissileAux")]
+        public class AddMissileAuxPatch
+        {
+            public static void Postfix(int __result,Vec3 direction)
+            {
+                OnAgentShootMissilePatch.num3 = __result;
+                OnAgentShootMissilePatch.direction= direction;
+            }
+        }
+
+        [HarmonyPatch(typeof(Mission), "OnAgentShootMissile")]
+        public class OnAgentShootMissilePatch
+        {
+            public static CreateMissile Message;
+            public static int num3;
+            public static Vec3 direction;
+            public static float num;
+            public static void Postfix(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity,
+                Mat3 orientation, bool hasRigidBody, bool isPrimaryWeaponShot, int forcedMissileIndex)
+            {
+                if (shooterAgent.Equals(MySubModule.MyAgent))
+                {
+                    MySubModule.MyAgentShot = true;
+                    Message= new CreateMissile(num3, shooterAgent, weaponIndex, MissionWeapon.Invalid, position, direction, num, orientation, hasRigidBody, null, isPrimaryWeaponShot);
+                }
             }
         }
 
@@ -865,8 +924,6 @@ namespace CoopTestMod
                     HitPoints[(int)equipmentIndex] = new EquipmentHitPoint(_otherAgent.Equipment[equipmentIndex].IsShield(), _otherAgent.Equipment[equipmentIndex].HitPoints, equipmentIndex);
                 }
 
-
-
                 //int damage = MissionOnAgentHitPatch.DamageDone;
                 mCache1 = ActionIndexCache.act_none;
 
@@ -965,14 +1022,20 @@ namespace CoopTestMod
                             writer.Write((int)HitPoints[i].Index);
                             writer.Write(HitPoints[i].HitPoint);
                         }
+                        writer.Write(MyAgentShot);
+                        if (MyAgentShot)
+                        {
+                            IOCreateMissile.Write(writer,OnAgentShootMissilePatch.Message);
+                            MyAgentShot = false;
+                        }
                         // writer.Write(damage);
 
 
-                        //writer.Write(targetPosition.x);
-                        //writer.Write(targetPosition.y);
-                        //writer.Write(targetDirection.x);
-                        //writer.Write(targetDirection.y);
-                        //writer.Write(targetDirection.z);
+                            //writer.Write(targetPosition.x);
+                            //writer.Write(targetPosition.y);
+                            //writer.Write(targetDirection.x);
+                            //writer.Write(targetDirection.y);
+                            //writer.Write(targetDirection.z);
                     }
                     byte[] bytes = stream.ToArray();
                     if (sender != null && sender.Connected)
