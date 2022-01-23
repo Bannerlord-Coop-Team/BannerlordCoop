@@ -202,7 +202,7 @@ namespace CoopTestMod
 
                     if (wieldedMeleeWeaponIndex != otherAgent.GetWieldedItemIndex(Agent.HandIndex.MainHand))
                     {
-                        otherAgent.SetWieldedItemIndexAsClient(Agent.HandIndex.MainHand, wieldedMeleeWeaponIndex, false, false, otherAgent.WieldedOffhandWeapon.CurrentUsageIndex);                    
+                        otherAgent.SetWieldedItemIndexAsClient(Agent.HandIndex.MainHand, wieldedMeleeWeaponIndex, false, false, otherAgent.WieldedWeapon.CurrentUsageIndex);                    
                     }
 
                     if (wieldedOffHandWeapon != otherAgent.GetWieldedItemIndex(Agent.HandIndex.OffHand))
