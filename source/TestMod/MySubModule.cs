@@ -198,22 +198,16 @@ namespace CoopTestMod
                     //}
                     //InformationManager.DisplayMessage(new InformationMessage("wMWI: " + wieldedMeleeWeaponIndex.ToString() + " oA CUI: " + otherAgent.WieldedWeapon.CurrentUsageIndex));
 
-                    if (wieldedMeleeWeaponIndex == EquipmentIndex.None)
+
+
+                    if (wieldedMeleeWeaponIndex != otherAgent.GetWieldedItemIndex(Agent.HandIndex.MainHand))
                     {
-                        otherAgent.SetWieldedItemIndexAsClient(Agent.HandIndex.MainHand, EquipmentIndex.None, false, false, otherAgent.WieldedWeapon.CurrentUsageIndex);
-                    }
-                    else if (wieldedMeleeWeaponIndex != otherAgent.GetWieldedItemIndex(Agent.HandIndex.MainHand))
-                    {
-                        otherAgent.WieldNextWeapon(Agent.HandIndex.MainHand);                        
+                        otherAgent.SetWieldedItemIndexAsClient(Agent.HandIndex.MainHand, wieldedMeleeWeaponIndex, false, false, otherAgent.WieldedOffhandWeapon.CurrentUsageIndex);                    
                     }
 
-                    if (wieldedOffHandWeapon == EquipmentIndex.None)
+                    if (wieldedOffHandWeapon != otherAgent.GetWieldedItemIndex(Agent.HandIndex.OffHand))
                     {
-                        otherAgent.SetWieldedItemIndexAsClient(Agent.HandIndex.OffHand, EquipmentIndex.None, false, false, otherAgent.WieldedOffhandWeapon.CurrentUsageIndex);
-                    }
-                    else if (wieldedOffHandWeapon != otherAgent.GetWieldedItemIndex(Agent.HandIndex.OffHand))
-                    {
-                        otherAgent.WieldNextWeapon(Agent.HandIndex.OffHand);
+                        otherAgent.SetWieldedItemIndexAsClient(Agent.HandIndex.OffHand, wieldedOffHandWeapon, false, false, otherAgent.WieldedOffhandWeapon.CurrentUsageIndex);
                     }
 
 
