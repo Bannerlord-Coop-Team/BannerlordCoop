@@ -251,8 +251,11 @@ namespace CoopTestMod
                     {
                         otherAgent.EventControlFlags |= Agent.EventControlFlag.Mount;
                     }
-
-
+                    if (eventFlag == 0x400u)
+                    {
+                        InformationManager.DisplayMessage(new InformationMessage("Toggled"));
+                        otherAgent.EventControlFlags |= Agent.EventControlFlag.ToggleAlternativeWeapon;
+                    }
 
 
                     if (otherAgent.HasMount)
