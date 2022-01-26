@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
@@ -15,14 +16,19 @@ using Network.Infrastructure;
 using NLog;
 using NLog.Layouts;
 using NLog.Targets;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.SaveSystem;
 using TaleWorlds.Engine.Screens;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Missions;
+using static TaleWorlds.CampaignSystem.GameMenus.GameMenu;
+using static TaleWorlds.CampaignSystem.Overlay.GameOverlays;
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
 
@@ -39,7 +45,7 @@ namespace Coop.Mod
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
-#region MainMenuButtons
+        #region MainMenuButtons
         public static InitialStateOption CoopCampaign =
             new InitialStateOption(
                 "CoOp Campaign",
@@ -72,7 +78,7 @@ namespace Coop.Mod
                             new object[] { }));
 #endif
                 },
-                () => { return false; }
+                () => { return (false, new TextObject()); }
             );
 
         public static InitialStateOption JoinCoopGame =
@@ -81,12 +87,13 @@ namespace Coop.Mod
               new TextObject("Join Co-op Campaign"),
               9991,
               JoinWindow,
-              () => { return false; }
+              () => { return (false, new TextObject()); }
             );
-#endregion
+        #endregion
 
         public Main()
         {
+
             Debug.DebugManager = Debugging.DebugManager;
             MBDebug.DisableLogging = false;
 
@@ -131,58 +138,117 @@ namespace Coop.Mod
             // Apply all patches via harmony
             harmony.PatchAll();
 
-#region ButtonAssignment
-            CoopCampaign =
-                new InitialStateOption(
-                    "CoOp Campaign",
-                    new TextObject("Host Co-op Campaign"),
-                    9990,
-                    () =>
-                    {
-                        string[] array = Utilities.GetFullCommandLineString().Split(' ');
+            var isServer = false;
+
+            var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
 
 
 #if DEBUG
-                        
-                        foreach (string argument in array)
-                        {
-                            if (argument.ToLower() == "/server")
-                            {
-                                ClientServerModeMessage = "Started Bannerlord Co-op in server mode";
-                                //TODO add name to args
-                                CoopServer.Instance.StartGame("MP");
-                            }
-                            else if (argument.ToLower() == "/client")
-                            {
-                                ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
-                                ServerConfiguration defaultConfiguration =
-                                    new ServerConfiguration();
-                                CoopClient.Instance.Connect(
-                                    defaultConfiguration.NetworkConfiguration.LanAddress,
-                                    defaultConfiguration.NetworkConfiguration.LanPort);
-                            }
-                        }
+
+
+            if (args.Contains("/server"))
+            {
+                isServer = true;
+                //TODO add name to args
+                
+            }
+            else if (args.Contains("/client"))
+            {
+                isServer = false;
+            }
+
 #else
                         ScreenManager.PushScreen(
                             ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
                                 new object[] { }));
 #endif
-                    },
-                    () => { return false; });
+            #region ButtonAssignment
+            CoopCampaign =
+                new InitialStateOption(
+                    "CoOp Campaign",
+                    new TextObject(isServer ? "Host Co-op Campaign" : "Join Co-op Campaign"),
+                    9990,
+                    () =>
+                    {
+                        string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
+                        var saveGames = new List<InquiryElement>();
+                        saveGames.Clear();
+
+                        InquiryElement HostNewGameElement = new InquiryElement("Host_New_Game", "Host New Game", new ImageIdentifier(ImageIdentifierType.Null));
+                        saveGames.Add(HostNewGameElement);
+
+                        foreach (PlatformFilePath saveGameFilePath in FileHelper.GetFiles(FilePaths.SavePath, "*.sav"))
+                        {
+                            InquiryElement saveInquiryElement = new InquiryElement(saveGameFilePath.GetFileNameWithoutExtension(), saveGameFilePath.GetFileNameWithoutExtension(), new ImageIdentifier(ImageIdentifierType.Null));
+                            saveGames.Add(saveInquiryElement);
+                        }
+#if DEBUG
+                        InformationManager.ShowInquiry(new InquiryData("Co-op Campaign", String.Empty, true, true, "Host", "Join", () =>
+                        {
+                            //Host Game
+                            InformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Co-op Campaign", String.Empty, saveGames, true, 1, "Continue", "Cancel",
+                            new Action<List<InquiryElement>>(OnSelectCoopSaveGame), new Action<List<InquiryElement>>(OnCancelCoopSaveGame)
+                        ));
+                        }, () => 
+                        {
+                            //Join Game
+                            ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
+                            ServerConfiguration defaultConfiguration =
+                                new ServerConfiguration();
+                            CoopClient.Instance.Connect(
+                                defaultConfiguration.NetworkConfiguration.LanAddress,
+                                defaultConfiguration.NetworkConfiguration.LanPort);
+
+                        }, ""
+                        ));
+
+#else
+                        ScreenManager.PushScreen(
+                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                                new object[] { }));
+#endif
+        },
+
+                    () => { return (false, new TextObject()); }
+                );
+        
             JoinCoopGame =
                 new InitialStateOption(
                   "Join Coop Game",
                   new TextObject("Join Co-op Campaign"),
                   9991,
                   JoinWindow,
-                  () => { return false; }
+              () => { return (false, new TextObject()); }
                 );
 
             Module.CurrentModule.AddInitialStateOption(CoopCampaign);
 
-            Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
-#endregion
+            //Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
+            #endregion
+        }
+
+        private static void OnSelectCoopSaveGame(List<InquiryElement> types)
+        {
+            var typeIdentifier = types.First().Identifier;
+
+            if (typeIdentifier.ToString() == "Host_New_Game")
+            {
+                ClientServerModeMessage = "Started Bannerlord Co-op in server mode";
+                //TODO add name to args
+                //Create new save file instead of using MP
+                CoopServer.Instance.StartGame("MP");
+            }
+            else
+            {
+                CoopServer.Instance.StartGame(typeIdentifier.ToString());
+            }
+                    
+        }
+
+        private static void OnCancelCoopSaveGame(List<InquiryElement> types)
+        {
+
         }
 
         protected override void OnSubModuleUnloaded()
@@ -247,7 +313,7 @@ namespace Coop.Mod
 
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            Exception ex = (Exception) e.ExceptionObject;
+            Exception ex = (Exception)e.ExceptionObject;
             Logger.Fatal(ex, "Unhandled exception");
         }
 
