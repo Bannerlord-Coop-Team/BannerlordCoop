@@ -31,6 +31,7 @@ using static TaleWorlds.CampaignSystem.GameMenus.GameMenu;
 using static TaleWorlds.CampaignSystem.Overlay.GameOverlays;
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
+using Coop.Mod.Managers;
 
 namespace Coop.Mod
 {
@@ -236,8 +237,8 @@ namespace Coop.Mod
             {
                 ClientServerModeMessage = "Started Bannerlord Co-op in server mode";
                 //TODO add name to args
-                //Create new save file instead of using MP
-                CoopServer.Instance.StartGame("MP");
+
+                MBGameManager.StartNewGame(new ServerGameManager());
             }
             else
             {
