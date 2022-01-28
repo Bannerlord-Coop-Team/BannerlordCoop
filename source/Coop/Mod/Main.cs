@@ -195,11 +195,15 @@ namespace Coop.Mod
                         {
                             //Join Game
                             ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
+
+                            var textInquiryData = new TextInquiryData(
+                                new TextObject("Enter IP:port").ToString(), "IP:Port", true, true, "Join", "Cancel", JoinCoopGameIP, null);
+
+                            InformationManager.ShowTextInquiry(textInquiryData);
+
                             ServerConfiguration defaultConfiguration =
                                 new ServerConfiguration();
-                            CoopClient.Instance.Connect(
-                                defaultConfiguration.NetworkConfiguration.LanAddress,
-                                defaultConfiguration.NetworkConfiguration.LanPort);
+                            InformationManager.DisplayMessage(new InformationMessage(defaultConfiguration.NetworkConfiguration.LanAddress.ToString() + defaultConfiguration.NetworkConfiguration.LanPort.ToString()));
 
                         }, ""
                         ));
@@ -227,6 +231,15 @@ namespace Coop.Mod
 
             //Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
             #endregion
+        }
+
+        private void JoinCoopGameIP(string ipport)
+        {
+            ServerConfiguration netConfig = new ServerConfiguration();
+            string ip = ipport.Split(":"[0]).First();
+            string port = ipport.Split(":"[0]).Last();
+
+            CoopClient.Instance.Connect(System.Net.IPAddress.Parse(ip), int.Parse(port));
         }
 
         private static void OnSelectCoopSaveGame(List<InquiryElement> types)
