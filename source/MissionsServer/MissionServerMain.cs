@@ -21,11 +21,15 @@ namespace MissionsServer
         static void Main(string[] args)
         {
 
-            PlayerTickSync sync = new PlayerTickSync();
-            MemoryStream ms = new MemoryStream();   
+            PlayerTickSync sync = new PlayerTickSync(1f, 2f, 3f, 4, 5, 6f, 7f, 8f, 9, 10, 11, 12f, 13, 14, 15, 16f, 17f, 18f, true);
+            
+            MemoryStream ms = new MemoryStream();
+            
             byte [] data = sync.Serialize(ms);
 
-            sync.Deserialize(data);
+            PlayerTickSync sync2 = new PlayerTickSync();
+            sync2.Deserialize(data);
+            Console.WriteLine(sync2.ToString());
 
             EventBasedNetListener listener = new EventBasedNetListener();
             NetManager server = new NetManager(listener);
