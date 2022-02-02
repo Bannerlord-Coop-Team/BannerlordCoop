@@ -20,7 +20,7 @@ namespace MissionsServerTest
             {
                 Console.WriteLine("We got: {0}", dataReader.GetString(100 /* max length of string */));
                 dataReader.Recycle();
-                client.SendToAll(new byte[] { 5 }, DeliveryMethod.ReliableOrdered);
+                client.SendToAll(new byte[] { 5 }, DeliveryMethod.Sequenced);
                 Console.WriteLine("We should have sent: " + client.ConnectedPeersCount);
             };
 

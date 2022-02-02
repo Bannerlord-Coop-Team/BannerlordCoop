@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)MissionsShared.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)PlayerSync.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)PlayerTickMessage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)PlayerTickInfo.cs" />
   </ItemGroup>
 </Project>
