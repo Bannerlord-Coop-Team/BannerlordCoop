@@ -33,6 +33,23 @@ namespace MissionsServer
             NetManager server = new NetManager(listener);
 
 
+            //local test
+            //FromClientTickMessage message = new FromClientTickMessage();
+            //message.AgentCount = 1;
+            //List<PlayerTickInfo> info = new List<PlayerTickInfo>();
+            //PlayerTickInfo tick = new PlayerTickInfo();
+            //tick.Action1Flag = 0x3U;
+            //info.Add(tick);
+            //message.AgentsTickInfo = info;
+            //MemoryStream s = new MemoryStream();
+            //Serializer.SerializeWithLengthPrefix(s, message, PrefixStyle.Fixed32BigEndian);
+
+            //MemoryStream s2 = new MemoryStream(s.ToArray());
+            //FromClientTickMessage recv = new FromClientTickMessage();
+            //FromClientTickMessage rcvMessg = Serializer.DeserializeWithLengthPrefix<FromClientTickMessage>(s2, PrefixStyle.Fixed32BigEndian);
+            //Console.WriteLine(rcvMessg.AgentsTickInfo.First().Action1Flag);
+
+
             server.Start(9050 /* port */);
 
             listener.ConnectionRequestEvent += request =>
@@ -55,25 +72,28 @@ namespace MissionsServer
             listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod) =>
             {
                 MissionsShared.MessageType messageType = (MessageType)dataReader.GetUInt();
-                if(messageType == MessageType.PlayerSync)
+                if (messageType == MessageType.PlayerSync)
                 {
-                    byte[] serializedLocation = null;
-                    dataReader.GetBytes(serializedLocation, dataReader.Position, dataReader.RawDataSize - dataReader.Position);
-                    MemoryStream stream = new MemoryStream();
-                    ClientTickMessage message = Serializer.DeserializeWithLengthPrefix<ClientTickMessage>(stream, PrefixStyle.Fixed32BigEndian);
-                    playerSyncDict[fromPeer.Id] = message.AgentsTickInfo;
+                    byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
+                    Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
+
+                    MemoryStream stream = new MemoryStream(serializedLocation);
+                    FromClientTickMessage msg = Serializer.DeserializeWithLengthPrefix<FromClientTickMessage>(stream, PrefixStyle.Fixed32BigEndian);
+                    Console.WriteLine("Tick Value: " + msg.AgentsTickInfo.First().Action2Flag + "\n");
+                    //playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
+                    playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
                 }
 
             };
 
-            List<ServerTickPayload> GeneratePlayerPayload(HashSet<int> clientIds)
+            List<FromServerTickPayload> GeneratePlayerPayload(HashSet<int> clientIds)
             {
-                List<ServerTickPayload> payloadList = new List<ServerTickPayload>();
+                List<FromServerTickPayload> payloadList = new List<FromServerTickPayload>();
 
                 foreach(int clientId in clientIds)
                 {
                     List<PlayerTickInfo> syncInfo = new List<PlayerTickInfo>();
-                    ServerTickPayload payload = new ServerTickPayload();
+                    FromServerTickPayload payload = new FromServerTickPayload();
                     payload.ClientId = clientId;
                     payload.AgentCount = syncInfo.Count;
                     payload.PlayerTick = syncInfo;
@@ -87,33 +107,33 @@ namespace MissionsServer
             while (!Console.KeyAvailable)
             {
                 server.PollEvents();
-                MemoryStream stream = new MemoryStream();
+                //MemoryStream stream = new MemoryStream();
 
-                ServerTickMessage message = new ServerTickMessage();
-                foreach (KeyValuePair<string, HashSet<int>> locationKVP in clientsLocation) 
-                {
-                    // player exist in this location, sync them
-                    if(locationKVP.Value.Count > 0)
-                    {
-                        // client ids in this location
-                        HashSet<int> clientIds = locationKVP.Value;
+                //FromServerTickMessage message = new FromServerTickMessage();
+                //foreach (KeyValuePair<string, HashSet<int>> locationKVP in clientsLocation) 
+                //{
+                //    // player exist in this location, sync them
+                //    if(locationKVP.Value.Count > 1)
+                //    {
+                //        // client ids in this location
+                //        HashSet<int> clientIds = locationKVP.Value;
 
-                        // get all client info based on clients in same location
-                        List<ServerTickPayload> payload = GeneratePlayerPayload(clientIds);
+                //        // get all client info based on clients in same location
+                //        List<FromServerTickPayload> payload = GeneratePlayerPayload(clientIds);
 
-                        // loop through clients and update them
-                        foreach (int clientId in clientIds)
-                        {
-                            message.ClientTicks = payload;
-                        }
-                    }
-                }
-                Serializer.Serialize(stream, message);
+                //        // loop through clients and update them
+                //        foreach (int clientId in clientIds)
+                //        {
+                //            message.ClientTicks = payload;
+                //        }
+                //    }
+                //}
+                //Serializer.Serialize(stream, message);
 
-                NetDataWriter dataWriter = new NetDataWriter();
-                dataWriter.Put((uint)MessageType.PlayerSync);
-                dataWriter.Put(stream.ToArray());
-                server.SendToAll(dataWriter, DeliveryMethod.Sequenced);
+                //NetDataWriter dataWriter = new NetDataWriter();
+                //dataWriter.Put((uint)MessageType.PlayerSync);
+                //dataWriter.Put(stream.ToArray());
+                //server.SendToAll(dataWriter, DeliveryMethod.Sequenced);
                 
                 Thread.Sleep(15);
             }

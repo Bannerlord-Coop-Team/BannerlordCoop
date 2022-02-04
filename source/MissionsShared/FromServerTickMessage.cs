@@ -7,14 +7,14 @@ using ProtoBuf;
 namespace MissionsShared
 {
     [ProtoContract]
-    public class ServerTickMessage
+    public class FromServerTickMessage
     {
         [ProtoMember(1)]
-        public List<ServerTickPayload> ClientTicks { get; set; }
+        public List<FromServerTickPayload> ClientTicks { get; set; }
 
-        public ServerTickMessage()
+        public FromServerTickMessage()
         {
-            ClientTicks = new List<ServerTickPayload>();
+            ClientTicks = new List<FromServerTickPayload>();
         }
 
 

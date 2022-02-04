@@ -6,7 +6,7 @@ using ProtoBuf;
 namespace MissionsShared
 {
     [ProtoContract]
-    public class ServerTickPayload
+    public class FromServerTickPayload
     {
 
         [ProtoMember(1)]
@@ -16,7 +16,7 @@ namespace MissionsShared
         [ProtoMember(3)]
         public List<PlayerTickInfo> PlayerTick;
 
-        public PlayerTickPayload()
+        public FromServerTickPayload()
         {
             PlayerTick = new List<PlayerTickInfo>();    
         }

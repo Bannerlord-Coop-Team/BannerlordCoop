@@ -4,7 +4,7 @@ using System.Text;
 
 namespace MissionsShared
 {
-    enum MessageType : uint
+    public enum MessageType : uint
     {
         EnterLocation,
         ExitLocation,
@@ -12,11 +12,6 @@ namespace MissionsShared
     }
     public class MissionsShared
     {
-        enum MessageType : uint
-        {
-            EnterLocation,
-            ExitLocation,
-            PlayerSync
-        }
+
     }
 }
