@@ -123,8 +123,6 @@ namespace Coop.Mod
                 Logger.Debug("Setup network connection for server.");
             }
 
-            SyncedObjectStore.OnObjectRecieved += SendHeroId;
-
             return null;
         }
 
@@ -342,16 +340,6 @@ namespace Coop.Mod
             }
 
             Persistence.MobilePartyEntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
-        }
-
-        private void SendHeroId(ConnectionBase connection, object obj)
-        {
-            if (obj is PlayerHeroSerializer heroSerializer)
-            {
-                Hero hero = (Hero)heroSerializer.Deserialize();
-                Guid guid = CoopObjectManager.AddObject(hero);
-                connection.Send(new Packet(EPacket.Server_HeroId, CommonSerializer.Serialize(guid)));
-            }
         }
     }
 }

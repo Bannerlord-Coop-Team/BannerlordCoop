@@ -228,6 +228,9 @@ namespace Coop.Mod
                 MBGameManager.StartNewGame(gameManager);
 
                 ClientCharacterCreatorManager.OnCharacterCreationFinishedEvent += CharacterCreationOver;
+
+                // Remove listener when disconnected
+                Session.OnConnectionDestroyed += (reason) => { ClientCharacterCreatorManager.OnCharacterCreationFinishedEvent -= CharacterCreationOver; };
             }
         }
 
@@ -272,7 +275,6 @@ namespace Coop.Mod
         private void ReceiveCharacterExists(ConnectionBase connection, Packet packet)
         {
             m_HeroGUID = CommonSerializer.Deserialize<Guid>(packet.Payload);
-            //m_Hero = (Hero)MBObjectManager.Instance.GetObject(m_HeroGUID);
             m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
         }
         #endregion
