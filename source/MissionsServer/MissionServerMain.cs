@@ -62,10 +62,14 @@ namespace MissionsServer
 
             listener.PeerConnectedEvent += peer =>
             {
-                Console.WriteLine("We got connection: {0}", peer.EndPoint); // Show peer ip
-                NetDataWriter writer = new NetDataWriter();                 // Create writer class
-                writer.Put("Hello client!");                                // Put some string
-                peer.Send(writer, DeliveryMethod.ReliableOrdered);             // Send with reliability
+                //Console.WriteLine("We got connection: {0}", peer.EndPoint); // Show peer ip
+                //NetDataWriter writer = new NetDataWriter();                 // Create writer class
+                //writer.Put("Hello client!");                                // Put some string
+                //peer.Send(writer, DeliveryMethod.ReliableOrdered);             // Send with reliability
+                NetDataWriter writer = new NetDataWriter();
+                writer.Put((uint)MessageType.ConnectionId);
+                writer.Put(peer.Id);
+                peer.Send(writer, DeliveryMethod.ReliableOrdered);
                 
             };
 
@@ -79,9 +83,10 @@ namespace MissionsServer
 
                     MemoryStream stream = new MemoryStream(serializedLocation);
                     FromClientTickMessage msg = Serializer.DeserializeWithLengthPrefix<FromClientTickMessage>(stream, PrefixStyle.Fixed32BigEndian);
-                    Console.WriteLine("Tick Value: " + msg.AgentsTickInfo.First().Action2Flag + "\n");
+                    
                     //playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
                     playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
+                    //Console.WriteLine("Recieved Update from Client: " + fromPeer.Id + " with info : \n" + msg.AgentsTickInfo.First());
                 }
 
             };
@@ -106,7 +111,39 @@ namespace MissionsServer
 
             while (!Console.KeyAvailable)
             {
+                // receiver updates from clients 
                 server.PollEvents();
+
+
+                // broadcast changes to all clients
+                MemoryStream stream = new MemoryStream();
+                FromServerTickMessage message = new FromServerTickMessage();
+                
+                foreach(KeyValuePair<int, List<PlayerTickInfo>> player in playerSyncDict)
+                {
+                    FromServerTickPayload payload = new FromServerTickPayload();
+                    payload.ClientId = player.Key;
+                    payload.PlayerTick = player.Value;
+                    message.ClientTicks.Add(payload);
+                    
+                    
+                    
+                }
+                Serializer.SerializeWithLengthPrefix<FromServerTickMessage>(stream, message, PrefixStyle.Fixed32BigEndian);
+                MemoryStream stream2 = new MemoryStream();
+                using (BinaryWriter writer = new BinaryWriter(stream2))
+                {
+                    writer.Write((uint)MessageType.PlayerSync);
+                    writer.Write(stream.ToArray());
+                    
+                }
+                foreach(NetPeer peer in server.ConnectedPeerList)
+                {
+
+                }
+                server.SendToAll(stream2.ToArray(), DeliveryMethod.ReliableSequenced);
+                
+                
                 //MemoryStream stream = new MemoryStream();
 
                 //FromServerTickMessage message = new FromServerTickMessage();
@@ -134,8 +171,8 @@ namespace MissionsServer
                 //dataWriter.Put((uint)MessageType.PlayerSync);
                 //dataWriter.Put(stream.ToArray());
                 //server.SendToAll(dataWriter, DeliveryMethod.Sequenced);
-                
-                Thread.Sleep(15);
+
+                Thread.Sleep(5);
             }
             server.Stop();
         }

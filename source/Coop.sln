@@ -58,6 +58,7 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "MissionsShared", "MissionsS
 EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		MissionsShared\MissionsShared.projitems*{6c9b73de-1b43-4be8-b840-e095778a12ad}*SharedItemsImports = 4
 		MissionsShared\MissionsShared.projitems*{91fecc70-8ab9-4776-9511-5fe23a48e79c}*SharedItemsImports = 4
 		MissionsShared\MissionsShared.projitems*{ad899977-93a7-4db6-9f49-a8507af04b35}*SharedItemsImports = 4
 		MissionsShared\MissionsShared.projitems*{dc62a72c-5fbb-4994-8db7-ef7880413960}*SharedItemsImports = 13

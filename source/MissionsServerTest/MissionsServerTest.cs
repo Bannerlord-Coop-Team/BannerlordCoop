@@ -21,7 +21,15 @@ namespace MissionsServerTest
             client.Connect("localhost" /* host ip or name */, 9050 /* port */, "SomeConnectionKey" /* text key or NetDataWriter */);
             listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod) =>
             {
-                Console.WriteLine("We got: {0}", dataReader.GetString(100 /* max length of string */));
+                MessageType type = (MessageType)dataReader.GetUInt();
+                if(type == MessageType.PlayerSync)
+                {
+                    //Console.WriteLine("Received PlayerSync!");
+                }
+                else if(type == MessageType.ConnectionId)
+                {
+                    Console.WriteLine("Received connectionId!" + dataReader.GetInt());
+                }
                 dataReader.Recycle();
                 //client.SendToAll(new byte[] { 5 }, DeliveryMethod.Sequenced);
                 //Console.WriteLine("We should have sent: " + client.ConnectedPeersCount);
@@ -36,7 +44,7 @@ namespace MissionsServerTest
                 FromClientTickMessage message = new FromClientTickMessage();
                 List<PlayerTickInfo> agentsList = new List<PlayerTickInfo>();
                 PlayerTickInfo mainParty = new PlayerTickInfo();
-                mainParty.Action2Flag = 0x3F;
+                mainParty.Action1Flag = 0x3F;
                 agentsList.Add(mainParty);
                 message.AgentsTickInfo = agentsList;
                 MemoryStream stream = new MemoryStream();

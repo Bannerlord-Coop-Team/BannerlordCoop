@@ -21,6 +21,12 @@ using HarmonyLib;
 using NetworkMessages.FromServer;
 using TaleWorlds.MountAndBlade.ComponentInterfaces;
 using SandBox;
+using TaleWorlds.Engine.Screens;
+using TaleWorlds.GauntletUI;
+using TaleWorlds.MountAndBlade.GauntletUI;
+using LiteNetLib;
+using MissionsShared;
+using ProtoBuf;
 
 namespace CoopTestMod
 {
@@ -70,328 +76,7 @@ namespace CoopTestMod
     public class MySubModule : MBSubModuleBase
     {
 
-        public class MessageParser
-        {
-            private int bitExtracted(int number, int k, int p)
-            {
-                return (((1 << k) - 1) & (number >> (p - 1)));
-            }
-
-            public void parseMessage(byte[] bytes, Agent otherAgent, Agent playerAgent, ref uint currentId, ref float otherAgentHealth)
-            {
-                float x = BitConverter.ToSingle(bytes, 0);
-                float y = BitConverter.ToSingle(bytes, 4);
-                float z = BitConverter.ToSingle(bytes, 8);
-                uint movementFlag = BitConverter.ToUInt32(bytes, 12);
-                uint eventFlag = BitConverter.ToUInt32(bytes, 16);
-                float moveX = BitConverter.ToSingle(bytes, 20);
-                float moveY = BitConverter.ToSingle(bytes, 24);
-                float inputVectorX = BitConverter.ToSingle(bytes, 28);
-                float inputVectorY = BitConverter.ToSingle(bytes, 32);
-                int cacheIndex1 = BitConverter.ToInt32(bytes, 36);
-                float progress1 = BitConverter.ToSingle(bytes, 40);
-                AnimFlags flags1 = (AnimFlags)BitConverter.ToUInt64(bytes, 44);
-                int cacheIndex2 = BitConverter.ToInt32(bytes, 52);
-                float progress2 = BitConverter.ToSingle(bytes, 56);
-                AnimFlags flags2 = (AnimFlags)BitConverter.ToUInt64(bytes, 60);
-                //int cacheIndex3 = BitConverter.ToInt32(bytes, 68);
-                //float progress3 = BitConverter.ToSingle(bytes, 72);
-                //AnimFlags flags3 = (AnimFlags)BitConverter.ToUInt64(bytes, 76);
-                float lookDirectionX = BitConverter.ToSingle(bytes, 68);
-                float lookDirectionY = BitConverter.ToSingle(bytes, 72);
-                float lookDirectionZ = BitConverter.ToSingle(bytes, 76);
-                float health = BitConverter.ToSingle(bytes, 80);
-                uint packetId = BitConverter.ToUInt32(bytes, 84);
-                Agent.ActionCodeType ch0 = (Agent.ActionCodeType)BitConverter.ToInt32(bytes, 88);
-                Agent.ActionCodeType ch1 = (Agent.ActionCodeType)BitConverter.ToInt32(bytes, 92);
-                bool crouchMode = BitConverter.ToBoolean(bytes, 96);
-
-                float mInputVectorX = BitConverter.ToSingle(bytes, 97);
-                float mInputVectorY = BitConverter.ToSingle(bytes, 101);
-                AnimFlags mFlags2 = (AnimFlags)BitConverter.ToUInt64(bytes, 105);
-                float mProgress2 = BitConverter.ToSingle(bytes, 113);
-                int mCacheIndex2 = BitConverter.ToInt32(bytes, 117);
-                float playerAgentHealth = BitConverter.ToSingle(bytes, 121);
-
-                EquipmentIndex wieldedMeleeWeaponIndex = (EquipmentIndex)BitConverter.ToInt32(bytes, 125);
-                EquipmentIndex wieldedOffHandWeapon = (EquipmentIndex)BitConverter.ToInt32(bytes, 129);
-                EquipmentHitPoint[] HitPoints = new EquipmentHitPoint[4];
-                if (playerAgent != null)
-                {
-                    for (int i = 0; i < 4; i++)
-                    {
-                        EquipmentIndex Index = (EquipmentIndex)BitConverter.ToInt32(bytes, 133 + i * 4 + i * 2);
-                        short ShieldHealth = BitConverter.ToInt16(bytes, 137 + i * 4 + i * 2);
-                        HitPoints[i] = new EquipmentHitPoint(playerAgent.Equipment[Index].IsShield(), ShieldHealth, Index);
-                    }
-                }
-                //Next StartIndex: 157
-                bool EnemyAgentShot = BitConverter.ToBoolean(bytes, 157);
-                CreateMissile message = null;
-                if (EnemyAgentShot)
-                    message = IOCreateMissile.Read(bytes,otherAgent,158);
-
-
-                //int damageTaken = BitConverter.ToInt32(bytes, 121);
-
-
-                //InformationManager.DisplayMessage(new InformationMessage("CH0 Action: " + ch0));
-                //InformationManager.DisplayMessage(new InformationMessage("CH1 Action: " + ch1));
-                //float targetPositionX = BitConverter.ToSingle(bytes, 80);
-                //float targetPositionY = BitConverter.ToSingle(bytes, 84);
-                //float targetDirectionX = BitConverter.ToSingle(bytes, 88);
-                //float targetDirectionY = BitConverter.ToSingle(bytes, 92);
-                //float targetDirectionZ = BitConverter.ToSingle(bytes, 96);
-
-                //otherAgent.UpdateSyncHealthToAllClients(true);
-                Vec3 pos = new Vec3(x, y, z);
-                //Vec2 targetPosition = new Vec2(targetPositionX, targetPositionY);
-                //Vec3 targetDirection = new Vec3(targetDirectionX, targetDirectionY, targetDirectionZ);
-                //Agent.UsageDirection direction = Agent.MovementFlagToDirection((Agent.MovementControlFlag)movementFlag);
-
-
-
-                if (Mission.Current != null && otherAgent != null)
-                {
-                    //otherAgent.TeleportToPosition(pos);
-                    //InformationManager.DisplayMessage(new InformationMessage("Received ID: " + currentId.ToString()));
-                    if (packetId < currentId)
-                    {
-                        return;
-                    }
-                    else
-                    {
-                        currentId = packetId;
-                    }
-                    //InformationManager.DisplayMessage(new InformationMessage("Processed ID: " + currentId.ToString()));
-                    if (playerAgentHealth < playerAgent.Health)
-                    {
-                        Blow b = new Blow(otherAgent.Index);
-                        b.InflictedDamage = (int)(playerAgent.Health - playerAgentHealth);
-                        playerAgent.RegisterBlow(b);
-
-                    }
-                    //We are going through the EquipmentSlots and change the HitPoint if it's damaged and there is a shield in the slot.
-                    foreach (EquipmentHitPoint HitPoint in HitPoints)
-                        if (HitPoint.IsShield && playerAgent.Equipment[HitPoint.Index].HitPoints > HitPoint.HitPoint)
-                        {
-                            playerAgent.ChangeWeaponHitPoints(HitPoint.Index, HitPoint.HitPoint);
-                            if (HitPoint.HitPoint == 0)
-                                playerAgent.RemoveEquippedWeapon(HitPoint.Index);
-                        }
-
-                    if (message != null)
-                    {
-                        Vec3 velocity = message.Direction * message.Speed;
-                        OnAgentShootMissileMethod.Invoke(Mission.Current,new object[] { message.Agent, message.WeaponIndex, message.Position, velocity, message.Orientation, message.HasRigidBody, message.IsPrimaryWeaponShot, message.MissileIndex });
-                    }
-                    
-                    
-                    //InformationManager.DisplayMessage(new InformationMessage("OffHandWeapon: " + wieldedOffHandWeapon.ToString()));
-
-
-                    //if (wieldedWeapon != Convert.ToInt32(otherAgent.WieldedWeapon.RawDataForNetwork))
-                    //{
-
-                    //    otherAgent.WieldNextWeapon(Agent.HandIndex.MainHand);
-
-                    //}
-                    //InformationManager.DisplayMessage(new InformationMessage("wMWI: " + wieldedMeleeWeaponIndex.ToString() + " oA CUI: " + otherAgent.WieldedWeapon.CurrentUsageIndex));
-
-
-
-                    if (wieldedMeleeWeaponIndex != otherAgent.GetWieldedItemIndex(Agent.HandIndex.MainHand))
-                    {
-                        otherAgent.SetWieldedItemIndexAsClient(Agent.HandIndex.MainHand, wieldedMeleeWeaponIndex, false, false, otherAgent.WieldedWeapon.CurrentUsageIndex);                    
-                    }
-
-                    if (wieldedOffHandWeapon != otherAgent.GetWieldedItemIndex(Agent.HandIndex.OffHand))
-                    {
-                        otherAgent.SetWieldedItemIndexAsClient(Agent.HandIndex.OffHand, wieldedOffHandWeapon, false, false, otherAgent.WieldedOffhandWeapon.CurrentUsageIndex);
-                    }
-
-
-                    if (otherAgent.Health <= 0)
-                    {
-                        return;
-                    }
-
-
-
-                    if (otherAgent.GetPathDistanceToPoint(ref pos) > 0.3f)
-                    {
-                        otherAgent.TeleportToPosition(pos);
-                    }
-
-                    //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-                    //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-
-                    //InformationManager.DisplayMessage(new InformationMessage(ch1.ToString()));
-
-
-                    otherAgent.EventControlFlags = 0U;
-                    if (crouchMode)
-                    {
-                        otherAgent.EventControlFlags |= Agent.EventControlFlag.Crouch;
-                    }
-                    else
-                    {
-                        otherAgent.EventControlFlags |= Agent.EventControlFlag.Stand;
-                    }
-
-
-                    otherAgent.LookDirection = new Vec3(lookDirectionX, lookDirectionY, lookDirectionZ);
-                    otherAgent.MovementInputVector = new Vec2(inputVectorX, inputVectorY);
-
-                    if (eventFlag == 1u)
-                    {
-                        otherAgent.EventControlFlags |= Agent.EventControlFlag.Dismount;
-                    }
-                    if (eventFlag == 2u)
-                    {
-                        otherAgent.EventControlFlags |= Agent.EventControlFlag.Mount;
-                    }
-                    if (eventFlag == 0x400u)
-                    {
-                        InformationManager.DisplayMessage(new InformationMessage("Toggled"));
-                        otherAgent.EventControlFlags |= Agent.EventControlFlag.ToggleAlternativeWeapon;
-                    }
-
-
-                    if (otherAgent.HasMount)
-                    {
-                        otherAgent.MountAgent.SetMovementDirection(new Vec2(mInputVectorX, mInputVectorY));
-
-                        //Currently not doing anything afaik
-                        //if (otherAgent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.MountAgent.GetCurrentAction(1).Index != mCacheIndex2)
-                        //{
-                        //    string mActionName2 = MBAnimation.GetActionNameWithCode(mCacheIndex2);
-                        //    otherAgent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)mFlags2, startProgress: mProgress2);
-                        //}
-                        //else
-                        //{
-                        //    otherAgent.MountAgent.SetCurrentActionProgress(1, mProgress2);
-                        //}
-                    }
-
-
-                    if (otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(0).Index != cacheIndex1)
-                    {
-                        string actionName1 = MBAnimation.GetActionNameWithCode(cacheIndex1);
-                        otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)flags1, startProgress: progress1);
-
-                    }
-                    else
-                    {
-                        otherAgent.SetCurrentActionProgress(0, progress1);
-                    }
-                    otherAgent.MovementFlags = 0U;
-
-                    if ((int)ch1 >= (int)Agent.ActionCodeType.DefendAllBegin && (int)ch1 <= (int)Agent.ActionCodeType.DefendAllEnd)
-
-                    {
-                        otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-                        return;
-                    }
-
-
-
-                    //// we either don't have an action so set it to the new one or the receive action is different than our current action
-
-                    if (ch1 != Agent.ActionCodeType.BlockedMelee)
-                    {
-                        if (otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.GetCurrentAction(1).Index != cacheIndex2)
-                        {
-                            string actionName2 = MBAnimation.GetActionNameWithCode(cacheIndex2);
-                            otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)flags2, startProgress: progress2);
-
-                        }
-                        else
-                        {
-                            otherAgent.SetCurrentActionProgress(1, progress2);
-                        }
-                    }
-                    else
-                    {
-
-                        otherAgent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
-                    }
-
-                    //otherAgent.MovementFlags = 0U;
-                    //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-
-                    //InformationManager.DisplayMessage(new InformationMessage(Agent.Main.Position + ""));
-
-                    //if (health != otherAgent.Health)
-                    //{
-                    //    //InformationManager.DisplayMessage(new InformationMessage("otherAgent.Health: " + otherAgent.Health));
-                    //    //InformationManager.DisplayMessage(new InformationMessage("damageTaken: " + damageTaken));
-                    //    //InformationManager.DisplayMessage(new InformationMessage("health: " + health));
-
-                    //    if (otherAgent.Health < 0)
-                    //    {
-                    //        otherAgent.MakeDead(true, otherAgent.GetCurrentAction(1)); //Which action do we require or what does it do?
-                    //    }
-                    //}
-
-
-                    //if (eventFlag != 0)
-                    //{
-                    //    otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-
-                    //}
-
-                    //if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none && otherAgent.CurrentGuardMode == Agent.GuardMode.None)
-                    //{
-                    //    otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
-                    //}
-
-
-                    /*
-                    if (otherAgent == Agent.ActionCodeType.)
-                    {
-                        InformationManager.DisplayMessage(new InformationMessage(otherAgent.CrouchMode.ToString()));
-
-                        otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
-                    } */
-
-                    // if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none)
-                    // {
-                    //    InformationManager.DisplayMessage(new InformationMessage(otherAgent.GetCurrentActionType(1).ToString()));
-                    // }
-
-
-                    //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-                    //otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
-                    //otherAgent.AttackDirectionToMovementFlag(direction);
-                    //otherAgent.DefendDirectionToMovementFlag(direction);
-
-                    // otherAgent.EnforceShieldUsage(direction);
-                    //InformationManager.DisplayMessage(new InformationMessage("Received: " + ((Agent.EventControlFlag)eventFlag).ToString()));
-
-
-
-                    //InformationManager.DisplayMessage(new InformationMessage("Received : X: " +  lookDirectionX + " Y: " + lookDirectionY + " | Z: " + lookDirectionZ));
-
-
-
-                    //InformationManager.DisplayMessage(new InformationMessage("Receiving: " + ((Agent.EventControlFlag)eventFlag).ToString()));
-
-                    //otherAgent.SetTargetPositionAndDirection(targetPosition, targetDirection);
-
-
-                    //otherAgent.SetCurrentActionProgress(1, progress2);
-
-                    //string actionName3 = MBAnimation.GetActionNameWithCode(cacheIndex3);
-                    //otherAgent.SetActionChannel(2, ActionIndexCache.Create(actionName3), additionalFlags: (ulong)flags3, startProgress: progress3);
-                    //otherAgent.SetCurrentActionProgress(2, progress3);
-
-
-
-
-                }
-            }
-        }
+        
 
         private Agent _otherAgent;
         private Agent _player;
@@ -422,6 +107,11 @@ namespace CoopTestMod
         AnimFlags mFlags1;
         float mProgress1;
         ActionIndexCache mCache1;
+
+        EventBasedNetListener listener;
+        NetManager client;
+
+        private int myPeerId = -1;
 
         private float otherAgentHealth = 0;
 
@@ -460,87 +150,7 @@ namespace CoopTestMod
         }
 
 
-        public void StartServer()
-        {
-            initSockets("127.0.0.1", 14905, 14906);
-            MessageParser messageParser = new MessageParser();
-            IPAddress ipAddress = IPAddress.Parse("127.0.0.1");
-            epTo = new IPEndPoint(ipAddress, 14905);
-            epFrom = new IPEndPoint(ipAddress, 14906);
-
-
-            try
-            {
-
-
-
-                // Incoming data from the client.
-
-                byte[] bytes = null;
-
-                while (true)
-                {
-                    try
-                    {
-                        bytes = new byte[1024];
-                        int bytesRec = receiver.ReceiveFrom(bytes, ref epFrom);
-                        messageParser.parseMessage(bytes, _otherAgent, _player, ref currentId, ref otherAgentHealth);
-                    }
-                    catch (Exception ex)
-                    {
-                        File.AppendAllText("wouterror.txt", ex.Message);
-                    }
-
-
-
-
-                }
-
-
-
-
-
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.ToString());
-            }
-            finally
-            {
-                sender.Close();
-                receiver.Close();
-            }
-        }
-
-        // thread to receive the data as the client
-        public void StartClient()
-        {
-            byte[] bytes = null;
-            MessageParser messageParser = new MessageParser();
-            initSockets("127.0.0.1", 14906, 14905);
-            IPAddress ipAddress = System.Net.IPAddress.Parse("127.0.0.1");
-            epTo = new IPEndPoint(ipAddress, 14906);
-            epFrom = new IPEndPoint(ipAddress, 14905);
-            try
-            {
-                while (true)
-                {
-                    bytes = new byte[1024];
-                    int bytesRec = receiver.ReceiveFrom(bytes, ref epFrom);
-                    messageParser.parseMessage(bytes, _otherAgent, _player, ref currentId, ref otherAgentHealth);
-                }
-
-            }
-            catch (Exception e)
-            {
-
-            }
-            finally
-            {
-                sender.Close();
-                receiver.Close();
-            }
-        }
+        
 
 
         protected override void OnSubModuleLoad()
@@ -555,22 +165,393 @@ namespace CoopTestMod
 
 
             // pass /server or /client to start as either or
-            Thread thread = null;
-            string[] array = Utilities.GetFullCommandLineString().Split(' ');
-            foreach (string argument in array)
-            {
-                if (argument.ToLower() == "/server")
+            Thread thread = new Thread (()=>{
+                Thread.CurrentThread.IsBackground = true;
+                listener = new EventBasedNetListener();
+                client = new NetManager(listener);
+                client.Start();
+                client.Connect("localhost" /* host ip or name */, 9050 /* port */, "SomeConnectionKey" /* text key or NetDataWriter */);
+                listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod) =>
                 {
-                    isServer = true;
-                    thread = new Thread(StartServer);
-                }
-                else if (argument.ToLower() == "/client")
+                    MissionsShared.MessageType messageType = (MessageType)dataReader.GetUInt();
+                    if(messageType == MissionsShared.MessageType.PlayerSync)
+                    {
+                        byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
+                        Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
+                        FromServerTickMessage message;
+                        MemoryStream stream = new MemoryStream(serializedLocation);
+                        message = Serializer.DeserializeWithLengthPrefix<FromServerTickMessage>(stream, PrefixStyle.Fixed32BigEndian);
+                        List<FromServerTickPayload> serverPaylod = message.ClientTicks.Where(client => client.ClientId != myPeerId).ToList();
+                        if (serverPaylod.IsEmpty() || serverPaylod.First().PlayerTick.IsEmpty())
+                        {
+                            return;
+                        }
+                        PlayerTickInfo info = message.ClientTicks.Where(client => client.ClientId != myPeerId).First().PlayerTick.First();
+                        if (Mission.Current != null && _otherAgent != null)
+                        {
+                            //otherAgent.TeleportToPosition(pos);
+                            //InformationManager.DisplayMessage(new InformationMessage("Received ID: " + currentId.ToString()));
+                           
+                            //InformationManager.DisplayMessage(new InformationMessage("Processed ID: " + currentId.ToString()));
+                            //if (playerAgentHealth < playerAgent.Health)
+                            //{
+                            //    Blow b = new Blow(otherAgent.Index);
+                            //    b.InflictedDamage = (int)(playerAgent.Health - playerAgentHealth);
+                            //    playerAgent.RegisterBlow(b);
+
+                            //}
+                            ////We are going through the EquipmentSlots and change the HitPoint if it's damaged and there is a shield in the slot.
+                            //foreach (EquipmentHitPoint HitPoint in HitPoints)
+                            //    if (HitPoint.IsShield && playerAgent.Equipment[HitPoint.Index].HitPoints > HitPoint.HitPoint)
+                            //    {
+                            //        playerAgent.ChangeWeaponHitPoints(HitPoint.Index, HitPoint.HitPoint);
+                            //        if (HitPoint.HitPoint == 0)
+                            //            playerAgent.RemoveEquippedWeapon(HitPoint.Index);
+                            //    }
+
+                            //if (message != null)
+                            //{
+                            //    Vec3 velocity = message.Direction * message.Speed;
+                            //    OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { message.Agent, message.WeaponIndex, message.Position, velocity, message.Orientation, message.HasRigidBody, message.IsPrimaryWeaponShot, message.MissileIndex });
+                            //}
+
+
+                            //InformationManager.DisplayMessage(new InformationMessage("OffHandWeapon: " + wieldedOffHandWeapon.ToString()));
+
+
+                            //if (wieldedWeapon != Convert.ToInt32(otherAgent.WieldedWeapon.RawDataForNetwork))
+                            //{
+
+                            //    otherAgent.WieldNextWeapon(Agent.HandIndex.MainHand);
+
+                            //}
+                            //InformationManager.DisplayMessage(new InformationMessage("wMWI: " + wieldedMeleeWeaponIndex.ToString() + " oA CUI: " + otherAgent.WieldedWeapon.CurrentUsageIndex));
+
+
+
+                            //if (wieldedMeleeWeaponIndex != otherAgent.GetWieldedItemIndex(Agent.HandIndex.MainHand))
+                            //{
+                            //    otherAgent.SetWieldedItemIndexAsClient(Agent.HandIndex.MainHand, wieldedMeleeWeaponIndex, false, false, otherAgent.WieldedWeapon.CurrentUsageIndex);
+                            //}
+
+                            //if (wieldedOffHandWeapon != otherAgent.GetWieldedItemIndex(Agent.HandIndex.OffHand))
+                            //{
+                            //    otherAgent.SetWieldedItemIndexAsClient(Agent.HandIndex.OffHand, wieldedOffHandWeapon, false, false, otherAgent.WieldedOffhandWeapon.CurrentUsageIndex);
+                            //}
+
+                            Vec3 pos = new Vec3(info.PosX, info.PosY, info.PosZ);
+                            bool crouchMode = info.crouchMode;
+
+                            if (_otherAgent.Health <= 0)
+                            {
+                                return;
+                            }
+
+
+                            //if(otherAgent.GetPathDistanceToPoint(ref pos) > 0.5f)
+                            //{
+                            //    otherAgent.SetTargetPosition(pos.AsVec2);
+                            //}
+                            //if (_otherAgent.GetPathDistanceToPoint(ref pos) >= 5f)
+                            //{
+                            //    _otherAgent.TeleportToPosition(pos);
+                            //}
+                            //else
+                            //{
+                            //    Vec2 posVec2 = pos.AsVec2;
+                            //    _otherAgent.SetTargetPositionSynched(ref posVec2);
+                            //}
+                            Vec2 posVec2 = pos.AsVec2;
+                            _otherAgent.SetTargetPosition(posVec2);
+                            _otherAgent.SetMovementDirection(new Vec2(info.MovementDirectionX, info.MovementDirectionY));   
+                            //otherAgent.TeleportToPosition(Vec3.Slerp(otherAgent.Position, pos, 0.7f));
+
+                            //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
+                            //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+
+                            //InformationManager.DisplayMessage(new InformationMessage(ch1.ToString()));
+
+
+                            _otherAgent.EventControlFlags = 0U;
+                            if (crouchMode)
+                            {
+                                _otherAgent.EventControlFlags |= Agent.EventControlFlag.Crouch;
+                            }
+                            else
+                            {
+                                _otherAgent.EventControlFlags |= Agent.EventControlFlag.Stand;
+                            }
+
+
+                            _otherAgent.LookDirection = new Vec3(info.LookDirectionX, info.LookDirectionY, info.LookDirectionZ);
+                            _otherAgent.MovementInputVector = new Vec2(info.InputVectorX, info.InputVectorY);
+
+                            if (info.EventFlag == 1u)
+                            {
+                                _otherAgent.EventControlFlags |= Agent.EventControlFlag.Dismount;
+                            }
+                            if (info.EventFlag == 2u)
+                            {
+                                _otherAgent.EventControlFlags |= Agent.EventControlFlag.Mount;
+                            }
+                            if (info.EventFlag == 0x400u)
+                            {
+                                InformationManager.DisplayMessage(new InformationMessage("Toggled"));
+                                _otherAgent.EventControlFlags |= Agent.EventControlFlag.ToggleAlternativeWeapon;
+                            }
+
+
+                            if (_otherAgent.HasMount)
+                            {
+                                _otherAgent.MountAgent.SetMovementDirection(new Vec2(info.MountInputVectorX, info.MountInputVectorY));
+
+                                //Currently not doing anything afaik
+                                //if (otherAgent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.MountAgent.GetCurrentAction(1).Index != mCacheIndex2)
+                                //{
+                                //    string mActionName2 = MBAnimation.GetActionNameWithCode(mCacheIndex2);
+                                //    otherAgent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)mFlags2, startProgress: mProgress2);
+                                //}
+                                //else
+                                //{
+                                //    otherAgent.MountAgent.SetCurrentActionProgress(1, mProgress2);
+                                //}
+                            }
+
+
+                            if (_otherAgent.GetCurrentAction(0) == ActionIndexCache.act_none || _otherAgent.GetCurrentAction(0).Index != info.Action0Index)
+                            {
+                                string actionName1 = MBAnimation.GetActionNameWithCode(info.Action0Index);
+                                _otherAgent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)info.Action0Flag, startProgress: info.Action0Progress);
+
+                            }
+                            else
+                            {
+                                _otherAgent.SetCurrentActionProgress(0, info.Action0Progress);
+                            }
+                            _otherAgent.MovementFlags = 0U;
+
+                            if ((int)info.Action0CodeType >= (int)Agent.ActionCodeType.DefendAllBegin && (int)info.Action0CodeType <= (int)Agent.ActionCodeType.DefendAllEnd)
+
+                            {
+                                _otherAgent.MovementFlags = (Agent.MovementControlFlag)info.MovementFlag;
+                                return;
+                            }
+
+
+
+                            //// we either don't have an action so set it to the new one or the receive action is different than our current action
+
+                            if ((Agent.ActionCodeType)info.Action1CodeType != Agent.ActionCodeType.BlockedMelee)
+                            {
+                                if (_otherAgent.GetCurrentAction(1) == ActionIndexCache.act_none || _otherAgent.GetCurrentAction(1).Index != info.Action1Index)
+                                {
+                                    string actionName2 = MBAnimation.GetActionNameWithCode(info.Action1Index);
+                                    _otherAgent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)info.Action1Flag, startProgress: info.Action1Progress);
+
+                                }
+                                else
+                                {
+                                    _otherAgent.SetCurrentActionProgress(1, info.Action1Progress);
+                                }
+                            }
+                            else
+                            {
+
+                                _otherAgent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
+                            }
+
+                            //otherAgent.MovementFlags = 0U;
+                            //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
+
+                            //InformationManager.DisplayMessage(new InformationMessage(Agent.Main.Position + ""));
+
+                            //if (health != otherAgent.Health)
+                            //{
+                            //    //InformationManager.DisplayMessage(new InformationMessage("otherAgent.Health: " + otherAgent.Health));
+                            //    //InformationManager.DisplayMessage(new InformationMessage("damageTaken: " + damageTaken));
+                            //    //InformationManager.DisplayMessage(new InformationMessage("health: " + health));
+
+                            //    if (otherAgent.Health < 0)
+                            //    {
+                            //        otherAgent.MakeDead(true, otherAgent.GetCurrentAction(1)); //Which action do we require or what does it do?
+                            //    }
+                            //}
+
+
+                            //if (eventFlag != 0)
+                            //{
+                            //    otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+
+                            //}
+
+                            //if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none && otherAgent.CurrentGuardMode == Agent.GuardMode.None)
+                            //{
+                            //    otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
+                            //}
+
+
+                            /*
+                            if (otherAgent == Agent.ActionCodeType.)
+                            {
+                                InformationManager.DisplayMessage(new InformationMessage(otherAgent.CrouchMode.ToString()));
+
+                                otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
+                            } */
+
+                            // if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none)
+                            // {
+                            //    InformationManager.DisplayMessage(new InformationMessage(otherAgent.GetCurrentActionType(1).ToString()));
+                            // }
+
+
+                            //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+                            //otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
+                            //otherAgent.AttackDirectionToMovementFlag(direction);
+                            //otherAgent.DefendDirectionToMovementFlag(direction);
+
+                            // otherAgent.EnforceShieldUsage(direction);
+                            //InformationManager.DisplayMessage(new InformationMessage("Received: " + ((Agent.EventControlFlag)eventFlag).ToString()));
+
+
+
+                            //InformationManager.DisplayMessage(new InformationMessage("Received : X: " +  lookDirectionX + " Y: " + lookDirectionY + " | Z: " + lookDirectionZ));
+
+
+
+                            //InformationManager.DisplayMessage(new InformationMessage("Receiving: " + ((Agent.EventControlFlag)eventFlag).ToString()));
+
+                            //otherAgent.SetTargetPositionAndDirection(targetPosition, targetDirection);
+
+
+                            //otherAgent.SetCurrentActionProgress(1, progress2);
+
+                            //string actionName3 = MBAnimation.GetActionNameWithCode(cacheIndex3);
+                            //otherAgent.SetActionChannel(2, ActionIndexCache.Create(actionName3), additionalFlags: (ulong)flags3, startProgress: progress3);
+                            //otherAgent.SetCurrentActionProgress(2, progress3);
+
+
+
+
+                        }
+
+                       
+
+
+                    }
+                    else if (messageType == MessageType.ConnectionId)
+                    {
+                        myPeerId = dataReader.GetInt();
+                    }
+                    // received something from server
+
+                    dataReader.Recycle();
+                };
+                while (true)
                 {
-                    thread = new Thread(StartClient);
+                    client.PollEvents();
+                    Thread.Sleep(5); // approx. 60hz
+
+                    if(Mission.Current != null && playerPtr != UIntPtr.Zero)
+                    {
+                        FromClientTickMessage message = new FromClientTickMessage();
+                        List<PlayerTickInfo> agentsList = new List<PlayerTickInfo>();
+                        PlayerTickInfo mainCharacter = new PlayerTickInfo();
+                        Vec3 myPos = _player.Position;
+                        uint movementFlag = (uint)_player.MovementFlags;
+                        uint eventFlag = (uint)_player.EventControlFlags;
+                        Vec2 movementDirection = _player.GetMovementDirection();
+                        Vec2 inputVector = _player.MovementInputVector;
+                        ActionIndexCache cache0 = ActionIndexCache.act_none;
+                        float progress0= 0f;
+                        AnimFlags flags0 = 0;
+                        ActionIndexCache cache1 = ActionIndexCache.act_none;
+                        float progress1 = 0f;
+                        AnimFlags flags1 = 0;
+                        Vec3 lookDirection = _player.LookDirection;
+                        Agent.ActionCodeType actionTypeCh0 = Agent.ActionCodeType.Other;
+                        Agent.ActionCodeType actionTypeCh1 = Agent.ActionCodeType.Other;
+                        //int damage = MissionOnAgentHitPatch.DamageDone;
+                        mCache1 = ActionIndexCache.act_none;
+                        if (_player.Health > 0f)
+                        {
+                            cache0 = _player.GetCurrentAction(0);
+                            progress0 = _player.GetCurrentActionProgress(0);
+                            flags0 = _player.GetCurrentAnimationFlag(0);
+                            cache1 = _player.GetCurrentAction(1);
+                            progress1 = _player.GetCurrentActionProgress(1);
+                            flags1 = _player.GetCurrentAnimationFlag(1);
+                            actionTypeCh0 = _player.GetCurrentActionType(0);
+                            actionTypeCh1 = _player.GetCurrentActionType(1);
+
+                            if (_player.HasMount)
+                            {
+                                mInputVector = _player.MountAgent.GetMovementDirection();
+                                mFlags1 = _player.MountAgent.GetCurrentAnimationFlag(1);
+                                mProgress1 = _player.MountAgent.GetCurrentActionProgress(1);
+                                mCache1 = _player.MountAgent.GetCurrentAction(1);
+                            }
+
+                        }
+                        else
+                        {
+                            mCache1 = ActionIndexCache.act_none;
+                        }
+                        mainCharacter.PosX = myPos.X;
+                        mainCharacter.PosY = myPos.Y;  
+                        mainCharacter.PosZ = myPos.Z;
+                        mainCharacter.MovementFlag = movementFlag;
+                        mainCharacter.EventFlag = eventFlag;
+                        mainCharacter.MovementDirectionX = movementDirection.X;
+                        mainCharacter.MovementDirectionY = movementDirection.Y;
+                        mainCharacter.InputVectorX = inputVector.X;
+                        mainCharacter.InputVectorY = inputVector.Y;
+                        mainCharacter.Action0CodeType = (int)actionTypeCh0;
+                        mainCharacter.Action0Index = cache0.Index;
+                        mainCharacter.Action0Progress = progress0;
+                        mainCharacter.Action0Flag = (ulong)flags0;
+                        mainCharacter.Action1CodeType = (int)actionTypeCh1;
+                        mainCharacter.Action1Index = cache1.Index;
+                        mainCharacter.Action1Progress = progress1;
+                        mainCharacter.Action1Flag = (ulong)flags1;
+                        mainCharacter.LookDirectionX = lookDirection.X;
+                        mainCharacter.LookDirectionY = lookDirection.Y;
+                        mainCharacter.LookDirectionZ = lookDirection.Z;
+                        mainCharacter.crouchMode = _player.CrouchMode;
+                        agentsList.Add(mainCharacter);
+                        message.AgentsTickInfo = agentsList;
+                        MemoryStream stream = new MemoryStream();
+                        Serializer.SerializeWithLengthPrefix<FromClientTickMessage>(stream, message, PrefixStyle.Fixed32BigEndian);
+                        MemoryStream strm = new MemoryStream();
+                        message.AgentCount = 1;
+                        using (System.IO.BinaryWriter writer = new System.IO.BinaryWriter(strm))
+                        {
+                            writer.Write((uint)MessageType.PlayerSync);
+                            writer.Write(stream.ToArray());
+                        }
+                        client.SendToAll(strm.ToArray(), DeliveryMethod.ReliableSequenced);
+                    }
+
                 }
-            }
-            thread.IsBackground = true;
+
+                client.Stop();
+            });
             thread.Start();
+
+            //string[] array = Utilities.GetFullCommandLineString().Split(' ');
+            //foreach (string argument in array)
+            //{
+            //    if (argument.ToLower() == "/server")
+            //    {
+            //        isServer = true;
+            //        thread = new Thread(StartServer);
+            //    }
+            //    else if (argument.ToLower() == "/client")
+            //    {
+            //        thread = new Thread(StartClient);
+            //    }
+            //}
+            //thread.IsBackground = true;
+            //thread.Start();
 
 
 
@@ -680,6 +661,35 @@ namespace CoopTestMod
 
             return agent;
         }
+
+
+        [HarmonyPatch(typeof(CampaignMission), "OpenIndoorMission")]
+        public class CampaignMissionPatch
+        {
+            
+
+            public static void Postfix(string scene)
+            {
+                InformationManager.DisplayMessage(new InformationMessage(scene));
+                
+            }
+        }
+
+        [HarmonyPatch(typeof(Mission), "AfterStart")]
+        public class CampaignPatch
+        {
+            
+
+            public static void Postfix()
+            {
+                foreach(Agent a in Mission.Current.Agents)
+                {
+                    InformationManager.DisplayMessage(new InformationMessage(a.Character.Id.ToString()));
+                }
+                
+            }
+        }
+
 
         [HarmonyPatch(typeof(Mission), "OnAgentHit")]
         public class MissionOnAgentHitPatch
@@ -863,12 +873,12 @@ namespace CoopTestMod
 
             if (Input.IsReleased(InputKey.Numpad9))
             {
-                StartArenaFight();
+               
             }
 
             if (Input.IsReleased(InputKey.Numpad7))
             {
-                _otherAgent.WieldNextWeapon(Agent.HandIndex.MainHand);
+                Utilities.DisableGlobalLoadingWindow();
             }
 
             if (Input.IsReleased(InputKey.Numpad3))
@@ -894,69 +904,70 @@ namespace CoopTestMod
             // Mission is loaded
             if (Mission.Current != null && playerPtr != UIntPtr.Zero)
             {
-                // every 0.1 tick send an update to other endpoint
+                //every 0.1 tick send an update to other endpoint
                 if (t + 0.015 > Time.ApplicationTime)
                 {
                     return;
                 }
                 // update time
                 t = Time.ApplicationTime;
-
+                InformationManager.ClearAllMessages();
+                InformationManager.DisplayMessage(new InformationMessage("My movement vel: " + _player.GetCurrentVelocity()));
                 // create a memory stream
-                MemoryStream stream = new MemoryStream();
+                //MemoryStream stream = new MemoryStream();
 
-                // get all the values needed to sync character (there is more for actions, weapon switching, etc).
-                Vec3 myPos = getPosition(playerPtr);
-                uint movementFlag = (uint)_player.MovementFlags;
-                uint eventFlag = (uint)_player.EventControlFlags;
-                Vec2 movementDirection = _player.GetMovementDirection();
-                Vec2 inputVector = _player.MovementInputVector;
-                ActionIndexCache cache1 = ActionIndexCache.act_none;
-                float progress1 = 0f;
-                AnimFlags flags1 = 0;
-                ActionIndexCache cache2 = ActionIndexCache.act_none;
-                float progress2 = 0f;
-                AnimFlags flags2 = 0;
-                Vec3 lookDirection = _player.LookDirection;
-                float health = _player.Health;
-                Agent.ActionCodeType actionTypeCh0 = Agent.ActionCodeType.Other;
-                Agent.ActionCodeType actionTypeCh1 = Agent.ActionCodeType.Other;
-                EquipmentIndex wieldedWeaponIndex = _player.GetWieldedItemIndex(Agent.HandIndex.MainHand);
-                EquipmentIndex wieldedOffHandWeapon = _player.GetWieldedItemIndex(Agent.HandIndex.OffHand);
-                EquipmentHitPoint[] HitPoints = new EquipmentHitPoint[4];
-                for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.Weapon4; equipmentIndex++)
-                {
-                    HitPoints[(int)equipmentIndex] = new EquipmentHitPoint(_otherAgent.Equipment[equipmentIndex].IsShield(), _otherAgent.Equipment[equipmentIndex].HitPoints, equipmentIndex);
-                }
+                //// get all the values needed to sync character (there is more for actions, weapon switching, etc).
+                //Vec3 myPos = getPosition(playerPtr);
+                //uint movementFlag = (uint)_player.MovementFlags;
+                //uint eventFlag = (uint)_player.EventControlFlags;
+                //Vec2 movementDirection = _player.GetMovementDirection();
+                //Vec2 inputVector = _player.MovementInputVector;
+                //ActionIndexCache cache1 = ActionIndexCache.act_none;
+                //float progress1 = 0f;
+                //AnimFlags flags1 = 0;
+                //ActionIndexCache cache2 = ActionIndexCache.act_none;
+                //float progress2 = 0f;
+                //AnimFlags flags2 = 0;
+                //Vec3 lookDirection = _player.LookDirection;
+                //float health = _player.Health;
+                //Agent.ActionCodeType actionTypeCh0 = Agent.ActionCodeType.Other;
+                //Agent.ActionCodeType actionTypeCh1 = Agent.ActionCodeType.Other;
+                //EquipmentIndex wieldedWeaponIndex = _player.GetWieldedItemIndex(Agent.HandIndex.MainHand);
+                //EquipmentIndex wieldedOffHandWeapon = _player.GetWieldedItemIndex(Agent.HandIndex.OffHand);
+                //EquipmentHitPoint[] HitPoints = new EquipmentHitPoint[4];
+                //for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.Weapon4; equipmentIndex++)
+                //{
+                //    HitPoints[(int)equipmentIndex] = new EquipmentHitPoint(_otherAgent.Equipment[equipmentIndex].IsShield(), _otherAgent.Equipment[equipmentIndex].HitPoints, equipmentIndex);
+                //}
 
-                //int damage = MissionOnAgentHitPatch.DamageDone;
-                mCache1 = ActionIndexCache.act_none;
+                ////int damage = MissionOnAgentHitPatch.DamageDone;
+                //mCache1 = ActionIndexCache.act_none;
 
 
-                if (_player.Health > 0f)
-                {
-                    cache1 = _player.GetCurrentAction(0);
-                    progress1 = _player.GetCurrentActionProgress(0);
-                    flags1 = _player.GetCurrentAnimationFlag(0);
-                    cache2 = _player.GetCurrentAction(1);
-                    progress2 = _player.GetCurrentActionProgress(1);
-                    flags2 = _player.GetCurrentAnimationFlag(1);
-                    actionTypeCh0 = _player.GetCurrentActionType(0);
-                    actionTypeCh1 = _player.GetCurrentActionType(1);
+                //if (_player.Health > 0f)
+                //{
+                //    cache1 = _player.GetCurrentAction(0);
+                //    progress1 = _player.GetCurrentActionProgress(0);
+                //    flags1 = _player.GetCurrentAnimationFlag(0);
+                //    cache2 = _player.GetCurrentAction(1);
+                //    progress2 = _player.GetCurrentActionProgress(1);
+                //    flags2 = _player.GetCurrentAnimationFlag(1);
+                //    actionTypeCh0 = _player.GetCurrentActionType(0);
+                //    actionTypeCh1 = _player.GetCurrentActionType(1);
 
-                    if (_player.HasMount)
-                    {
-                        mInputVector = _player.MountAgent.GetMovementDirection();
-                        mFlags1 = _player.MountAgent.GetCurrentAnimationFlag(1);
-                        mProgress1 = _player.MountAgent.GetCurrentActionProgress(1);
-                        mCache1 = _player.MountAgent.GetCurrentAction(1);
-                    }
+                //    if (_player.HasMount)
+                //    {
+                //        mInputVector = _player.MountAgent.GetMovementDirection();
+                //        mFlags1 = _player.MountAgent.GetCurrentAnimationFlag(1);
+                //        mProgress1 = _player.MountAgent.GetCurrentActionProgress(1);
+                //        mCache1 = _player.MountAgent.GetCurrentAction(1);
+                //    }
 
-                }
-                else
-                {
-                    mCache1 = ActionIndexCache.act_none;
-                }
+                //}
+                //else
+                //{
+                //    mCache1 = ActionIndexCache.act_none;
+                //}
 
 
                 //InformationManager.DisplayMessage(new InformationMessage("Horse flag: " + mFlags1 + "  Horse progress: " + mProgress1 + "  Horse cache: " + mCache1.Index));
@@ -964,7 +975,6 @@ namespace CoopTestMod
 
 
 
-                //InformationManager.DisplayMessage(new InformationMessage(damageDone.ToString()));
 
 
                 //Vec2 targetPosition = _player.GetTargetPosition();
@@ -985,70 +995,70 @@ namespace CoopTestMod
                 //throw new Exception();
 
 
-                if (myPos.IsValid)
-                {
-                    using (System.IO.BinaryWriter writer = new System.IO.BinaryWriter(stream))
-                    {
-                        writer.Write(myPos.x);
-                        writer.Write(myPos.y);
-                        writer.Write(myPos.z);
-                        writer.Write(movementFlag);
-                        writer.Write(eventFlag);
-                        writer.Write(movementDirection.x);
-                        writer.Write(movementDirection.y);
-                        writer.Write(inputVector.x);
-                        writer.Write(inputVector.y);
-                        writer.Write(cache1.Index);
-                        writer.Write(progress1);
-                        writer.Write((ulong)flags1);
-                        writer.Write(cache2.Index);
-                        writer.Write(progress2);
-                        writer.Write((ulong)flags2);
-                        writer.Write(lookDirection.x);
-                        writer.Write(lookDirection.y);
-                        writer.Write(lookDirection.z);
-                        writer.Write(health);
-                        writer.Write(packetId++);
-                        writer.Write((int)actionTypeCh0);
-                        writer.Write((int)actionTypeCh1);
-                        writer.Write(_player.CrouchMode);
+                //if (myPos.IsValid)
+                //{
+                //    using (System.IO.BinaryWriter writer = new System.IO.BinaryWriter(stream))
+                //    {
+                //        writer.Write(myPos.x);
+                //        writer.Write(myPos.y);
+                //        writer.Write(myPos.z);
+                //        writer.Write(movementFlag);
+                //        writer.Write(eventFlag);
+                //        writer.Write(movementDirection.x);
+                //        writer.Write(movementDirection.y);
+                //        writer.Write(inputVector.x);
+                //        writer.Write(inputVector.y);
+                //        writer.Write(cache1.Index);
+                //        writer.Write(progress1);
+                //        writer.Write((ulong)flags1);
+                //        writer.Write(cache2.Index);
+                //        writer.Write(progress2);
+                //        writer.Write((ulong)flags2);
+                //        writer.Write(lookDirection.x);
+                //        writer.Write(lookDirection.y);
+                //        writer.Write(lookDirection.z);
+                //        writer.Write(health);
+                //        writer.Write(packetId++);
+                //        writer.Write((int)actionTypeCh0);
+                //        writer.Write((int)actionTypeCh1);
+                //        writer.Write(_player.CrouchMode);
 
-                        writer.Write(mInputVector.x);
-                        writer.Write(mInputVector.y);
-                        writer.Write((ulong)mFlags1);
-                        writer.Write(mProgress1);
-                        writer.Write(mCache1.Index);
-                        writer.Write(_otherAgent.Health);
+                //        writer.Write(mInputVector.x);
+                //        writer.Write(mInputVector.y);
+                //        writer.Write((ulong)mFlags1);
+                //        writer.Write(mProgress1);
+                //        writer.Write(mCache1.Index);
+                //        writer.Write(_otherAgent.Health);
 
-                        writer.Write((int)wieldedWeaponIndex);
-                        writer.Write((int)wieldedOffHandWeapon);
-                        for (int i = 0; i < 4; i++)
-                        {
-                            writer.Write((int)HitPoints[i].Index);
-                            writer.Write(HitPoints[i].HitPoint);
-                        }
-                        writer.Write(MyAgentShot);
-                        if (MyAgentShot)
-                        {
-                            IOCreateMissile.Write(writer,OnAgentShootMissilePatch.Message);
-                            MyAgentShot = false;
-                        }
-                        // writer.Write(damage);
+                //        writer.Write((int)wieldedWeaponIndex);
+                //        writer.Write((int)wieldedOffHandWeapon);
+                //        for (int i = 0; i < 4; i++)
+                //        {
+                //            writer.Write((int)HitPoints[i].Index);
+                //            writer.Write(HitPoints[i].HitPoint);
+                //        }
+                //        writer.Write(MyAgentShot);
+                //        if (MyAgentShot)
+                //        {
+                //            IOCreateMissile.Write(writer, OnAgentShootMissilePatch.Message);
+                //            MyAgentShot = false;
+                //        }
+                //        // writer.Write(damage);
 
 
-                            //writer.Write(targetPosition.x);
-                            //writer.Write(targetPosition.y);
-                            //writer.Write(targetDirection.x);
-                            //writer.Write(targetDirection.y);
-                            //writer.Write(targetDirection.z);
-                    }
-                    byte[] bytes = stream.ToArray();
-                    if (sender != null && sender.Connected)
-                    {
-                        sender.Send(bytes);
-                    }
+                //        //writer.Write(targetPosition.x);
+                //        //writer.Write(targetPosition.y);
+                //        //writer.Write(targetDirection.x);
+                //        //writer.Write(targetDirection.y);
+                //        //writer.Write(targetDirection.z);
+                //    }
+                //    byte[] bytes = stream.ToArray();
+                //    if (sender != null && sender.Connected)
+                //    {
+                //        sender.Send(bytes);
+                //    }
 
-                }
+                //}
             }
 
         }

@@ -8,7 +8,8 @@ namespace MissionsShared
     {
         EnterLocation,
         ExitLocation,
-        PlayerSync
+        PlayerSync,
+        ConnectionId
     }
     public class MissionsShared
     {
