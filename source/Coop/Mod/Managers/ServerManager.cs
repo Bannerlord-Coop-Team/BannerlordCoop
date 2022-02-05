@@ -101,21 +101,6 @@ namespace Coop.Mod.Managers
                 CoopObjectManager.AddObject(party);
                 CoopObjectManager.AddObject(party.Party);
             }
-
-            //CoopClient.Instance.RemoteStoreCreated += (remoteStore) => {
-            //    remoteStore.OnObjectReceived += (objId, obj) =>
-            //    {
-            //        if (obj is PlayerHeroSerializer serializedPlayerHero)
-            //        {
-            //            // Hero received from client after character creation
-            //            Hero hero = (Hero)serializedPlayerHero.Deserialize();
-            //            CoopSaveManager.PlayerParties.Add(serializedPlayerHero.PlayerId, hero.Id);
-
-            //            Settlement settlement = Settlement.Find("tutorial_training_field");
-            //            EnterSettlementAction.ApplyForParty(hero.PartyBelongedTo, settlement);
-            //        }
-            //    };
-            //};
         }
     }
 }
