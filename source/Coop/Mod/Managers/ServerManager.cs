@@ -47,13 +47,6 @@ namespace Coop.Mod.Managers
             MobileParty mainParty = MobileParty.MainParty;
 
             mainParty.RemoveParty();
-
-
-            
-
-            
-
-
             foreach(Hero hero in Hero.AllAliveHeroes)
             {
                 CoopObjectManager.AddObject(hero.CharacterObject);
