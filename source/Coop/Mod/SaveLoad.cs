@@ -30,7 +30,7 @@ namespace Coop.Mod
                 gameHandler.OnBeforeSave();
             }
 
-            SaveOutput saveOutput = SaveManager.Save(game, metaData, driver);
+            SaveOutput saveOutput = SaveManager.Save(game, metaData, Main.LOAD_GAME, driver);
             saveOutput.PrintStatus();
             foreach (GameHandler gameHandler2 in entitySystem.Components)
             {
@@ -54,12 +54,12 @@ namespace Coop.Mod
         public static LoadGameResult LoadSaveGameData(ISaveDriver driver)
         {
             List<ModuleInfo> currentModules = GetModules();
-            LoadResult loadResult = SaveManager.Load(driver, true);
+            LoadResult loadResult = SaveManager.Load(Main.LOAD_GAME, driver, true);
             if (loadResult.Successful)
             {
                 return new LoadGameResult(
                     loadResult,
-                    CheckModules(driver.LoadMetaData(), currentModules));
+                    CheckModules(driver.LoadMetaData(Main.LOAD_GAME), currentModules));
             }
 
             Logger.Error("{loadResult}", loadResult.ToFriendlyString());

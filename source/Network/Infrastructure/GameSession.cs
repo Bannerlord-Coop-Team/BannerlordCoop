@@ -8,12 +8,6 @@ namespace Network.Infrastructure
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public GameSession(ISaveData worldData)
-        {
-            World = worldData;
-        }
-
-        public ISaveData World { get; }
         [CanBeNull] public ConnectionClient Connection { get; private set; }
         public event Action<ConnectionClient> OnConnectionCreated;
         public event Action<EDisconnectReason> OnConnectionDestroyed;

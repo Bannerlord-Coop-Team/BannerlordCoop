@@ -1,6 +1,8 @@
 ﻿using System;
+using Coop.Mod.Data;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
+using Moq;
 using TaleWorlds.CampaignSystem;
 using Xunit;
 
@@ -31,11 +33,9 @@ namespace Coop.Tests.Persistence
         [Fact]
         void MobilePartyIsSynced()
         {
-
             MobileParty party = (MobileParty) Activator.CreateInstance(typeof(MobileParty));
-            m_Environment.Parties.Add(party.Id, party);
             Persistence.Server.Room.AddNewEntity<MobilePartyEntityServer>(
-                e => e.State.PartyId = party.Id);
+                e => e.State.PartyId = new PartyData(party));
             
             m_Environment.Persistence.UpdateServer();
             m_Environment.ExecuteSendsServer();

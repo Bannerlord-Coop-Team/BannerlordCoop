@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using Network.Protocol;
 using Version = Network.Protocol.Version;
 
@@ -76,7 +77,9 @@ namespace Network.Infrastructure
         #region ClientJoinRequesting
         private void sendClientHello()
         {
-            Send(new Packet(EPacket.Client_Hello, new Client_Hello(Version.Number).Serialize()));
+            var compatibilityInfo = CompatibilityInfo.Get();
+            var clientHello = new Client_Hello(Version.Number, compatibilityInfo);
+            Send(new Packet(EPacket.Client_Hello, clientHello.Serialize()));
         }
 
         [ConnectionClientPacketHandler(EClientConnectionState.JoinRequesting, EPacket.Server_RequestClientInfo)]

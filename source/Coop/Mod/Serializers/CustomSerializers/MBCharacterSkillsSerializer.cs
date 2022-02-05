@@ -1,13 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    internal class MBCharacterSkillsSerializer : ICustomSerializer
+    public class MBCharacterSkillsSerializer : ICustomSerializer
     {
         CharacterSkillsSerializer characterSkillsSerializer;
         public MBCharacterSkillsSerializer(MBCharacterSkills value)
@@ -21,6 +20,11 @@ namespace Coop.Mod.Serializers
             typeof(MBCharacterSkills).GetProperty("Skills")
                 .SetValue(skills, characterSkillsSerializer.Deserialize(), BindingFlags.NonPublic | BindingFlags.Instance, null, null, null);
             return skills;
+        }
+
+        public void ResolveReferenceGuids()
+        {
+            // No references
         }
     }
 }

@@ -6,8 +6,10 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.PlayerServices;
+using Debug = System.Diagnostics.Debug;
 
 namespace Coop.Mod.Serializers
 {
@@ -25,14 +27,14 @@ namespace Coop.Mod.Serializers
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
-        public CharacterObjectSerializer CharacterObject { get; private set; }
+        public PlayerCharacterObjectSerializer CharacterObject { get; private set; }
         public string PlayerId { get; }
-
-        readonly List<HeroSerializer> ExSpouses = new List<HeroSerializer>();
 
         public PlayerHeroSerializer(Hero hero) : base(hero)
         {
             PlayerId = new PlatformAPI().GetPlayerID().ToString();
+
+            List<string> UnmanagedFields = new List<string>();
 
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
@@ -47,17 +49,29 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
+                    case "_firstName":
+#if DEBUG
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer(new TextObject("Client_Player")));
+                        break;
+#endif
+                    case "_name":
+                    case "<EncyclopediaText>k__BackingField":
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
+                        break;
                     case "_characterObject":
-                        SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value));
+                        SNNSO.Add(fieldInfo, new PlayerCharacterObjectSerializer((CharacterObject)value));
                         break;
                     case "<BattleEquipment>k__BackingField":
-                        SNNSO.Add(fieldInfo, new EquipmentSerializer((Equipment)value));
+                        SNNSO.Add(fieldInfo, new Custom.EquipmentSerializer((Equipment)value));
                         break;
                     case "<CivilianEquipment>k__BackingField":
-                        SNNSO.Add(fieldInfo, new EquipmentSerializer((Equipment)value));
+                        SNNSO.Add(fieldInfo, new Custom.EquipmentSerializer((Equipment)value));
                         break;
                     case "<CaptivityStartTime>k__BackingField":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_heroTraits":
                         SNNSO.Add(fieldInfo, new CharacterTraitsSerializer((CharacterTraits)value));
@@ -69,103 +83,103 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new CharacterSkillsSerializer((CharacterSkills)value));
                         break;
                     case "_cachedLastSeenInformation":
-                        SNNSO.Add(fieldInfo, new HeroLastSeenInformationSerializer((Hero.HeroLastSeenInformation)value));
+                        SNNSO.Add(fieldInfo, new PlayerHeroLastSeenInformationSerializer((Hero.HeroLastSeenInformation)value));
                         break;
                     case "_lastSeenInformationKnownToPlayer":
-                        SNNSO.Add(fieldInfo, new HeroLastSeenInformationSerializer((Hero.HeroLastSeenInformation)value));
+                        SNNSO.Add(fieldInfo, new PlayerHeroLastSeenInformationSerializer((Hero.HeroLastSeenInformation)value));
                         break;
                     case "_birthDay":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_deathDay":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "<LastCommentTime>k__BackingField":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_clan":
-                        SNNSO.Add(fieldInfo, new ClanSerializer((Clan)value));
+                        SNNSO.Add(fieldInfo, new PlayerClanSerializer((Clan)value));
                         break;
                     case "Culture":
                         // NOTE: May want to read from server before character creation
-                        SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)value));
+                        SNNSO.Add(fieldInfo, new PlayerCultureObjectSerializer((CultureObject)value));
                         break;
                     case "_partyBelongedTo":
-                        SNNSO.Add(fieldInfo, new MobilePartySerializer((MobileParty)value));
+                        SNNSO.Add(fieldInfo, new PlayerMobilePartySerializer((MobileParty)value));
                         break;
                     case "<LastMeetingTimeWithPlayer>k__BackingField":
-                        SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_bornSettlement":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        SNNSO.Add(fieldInfo, new PlayerSettlementSerializer((Settlement)value));
                         break;
                     case "<HomeSettlement>k__BackingField":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        SNNSO.Add(fieldInfo, new PlayerSettlementSerializer((Settlement)value));
                         break;
                     case "_homeSettlement":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        SNNSO.Add(fieldInfo, new PlayerSettlementSerializer((Settlement)value));
                         break;
                     case "_father":
-                        SNNSO.Add(fieldInfo, new HeroSerializer((Hero)value));
+                        SNNSO.Add(fieldInfo, null);
                         break;
                     case "_mother":
-                        SNNSO.Add(fieldInfo, new HeroSerializer((Hero)value));
+                        SNNSO.Add(fieldInfo, null);
                         break;
                     case "ExSpouses":
-                        foreach (Hero exSpouse in (MBReadOnlyList<Hero>)value)
-                        {
-                            ExSpouses.Add(new HeroSerializer((Hero)value));
-                        }
+                        // This starts empty
                         break;
                     case "_heroDeveloper":
                         // Can reinstantiate on recipient as this is hero data loaded at start of game.
-                        SNNSO.Add(fieldInfo, new HeroDeveloperSerializer((HeroDeveloper)value));
+                        SNNSO.Add(fieldInfo, new PlayerHeroDeveloperSerializer((HeroDeveloper)value));
+                        break;
+                    case "_characterAttributes":
+                        // TODO: Fix this joke
                         break;
                     default:
-                        throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
-
+                        UnmanagedFields.Add(fieldInfo.Name);
+                        break;
                 }
+            }
+
+            if (!UnmanagedFields.IsEmpty())
+            {
+              throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
             }
 
             // TODO manage collections
 
-            // Remove non serializable objects before serialization
-            // They are marked as nonserializable in CustomSerializer but still tries to serialize???
-            NonSerializableCollections.Clear();
-            NonSerializableObjects.Clear();
+            Debug.WriteLine($"{hero.Id}");
         }
         public override object Deserialize()
         {
             hero = MBObjectManager.Instance.CreateObject<Hero>();
+
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
                 // Pass references to specified serializers
                 switch (entry.Value)
                 {
-                    case CharacterObjectSerializer characterObjectSerializer:
+                    case PlayerCharacterObjectSerializer characterObjectSerializer:
                         characterObjectSerializer.SetHeroReference(hero);
                         break;
-                    case ClanSerializer clanSerializer:
+                    case PlayerClanSerializer clanSerializer:
                         clanSerializer.SetHeroReference(hero);
                         break;
-                    case MobilePartySerializer mobilePartySerializer:
+                    case PlayerMobilePartySerializer mobilePartySerializer:
                         mobilePartySerializer.SetHeroReference(hero);
+                        mobilePartySerializer.SetClanReference(hero.Clan);
+                        break;
+                    case PlayerHeroDeveloperSerializer heroDeveloperSerializer:
+                        heroDeveloperSerializer.SetHeroReference(hero);
                         break;
                 }
 
-                entry.Key.SetValue(hero, entry.Value.Deserialize());
-            }
-
-            // Deserialize exSpouse list
-            List<Hero> lExSpouses = new List<Hero>();
-            foreach (HeroSerializer exSpouse in ExSpouses)
-            {
-                lExSpouses.Add((Hero)exSpouse.Deserialize());
+                entry.Key.SetValue(hero, entry.Value?.Deserialize());
             }
 
             hero.GetType()
                 .GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(hero, lExSpouses);
+                .SetValue(hero, new List<Hero>());
 
 
             ConstructorInfo ctor = typeof(HeroDeveloper).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance,
@@ -194,7 +208,14 @@ namespace Coop.Mod.Serializers
             typeof(PartyVisual).GetMethod("TaleWorlds.CampaignSystem.IPartyVisual.OnStartup", BindingFlags.Instance | BindingFlags.NonPublic)
             .Invoke(hero.PartyBelongedTo.Party.Visuals, new object[] { hero.PartyBelongedTo.Party });
 
+            Debug.WriteLine($"{hero.Id}");
+
             return hero;
+        }
+
+        public override void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
         }
     }
 }

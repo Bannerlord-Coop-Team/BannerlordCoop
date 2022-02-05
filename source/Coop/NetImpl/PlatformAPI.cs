@@ -72,7 +72,7 @@ namespace Coop.NetImpl
         //so this method is needed to convert the User ID to the PlayerId depending on the platform.
         public PlayerId GetPlayerID()
         {
-            string currentPlatformName = friendListService.GetServiceName();
+            string currentPlatformName = friendListService.GetServiceCodeName();
             PlayerId playerId = PlayerId.Empty;
 
             string userIdString = platformServices.UserId;

@@ -150,5 +150,20 @@ namespace Coop.Mod.DebugUtil
         {
             Logger.Debug("{message}", message);
         }
+
+        public void ShowError(string message)
+        {
+            Logger.Error("{message}", message);
+        }
+
+        public void BeginTelemetryScopeBaseLevel(TelemetryLevelMask levelMask, string scopeName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public void EndTelemetryScopeBaseLevel()
+        {
+            throw new System.NotImplementedException();
+        }
     }
 }

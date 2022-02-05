@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using Moq;
 using Network.Infrastructure;
 using Network.Protocol;
@@ -24,13 +25,13 @@ namespace Coop.Tests.Network
             m_Connection = new ConnectionClient(
                 m_NetworkConnection.Object,
                 m_GamePersistence.Object);
+            CompatibilityInfo.ModuleProvider = new ModuleInfoProviderMock();
         }
 
         private readonly Mock<INetworkConnection> m_NetworkConnection =
             TestUtils.CreateMockConnection();
 
         private readonly Mock<IGameStatePersistence> m_GamePersistence;
-        private readonly Mock<ISaveData> m_WorldData = TestUtils.CreateMockSaveData();
         private readonly ConnectionClient m_Connection;
         private ArraySegment<byte> m_PersistenceReceiveParam;
 
@@ -51,7 +52,7 @@ namespace Coop.Tests.Network
                 Times.Once);
             ArraySegment<byte> expectedSentData = TestUtils.MakeRaw(
                 EPacket.Client_Hello,
-                new Client_Hello(Version.Number).Serialize());
+                new Client_Hello(Version.Number, CompatibilityInfo.Get()).Serialize());
             Assert.Equal(expectedSentData, m_SendRawParam);
 
             // Ack client hello

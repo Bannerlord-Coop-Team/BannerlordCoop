@@ -126,7 +126,7 @@ namespace Coop.Mod.Persistence
                 m_Parties.Add(party, entity);
             }
 
-            CampaignEvents.OnPartyDisbandedEvent.AddNonSerializedListener(this, OnPartyRemoved);
+            CampaignEvents.OnPartyDisbandedEvent.AddNonSerializedListener(this, OnPartyDisbanded);
             CampaignEvents.OnPartyRemovedEvent.AddNonSerializedListener(this, OnPartyRemoved);
             
             CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, OnPartyAdded);
@@ -251,12 +251,12 @@ namespace Coop.Mod.Persistence
             return toBeAdded;
         }
 
-        private void OnPartyRemoved(PartyBase partyBase)
+        private void OnPartyRemoved(PartyBase party)
         {
-            OnPartyRemoved(partyBase.MobileParty);
+            OnPartyDisbanded(party.MobileParty, null);
         }
 
-        private void OnPartyRemoved(MobileParty party)
+        private void OnPartyDisbanded(MobileParty party, Settlement settlement)
         {
             RailEntityServer entityToRemove;
             lock (m_Lock)
