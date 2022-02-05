@@ -49,8 +49,6 @@ namespace Coop.Mod.Managers
 #if DEBUG
             SkipCharacterCreation();
 #endif
-            //Settlement settlement = Settlement.Find("tutorial_training_field");
-            //MobileParty.MainParty.Position2D = settlement.Position2D;
 
             OnGameLoadFinishedEvent?.Invoke(this, new HeroEventArgs());
         }
