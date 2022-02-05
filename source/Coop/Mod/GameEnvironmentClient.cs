@@ -25,7 +25,7 @@ namespace Coop.Mod
 
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;
 
-        public void SetIsPlayerControlled(MBGUID guid, bool isPlayerControlled)
+        public void SetIsPlayerControlled(Guid guid, bool isPlayerControlled)
         {
             MobileParty party = GetMobilePartyById(guid);
 
@@ -62,9 +62,9 @@ namespace Coop.Mod
         }
 
         #region Game state access
-        public MobileParty GetMobilePartyById(MBGUID guid)
+        public MobileParty GetMobilePartyById(Guid guid)
         {
-            return MobileParty.All.SingleOrDefault(p => p.Id == guid);
+            return CoopObjectManager.GetObject<MobileParty>(guid);
         }
         public void SetAuthoritative(MobileParty party, MovementData data)
         {

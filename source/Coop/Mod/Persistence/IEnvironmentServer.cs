@@ -2,6 +2,7 @@
 using Coop.Mod.Persistence.RemoteAction;
 using JetBrains.Annotations;
 using Sync.Store;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
@@ -31,7 +32,7 @@ namespace Coop.Mod.Persistence
         /// <param name="guid"></param>
         /// <returns></returns>
         [CanBeNull]
-        MobileParty GetMobilePartyById(MBGUID guid);
+        MobileParty GetMobilePartyById(Guid guid);
         
         /// <summary>
         ///     Gets the synchronization for <see cref="MobileParty"/> instances.

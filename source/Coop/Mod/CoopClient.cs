@@ -311,6 +311,9 @@ namespace Coop.Mod
             ChangePlayerCharacterAction.Apply(newPlayer);
 
             m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
+
+            Session.Connection.Send(
+                new Packet(EPacket.Client_PartyChanged, CommonSerializer.Serialize(gameData.PlayerHeroId)));
         }
         #endregion
 

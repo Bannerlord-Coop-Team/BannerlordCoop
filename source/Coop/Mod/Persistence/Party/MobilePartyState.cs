@@ -17,7 +17,7 @@ namespace Coop.Mod.Persistence.Party
         ///     Party ID as found in <see cref="TaleWorlds.CampaignSystem.MobileParty.Party.Index" />.
         /// </summary>
         [Immutable]
-        public MBGUID PartyId { get; set; } = Coop.InvalidId;
+        public Guid PartyId { get; set; } = Guid.Empty;
 
         /// <summary>
         ///     Is the party controlled by any player?

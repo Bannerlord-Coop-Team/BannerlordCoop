@@ -391,6 +391,7 @@
     <Compile Include="Mod\Serializers\CustomSerializers\WorkshopSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\WorkshopTypeSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializerWithGuid.cs" />
+    <Compile Include="Mod\Serializers\Encoders\RailgunSerializers.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerCharacterObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerClanSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerCultureObjectSerializer.cs" />

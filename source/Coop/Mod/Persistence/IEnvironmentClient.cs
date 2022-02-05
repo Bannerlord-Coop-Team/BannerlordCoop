@@ -57,7 +57,7 @@ namespace Coop.Mod.Persistence
         ///     Party guid, to be resolved using <see cref="GetMobilePartyById" />
         /// </param>
         /// <param name="isPlayerControlled"></param>
-        void SetIsPlayerControlled(MBGUID guid, bool isPlayerControlled);
+        void SetIsPlayerControlled(Guid guid, bool isPlayerControlled);
 
         /// <summary>
         ///     Returns a party given its guid.
@@ -65,7 +65,7 @@ namespace Coop.Mod.Persistence
         /// <param name="guid"></param>
         /// <returns></returns>
         [CanBeNull]
-        MobileParty GetMobilePartyById(MBGUID guid);
+        MobileParty GetMobilePartyById(Guid guid);
 
         /// <summary>
         ///     Called when a party enter the scope of the local client.

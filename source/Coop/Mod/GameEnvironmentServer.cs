@@ -21,21 +21,9 @@ namespace Coop.Mod
 
         public EventBroadcastingQueue EventQueue => CoopServer.Instance.Persistence?.EventQueue;
 
-        private Dictionary<MBGUID, MobileParty> m_PartyCache = new Dictionary<MBGUID, MobileParty>();
-
-        public MobileParty GetMobilePartyById(MBGUID guid)
+        public MobileParty GetMobilePartyById(Guid guid)
         {
-            if (!m_PartyCache.TryGetValue(guid, out MobileParty ret))
-            {
-                GameLoopRunner.RunOnMainThread(
-                    () =>
-                    {
-                        // Update the whole cache since we're already in the game loop thread. Doesn't happen that often.
-                        m_PartyCache = MobileParty.All.AsParallel().ToDictionary(party => party.Id);
-                        ret = m_PartyCache[guid];
-                    });
-            }
-            return ret;
+            return CoopObjectManager.GetObject<MobileParty>(guid);
         }
 
         public MobilePartySync PartySync { get; } = CampaignMapMovement.Sync;

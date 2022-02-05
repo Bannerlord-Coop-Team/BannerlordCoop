@@ -331,8 +331,6 @@ namespace Coop.Mod
 
             MobileParty party = clientHero.PartyBelongedTo;
 
-            party.Party.UpdateVisibilityAndInspected(0, false);
-
             if (!Persistence.MobilePartyEntityManager.Parties.Contains(party))
             {
                 // Add party to persistance since manual creation of party is not handled
