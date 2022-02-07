@@ -191,16 +191,23 @@ namespace CoopTestMod
                         {
                             //otherAgent.TeleportToPosition(pos);
                             //InformationManager.DisplayMessage(new InformationMessage("Received ID: " + currentId.ToString()));
-                           
+                            //if (packetId < currentId)
+                            //{
+                            //    return;
+                            //}
+                            //else
+                            //{
+                            //    currentId = packetId;
+                            //}
                             //InformationManager.DisplayMessage(new InformationMessage("Processed ID: " + currentId.ToString()));
                             //if (playerAgentHealth < playerAgent.Health)
                             //{
                             //    Blow b = new Blow(otherAgent.Index);
-                            //    b.InflictedDamage = (int)(playerAgent.Health - playerAgentHealth);
-                            //    playerAgent.RegisterBlow(b);
+                            //    b.InflictedDamage = (int)(_player.Health - playerAgentHealth);
+                            //    _player.RegisterBlow(b);
 
                             //}
-                            ////We are going through the EquipmentSlots and change the HitPoint if it's damaged and there is a shield in the slot.
+                            //We are going through the EquipmentSlots and change the HitPoint if it's damaged and there is a shield in the slot.
                             //foreach (EquipmentHitPoint HitPoint in HitPoints)
                             //    if (HitPoint.IsShield && playerAgent.Equipment[HitPoint.Index].HitPoints > HitPoint.HitPoint)
                             //    {
@@ -240,31 +247,19 @@ namespace CoopTestMod
                             //}
 
                             Vec3 pos = new Vec3(info.PosX, info.PosY, info.PosZ);
-                            bool crouchMode = info.crouchMode;
-
+                            uint eventFlag = info.EventFlag;
+                            uint movementFlag = info.MovementFlag;
                             if (_otherAgent.Health <= 0)
                             {
                                 return;
                             }
 
 
-                            //if(otherAgent.GetPathDistanceToPoint(ref pos) > 0.5f)
-                            //{
-                            //    otherAgent.SetTargetPosition(pos.AsVec2);
-                            //}
-                            //if (_otherAgent.GetPathDistanceToPoint(ref pos) >= 5f)
-                            //{
-                            //    _otherAgent.TeleportToPosition(pos);
-                            //}
-                            //else
-                            //{
-                            //    Vec2 posVec2 = pos.AsVec2;
-                            //    _otherAgent.SetTargetPositionSynched(ref posVec2);
-                            //}
-                            Vec2 posVec2 = pos.AsVec2;
-                            _otherAgent.SetTargetPosition(posVec2);
-                            _otherAgent.SetMovementDirection(new Vec2(info.MovementDirectionX, info.MovementDirectionY));   
-                            //otherAgent.TeleportToPosition(Vec3.Slerp(otherAgent.Position, pos, 0.7f));
+
+                            if (_otherAgent.GetPathDistanceToPoint(ref pos) > 0.3f)
+                            {
+                                _otherAgent.TeleportToPosition(pos);
+                            }
 
                             //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
                             //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
@@ -273,7 +268,7 @@ namespace CoopTestMod
 
 
                             _otherAgent.EventControlFlags = 0U;
-                            if (crouchMode)
+                            if (info.crouchMode)
                             {
                                 _otherAgent.EventControlFlags |= Agent.EventControlFlag.Crouch;
                             }
@@ -285,16 +280,16 @@ namespace CoopTestMod
 
                             _otherAgent.LookDirection = new Vec3(info.LookDirectionX, info.LookDirectionY, info.LookDirectionZ);
                             _otherAgent.MovementInputVector = new Vec2(info.InputVectorX, info.InputVectorY);
-
-                            if (info.EventFlag == 1u)
+                            
+                            if (eventFlag == 1u)
                             {
                                 _otherAgent.EventControlFlags |= Agent.EventControlFlag.Dismount;
                             }
-                            if (info.EventFlag == 2u)
+                            if (eventFlag == 2u)
                             {
                                 _otherAgent.EventControlFlags |= Agent.EventControlFlag.Mount;
                             }
-                            if (info.EventFlag == 0x400u)
+                            if (eventFlag == 0x400u)
                             {
                                 InformationManager.DisplayMessage(new InformationMessage("Toggled"));
                                 _otherAgent.EventControlFlags |= Agent.EventControlFlag.ToggleAlternativeWeapon;
@@ -330,10 +325,10 @@ namespace CoopTestMod
                             }
                             _otherAgent.MovementFlags = 0U;
 
-                            if ((int)info.Action0CodeType >= (int)Agent.ActionCodeType.DefendAllBegin && (int)info.Action0CodeType <= (int)Agent.ActionCodeType.DefendAllEnd)
+                            if ((int)info.Action1CodeType >= (int)Agent.ActionCodeType.DefendAllBegin && (int)info.Action1CodeType <= (int)Agent.ActionCodeType.DefendAllEnd)
 
                             {
-                                _otherAgent.MovementFlags = (Agent.MovementControlFlag)info.MovementFlag;
+                                _otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
                                 return;
                             }
 
@@ -432,9 +427,10 @@ namespace CoopTestMod
 
 
 
+
                         }
 
-                       
+
 
 
                     }
