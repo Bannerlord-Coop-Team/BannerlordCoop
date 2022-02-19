@@ -214,7 +214,7 @@ namespace Coop.Mod
                 // Handler Registration
                 //Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyId);
-                Session.Connection.Dispatcher.RegisterPacketHandler(RecieveGameData);
+                Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveGameData);
 
                 Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
             }
@@ -295,7 +295,7 @@ namespace Coop.Mod
         }
 
         [GameClientPacketHandler(ECoopClientState.ReceivingGameData, EPacket.Server_GameData)]
-        public void RecieveGameData(ConnectionBase connection, Packet packet)
+        public void ReceiveGameData(ConnectionBase connection, Packet packet)
         {
             GameData gameData = (GameData)SyncedObjectStore.Deserialize(packet.Payload.Array);
 
@@ -307,13 +307,16 @@ namespace Coop.Mod
 
             Hero newPlayer = CoopObjectManager.GetObject<Hero>(gameData.PlayerHeroId);
 
+            CharacterObject testObj = newPlayer.PartyBelongedTo.Party.MemberRoster.GetCharacterAtIndex(0);
+
             Game.Current.PlayerTroop = newPlayer.CharacterObject;
             ChangePlayerCharacterAction.Apply(newPlayer);
 
-            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
+            newPlayer.PartyBelongedTo.Party.UpdateVisibilityAndInspected(0, true);
 
-            Session.Connection.Send(
-                new Packet(EPacket.Client_PartyChanged, CommonSerializer.Serialize(gameData.PlayerHeroId)));
+            m_HeroGUID = gameData.PlayerHeroId;
+
+            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
         }
         #endregion
 
@@ -344,6 +347,8 @@ namespace Coop.Mod
             Session.Connection.Send(
                 new Packet(EPacket.Client_Loaded));
             TryInitPersistence();
+            Session.Connection.Send(
+                new Packet(EPacket.Client_PartyChanged, CommonSerializer.Serialize(m_HeroGUID)));
         }
 		
 

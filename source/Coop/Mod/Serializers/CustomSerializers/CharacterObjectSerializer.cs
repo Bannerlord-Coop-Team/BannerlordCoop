@@ -81,6 +81,9 @@ namespace Coop.Mod.Serializers.Custom
                     case "_originCharacter":
                         // TODO
                         break;
+                    case "<UpgradeRequiresItemFromCategory>k__BackingField":
+                        // TODO
+                        break;
 
                     default:
                         UnmanagedFields.Add(fieldInfo.Name);
@@ -99,7 +102,7 @@ namespace Coop.Mod.Serializers.Custom
 
         public override object Deserialize()
         {
-            characterObject = MBObjectManager.Instance.CreateObject<CharacterObject>();
+            characterObject = new CharacterObject();
 
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)

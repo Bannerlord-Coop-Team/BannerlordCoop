@@ -19,14 +19,14 @@ namespace Coop.Mod.Data
 
         public bool RequiresCharacterCreation => !Coop.IsServer;
 
-        List<CustomSerializerWithGuid[]> data = new List<CustomSerializerWithGuid[]>();
+        List<ICustomSerializer[]> data = new List<ICustomSerializer[]>();
 
-        Dictionary<Guid, string> SettlementIds;
+        Dictionary<Guid, string> ExpectedIds = new Dictionary<Guid, string>();
 
         public GameData()
         {
             //.Where(hero => hero != Hero.MainHero)
-            data = new List<CustomSerializerWithGuid[]>
+            data = new List<ICustomSerializer[]>
             {
                 CoopObjectManager.GetObjects<Hero>().Select(hero => new HeroSerializer(hero)).ToArray(),
                 CoopObjectManager.GetObjects<MobileParty>().Select(party => new MobilePartySerializer(party)).ToArray(),
@@ -34,14 +34,29 @@ namespace Coop.Mod.Data
                 CoopObjectManager.GetObjects<Town>().Select(town => new TownSerializer(town)).ToArray(),
                 CoopObjectManager.GetObjects<Village>().Select(village => new VillageSerializer(village)).ToArray(),
                 CoopObjectManager.GetObjects<Clan>().Select(clan => new ClanSerializer(clan)).ToArray(),
-                CoopObjectManager.GetObjects<Kingdom>().Select(kingdom => new KingdomSerializer(kingdom)).ToArray()
+                CoopObjectManager.GetObjects<Kingdom>().Select(kingdom => new KingdomSerializer(kingdom)).ToArray(),
+                CoopObjectManager.GetObjects<CharacterObject>().Select(characterObject => new CharacterObjectSerializer(characterObject)).ToArray()
             };
-            
 
-            SettlementIds = CoopObjectManager.GetTypeGuids<Settlement>()
+            AddExpected();
+        }
+
+        void AddExpected()
+        {
+            
+            Dictionary<Guid, string>  expectedSettlements = CoopObjectManager.GetTypeGuids<Settlement>()
                 .ToDictionary(
-                    guid => guid, 
+                    guid => guid,
                     guid => CoopObjectManager.GetObject<Settlement>(guid).Name.ToString());
+
+            ExpectedIds.Concat(expectedSettlements);
+
+            Dictionary<Guid, string> expectedCharacterObjects = CoopObjectManager.GetTypeGuids<CharacterObject>()
+                .ToDictionary(
+                    guid => guid,
+                    guid => CoopObjectManager.GetObject<CharacterObject>(guid).Name.ToString());
+
+            ExpectedIds.Concat(expectedSettlements);
         }
 
         public void Unpack()
@@ -70,15 +85,11 @@ namespace Coop.Mod.Data
         private void ValidateIds()
         {
             Dictionary<Guid, string> unknownIds = new Dictionary<Guid, string>();
-            foreach (var settlementId in SettlementIds)
+            foreach (var expectedId in ExpectedIds)
             {
-                try
+                if(CoopObjectManager.GetObject(expectedId.Key) == null)
                 {
-                    CoopObjectManager.GetObject(settlementId.Key);
-                }
-                catch (Exception)
-                {
-                    unknownIds.Add(settlementId.Key, settlementId.Value);
+                    unknownIds.Add(expectedId.Key, expectedId.Value);
                 }
             }
 

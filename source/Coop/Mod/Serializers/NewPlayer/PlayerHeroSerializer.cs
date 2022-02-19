@@ -27,7 +27,6 @@ namespace Coop.Mod.Serializers
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
-        public PlayerCharacterObjectSerializer CharacterObject { get; private set; }
         public string PlayerId { get; }
 
         public PlayerHeroSerializer(Hero hero) : base(hero)

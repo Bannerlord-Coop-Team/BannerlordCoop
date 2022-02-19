@@ -92,7 +92,11 @@ namespace Coop.Mod.Managers
             foreach (MobileParty party in MobileParty.All)
             {
                 CoopObjectManager.AddObject(party);
-                CoopObjectManager.AddObject(party.Party);
+            }
+
+            foreach (CharacterObject characterObject in CharacterObject.All)
+            {
+                CoopObjectManager.AddObject(characterObject);
             }
         }
     }

@@ -4,13 +4,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NLog;
+using System.Collections.Concurrent;
 
 namespace Coop.Mod.Serializers
 {
     [Serializable]
     public class TextObjectSerializer : ICustomSerializer
     {
-        static Stack<object> Stack = new Stack<object>();
+        static ConcurrentStack<object> Stack = new ConcurrentStack<object>();
         string text;
         Dictionary<string, object> attributes = new Dictionary<string, object>();
         public TextObjectSerializer(TextObject textObject)
@@ -22,7 +23,7 @@ namespace Coop.Mod.Serializers
             else
             {
                 Stack.Push(textObject);
-            }
+            } 
 
             text = (string)textObject.GetType()
                 .GetField("Value", BindingFlags.NonPublic | BindingFlags.Instance)
@@ -57,7 +58,8 @@ namespace Coop.Mod.Serializers
                 }
             }
 
-            Stack.Pop();
+            object _;
+            Stack.TryPop(out _);
         }
 
         public object Deserialize()

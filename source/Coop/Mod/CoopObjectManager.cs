@@ -185,7 +185,7 @@ namespace Coop.Mod
 
         public static T GetObject<T>(Guid id)
         {
-            if(id == Guid.Empty)
+            if(id == Guid.Empty || !Objects.ContainsKey(id))
             {
                 return default(T);
             }

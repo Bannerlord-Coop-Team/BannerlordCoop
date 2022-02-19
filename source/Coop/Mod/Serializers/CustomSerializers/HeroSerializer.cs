@@ -113,11 +113,7 @@ namespace Coop.Mod.Serializers.Custom
                         // TODO: Fix this joke
                         break;
                     case "_characterObject":
-                        SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value));
-                        break;
-
                     case "<Template>k__BackingField":
-                    
                     case "_clan":
                     case "_bornSettlement":
                     case "_homeSettlement":

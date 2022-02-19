@@ -382,6 +382,7 @@
     <Compile Include="Mod\Serializers\CustomSerializers\SiegeLaneSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\TownMarketDataSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\TownSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\TroopRosterElementSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\VillageMarketDataSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\VillageSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\SettlementSerializer.cs" />

@@ -66,9 +66,6 @@ namespace Coop.Mod.Managers
             else if(m_HeroGUID != null)
             {
                 m_PlayerInCampaign = (Hero)CoopObjectManager.GetObject(m_HeroGUID);
-
-                // Switch current player party from host to client party
-                ChangePlayerCharacterAction.Apply(m_PlayerInCampaign);
             }
             else
             {

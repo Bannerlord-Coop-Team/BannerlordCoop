@@ -25,8 +25,12 @@ namespace Coop.Mod.Serializers.Custom
 
         List<Guid> attachedParties = new List<Guid>();
 
+        string name;
+
         public MobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
         {
+            name = mobileParty.Name.ToString();
+
             List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
 
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
@@ -144,14 +148,14 @@ namespace Coop.Mod.Serializers.Custom
                 throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
             }
 
-            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
-            {
-                entry.Value.ResolveReferenceGuids();
-            }
-
             foreach(KeyValuePair<FieldInfo, Guid> reference in references)
             {
                 reference.Key.SetValue(mobileParty, CoopObjectManager.GetObject(reference.Value));
+            }
+
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
             }
 
             List<MobileParty> attachedParties = this.attachedParties

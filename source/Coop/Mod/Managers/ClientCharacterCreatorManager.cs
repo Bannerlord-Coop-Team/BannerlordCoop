@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using Coop.Mod.Extentions;
 using Coop.Mod.Serializers;
 using SandBox;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Managers
 {
@@ -63,6 +64,9 @@ namespace Coop.Mod.Managers
             campaignObjectManager.GetClans().RemoveAll(x => true);
             campaignObjectManager.GetKingdoms().RemoveAll(x => true);
 
+            MBObjectManager.Instance.ClearAllObjectsWithType(typeof(CharacterObject));
+            MBObjectManager.Instance.ClearAllObjectsWithType(typeof(Hero));
+
             typeof(Campaign)
                 .GetField("_towns", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(Campaign.Current, new List<Town>());
@@ -79,6 +83,8 @@ namespace Coop.Mod.Managers
 
             List<Settlement> settlements = campaignObjectManager.Settlements.ToList();
             settlements.ForEach(x => Campaign.Current.ObjectManager.UnregisterObject(x));
+
+            MobileParty.MainParty.RemoveParty();
 
             GC.Collect();
         }

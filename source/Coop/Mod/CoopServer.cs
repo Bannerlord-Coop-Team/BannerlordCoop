@@ -28,6 +28,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization;
 using TaleWorlds.TwoDimension;
 using System.Reflection;
+using Coop.Mod.Serializers.Custom;
 
 namespace Coop.Mod
 {

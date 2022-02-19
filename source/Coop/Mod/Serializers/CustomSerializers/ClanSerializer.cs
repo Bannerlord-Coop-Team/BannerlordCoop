@@ -79,8 +79,6 @@ namespace Coop.Mod.Serializers.Custom
                         }
                         break;
                     case "_basicTroop":
-                        SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value));
-                        break;
                     case "_leader":
                         // Assigned by SetHeroReference on deserialization
                         references.Add(fieldInfo, CoopObjectManager.GetGuid(value));

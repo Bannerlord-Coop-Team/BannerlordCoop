@@ -44,11 +44,11 @@ namespace Coop.Mod.Serializers
                         break;
                     case "<MemberRoster>k__BackingField":
                         // TroopRoster
-                        SNNSO.Add(fieldInfo, new Custom.TroopRosterSerializer((TroopRoster)value));
+                        //SNNSO.Add(fieldInfo, new Custom.TroopRosterSerializer((TroopRoster)value));
                         break;
                     case "<PrisonRoster>k__BackingField":
                         // TroopRoster
-                        SNNSO.Add(fieldInfo, new Custom.TroopRosterSerializer((TroopRoster)value));
+                        //SNNSO.Add(fieldInfo, new Custom.TroopRosterSerializer((TroopRoster)value));
                         break;
                     case "<ItemRoster>k__BackingField":
                         // ItemRoster
@@ -99,7 +99,7 @@ namespace Coop.Mod.Serializers
                 entry.Key.SetValue(newPartyBase, entry.Value.Deserialize());
             }
 
-            newPartyBase.AddElementToMemberRoster(hero.CharacterObject, 1);
+            newPartyBase.AddElementToMemberRoster(hero.CharacterObject, 1, true);
             newPartyBase.GetType().GetField("_leader", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, hero.CharacterObject);
             newPartyBase.GetType().GetField("<MobileParty>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, mobileParty);
 

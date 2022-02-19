@@ -302,6 +302,8 @@ namespace Coop.Mod.Persistence
                     return;
                 }
 
+                CoopObjectManager.AddObject(party);
+
                 m_PartiesToAdd.Add(party);
             }
         }

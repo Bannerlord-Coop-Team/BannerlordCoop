@@ -63,11 +63,7 @@ namespace Coop.Mod.Serializers
                     }
                     else
                     {
-                        object value = field.GetValue(obj);
-                        if (value != null)
-                        {
-                            NonSerializableObjects.Add(field);
-                        }
+                        NonSerializableObjects.Add(field);
                     }
                 }
             }
