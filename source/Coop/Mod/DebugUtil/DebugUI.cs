@@ -29,6 +29,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using Registry = Sync.Registry;
 using Logger = NLog.Logger;
+using SandBox.View.Map;
 
 namespace Coop.Mod.DebugUtil
 {
@@ -36,6 +37,9 @@ namespace Coop.Mod.DebugUtil
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly string m_WindowTitle = "Debug UI";
+
+        private HashSet<object> detailsObjects = new HashSet<object>();
+        private HashSet<object> toDeleteObjects = new HashSet<object>();
 
         public bool Visible { get; set; }
 
@@ -49,10 +53,98 @@ namespace Coop.Mod.DebugUtil
                 DisplayConnectionInfo();
                 DisplayHarmonyPatches();
                 DisplayPersistenceMenu();
+                DisplayCoopObjectManagers();
                 End();
+
+                foreach(object detailObject in this.detailsObjects)
+                {
+                    Imgui.Begin(detailObject.ToString());
+                    if(Imgui.Button("close"))
+                    {
+                        this.toDeleteObjects.Add(detailObject);
+                    }
+
+                    Type detailObjectType = detailObject.GetType();
+
+                    foreach (PropertyInfo prop in detailObjectType.GetProperties())
+                    {
+                        Imgui.Text(prop.Name + ": " + prop.GetValue(detailObject, null));
+                    }
+
+                    Imgui.End();
+                }
+
+                foreach(object toDeleteObject in this.toDeleteObjects)
+                {
+                    this.detailsObjects.Remove(toDeleteObject);
+                }
+
+                this.toDeleteObjects.Clear();
+                Imgui.EndMainThreadScope();
             }
         }
         public int Priority { get; } = UpdatePriority.MainLoop.DebugUI;
+
+        private void DisplayCoopObjectManagers()
+        {
+            if (!Imgui.TreeNode("Object managers"))
+            {
+                return;
+            }
+
+            Dictionary<Type, List<Guid>> objects = CoopObjectManager.GetAssociatedGuids();
+
+            foreach (KeyValuePair<Type, List<Guid>> objectsManaged in objects)
+            {
+                string sName = $"{objectsManaged.Key.Name} ({objectsManaged.Value.Count.ToString()})";
+                if (!Imgui.TreeNode(sName))
+                {
+                    continue;
+                }
+
+                Imgui.Columns(3);
+                Imgui.Separator();
+                Imgui.Text("Guid");
+                Imgui.NextColumn();
+                Imgui.Text("Object");
+                Imgui.NextColumn();
+                Imgui.Text("Actions");
+                Imgui.NextColumn();
+
+                objectsManaged.Value.ForEach(guid =>
+                {
+                    object objectOfGuuid = CoopObjectManager.GetObject(guid);
+
+                    Imgui.Text(guid.ToString());
+                    Imgui.NextColumn();
+                    if (objectOfGuuid is ITrackableBase)
+                    {
+                        if (Imgui.Button(objectOfGuuid.ToString()))
+                        {
+                            MapScreen.Instance.FastMoveCameraToPosition(((ITrackableBase)objectOfGuuid).GetPosition().AsVec2);
+                        }
+                    }
+                    else
+                    {
+                        Imgui.Text(objectOfGuuid.ToString());
+                    }
+                    Imgui.NextColumn();
+                    if( Imgui.Button("Details###" + guid) )
+                    {
+                        if (this.detailsObjects.Contains(objectOfGuuid))
+                            this.detailsObjects.Remove(objectOfGuuid);
+                        else this.detailsObjects.Add(objectOfGuuid);
+                    }
+                    Imgui.NextColumn();
+                });
+
+                Imgui.Columns();
+                Imgui.TreePop();
+            }
+
+
+            Imgui.TreePop();
+        }
 
         private static void DisplayPersistenceMenu()
         {
@@ -627,7 +719,6 @@ namespace Coop.Mod.DebugUtil
         private static void End()
         {
             Imgui.End();
-            Imgui.EndMainThreadScope();
         }
 
         private class SPeer
