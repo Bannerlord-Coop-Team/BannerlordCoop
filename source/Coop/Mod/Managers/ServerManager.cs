@@ -11,6 +11,7 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem.Load;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Managers
 {
@@ -47,7 +48,15 @@ namespace Coop.Mod.Managers
             MobileParty mainParty = MobileParty.MainParty;
 
             mainParty.RemoveParty();
-            foreach(Hero hero in Hero.AllAliveHeroes)
+
+            // Completely removes server hero but cant move then
+            //KillCharacterAction.ApplyByRemove(Hero.MainHero);
+
+            //typeof(CampaignObjectManager)
+            //    .GetMethod("UnregisterDeadHero", BindingFlags.Instance | BindingFlags.NonPublic)
+            //    .Invoke(Campaign.Current.CampaignObjectManager, new object[] { Hero.MainHero });
+
+            foreach (Hero hero in Hero.AllAliveHeroes)
             {
                 CoopObjectManager.AddObject(hero.CharacterObject);
                 CoopObjectManager.AddObject(hero);

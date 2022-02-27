@@ -99,21 +99,21 @@ namespace Coop.Mod.Persistence
 
             room.ClientJoined += controller =>
             {
-                if (controller.Scope == null)
-                {
-                    throw new Exception("Connected clients should always be scoped!");
-                }
-                controller.Scope.Evaluator = new CoopRailScopeEvaluator(
-                    room.Clients.Count == 1,    // the first client is always the arbiter.
-                    () =>
-                {
-                    if (m_ClientControlledParties.TryGetValue((RailServerPeer) controller, out MobileParty party))
-                    {
-                        return m_Parties.ContainsKey(party) ? m_Parties[party] : null;
-                    }
-                    return null;
-                },
-                GetScopeRange);
+                //if (controller.Scope == null)
+                //{
+                //    throw new Exception("Connected clients should always be scoped!");
+                //}
+                //controller.Scope.Evaluator = new CoopRailScopeEvaluator(
+                //    room.Clients.Count == 1,    // the first client is always the arbiter.
+                //    () =>
+                //{
+                //    if (m_ClientControlledParties.TryGetValue((RailServerPeer) controller, out MobileParty party))
+                //    {
+                //        return m_Parties.ContainsKey(party) ? m_Parties[party] : null;
+                //    }
+                //    return null;
+                //},
+                //GetScopeRange);
             };
             
             WorldEntityServer = room.AddNewEntity<WorldEntityServer>();

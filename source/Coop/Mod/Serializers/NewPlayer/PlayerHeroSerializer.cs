@@ -202,10 +202,10 @@ namespace Coop.Mod.Serializers
 
             Campaign.Current.MainParty.ActualClan = Clan.PlayerClan;
             Campaign.Current.MainParty.PartyComponent = lordPartyComponent;
-            
+
             // Invoke party visual onstartup to initialize properly
-            typeof(PartyVisual).GetMethod("TaleWorlds.CampaignSystem.IPartyVisual.OnStartup", BindingFlags.Instance | BindingFlags.NonPublic)
-            .Invoke(hero.PartyBelongedTo.Party.Visuals, new object[] { hero.PartyBelongedTo.Party });
+            PartyBase partyBase = hero.PartyBelongedTo.Party;
+            partyBase.Visuals.OnStartup(partyBase);
 
             Debug.WriteLine($"{hero.Id}");
 

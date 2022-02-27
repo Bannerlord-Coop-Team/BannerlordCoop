@@ -55,7 +55,7 @@ namespace Coop.Mod.Serializers.Custom
                         SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
                         break;
                     case "<Culture>k__BackingField":
-                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+                        SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)value));
                         break;
                     case "<LastFactionChangeTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));

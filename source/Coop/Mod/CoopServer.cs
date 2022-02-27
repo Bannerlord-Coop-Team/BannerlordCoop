@@ -292,6 +292,8 @@ namespace Coop.Mod
             CoopObjectManager.AddObject(newHero.Clan);
             CoopObjectManager.AddObject(newHero.PartyBelongedTo.PartyComponent.HomeSettlement);
 
+            GameData.SPlayerHeroId = newHeroGuid;
+
             GameData gameData = new GameData();
             gameData.PlayerHeroId = newHeroGuid;
 

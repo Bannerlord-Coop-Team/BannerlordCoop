@@ -15,21 +15,25 @@ namespace Coop.Mod.Data
         [NonSerialized]
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
+        // TODO remove static
+        public static Guid SPlayerHeroId { get; set; }
         public Guid PlayerHeroId { get; set; }
 
         public bool RequiresCharacterCreation => !Coop.IsServer;
 
-        List<ICustomSerializer[]> data = new List<ICustomSerializer[]>();
+        List<CustomSerializerWithGuid[]> data = new List<CustomSerializerWithGuid[]>();
 
         Dictionary<Guid, string> ExpectedIds = new Dictionary<Guid, string>();
 
         public GameData()
         {
             //.Where(hero => hero != Hero.MainHero)
-            data = new List<ICustomSerializer[]>
+            data = new List<CustomSerializerWithGuid[]>
             {
-                CoopObjectManager.GetObjects<Hero>().Select(hero => new HeroSerializer(hero)).ToArray(),
-                CoopObjectManager.GetObjects<MobileParty>().Select(party => new MobilePartySerializer(party)).ToArray(),
+                //CoopObjectManager.GetObjects<Hero>().Select(hero => new HeroSerializer(hero)).ToArray(),
+                //CoopObjectManager.GetObjects<MobileParty>().Select(party => new MobilePartySerializer(party)).ToArray(),
+                new CustomSerializerWithGuid[] { new HeroSerializer(CoopObjectManager.GetObject<Hero>(SPlayerHeroId))},
+                new CustomSerializerWithGuid[] { new MobilePartySerializer(CoopObjectManager.GetObject<Hero>(SPlayerHeroId).PartyBelongedTo)},
                 CoopObjectManager.GetObjects<Settlement>().Select(settlement => new SettlementSerializer(settlement)).ToArray(),
                 CoopObjectManager.GetObjects<Town>().Select(town => new TownSerializer(town)).ToArray(),
                 CoopObjectManager.GetObjects<Village>().Select(village => new VillageSerializer(village)).ToArray(),

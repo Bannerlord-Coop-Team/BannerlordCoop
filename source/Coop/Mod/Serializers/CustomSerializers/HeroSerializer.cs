@@ -159,11 +159,6 @@ namespace Coop.Mod.Serializers.Custom
                 throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
             }
 
-            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
-            {
-                entry.Value.ResolveReferenceGuids();
-            }
-
             // Deserialize exSpouse list
             List<Hero> lExSpouses = new List<Hero>();
             foreach (Guid exSpouseId in ExSpouses)
@@ -177,6 +172,11 @@ namespace Coop.Mod.Serializers.Custom
                 Guid id = entry.Value;
 
                 field.SetValue(newHero, CoopObjectManager.GetObject(id));
+            }
+
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
             }
         }
     }

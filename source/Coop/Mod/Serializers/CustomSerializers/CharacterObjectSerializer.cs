@@ -19,10 +19,14 @@ namespace Coop.Mod.Serializers.Custom
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
 
+        string stringId;
+
         Guid hero;
 
         public CharacterObjectSerializer(CharacterObject characterObject) : base(characterObject)
         {
+            stringId = characterObject.StringId;
+
             List<string> UnmanagedFields = new List<string>();
 
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
@@ -44,7 +48,7 @@ namespace Coop.Mod.Serializers.Custom
                         break;
 
                     case "<BodyPropertyRange>k__BackingField":
-                        // Cached object
+                        //SNNSO.Add(fieldInfo, new MBBodyPropertySerializer((MBBodyProperty)value));
                         break;
 
                     case "_culture":
@@ -102,7 +106,7 @@ namespace Coop.Mod.Serializers.Custom
 
         public override object Deserialize()
         {
-            characterObject = new CharacterObject();
+            characterObject = MBObjectManager.Instance.CreateObject<CharacterObject>(stringId);
 
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)

@@ -30,6 +30,11 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using System.Reflection;
 using Logger = NLog.Logger;
+using SandBox.View.Map;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade.View;
+using TaleWorlds.Engine;
+using SandBox;
 
 namespace Coop.Mod
 {
@@ -305,14 +310,17 @@ namespace Coop.Mod
 
             gameData.Unpack();
 
+            Hero oldPlayer = Hero.MainHero;
+
             Hero newPlayer = CoopObjectManager.GetObject<Hero>(gameData.PlayerHeroId);
 
-            CharacterObject testObj = newPlayer.PartyBelongedTo.Party.MemberRoster.GetCharacterAtIndex(0);
-
-            Game.Current.PlayerTroop = newPlayer.CharacterObject;
+            newPlayer.PartyBelongedTo.IsVisible = true;
             ChangePlayerCharacterAction.Apply(newPlayer);
 
-            newPlayer.PartyBelongedTo.Party.UpdateVisibilityAndInspected(0, true);
+            PartyBase partyBase = newPlayer.PartyBelongedTo.Party;
+            partyBase.MemberRoster.Clear();
+            partyBase.AddElementToMemberRoster(newPlayer.CharacterObject, 1, true);
+            partyBase.Visuals.OnStartup(partyBase);
 
             m_HeroGUID = gameData.PlayerHeroId;
 

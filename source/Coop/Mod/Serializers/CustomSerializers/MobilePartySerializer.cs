@@ -5,6 +5,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Serializers.Custom
 {
@@ -25,10 +26,12 @@ namespace Coop.Mod.Serializers.Custom
 
         List<Guid> attachedParties = new List<Guid>();
 
+        string stringId;
         string name;
 
         public MobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
         {
+            stringId = mobileParty.StringId;
             name = mobileParty.Name.ToString();
 
             List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
@@ -130,7 +133,7 @@ namespace Coop.Mod.Serializers.Custom
 
         public override object Deserialize()
         {
-            mobileParty = new MobileParty();
+            mobileParty = MBObjectManager.Instance.CreateObject<MobileParty>(stringId);
 
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
