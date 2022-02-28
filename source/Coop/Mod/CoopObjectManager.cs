@@ -18,8 +18,6 @@ namespace Coop.Mod
         private static readonly Dictionary<object, Guid> Guids = new Dictionary<object, Guid>();
         private static readonly Dictionary<Type, List<Guid>> AssosiatedGuids = new Dictionary<Type, List<Guid>>();
         
-        
-        
         private static void AddTypeEntry(object obj, Guid id)
         {
             Type type = obj.GetType();
@@ -201,6 +199,11 @@ namespace Coop.Mod
         public static IEnumerable<T> GetObjects<T>()
         {
             return AssosiatedGuids[typeof(T)].Select(guid => (T)GetObject(guid));
+        }
+
+        public static Dictionary<Type, List<Guid>> GetAssociatedGuids()
+        {
+            return AssosiatedGuids;
         }
 
         public static IEnumerable<Guid> GetTypeGuids<T>()
