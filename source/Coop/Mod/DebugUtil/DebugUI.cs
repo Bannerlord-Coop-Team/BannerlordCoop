@@ -33,6 +33,9 @@ using SandBox.View.Map;
 
 namespace Coop.Mod.DebugUtil
 {
+    /// <summary>
+    /// Utility using Imgui that allows you to have a simple display to present the important information of the mood.
+    /// </summary>
     public class DebugUI : IUpdateable
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -99,7 +102,7 @@ namespace Coop.Mod.DebugUtil
                 Imgui.NextColumn();
                 Imgui.Text("Object");
                 Imgui.NextColumn();
-                Imgui.Text("Actions");
+                Imgui.Text("Action");
                 Imgui.NextColumn();
 
                 objectsManaged.Value.ForEach(guid =>
@@ -108,6 +111,7 @@ namespace Coop.Mod.DebugUtil
 
                     Imgui.Text(guid.ToString());
                     Imgui.NextColumn();
+
                     if (objectOfGuuid is ITrackableBase)
                     {
                         if (Imgui.Button(objectOfGuuid.ToString()))
@@ -120,11 +124,17 @@ namespace Coop.Mod.DebugUtil
                         Imgui.Text(objectOfGuuid.ToString());
                     }
                     Imgui.NextColumn();
+
                     if( Imgui.Button("Details###" + guid) )
                     {
                         if (this.detailsObjects.Contains(objectOfGuuid))
+                        {
                             this.detailsObjects.Remove(objectOfGuuid);
-                        else this.detailsObjects.Add(objectOfGuuid);
+                        }
+                        else
+                        {
+                            this.detailsObjects.Add(objectOfGuuid);
+                        }
                     }
                     Imgui.NextColumn();
                 });
@@ -169,12 +179,14 @@ namespace Coop.Mod.DebugUtil
             this.toDeleteObjects.Clear();
         }
 
+        /// <summary>
+        /// Displaying information on persistence (entry point), the sub-sections are <c>DisplayPersistenceInfo</c>,
+        /// <c>DisplayClientRpcInfo</c> and <c>DisplayEntities</c>.
+        /// </summary>
         private void DisplayPersistenceMenu()
         {
             if (!Imgui.TreeNode("Persistence"))
-            {
                 return;
-            }
 
             DisplayPersistenceInfo();
             DisplayClientRpcInfo();
@@ -233,12 +245,117 @@ namespace Coop.Mod.DebugUtil
             Imgui.Columns();
         }
 
+        private void DisplayClientRpcInfo()
+        {
+            if (!Imgui.TreeNode("Client synchronized method calls"))
+                return;
+
+            if (CoopClient.Instance?.Synchronization.BroadcastHistory == null)
+            {
+                Imgui.Text("Coop client not connected.");
+            }
+            else
+            {
+                EventBroadcastingQueue queue = CoopServer.Instance.Environment?.EventQueue;
+                if (queue != null)
+                {
+                    int currentQueueSize = queue.Count;
+                    double avgSize = m_AverageEventsInQueue.Push(currentQueueSize);
+                    Imgui.Text(
+                        $"Event queue {queue.Count}/{EventBroadcastingQueue.MaximumQueueSize}.");
+                    Imgui.Text(
+                        $"    min {m_AverageEventsInQueue.AllTimeMin} / avg {Math.Round(m_AverageEventsInQueue.Average)} / max {m_AverageEventsInQueue.AllTimeMax}.");
+                }
+
+#if DEBUG
+                CallStatistics history = CoopClient.Instance?.Synchronization.BroadcastHistory;
+                Imgui.Columns(2);
+
+                Imgui.Text("Tick");
+                foreach (CallTrace trace in history)
+                {
+                    Imgui.Text(trace.Tick.ToString());
+                }
+
+                Imgui.NextColumn();
+                Imgui.Text("Call");
+                foreach (CallTrace trace in history)
+                {
+                    Imgui.Text(trace.Call.ToString());
+                }
+
+                Imgui.Columns();
+
+
+#else
+                DisplayDebugDisabledText();
+#endif
+            }
+
+            Imgui.TreePop();
+        }
+
+        private void DisplayEntities()
+        {
+            if (!Imgui.TreeNode("Parties"))
+                return;
+
+            if (CoopServer.Instance?.Persistence?.MobilePartyEntityManager == null)
+            {
+                RailClientRoom clientRoom = CoopClient.Instance?.Persistence?.Room;
+                if (clientRoom != null)
+                {
+                    var entities = clientRoom.Entities
+                        .OfType<MobilePartyEntityClient>()
+                        .ToList().OrderBy(o => o.State.PartyId);
+                    foreach (MobilePartyEntityClient entity in entities)
+                    {
+                        Imgui.Text(entity.ToString());
+                    }
+                }
+            }
+            else
+            {
+                MobilePartyEntityManager manager = CoopServer.Instance.Persistence.MobilePartyEntityManager;
+
+                Imgui.SliderFloat("Client scope range", ref manager.ClientRailScopeRange, 0f, 100f);
+
+                Imgui.Columns(2);
+                Imgui.Separator();
+                Imgui.Text("ID");
+                var parties = manager.ServerPartyEntities.ToList();
+                foreach (RailEntityServer entity in parties)
+                {
+                    if (entity != null)
+                    {
+                        Imgui.Text(entity.Id.ToString());
+                    }
+                }
+
+                Imgui.NextColumn();
+                Imgui.Text("Entity");
+                Imgui.Separator();
+                foreach (RailEntityServer entity in parties)
+                {
+                    if (entity != null)
+                    {
+                        Imgui.Text(entity.ToString());
+                    }
+                }
+
+                Imgui.Columns();
+            }
+
+            Imgui.TreePop();
+        }
+
+        /// <summary>
+        /// Displays all method patches using noHarmony that have been performed on the game.
+        /// </summary>
         private void DisplayHarmonyPatches()
         {
             if (!Imgui.TreeNode("Harmony patches"))
-            {
                 return;
-            }
             
             Dictionary<MethodBase, List<InvokableId>> coopPatchMethods = new Dictionary<MethodBase, List<InvokableId>>();
             foreach (KeyValuePair<InvokableId, Invokable> registrar in Registry.IdToInvokable)
@@ -444,9 +561,14 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
+        /// <summary>
+        /// First section which allows a simple control like closing the UI, connecting or disconnecting the server 
+        /// and activating the "show whole map" cheat.
+        /// </summary>
         private void AddButtons()
         {
             Imgui.NewLine();
+
             string startServerResult = null;
             string connectResult = null;
 
@@ -504,60 +626,9 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
-        private void DisplayEntities()
-        {
-            if (!Imgui.TreeNode("Parties"))
-                return;
-
-            if (CoopServer.Instance?.Persistence?.MobilePartyEntityManager == null)
-            {
-                RailClientRoom clientRoom = CoopClient.Instance?.Persistence?.Room;
-                if (clientRoom != null)
-                {
-                    var entities = clientRoom.Entities
-                        .OfType<MobilePartyEntityClient>()
-                        .ToList().OrderBy(o => o.State.PartyId);
-                    foreach (MobilePartyEntityClient entity in entities)
-                    {
-                        Imgui.Text(entity.ToString());
-                    }
-                }
-            }
-            else
-            {
-                MobilePartyEntityManager manager = CoopServer.Instance.Persistence.MobilePartyEntityManager;
-
-                Imgui.SliderFloat("Client scope range", ref manager.ClientRailScopeRange, 0f, 100f);
-
-                Imgui.Columns(2);
-                Imgui.Separator();
-                Imgui.Text("ID");
-                var parties = manager.ServerPartyEntities.ToList();
-                foreach (RailEntityServer entity in parties)
-                {
-                    if (entity != null)
-                    {
-                        Imgui.Text(entity.Id.ToString());
-                    }
-                }
-
-                Imgui.NextColumn();
-                Imgui.Text("Entity");
-                Imgui.Separator();
-                foreach (RailEntityServer entity in parties)
-                {
-                    if (entity != null)
-                    {
-                        Imgui.Text(entity.ToString());
-                    }
-                }
-
-                Imgui.Columns();
-            }
-
-            Imgui.TreePop();
-        }
-
+        /// <summary>
+        /// Display that allows you to scan your environment and check if there is a bannerlord coop server running.
+        /// </summary>
         private void DisplayDiscovery()
         {
             if (!Imgui.TreeNode("LAN server discovery"))
@@ -585,6 +656,7 @@ namespace Coop.Mod.DebugUtil
                     }
                 }
             }
+
             Imgui.Text("Scanning...");
 
             Imgui.TreePop();
@@ -662,56 +734,6 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private void DisplayClientRpcInfo()
-        {
-            if (!Imgui.TreeNode("Client synchronized method calls"))
-                return;
-
-            if (CoopClient.Instance?.Synchronization.BroadcastHistory == null)
-            {
-                Imgui.Text("Coop client not connected.");
-            }
-            else
-            {
-                EventBroadcastingQueue queue = CoopServer.Instance.Environment?.EventQueue;
-                if (queue != null)
-                {
-                    int currentQueueSize = queue.Count;
-                    double avgSize = m_AverageEventsInQueue.Push(currentQueueSize);
-                    Imgui.Text(
-                        $"Event queue {queue.Count}/{EventBroadcastingQueue.MaximumQueueSize}.");
-                    Imgui.Text(
-                        $"    min {m_AverageEventsInQueue.AllTimeMin} / avg {Math.Round(m_AverageEventsInQueue.Average)} / max {m_AverageEventsInQueue.AllTimeMax}.");
-                }
-
-#if DEBUG
-                CallStatistics history = CoopClient.Instance?.Synchronization.BroadcastHistory;
-                Imgui.Columns(2);
-                
-                Imgui.Text("Tick");
-                foreach (CallTrace trace in history)
-                {
-                    Imgui.Text(trace.Tick.ToString());
-                }
-                
-                Imgui.NextColumn();
-                Imgui.Text("Call");
-                foreach (CallTrace trace in history)
-                {
-                    Imgui.Text(trace.Call.ToString());
-                }
-                
-                Imgui.Columns();
-                
-                
-#else
-                    DisplayDebugDisabledText();
-#endif
-            }
-
-            Imgui.TreePop();
-        }
-
         [Conditional("DEBUG")]
         private void DisplayDebugDisabledText()
         {
@@ -737,6 +759,7 @@ namespace Coop.Mod.DebugUtil
         private static class DebugShowWholeMapPatch
         {
             public static bool IsCheatEnabled = false;
+
             static bool Prefix(MobileParty __instance, ref float __result)
             {
                 if (IsCheatEnabled && __instance == MobileParty.MainParty)
@@ -744,6 +767,7 @@ namespace Coop.Mod.DebugUtil
                     __result = Single.MaxValue;
                     return false;
                 }
+
                 return true;
             }
         }
