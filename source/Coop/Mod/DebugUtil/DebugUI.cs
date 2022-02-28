@@ -38,6 +38,8 @@ namespace Coop.Mod.DebugUtil
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly string m_WindowTitle = "Debug UI";
 
+        public int Priority { get; } = UpdatePriority.MainLoop.DebugUI;
+
         private HashSet<object> detailsObjects = new HashSet<object>();
         private HashSet<object> toDeleteObjects = new HashSet<object>();
 
@@ -47,60 +49,43 @@ namespace Coop.Mod.DebugUtil
         {
             if (Visible)
             {
-                Begin();
+                Imgui.BeginMainThreadScope();
+                Imgui.Begin(m_WindowTitle);
+
                 AddButtons();
                 DisplayDiscovery();
                 DisplayConnectionInfo();
                 DisplayHarmonyPatches();
                 DisplayPersistenceMenu();
                 DisplayCoopObjectManagers();
-                End();
 
-                foreach(object detailObject in this.detailsObjects)
-                {
-                    Imgui.Begin(detailObject.ToString());
-                    if(Imgui.Button("close"))
-                    {
-                        this.toDeleteObjects.Add(detailObject);
-                    }
+                Imgui.End();
 
-                    Type detailObjectType = detailObject.GetType();
-
-                    foreach (PropertyInfo prop in detailObjectType.GetProperties())
-                    {
-                        Imgui.Text(prop.Name + ": " + prop.GetValue(detailObject, null));
-                    }
-
-                    Imgui.End();
-                }
-
-                foreach(object toDeleteObject in this.toDeleteObjects)
-                {
-                    this.detailsObjects.Remove(toDeleteObject);
-                }
-
-                this.toDeleteObjects.Clear();
+                DisplayCoopObjectManagersWindows();
+                
                 Imgui.EndMainThreadScope();
             }
         }
-        public int Priority { get; } = UpdatePriority.MainLoop.DebugUI;
 
+        /// <summary>
+        /// Display the list of items saved in the <c>AssociatedGuuids</c> variable of the CoopObjectManager class 
+        /// by type group (Hero, Character, Kingdom, etc.).
+        /// 
+        /// Possibility to teleport on some elements and to open a new window with the object properties.
+        /// </summary>
         private void DisplayCoopObjectManagers()
         {
-            if (!Imgui.TreeNode("Object managers"))
-            {
-                return;
-            }
-
             Dictionary<Type, List<Guid>> objects = CoopObjectManager.GetAssociatedGuids();
 
+            if (objects == null || objects.Count <= 0 || !Imgui.TreeNode("Coop object managers"))
+                return;
+   
             foreach (KeyValuePair<Type, List<Guid>> objectsManaged in objects)
             {
                 string sName = $"{objectsManaged.Key.Name} ({objectsManaged.Value.Count.ToString()})";
+
                 if (!Imgui.TreeNode(sName))
-                {
                     continue;
-                }
 
                 Imgui.Columns(3);
                 Imgui.Separator();
@@ -142,8 +127,40 @@ namespace Coop.Mod.DebugUtil
                 Imgui.TreePop();
             }
 
-
             Imgui.TreePop();
+        }
+
+        /// <summary>
+        /// Display the windows opened from the Coop object managers section with the object information 
+        /// using Reflection.
+        /// </summary>
+        private void DisplayCoopObjectManagersWindows()
+        {
+            foreach (object detailObject in this.detailsObjects)
+            {
+                Imgui.Begin(detailObject.ToString());
+
+                if (Imgui.Button("Close"))
+                {
+                    this.toDeleteObjects.Add(detailObject);
+                }
+
+                Type detailObjectType = detailObject.GetType();
+
+                foreach (PropertyInfo prop in detailObjectType.GetProperties())
+                {
+                    Imgui.Text(prop.Name + ": " + prop.GetValue(detailObject, null));
+                }
+
+                Imgui.End();
+            }
+
+            foreach (object toDeleteObject in this.toDeleteObjects)
+            {
+                this.detailsObjects.Remove(toDeleteObject);
+            }
+
+            this.toDeleteObjects.Clear();
         }
 
         private static void DisplayPersistenceMenu()
@@ -427,11 +444,6 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
-        private void Begin()
-        {
-            Imgui.BeginMainThreadScope();
-            Imgui.Begin(m_WindowTitle);
-        }
 
         private void AddButtons()
         {
@@ -714,11 +726,6 @@ namespace Coop.Mod.DebugUtil
         private static void DisplayDebugDisabledText()
         {
             Imgui.Text("DEBUG is disabled. No information available.");
-        }
-
-        private static void End()
-        {
-            Imgui.End();
         }
 
         private class SPeer
