@@ -36,12 +36,18 @@ namespace Coop.Mod.DebugUtil
     public class DebugUI : IUpdateable
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        private readonly string m_WindowTitle = "Debug UI";
 
         public int Priority { get; } = UpdatePriority.MainLoop.DebugUI;
 
         private HashSet<object> detailsObjects = new HashSet<object>();
         private HashSet<object> toDeleteObjects = new HashSet<object>();
+
+        private static Dictionary<SyncBuffered, int> m_LogEntrySize = new Dictionary<SyncBuffered, int>();
+
+        private static readonly MovingAverage m_AverageEventsInQueue = new MovingAverage(60);
+
+        [CanBeNull]
+        private static DiscoveryThread m_discoveryThread = null;
 
         public bool Visible { get; set; }
 
@@ -50,7 +56,7 @@ namespace Coop.Mod.DebugUtil
             if (Visible)
             {
                 Imgui.BeginMainThreadScope();
-                Imgui.Begin(m_WindowTitle);
+                Imgui.Begin("Debug UI");
 
                 AddButtons();
                 DisplayDiscovery();
@@ -163,7 +169,7 @@ namespace Coop.Mod.DebugUtil
             this.toDeleteObjects.Clear();
         }
 
-        private static void DisplayPersistenceMenu()
+        private void DisplayPersistenceMenu()
         {
             if (!Imgui.TreeNode("Persistence"))
             {
@@ -177,7 +183,7 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private static void DisplayPersistenceInfo()
+        private void DisplayPersistenceInfo()
         {
             List<SPeer> peers = new List<SPeer>();
             if (CoopClient.Instance.Persistence != null)
@@ -227,7 +233,7 @@ namespace Coop.Mod.DebugUtil
             Imgui.Columns();
         }
 
-        private static void DisplayHarmonyPatches()
+        private void DisplayHarmonyPatches()
         {
             if (!Imgui.TreeNode("Harmony patches"))
             {
@@ -277,24 +283,17 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private static void ShowPatches(string name, 
-            ReadOnlyCollection<HarmonyLib.Patch> patches)
+        private void ShowPatches(string name, ReadOnlyCollection<HarmonyLib.Patch> patches)
         {
             List<HarmonyLib.Patch> list = patches.ToList();
-            if (list.Count == 0)
-            {
-                return;
-            }
-            
-            if (!Imgui.TreeNode($"{name} ({list.Count})"))
-            {
-                return;
-            }
 
+            if (list.Count == 0 || !Imgui.TreeNode($"{name} ({list.Count})"))
+                return;
+ 
             foreach (HarmonyLib.Patch patch in list)
             {
-                string header = patch.PatchMethod.DeclaringType?.FullName;
-                if (Imgui.TreeNode(header))
+
+                if (Imgui.TreeNode(patch.PatchMethod.DeclaringType?.FullName))
                 {
                     const float tabWidth = 200;
                     Imgui.Text("Patch method:");
@@ -330,12 +329,19 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private static Dictionary<SyncBuffered, int> m_LogEntrySize = new Dictionary<SyncBuffered, int>();
-
-        private static void ShowCoopPatchInfo(List<InvokableId> coopPatch)
+        private void ShowCoopPatchInfo(List<InvokableId> coopPatch)
         {
             const float indent = 50f;
             const float tabWidth = 200f;
+
+            void PrintField(HashSet<FieldId> relatedFields, FieldBase valueAccess, float indentF = 0f)
+            {
+                relatedFields.Add(valueAccess.Id);
+                Imgui.Text("Related FieldId:");
+                Imgui.SameLine(tabWidth + indentF);
+                Imgui.Text($"{valueAccess.Id.InternalValue} [" + valueAccess + "]");
+            }
+
             foreach (InvokableId methodId in coopPatch)
             {
                 Imgui.Text("MethodId:");
@@ -347,21 +353,15 @@ namespace Coop.Mod.DebugUtil
                 {
                     foreach (FieldId valueId in Registry.Relation[methodId])
                     {
-                        void PrintField(FieldBase valueAccess, float indentF = 0f)
-                        {
-                            relatedFields.Add(valueAccess.Id);
-                            Imgui.Text("Related FieldId:");
-                            Imgui.SameLine(tabWidth + indentF);
-                            Imgui.Text($"{valueAccess.Id.InternalValue} [" + valueAccess + "]");
-                        }
-
                         FieldBase field = Registry.IdToField[valueId];
-                        PrintField(field);
+
+                        PrintField(relatedFields, field);
+
                         if (field is FieldAccessGroup group)
                         {
                             foreach (FieldAccess groupMember in group.Fields)
                             {
-                                PrintField(groupMember, indent);
+                                PrintField(relatedFields, groupMember, indent);
                             }
                         }
                     }
@@ -444,7 +444,6 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
-
         private void AddButtons()
         {
             Imgui.NewLine();
@@ -505,12 +504,10 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
-        private static void DisplayEntities()
+        private void DisplayEntities()
         {
             if (!Imgui.TreeNode("Parties"))
-            {
                 return;
-            }
 
             if (CoopServer.Instance?.Persistence?.MobilePartyEntityManager == null)
             {
@@ -561,8 +558,7 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        [CanBeNull] private static DiscoveryThread m_discoveryThread = null;
-        private static void DisplayDiscovery()
+        private void DisplayDiscovery()
         {
             if (!Imgui.TreeNode("LAN server discovery"))
             {
@@ -594,12 +590,10 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private static void DisplayConnectionInfo()
+        private void DisplayConnectionInfo()
         {
             if (!Imgui.TreeNode("Connectioninfo"))
-            {
                 return;
-            }
 
             Server server = CoopServer.Instance.Current;
             GameSession session = CoopClient.Instance.Session;
@@ -668,14 +662,10 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private static readonly MovingAverage m_AverageEventsInQueue = new MovingAverage(60);
-
-        private static void DisplayClientRpcInfo()
+        private void DisplayClientRpcInfo()
         {
             if (!Imgui.TreeNode("Client synchronized method calls"))
-            {
                 return;
-            }
 
             if (CoopClient.Instance?.Synchronization.BroadcastHistory == null)
             {
@@ -723,7 +713,7 @@ namespace Coop.Mod.DebugUtil
         }
 
         [Conditional("DEBUG")]
-        private static void DisplayDebugDisabledText()
+        private void DisplayDebugDisabledText()
         {
             Imgui.Text("DEBUG is disabled. No information available.");
         }
@@ -757,8 +747,5 @@ namespace Coop.Mod.DebugUtil
                 return true;
             }
         }
-        
     }
-    
-    
 }
