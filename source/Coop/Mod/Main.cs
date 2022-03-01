@@ -163,16 +163,42 @@ namespace Coop.Mod
                             ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
                                 new object[] { }));
 #endif
+
             #region ButtonAssignment
+
             CoopCampaign =
-                new InitialStateOption(
+            new InitialStateOption(
                     "CoOp Campaign",
                     new TextObject(isServer ? "Host Co-op Campaign" : "Join Co-op Campaign"),
                     9990,
                     () =>
                     {
                         string[] array = Utilities.GetFullCommandLineString().Split(' ');
+#if DEBUG
+                        foreach (string argument in array)
+                        {
+                            if (argument.ToLower() == "/server")
+                            {
+                                ClientServerModeMessage = "Started Bannerlord Co-op in server mode";
+                                //TODO add name to args
+                                CoopServer.Instance.StartGame("MP");
+                            }
+                            else if (argument.ToLower() == "/client")
+                            {
+                                ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
+                                ServerConfiguration defaultConfiguration =
+                                    new ServerConfiguration();
+                                CoopClient.Instance.Connect(
+                                    defaultConfiguration.NetworkConfiguration.LanAddress,
+                                    defaultConfiguration.NetworkConfiguration.LanPort);
+                            }
+                        }
 
+                        //ScreenManager.PushScreen(
+                        //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                        //        new object[] { }));
+
+#else
                         var saveGames = new List<InquiryElement>();
                         saveGames.Clear();
 
@@ -184,7 +210,7 @@ namespace Coop.Mod
                             InquiryElement saveInquiryElement = new InquiryElement(saveGameFilePath.GetFileNameWithoutExtension(), saveGameFilePath.GetFileNameWithoutExtension(), new ImageIdentifier(ImageIdentifierType.Null));
                             saveGames.Add(saveInquiryElement);
                         }
-#if DEBUG
+
                         InformationManager.ShowInquiry(new InquiryData("Co-op Campaign", String.Empty, true, true, "Host", "Join", () =>
                         {
                             //Host Game
@@ -194,26 +220,21 @@ namespace Coop.Mod
                         }, () => 
                         {
                             //Join Game
-                            ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
+                            //ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
 
-                            var textInquiryData = new TextInquiryData(
-                                new TextObject("Enter IP:port").ToString(), "IP:Port", true, true, "Join", "Cancel", JoinCoopGameIP, null);
+                            //var textInquiryData = new TextInquiryData(
+                            //    new TextObject("Enter IP:port").ToString(), "IP:Port", true, true, "Join", "Cancel", JoinCoopGameIP, null);
 
-                            InformationManager.ShowTextInquiry(textInquiryData);
+                            //InformationManager.ShowTextInquiry(textInquiryData);
 
-                            ServerConfiguration defaultConfiguration =
-                                new ServerConfiguration();
-                            InformationManager.DisplayMessage(new InformationMessage(defaultConfiguration.NetworkConfiguration.LanAddress.ToString() + defaultConfiguration.NetworkConfiguration.LanPort.ToString()));
+                            //ServerConfiguration defaultConfiguration =
+                            //    new ServerConfiguration();
+                            //InformationManager.DisplayMessage(new InformationMessage(defaultConfiguration.NetworkConfiguration.LanAddress.ToString() + defaultConfiguration.NetworkConfiguration.LanPort.ToString()));
 
                         }, ""
                         ));
-
-#else
-                        ScreenManager.PushScreen(
-                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                                new object[] { }));
 #endif
-        },
+                    },
 
                     () => { return (false, new TextObject()); }
                 );
@@ -300,7 +321,7 @@ namespace Coop.Mod
             base.OnApplicationTick(dt);
             if (Input.IsKeyDown(InputKey.LeftControl) && Input.IsKeyDown(InputKey.Tilde))
             {
-                CLICommands.ShowDebugUi(new List<string>());
+                CLICommands.ToggleDebugUI(new List<string>());
                 // DebugConsole.Toggle();
             }
 
