@@ -36,7 +36,7 @@ namespace Sync.Store
     public class RemoteStore : IStore
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        private readonly ConnectionBase m_Connection;
+        public readonly ConnectionBase m_Connection;
         private readonly Dictionary<ObjectId, object> m_Data;
         private readonly StoreSerializer m_Serializer;
 

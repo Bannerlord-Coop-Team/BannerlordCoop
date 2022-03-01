@@ -22,6 +22,12 @@ using Common;
 using System.Linq;
 using TaleWorlds.ObjectSystem;
 using Coop.Mod.Patch.World;
+using System.Diagnostics;
+using Coop.Mod.Data;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization;
+using TaleWorlds.TwoDimension;
+using System.Reflection;
 
 namespace Coop.Mod
 {
@@ -74,6 +80,7 @@ namespace Coop.Mod
 
         public string StartServer()
         {
+
             if (Campaign.Current == null)
             {
                 string msg = "Campaign is not loaded. Could not start server.";
@@ -111,7 +118,7 @@ namespace Coop.Mod
 
             if (m_NetManager == null)
             {
-                m_NetManager = new LiteNetManagerServer(Current, new GameData());
+                m_NetManager = new LiteNetManagerServer(Current);
                 m_NetManager.StartListening();
                 Logger.Debug("Setup network connection for server.");
             }
@@ -138,16 +145,16 @@ namespace Coop.Mod
         {
 #if DEBUG
             try
-                {
-                    LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(
-                        saveName,
-                        Utilities.GetModulesNames());
-                    MBGameManager.StartNewGame(CreateGameManager(saveGameData));
-                }
-                catch (IOException ex)
-                {
-                    Logger.Error("Save file not found: " + ex.Message);
-                }
+            {
+                LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(
+                    saveName,
+                    Utilities.GetModulesNames());
+                MBGameManager.StartNewGame(CreateGameManager(saveGameData));
+            }
+            catch (IOException ex)
+            {
+                Logger.Error("Save file not found: " + ex.Message);
+            }
 #endif
         }
 
@@ -200,7 +207,6 @@ namespace Coop.Mod
             m_CoopServerSMs.Add(connection, coopServerSM);
 
             #region State Machine Callbacks
-            coopServerSM.SendingWorldDataState.OnEntryFrom(coopServerSM.SendWorldDataTrigger, SendInitialWorldData);
             #endregion
 
             SyncedObjectStore.AddConnection(connection);
@@ -213,9 +219,13 @@ namespace Coop.Mod
 
             // Packet Handler Registration
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientRequestWorldData);
-            connection.Dispatcher.RegisterPacketHandler(ReceiveClientDeclineWorldData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientLoaded);
+            connection.Dispatcher.RegisterPacketHandler(SendGameData);
             connection.Dispatcher.RegisterPacketHandler(ReceiveClientPlayerPartyChanged);
+
+#if DEBUG
+            connection.Dispatcher.RegisterPacketHandler(ReceiveClientBadId);
+#endif
 
             // State Machine Registration
             connection.Dispatcher.RegisterStateMachine(connection, coopServerSM);
@@ -232,8 +242,8 @@ namespace Coop.Mod
             if (CoopSaveManager.PlayerParties.ContainsKey(clientId))
             {
                 // skip character creation on client
-                MBGUID guid = CoopSaveManager.PlayerParties[clientId];
-                connection.Send(new Packet(EPacket.Server_NotifyCharacterExists, new MBGUIDSerializer(guid).Serialize()));
+                Guid guid = CoopSaveManager.PlayerParties[clientId];
+                connection.Send(new Packet(EPacket.Server_NotifyCharacterExists, CommonSerializer.Serialize(guid)));
             }
             else
             {
@@ -254,6 +264,8 @@ namespace Coop.Mod
         [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestWorldData)]
         private void ReceiveClientRequestWorldData(ConnectionBase connection, Packet packet)
         {
+            OnServerSendingWorldData?.Invoke();
+
             ConnectionServer connectionServer = (ConnectionServer)connection;
             Client_RequestWorldData info =
                 Client_RequestWorldData.Deserialize(new ByteReader(packet.Payload));
@@ -265,25 +277,61 @@ namespace Coop.Mod
                     connectionServer);
         }
 
-        [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_DeclineWorldData)]
-        private void ReceiveClientDeclineWorldData(ConnectionBase connection, Packet packet)
+        [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestGameData)]
+        private void SendGameData(ConnectionBase connection, Packet packet)
         {
-            m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.DeclineWorldData);
+            PlayerHeroSerializer serializer = (PlayerHeroSerializer)CommonSerializer.Deserialize(packet.Payload);
+            Hero newHero = (Hero)serializer.Deserialize();
+            Guid newHeroGuid = CoopObjectManager.AddObject(newHero);
+
+            CoopObjectManager.AddObject(newHero);
+            CoopObjectManager.AddObject(newHero.CharacterObject);
+            CoopObjectManager.AddObject(newHero.PartyBelongedTo);
+            CoopObjectManager.AddObject(newHero.PartyBelongedTo.Party);
+            CoopObjectManager.AddObject(newHero.Clan);
+            CoopObjectManager.AddObject(newHero.PartyBelongedTo.PartyComponent.HomeSettlement);
+
+            GameData gameData = new GameData();
+            gameData.PlayerHeroId = newHeroGuid;
+
+            byte[] data = CommonSerializer.Serialize(gameData);
+
+            connection.Send(new Packet(EPacket.Server_GameData, data));
+
+            ConnectionServer connectionServer = (ConnectionServer)connection;
+            m_CoopServerSMs[connectionServer].StateMachine.Fire(ECoopServerTrigger.RequiresWorldData);
         }
 
-        [GameServerPacketHandler(ECoopServerState.SendingWorldData, EPacket.Client_Loaded)]
+        [GameServerPacketHandler(ECoopServerState.SendingGameData, EPacket.Client_Loaded)]
         private void ReceiveClientLoaded(ConnectionBase connection, Packet packet)
         {
-            m_CoopServerSMs[(ConnectionServer)connection].StateMachine.Fire(ECoopServerTrigger.ClientLoaded);
+            ConnectionServer connectionServer = (ConnectionServer)connection;
+            m_CoopServerSMs[connectionServer].StateMachine.Fire(ECoopServerTrigger.ClientLoaded);
+
+            OnServerSentWorldData?.Invoke();
         }
+
+#if DEBUG
+        [GameServerPacketHandler(ECoopServerState.SendingGameData, EPacket.BadID)]
+        private void ReceiveClientBadId(ConnectionBase connection, Packet packet)
+        {
+            GameData gameData = new GameData();
+            
+            Guid id = (Guid)CommonSerializer.Deserialize(packet.Payload);
+            object badObj = CoopObjectManager.GetObject(id);
+        }
+#endif
 
         [GameServerPacketHandler(ECoopServerState.Playing, EPacket.Client_PartyChanged)]
         private void ReceiveClientPlayerPartyChanged(ConnectionBase connection, Packet packet)
         {
-            MBGUID guid = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
-            MobileParty party = (MobileParty)MBObjectManager.Instance.GetObject(guid);
+            Guid guid = CommonSerializer.Deserialize<Guid>(packet.Payload);
+            Debug.WriteLine($"Requested GUID {guid}");
+            Hero clientHero = CoopObjectManager.GetObject<Hero>(guid);
 
-            party.Party.UpdateVisibilityAndInspected(false);
+            MobileParty party = clientHero.PartyBelongedTo;
+
+            party.Party.UpdateVisibilityAndInspected(0, false);
 
             if (!Persistence.MobilePartyEntityManager.Parties.Contains(party))
             {
@@ -292,13 +340,6 @@ namespace Coop.Mod
             }
 
             Persistence.MobilePartyEntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
-        }
-
-        private void SendInitialWorldData(ConnectionServer connection)
-        {
-            OnServerSendingWorldData?.Invoke();
-            connection.SendWorldData();
-            OnServerSentWorldData?.Invoke();
         }
     }
 }

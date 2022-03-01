@@ -306,7 +306,7 @@ namespace Coop.Lib.NoHarmony
             if (mode != TaskMode.Add)
             {
                 RemoveType cgb = campaign.GetCampaignBehavior<RemoveType>();
-                CampaignEvents.RemoveListeners(cgb);
+                CampaignEventDispatcher.Instance.RemoveListeners(cgb);
                 cbm.RemoveBehavior<RemoveType>();
             }
 

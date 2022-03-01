@@ -1,4 +1,5 @@
-﻿using Network.Infrastructure;
+﻿using Common;
+using Network.Infrastructure;
 using System;
 
 namespace Network.Protocol
@@ -10,20 +11,31 @@ namespace Network.Protocol
         Client_RequestWorldData, // Client wants to be sent a save game of the current state.
         Client_RequestParty, // Client wants to know if they already created a party.
         Client_DeclineWorldData, // Client does not need world data
+        Client_RequestGameData, // Client requires all game data
         Client_Loaded, // Sent once the client has loaded the initial world state.
+        Client_RequestParties, // Parties the client needs to be in sync with host
+        Client_RecievedParties, // Parties were loaded on client
         Client_PartyChanged, // When the player party is switched
+        Client_SendParty, // When the player party is switched
 
         Server_RequestClientInfo, // Instructs the client to send its ClientInfo.
         Server_JoinRequestAccepted, // Client is allowed to join the server.
         Server_RequireCharacterCreation, // Instructs the client to create a character.
         Server_NotifyCharacterExists, // Notifies the client a party already exists for that player id.
+        Server_HeroId, // Contains the clients party id.
         Server_WorldData, // Contains the initial state of the game world.
+        Server_GameData, // Contains data for all current heros
 
         Sync,
         StoreAdd, // Adds an object to the global object store
         StoreAck, // Sent after receiving an object via StoreAdd
         KeepAlive,
-        Persistence // Will be forwarded to the game state persistence layer.
+        Persistence, // Will be forwarded to the game state persistence layer.
+
+        CreateObject,
+#if DEBUG
+        BadID,
+#endif
     }
 
     public static class Version
@@ -58,21 +70,27 @@ namespace Network.Protocol
     {
         public readonly int m_Version;
 
-        public Client_Hello(int version)
+        public readonly CompatibilityInfo m_CompatibilityInfo;
+
+        public Client_Hello(int version, CompatibilityInfo compatibilityInfo)
         {
             m_Version = version;
+            m_CompatibilityInfo = compatibilityInfo;
         }
 
         public byte[] Serialize()
         {
             ByteWriter writer = new ByteWriter();
             writer.Binary.Write(m_Version);
+            writer.Binary.Write(m_CompatibilityInfo.Serialize());
             return writer.ToArray();
         }
 
         public static Client_Hello Deserialize(ByteReader reader)
         {
-            return new Client_Hello(reader.Binary.ReadInt32());
+            var version = reader.Binary.ReadInt32();
+            var compatibilityInfo = CompatibilityInfo.Deserialize (reader.Binary.ReadBytes((int)reader.RemainingBytes));
+            return new Client_Hello(version, compatibilityInfo);
         }
     }
 

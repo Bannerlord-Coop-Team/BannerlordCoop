@@ -1,7 +1,7 @@
 ﻿using System;
 using TaleWorlds.Core;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
     internal class BannerSerializer : ICustomSerializer
@@ -17,6 +17,11 @@ namespace Coop.Mod.Serializers
         {
             Banner newBanner = new Banner(data);
             return newBanner;
+        }
+
+        public void ResolveReferenceGuids()
+        {
+            // No references
         }
     }
 }

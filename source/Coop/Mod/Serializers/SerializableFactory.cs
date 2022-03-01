@@ -3,6 +3,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
+using Coop.Mod.Serializers.Custom;
 
 namespace Coop.Mod.Serializers
 {
@@ -47,8 +48,6 @@ namespace Coop.Mod.Serializers
                     
                 case ItemRoster itemRoster:
                     return new ItemRosterSerializer(itemRoster);
-                case MBGUID mbguid:
-                    return new MBGUIDSerializer(mbguid);
                 case MobilePartiesAroundPositionList partiesAroundPosition:
                     return new MobilePartiesAroundPositionListSerializer(partiesAroundPosition);
                 case MobileParty mobileParty:

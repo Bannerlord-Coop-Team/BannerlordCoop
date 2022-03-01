@@ -16,7 +16,6 @@ namespace Coop.Tests.Network
         private readonly TimeSpan m_keepAliveInterval = TimeSpan.FromMilliseconds(50);
         private readonly LiteNetManagerServer m_NetManagerServer;
         private readonly Mock<Server> m_Server;
-        private readonly Mock<ISaveData> m_WorldData = TestUtils.CreateMockSaveData();
 
         public ClientServerCommunication_Test()
         {
@@ -28,7 +27,7 @@ namespace Coop.Tests.Network
                 CallBase = true
             };
             m_Server.Object.Start(config);
-            m_NetManagerServer = new LiteNetManagerServer(m_Server.Object, m_WorldData.Object);
+            m_NetManagerServer = new LiteNetManagerServer(m_Server.Object);
             m_NetManagerServer.StartListening();
         }
 
@@ -76,7 +75,7 @@ namespace Coop.Tests.Network
                     .CallBase();
 
             // Setup client
-            Client client = new Client(m_WorldData.Object);
+            Client client = new Client();
             client.Manager.Connect(
                 m_Server.Object.ActiveConfig.NetworkConfiguration.LanAddress,
                 m_Server.Object.ActiveConfig.NetworkConfiguration.LanPort);
@@ -104,12 +103,6 @@ namespace Coop.Tests.Network
                 });
             Assert.True(connServerSide.State.Equals(EClientConnectionState.Connected));
             Assert.Equal(expectedReceiveOrderOnServer.Count, iPacketsReceived);
-            m_WorldData.Verify(
-                w => w.Receive(It.IsAny<ArraySegment<byte>>()),
-                bExchangeWorldData ? Times.Once() : Times.Never());
-            m_WorldData.Verify(
-                w => w.SerializeInitialWorldState(),
-                bExchangeWorldData ? Times.Once() : Times.Never());
 
             // Check if keep alive gets sent
             if (iKeepAlivesReceived == 0)
@@ -144,9 +137,9 @@ namespace Coop.Tests.Network
             public readonly LiteNetManagerClient Manager;
             public readonly GameSession Session;
 
-            public Client(ISaveData worldData)
+            public Client()
             {
-                Session = new GameSession(worldData);
+                Session = new GameSession();
                 Manager = new LiteNetManagerClient(Session, new ClientConfiguration());
             }
         }

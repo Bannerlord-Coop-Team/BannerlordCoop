@@ -24,7 +24,7 @@ namespace Coop.Mod
         /// <summary>
         /// Client is receiving world data.
         /// </summary>
-        ReceivingWorldData,
+        ReceivingGameData,
 
         /// <summary>
         /// Client is loading.
@@ -46,6 +46,11 @@ namespace Coop.Mod
         /// <summary>
         /// Client has existing character on host.
         /// </summary>
+        IsServer,
+
+        /// <summary>
+        /// Client has existing character on host.
+        /// </summary>
         CharacterExists,
 
         /// <summary>
@@ -56,7 +61,7 @@ namespace Coop.Mod
         /// <summary>
         /// World data has been received.
         /// </summary>
-        WorldDataReceived,
+        GameDataReceived,
 
         /// <summary>
         /// The game has been loaded for the client.
@@ -71,27 +76,22 @@ namespace Coop.Mod
     {
         public readonly StateConfiguration MainMenuState;
         public readonly StateConfiguration CharacterCreationState;
-        public readonly StateConfiguration ReceivingWorldDataState;
-        public readonly StateConfiguration LoadingState;
+        public readonly StateConfiguration ReceivingGameDataState;
         public readonly StateConfiguration PlayingState;
         public CoopClientSM() : base(ECoopClientState.MainManu)
         {
             // Client at Main Menu
             MainMenuState = StateMachine.Configure(ECoopClientState.MainManu);
             MainMenuState.Permit(ECoopClientTrigger.RequiresCharacterCreation, ECoopClientState.CharacterCreation);
-            MainMenuState.Permit(ECoopClientTrigger.CharacterExists, ECoopClientState.ReceivingWorldData);
+            MainMenuState.Permit(ECoopClientTrigger.IsServer, ECoopClientState.Playing);
 
             // Client creating character
             CharacterCreationState = StateMachine.Configure(ECoopClientState.CharacterCreation);
-            CharacterCreationState.Permit(ECoopClientTrigger.CharacterCreated, ECoopClientState.ReceivingWorldData);
+            CharacterCreationState.Permit(ECoopClientTrigger.CharacterCreated, ECoopClientState.ReceivingGameData);
 
             // Client receiving world data
-            ReceivingWorldDataState = StateMachine.Configure(ECoopClientState.ReceivingWorldData);
-            ReceivingWorldDataState.Permit(ECoopClientTrigger.WorldDataReceived, ECoopClientState.Loading);
-
-            // Client loading
-            LoadingState = StateMachine.Configure(ECoopClientState.Loading);
-            LoadingState.Permit(ECoopClientTrigger.GameLoaded, ECoopClientState.Playing);
+            ReceivingGameDataState = StateMachine.Configure(ECoopClientState.ReceivingGameData);
+            ReceivingGameDataState.Permit(ECoopClientTrigger.GameDataReceived, ECoopClientState.Playing);
 
             // Client playing
             PlayingState = StateMachine.Configure(ECoopClientState.Playing);

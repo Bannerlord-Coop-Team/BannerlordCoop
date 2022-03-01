@@ -26,7 +26,7 @@ namespace Coop.Mod.DebugUtil
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("show_debug_ui", sGroupName)]
-        public static string ShowDebugUi(List<string> parameters)
+        public static string ToggleDebugUI(List<string> parameters)
         {
             if (m_DebugUI == null)
             {
@@ -34,7 +34,8 @@ namespace Coop.Mod.DebugUtil
                 Main.Instance.Updateables.Add(m_DebugUI);
             }
 
-            m_DebugUI.Visible = true;
+            m_DebugUI.Visible = !m_DebugUI.Visible;
+
             return "";
         }
 

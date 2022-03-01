@@ -6,10 +6,10 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    internal class ItemRosterSerializer : ICustomSerializer
+    public class ItemRosterSerializer : ICustomSerializer
     {
         readonly List<byte[]> data = new List<byte[]>();
 
@@ -52,5 +52,10 @@ namespace Coop.Mod.Serializers
 
             return newRoster;
             }
+
+        public void ResolveReferenceGuids()
+        {
+            // No references
         }
+    }
 }

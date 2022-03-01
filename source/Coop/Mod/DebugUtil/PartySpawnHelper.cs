@@ -27,7 +27,7 @@ namespace Coop.Mod.DebugUtil
                 5f,
                 2f);
             party.SetCustomName(new TextObject("testers"));
-            party.Party.Owner = null;
+            //party.Party.Owner = null;
             party.Party.Visuals.SetMapIconAsDirty();
 
             return party;

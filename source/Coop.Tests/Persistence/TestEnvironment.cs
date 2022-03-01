@@ -19,7 +19,6 @@ namespace Coop.Tests.Persistence
 {
     public class TestEnvironment
     {
-        public Dictionary<MBGUID, MobileParty> Parties = new Dictionary<MBGUID, MobileParty>();
         public TestEnvironment(int iNumberOfClients)
         {
             ConnectionsRaw = new TestConnectionsRaw(iNumberOfClients);
@@ -41,7 +40,7 @@ namespace Coop.Tests.Persistence
 
             // Railgun
             RailSynchronizedFactory.Detect(Assembly.GetAssembly(typeof(RailBitBufferExtensions)));
-            ServerEnvironment = new TestEnvironmentServer(StoreServer, Parties);
+            ServerEnvironment = new TestEnvironmentServer(StoreServer);
             EventQueue = ServerEnvironment.EventQueue;
             var registryServer = serverRegistryCreator(ServerEnvironment.Mock.Object);
             Persistence = new TestPersistence(registryServer);
@@ -53,7 +52,7 @@ namespace Coop.Tests.Persistence
                 var server = it.First.Second;
                 var store = it.Second;
 
-                var clientEnvironment = new TestEnvironmentClient(store, Parties);
+                var clientEnvironment = new TestEnvironmentClient(store);
                 ClientEnvironments.Add(clientEnvironment);
                 var registryClient =
                     clientRegistryCreator(clientEnvironment.Mock.Object);

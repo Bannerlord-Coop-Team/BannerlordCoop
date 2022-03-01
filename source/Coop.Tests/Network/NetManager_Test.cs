@@ -16,6 +16,7 @@ namespace Coop.Tests.Network
             m_Server = TestUtils.StartNewServer();
             m_NetManagerServer = new LiteNetManagerServer(m_Server, Mock.Of<ISaveData>());
             m_NetManagerServer.StartListening();
+            CompatibilityInfo.ModuleProvider = new ModuleInfoProviderMock();
         }
 
         private readonly Server m_Server;

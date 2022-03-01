@@ -35,15 +35,6 @@ namespace Coop.Tests
             return connection;
         }
 
-        public static Mock<ISaveData> CreateMockSaveData()
-        {
-            Mock<ISaveData> saveData = new Mock<ISaveData>();
-            saveData = new Mock<ISaveData>();
-            saveData.Setup(w => w.Receive(It.IsAny<ArraySegment<byte>>())).Returns(true);
-            saveData.Setup(w => w.SerializeInitialWorldState()).Returns(new byte[0]);
-            return saveData;
-        }
-
         public static void SetupLogger()
         {
             lock (LoggerLock)
