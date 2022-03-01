@@ -177,29 +177,29 @@ namespace Coop.Mod
                     {
                         string[] array = Utilities.GetFullCommandLineString().Split(' ');
 #if DEBUG
-                        //foreach (string argument in array)
-                        //{
-                        //    if (argument.ToLower() == "/server")
-                        //    {
-                        //        ClientServerModeMessage = "Started Bannerlord Co-op in server mode";
-                        //        //TODO add name to args
-                        //        CoopServer.Instance.StartGame("MP");
-                        //    }
-                        //    else if (argument.ToLower() == "/client")
-                        //    {
-                        //        ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
-                        //        ServerConfiguration defaultConfiguration =
-                        //            new ServerConfiguration();
-                        //        CoopClient.Instance.Connect(
-                        //            defaultConfiguration.NetworkConfiguration.LanAddress,
-                        //            defaultConfiguration.NetworkConfiguration.LanPort);
-                        //    }
-                        //}
+                        foreach (string argument in array)
+                        {
+                            if (argument.ToLower() == "/server")
+                            {
+                                ClientServerModeMessage = "Started Bannerlord Co-op in server mode";
+                                //TODO add name to args
+                                CoopServer.Instance.StartGame("MP");
+                            }
+                            else if (argument.ToLower() == "/client")
+                            {
+                                ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
+                                ServerConfiguration defaultConfiguration =
+                                    new ServerConfiguration();
+                                CoopClient.Instance.Connect(
+                                    defaultConfiguration.NetworkConfiguration.LanAddress,
+                                    defaultConfiguration.NetworkConfiguration.LanPort);
+                            }
+                        }
 
                         //ScreenManager.PushScreen(
                         //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
                         //        new object[] { }));
-
+#else
                         foreach (string argument in array)
                         {
                             if (argument.ToLower() == "/server")
