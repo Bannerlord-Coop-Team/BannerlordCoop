@@ -177,64 +177,58 @@ namespace Coop.Mod
                     {
                         string[] array = Utilities.GetFullCommandLineString().Split(' ');
 #if DEBUG
+                        //foreach (string argument in array)
+                        //{
+                        //    if (argument.ToLower() == "/server")
+                        //    {
+                        //        ClientServerModeMessage = "Started Bannerlord Co-op in server mode";
+                        //        //TODO add name to args
+                        //        CoopServer.Instance.StartGame("MP");
+                        //    }
+                        //    else if (argument.ToLower() == "/client")
+                        //    {
+                        //        ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
+                        //        ServerConfiguration defaultConfiguration =
+                        //            new ServerConfiguration();
+                        //        CoopClient.Instance.Connect(
+                        //            defaultConfiguration.NetworkConfiguration.LanAddress,
+                        //            defaultConfiguration.NetworkConfiguration.LanPort);
+                        //    }
+                        //}
+
+                        //ScreenManager.PushScreen(
+                        //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                        //        new object[] { }));
+
                         foreach (string argument in array)
                         {
                             if (argument.ToLower() == "/server")
                             {
                                 ClientServerModeMessage = "Started Bannerlord Co-op in server mode";
                                 //TODO add name to args
-                                CoopServer.Instance.StartGame("MP");
+                                var saveGames = new List<InquiryElement>();
+                                saveGames.Clear();
+
+                                InquiryElement HostNewGameElement = new InquiryElement("Host_New_Game", "Host New Game", new ImageIdentifier(ImageIdentifierType.Null));
+                                saveGames.Add(HostNewGameElement);
+
+                                foreach (PlatformFilePath saveGameFilePath in FileHelper.GetFiles(FilePaths.SavePath, "*.sav"))
+                                {
+                                    InquiryElement saveInquiryElement = new InquiryElement(saveGameFilePath.GetFileNameWithoutExtension(), saveGameFilePath.GetFileNameWithoutExtension(), new ImageIdentifier(ImageIdentifierType.Null));
+                                    saveGames.Add(saveInquiryElement);
+                                }
+
+                                //Host Game
+                                InformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Co-op Campaign", String.Empty, saveGames, true, 1, "Continue", "Cancel",
+                                new Action<List<InquiryElement>>(OnSelectCoopSaveGame), new Action<List<InquiryElement>>(OnCancelCoopSaveGame)));
+
                             }
                             else if (argument.ToLower() == "/client")
                             {
                                 ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
-                                ServerConfiguration defaultConfiguration =
-                                    new ServerConfiguration();
-                                CoopClient.Instance.Connect(
-                                    defaultConfiguration.NetworkConfiguration.LanAddress,
-                                    defaultConfiguration.NetworkConfiguration.LanPort);
+                                JoinWindow();
                             }
                         }
-
-                        //ScreenManager.PushScreen(
-                        //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                        //        new object[] { }));
-
-#else
-                        var saveGames = new List<InquiryElement>();
-                        saveGames.Clear();
-
-                        InquiryElement HostNewGameElement = new InquiryElement("Host_New_Game", "Host New Game", new ImageIdentifier(ImageIdentifierType.Null));
-                        saveGames.Add(HostNewGameElement);
-
-                        foreach (PlatformFilePath saveGameFilePath in FileHelper.GetFiles(FilePaths.SavePath, "*.sav"))
-                        {
-                            InquiryElement saveInquiryElement = new InquiryElement(saveGameFilePath.GetFileNameWithoutExtension(), saveGameFilePath.GetFileNameWithoutExtension(), new ImageIdentifier(ImageIdentifierType.Null));
-                            saveGames.Add(saveInquiryElement);
-                        }
-
-                        InformationManager.ShowInquiry(new InquiryData("Co-op Campaign", String.Empty, true, true, "Host", "Join", () =>
-                        {
-                            //Host Game
-                            InformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Co-op Campaign", String.Empty, saveGames, true, 1, "Continue", "Cancel",
-                            new Action<List<InquiryElement>>(OnSelectCoopSaveGame), new Action<List<InquiryElement>>(OnCancelCoopSaveGame)
-                        ));
-                        }, () => 
-                        {
-                            //Join Game
-                            ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
-
-                            var textInquiryData = new TextInquiryData(
-                                new TextObject("Enter IP:port").ToString(), "IP:Port", true, true, "Join", "Cancel", JoinCoopGameIP, null);
-
-                            InformationManager.ShowTextInquiry(textInquiryData);
-
-                            ServerConfiguration defaultConfiguration =
-                                new ServerConfiguration();
-                            InformationManager.DisplayMessage(new InformationMessage(defaultConfiguration.NetworkConfiguration.LanAddress.ToString() + defaultConfiguration.NetworkConfiguration.LanPort.ToString()));
-
-                        }, ""
-                        ));
 #endif
                     },
 
