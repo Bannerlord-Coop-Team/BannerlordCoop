@@ -108,7 +108,7 @@ namespace Coop.Mod
 
         public override void NoHarmonyInit()
         {
-            initLogger();
+            DebugLogging.Initialize();
         }
 
         public override void NoHarmonyLoad()
@@ -237,6 +237,7 @@ namespace Coop.Mod
         {
             base.OnGameEnd(game);
             CoopServer.Instance.ShutDownServer();
+            DebugLogging.Shutdown();
         }
 
         protected override void OnApplicationTick(float dt)
@@ -260,29 +261,11 @@ namespace Coop.Mod
             Updateables.MakeUnion(SyncBufferManager.ProcessBufferedChanges).UpdateAll(frameTime);
         }
 
-        private void initLogger()
-        {
-            // NoHarmony
-            Logging = true;
-
-            // NLog
-            Target.Register<MbLogTarget>("MbLog");
-            Mod.Logging.Init(
-                new Target[]
-                {
-                    new MbLogTarget
-                    {
-                        Layout = Layout.FromString("[${level:uppercase=true}] ${message}")
-                    }
-                });
-        }
-
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             Exception ex = (Exception)e.ExceptionObject;
             Logger.Fatal(ex, "Unhandled exception");
         }
-
 
         internal static bool DisableIntroVideo = true;
 
@@ -293,7 +276,6 @@ namespace Coop.Mod
         internal static bool DontGroupThirdPartyMenuOptions = true;
 
         internal static bool QuartermasterIsClanWide = true;
-
 
         internal static void JoinWindow()
         {

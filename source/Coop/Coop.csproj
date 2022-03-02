@@ -275,7 +275,7 @@
     <Compile Include="Mod\Exceptions.cs" />
     <Compile Include="Mod\GameEnvironmentClient.cs" />
     <Compile Include="Mod\GameLoopRunner.cs" />
-    <Compile Include="Mod\Logging.cs" />
+    <Compile Include="Mod\DebugUtil\DebugLogging.cs" />
     <Compile Include="Mod\Managers\ClientCharacterCreatorManager.cs" />
     <Compile Include="Mod\Managers\ClientManager.cs" />
     <Compile Include="Mod\Managers\ServerManager.cs" />
