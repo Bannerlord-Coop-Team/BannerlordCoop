@@ -59,9 +59,7 @@ namespace Coop.Mod
         }
 
         /// <summary>
-        /// Get the file name based on the process.
-        ///     - 0: Server
-        ///     - 1: Client (corresponds to the ClientDebug)
+        /// Get the file name based on the process argument line.
         /// </summary>
         /// <returns></returns>
         private static string GetLogFileName()
