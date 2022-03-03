@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using NLog;
@@ -59,12 +60,14 @@ namespace Coop.Mod
         }
 
         /// <summary>
-        /// Get the file name based on the process argument line.
+        /// Get the file name based on the process argument line and the "COOP_LOG" environment variable to specify the folder where the logs are saved. If no 
+        /// environment variable is set, the output will be on the Bannerlord.exe side by default if you are using Steam it 
+        /// will be on this folder: "%Steam%\steamapps\common\Mount & Blade II Bannerlord\bin\Win64_Shipping_Client"
         /// </summary>
         /// <returns></returns>
         private static string GetLogFileName()
         {
-            return $"Coop_{(Utilities.GetFullCommandLineString().Contains("/server") ? "server" : "client")}.txt";
+            return $"{Environment.GetEnvironmentVariable("COOP_LOG", EnvironmentVariableTarget.User)}/Coop_{(Utilities.GetFullCommandLineString().Contains("/server") ? "server" : "client")}.log";
         }
 
         /// <summary>
