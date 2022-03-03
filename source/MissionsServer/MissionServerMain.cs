@@ -137,10 +137,10 @@ namespace MissionsServer
                     writer.Write(stream.ToArray());
                     
                 }
-                foreach(NetPeer peer in server.ConnectedPeerList)
-                {
+                //foreach(NetPeer peer in server.ConnectedPeerList)
+                //{
 
-                }
+                //}
                 server.SendToAll(stream2.ToArray(), DeliveryMethod.ReliableSequenced);
                 
                 
@@ -172,7 +172,7 @@ namespace MissionsServer
                 //dataWriter.Put(stream.ToArray());
                 //server.SendToAll(dataWriter, DeliveryMethod.Sequenced);
 
-                Thread.Sleep(5);
+                Thread.Sleep(15);
             }
             server.Stop();
         }
