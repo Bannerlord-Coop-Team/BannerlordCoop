@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;

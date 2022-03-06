@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Common;
 using Coop.Mod.Patch;
 using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.Persistence;

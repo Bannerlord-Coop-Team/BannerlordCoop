@@ -1,41 +1,50 @@
-﻿using HarmonyLib;
-using Network.Infrastructure;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod
+namespace Common
 {
+    class GuidWrapper
+    {
+        public GuidWrapper(Guid guid)
+        {
+            Guid = guid;
+        }
+
+        public Guid Guid { get; set; }
+
+    }
+
     public class CoopObjectManager
     {
-        private static readonly Dictionary<Guid, object> Objects = new Dictionary<Guid, object>();
-        private static readonly Dictionary<object, Guid> Guids = new Dictionary<object, Guid>();
-        private static readonly Dictionary<Type, List<Guid>> AssosiatedGuids = new Dictionary<Type, List<Guid>>();
+        public static readonly Dictionary<Guid, object> Objects = new Dictionary<Guid, object>();
+        private static readonly ConditionalWeakTable<object, GuidWrapper> Guids = new ConditionalWeakTable<object, GuidWrapper>();
+        private static readonly Dictionary<Type, List<Guid>> AssociatedGuids = new Dictionary<Type, List<Guid>>();
         
         
         
         private static void AddTypeEntry(object obj, Guid id)
         {
             Type type = obj.GetType();
-            if (AssosiatedGuids.ContainsKey(obj.GetType()))
+            if (AssociatedGuids.ContainsKey(obj.GetType()))
             {
-                AssosiatedGuids[type].Add(id);
+                AssociatedGuids[type].Add(id);
             }
             else
             {
-                AssosiatedGuids.Add(type, new List<Guid>(new[] { id }));
+                AssociatedGuids.Add(type, new List<Guid>(new[] { id }));
             }
         }
 
         private static bool ContainsElement(object obj)
         {
-            return Guids.ContainsKey(obj);
+            GuidWrapper guidWrapper;
+            Guids.TryGetValue(obj, out guidWrapper);
+
+            return guidWrapper != null;
         }
 
         private static bool ContainsElement(Guid guid)
@@ -51,8 +60,9 @@ namespace Coop.Mod
             }
             else
             {
-                Guids.Add(obj, guid);
+                Guids.Add(obj, new GuidWrapper(guid));
                 Objects.Add(guid, obj);
+
                 return true;
             }
         }
@@ -75,18 +85,9 @@ namespace Coop.Mod
                 }
                 return false;
             }
-            else if (ContainsElement(guid))
-            {
-                return false;
-            }
-            else if (ContainsElement(obj))
-            {
-                return false;
-            }
             else
             {
-                Objects.Add(guid, obj);
-                return true;
+                return AddObject(guid, obj); ;
             }
         }
 
@@ -117,17 +118,6 @@ namespace Coop.Mod
 
             Objects.TryGetValue(id, out object obj);
 
-#if DEBUG
-            if(obj == null)
-            {
-                CoopClient.Instance.Session.Connection.Send(
-                    new Network.Protocol.Packet(
-                        Network.Protocol.EPacket.BadID, 
-                        Common.CommonSerializer.Serialize(id)) 
-                    );
-            }
-#endif
-
 
             return obj;
         }
@@ -146,7 +136,9 @@ namespace Coop.Mod
             }
             else if (ContainsElement(obj))
             {
-                return Guids[obj];
+                GuidWrapper guidWrapper;
+                Guids.TryGetValue(obj, out guidWrapper);
+                return guidWrapper.Guid;
             }
             return Guid.Empty;
         }
@@ -165,7 +157,9 @@ namespace Coop.Mod
             {
                 if (ContainsElement(obj))
                 {
-                    guids.Add(Guids[obj]);
+                    GuidWrapper guidWrapper;
+                    Guids.TryGetValue(obj, out guidWrapper);
+                    guids.Add(guidWrapper.Guid);
                 }
                 else
                 {
@@ -191,7 +185,7 @@ namespace Coop.Mod
             }
 
             object obj = Objects[id];
-            if (obj.GetType() != typeof(T))
+            if (!(obj is T))
             {
                 throw new Exception("Stored object is not the same type as given type.");
             }
@@ -200,21 +194,21 @@ namespace Coop.Mod
 
         public static IEnumerable<T> GetObjects<T>()
         {
-            return AssosiatedGuids[typeof(T)].Select(guid => (T)GetObject(guid));
+            return AssociatedGuids[typeof(T)].Select(guid => (T)GetObject(guid));
         }
 
         public static IEnumerable<Guid> GetTypeGuids<T>()
         {
-            return AssosiatedGuids[typeof(T)];
+            return AssociatedGuids[typeof(T)];
         }
 
         private static bool RemoveObjectFromType(Guid id, object obj)
         {
             bool result;
 
-            if (AssosiatedGuids.ContainsKey(obj.GetType()))
+            if (AssociatedGuids.ContainsKey(obj.GetType()))
             {
-                result = AssosiatedGuids[obj.GetType()].Remove(id);
+                result = AssociatedGuids[obj.GetType()].Remove(id);
             }
             else
             {
@@ -250,7 +244,10 @@ namespace Coop.Mod
 
             if (ContainsElement(obj))
             {
-                Guid id = Guids[obj];
+                GuidWrapper guidWrapper;
+                Guids.TryGetValue(obj, out guidWrapper);
+                Guid id = guidWrapper.Guid;
+
                 Guids.Remove(obj);
                 Objects.Remove(id);
 

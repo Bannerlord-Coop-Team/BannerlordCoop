@@ -164,6 +164,10 @@ namespace Coop.Mod.Serializers
         {
             MobileParty newMobileParty = MBObjectManager.Instance.CreateObject<MobileParty>(stringId);
 
+            MethodInfo _AddMobileParty = typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            _AddMobileParty.Invoke(Campaign.Current.CampaignObjectManager, new object[] { newMobileParty });
+
             // Circular referenced object needs assignment before deserialize
             if (hero == null)
             {

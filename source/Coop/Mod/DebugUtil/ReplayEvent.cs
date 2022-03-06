@@ -5,6 +5,7 @@ using Coop.Mod.Persistence.Party;
 using RemoteAction;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
+using Common;
 
 namespace Coop.Mod.DebugUtil
 {
@@ -44,7 +45,7 @@ namespace Coop.Mod.DebugUtil
         {
             buffer.WriteCampaignTime(replay.time);
             buffer.WriteEntityId(replay.entityId);
-            buffer.WriteMBGUID(replay.party.Id);
+            buffer.WriteGUID(CoopObjectManager.GetGuid(replay.party));
             buffer.WriteMovementData(replay.movement);
         }
 
@@ -55,7 +56,7 @@ namespace Coop.Mod.DebugUtil
             {
                 time = buffer.ReadCampaignTime(),
                 entityId = buffer.ReadEntityId(),
-                party = (MobileParty)MBObjectManager.Instance.GetObject(buffer.ReadMBGUID()),
+                party = (MobileParty)CoopObjectManager.GetObject(buffer.ReadGUID()),
                 movement = buffer.ReadMovementData(),
             };
         }

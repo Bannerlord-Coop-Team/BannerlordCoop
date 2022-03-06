@@ -28,10 +28,13 @@ namespace Coop.Mod.Serializers
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
         public string PlayerId { get; }
+        string stringId;
 
         public PlayerHeroSerializer(Hero hero) : base(hero)
         {
             PlayerId = new PlatformAPI().GetPlayerID().ToString();
+
+            stringId = hero.StringId;
 
             List<string> UnmanagedFields = new List<string>();
 
@@ -151,7 +154,7 @@ namespace Coop.Mod.Serializers
         }
         public override object Deserialize()
         {
-            hero = MBObjectManager.Instance.CreateObject<Hero>();
+            hero = Hero.CreateHero(stringId);
 
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {

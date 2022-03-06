@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Common;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using CoopFramework;

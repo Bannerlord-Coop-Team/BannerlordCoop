@@ -1,4 +1,5 @@
 ﻿using RailgunNet.System.Encoding;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
@@ -24,15 +25,15 @@ namespace RemoteAction
         }
 
         [Encoder]
-        public static void WriteMBGUID(this RailBitBuffer buffer, MBGUID guid)
+        public static void WriteGUID(this RailBitBuffer buffer, Guid guid)
         {
-            buffer.WriteUInt(guid.InternalValue);
+            buffer.WriteByteArray(guid.ToByteArray());
         }
 
         [Decoder]
-        public static MBGUID ReadMBGUID(this RailBitBuffer buffer)
+        public static Guid ReadGUID(this RailBitBuffer buffer)
         {
-            return new MBGUID(buffer.ReadUInt());
+            return new Guid(buffer.ReadByteArray());
         }
 
         [Encoder]

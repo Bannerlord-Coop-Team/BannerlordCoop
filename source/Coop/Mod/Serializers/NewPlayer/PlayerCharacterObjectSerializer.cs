@@ -12,6 +12,7 @@ using System.Collections;
 using TaleWorlds.ObjectSystem;
 using System.Runtime.Serialization;
 using TaleWorlds.Localization;
+using Common;
 
 namespace Coop.Mod.Serializers
 {

@@ -161,7 +161,7 @@ namespace Coop.Mod.Persistence.Party
         /// <exception cref="Exception"></exception>
         private void RegisterAsController()
         {
-            if (Controller != null)
+            if (Controller != null && State.PartyId != Guid.Empty)
             {
                 if (!TryGetParty(out MobileParty controlledParty))
                 {

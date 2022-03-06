@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Common;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using NLog;
@@ -311,10 +312,10 @@ namespace Coop.Mod.DebugUtil
                         DefaultBehavior = replay.movement.DefaultBehaviour,
                         TargetPosition = replay.movement.TargetPosition,
                         SettlementIndex = replay.movement.TargetSettlement != null ?
-                            replay.movement.TargetSettlement.Id :
+                            CoopObjectManager.GetGuid(replay.movement.TargetSettlement) :
                             Coop.InvalidId,
                         TargetPartyIndex = replay.movement.TargetParty != null ?
-                            replay.movement.TargetParty.Id :
+                            CoopObjectManager.GetGuid(replay.movement.TargetParty) :
                             Coop.InvalidId
                     };
                 }

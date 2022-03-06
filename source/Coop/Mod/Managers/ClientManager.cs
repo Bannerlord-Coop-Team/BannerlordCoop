@@ -10,6 +10,7 @@ using JetBrains.Annotations;
 using TaleWorlds.ObjectSystem;
 using StoryMode;
 using System.Diagnostics;
+using Common;
 
 namespace Coop.Mod.Managers
 {

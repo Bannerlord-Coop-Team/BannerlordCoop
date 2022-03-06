@@ -256,12 +256,11 @@
     <Compile Include="Mod\Config\ManagedTypesConfig.cs" />
     <Compile Include="Mod\CoopClientSM.cs" />
     <Compile Include="Mod\CoopConditions.cs" />
-    <Compile Include="Mod\Data\GameData.cs" />
+    <Compile Include="Mod\Data\SaveData.cs" />
     <Compile Include="Mod\Extentions\CampaignObjectManagerExtentions.cs" />
     <Compile Include="Mod\GameSync\Bandit\BanditPartyComponentSync.cs" />
     <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
-    <Compile Include="Mod\CoopObjectManager.cs" />
     <Compile Include="Mod\ObjectManagerAdapter.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />
     <Compile Include="Mod\DebugUtil\CLICommands.cs" />
@@ -353,6 +352,7 @@
     <Compile Include="Mod\Serializers\CustomSerializers\CampaignTimeSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CharacterObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ClanSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\MBGUIDSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\DefaultPartyTemplateSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CultureObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\DeterministicRandomSerializer.cs" />
@@ -393,7 +393,6 @@
     <Compile Include="Mod\Serializers\CustomSerializers\WorkshopSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\WorkshopTypeSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializerWithGuid.cs" />
-    <Compile Include="Mod\Serializers\Encoders\RailgunSerializers.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerCharacterObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerClanSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerCultureObjectSerializer.cs" />

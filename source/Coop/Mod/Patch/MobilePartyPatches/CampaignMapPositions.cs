@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Common;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using HarmonyLib;

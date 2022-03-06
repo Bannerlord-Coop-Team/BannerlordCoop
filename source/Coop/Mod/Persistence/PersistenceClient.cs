@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Common;
+using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
 using CoopFramework;
@@ -11,6 +12,7 @@ using RemoteAction;
 using Sync;
 using Sync.Behaviour;
 using Sync.Value;
+using TaleWorlds.CampaignSystem;
 
 namespace Coop.Mod.Persistence
 {

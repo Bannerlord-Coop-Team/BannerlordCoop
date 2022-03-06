@@ -35,6 +35,9 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.Engine;
 using SandBox;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.Engine.Screens;
 
 namespace Coop.Mod
 {
@@ -173,6 +176,7 @@ namespace Coop.Mod
             if (Persistence == null)
             {
                 Persistence = new PersistenceClient(new GameEnvironmentClient());
+
                 m_Updateables.Add(Persistence);
                 OnPersistenceInitialized?.Invoke(Persistence);
             }
@@ -302,29 +306,27 @@ namespace Coop.Mod
         [GameClientPacketHandler(ECoopClientState.ReceivingGameData, EPacket.Server_GameData)]
         public void ReceiveGameData(ConnectionBase connection, Packet packet)
         {
-            GameData gameData = (GameData)SyncedObjectStore.Deserialize(packet.Payload.Array);
+            SaveData saveData = SaveData.Deserialize(packet.Payload);
 
-            ClientCharacterCreatorManager manager = (ClientCharacterCreatorManager)gameManager;
+            m_HeroGUID = saveData.PlayerId;
 
-            manager.RemoveAllObjects();
+            if (Game.Current != null)
+            {
+                ScreenManager.PopScreen();
+                GameStateManager.Current.CleanStates(0);
+                GameStateManager.Current = TaleWorlds.MountAndBlade.Module.CurrentModule.GlobalGameStateManager;
+            }
 
-            gameData.Unpack();
+            gameManager = new ClientManager(saveData.LoadResult, saveData.PlayerId);
 
-            Hero oldPlayer = Hero.MainHero;
+            MBGameManager.StartNewGame(gameManager);
 
-            Hero newPlayer = CoopObjectManager.GetObject<Hero>(gameData.PlayerHeroId);
+            ClientManager.OnPostLoadFinishedEvent += (sender, eventArgs) =>
+            {
+                saveData.AssosiateIds();
 
-            newPlayer.PartyBelongedTo.IsVisible = true;
-            ChangePlayerCharacterAction.Apply(newPlayer);
-
-            PartyBase partyBase = newPlayer.PartyBelongedTo.Party;
-            partyBase.MemberRoster.Clear();
-            partyBase.AddElementToMemberRoster(newPlayer.CharacterObject, 1, true);
-            partyBase.Visuals.OnStartup(partyBase);
-
-            m_HeroGUID = gameData.PlayerHeroId;
-
-            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
+                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
+            };
         }
         #endregion
 
@@ -390,5 +392,7 @@ namespace Coop.Mod
 
             return sRet;
         }
+
+        
     }
 }

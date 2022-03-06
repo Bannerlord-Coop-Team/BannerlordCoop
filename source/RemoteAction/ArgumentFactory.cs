@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using Common;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet;
@@ -39,7 +40,7 @@ namespace RemoteAction
                 case EventArgType.MBObjectManager:
                     return MBObjectManager.Instance;
                 case EventArgType.MBObject:
-                    return MBObjectManager.Instance.GetObject(arg.MbGUID.Value);
+                    return CoopObjectManager.GetObject(arg.GUID.Value);
                 case EventArgType.Int:
                     return arg.Int.Value;
                 case EventArgType.Float:
@@ -110,14 +111,14 @@ namespace RemoteAction
                     return new Argument(b);
                 case MBObjectManager _:
                     return Argument.MBObjectManager;
-                case MBGUID guid:
+                case Guid guid:
                     return new Argument(guid);
                 case int i:
                     return new Argument(i);
                 case float f:
                     return new Argument(f);
                 case MBObjectBase mbObject:
-                    return bTransferByValue ? new Argument(store.Insert(obj)) : new Argument(mbObject.Id);
+                    return bTransferByValue ? new Argument(store.Insert(obj)) : new Argument(CoopObjectManager.GetGuid(mbObject));
                 case Campaign campaign:
                     if (campaign == Campaign.Current) return Argument.CurrentCampaign;
                     // New campaign? Send by value

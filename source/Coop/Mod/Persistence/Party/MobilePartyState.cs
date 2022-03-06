@@ -85,8 +85,8 @@ namespace Coop.Mod.Persistence.Party
     /// </summary>
     public class MovementState
     {
-        public MBGUID TargetPartyIndex { get; set; } = Coop.InvalidId;
-        public MBGUID SettlementIndex { get; set; } = Coop.InvalidId;
+        public Guid TargetPartyIndex { get; set; } = Coop.InvalidId;
+        public Guid SettlementIndex { get; set; } = Coop.InvalidId;
         public AiBehavior DefaultBehavior { get; set; }
         public Vec2 TargetPosition { get; set; }
 
@@ -134,8 +134,8 @@ namespace Coop.Mod.Persistence.Party
         {
             buffer.WriteByte((byte) state.DefaultBehavior);
             CoordinateCompressor.WriteVec2(buffer, state.TargetPosition);
-            buffer.WriteMBGUID(state.TargetPartyIndex);
-            buffer.WriteMBGUID(state.SettlementIndex);
+            buffer.WriteGUID(state.TargetPartyIndex);
+            buffer.WriteGUID(state.SettlementIndex);
         }
 
         [Decoder]
@@ -145,8 +145,8 @@ namespace Coop.Mod.Persistence.Party
             {
                 DefaultBehavior = (AiBehavior) buffer.ReadByte(),
                 TargetPosition = CoordinateCompressor.ReadVec2(buffer),
-                TargetPartyIndex = buffer.ReadMBGUID(),
-                SettlementIndex = buffer.ReadMBGUID()
+                TargetPartyIndex = buffer.ReadGUID(),
+                SettlementIndex = buffer.ReadGUID()
             };
         }
     }

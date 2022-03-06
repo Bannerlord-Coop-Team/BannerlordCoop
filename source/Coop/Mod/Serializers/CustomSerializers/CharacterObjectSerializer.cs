@@ -5,6 +5,7 @@ using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.Localization;
+using Common;
 
 namespace Coop.Mod.Serializers.Custom
 {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Common;
 using Coop.Mod.Patch.Party;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.World;
@@ -290,9 +291,9 @@ namespace Coop.Mod.Persistence
 
         private void OnPartyAdded(MobileParty party)
         {
-            if (party.Id == Coop.InvalidId)
+            if (CoopObjectManager.GetGuid(party) == Coop.InvalidId)
             {
-                throw new Exception($"Invalid party id in {party}");
+                //throw new Exception($"Invalid party id in {party}");
             }
 
             lock (m_Lock)
