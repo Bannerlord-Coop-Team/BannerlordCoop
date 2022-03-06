@@ -15,6 +15,9 @@ using TaleWorlds.SaveSystem.Load;
 
 namespace Coop.Mod.Data
 {
+    /// <summary>
+    /// Package class for game data that is sent to client
+    /// </summary>
     [Serializable]
     public class SaveData
     {
@@ -85,7 +88,7 @@ namespace Coop.Mod.Data
                 assosiation => (MBGUID)assosiation.Item1.Deserialize(), 
                 assosiation => assosiation.Item2);
 
-            // Assosiate Objects
+            // Associate Objects
             AssociateObjectsFromMBGUID(assosiations);
         }
 
@@ -131,6 +134,11 @@ namespace Coop.Mod.Data
             return (SaveData)CommonSerializer.Deserialize(payload);
         }
 
+        /// <summary>
+        /// Creates dictionary with associations to object MBGUID to/from Guid
+        /// </summary>
+        /// <exception cref="Exception">Collision exception of 2 different objects with same Guid</exception>
+        /// <returns>Dictionary of MBGUID to Guid associations</returns>
         public static Dictionary<MBGUID, Guid> GenerateMBGUIDAssociations()
         {
             Dictionary<MBGUID, Guid> result = new Dictionary<MBGUID, Guid>();
@@ -157,6 +165,12 @@ namespace Coop.Mod.Data
             return result;
         }
 
+        /// <summary>
+        /// Registers existing objects with <see cref="CoopObjectManager"/> using an associated 
+        /// dictionary to lookup Guid values from MBGUID.
+        /// </summary>
+        /// <param name="GuidAssociations">Associated dictionary to lookup Guid values from MBGUID</param>
+        /// <returns>true if all Guid associations were found, false otherwise</returns>
         public static bool AssociateObjectsFromMBGUID(Dictionary<MBGUID, Guid> GuidAssociations)
         {
             foreach (MBObjectBase mbObject in MBObjectManager.Instance.GetObjectTypeList<MBObjectBase>())

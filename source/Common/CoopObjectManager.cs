@@ -7,6 +7,9 @@ using System.Runtime.CompilerServices;
 
 namespace Common
 {
+    /// <summary>
+    /// Wrapper for Guid for referencing struct
+    /// </summary>
     class GuidWrapper
     {
         public GuidWrapper(Guid guid)
@@ -18,6 +21,9 @@ namespace Common
 
     }
 
+    /// <summary>
+    /// Object manager for identifying objects across the network
+    /// </summary>
     public class CoopObjectManager
     {
         public static readonly Dictionary<Guid, object> Objects = new Dictionary<Guid, object>();
