@@ -40,6 +40,8 @@ namespace Coop.Mod
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
+        private bool _isDebugToggled = false;
+
         #region MainMenuButtons
         public static InitialStateOption CoopCampaign =
             new InitialStateOption(
@@ -246,10 +248,12 @@ namespace Coop.Mod
             }
 
             base.OnApplicationTick(dt);
-            if (Input.IsKeyDown(InputKey.LeftControl) && Input.IsKeyDown(InputKey.Tilde))
-            {
-                CLICommands.ShowDebugUi(new List<string>());
-                // DebugConsole.Toggle();
+
+            if (Input.IsKeyDown(InputKey.LeftControl) && Input.IsKeyDown(InputKey.Tilde) && this._isDebugToggled == false) {
+                CLICommands.ToggleDebugUI(new List<string>());
+                this._isDebugToggled = true;
+            } else if(Input.IsKeyReleased(InputKey.LeftControl) || Input.IsKeyReleased(InputKey.Tilde)) {
+                this._isDebugToggled = false;
             }
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);

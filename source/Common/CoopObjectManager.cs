@@ -30,8 +30,6 @@ namespace Common
         private static readonly ConditionalWeakTable<object, GuidWrapper> Guids = new ConditionalWeakTable<object, GuidWrapper>();
         private static readonly Dictionary<Type, List<Guid>> AssociatedGuids = new Dictionary<Type, List<Guid>>();
         
-        
-        
         private static void AddTypeEntry(object obj, Guid id)
         {
             Type type = obj.GetType();
@@ -201,6 +199,11 @@ namespace Common
         public static IEnumerable<T> GetObjects<T>()
         {
             return AssociatedGuids[typeof(T)].Select(guid => (T)GetObject(guid));
+        }
+
+        public static Dictionary<Type, List<Guid>> GetAssociatedGuids()
+        {
+            return AssosiatedGuids;
         }
 
         public static IEnumerable<Guid> GetTypeGuids<T>()

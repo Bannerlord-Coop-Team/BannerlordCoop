@@ -107,6 +107,9 @@ namespace Coop.Mod.Serializers.Custom
                     case "_pureSpeedExplainer":
                         // TODO Joke Fix this
                         break;
+                    case "<MoveTargetParty>k__BackingField":
+                        // TODO Joke Fix this
+                        break;
                     case "<TaleWorlds.CampaignSystem.ILocatable<TaleWorlds.CampaignSystem.MobileParty>.NextLocatable>k__BackingField":
                         // TODO Joke Fix this
                         break;
