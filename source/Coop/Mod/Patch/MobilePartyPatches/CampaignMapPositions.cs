@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Common;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using HarmonyLib;
@@ -61,7 +62,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             
             foreach (var item in CampaignMapMovement.Instances)
             {
-                MobileParty party = MBObjectManager.Instance.GetObject(item.Key) as MobileParty;
+                MobileParty party = CoopObjectManager.GetObject(item.Key) as MobileParty;
                 if (party != null)
                 {
                     m_Buffer.PushValue(CampaignMapMovement.MapPosition, party);

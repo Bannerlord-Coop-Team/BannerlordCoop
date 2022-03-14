@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Common;
 using Coop.Mod.Patch.Party;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.World;
@@ -99,21 +100,21 @@ namespace Coop.Mod.Persistence
 
             room.ClientJoined += controller =>
             {
-                if (controller.Scope == null)
-                {
-                    throw new Exception("Connected clients should always be scoped!");
-                }
-                controller.Scope.Evaluator = new CoopRailScopeEvaluator(
-                    room.Clients.Count == 1,    // the first client is always the arbiter.
-                    () =>
-                {
-                    if (m_ClientControlledParties.TryGetValue((RailServerPeer) controller, out MobileParty party))
-                    {
-                        return m_Parties.ContainsKey(party) ? m_Parties[party] : null;
-                    }
-                    return null;
-                },
-                GetScopeRange);
+                //if (controller.Scope == null)
+                //{
+                //    throw new Exception("Connected clients should always be scoped!");
+                //}
+                //controller.Scope.Evaluator = new CoopRailScopeEvaluator(
+                //    room.Clients.Count == 1,    // the first client is always the arbiter.
+                //    () =>
+                //{
+                //    if (m_ClientControlledParties.TryGetValue((RailServerPeer) controller, out MobileParty party))
+                //    {
+                //        return m_Parties.ContainsKey(party) ? m_Parties[party] : null;
+                //    }
+                //    return null;
+                //},
+                //GetScopeRange);
             };
             
             WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
@@ -121,8 +122,10 @@ namespace Coop.Mod.Persistence
             // Parties
             foreach (MobileParty party in Campaign.Current.MobileParties)
             {
+                Guid partyGuid = CoopObjectManager.GetGuid(party);
+
                 MobilePartyEntityServer entity = room.AddNewEntity<MobilePartyEntityServer>(
-                    e => e.State.PartyId = party.Id);
+                    e => e.State.PartyId = partyGuid);
                 m_Parties.Add(party, entity);
             }
 
@@ -147,9 +150,11 @@ namespace Coop.Mod.Persistence
                 return;
             }
 
+            Guid partyGuid = CoopObjectManager.GetGuid(party);
+
             MobilePartyEntityServer entity =
                 m_Room.AddNewEntity<MobilePartyEntityServer>(
-                    e => e.State.PartyId = party.Id);
+                    e => e.State.PartyId = partyGuid);
             Logger.Debug("Added new entity {}.", entity);
 
             lock (m_Lock)
@@ -198,12 +203,14 @@ namespace Coop.Mod.Persistence
                     m_Parties.Add(party, null); // Reserve to prevent duplicate entity creation
                 }
 
+                Guid partyGuid = CoopObjectManager.GetGuid(party);
+
                 // Need to leave m_Lock, otherwise the entity creation might deadlock since it needs to makes game state queries in the main thread
                 MobilePartyEntityServer entity =
                     m_Room.AddNewEntity<MobilePartyEntityServer>(
                         e =>
                         {
-                            e.State.PartyId = party.Id;
+                            e.State.PartyId = partyGuid;
                         });
                 Logger.Debug("Added new entity {}.", entity);
 
@@ -284,9 +291,9 @@ namespace Coop.Mod.Persistence
 
         private void OnPartyAdded(MobileParty party)
         {
-            if (party.Id == Coop.InvalidId)
+            if (CoopObjectManager.GetGuid(party) == Coop.InvalidId)
             {
-                throw new Exception($"Invalid party id in {party}");
+                //throw new Exception($"Invalid party id in {party}");
             }
 
             lock (m_Lock)
@@ -295,6 +302,8 @@ namespace Coop.Mod.Persistence
                 {
                     return;
                 }
+
+                CoopObjectManager.AddObject(party);
 
                 m_PartiesToAdd.Add(party);
             }

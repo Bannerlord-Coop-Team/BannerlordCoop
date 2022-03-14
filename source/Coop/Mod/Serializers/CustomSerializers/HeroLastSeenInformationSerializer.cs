@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using TaleWorlds.CampaignSystem;
 using static TaleWorlds.CampaignSystem.Hero;
 

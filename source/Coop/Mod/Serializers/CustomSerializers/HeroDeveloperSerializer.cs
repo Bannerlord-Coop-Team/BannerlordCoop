@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -38,9 +39,11 @@ namespace Coop.Mod.Serializers.Custom
                     case "<Id>k__BackingField":
                         // Ignore current MB id
                         break;
-                    case "<Hero>k__BackingField":
-                        break;
                     case "_newFocuses":
+                        SNNSO.Add(fieldInfo, new CharacterSkillsSerializer((CharacterSkills)value));
+                        break;
+                    case "<Hero>k__BackingField":
+                        References.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     default:
                         UnmanagedFields.Add(fieldInfo);

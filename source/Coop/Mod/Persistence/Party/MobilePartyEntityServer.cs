@@ -1,4 +1,5 @@
 ﻿using System;
+using Common;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Logic;
@@ -84,9 +85,9 @@ namespace Coop.Mod.Persistence.Party
 
             State.Movement.DefaultBehavior = data.DefaultBehaviour;
             State.Movement.TargetPosition = data.TargetPosition;
-            State.Movement.TargetPartyIndex = data.TargetParty?.Id ?? Coop.InvalidId;
+            State.Movement.TargetPartyIndex = CoopObjectManager.GetGuid(data.TargetParty);
             State.Movement.SettlementIndex =
-                data.TargetSettlement?.Id ?? Coop.InvalidId;
+                CoopObjectManager.GetGuid(data.TargetSettlement);
         }
 
         /// <summary>

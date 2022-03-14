@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using Coop.Mod.Persistence;
 using RailgunNet;
 using RailgunNet.Util;
@@ -10,7 +11,7 @@ namespace Coop.Mod
 {
     public static class Coop
     {
-        public static MBGUID InvalidId = new MBGUID(0xDEADBEEF);
+        public static Guid InvalidId = Guid.Empty;
         public static bool IsServer => CoopServer.Instance.Current != null;
         public static bool IsClientConnected => CoopClient.Instance.ClientConnected;
 

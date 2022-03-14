@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Common;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence.Party;
 using Sync.Reflection;
@@ -26,11 +27,11 @@ namespace Coop.Mod
                 DefaultBehaviour = state.DefaultBehavior,
                 TargetPosition = state.TargetPosition,
                 TargetParty = state.TargetPartyIndex != Coop.InvalidId
-                    ? MBObjectManager.Instance.GetObject(state.TargetPartyIndex) as
+                    ? CoopObjectManager.GetObject(state.TargetPartyIndex) as
                         MobileParty
                     : null,
                 TargetSettlement = state.SettlementIndex != Coop.InvalidId
-                    ? MBObjectManager.Instance.GetObject(
+                    ? CoopObjectManager.GetObject(
                         state.SettlementIndex) as Settlement
                     : null
             };
@@ -46,8 +47,8 @@ namespace Coop.Mod
             {
                 DefaultBehavior = data.DefaultBehaviour,
                 TargetPosition = data.TargetPosition,
-                TargetPartyIndex = data.TargetParty?.Id ?? Coop.InvalidId,
-                SettlementIndex = data.TargetSettlement?.Id ?? Coop.InvalidId
+                TargetPartyIndex = CoopObjectManager.GetGuid(data.TargetParty),
+                SettlementIndex = CoopObjectManager.GetGuid(data.TargetSettlement)
             };
         }
         /// <summary>

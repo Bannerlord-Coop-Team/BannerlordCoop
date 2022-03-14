@@ -1,10 +1,12 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Serializers.Custom
 {
@@ -25,8 +27,14 @@ namespace Coop.Mod.Serializers.Custom
 
         List<Guid> attachedParties = new List<Guid>();
 
+        string stringId;
+        string name;
+
         public MobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
         {
+            stringId = mobileParty.StringId;
+            name = mobileParty.Name.ToString();
+
             List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
 
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
@@ -129,7 +137,7 @@ namespace Coop.Mod.Serializers.Custom
 
         public override object Deserialize()
         {
-            mobileParty = new MobileParty();
+            mobileParty = MBObjectManager.Instance.CreateObject<MobileParty>(stringId);
 
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
@@ -147,14 +155,14 @@ namespace Coop.Mod.Serializers.Custom
                 throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
             }
 
-            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
-            {
-                entry.Value.ResolveReferenceGuids();
-            }
-
             foreach(KeyValuePair<FieldInfo, Guid> reference in references)
             {
                 reference.Key.SetValue(mobileParty, CoopObjectManager.GetObject(reference.Value));
+            }
+
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
             }
 
             List<MobileParty> attachedParties = this.attachedParties

@@ -28,6 +28,9 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization;
 using TaleWorlds.TwoDimension;
 using System.Reflection;
+using Coop.Mod.Serializers.Custom;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.Localization;
 
 namespace Coop.Mod
 {
@@ -280,23 +283,18 @@ namespace Coop.Mod
         [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestGameData)]
         private void SendGameData(ConnectionBase connection, Packet packet)
         {
+            // Recieve player hero
             PlayerHeroSerializer serializer = (PlayerHeroSerializer)CommonSerializer.Deserialize(packet.Payload);
             Hero newHero = (Hero)serializer.Deserialize();
-            Guid newHeroGuid = CoopObjectManager.AddObject(newHero);
 
-            CoopObjectManager.AddObject(newHero);
-            CoopObjectManager.AddObject(newHero.CharacterObject);
-            CoopObjectManager.AddObject(newHero.PartyBelongedTo);
-            CoopObjectManager.AddObject(newHero.PartyBelongedTo.Party);
-            CoopObjectManager.AddObject(newHero.Clan);
-            CoopObjectManager.AddObject(newHero.PartyBelongedTo.PartyComponent.HomeSettlement);
+            // Remove main hero
+            CoopObjectManager.RemoveObject(Hero.MainHero);
+            CoopObjectManager.RemoveObject(Hero.MainHero.Father);
 
-            GameData gameData = new GameData();
-            gameData.PlayerHeroId = newHeroGuid;
+            // Create save data, this contains player id and MBGUID <> Guid id assosiations
+            SaveData saveData = new SaveData(CoopObjectManager.AddObject(newHero));
 
-            byte[] data = CommonSerializer.Serialize(gameData);
-
-            connection.Send(new Packet(EPacket.Server_GameData, data));
+            connection.Send(new Packet(EPacket.Server_GameData, saveData));
 
             ConnectionServer connectionServer = (ConnectionServer)connection;
             m_CoopServerSMs[connectionServer].StateMachine.Fire(ECoopServerTrigger.RequiresWorldData);
@@ -315,10 +313,8 @@ namespace Coop.Mod
         [GameServerPacketHandler(ECoopServerState.SendingGameData, EPacket.BadID)]
         private void ReceiveClientBadId(ConnectionBase connection, Packet packet)
         {
-            GameData gameData = new GameData();
-            
-            Guid id = (Guid)CommonSerializer.Deserialize(packet.Payload);
-            object badObj = CoopObjectManager.GetObject(id);
+            List<Guid> list = (List<Guid>) CommonSerializer.Deserialize(packet.Payload);
+            List<object> list2 = list.Select(value => CoopObjectManager.GetObject(value)).ToList();
         }
 #endif
 
@@ -330,8 +326,6 @@ namespace Coop.Mod
             Hero clientHero = CoopObjectManager.GetObject<Hero>(guid);
 
             MobileParty party = clientHero.PartyBelongedTo;
-
-            party.Party.UpdateVisibilityAndInspected(0, false);
 
             if (!Persistence.MobilePartyEntityManager.Parties.Contains(party))
             {

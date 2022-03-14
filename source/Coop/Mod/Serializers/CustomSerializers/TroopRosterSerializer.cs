@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -11,66 +12,87 @@ namespace Coop.Mod.Serializers.Custom
     public class TroopRosterSerializer : ICustomSerializer
     {
         [NonSerialized]
+        TroopRoster newRoster;
+        [NonSerialized]
         readonly FieldInfo rosterDataField = typeof(TroopRoster).GetField("data", BindingFlags.NonPublic | BindingFlags.Instance);
-        readonly List<byte[]> data = new List<byte[]>();
-        int versionNumber;
+        
+
+        readonly TroopRosterElementSerializer[] troops = new TroopRosterElementSerializer[0];
+        readonly Guid partyGuid;
+        readonly int versionNumber;
+        readonly int count;
+#if DEBUG
+        // TODO remove debug code
+        readonly string partyName;
+#endif
+
         public TroopRosterSerializer(TroopRoster roster)
         {
             versionNumber = roster.VersionNo;
+            count = roster.Count;
 
             TroopRosterElement[] troops = (TroopRosterElement[])rosterDataField.GetValue(roster);
 
-            if(troops == null)
+            if(count > 0 && troops != null)
             {
-                return;
+                this.troops = troops.Take(count).AsParallel().Select(troop => new TroopRosterElementSerializer(troop)).ToArray();
             }
 
-            foreach (TroopRosterElement troop in troops)
-            {
-                // TaleWorlds BinaryWriter
-                BinaryWriter writer = new BinaryWriter();
-                // Have to get method info different due to the method being an explicit interface implementation
-                MethodInfo serializeTo = typeof(TroopRosterElement)
-                    .GetInterfaceMap(typeof(ISerializableObject))
-                    .InterfaceMethods.First((methodInfo) => { return methodInfo.Name == "SerializeTo"; });
-                serializeTo.Invoke(troop, new object[] { writer });
-                data.Add(writer.Data);
-            }
+            PartyBase partyBase = (PartyBase)typeof(TroopRoster)
+                .GetField("<OwnerParty>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(roster);
 
+            partyName = partyBase.Name.ToString();
+
+            partyGuid = CoopObjectManager.GetGuid(partyBase);
         }
 
         public object Deserialize()
         {
-            TroopRoster newRoster = TroopRoster.CreateDummyTroopRoster();
+            newRoster = TroopRoster.CreateDummyTroopRoster();
 
+            // Unpack VersionNo
             typeof(TroopRoster)
                 .GetField("<VersionNo>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(newRoster, versionNumber);
 
-            //List<TroopRosterElement> troops = new List<TroopRosterElement>();
-            //foreach (byte[] element in data)
-            //{
-            //    TroopRosterElement newTroop = new TroopRosterElement();
-            //    // TaleWorlds BinaryReader
-            //    BinaryReader reader = new BinaryReader(element);
-            //    // Have to get method info different due to the method being an explicit interface implementation
-            //    MethodInfo deserializeFrom = typeof(TroopRosterElement)
-            //        .GetInterfaceMap(typeof(ISerializableObject))
-            //        .InterfaceMethods.First((methodInfo) => { return methodInfo.Name == "DeserializeFrom"; });
-            //    deserializeFrom.Invoke(newTroop, new object[] { reader });
-            //    troops.Add(newTroop);
-            //}
-
-            //typeof(TroopRoster)
-            //    .GetField("data", BindingFlags.NonPublic | BindingFlags.Instance)
-            //    .SetValue(newRoster, troops.ToArray());
+            // Unpack _count
+            typeof(TroopRoster)
+                .GetField("_count", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(newRoster, count);
 
             return newRoster;
         }
 
         public void ResolveReferenceGuids()
         {
-            // No references
+            if (newRoster == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+            
+            // Unpack OwnerParty
+            PartyBase partyBase = CoopObjectManager.GetObject<PartyBase>(partyGuid);
+
+            typeof(TroopRoster)
+                .GetField("<OwnerParty>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(newRoster, partyBase);
+
+            // Unpack Troops
+            TroopRosterElement[] troops = new TroopRosterElement[0];
+
+            if (count > 0)
+            {
+                troops = this.troops.Take(count).Select(serializer => serializer.UnpackObject()).ToArray();
+            }
+
+            typeof(TroopRoster)
+                .GetField("data", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(newRoster, troops);
+
+            typeof(TroopRoster)
+                .GetField("_troopRosterElements", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(newRoster, new List<TroopRosterElement>(troops));
         }
     }
 }

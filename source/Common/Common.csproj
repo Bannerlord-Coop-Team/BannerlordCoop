@@ -58,6 +58,7 @@
   <ItemGroup>
     <Compile Include="CommonSerializer.cs" />
     <Compile Include="CompatibilityInfo.cs" />
+    <Compile Include="CoopObjectManager.cs" />
     <Compile Include="CoopStateMachine.cs" />
     <Compile Include="DropoutStack.cs" />
     <Compile Include="Extentions.cs" />

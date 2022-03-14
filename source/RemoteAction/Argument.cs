@@ -65,7 +65,7 @@ namespace RemoteAction
         /// <summary>
         ///     The contained <see cref="MBGUID"/> for <see cref="EventArgType.MBObject"/>, otherwise null. 
         /// </summary>
-        public MBGUID? MbGUID { get; }
+        public Guid? GUID { get; }
         /// <summary>
         ///     The contained <see cref="int"/> for <see cref="EventArgType.Int"/>, otherwise null. 
         /// </summary>
@@ -126,10 +126,10 @@ namespace RemoteAction
         ///     Constructs a new argument for <see cref="EventArgType.MBObject"/>.
         /// </summary>
         /// <param name="i"></param>
-        public Argument(MBGUID guid) : this()
+        public Argument(Guid guid) : this()
         {
             EventType = EventArgType.MBObject;
-            MbGUID = guid;
+            GUID = guid;
         }
         /// <summary>
         ///     Constructs a new argument for <see cref="EventArgType.StoreObjectId"/>.
@@ -186,7 +186,7 @@ namespace RemoteAction
                 case EventArgType.MBObjectManager:
                     break;
                 case EventArgType.MBObject:
-                    argHash = MbGUID.Value.GetHashCode();
+                    argHash = GUID.Value.GetHashCode();
                     break;
                 case EventArgType.Int:
                     argHash = Int.Value.GetHashCode();
@@ -220,7 +220,7 @@ namespace RemoteAction
                 case EventArgType.MBObjectManager:
                     return "MBObjectManager";
                 case EventArgType.MBObject:
-                    object obj = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject(MbGUID.Value);
+                    object obj = Common.CoopObjectManager.GetObject(GUID.Value);
                     if (obj is MobileParty party)
                         return string.Format(
                             "\"{0, 4}:{1}\"",

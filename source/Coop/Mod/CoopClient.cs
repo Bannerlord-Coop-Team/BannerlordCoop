@@ -30,6 +30,14 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using System.Reflection;
 using Logger = NLog.Logger;
+using SandBox.View.Map;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade.View;
+using TaleWorlds.Engine;
+using SandBox;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.Engine.Screens;
 
 namespace Coop.Mod
 {
@@ -168,6 +176,7 @@ namespace Coop.Mod
             if (Persistence == null)
             {
                 Persistence = new PersistenceClient(new GameEnvironmentClient());
+
                 m_Updateables.Add(Persistence);
                 OnPersistenceInitialized?.Invoke(Persistence);
             }
@@ -214,7 +223,7 @@ namespace Coop.Mod
                 // Handler Registration
                 //Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
                 Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyId);
-                Session.Connection.Dispatcher.RegisterPacketHandler(RecieveGameData);
+                Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveGameData);
 
                 Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
             }
@@ -295,22 +304,29 @@ namespace Coop.Mod
         }
 
         [GameClientPacketHandler(ECoopClientState.ReceivingGameData, EPacket.Server_GameData)]
-        public void RecieveGameData(ConnectionBase connection, Packet packet)
+        public void ReceiveGameData(ConnectionBase connection, Packet packet)
         {
-            GameData gameData = (GameData)SyncedObjectStore.Deserialize(packet.Payload.Array);
+            SaveData saveData = SaveData.Deserialize(packet.Payload);
 
-            ClientCharacterCreatorManager manager = (ClientCharacterCreatorManager)gameManager;
+            m_HeroGUID = saveData.PlayerId;
 
-            manager.RemoveAllObjects();
+            if (Game.Current != null)
+            {
+                ScreenManager.PopScreen();
+                GameStateManager.Current.CleanStates(0);
+                GameStateManager.Current = TaleWorlds.MountAndBlade.Module.CurrentModule.GlobalGameStateManager;
+            }
 
-            gameData.Unpack();
+            gameManager = new ClientManager(saveData.LoadResult, saveData.PlayerId);
 
-            Hero newPlayer = CoopObjectManager.GetObject<Hero>(gameData.PlayerHeroId);
+            MBGameManager.StartNewGame(gameManager);
 
-            Game.Current.PlayerTroop = newPlayer.CharacterObject;
-            ChangePlayerCharacterAction.Apply(newPlayer);
+            ClientManager.OnPostLoadFinishedEvent += (sender, eventArgs) =>
+            {
+                saveData.AssosiateIds();
 
-            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
+                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
+            };
         }
         #endregion
 
@@ -341,6 +357,8 @@ namespace Coop.Mod
             Session.Connection.Send(
                 new Packet(EPacket.Client_Loaded));
             TryInitPersistence();
+            Session.Connection.Send(
+                new Packet(EPacket.Client_PartyChanged, CommonSerializer.Serialize(m_HeroGUID)));
         }
 		
 
@@ -374,5 +392,7 @@ namespace Coop.Mod
 
             return sRet;
         }
+
+        
     }
 }

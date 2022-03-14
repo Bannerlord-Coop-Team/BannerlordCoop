@@ -161,7 +161,7 @@ namespace Coop.Mod.Persistence.Party
         /// <exception cref="Exception"></exception>
         private void RegisterAsController()
         {
-            if (Controller != null)
+            if (Controller != null && State.PartyId != Guid.Empty)
             {
                 if (!TryGetParty(out MobileParty controlledParty))
                 {
@@ -240,8 +240,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         private void OnPlayerControlledChanged()
         {
-            MobileParty party = m_Environment.GetMobilePartyById(State.PartyId);
-            m_Environment.SetIsPlayerControlled(party.Id, State.IsPlayerControlled);
+            m_Environment.SetIsPlayerControlled(State.PartyId, State.IsPlayerControlled);
         }
         
         [CanBeNull] private MobileParty m_Party; // Do not use, call TryGetParty instead.

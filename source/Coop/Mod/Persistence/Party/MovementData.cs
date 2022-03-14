@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Common;
 using RailgunNet.System.Encoding;
 using RemoteAction;
 using TaleWorlds.CampaignSystem;
@@ -149,10 +150,10 @@ namespace Coop.Mod.Persistence.Party
         public static void WriteMovementData(this RailBitBuffer buffer, MovementData movementData)
         {
             buffer.WriteByte((byte) movementData.DefaultBehaviour);
-            buffer.WriteMBGUID(
-                movementData.TargetSettlement != null ? movementData.TargetSettlement.Id : Coop.InvalidId);
-            buffer.WriteMBGUID(
-                movementData.TargetParty != null ? movementData.TargetParty.Id : Coop.InvalidId);
+            buffer.WriteGUID(
+                CoopObjectManager.GetGuid(movementData.TargetSettlement));
+            buffer.WriteGUID(
+                CoopObjectManager.GetGuid(movementData.TargetParty));
             MovementStateSerializer.CoordinateCompressor.WriteVec2(
                 buffer,
                 movementData.TargetPosition);
@@ -162,15 +163,15 @@ namespace Coop.Mod.Persistence.Party
         [Decoder]
         public static MovementData ReadMovementData(this RailBitBuffer buffer)
         {
-            MBGUID id;
+            Guid id;
             return new MovementData
             {
                 DefaultBehaviour = (AiBehavior) buffer.ReadByte(),
-                TargetSettlement = (id = buffer.ReadMBGUID()) != Coop.InvalidId
-                    ? (Settlement) MBObjectManager.Instance.GetObject(id)
+                TargetSettlement = (id = buffer.ReadGUID()) != Coop.InvalidId
+                    ? (Settlement)CoopObjectManager.GetObject(id)
                     : null,
-                TargetParty = (id = buffer.ReadMBGUID()) != Coop.InvalidId
-                    ? (MobileParty) MBObjectManager.Instance.GetObject(id)
+                TargetParty = (id = buffer.ReadGUID()) != Coop.InvalidId
+                    ? (MobileParty) CoopObjectManager.GetObject(id)
                     : null,
                 TargetPosition = MovementStateSerializer.CoordinateCompressor.ReadVec2(buffer),
                 NumberOfFleeingsAtLastTravel = buffer.ReadInt()

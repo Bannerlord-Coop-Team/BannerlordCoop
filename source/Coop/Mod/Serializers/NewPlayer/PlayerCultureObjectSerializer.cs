@@ -19,8 +19,6 @@ namespace Coop.Mod.Serializers
 
         public override object Deserialize()
         {
-
-
             CultureObject cultureObject = MBObjectManager.Instance.GetObject<CultureObject>(stringId);
             return cultureObject;
         }

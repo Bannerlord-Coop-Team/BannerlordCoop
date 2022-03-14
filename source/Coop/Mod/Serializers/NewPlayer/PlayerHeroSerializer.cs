@@ -27,12 +27,14 @@ namespace Coop.Mod.Serializers
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
         Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
-        public PlayerCharacterObjectSerializer CharacterObject { get; private set; }
         public string PlayerId { get; }
+        string stringId;
 
         public PlayerHeroSerializer(Hero hero) : base(hero)
         {
             PlayerId = new PlatformAPI().GetPlayerID().ToString();
+
+            stringId = hero.StringId;
 
             List<string> UnmanagedFields = new List<string>();
 
@@ -152,7 +154,7 @@ namespace Coop.Mod.Serializers
         }
         public override object Deserialize()
         {
-            hero = MBObjectManager.Instance.CreateObject<Hero>();
+            hero = Hero.CreateHero(stringId);
 
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
@@ -203,10 +205,10 @@ namespace Coop.Mod.Serializers
 
             Campaign.Current.MainParty.ActualClan = Clan.PlayerClan;
             Campaign.Current.MainParty.PartyComponent = lordPartyComponent;
-            
+
             // Invoke party visual onstartup to initialize properly
-            typeof(PartyVisual).GetMethod("TaleWorlds.CampaignSystem.IPartyVisual.OnStartup", BindingFlags.Instance | BindingFlags.NonPublic)
-            .Invoke(hero.PartyBelongedTo.Party.Visuals, new object[] { hero.PartyBelongedTo.Party });
+            PartyBase partyBase = hero.PartyBelongedTo.Party;
+            partyBase.Visuals.OnStartup(partyBase);
 
             Debug.WriteLine($"{hero.Id}");
 

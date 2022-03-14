@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
@@ -113,11 +114,7 @@ namespace Coop.Mod.Serializers.Custom
                         // TODO: Fix this joke
                         break;
                     case "_characterObject":
-                        SNNSO.Add(fieldInfo, new CharacterObjectSerializer((CharacterObject)value));
-                        break;
-
                     case "<Template>k__BackingField":
-                    
                     case "_clan":
                     case "_bornSettlement":
                     case "_homeSettlement":
@@ -163,11 +160,6 @@ namespace Coop.Mod.Serializers.Custom
                 throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
             }
 
-            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
-            {
-                entry.Value.ResolveReferenceGuids();
-            }
-
             // Deserialize exSpouse list
             List<Hero> lExSpouses = new List<Hero>();
             foreach (Guid exSpouseId in ExSpouses)
@@ -181,6 +173,11 @@ namespace Coop.Mod.Serializers.Custom
                 Guid id = entry.Value;
 
                 field.SetValue(newHero, CoopObjectManager.GetObject(id));
+            }
+
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
             }
         }
     }

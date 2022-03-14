@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Common;
 using Coop.Mod.Patch.MobilePartyPatches;
 using CoopFramework;
 using JetBrains.Annotations;
@@ -77,12 +78,13 @@ namespace Coop.Mod.Persistence.Party
         /// <param name="handler">The handler.</param>
         public void RegisterLocalHandler(MobileParty party, IMovementHandler handler)
         {
-            if (m_Handlers.ContainsKey(party.Id))
+            Guid guid = CoopObjectManager.GetGuid(party);
+            if (m_Handlers.ContainsKey(guid))
             {
                 Logger.Warn("Duplicate entity register for {party}.", party);
             }
 
-            m_Handlers[party.Id] = handler;
+            m_Handlers[guid] = handler;
         }
 
         /// <summary>
@@ -121,7 +123,8 @@ namespace Coop.Mod.Persistence.Party
                     throw new Exception($"{change.Key} is not a MobileParty, skip");
                 }
 
-                if (!m_Handlers.TryGetValue(party.Id, out IMovementHandler handler))
+                Guid guid = CoopObjectManager.GetGuid(party);
+                if (!m_Handlers.TryGetValue(guid, out IMovementHandler handler))
                 {
                     Logger.Debug("Got FieldChangeBuffer for unmanaged {party}. Ignored.", party);
                     continue;
@@ -169,7 +172,8 @@ namespace Coop.Mod.Persistence.Party
                     throw new Exception($"{change.Key} is not a MobileParty, skip");
                 }
 
-                if (!m_Handlers.TryGetValue(party.Id, out IMovementHandler handler))
+                Guid guid = CoopObjectManager.GetGuid(party);
+                if (!m_Handlers.TryGetValue(guid, out IMovementHandler handler))
                 {
                     Logger.Debug("Got FieldChangeBuffer for unmanaged {party}. Ignored.", party);
                     continue;
@@ -189,8 +193,8 @@ namespace Coop.Mod.Persistence.Party
                 }
             }
         }
-        private readonly Dictionary<MBGUID, IMovementHandler> m_Handlers =
-            new Dictionary<MBGUID, IMovementHandler>();
+        private readonly Dictionary<Guid, IMovementHandler> m_Handlers =
+            new Dictionary<Guid, IMovementHandler>();
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         [NotNull] private readonly FieldAccessGroup<MobileParty, MovementData> m_MovementOrder;

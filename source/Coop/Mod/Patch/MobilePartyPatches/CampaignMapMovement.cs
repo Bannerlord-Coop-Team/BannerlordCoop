@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using Common;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using CoopFramework;
@@ -106,7 +108,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         {
             foreach (var item in Instances)
             {
-                MobileParty party = MBObjectManager.Instance.GetObject(item.Key) as MobileParty;
+                MobileParty party = CoopObjectManager.GetObject(item.Key) as MobileParty;
                 if (party != null)
                 {
                     item.Value.ApplyServersideState(party);
@@ -118,7 +120,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         ///     All created <see cref="CampaignMapMovement"/> instances sorted by the <see cref="MBGUID"/> of the
         ///     managed party.
         /// </summary>
-        public static Dictionary<MBGUID, CampaignMapMovement> Instances = new Dictionary<MBGUID, CampaignMapMovement>();
+        public static Dictionary<Guid, CampaignMapMovement> Instances = new Dictionary<Guid, CampaignMapMovement>();
         /// <summary>
         ///     Callback when the movement data of a party was changed by the server.
         /// </summary>
@@ -136,8 +138,10 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 return;
 #endif
             }
-            
-            if (Instances.TryGetValue(party.Id, out CampaignMapMovement wrapper))
+
+            Guid partyGuid = CoopObjectManager.GetGuid(party);
+
+            if (Instances.TryGetValue(partyGuid, out CampaignMapMovement wrapper))
             {
                 wrapper.SetMovementGoal(party, data);
             }
@@ -151,7 +155,9 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         /// <param name="facingDirection"></param>
         public static void RemoteMapPositionChanged(MobileParty party, Vec2 posCurrent, Vec2? facingDirection)
         {
-            if (Instances.TryGetValue(party.Id, out CampaignMapMovement wrapper))
+            Guid partyGuid = CoopObjectManager.GetGuid(party);
+
+            if (Instances.TryGetValue(partyGuid, out CampaignMapMovement wrapper))
             {
                 wrapper.SetPosition(party, posCurrent, facingDirection);
             }
@@ -161,7 +167,9 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         #region Instance
         public CampaignMapMovement([NotNull] MobileParty instance) : base(instance)
         {
-            Instances[instance.Id] = this;
+            Guid partyGuid = CoopObjectManager.GetGuid(instance);
+
+            Instances[partyGuid] = this;
             if (!Coop.IsController(instance))
             {
                 // Disable AI decision making for newly spawned parties that we do not control locally. Will be kept

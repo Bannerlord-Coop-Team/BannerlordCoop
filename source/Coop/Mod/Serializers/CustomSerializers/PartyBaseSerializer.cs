@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Common;
+using SandBox.View.Map;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -83,6 +85,9 @@ namespace Coop.Mod.Serializers.Custom
                 entry.Key.SetValue(partyBase, entry.Value.Deserialize());
             }
 
+            IPartyVisual newVisual = Campaign.Current.VisualCreator.PartyVisualCreator.CreatePartyVisual();
+            partyBase.GetType().GetField("_visual", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(partyBase, newVisual);
+
             return base.Deserialize(partyBase);
         }
 
@@ -98,11 +103,15 @@ namespace Coop.Mod.Serializers.Custom
                 FieldInfo field = entry.Key;
                 Guid id = entry.Value;
 
-                field.SetValue(partyBase, CoopObjectManager.GetObject(id));
+                object obj = CoopObjectManager.GetObject(id);
+
+                field.SetValue(partyBase, obj);
             }
 
-            IPartyVisual newVisual = Campaign.Current.VisualCreator.PartyVisualCreator.CreatePartyVisual();
-            partyBase.GetType().GetField("_visual", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(partyBase, newVisual);
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
+            }
         }
     }
 }

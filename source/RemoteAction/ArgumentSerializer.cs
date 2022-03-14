@@ -21,7 +21,7 @@ namespace RemoteAction
             switch (arg.EventType)
             {
                 case EventArgType.MBObject:
-                    buffer.WriteMBGUID(arg.MbGUID.Value);
+                    buffer.WriteGUID(arg.GUID.Value);
                     break;
                 case EventArgType.Null:
                     // Empty
@@ -65,7 +65,7 @@ namespace RemoteAction
             switch (eType)
             {
                 case EventArgType.MBObject:
-                    return new Argument(buffer.ReadMBGUID());
+                    return new Argument(buffer.ReadGUID());
                 case EventArgType.MBObjectManager:
                     return Argument.MBObjectManager;
                 case EventArgType.Null:
