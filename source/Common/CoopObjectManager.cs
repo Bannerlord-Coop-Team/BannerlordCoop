@@ -43,7 +43,7 @@ namespace Common
             }
         }
 
-        private static bool ContainsElement(object obj)
+        public static bool ContainsElement(object obj)
         {
             GuidWrapper guidWrapper;
             Guids.TryGetValue(obj, out guidWrapper);
@@ -69,6 +69,22 @@ namespace Common
 
                 return true;
             }
+        }
+
+        public static void Assert(Guid guid, object obj)
+        {
+            if(obj == null)
+            {
+                throw new ArgumentException($"Invalid object.");
+            }
+            if(guid == Guid.Empty)
+            {
+                throw new ArgumentException($"Invalid guid.");
+            }
+
+            bool existed = Guids.Remove(obj);
+            Guids.Add(obj, new GuidWrapper(guid));
+            Objects[guid] = obj;
         }
 
         public static bool RegisterExistingObject(Guid guid, object obj)
@@ -203,7 +219,7 @@ namespace Common
 
         public static Dictionary<Type, List<Guid>> GetAssociatedGuids()
         {
-            return AssosiatedGuids;
+            return AssociatedGuids;
         }
 
         public static IEnumerable<Guid> GetTypeGuids<T>()

@@ -8,6 +8,7 @@ using Coop.Mod.Persistence.Party;
 using CoopFramework;
 using HarmonyLib;
 using JetBrains.Annotations;
+using NLog;
 using Sync.Behaviour;
 using Sync.Call;
 using Sync.Value;
@@ -132,7 +133,8 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             {
                 string sMessage = $"Received inconsistent data for {party}: {data}. Ignored";
 #if DEBUG
-                throw new InvalidStateException(sMessage);
+                Logger.Warn(sMessage);
+                // throw new InvalidStateException(sMessage);
 #else
                 Logger.Warn(sMessage);
                 return;
@@ -262,6 +264,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
 
         private Vec2 m_NextPosition = Vec2.Invalid;
         private Vec2? m_FacingDirection = null;
+        private static readonly NLog.Logger Logger = LogManager.GetCurrentClassLogger();
 
         #endregion
     }

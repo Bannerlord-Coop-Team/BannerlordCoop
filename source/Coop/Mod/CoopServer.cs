@@ -31,6 +31,7 @@ using System.Reflection;
 using Coop.Mod.Serializers.Custom;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.Localization;
+using System.Text;
 
 namespace Coop.Mod
 {
@@ -283,16 +284,21 @@ namespace Coop.Mod
         [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestGameData)]
         private void SendGameData(ConnectionBase connection, Packet packet)
         {
-            // Recieve player hero
-            PlayerHeroSerializer serializer = (PlayerHeroSerializer)CommonSerializer.Deserialize(packet.Payload);
-            Hero newHero = (Hero)serializer.Deserialize();
+            SaveData saveData = null;
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                // Recieve player hero
+                PlayerHeroSerializer serializer = (PlayerHeroSerializer)CommonSerializer.Deserialize(packet.Payload);
+                Hero newHero = (Hero)serializer.Deserialize();
 
-            // Remove main hero
-            CoopObjectManager.RemoveObject(Hero.MainHero);
-            CoopObjectManager.RemoveObject(Hero.MainHero.Father);
+                // Remove main hero
+                CoopObjectManager.RemoveObject(Hero.MainHero);
+                CoopObjectManager.RemoveObject(Hero.MainHero.Father);
 
-            // Create save data, this contains player id and MBGUID <> Guid id assosiations
-            SaveData saveData = new SaveData(CoopObjectManager.AddObject(newHero));
+                // Create save data, this contains player id and MBGUID <> Guid id assosiations
+                CoopObjectManager.AddObject(newHero.PartyBelongedTo);
+                saveData = new SaveData(CoopObjectManager.AddObject(newHero));
+            });
 
             connection.Send(new Packet(EPacket.Server_GameData, saveData));
 
@@ -314,7 +320,18 @@ namespace Coop.Mod
         private void ReceiveClientBadId(ConnectionBase connection, Packet packet)
         {
             List<Guid> list = (List<Guid>) CommonSerializer.Deserialize(packet.Payload);
-            List<object> list2 = list.Select(value => CoopObjectManager.GetObject(value)).ToList();
+            foreach(object obj in list.Select(value => CoopObjectManager.GetObject(value)))
+            {
+                StringBuilder s = new StringBuilder("### Client replied BadID:\n");
+                Type t = obj.GetType();
+                PropertyInfo[] props = t.GetProperties();
+                foreach (PropertyInfo p in props)
+                {
+                    s.Append(p.Name + " : " + p.GetValue(obj) + "\n");
+                }
+                Logger.Error(s);
+            }
+            
         }
 #endif
 
