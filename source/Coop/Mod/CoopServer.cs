@@ -284,7 +284,6 @@ namespace Coop.Mod
         [GameServerPacketHandler(ECoopServerState.Preparing, EPacket.Client_RequestGameData)]
         private void SendGameData(ConnectionBase connection, Packet packet)
         {
-            SaveData saveData = null;
             GameLoopRunner.RunOnMainThread(() =>
             {
                 // Recieve player hero
@@ -297,13 +296,13 @@ namespace Coop.Mod
 
                 // Create save data, this contains player id and MBGUID <> Guid id assosiations
                 CoopObjectManager.AddObject(newHero.PartyBelongedTo);
-                saveData = new SaveData(CoopObjectManager.AddObject(newHero));
+                SaveData saveData = new SaveData(CoopObjectManager.AddObject(newHero));
+
+                connection.Send(new Packet(EPacket.Server_GameData, saveData));
+
+                ConnectionServer connectionServer = (ConnectionServer)connection;
+                m_CoopServerSMs[connectionServer].StateMachine.Fire(ECoopServerTrigger.RequiresWorldData);
             });
-
-            connection.Send(new Packet(EPacket.Server_GameData, saveData));
-
-            ConnectionServer connectionServer = (ConnectionServer)connection;
-            m_CoopServerSMs[connectionServer].StateMachine.Fire(ECoopServerTrigger.RequiresWorldData);
         }
 
         [GameServerPacketHandler(ECoopServerState.SendingGameData, EPacket.Client_Loaded)]
