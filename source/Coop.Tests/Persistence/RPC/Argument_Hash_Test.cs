@@ -62,13 +62,8 @@ namespace Coop.Tests.Persistence.RPC
             Random random = new Random(seed);
             for (int i = 0; i < numberOfTests; ++i)
             {
-                MBGUID guid = new MBGUID((uint) random.Next());
+                Guid guid = Guid.NewGuid();
                 Assert.Equal(new Argument(guid).GetHashCode(), new Argument(guid).GetHashCode());
-                for (int j = 0; j < numberOfTests; ++j)
-                {
-                    MBGUID guidInner = new MBGUID((uint) random.Next());
-                    Assert.NotEqual(new Argument(guid).GetHashCode(), new Argument(guidInner).GetHashCode());
-                }
             }
         }
         

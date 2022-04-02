@@ -64,8 +64,6 @@ namespace Coop.Mod.Serializers
                     return new TraitObjectSerializer(traitObject);
                 case TroopRoster troopRoster:
                     return new TroopRosterSerializer(troopRoster);
-                case CharacterFeats characterFeats:
-                    return new CharacterFeatsSerializer(characterFeats);
                 case CharacterPerks characterPerks:
                     return new CharacterPerksSerializer(characterPerks);
                 case CharacterSkills characterSkills:

@@ -61,7 +61,7 @@ namespace RemoteAction
                         resolvedObject,
                         resolvedObject.GetType());
                     // TODO find a way to remove without breaking everything
-                    //store.Remove(arg.StoreObjectId.Value);
+                    store.Remove(arg.StoreObjectId.Value);
                     return resolvedObject;
                 case EventArgType.CurrentCampaign:
                     return Campaign.Current;

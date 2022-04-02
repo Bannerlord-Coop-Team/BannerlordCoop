@@ -20,7 +20,7 @@ namespace Coop.Mod.DebugUtil
                     "tutorial_placeholder_volunteer");
             roster.AddToCounts(obj, 5 - roster.TotalManCount);
             TroopRoster prisonerRoster = TroopRoster.CreateDummyTroopRoster();
-            party.InitializeMobileParty(
+            party.InitializeMobilePartyAroundPosition(
                 roster,
                 prisonerRoster,
                 nearbyParty.Position2D,

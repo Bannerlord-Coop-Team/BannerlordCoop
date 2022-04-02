@@ -4,10 +4,12 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using Common;
+using Coop.Mod.Data;
 using Coop.NetImpl.LiteNet;
 using LiteNetLib;
 using Moq;
 using Network.Infrastructure;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace Coop.Tests.Network
@@ -20,7 +22,7 @@ namespace Coop.Tests.Network
         {
             // Setup server mock
             m_Server = new Mock<Server>(Server.EType.Threaded);
-            m_ListenerServer = new LiteNetListenerServer(m_Server.Object, Mock.Of<ISaveData>());
+            m_ListenerServer = new LiteNetListenerServer(m_Server.Object);
             m_ServerSideConnected = new List<ConnectionBase>();
             m_ServerSideDisconnects = new List<(ConnectionBase, EDisconnectReason)>();
             m_Server.Setup(server => server.CanPlayerJoin()).Returns(true);
@@ -59,7 +61,7 @@ namespace Coop.Tests.Network
             public Client(int iPort)
             {
                 m_iPort = iPort;
-                Session = new GameSession(Mock.Of<ISaveData>());
+                Session = new GameSession();
                 Listener = new LiteNetListenerClient(Session);
                 Manager = new NetManager(Listener);
                 Manager.Start();

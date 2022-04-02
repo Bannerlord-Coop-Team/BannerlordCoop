@@ -1,5 +1,5 @@
 ﻿using HarmonyLib;
-using static StoryMode.Behaviors.Quests.FirstPhase.BannerInvestigationQuestBehavior;
+using StoryMode.Behaviors.Quests.FirstPhase;
 
 namespace Coop.Mod.Patch
 {

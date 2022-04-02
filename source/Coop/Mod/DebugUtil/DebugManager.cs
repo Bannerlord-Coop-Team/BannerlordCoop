@@ -28,7 +28,7 @@ namespace Coop.Mod.DebugUtil
                     CallerLine);
                 if (Debugger.IsAttached)
                 {
-                    Debugger.Break();
+                    //Debugger.Break();
                 }
             }
         }
@@ -162,6 +162,11 @@ namespace Coop.Mod.DebugUtil
         }
 
         public void EndTelemetryScopeBaseLevel()
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public void RenderDebugText3D(Vec3 position, string text, uint color = uint.MaxValue, int screenPosOffsetX = 0, int screenPosOffsetY = 0, float time = 0)
         {
             throw new System.NotImplementedException();
         }

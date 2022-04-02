@@ -72,10 +72,6 @@ namespace Coop.Mod.Serializers.Custom
                         SNNSO.Add(fieldInfo, new CharacterTraitsSerializer((CharacterTraits)value));
                         break;
 
-                    case "_characterFeats":
-                        SNNSO.Add(fieldInfo, new CharacterFeatsSerializer((CharacterFeats)value));
-                        break;
-
                     case "CharacterSkills":
                         SNNSO.Add(fieldInfo, new MBCharacterSkillsSerializer((MBCharacterSkills)value));
                         break;
