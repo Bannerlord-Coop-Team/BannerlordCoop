@@ -22,6 +22,8 @@ namespace Coop.Mod.Managers
     /// </summary>
     public class ServerGameManager : SandBoxGameManager
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+    
         public ServerGameManager() : base() { }
         public ServerGameManager(LoadResult saveGameData) : base(saveGameData) { }
 
@@ -113,7 +115,5 @@ namespace Coop.Mod.Managers
                 CoopObjectManager.AddObject(characterObject);
             }
         }
-
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
     }
 }
