@@ -50,7 +50,7 @@ namespace Coop.Mod.Persistence.Party
             }
 
             State.IsPlayerControlled = false;
-            m_Environment.PartySync.RegisterLocalHandler(party, this);
+            m_Environment.PartySync?.RegisterLocalHandler(party, this);
             m_bIsRegisteredAsController = true;
         }
 
@@ -59,7 +59,7 @@ namespace Coop.Mod.Persistence.Party
         /// </summary>
         private void UnregisterAsController()
         {
-            m_Environment.PartySync.Unregister(this);
+            m_Environment.PartySync?.Unregister(this);
             m_bIsRegisteredAsController = false;
         }
         #region IMovementHandler

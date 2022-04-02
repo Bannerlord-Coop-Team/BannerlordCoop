@@ -14,7 +14,7 @@ namespace Coop.Tests.Network
         public NetManager_Test()
         {
             m_Server = TestUtils.StartNewServer();
-            m_NetManagerServer = new LiteNetManagerServer(m_Server, Mock.Of<ISaveData>());
+            m_NetManagerServer = new LiteNetManagerServer(m_Server);
             m_NetManagerServer.StartListening();
             CompatibilityInfo.ModuleProvider = new ModuleInfoProviderMock();
         }
@@ -29,7 +29,7 @@ namespace Coop.Tests.Network
 
             public Client()
             {
-                Session = new GameSession(Mock.Of<ISaveData>());
+                Session = new GameSession();
                 Manager = new LiteNetManagerClient(Session, new ClientConfiguration());
             }
         }
