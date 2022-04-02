@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using CoopFramework;
 using HarmonyLib;
 using JetBrains.Annotations;
+using NLog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -18,7 +19,7 @@ namespace Coop.Mod
         ///     Instance of the adapter.
         /// </summary>
         public static ObjectManagerAdapter Instance => m_Instance.Value;
-        
+
         /// <inheritdoc cref="IObjectManager.Manages{T}"/>
         public bool Manages<T>()
         {
@@ -197,7 +198,51 @@ namespace Coop.Mod
                 Instance.OnAfterRegisterObjectWithoutInitialization(obj);
             }
         }
-        
+
+        /// <summary>
+        ///     Kind of a workaround. Taleworlds change initalization logic in 1.6.0 after loading a file.
+        ///     Some classes explicitly skip calling MBObjectBase.OnBeforeLoad. Not sure why and i can imagine
+        ///     that this will be changed again. Looks quite hacky in the disassembly.
+        ///     
+        ///     Affected:
+        ///     - MobileParty
+        ///     - Clan
+        ///     - Hero
+        ///     - Kingdom
+        /// </summary>
+        [HarmonyPatch(typeof(MobileParty), "OnBeforeLoad")]
+        private static class MobileParty_OnBeforeLoad
+        {
+            static void Postfix(MobileParty __instance)
+            {
+                Instance.OnAfterRegisterObjectWithoutInitialization(__instance);
+            }
+        }
+        [HarmonyPatch(typeof(Clan), "OnBeforeLoad")]
+        private static class Clan_OnBeforeLoad
+        {
+            static void Postfix(Clan __instance)
+            {
+                Instance.OnAfterRegisterObjectWithoutInitialization(__instance);
+            }
+        }
+        [HarmonyPatch(typeof(Hero), "OnBeforeLoad")]
+        private static class Hero_OnBeforeLoad
+        {
+            static void Postfix(Hero __instance)
+            {
+                Instance.OnAfterRegisterObjectWithoutInitialization(__instance);
+            }
+        }
+        [HarmonyPatch(typeof(MobileParty), "OnBeforeLoad")]
+        private static class Kingdom_OnBeforeLoad
+        {
+            static void Postfix(Kingdom __instance)
+            {
+                Instance.OnAfterRegisterObjectWithoutInitialization(__instance);
+            }
+        }
+
         private class CampaignLifetimeHandler : IHandler
         {
             public CampaignLifetimeHandler([NotNull] IObjectLifetimeObserver observer)

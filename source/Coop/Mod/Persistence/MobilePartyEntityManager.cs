@@ -100,21 +100,21 @@ namespace Coop.Mod.Persistence
 
             room.ClientJoined += controller =>
             {
-                //if (controller.Scope == null)
-                //{
-                //    throw new Exception("Connected clients should always be scoped!");
-                //}
-                //controller.Scope.Evaluator = new CoopRailScopeEvaluator(
-                //    room.Clients.Count == 1,    // the first client is always the arbiter.
-                //    () =>
-                //{
-                //    if (m_ClientControlledParties.TryGetValue((RailServerPeer) controller, out MobileParty party))
-                //    {
-                //        return m_Parties.ContainsKey(party) ? m_Parties[party] : null;
-                //    }
-                //    return null;
-                //},
-                //GetScopeRange);
+                if (controller.Scope == null)
+                {
+                    throw new Exception("Connected clients should always be scoped!");
+                }
+                controller.Scope.Evaluator = new CoopRailScopeEvaluator(
+                    room.Clients.Count == 1,    // the first client is always the arbiter.
+                    () =>
+                {
+                    if (m_ClientControlledParties.TryGetValue((RailServerPeer) controller, out MobileParty party))
+                    {
+                        return m_Parties.ContainsKey(party) ? m_Parties[party] : null;
+                    }
+                    return null;
+                },
+                GetScopeRange);
             };
             
             WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
@@ -123,6 +123,12 @@ namespace Coop.Mod.Persistence
             foreach (MobileParty party in Campaign.Current.MobileParties)
             {
                 Guid partyGuid = CoopObjectManager.GetGuid(party);
+                if (partyGuid.Equals(Guid.Empty))
+                {
+                    Logger.Error("Party {party} is not in the CoopObjectManager. Skipped adding it to the room, it will not be synced.");
+                    continue;
+                }
+                    
 
                 MobilePartyEntityServer entity = room.AddNewEntity<MobilePartyEntityServer>(
                     e => e.State.PartyId = partyGuid);
@@ -293,7 +299,8 @@ namespace Coop.Mod.Persistence
         {
             if (CoopObjectManager.GetGuid(party) == Coop.InvalidId)
             {
-                //throw new Exception($"Invalid party id in {party}");
+                Logger.Warn($"{party} not present in CoopObjectManager. Somehow bypassed CoopManager. Will not be synced.");
+                return;
             }
 
             lock (m_Lock)
@@ -302,9 +309,6 @@ namespace Coop.Mod.Persistence
                 {
                     return;
                 }
-
-                CoopObjectManager.AddObject(party);
-
                 m_PartiesToAdd.Add(party);
             }
         }

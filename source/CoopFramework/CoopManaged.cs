@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using Common;
 using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
@@ -28,6 +29,7 @@ namespace CoopFramework
         public CoopManaged([NotNull] TExtended instance)
         {
             if (instance == null) throw new ArgumentNullException(nameof(instance));
+            CoopObjectManager.AddObject(instance);
             Instance = new WeakReference<TExtended>(instance, true);
             SetupHandlers(this);
         }

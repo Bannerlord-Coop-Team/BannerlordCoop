@@ -13,6 +13,7 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.ObjectSystem;
 using Common;
+using NLog;
 
 namespace Coop.Mod.Managers
 {
@@ -21,6 +22,8 @@ namespace Coop.Mod.Managers
     /// </summary>
     public class ServerGameManager : SandBoxGameManager
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+    
         public ServerGameManager() : base() { }
         public ServerGameManager(LoadResult saveGameData) : base(saveGameData) { }
 
@@ -101,7 +104,10 @@ namespace Coop.Mod.Managers
 
             foreach (MobileParty party in MobileParty.All)
             {
-                CoopObjectManager.AddObject(party);
+                if(!CoopObjectManager.ContainsElement(party))
+                {
+                    Logger.Warn($"Object {party} was not picked up by after load patches. Need to fix patches in ObjectManagerAdapter.");
+                }
             }
 
             foreach (CharacterObject characterObject in CharacterObject.All)
