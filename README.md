@@ -18,7 +18,7 @@ Mod to enjoy the original Mount & Blade II: Bannerlord campaign with other playe
 ## Current State
 ***There's is absolutely no gameplay so far***.
 
-Currently utilizing Bannerlord v1.5.9
+Currently working with Bannerlord v1.7.0.
 
 Very early in development.  [Video created on commit d86c24c](https://youtu.be/Y_htoMXQGqU).
 
