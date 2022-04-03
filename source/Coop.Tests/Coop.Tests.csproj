@@ -18,6 +18,7 @@
     <PackageReference Include="Lib.Harmony" Version="2.0.4" />
     <PackageReference Include="LiteNetLib" Version="0.9.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.4.0" />
+    <PackageReference Include="Microsoft.TestPlatform.ObjectModel" Version="17.1.0" />
     <PackageReference Include="Moq" Version="4.14.1" />
     <PackageReference Include="NLog" Version="4.7.2" />
     <PackageReference Include="Stateless" Version="5.1.2" />
