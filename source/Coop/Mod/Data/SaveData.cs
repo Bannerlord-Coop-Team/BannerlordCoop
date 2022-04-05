@@ -142,21 +142,23 @@ namespace Coop.Mod.Data
         public static Dictionary<MBGUID, Guid> GenerateMBGUIDAssociations()
         {
             Dictionary<MBGUID, Guid> result = new Dictionary<MBGUID, Guid>();
-            foreach (KeyValuePair<Guid, object> value in CoopObjectManager.Objects)
+            foreach (KeyValuePair<Guid, WeakReference<object>> pair in CoopObjectManager.Objects)
             {
-                if (value.Value is MBObjectBase mbObject)
+                if (!pair.Value.TryGetTarget(out object obj))
+                {
+                    continue;
+                }
+
+                if (obj is MBObjectBase mbObject)
                 {
                     if (!result.ContainsKey(mbObject.Id))
                     {
-                        result.Add(mbObject.Id, value.Key);
+                        result.Add(mbObject.Id, pair.Key);
                     }
                     else
                     {
                         MBObjectBase object1 = mbObject;
                         MBObjectBase object2 = CoopObjectManager.GetObject<MBObjectBase>(result[mbObject.Id]);
-
-                        int index = CoopObjectManager.Objects.Values.ToList().IndexOf(object1);
-
                         throw new Exception($"Key Collision {object1} and {object2}");
                     }
                 }

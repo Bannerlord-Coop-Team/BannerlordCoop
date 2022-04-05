@@ -29,7 +29,10 @@ namespace CoopFramework
         public CoopManaged([NotNull] TExtended instance)
         {
             if (instance == null) throw new ArgumentNullException(nameof(instance));
-            CoopObjectManager.AddObject(instance);
+            if(!CoopObjectManager.ContainsElement(instance))
+            {
+                CoopObjectManager.AddObject(instance);
+            }
             Instance = new WeakReference<TExtended>(instance, true);
             SetupHandlers(this);
         }
@@ -155,7 +158,7 @@ namespace CoopFramework
         {
             if (Instance.TryGetTarget(out resolvedInstance)) return true;
 
-            Logger.Warn("Coop synced {Instance} seems to have expired", ToString());
+            Logger.Debug("Coop synced {Instance} seems to have expired. Removed.", ToString());
             lock (m_AutoWrappedInstances)
             {
                 // If the wrapper was automatically created, delete it
@@ -277,6 +280,7 @@ namespace CoopFramework
             }
 
             Instance = new WeakReference<TExtended>(null);
+            CoopObjectManager.RemoveObject(instance);
         }
 
         /// <summary>

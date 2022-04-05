@@ -26,7 +26,7 @@ namespace Common
     /// </summary>
     public class CoopObjectManager
     {
-        public static readonly Dictionary<Guid, object> Objects = new Dictionary<Guid, object>();
+        public static readonly Dictionary<Guid, WeakReference<object>> Objects = new Dictionary<Guid, WeakReference<object>>();
         private static readonly ConditionalWeakTable<object, GuidWrapper> Guids = new ConditionalWeakTable<object, GuidWrapper>();
         private static readonly Dictionary<Type, List<Guid>> AssociatedGuids = new Dictionary<Type, List<Guid>>();
         
@@ -65,7 +65,7 @@ namespace Common
             else
             {
                 Guids.Add(obj, new GuidWrapper(guid));
-                Objects.Add(guid, obj);
+                Objects.Add(guid, new WeakReference<object>(obj));
 
                 return true;
             }
@@ -82,9 +82,13 @@ namespace Common
                 throw new ArgumentException($"Invalid guid.");
             }
 
-            bool existed = Guids.Remove(obj);
+            if(Guids.TryGetValue(obj, out GuidWrapper guidWrapper))
+            {
+                Objects.Remove(guidWrapper.Guid);
+                Guids.Remove(obj);
+            }
             Guids.Add(obj, new GuidWrapper(guid));
-            Objects[guid] = obj;
+            Objects.Add(guid, new WeakReference<object>(obj));
         }
 
         public static bool RegisterExistingObject(Guid guid, object obj)
@@ -136,9 +140,18 @@ namespace Common
                 return null;
             }
 
-            Objects.TryGetValue(id, out object obj);
+            Objects.TryGetValue(id, out WeakReference<object> wp);
+            if(wp == null)
+            {
+                return null;
+            }
 
-
+            wp.TryGetTarget(out object obj);
+            if(obj == null)
+            {
+                // Expired, cleanup internal state
+                RemoveObject(id);
+            }
             return obj;
         }
 
@@ -204,7 +217,13 @@ namespace Common
                 return default(T);
             }
 
-            object obj = Objects[id];
+            WeakReference<object> wp = Objects[id];
+            if(!wp.TryGetTarget(out object obj))
+            {
+                // Expired, cleanup internal state
+                RemoveObject(id);
+                return default(T);
+            }
             if (!(obj is T))
             {
                 throw new Exception("Stored object is not the same type as given type.");
@@ -249,11 +268,28 @@ namespace Common
 
             if (ContainsElement(id))
             {
-                object obj = Objects[id];
+                WeakReference<object> wp = Objects[id];
+                if(wp.TryGetTarget(out object obj))
+                {
+                    result = RemoveObject(obj);
+                    RemoveObjectFromType(id, obj);
+                }
+                else
+                {
+                    // Object no longer exists. Cleanup internal state.
+                    Objects.Remove(id);
 
-                result = RemoveObject(obj);
-
-                RemoveObjectFromType(id, obj);
+                    // Since the object no longer exist, we have to manually search the AssociatedGuids
+                    foreach (var pair in AssociatedGuids)
+                    {
+                        if(pair.Value.Remove(id))
+                        {
+                            // Assuming we only assigned each Guid once, this should be sufficient.
+                            break;
+                        }
+                    }
+                    result = true;
+                }
             }
             else 
             {
