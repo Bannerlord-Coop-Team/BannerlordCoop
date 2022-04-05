@@ -197,7 +197,7 @@ namespace Coop.Mod.Persistence.Party
                 NextState != null && IsValidCoordinate(NextState.MapPosition))
             {
                 // Remote controlled entity
-                Vec2 moveDir = (NextState.MapPosition.Vec2 - State.MapPosition.Vec2).Normalized();
+                Vec2 moveDir = (NextState.MapPosition.Vec2 - AuthState.MapPosition.Vec2).Normalized();
                 m_Environment.SetAuthoritative(party, AuthState.MapPosition, moveDir);
             }
             else

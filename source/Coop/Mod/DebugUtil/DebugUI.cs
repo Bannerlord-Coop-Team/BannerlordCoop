@@ -318,7 +318,7 @@ namespace Coop.Mod.DebugUtil
             {
                 MobilePartyEntityManager manager = CoopServer.Instance.Persistence.MobilePartyEntityManager;
 
-                Imgui.SliderFloat("Client scope range", ref manager.ClientRailScopeRange, 0f, 200f);
+                Imgui.SliderFloat("ClientScopeRange = ClientParty.SeeingRange * <this slider value>", ref manager.ClientScopeRangeFactor, 0f, 3f);
 
                 Imgui.Columns(2);
                 Imgui.Separator();

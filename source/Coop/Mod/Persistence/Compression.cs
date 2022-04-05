@@ -20,18 +20,19 @@ namespace Coop.Mod.Persistence
 
             public Coordinate2d()
             {
+                float min = Math.Min(Campaign.MapMinimumPosition.x, Campaign.MapMinimumPosition.y);
+                float max = Math.Max(Campaign.MapMaximumPosition.x, Campaign.MapMaximumPosition.y);
                 m_Compressor = new RailFloatCompressor(
-                    0.0f,
-                    // TODO #190 - not sure what this does.... probably fine.
-                    Campaign.MapMaximumHeight,
+                    min,
+                    max,
                     Compare.COORDINATE_PRECISION / 10.0f);
             }
 
             [Encoder]
             public void WriteVec2(RailBitBuffer buffer, Vec2 coord)
             {
-                buffer.WriteFloat(m_Compressor, coord.X);
-                buffer.WriteFloat(m_Compressor, coord.Y);
+                buffer.WriteFloat(m_Compressor, coord.x);
+                buffer.WriteFloat(m_Compressor, coord.y);
             }
 
             [Decoder]

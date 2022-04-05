@@ -589,6 +589,10 @@ namespace CoopFramework
 
             return ECallPropagation.CallOriginal;
         }
+        public override string ToString()
+        {
+            return $"CoopManaged: {Instance}";
+        }
 
         [CanBeNull] private static ObjectLifetimeObserver<TExtended> m_LifetimeObserver;
         [CanBeNull] private static Timer TimerGC;

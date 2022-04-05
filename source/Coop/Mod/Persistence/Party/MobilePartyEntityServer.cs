@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Common;
 using JetBrains.Annotations;
 using NLog;
@@ -18,6 +18,12 @@ namespace Coop.Mod.Persistence.Party
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         [NotNull] private readonly IEnvironmentServer m_Environment;
         private bool m_bIsRegisteredAsController;
+
+        public MobileParty Instance
+        {
+            [CanBeNull]
+            get => m_Instance;
+        }
         [CanBeNull] private MobileParty m_Instance;
 
         public MobilePartyEntityServer([NotNull] IEnvironmentServer environment)
@@ -50,7 +56,7 @@ namespace Coop.Mod.Persistence.Party
             }
 
             State.IsPlayerControlled = false;
-            m_Environment.PartySync?.RegisterLocalHandler(party, this);
+            m_Environment.PartySync.RegisterLocalHandler(party, this);
             m_bIsRegisteredAsController = true;
         }
 
@@ -62,6 +68,24 @@ namespace Coop.Mod.Persistence.Party
             m_Environment.PartySync?.Unregister(this);
             m_bIsRegisteredAsController = false;
         }
+
+        /// <summary>
+        ///     Applies a movement issued by the controller of this instance to the local game state.
+        /// </summary>
+        /// <param name="data"></param>
+        public void ApplyPlayerMove(MovementData data)
+        {
+            if(m_Instance == null)
+            {
+                Logger.Warn(
+                    "{Player controlled party {PartyId} not found on server. Desync!",
+                    State.PartyId);
+                return;
+            }
+
+            m_Environment.SetMovement(m_Instance, data);
+        }
+
         #region IMovementHandler
 
         public Tick Tick => Room?.Tick ?? Tick.INVALID;
