@@ -296,7 +296,6 @@
     <Compile Include="Mod\GameSync\Caravan\CaravanPartyComponentSync.cs" />
     <Compile Include="Mod\GameSync\FiefSync.cs" />
     <Compile Include="Mod\GameSync\HeroSync.cs" />
-    <Compile Include="Mod\GameSync\MobilePartySync.cs" />
     <Compile Include="Mod\GameSync\SettlementSync.cs" />
     <Compile Include="Mod\Patch\World\TimeSynchronization.cs" />
     <Compile Include="Mod\Patch\CampaignPatches\SetTimeSpeedPatch.cs" />

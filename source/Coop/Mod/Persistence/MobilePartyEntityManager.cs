@@ -144,7 +144,7 @@ namespace Coop.Mod.Persistence
             // Settlements
         }
 
-        public float ClientRailScopeRange = 25f;
+        public float ClientRailScopeRange = 50f;
         private float GetScopeRange(MobilePartyEntityServer entity)
         {
             return ClientRailScopeRange;

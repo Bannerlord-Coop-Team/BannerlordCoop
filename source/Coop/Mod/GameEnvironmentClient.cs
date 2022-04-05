@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Common;
@@ -52,9 +52,9 @@ namespace Coop.Mod
             CoopClient.Instance.SyncedObjectStore ??
             throw new InvalidOperationException("Client not initialized.");
         
-        public void ScopeEntered(MobileParty party, Vec2 mapPosition, Vec2? facingDirection, MovementData movementData)
+        public void ScopeEntered(MobileParty party, Vec2 mapPosition, Vec2? facingDirection)
         {
-            MobilePartyScopeHelper.Enter(party, mapPosition, facingDirection, movementData);
+            MobilePartyScopeHelper.Enter(party, mapPosition, facingDirection);
         }
 
         public void ScopeLeft(MobileParty party)

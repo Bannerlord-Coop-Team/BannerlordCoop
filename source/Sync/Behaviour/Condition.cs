@@ -58,7 +58,23 @@ namespace Sync.Behaviour
         {
             return new Condition((eOrigin, instance) => lhs.m_Func(eOrigin, instance) && rhs.m_Func(eOrigin, instance));
         }
-        
+
+        /// <summary>
+        ///     Operator to chain two conditions with an OR.
+        /// </summary>
+        /// <param name="lhs"></param>
+        /// <param name="rhs"></param>
+        /// <returns></returns>
+        public static Condition operator |([NotNull] Condition lhs, [NotNull] Condition rhs)
+        {
+            return new Condition((eOrigin, instance) => lhs.m_Func(eOrigin, instance) || rhs.m_Func(eOrigin, instance));
+        }
+
+        public static Condition operator !([NotNull] Condition c)
+        {
+            return new Condition((eOrigin, instance) => !c.Evaluate(eOrigin, instance));
+        }
+
         #region Private
         private readonly Func<EOriginator, object, bool> m_Func;
         #endregion

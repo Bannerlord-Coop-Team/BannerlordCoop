@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Coop.Mod.Persistence.Party;
 using JetBrains.Annotations;
@@ -73,8 +73,7 @@ namespace Coop.Mod.Persistence
         /// <param name="party"></param>
         /// <param name="mapPosition"></param>
         /// <param name="facingDirection"></param>
-        /// <param name="movementData"></param>
-        void ScopeEntered([NotNull] MobileParty party, Vec2 mapPosition, Vec2? facingDirection, MovementData movementData);
+        void ScopeEntered([NotNull] MobileParty party, Vec2 mapPosition, Vec2? facingDirection);
         /// <summary>
         ///     Called when a party leaves the scope of the local client.
         /// </summary>

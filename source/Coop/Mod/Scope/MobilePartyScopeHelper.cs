@@ -20,13 +20,13 @@ namespace Coop.Mod.Scope
         /// <param name="currentMovementData"></param>
         public static void Enter([NotNull] MobileParty party,
             Vec2 position,
-            Vec2? facingDirection,
-            MovementData currentMovementData)
+            Vec2? facingDirection)
         {
-            // TODO: make sure the party visuals are correct
-            CampaignMapMovement.RemoteMovementChanged(party, currentMovementData);
-            CampaignMapMovement.RemoteMapPositionChanged(party, position, facingDirection);
             party.IsActive = true;
+            party.IsVisible = true;
+
+            // TODO: make sure the party visuals are correct
+            CampaignMapMovement.RemoteMapPositionChanged(party, position, facingDirection);
         }
         /// <summary>
         ///     To be called when a <see cref="MobileParty"/> leaves the scope of this game instance.
@@ -35,6 +35,7 @@ namespace Coop.Mod.Scope
         public static void Leave([NotNull] MobileParty party)
         {
             party.IsActive = false;
+            party.IsVisible = false;
         }
     }
 }

@@ -142,12 +142,12 @@ namespace Coop.Mod.Persistence.Party
             {
                 // Remote controlled entity
                 Vec2 moveDir = (AuthState.MapPosition.Vec2 - State.MapPosition.Vec2).Normalized();
-                m_Environment.ScopeEntered(party, AuthState.MapPosition, moveDir, AuthState.Movement.ToData());
+                m_Environment.ScopeEntered(party, AuthState.MapPosition, moveDir);
             }
             else
             {
                 // We are the controller
-                m_Environment.ScopeEntered(party, State.MapPosition, null, State.Movement.ToData());
+                m_Environment.ScopeEntered(party, State.MapPosition, null);
             }
         }
 

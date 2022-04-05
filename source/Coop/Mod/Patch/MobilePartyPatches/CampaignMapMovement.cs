@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -257,11 +257,14 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             }
         }
 
-        /// <summary>
-        ///     The target movement data of this mobile party as dictated by the server.
-        /// </summary>
-        [CanBeNull] private MovementData m_TargetMovementData;
+        public override string ToString()
+        {
+            bool instanceAlive = TryGetInstance(out MobileParty managed);
+            string instance = instanceAlive ? managed.ToString() : "expired_instance";
+            return $"{base.ToString()}: {instance}";
+        }
 
+        private MovementData m_TargetMovementData;
         private Vec2 m_NextPosition = Vec2.Invalid;
         private Vec2? m_FacingDirection = null;
         private static readonly NLog.Logger Logger = LogManager.GetCurrentClassLogger();
