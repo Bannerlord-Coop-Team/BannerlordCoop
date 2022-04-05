@@ -180,13 +180,13 @@ namespace Coop.Mod.Persistence.Party
             new Compression.Coordinate2d();
 
         [Encoder]
-        public static void WriteMovementState(this RailBitBuffer buffer, MapVec2 state)
+        public static void WriteMapVec2(this RailBitBuffer buffer, MapVec2 state)
         {
             CoordinateCompressor.WriteVec2(buffer, state.Vec2);
         }
 
         [Decoder]
-        public static MapVec2 ReadMovementState(this RailBitBuffer buffer)
+        public static MapVec2 ReadMapVec2(this RailBitBuffer buffer)
         {
             return new MapVec2(CoordinateCompressor.ReadVec2(buffer));
         }

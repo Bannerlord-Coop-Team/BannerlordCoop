@@ -199,13 +199,16 @@ namespace Coop.Mod.Persistence.Party
                 // Remote controlled entity
                 Vec2 moveDir = (NextState.MapPosition.Vec2 - AuthState.MapPosition.Vec2).Normalized();
                 m_Environment.SetAuthoritative(party, AuthState.MapPosition, moveDir);
+                Replay.ReplayRecording?.Invoke(Id, party, AuthState.MapPosition);
             }
             else
             {
                 // We are the controller
                 m_Environment.SetAuthoritative(party, State.MapPosition, null);
+                Replay.ReplayRecording?.Invoke(Id, party, State.MapPosition);
             }
         }
+
         /// <summary>
         ///     Returns whether the given vector is a valid map coordinate.
         /// </summary>
