@@ -65,7 +65,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             Sync = new MobilePartySync(MovementOrderGroup, MapPosition);
 
             // On clients, send the movement orders for our party to the server
-            When(GameLoop & !CoopConditions.IsServer & CoopConditions.ControlsParty)
+            When(GameLoop & CoopConditions.IsRemoteClient & CoopConditions.ControlsParty)
                 .Changes(MovementOrderGroup)
                 .Through(
                     DefaultBehaviourSetter,
