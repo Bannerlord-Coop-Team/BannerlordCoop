@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Coop.Mod.Persistence.Party;
 using JetBrains.Annotations;
@@ -14,11 +14,6 @@ namespace Coop.Mod.Persistence
     /// </summary>
     public interface IEnvironmentClient
     {
-        /// <summary>
-        ///     Set the movement data of the given party as an authoritative action.
-        /// </summary>
-        void SetAuthoritative(MobileParty party, MovementData data);
-
         /// <summary>
         ///     Set the current position of the given party as an authoritative action.
         /// </summary>

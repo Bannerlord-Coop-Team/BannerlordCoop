@@ -63,15 +63,25 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             
             Sync = new MobilePartySync(MovementOrderGroup, MapPosition);
 
-            // Synchronize setters for the target movement fields
-            When(GameLoop & CoopConditions.ControlsParty)
+            // On clients, send the movement orders for our party to the server
+            // When(GameLoop & !CoopConditions.IsServer & CoopConditions.ControlsParty)
+            //     .Changes(MovementOrderGroup)
+            //     .Through(
+            //         DefaultBehaviourSetter,
+            //         TargetSettlementSetter,
+            //         TargetPartySetter,
+            //         TargetPositionSetter)
+            //     .Broadcast(() => Sync);
+
+            // Movement orders are only applied on the server and for the controlled parties.
+            When(GameLoop & !CoopConditions.ControlsParty)
                 .Changes(MovementOrderGroup)
                 .Through(
                     DefaultBehaviourSetter,
                     TargetSettlementSetter,
                     TargetPartySetter,
                     TargetPositionSetter)
-                .Broadcast(() => Sync);
+                .Revert();            
 
             AutoWrapAllInstances(party => new CampaignMapMovement(party));
         }
@@ -117,37 +127,27 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             }
         }
         
+        public static void SetMovement(MobileParty party, MovementData data)
+        {
+            MovementOrderGroup.SetTyped(party, data);
+            DefaultBehaviorNeedsUpdate(party) = Coop.IsServer;
+
+            if (party.IsRemotePlayerMainParty())
+            // That is a remote player moving. We need to update the local MainParty as well
+            // because Campaign.Tick will otherwise not update the AI decisions and just
+            // ignore some actions (for example EngageParty).
+            {
+                DefaultBehaviorNeedsUpdate(Campaign.Current.MainParty) = true;
+            }
+            party.Ai.SetDoNotMakeNewDecisions(true);
+            party.ComputeSpeed();
+        }
+
         /// <summary>
         ///     All created <see cref="CampaignMapMovement"/> instances sorted by the <see cref="MBGUID"/> of the
         ///     managed party.
         /// </summary>
         public static Dictionary<Guid, CampaignMapMovement> Instances = new Dictionary<Guid, CampaignMapMovement>();
-        /// <summary>
-        ///     Callback when the movement data of a party was changed by the server.
-        /// </summary>
-        /// <param name="party"></param>
-        /// <param name="data"></param>
-        public static void RemoteMovementChanged(MobileParty party, MovementData data)
-        {
-            if (!data.IsValid())
-            {
-                string sMessage = $"Received inconsistent data for {party}: {data}. Ignored";
-#if DEBUG
-                Logger.Warn(sMessage);
-                // throw new InvalidStateException(sMessage);
-#else
-                Logger.Warn(sMessage);
-                return;
-#endif
-            }
-
-            Guid partyGuid = CoopObjectManager.GetGuid(party);
-
-            if (Instances.TryGetValue(partyGuid, out CampaignMapMovement wrapper))
-            {
-                wrapper.SetMovementGoal(party, data);
-            }
-        }
 
         /// <summary>
         ///     Callback when the world map position of a mobile party was changed by the server.

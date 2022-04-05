@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Common;
@@ -66,10 +66,6 @@ namespace Coop.Mod
         public MobileParty GetMobilePartyById(Guid guid)
         {
             return CoopObjectManager.GetObject<MobileParty>(guid);
-        }
-        public void SetAuthoritative(MobileParty party, MovementData data)
-        {
-            CampaignMapMovement.RemoteMovementChanged(party, data);
         }
         public void SetAuthoritative(MobileParty party, Vec2 position, Vec2? facingDirection)
         {

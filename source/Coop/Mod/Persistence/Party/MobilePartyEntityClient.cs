@@ -92,7 +92,6 @@ namespace Coop.Mod.Persistence.Party
         protected override void OnAdded()
         {
             State.OnPositionChanged += UpdateLocalPosition;
-            State.OnMovementChanged += UpdateLocalMovement;
             State.OnPlayerControlledChanged += OnPlayerControlledChanged;
         }
 
@@ -102,7 +101,6 @@ namespace Coop.Mod.Persistence.Party
         protected override void OnRemoved()
         {
             State.OnPlayerControlledChanged -= OnPlayerControlledChanged;
-            State.OnMovementChanged -= UpdateLocalMovement;
             State.OnPositionChanged -= UpdateLocalPosition;
         }
 
@@ -179,21 +177,6 @@ namespace Coop.Mod.Persistence.Party
             m_Environment.PartySync.Unregister(this);
         }
 
-        /// <summary>
-        ///     Handler to apply a received move command for this party.
-        /// </summary>
-        /// <exception cref="Exception"></exception>
-        private void UpdateLocalMovement()
-        {
-            if (!TryGetParty(out MobileParty party))
-            {
-                return;
-            }
-
-            MovementData data = AuthState != null ? AuthState.Movement.ToData() : State.Movement.ToData();
-            m_Environment.SetAuthoritative(party, data);
-            Replay.ReplayRecording?.Invoke(Id, party, data);
-        }
         /// <summary>
         ///     Handler to apply a changed position from the server to the local game state.
         /// </summary>

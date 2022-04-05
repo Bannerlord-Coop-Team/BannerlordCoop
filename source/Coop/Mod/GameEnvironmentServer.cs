@@ -43,5 +43,10 @@ namespace Coop.Mod
         {
             Campaign.Current.SetTimeControlModeLock(false);
         }
+
+        public void SetMovement(MobileParty party, MovementData data)
+        {
+            CampaignMapMovement.SetMovement(party, data);
+        }
     }
 }
