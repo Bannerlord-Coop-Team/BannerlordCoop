@@ -234,7 +234,7 @@ namespace Coop.Mod
                 Instance.OnAfterRegisterObjectWithoutInitialization(__instance);
             }
         }
-        [HarmonyPatch(typeof(MobileParty), "OnBeforeLoad")]
+        [HarmonyPatch(typeof(Kingdom), "OnBeforeLoad")]
         private static class Kingdom_OnBeforeLoad
         {
             static void Postfix(Kingdom __instance)

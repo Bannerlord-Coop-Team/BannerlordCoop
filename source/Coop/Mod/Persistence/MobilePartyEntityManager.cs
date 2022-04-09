@@ -52,7 +52,6 @@ namespace Coop.Mod.Persistence
         }
 
         public WorldEntityServer WorldEntityServer { get; private set; }
-        public bool SuppressInconsistentStateWarnings { get; set; } = false;
 
         /// <summary>
         ///     Returns a copy of all currently known <see cref="RailEntityServer"/>.
@@ -118,30 +117,6 @@ namespace Coop.Mod.Persistence
             };
             
             WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
-
-            // Parties
-            foreach (MobileParty party in Campaign.Current.MobileParties)
-            {
-                Guid partyGuid = CoopObjectManager.GetGuid(party);
-                if (partyGuid.Equals(Guid.Empty))
-                {
-                    Logger.Error("Party {party} is not in the CoopObjectManager. Skipped adding it to the room, it will not be synced.");
-                    continue;
-                }
-                    
-
-                MobilePartyEntityServer entity = room.AddNewEntity<MobilePartyEntityServer>(
-                    e => e.State.PartyId = partyGuid);
-                m_Parties.Add(party, entity);
-            }
-
-            CampaignEvents.OnPartyDisbandedEvent.AddNonSerializedListener(this, OnPartyDisbanded);
-            CampaignEvents.OnPartyRemovedEvent.AddNonSerializedListener(this, OnPartyRemoved);
-            
-            CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, OnPartyAdded);
-            BanditsCampaignBehaviorPatch.OnBanditAdded += (sender, e) => OnPartyAdded(e);
-
-            // Settlements
         }
 
         public float ClientScopeRangeFactor = 1f;
@@ -155,22 +130,34 @@ namespace Coop.Mod.Persistence
         }
         public void AddParty(MobileParty party)
         {
-            if (m_Parties.ContainsKey(party))
-            {
-                return;
-            }
-
-            Guid partyGuid = CoopObjectManager.GetGuid(party);
-
-            MobilePartyEntityServer entity =
-                m_Room.AddNewEntity<MobilePartyEntityServer>(
-                    e => e.State.PartyId = partyGuid);
-            Logger.Debug("Added new entity {}.", entity);
-
             lock (m_Lock)
             {
-                 m_Parties.Add(party, entity);
+                if (m_Parties.ContainsKey(party))
+                {
+                    return;
+                }
+
+                m_PartiesToAdd.Add(party);
             }
+        }
+
+        public void RemoveParty(MobileParty party)
+        {
+            RailEntityServer entityToRemove;
+            lock (m_Lock)
+            {
+                if (!m_Parties.ContainsKey(party))
+                {
+                    return;
+                }
+
+                entityToRemove = m_Parties[party];
+                m_Parties.Remove(party);
+                m_PartiesToAdd.Remove(party);
+            }
+
+            m_Room.MarkForRemoval(entityToRemove);
+            Logger.Debug("Marked entity {EntityToRemove} for removal", entityToRemove);
         }
 
         public void GrantPartyControl(MobileParty party, RailServerPeer peer)
@@ -190,17 +177,33 @@ namespace Coop.Mod.Persistence
                     m_PendingGrantControl[party] = peer;
                     return;
                 }
-                if (!m_ClientControlledParties.ContainsKey(peer))
+                
+            }
+            grantControl(correspondingEntity, party, peer);
+        }
+
+        #region Private
+        private void grantControl(MobilePartyEntityServer entity, MobileParty party, RailServerPeer peer)
+        {
+            lock (m_Lock)
+            {
+                if (m_ClientControlledParties.TryGetValue(peer, out MobileParty controlledParty))
+                {
+                    RailEntityServer controlledEntity = peer.ControlledEntities.FirstOrDefault() as RailEntityServer;
+                    Logger.Warn($"Client {peer} may only control 1 party at a time. Revoking control over {controlledParty}.");
+                    peer.RevokeControl(controlledEntity);
+                    m_ClientControlledParties[peer] = party;
+                }
+                else
                 {
                     m_ClientControlledParties.Add(peer, party);
                 }
             }
-            peer.GrantControl(correspondingEntity);
+            peer.GrantControl(entity);
             party.Ai.SetDoNotMakeNewDecisions(true);
             Logger.Info("{Party} control granted to {Peer}", party, peer.Identifier);
         }
 
-        #region Private
         private void AddPendingParties(Tick tick)
         {
             foreach (var (party, controller) in GetPartiesToBeAdded())
@@ -226,8 +229,7 @@ namespace Coop.Mod.Persistence
 
                 if (controller != null)
                 {
-                    controller.GrantControl(entity);
-                    party.Ai.SetDoNotMakeNewDecisions(true);
+                    grantControl(entity, party, controller);
                 }
 
                 lock (m_Lock)
@@ -268,37 +270,6 @@ namespace Coop.Mod.Persistence
             return toBeAdded;
         }
 
-        private void OnPartyRemoved(PartyBase party)
-        {
-            OnPartyDisbanded(party.MobileParty, null);
-        }
-
-        private void OnPartyDisbanded(MobileParty party, Settlement settlement)
-        {
-            RailEntityServer entityToRemove;
-            lock (m_Lock)
-            {
-                if (!m_Parties.ContainsKey(party))
-                {
-                    if (!SuppressInconsistentStateWarnings)
-                    {
-                        Logger.Warn(
-                            "Inconsistent internal state: {Party} was removed, but never added",
-                            party);
-                    }
-
-                    return;
-                }
-
-                entityToRemove = m_Parties[party];
-                m_Parties.Remove(party);
-                m_PartiesToAdd.Remove(party);
-            }
-
-            m_Room.MarkForRemoval(entityToRemove);
-            Logger.Debug("Marked entity {EntityToRemove} for removal", entityToRemove);
-        }
-
         private void OnPartyAdded(MobileParty party)
         {
             if (CoopObjectManager.GetGuid(party) == Coop.InvalidId)
@@ -307,14 +278,7 @@ namespace Coop.Mod.Persistence
                 return;
             }
 
-            lock (m_Lock)
-            {
-                if (m_Parties.ContainsKey(party))
-                {
-                    return;
-                }
-                m_PartiesToAdd.Add(party);
-            }
+            
         }
         private void OnClientAdded(RailServerPeer peer)
         {

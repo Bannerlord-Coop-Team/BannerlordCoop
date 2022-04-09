@@ -6,6 +6,8 @@ using Common;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
+using Coop.Mod.GameSync;
+using Coop.Mod.GameSync.Party;
 using Coop.Mod.Patch;
 using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.UI;
@@ -115,6 +117,7 @@ namespace Coop.Mod
         {
             AddBehavior<InitServerBehaviour>();
             AddBehavior<GameLoadedBehaviour>();
+            AddBehavior<MobilePartyLifetimeBehavior>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
             CoopFramework.CoopFramework.InitPatches(ObjectManagerAdapter.Instance, Coop.IsCoopGameSession);

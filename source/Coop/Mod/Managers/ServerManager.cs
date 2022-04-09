@@ -41,12 +41,7 @@ namespace Coop.Mod.Managers
         public override void OnLoadFinished()
         {
             NetworkMain.InitializeAsDedicatedServer();
-            base.OnLoadFinished();
-            if (CoopServer.Instance.StartServer() == null)
-            {
-                ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
-                CoopClient.Instance.Connect(config.NetworkConfiguration.LanAddress, config.NetworkConfiguration.LanPort);
-            }
+            base.OnLoadFinished();            
 
             // Removes main party on server.
             MobileParty mainParty = MobileParty.MainParty;
@@ -104,15 +99,18 @@ namespace Coop.Mod.Managers
 
             foreach (MobileParty party in MobileParty.All)
             {
-                if(!CoopObjectManager.ContainsElement(party))
-                {
-                    Logger.Warn($"Object {party} was not picked up by after load patches. Need to fix patches in ObjectManagerAdapter.");
-                }
+                CoopObjectManager.AddObject(party);
             }
 
             foreach (CharacterObject characterObject in CharacterObject.All)
             {
                 CoopObjectManager.AddObject(characterObject);
+            }
+
+            if (CoopServer.Instance.StartServer() == null)
+            {
+                ServerConfiguration config = CoopServer.Instance.Current.ActiveConfig;
+                CoopClient.Instance.Connect(config.NetworkConfiguration.LanAddress, config.NetworkConfiguration.LanPort);
             }
         }
     }

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Common;
-using Coop.Mod.Patch.MobilePartyPatches;
+using Coop.Mod.GameSync;
 using CoopFramework;
 using JetBrains.Annotations;
 using NLog;
@@ -16,20 +16,19 @@ using Logger = NLog.Logger;
 namespace Coop.Mod.Persistence.Party
 {
     /// <summary>
-    ///     Synchronization implementation for <see cref="CampaignMapMovement" />. It handles buffered changes to 2 different
-    ///     field groups:
+    ///     Synchronization implementation for position & movement data of a <see cref="MobileParty"/>. It records 
+    ///     buffered changes to 2 different field groups:
     ///     1.  The captured <see cref="MovementData" />.
     ///     2.  The captured 2d position on the campaign map.
-    ///     These changes are forwarded to the responsible <see cref="IMovementHandler" />. The following handlers are
-    ///     registered:
+    ///     These changes are forwarded to the <see cref="IMovementHandler" />. The following handlers are registered:
     ///     -   On every client: <see cref="MobilePartyEntityClient" /> for every party that is directly controlled by
     ///     this local client, i.e. its main party.
     ///     -   On the server: <see cref="MobilePartyEntityServer" /> for every party that is not directly controlled by
     ///     any client.
     /// </summary>
-    public class MobilePartySync : SyncBuffered
+    public class MobilePartyMovementSync : SyncBuffered
     {
-        public MobilePartySync(
+        public MobilePartyMovementSync(
             [NotNull] FieldAccessGroup<MobileParty, MovementData> movementOrder,
             [NotNull] FieldAccess<MobileParty, Vec2> mapPosition)
         {

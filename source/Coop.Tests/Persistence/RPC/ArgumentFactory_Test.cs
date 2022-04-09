@@ -34,7 +34,7 @@ namespace Coop.Tests.Persistence.RPC
             Assert.Equal(
                 EventArgType.Null,
                 arg.EventType); // Regardless of byValue because its a value type!
-            Assert.False(arg.GUID.HasValue);
+            Assert.False(arg.CoopObjectManagerId.HasValue);
             Assert.False(arg.Int.HasValue);
             Assert.False(arg.StoreObjectId.HasValue);
 
@@ -62,7 +62,7 @@ namespace Coop.Tests.Persistence.RPC
             Assert.Equal(
                 EventArgType.Int,
                 arg.EventType); // Regardless of byValue because its a value type!
-            Assert.False(arg.GUID.HasValue);
+            Assert.False(arg.CoopObjectManagerId.HasValue);
             Assert.True(arg.Int.HasValue);
             Assert.False(arg.StoreObjectId.HasValue);
 
@@ -143,7 +143,7 @@ namespace Coop.Tests.Persistence.RPC
             DateTime time = DateTime.Now; // Just an arbitrary type that supports serialization.
             Argument arg = ArgumentFactory.Create(m_StoreClient0, time, true);
             Assert.Equal(EventArgType.StoreObjectId, arg.EventType);
-            Assert.False(arg.GUID.HasValue);
+            Assert.False(arg.CoopObjectManagerId.HasValue);
             Assert.False(arg.Int.HasValue);
             Assert.True(arg.StoreObjectId.HasValue);
             Assert.Contains(arg.StoreObjectId.Value, m_StoreClient0.Data);
@@ -190,7 +190,7 @@ namespace Coop.Tests.Persistence.RPC
             ETest transferedValue = ETest.Second;
             Argument arg = ArgumentFactory.Create(m_StoreClient0, transferedValue, true);
             Assert.Equal(EventArgType.Int, arg.EventType);
-            Assert.False(arg.GUID.HasValue);
+            Assert.False(arg.CoopObjectManagerId.HasValue);
             Assert.True(arg.Int.HasValue);
             Assert.False(arg.StoreObjectId.HasValue);
 
@@ -221,7 +221,7 @@ namespace Coop.Tests.Persistence.RPC
             byte[] raw = m_StoreClient0.Serialize(toBeTransfered);
             Argument arg = new Argument(raw);
             Assert.Equal(EventArgType.SmallObjectRaw, arg.EventType);
-            Assert.False(arg.GUID.HasValue);
+            Assert.False(arg.CoopObjectManagerId.HasValue);
             Assert.NotNull(arg.Raw);
             Assert.False(arg.StoreObjectId.HasValue);
 

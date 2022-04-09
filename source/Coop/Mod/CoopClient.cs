@@ -7,6 +7,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 using Common;
 using Coop.Mod.Config;
 using Coop.Mod.Data;
+using Coop.Mod.GameSync;
 using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
@@ -105,7 +106,7 @@ namespace Coop.Mod
 
         [CanBeNull] public PersistenceClient Persistence { get; private set; }
         
-        [NotNull] public SyncBuffered Synchronization { get; }
+        [NotNull] public CoopSyncClient Synchronization { get; }
 
         [NotNull] public GameSession Session { get; }
 
@@ -183,7 +184,6 @@ namespace Coop.Mod
 
             Persistence.SetConnection(con);
         }
-
         private void ConnectionCreated(ConnectionClient con)
         {
             if (con == null)
@@ -357,6 +357,11 @@ namespace Coop.Mod
             Session.Connection.Send(
                 new Packet(EPacket.Client_Loaded));
             TryInitPersistence();
+            if(!Coop.IsServer)
+            {
+                // When the server is running in the same game instance, sync is already initialized.
+                Initializer.SetupSyncAfterLoad();
+            }            
             Session.Connection.Send(
                 new Packet(EPacket.Client_PartyChanged, CommonSerializer.Serialize(m_HeroGUID)));
         }

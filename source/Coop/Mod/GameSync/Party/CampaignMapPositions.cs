@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using Common;
 using Coop.Mod.Persistence;
-using Coop.Mod.Persistence.Party;
 using HarmonyLib;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
@@ -10,7 +9,7 @@ using TaleWorlds.DotNet;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Patch.MobilePartyPatches
+namespace Coop.Mod.GameSync.Party
 {
     /// <summary>
     ///     On the server, this patch writes all changes to the <see cref="MobileParty"/> positions during one tick to
@@ -20,7 +19,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
     public class CampaignMapPositions
     {
         private static FieldChangeStack m_Buffer = null;
-        
+
         [HarmonyPrefix]
         private static bool Prefix()
         {
@@ -30,7 +29,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 {
                     m_Buffer = new FieldChangeStack();
                 }
-                
+
                 m_Buffer.PushMarker();
                 WriteAllPositionsToBuffer();
             }
@@ -40,7 +39,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         [HarmonyPostfix]
         private static void Postfix()
         {
-            if(m_Buffer != null)
+            if (m_Buffer != null)
             {
                 WriteAllPositionsToBuffer();
                 FieldChangeBuffer buffer = m_Buffer.PopUntilMarker(false);
@@ -59,23 +58,19 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             {
                 return;
             }
-            
-            foreach (var item in CampaignMapMovement.Instances)
+
+            foreach (MobileParty party in Campaign.Current?.MobileParties)
             {
-                MobileParty party = CoopObjectManager.GetObject(item.Key) as MobileParty;
-                if (party != null)
-                {
-                    m_Buffer.PushValue(CampaignMapMovement.MapPosition, party);
-                }
+                m_Buffer.PushValue(MobilePartyManaged.MovementPatches.MapPosition, party);
             }
         }
         private static void ProcessBufferedChanges(FieldChangeBuffer buffer)
         {
             var changes = buffer.FetchChanges();
             List<Tuple<MobileParty, Vec2>> positionChanges = new List<Tuple<MobileParty, Vec2>>();
-            if (changes.ContainsKey(CampaignMapMovement.MapPosition))
+            if (changes.ContainsKey(MobilePartyManaged.MovementPatches.MapPosition))
             {
-                foreach (var change in changes[CampaignMapMovement.MapPosition])
+                foreach (var change in changes[MobilePartyManaged.MovementPatches.MapPosition])
                 {
                     if (change.Key is MobileParty party &&
                         change.Value.OriginalValue is Vec2 before &&

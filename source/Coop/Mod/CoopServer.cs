@@ -32,6 +32,9 @@ using Coop.Mod.Serializers.Custom;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.Localization;
 using System.Text;
+using Coop.Mod.Persistence.RemoteAction;
+using Coop.Mod.GameSync;
+using Coop.Mod.GameSync.Party;
 
 namespace Coop.Mod
 {
@@ -72,6 +75,8 @@ namespace Coop.Mod
 
         [CanBeNull] public CoopServerRail Persistence { get; private set; }
 
+        [NotNull] public CoopSyncServer Synchronization { get; private set; }
+
         public static CoopServer Instance => m_Instance.Value;
 
         public Server Current { get; private set; }
@@ -106,6 +111,8 @@ namespace Coop.Mod
                     SyncedObjectStore,
                     Registry.Server(m_GameEnvironmentServer),
                     config.EventBroadcastTimeout);
+                Synchronization = new CoopSyncServer();
+                Initializer.SetupSyncAfterLoad();
 
                 Current.Updateables.Add(Persistence);
                 Current.OnClientConnected += OnClientConnected;
@@ -343,12 +350,8 @@ namespace Coop.Mod
 
             MobileParty party = clientHero.PartyBelongedTo;
 
-            if (!Persistence.MobilePartyEntityManager.Parties.Contains(party))
-            {
-                // Add party to persistance since manual creation of party is not handled
-                Persistence.MobilePartyEntityManager.AddParty(party);
-            }
-
+            // TODO: quite hacky, wouldn't really work outside of the initial loading.
+            MobilePartyManaged.MakeManaged(party, false);
             Persistence.MobilePartyEntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
         }
     }

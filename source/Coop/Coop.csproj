@@ -261,6 +261,10 @@
     <Compile Include="Mod\GameSync\Bandit\BanditPartyComponentSync.cs" />
     <Compile Include="Mod\GameSync\Bandit\BanditCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Caravan\CaravansCampaignBehaviorSync.cs" />
+    <Compile Include="Mod\GameSync\Initializer.cs" />
+    <Compile Include="Mod\GameSync\Party\MapMovementPatches.cs" />
+    <Compile Include="Mod\GameSync\Party\MobilePartyLifetimeBehavior.cs" />
+    <Compile Include="Mod\GameSync\Party\MobilePartyManaged.cs" />
     <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
@@ -282,11 +286,10 @@
     <Compile Include="Mod\Managers\ClientManager.cs" />
     <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
-    <Compile Include="Mod\Patch\MobilePartyPatches\CampaignMapMovement.cs" />
-    <Compile Include="Mod\Patch\MobilePartyPatches\CampaignMapPositions.cs" />
+    <Compile Include="Mod\GameSync\Party\CampaignMapMovement.cs" />
+    <Compile Include="Mod\GameSync\Party\CampaignMapPositions.cs" />
     <Compile Include="Mod\Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />
-    <Compile Include="Mod\Patch\MobilePartyPatches\MobilePartyUpdatable.cs" />
-    <Compile Include="Mod\Patch\Party\BanditsCampaignBehavior.cs" />
+    <Compile Include="Mod\GameSync\Party\MobilePartyUpdatable.cs" />
     <Compile Include="Mod\Patch\Party\GarrisonTroopsCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyFoodCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyHorseCampaignBehavior.cs" />
@@ -315,7 +318,7 @@
     <Compile Include="Mod\Persistence\IEnvironmentClient.cs" />
     <Compile Include="Mod\Persistence\IEnvironmentServer.cs" />
     <Compile Include="Mod\Persistence\Party\IMovementHandler.cs" />
-    <Compile Include="Mod\Persistence\Party\MobilePartySync.cs" />
+    <Compile Include="Mod\Persistence\Party\MobilePartyMovementSync.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\CoopSyncServer.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventFieldChange.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventActionBase.cs" />

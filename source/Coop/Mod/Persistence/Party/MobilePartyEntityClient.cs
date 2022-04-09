@@ -65,7 +65,11 @@ namespace Coop.Mod.Persistence.Party
 
         public override string ToString()
         {
-            return $"Party {State.PartyId} ({Id}): {m_Party}";
+            if(TryGetParty(out MobileParty party))
+            {
+                return $"Party {State.PartyId} ({Id}): {party}";
+            }
+            return $"Party {State.PartyId} ({Id}): null";
         }
         
         #region RailEntityClient
@@ -119,7 +123,7 @@ namespace Coop.Mod.Persistence.Party
             {
                 return;
             }
-            m_Environment.ScopeLeft(m_Party);
+            m_Environment.ScopeLeft(party);
         }
         /// <summary>
         ///     Called when this party enters the scope of the local game instance.
@@ -192,18 +196,22 @@ namespace Coop.Mod.Persistence.Party
                 return;
             }
             
-            if (!State.IsPlayerControlled &&
-                AuthState != null && IsValidCoordinate(AuthState.MapPosition) && 
-                NextState != null && IsValidCoordinate(NextState.MapPosition))
+            if (!State.IsPlayerControlled)
             {
                 // Remote controlled entity
-                Vec2 moveDir = (NextState.MapPosition.Vec2 - AuthState.MapPosition.Vec2).Normalized();
-                m_Environment.SetAuthoritative(party, AuthState.MapPosition, moveDir);
-                Replay.ReplayRecording?.Invoke(Id, party, AuthState.MapPosition);
+                MapVec2 pos = AuthState != null ? AuthState.MapPosition.Vec2 : State.MapPosition.Vec2;
+                Vec2? moveDir = null;
+                if (NextState != null && IsValidCoordinate(NextState.MapPosition))
+                {
+                    // Got a next state, extrapolate movement direction
+                    moveDir = (NextState.MapPosition.Vec2 - pos.Vec2).Normalized();
+                }
+                m_Environment.SetAuthoritative(party, pos.Vec2, moveDir);
+                Replay.ReplayRecording?.Invoke(Id, party, pos);
             }
             else
             {
-                // We are the controller
+                // We are the controller. Apply the state from the server.
                 m_Environment.SetAuthoritative(party, State.MapPosition, null);
                 Replay.ReplayRecording?.Invoke(Id, party, State.MapPosition);
             }
@@ -228,8 +236,6 @@ namespace Coop.Mod.Persistence.Party
         {
             m_Environment.SetIsPlayerControlled(State.PartyId, State.IsPlayerControlled);
         }
-        
-        [CanBeNull] private MobileParty m_Party; // Do not use, call TryGetParty instead.
 
         /// <summary>
         ///     Returns the party for this entity.
@@ -238,16 +244,11 @@ namespace Coop.Mod.Persistence.Party
         /// <returns></returns>
         private bool TryGetParty(out MobileParty party)
         {
-            if (m_Party == null)
+            party = m_Environment.GetMobilePartyById(State.PartyId);
+            if (party == null)
             {
-                m_Party = m_Environment.GetMobilePartyById(State.PartyId);
-                if (m_Party == null)
-                {
-                    Logger.Warn("Mobile party id {PartyId} not found", State.PartyId);
-                }
+                Logger.Warn("Mobile party id {PartyId} not found", State.PartyId);
             }
-
-            party = m_Party;
             return party != null;
         }
     }

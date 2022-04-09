@@ -6,6 +6,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Serializers.Custom
@@ -120,6 +121,9 @@ namespace Coop.Mod.Serializers.Custom
                     case "_actualClan":
                     case "_targetSettlement":
                         references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+                        break;
+                    case "<CustomName>k__BackingField":
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
                         break;
                     default:
                         UnmanagedFields.Add(fieldInfo);

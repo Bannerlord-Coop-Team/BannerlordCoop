@@ -1,4 +1,5 @@
-﻿using Coop.Mod.Patch.MobilePartyPatches;
+﻿using Coop.Mod.GameSync;
+using Coop.Mod.GameSync.Party;
 using Coop.Mod.Persistence.Party;
 using JetBrains.Annotations;
 using System.Runtime.CompilerServices;
@@ -45,9 +46,8 @@ namespace Coop.Mod.Scope
 
             party.IsActive = true;
             party.IsVisible = true;
-
-            // TODO: make sure the party visuals are correct
-            CampaignMapMovement.RemoteMapPositionChanged(party, position, facingDirection);
+            party.Party.Visuals.SetMapIconAsDirty();
+            MobilePartyManaged.AuthoritativePositionChange(party, position, facingDirection);
         }
         /// <summary>
         ///     To be called when a <see cref="MobileParty"/> leaves the scope of this game instance.
@@ -66,6 +66,7 @@ namespace Coop.Mod.Scope
 
             party.IsActive = false;
             party.IsVisible = false;
+            party.Party.Visuals.SetMapIconAsDirty();
         }
 
         /// <summary>

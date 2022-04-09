@@ -81,7 +81,7 @@ namespace Coop.Mod.Serializers
         {
             switch (obj)
             {
-                case TroopRosterSerializer ser:
+                case ICustomSerializer ser:
                     return ser.Deserialize();
                 default:
                     return obj;

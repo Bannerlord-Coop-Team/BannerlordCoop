@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using Common;
+using Coop.Mod.GameSync;
+using Coop.Mod.GameSync.Party;
 using Coop.Mod.Patch;
-using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.RemoteAction;
@@ -27,7 +28,7 @@ namespace Coop.Mod
             return CoopObjectManager.GetObject<MobileParty>(guid);
         }
 
-        public MobilePartySync PartySync { get; } = CampaignMapMovement.Sync;
+        public MobilePartyMovementSync PartySync { get; } = MobilePartyManaged.MovementSync;
 
         public SharedRemoteStore Store =>
             CoopServer.Instance.SyncedObjectStore ??
@@ -46,7 +47,7 @@ namespace Coop.Mod
 
         public void SetMovement(MobileParty party, MovementData data)
         {
-            CampaignMapMovement.SetMovement(party, data);
+            MobilePartyManaged.AuthoritativeMovementChange(party, data);
         }
     }
 }

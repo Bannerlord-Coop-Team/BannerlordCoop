@@ -24,8 +24,10 @@ namespace Coop.Tests.Persistence.RPC
                     return Argument.Null;
                 case EventArgType.MBObjectManager:
                     return Argument.MBObjectManager;
-                case EventArgType.MBObject:
-                    return new Argument(Guid.NewGuid());
+                case EventArgType.CoopObjectManagerId:
+                    return new Argument(Guid.NewGuid(), true);
+                case EventArgType.Guid:
+                    return new Argument(Guid.NewGuid(), false);
                 case EventArgType.Int:
                     return new Argument(random.Next());
                 case EventArgType.Float:

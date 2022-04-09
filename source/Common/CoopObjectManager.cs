@@ -51,24 +51,22 @@ namespace Common
             return guidWrapper != null;
         }
 
-        private static bool ContainsElement(Guid guid)
-        {
-            return Objects.ContainsKey(guid);
-        }
-
         private static bool AddObject(Guid guid, object obj)
         {
             if (ContainsElement(obj))
             {
                 return false;
             }
-            else
+            else if (Objects.TryGetValue(guid, out WeakReference<object> wp) &&
+                     wp.TryGetTarget(out object existingObj))
             {
-                Guids.Add(obj, new GuidWrapper(guid));
-                Objects.Add(guid, new WeakReference<object>(obj));
-
-                return true;
+                throw new ArgumentException($"{guid} is already assigned to {existingObj}. Cannot add a different {obj} with the same guid.");
             }
+
+            Guids.Add(obj, new GuidWrapper(guid));
+            Objects.Add(guid, new WeakReference<object>(obj));
+
+            return true;
         }
 
         public static void Assert(Guid guid, object obj)
@@ -266,7 +264,7 @@ namespace Common
         {
             bool result;
 
-            if (ContainsElement(id))
+            if (Objects.ContainsKey(id))
             {
                 WeakReference<object> wp = Objects[id];
                 if(wp.TryGetTarget(out object obj))

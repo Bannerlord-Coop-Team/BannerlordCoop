@@ -37,7 +37,7 @@ namespace Coop.Mod.Persistence
         /// <summary>
         ///     Gets the synchronization for <see cref="MobileParty"/> instances.
         /// </summary>
-        MobilePartySync PartySync { get; }
+        MobilePartyMovementSync PartySync { get; }
 
         /// <summary>
         ///     Set movement data for a given party.
