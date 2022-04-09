@@ -174,6 +174,8 @@ namespace Coop.Mod.Serializers.Custom
             mobileParty.GetType()
                 .GetField("<AttachedParties>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(mobileParty, new MBReadOnlyList<MobileParty>(attachedParties));
+
+            mobileParty.Party.Visuals.OnStartup(mobileParty.Party);
         }
     }
 }
