@@ -59,6 +59,7 @@ namespace Coop.Mod.Serializers.Custom
                     case "<MobileParty>k__BackingField":
                     case "<Settlement>k__BackingField":
                     case "_leader":
+                    case "_customOwner":
                         references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     default:

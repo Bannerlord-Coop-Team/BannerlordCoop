@@ -130,7 +130,7 @@ namespace Coop.Mod.DebugUtil
                 spawnDistance = spawnDistanceArg;
             }
 
-            MobileParty party = PartySpawnHelper.SpawnTestersNear(Campaign.Current.MainParty, spawnDistance);
+            MobileParty party = PartySpawnHelper.SpawnTestersNearby(Campaign.Current.MainParty, spawnDistance);
             return $"Spawned {party}.";
         }
     }

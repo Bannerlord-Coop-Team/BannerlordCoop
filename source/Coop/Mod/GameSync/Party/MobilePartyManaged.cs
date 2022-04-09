@@ -165,7 +165,7 @@ namespace Coop.Mod.GameSync.Party
             }
             else
             {
-                CampaignEventDispatcher.Instance.OnMobilePartyCreated(party);
+                spawnParty(party);
             }
         }
         #endregion
@@ -190,6 +190,13 @@ namespace Coop.Mod.GameSync.Party
                 return instance;
             }
             return new MobilePartyManaged(party, doSyncCreation);
+        }
+
+        private static void spawnParty(MobileParty party)
+        {
+            // MethodInfo _AddMobileParty = typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.NonPublic | BindingFlags.Instance);
+            // _AddMobileParty.Invoke(Campaign.Current.CampaignObjectManager, new object[] { party });
+            CampaignEventDispatcher.Instance.OnMobilePartyCreated(party);
         }
         #endregion
 
