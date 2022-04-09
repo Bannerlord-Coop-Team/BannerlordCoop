@@ -148,6 +148,7 @@ namespace Coop.Mod
 
             if (args.Contains("/server"))
             {
+                AddBehavior<PartySyncDebugBehavior>();
                 isServer = true;
                 //TODO add name to args
                 

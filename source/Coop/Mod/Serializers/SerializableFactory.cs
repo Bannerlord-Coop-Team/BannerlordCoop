@@ -82,7 +82,9 @@ namespace Coop.Mod.Serializers
             switch (obj)
             {
                 case ICustomSerializer ser:
-                    return ser.Deserialize();
+                    object ret = ser.Deserialize();
+                    ser.ResolveReferenceGuids();
+                    return ret;
                 default:
                     return obj;
             }

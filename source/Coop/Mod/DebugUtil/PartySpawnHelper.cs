@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
@@ -7,11 +8,11 @@ namespace Coop.Mod.DebugUtil
 {
     public static class PartySpawnHelper
     {
-        public static MobileParty SpawnTestersNearby(MobileParty nearbyParty, float spawnRadius)
+        public static MobileParty SpawnTestersNearby(Vec2 position, float spawnRadius)
         {
             // We need to assign an owner to the party, otherwise the Bannerlord main loop runs into a segfault.
             // We'll just pick the owner of a random nearby settlement.
-            Settlement s = Settlement.FindSettlementsAroundPosition(nearbyParty.Position2D, 100).First();
+            Settlement s = Settlement.FindSettlementsAroundPosition(position, 100).First();
             return MobileParty.CreateParty("coop_testers", null, delegate(MobileParty party)
             {
                 party.Aggressiveness = 0;
@@ -26,7 +27,7 @@ namespace Coop.Mod.DebugUtil
                 party.InitializeMobilePartyAroundPosition(
                     roster,
                     new TroopRoster(party.Party),
-                    nearbyParty.Position2D,
+                    position,
                     spawnRadius,
                     spawnRadius);
                 party.DisableAi();

@@ -257,6 +257,7 @@
     <Compile Include="Mod\CoopClientSM.cs" />
     <Compile Include="Mod\CoopConditions.cs" />
     <Compile Include="Mod\Data\SaveData.cs" />
+    <Compile Include="Mod\DebugUtil\PartySyncDebugBehavior.cs" />
     <Compile Include="Mod\Extentions\CampaignObjectManagerExtentions.cs" />
     <Compile Include="Mod\GameSync\Bandit\BanditPartyComponentSync.cs" />
     <Compile Include="Mod\GameSync\Bandit\BanditCampaignBehaviorSync.cs" />

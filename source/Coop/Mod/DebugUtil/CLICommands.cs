@@ -130,8 +130,33 @@ namespace Coop.Mod.DebugUtil
                 spawnDistance = spawnDistanceArg;
             }
 
-            MobileParty party = PartySpawnHelper.SpawnTestersNearby(Campaign.Current.MainParty, spawnDistance);
+            MobileParty party = PartySpawnHelper.SpawnTestersNearby(Campaign.Current.MainParty.Position2D, spawnDistance);
             return $"Spawned {party}.";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("start_dance", sTestGroupName)]
+        public static string StartDanceParty(List<string> parameters)
+        {
+            if (parameters.Count != 1 || !uint.TryParse(parameters[0], out uint numberOfDancers))
+            {
+                return $"Usage: \"{sTestGroupName}.start_dance [numberOfDancers]";
+            }
+
+            PartySyncDebugBehavior.StartDancing(new PartySyncDebugBehavior.DanceParams 
+            { 
+                center = Campaign.Current.MainParty.Position2D,
+                radius = 3f,
+                animationLength = CampaignTime.Hours(1),
+                numberOfDancers = numberOfDancers
+            });
+            return "(>'-')> <('-'<) ^('-')^ v('-')v(>'-')>";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("stop_dance", sTestGroupName)]
+        public static string StopDanceParty(List<string> parameters)
+        {
+            PartySyncDebugBehavior.StopDancing();
+            return "";
         }
     }
 }
