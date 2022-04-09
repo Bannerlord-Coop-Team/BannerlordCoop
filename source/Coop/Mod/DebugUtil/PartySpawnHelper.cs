@@ -21,7 +21,7 @@ namespace Coop.Mod.DebugUtil
                 party.Party.Visuals.SetMapIconAsDirty();
                 party.SetCustomName(new TextObject("Testers"));                
 
-                CharacterObject obj = Campaign.Current.ObjectManager.GetObject<CharacterObject>("tutorial_placeholder_volunteer");
+                CharacterObject obj = Campaign.Current.ObjectManager.GetObject<CharacterObject>("gear_practice_dummy_empire");
                 TroopRoster roster = new TroopRoster(party.Party);
                 roster.AddToCounts(obj, 5 - roster.TotalManCount);
                 party.InitializeMobilePartyAroundPosition(

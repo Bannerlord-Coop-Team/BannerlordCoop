@@ -21,6 +21,7 @@ namespace Coop.Mod.Serializers.Custom
         readonly Guid partyGuid;
         readonly int versionNumber;
         readonly int count;
+        readonly bool isPrisonRoster;
 #if DEBUG
         // TODO remove debug code
         readonly string partyName;
@@ -30,6 +31,7 @@ namespace Coop.Mod.Serializers.Custom
         {
             versionNumber = roster.VersionNo;
             count = roster.Count;
+            isPrisonRoster = roster.IsPrisonRoster;
 
             TroopRosterElement[] troops = (TroopRosterElement[])rosterDataField.GetValue(roster);
 
@@ -50,6 +52,8 @@ namespace Coop.Mod.Serializers.Custom
         public object Deserialize()
         {
             newRoster = TroopRoster.CreateDummyTroopRoster();
+
+            newRoster.IsPrisonRoster = isPrisonRoster;
 
             // Unpack VersionNo
             typeof(TroopRoster)

@@ -106,16 +106,15 @@ namespace Coop.Mod.Serializers.Custom
                         SNNSO.Add(fieldInfo, new PartyComponentSerializer((PartyComponent)value));
                         break;
                     case "_pureSpeedExplainer":
-                        // TODO Joke Fix this
-                        break;
-                    case "<MoveTargetParty>k__BackingField":
-                        // TODO Joke Fix this
+                        // Calculated on client side
                         break;
                     case "<TaleWorlds.CampaignSystem.ILocatable<TaleWorlds.CampaignSystem.MobileParty>.NextLocatable>k__BackingField":
-                        // TODO Joke Fix this
+                        // Not used by TW even
                         break;
                     case "<AiBehaviorObject>k__BackingField":
+                        // AI not used
                         break;
+                    case "<MoveTargetParty>k__BackingField":
                     case "<LastVisitedSettlement>k__BackingField":
                     case "_currentSettlement":
                     case "_actualClan":

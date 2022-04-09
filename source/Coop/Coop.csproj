@@ -251,7 +251,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Config\RequiredSyncTypes.cs" />
+    <Compile Include="Mod\Config\RequiredSyncTypes.cs" />
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Mod\Config\ManagedTypesConfig.cs" />
     <Compile Include="Mod\CoopClientSM.cs" />

@@ -121,7 +121,7 @@ namespace Coop.Mod.DebugUtil
                     }
                     else
                     {
-                        Imgui.Text(objectOfGuuid.ToString());
+                        Imgui.Text(objectOfGuuid?.ToString());
                     }
                     Imgui.NextColumn();
 
