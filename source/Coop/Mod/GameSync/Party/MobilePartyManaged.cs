@@ -194,6 +194,16 @@ namespace Coop.Mod.GameSync.Party
 
         private static void spawnParty(MobileParty party)
         {
+            party.IsInspected = false;
+
+            // Detele locatorNodeIndex cache from serializer to add it back to the client.
+            typeof(MobileParty).GetField("_locatorNodeIndex", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.SetValue(party, -1);
+
+            // Initializes visuals & infos, needed otherwise party is not visible.
+            typeof(PartyBase).GetMethod("OnFinishLoadState", BindingFlags.Instance | BindingFlags.NonPublic)?
+                .Invoke(party.Party, new object[] { });
+
             MethodInfo _AddMobileParty = typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.NonPublic | BindingFlags.Instance);
             _AddMobileParty.Invoke(Campaign.Current.CampaignObjectManager, new object[] { party });
             CampaignEventDispatcher.Instance.OnMobilePartyCreated(party);

@@ -174,9 +174,6 @@ namespace Coop.Mod.Serializers.Custom
             mobileParty.GetType()
                 .GetField("<AttachedParties>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(mobileParty, new MBReadOnlyList<MobileParty>(attachedParties));
-
-            // Initializes visuals, needed otherwise party is not visible
-            mobileParty.Party.Visuals.OnStartup(mobileParty.Party);
         }
     }
 }
