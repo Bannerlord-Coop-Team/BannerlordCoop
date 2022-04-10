@@ -158,9 +158,8 @@ namespace Coop.Mod.Serializers.Custom
 
             // TODO: Is it correct to set the owner as leader?
             LordPartyComponent.GetType()
-                .GetProperty(nameof(LordPartyComponent.Leader))
-                .GetSetMethod(true)
-                .Invoke(LordPartyComponent, new object[] { CoopObjectManager.GetObject(owner) });
+                .GetField("_leader", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(LordPartyComponent, CoopObjectManager.GetObject(owner));
         }
     }
 
