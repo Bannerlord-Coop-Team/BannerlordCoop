@@ -89,7 +89,7 @@ namespace Coop.Mod.DebugUtil
             if (objects == null || objects.Count <= 0 || !Imgui.TreeNode("Coop object managers"))
                 return;
    
-            foreach (KeyValuePair<Type, List<Guid>> objectsManaged in objects)
+            foreach (KeyValuePair<Type, List<Guid>> objectsManaged in objects.OrderBy(pair => pair.Key.Name))
             {
                 string sName = $"{objectsManaged.Key.Name} ({objectsManaged.Value.Count.ToString()})";
 
@@ -105,9 +105,16 @@ namespace Coop.Mod.DebugUtil
                 Imgui.Text("Action");
                 Imgui.NextColumn();
 
-                objectsManaged.Value.ForEach(guid =>
+                var iterCopy = objectsManaged.Value.ToArray(); // Make a copy for iteration because updates to the list can come in asynchronously.
+                foreach(var guid in iterCopy)
                 {
                     object objectOfGuuid = CoopObjectManager.GetObject(guid);
+                    if(objectOfGuuid == null)
+                    {
+                        // This is a valid state. The store uses a `ConditionalWeakTable` which, with current .NET version, does not offer a way
+                        // to get a callback when an entry is removed. The AssociatedGuids can thus get outdated and contain expired objects.
+                        continue;
+                    }
 
                     Imgui.Text(guid.ToString());
                     Imgui.NextColumn();
@@ -121,7 +128,7 @@ namespace Coop.Mod.DebugUtil
                     }
                     else
                     {
-                        Imgui.Text(objectOfGuuid?.ToString());
+                        Imgui.Text(objectOfGuuid.ToString());
                     }
                     Imgui.NextColumn();
 
@@ -137,7 +144,7 @@ namespace Coop.Mod.DebugUtil
                         }
                     }
                     Imgui.NextColumn();
-                });
+                };
 
                 Imgui.Columns();
                 Imgui.TreePop();

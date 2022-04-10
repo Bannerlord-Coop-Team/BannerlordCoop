@@ -51,24 +51,6 @@ namespace Common
             return guidWrapper != null;
         }
 
-        private static bool AddObject(Guid guid, object obj)
-        {
-            if (ContainsElement(obj))
-            {
-                return false;
-            }
-            else if (Objects.TryGetValue(guid, out WeakReference<object> wp) &&
-                     wp.TryGetTarget(out object existingObj))
-            {
-                throw new ArgumentException($"{guid} is already assigned to {existingObj}. Cannot add a different {obj} with the same guid.");
-            }
-
-            Guids.Add(obj, new GuidWrapper(guid));
-            Objects.Add(guid, new WeakReference<object>(obj));
-
-            return true;
-        }
-
         public static void Assert(Guid guid, object obj)
         {
             if(obj == null)
@@ -82,11 +64,16 @@ namespace Common
 
             if(Guids.TryGetValue(obj, out GuidWrapper guidWrapper))
             {
-                Objects.Remove(guidWrapper.Guid);
-                Guids.Remove(obj);
+                if(guidWrapper.Guid == guid)
+                {
+                    // Already correct
+                    return;
+                }
+
+                // Wrong guid for the object
+                RemoveObject(obj);
             }
-            Guids.Add(obj, new GuidWrapper(guid));
-            Objects.Add(guid, new WeakReference<object>(obj));
+            AddObject(guid, obj);
         }
 
         public static bool RegisterExistingObject(Guid guid, object obj)
@@ -109,8 +96,27 @@ namespace Common
             }
             else
             {
-                return AddObject(guid, obj); ;
+                return AddObject(guid, obj);
             }
+        }
+
+        private static bool AddObject(Guid guid, object obj)
+        {
+            if (ContainsElement(obj))
+            {
+                return false;
+            }
+            else if (Objects.TryGetValue(guid, out WeakReference<object> wp) &&
+                     wp.TryGetTarget(out object existingObj))
+            {
+                throw new ArgumentException($"{guid} is already assigned to {existingObj}. Cannot add a different {obj} with the same guid.");
+            }
+
+            Guids.Add(obj, new GuidWrapper(guid));
+            Objects.Add(guid, new WeakReference<object>(obj));
+            AddTypeEntry(obj, guid);
+
+            return true;
         }
 
         public static Guid AddObject(object obj)
@@ -124,7 +130,6 @@ namespace Common
 
             if(AddObject(newId, obj))
             {
-                AddTypeEntry(obj, newId);
                 return newId;
             }
 
