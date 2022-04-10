@@ -158,5 +158,23 @@ namespace Coop.Mod.DebugUtil
             PartySyncDebugBehavior.StopDancing();
             return "";
         }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("addCaptivity", sTestGroupName)]
+        public static string AddCaptivity(List<string> parameters)
+        {
+            int prisonersNumber = 1;
+            if (parameters.Count == 1)
+            {
+                int.TryParse(parameters[0], out prisonersNumber);
+            }
+            Campaign.Current.MainParty.AddPrisoner(Campaign.Current.ObjectManager.GetObject<CharacterObject>("gear_practice_dummy_empire"), prisonersNumber);
+            return $"Added {prisonersNumber} prisoners to {Campaign.Current.MainParty.GetName()}";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("showCaptivity", sTestGroupName)]
+        public static string ShowCaptivity(List<string> parameters)
+        {
+            return Campaign.Current.MainParty.PrisonRoster.TotalHealthyCount.ToString();
+        }
     }
 }
