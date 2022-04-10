@@ -30,6 +30,7 @@ using TaleWorlds.Engine;
 using Registry = Sync.Registry;
 using Logger = NLog.Logger;
 using SandBox.View.Map;
+using Coop.Mod.GameSync.Party;
 
 namespace Coop.Mod.DebugUtil
 {
@@ -621,6 +622,19 @@ namespace Coop.Mod.DebugUtil
             
             Imgui.SameLine(400);
             Imgui.Checkbox("Show whole map", ref DebugShowWholeMapPatch.IsCheatEnabled);
+            
+            foreach(MobileParty playerParty in CoopServer.Instance?.Persistence?.MobilePartyEntityManager?.PlayerControlledParties)
+            {
+                if(playerParty == null || Campaign.Current?.MainParty == null)
+                {
+                    continue;
+                }
+
+                if(Imgui.Button($"Teleport to me: {playerParty}"))
+                {
+                    MobilePartyManaged.AuthoritativePositionChange(playerParty, Campaign.Current.MainParty.Position2D, null);
+                }
+            }
 
             if (startServerResult != null)
             {

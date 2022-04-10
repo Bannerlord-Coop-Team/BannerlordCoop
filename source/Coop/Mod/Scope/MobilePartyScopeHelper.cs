@@ -45,7 +45,11 @@ namespace Coop.Mod.Scope
             }
 
             party.IsActive = true;
-            party.IsVisible = true;
+            bool shouldBeVisble = party.CurrentSettlement == null; // Parties inside of settlements should stay invisible. Otherwise they just stand around the gate.
+            if (shouldBeVisble) 
+            {
+                party.IsVisible = true;
+            }
             party.Party.Visuals.SetMapIconAsDirty();
             MobilePartyManaged.AuthoritativePositionChange(party, position, facingDirection);
         }
@@ -67,6 +71,8 @@ namespace Coop.Mod.Scope
             party.IsActive = false;
             party.IsVisible = false;
             party.Party.Visuals.SetMapIconAsDirty();
+            party.SetMoveModeHold();
+            party.DisableAi();
         }
 
         /// <summary>

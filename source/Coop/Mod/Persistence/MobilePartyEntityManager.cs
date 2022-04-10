@@ -69,6 +69,20 @@ namespace Coop.Mod.Persistence
         }
 
         /// <summary>
+        ///     Returns a copy of all parties currently controlled by a player.
+        /// </summary>
+        public IReadOnlyCollection<MobileParty> PlayerControlledParties
+        {
+            get
+            {
+                lock(m_Lock)
+                {
+                    return m_ClientControlledParties.Values.ToList();
+                }
+            }
+        }
+
+        /// <summary>
         ///     Returns a copy of all currently known <see cref="MobileParty"/> that have a corresponding entity.
         /// </summary>
         public IReadOnlyCollection<MobileParty> Parties
