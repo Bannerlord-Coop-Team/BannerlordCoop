@@ -170,6 +170,7 @@ namespace Coop.Mod.Persistence.Party
                     throw new Exception($"Mobile party id {State.PartyId} not found. Cannot register as controller.");
                 }
                 m_Environment.PartySync.RegisterLocalHandler(controlledParty, this);
+                controlledParty.EnableAi();
             }
         }
 

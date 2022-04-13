@@ -73,7 +73,6 @@ namespace Coop.Mod.Scope
             party.IsVisible = false;
             party.Party.Visuals.SetMapIconAsDirty();
             party.SetMoveModeHold();
-            party.DisableAi();
         }
 
         /// <summary>

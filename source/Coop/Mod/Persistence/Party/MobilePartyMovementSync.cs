@@ -128,14 +128,6 @@ namespace Coop.Mod.Persistence.Party
                     continue;
                 }
 
-                // MovementData before = change.Value.OriginalValue as MovementData;
-                // if (!Coop.IsController(party))
-                // {
-                //     // Revert the local changes, we will receive the correct one from the server.
-                //     SetAuthoritative(party, before);
-                //     continue;
-                // }
-
                 MovementData requested = change.Value.RequestedValue as MovementData;
                 BroadcastHistory.Push(new CallTrace
                 {

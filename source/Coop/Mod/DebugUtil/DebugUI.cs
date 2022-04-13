@@ -92,7 +92,12 @@ namespace Coop.Mod.DebugUtil
             if (objects == null || objects.Count <= 0 || !Imgui.TreeNode("Coop object managers"))
                 return;
 
-            Imgui.Checkbox("Show only entities in scope", ref showOnlyEntitiesInScope);
+            if (!Coop.IsServer)
+            {
+                // On server, everything is in scope. No point in showing this checkbox.
+                Imgui.Checkbox("Show only entities in scope", ref showOnlyEntitiesInScope);
+            }
+            
             foreach (KeyValuePair<Type, List<Guid>> objectsManaged in objects.OrderBy(pair => pair.Key.Name))
             {
                 string sName = $"{objectsManaged.Key.Name}";
