@@ -24,9 +24,9 @@ namespace Coop.Mod.Persistence.RemoteAction
         ///     to be adjusted depending on how much is done using events.
         /// </summary>
 #if DEBUG
-        public static readonly int MaximumQueueSize = 1024;
+        public static readonly int MaximumQueueSize = 2048;
 #else
-        public static readonly int MaximumQueueSize = 8192;
+        public static readonly int MaximumQueueSize = 16384;
 #endif
 
         private readonly OrderedHashSet<ObjectId> m_DistributedObjects =
@@ -174,7 +174,6 @@ namespace Coop.Mod.Persistence.RemoteAction
             public bool TryBroadcast()
             {
                 if (!IsReadyToBeSent()) return false;
-                Logger.Trace("Broadcast: {event}", RPC);
                 Room.BroadcastEvent(RPC);
                 return true;
             }

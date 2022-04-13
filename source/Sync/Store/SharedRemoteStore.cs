@@ -58,7 +58,6 @@ namespace Sync.Store
         {
             var id = new ObjectId(XXHash.XXH32(serialized));
             m_Data[id] = obj;
-            Logger.Trace("[{Id}] Insert: {Object}", id, obj);
 
             m_PendingAcks[id] = new PendingResponse(null, m_Stores.Values.ToList());
             foreach (var store in m_Stores.Values) store.SendAdd(id, serialized);
@@ -98,18 +97,16 @@ namespace Sync.Store
             if (!m_PendingAcks.ContainsKey(id))
             {
                 Logger.Warn(
-                    "[{id}] Received ACK for from {sender}, but the server was not expecting one.",
+                    "[{id}] Received ACK from {sender}, but the server was not expecting one.",
                     id,
                     sender);
                 return;
             }
 
-            Logger.Trace("[{id}] Received ACK for from {sender}.", id, sender);
             var pending = m_PendingAcks[id];
             pending.OnAckFrom(m_Stores[sender]);
             if (pending.AllDone())
             {
-                Logger.Debug("[{id}] Received all necessary ACKs. Object distributed.", id);
                 pending.Origin?.SendACK(id);
                 m_PendingAcks.Remove(id);
                 OnObjectDistributed?.Invoke(id);
@@ -126,7 +123,6 @@ namespace Sync.Store
 
             OnObjectRecieved?.Invoke(sender, obj);
 
-            Logger.Debug("[{id}] Client added: {object}.", id, obj);
             var otherStores =
                 m_Stores.Where(s => s.Key != sender).Select(p => p.Value).ToList();
             if (otherStores.Count == 0)
@@ -139,7 +135,6 @@ namespace Sync.Store
             m_PendingAcks[id] = new PendingResponse(m_Stores[sender], otherStores);
             foreach (var store in otherStores)
             {
-                Logger.Trace("[{id}] Distributing to {store}.", id, store);
                 store.SendAdd(id, payload);
             }
 

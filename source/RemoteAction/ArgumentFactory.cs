@@ -62,8 +62,7 @@ namespace RemoteAction
                         arg.StoreObjectId.Value,
                         resolvedObject,
                         resolvedObject.GetType());
-                    // TODO find a way to remove without breaking everything
-                    store.Remove(arg.StoreObjectId.Value);
+                    // store.Remove(arg.StoreObjectId.Value);
                     return resolvedObject;
                 case EventArgType.CurrentCampaign:
                     return Campaign.Current;
@@ -119,8 +118,10 @@ namespace RemoteAction
                     return new Argument(i);
                 case float f:
                     return new Argument(f);
-                case MBObjectBase mbObject:
-                    return bTransferByValue ? new Argument(store.Insert(obj)) : new Argument(CoopObjectManager.GetGuid(mbObject), true);
+                case MBObjectBase o:
+                    return bTransferByValue ? new Argument(store.Insert(o)) : new Argument(CoopObjectManager.GetGuid(o), true);
+                case TroopRoster t:
+                    return new Argument(store.Insert(t));
                 case Campaign campaign:
                     if (campaign == Campaign.Current) return Argument.CurrentCampaign;
                     // New campaign? Send by value

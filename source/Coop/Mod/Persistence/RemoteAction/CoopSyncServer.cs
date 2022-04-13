@@ -1,8 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using CoopFramework;
+using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Connection.Server;
+using RailgunNet.Logic;
+using RailgunNet.System.Types;
 using RemoteAction;
 using Sync.Behaviour;
 using Sync.Call;
@@ -21,7 +24,7 @@ namespace Coop.Mod.Persistence.RemoteAction
     public class CoopSyncServer : SyncBuffered
     {
         /// <inheritdoc cref="ISynchronization.Broadcast(InvokableId, object, object[])"/>
-        public override void Broadcast(InvokableId id, object instance, object[] args)
+        public override void Broadcast([CanBeNull] EntityId[] affectedEntities, InvokableId id, object instance, object[] args)
         {
             RailServerRoom room = CoopServer.Instance?.Persistence?.Room;
             SharedRemoteStore store = CoopServer.Instance?.SyncedObjectStore;
@@ -48,6 +51,7 @@ namespace Coop.Mod.Persistence.RemoteAction
             
             EventMethodCall evt = room.CreateEvent<EventMethodCall>();
             evt.Call = call;
+            evt.Entities = affectedEntities;
             BroadcastHistory.Push(evt.Call, room.Tick);
             queue.Add(room, evt);
         }

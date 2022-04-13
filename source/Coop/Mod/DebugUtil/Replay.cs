@@ -304,7 +304,7 @@ namespace Coop.Mod.DebugUtil
                 PlaybackMainPartyList.FirstOrDefault(q => !q.applied && q.time <= now);
             if (replay != null)
             {
-                if (CoopServer.Instance.Persistence.Room.Entities.FirstOrDefault(
+                if (CoopServer.Instance.Persistence.Room.Entities.Values.FirstOrDefault(
                     q => q.Id == replay.entityId) is MobilePartyEntityServer entity)
                 {
                     entity.State.MapPosition = replay.position;

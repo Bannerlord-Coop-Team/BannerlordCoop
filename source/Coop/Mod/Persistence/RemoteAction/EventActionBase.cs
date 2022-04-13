@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
+using JetBrains.Annotations;
 using RailgunNet.Logic;
+using RailgunNet.System.Types;
 using RemoteAction;
 
 namespace Coop.Mod.Persistence.RemoteAction
@@ -22,5 +24,11 @@ namespace Coop.Mod.Persistence.RemoteAction
         /// </summary>
         /// <returns></returns>
         public abstract bool IsValid();
+
+        /// <summary>
+        ///     If set, the events scope will be defined by the given entities. For
+        ///     more details <see cref="CoopRailScopeEvaluator"/>.
+        /// </summary>
+        [CanBeNull] public abstract IEnumerable<EntityId> AffectedEntities {  get; }
     }
 }

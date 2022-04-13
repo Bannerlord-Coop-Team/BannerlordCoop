@@ -112,10 +112,9 @@ namespace Coop.Mod.GameSync.Party
                     // Send the new party to all remote clients
                     CoopServer.Instance.Synchronization.Broadcast(OnNewMobilePartyRPC.Id, null, new object[] { party, guid });
                 }
-                else
-                {
-                    OnNewMobileParty(party, guid);
-                }
+
+                // Setup railgun entity
+                CoopServer.Instance.Persistence.MobilePartyEntityManager.AddParty(party);
             }
 
             if (!Coop.IsController(party))
@@ -158,12 +157,7 @@ namespace Coop.Mod.GameSync.Party
                 }
             }
 
-            if(Coop.IsServer)
-            {
-                // Now the party exists on all clients, setup the railgun sync for it
-                CoopServer.Instance.Persistence.MobilePartyEntityManager.AddParty(party);
-            }
-            else
+            if(!Coop.IsServer)
             {
                 spawnParty(party);
             }

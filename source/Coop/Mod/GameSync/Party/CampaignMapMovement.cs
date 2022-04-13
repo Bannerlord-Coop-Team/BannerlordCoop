@@ -73,13 +73,6 @@ namespace Coop.Mod.GameSync.Party
 
         public void ApplyAuthoritativeState(MobileParty party)
         {
-            if (Coop.IsArbiter &&
-                !party.IsAnyPlayerMainParty())
-            {
-                // The arbiter only needs to update player parties
-                return;
-            }
-
             if (!party.IsInClientScope())
             {
                 return;

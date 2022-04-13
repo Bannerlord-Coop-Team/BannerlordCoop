@@ -98,7 +98,6 @@ namespace Sync.Store
         {
             var id = new ObjectId(XXHash.XXH32(serialized));
             m_Data[id] = obj;
-            Logger.Trace("[{Id}] Insert: {Object} [{Type}]", id, obj, obj.GetType());
             SendAdd(id, serialized);
             return id;
         }
@@ -106,7 +105,6 @@ namespace Sync.Store
         public bool Remove(ObjectId id)
         {
             m_State.Remove(id);
-            Logger.Trace("[{id}] Remove: {object} [{type}]", id, m_Data[id], m_Data[id].GetType());
             return m_Data.Remove(id);
         }
 
@@ -139,11 +137,6 @@ namespace Sync.Store
             else
             {
                 m_Data[id] = Deserialize(raw);
-                Logger.Trace(
-                    "[{id}] Received: {object} [{type}]",
-                    id,
-                    m_Data[id],
-                    m_Data[id].GetType());
             }
 
             // Call handlers
@@ -166,7 +159,6 @@ namespace Sync.Store
                     "Invalid internal state for {id}: A locally added object cannot be acknowledged.");
             m_State[id].Acknowledged = true;
             m_Connection.Send(new Packet(EPacket.StoreAck, id));
-            Logger.Trace("[{id}] Sent ACK", id);
         }
 
         [ConnectionClientPacketHandler(EClientConnectionState.Connected, EPacket.StoreAck)]
@@ -179,11 +171,6 @@ namespace Sync.Store
                 throw new Exception($"Received ACK for unknown object {id}.");
 
             m_State[id].Acknowledged = true;
-            Logger.Trace(
-                "[{id}] Received ACK: {object} [{type}]",
-                id,
-                m_Data[id],
-                m_Data[id].GetType());
             OnObjectAcknowledged?.Invoke(id, m_Data[id]);
         }
 
@@ -195,8 +182,6 @@ namespace Sync.Store
                 Acknowledged = false,
                 Sent = true
             };
-
-            Logger.Trace("[{id}] Sent StoreAdd", id);
         }
     }
 }

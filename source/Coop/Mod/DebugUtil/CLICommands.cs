@@ -158,5 +158,17 @@ namespace Coop.Mod.DebugUtil
             PartySyncDebugBehavior.StopDancing();
             return "";
         }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("change_dancer_troop_count", sTestGroupName)]
+        public static string ChangeDancerCount(List<string> parameters)
+        {
+            if (parameters.Count != 1 || !int.TryParse(parameters[0], out int i))
+            {
+                return $"Usage: \"{sTestGroupName}.change_dancer_troop_count [numberToAdd] \n numberToAdd can be negative.";
+            }
+
+            PartySyncDebugBehavior.AddToCounts(i);
+            return "";
+        }
     }
 }

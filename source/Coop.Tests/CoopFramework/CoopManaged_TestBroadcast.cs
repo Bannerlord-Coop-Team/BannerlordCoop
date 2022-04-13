@@ -28,6 +28,7 @@ namespace Coop.Tests.CoopFramework
 
             // Broadcast was called exactly once with foo as an instance and 43 as argument
             m_SyncMock.Verify(m => m.Broadcast(
+                null,
                 CoopManagedFoo.BarSetter.Id,
                 foo,
                 It.Is<object[]>(args =>
@@ -51,6 +52,7 @@ namespace Coop.Tests.CoopFramework
 
             // Broadcast was called exactly once with foo as an instance and 43 as argument
             m_SyncMock.Verify(m => m.Broadcast(
+                null,
                 CoopManagedFoo.BazSetter.Id,
                 foo,
                 It.Is<object[]>(args =>

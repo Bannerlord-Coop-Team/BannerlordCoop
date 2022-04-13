@@ -10,6 +10,7 @@ namespace Coop.Mod.Scope
 {
     /// <summary>
     ///     Helper functions to work with <see cref="MobileParty"/> in regards to the synchronization scoping.
+    ///     The helper is relevant for client side only.
     /// </summary>
     public static class MobilePartyScopeHelper
     {

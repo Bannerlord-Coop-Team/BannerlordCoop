@@ -311,9 +311,11 @@ namespace Coop.Mod
         private void ReceiveClientBadId(ConnectionBase connection, Packet packet)
         {
             List<Guid> list = (List<Guid>) CommonSerializer.Deserialize(packet.Payload);
-            foreach(object obj in list.Select(value => CoopObjectManager.GetObject(value)))
+            foreach(Guid guid in list)
             {
                 StringBuilder s = new StringBuilder("### Client replied BadID:\n");
+                s.Append($"Guid: {guid}\n");
+                object obj = CoopObjectManager.GetObject(guid);
                 Type t = obj.GetType();
                 PropertyInfo[] props = t.GetProperties();
                 foreach (PropertyInfo p in props)
