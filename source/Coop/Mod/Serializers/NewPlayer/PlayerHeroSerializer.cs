@@ -134,6 +134,7 @@ namespace Coop.Mod.Serializers
                         // Can reinstantiate on recipient as this is hero data loaded at start of game.
                         SNNSO.Add(fieldInfo, new PlayerHeroDeveloperSerializer((HeroDeveloper)value));
                         break;
+                    case "<BannerItem>k__BackingField":
                     case "_characterAttributes":
                         // TODO: Fix this joke
                         break;
@@ -200,8 +201,8 @@ namespace Coop.Mod.Serializers
 
             ConstructorInfo ctorInfo = typeof(LordPartyComponent)
                 .GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null,
-                    new Type[] { typeof(Hero) }, new ParameterModifier[0]);
-            LordPartyComponent lordPartyComponent = (LordPartyComponent)ctorInfo.Invoke(new object[] { Hero.MainHero });
+                    new Type[] { typeof(Hero), typeof(Hero) }, new ParameterModifier[0]);
+            LordPartyComponent lordPartyComponent = (LordPartyComponent)ctorInfo.Invoke(new object[] { Hero.MainHero, Hero.MainHero });
 
             Campaign.Current.MainParty.ActualClan = Clan.PlayerClan;
             Campaign.Current.MainParty.PartyComponent = lordPartyComponent;

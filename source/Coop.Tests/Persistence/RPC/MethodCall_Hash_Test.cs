@@ -5,6 +5,8 @@ using RemoteAction;
 using Sync;
 using Sync.Call;
 using Sync.Store;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 
@@ -23,7 +25,7 @@ namespace Coop.Tests.Persistence.RPC
                 case EventArgType.MBObjectManager:
                     return Argument.MBObjectManager;
                 case EventArgType.MBObject:
-                    return new Argument(new MBGUID((uint) random.Next()));
+                    return new Argument(Guid.NewGuid());
                 case EventArgType.Int:
                     return new Argument(random.Next());
                 case EventArgType.Float:
@@ -31,7 +33,13 @@ namespace Coop.Tests.Persistence.RPC
                 case EventArgType.StoreObjectId:
                     return new Argument(new ObjectId((uint) random.Next()));
                 case EventArgType.CurrentCampaign:
-                    return Argument.CurrentCampaign; 
+                    return Argument.CurrentCampaign;
+                case EventArgType.Bool:
+                    return new Argument(random.Next(2) ==  0);
+                case EventArgType.CampaignBehavior:
+                    return new Argument(new BannerCampaignBehavior());
+                case EventArgType.PartyComponent:
+                    return new Argument(new CustomPartyComponent());
                 case EventArgType.SmallObjectRaw:
                     int[] intArray = {random.Next(), random.Next()};
                     byte[] raw = new byte[intArray.Length * sizeof(int)];

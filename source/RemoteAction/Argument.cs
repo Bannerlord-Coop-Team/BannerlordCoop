@@ -202,6 +202,15 @@ namespace RemoteAction
                 case EventArgType.SmallObjectRaw:
                     argHash = Raw.GetHashCode();
                     break;
+                case EventArgType.Bool:
+                    argHash = Bool.GetHashCode();
+                    break;
+                case EventArgType.CampaignBehavior:
+                    argHash = CampaignBehavior.GetHashCode();
+                    break;
+                case EventArgType.PartyComponent:
+                    argHash = MobilePartyComponent.GetHashCode();
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }

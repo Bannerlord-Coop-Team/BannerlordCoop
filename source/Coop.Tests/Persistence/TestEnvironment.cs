@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
@@ -42,8 +44,33 @@ namespace Coop.Tests.Persistence
             RailSynchronizedFactory.Detect(Assembly.GetAssembly(typeof(RailBitBufferExtensions)));
             ServerEnvironment = new TestEnvironmentServer(StoreServer);
             EventQueue = ServerEnvironment.EventQueue;
-            var registryServer = serverRegistryCreator(ServerEnvironment.Mock.Object);
-            Persistence = new TestPersistence(registryServer);
+            try
+            {
+                var registryServer = serverRegistryCreator(ServerEnvironment.Mock.Object);
+                Persistence = new TestPersistence(registryServer);
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                StringBuilder sb = new StringBuilder();
+                foreach (Exception exSub in ex.LoaderExceptions)
+                {
+                    sb.AppendLine(exSub.Message);
+                    FileNotFoundException exFileNotFound = exSub as FileNotFoundException;
+                    if (exFileNotFound != null)
+                    {
+                        if (!string.IsNullOrEmpty(exFileNotFound.FusionLog))
+                        {
+                            sb.AppendLine("Fusion Log:");
+                            sb.AppendLine(exFileNotFound.FusionLog);
+                        }
+                    }
+                    sb.AppendLine();
+                }
+                string errorMessage = sb.ToString();
+                throw new Exception(errorMessage);
+            }
+            
+            
 
             foreach (((RailNetPeerWrapper First, RailNetPeerWrapper Second) First, RemoteStore
                 Second) it in RailPeerClient.Zip(RailPeerServer, (c, s) => (c, s)).Zip(StoresClient, (c, s) => (c, s)))

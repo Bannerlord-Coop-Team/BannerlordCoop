@@ -100,7 +100,6 @@ namespace Coop.Mod.Serializers
             }
 
             newPartyBase.AddElementToMemberRoster(hero.CharacterObject, 1, true);
-            newPartyBase.GetType().GetField("_leader", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, hero.CharacterObject);
             newPartyBase.GetType().GetField("<MobileParty>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(newPartyBase, mobileParty);
 
             IPartyVisual newVisual = Campaign.Current.VisualCreator.PartyVisualCreator.CreatePartyVisual();

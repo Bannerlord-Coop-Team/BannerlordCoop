@@ -47,55 +47,55 @@ namespace Coop.Tests.Sync
         }
 
 
-        [Fact]
-        public void ObserverGC_Test()
-        {
-            CoopObjectManager.PatchType<MobileParty>(harmony);
+        //[Fact]
+        //public void ObserverGC_Test()
+        //{
+        //    CoopObjectManager.PatchType<MobileParty>(harmony);
 
-            MobileParty party = (MobileParty)Activator.CreateInstance(typeof(MobileParty));
+        //    MobileParty party = (MobileParty)Activator.CreateInstance(typeof(MobileParty));
 
-            for (int x = 0; x < 50; x++)
-            {
-                Activator.CreateInstance(typeof(MobileParty));
-            }
+        //    for (int x = 0; x < 50; x++)
+        //    {
+        //        Activator.CreateInstance(typeof(MobileParty));
+        //    }
             
 
-            Guid id = NetworkedObjectObserver.GetGuid(party);
+        //    Guid id = NetworkedObjectObserver.GetGuid(party);
 
-            Assert.NotNull(NetworkedObjectObserver.GetObserver(id));
+        //    Assert.NotNull(NetworkedObjectObserver.GetObserver(id));
 
-            Assert.Equal(51, NetworkedObjectObserver.ObjectCount());
+        //    Assert.Equal(51, NetworkedObjectObserver.ObjectCount());
 
-            party = null;
+        //    party = null;
 
-            Thread.Sleep(TimeSpan.FromSeconds(1));
+        //    Thread.Sleep(TimeSpan.FromSeconds(1));
 
-            GC.Collect();
+        //    GC.Collect();
 
-            Thread.Sleep(TimeSpan.FromSeconds(5));
+        //    Thread.Sleep(TimeSpan.FromSeconds(5));
 
-            Assert.Equal(1, NetworkedObjectObserver.ObjectCount());
-        }
+        //    Assert.Equal(1, NetworkedObjectObserver.ObjectCount());
+        //}
 
-        [Fact]
-        public void ObjectManagerCreateFromServer_Test()
-        {
-            ManagedTypesInitializer.InitializeTypes(harmony);
+        //[Fact]
+        //public void ObjectManagerCreateFromServer_Test()
+        //{
+        //    ManagedTypesInitializer.InitializeTypes(harmony);
 
-            CoopObjectManager objectManager = new CoopObjectManager();
+        //    CoopObjectManager objectManager = new CoopObjectManager();
 
-            Guid guid = Guid.NewGuid();
+        //    Guid guid = Guid.NewGuid();
 
-            int callCounter = 0;
-            objectManager.OnObjectCreatedFromServer += (id) => callCounter++;
-            objectManager.OnObjectCreated += (id) => callCounter++;
+        //    int callCounter = 0;
+        //    objectManager.OnObjectCreatedFromServer += (id) => callCounter++;
+        //    objectManager.OnObjectCreated += (id) => callCounter++;
 
-            MobileParty party = objectManager.CreateObjectFromServer<MobileParty>(guid, new object[0]);
+        //    MobileParty party = objectManager.CreateObjectFromServer<MobileParty>(guid, new object[0]);
 
-            Assert.Equal(2, callCounter);
+        //    Assert.Equal(2, callCounter);
 
-            Assert.NotNull(party);
-            Assert.Equal(guid, NetworkedObjectObserver.GetGuid(party));
-        }
+        //    Assert.NotNull(party);
+        //    Assert.Equal(guid, NetworkedObjectObserver.GetGuid(party));
+        //}
     }
 }

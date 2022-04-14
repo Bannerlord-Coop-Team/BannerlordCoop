@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Reflection;
+using System.Runtime.Serialization;
+using Common;
 using Coop.Mod.Data;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
@@ -33,13 +36,19 @@ namespace Coop.Tests.Persistence
         [Fact]
         void MobilePartyIsSynced()
         {
-            MobileParty party = (MobileParty) Activator.CreateInstance(typeof(MobileParty));
+            MobileParty party = CreateMobileParty();
+            Guid guid = CoopObjectManager.AddObject(party);
             Persistence.Server.Room.AddNewEntity<MobilePartyEntityServer>(
-                e => e.State.PartyId = new PartyData(party));
+                e => e.State.PartyId = guid);
             
             m_Environment.Persistence.UpdateServer();
             m_Environment.ExecuteSendsServer();
             m_Environment.Persistence.UpdateClients();
+        }
+
+        MobileParty CreateMobileParty()
+        {
+            return (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
         }
     }
 }

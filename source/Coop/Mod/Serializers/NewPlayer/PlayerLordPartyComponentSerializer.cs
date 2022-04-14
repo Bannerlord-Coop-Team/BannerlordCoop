@@ -21,7 +21,7 @@ namespace Coop.Mod.Serializers
                 typeof(LordPartyComponent),
                 BindingFlags.Instance | BindingFlags.NonPublic,
                 null,
-                new object[] { null },
+                new object[] { hero, hero },
                 null);
 
             // Circular referenced object needs assignment before deserialize
