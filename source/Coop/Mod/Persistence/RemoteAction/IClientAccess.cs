@@ -10,7 +10,7 @@ namespace Coop.Mod.Persistence.RemoteAction
     public interface IClientAccess
     {
         [CanBeNull]
-        RemoteStore GetStore();
+        RemoteStoreClient GetStore();
 
         [CanBeNull]
         RailClientRoom GetRoom();

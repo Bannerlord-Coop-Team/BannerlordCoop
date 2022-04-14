@@ -14,7 +14,7 @@ namespace RemoteAction
     ///     ATTENTION: The used state transfer library, Railgun, is intended to reliably distribute
     ///     very small amount of data that is to be applied at a synchronized point in time on all clients.
     ///     Maximum payload data in a single event is tiny <see cref="RailgunNet.RailConfig.MAXSIZE_EVENT" />.
-    ///     Larger objects need be transferred using a <see cref="Sync.Store.RemoteStore" /> and then referenced
+    ///     Larger objects need be transferred using a <see cref="Sync.Store.RemoteStoreClient" /> and then referenced
     ///     in a <see cref="EventArgType.StoreObjectId" />. The <see cref="ArgumentFactory.Create" />
     ///     can take care of this.
     ///     To add a new argument type:

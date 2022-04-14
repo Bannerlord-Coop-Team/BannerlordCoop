@@ -34,7 +34,7 @@ namespace Coop.Mod.Persistence.RemoteAction
 
         private readonly List<Call> m_Queue = new List<Call>();
 
-        [NotNull] private readonly SharedRemoteStore m_Store;
+        [NotNull] private readonly RemoteStoreServer m_Store;
 
         private readonly TimeSpan m_Timeout;
 
@@ -45,11 +45,11 @@ namespace Coop.Mod.Persistence.RemoteAction
         ///     Maximum amount of time a single event may spend in the queue. After
         ///     which it is dropped.
         /// </param>
-        public EventBroadcastingQueue([NotNull] SharedRemoteStore store, TimeSpan eventTimeout)
+        public EventBroadcastingQueue([NotNull] RemoteStoreServer store, TimeSpan eventTimeout)
         {
             m_Timeout = eventTimeout;
             m_Store = store;
-            m_Store.OnObjectDistributed += OnObjectDistributed;
+            m_Store.OnObjectAvailable += OnObjectAvailable;
         }
 
         public int Count
@@ -133,7 +133,7 @@ namespace Coop.Mod.Persistence.RemoteAction
             }
         }
 
-        private void OnObjectDistributed(ObjectId id)
+        private void OnObjectAvailable(ObjectId id)
         {
             lock (m_Queue)
             {

@@ -13,7 +13,7 @@ namespace Sync.Call
         /// <summary>
         ///     Bit 1: Set if the arguments to the method should be preferably sent by value. This
         ///     means it will either be serialized directly into the event or transferred
-        ///     using the <see cref="Sync.Store.RemoteStore" />.
+        ///     using the <see cref="Sync.Store.RemoteStoreClient" />.
         ///     Unset if by-reference should be preferred.
         /// </summary>
         TransferArgumentsByValue = 1 << 1

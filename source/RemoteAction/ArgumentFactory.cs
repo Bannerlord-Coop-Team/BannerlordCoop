@@ -50,19 +50,25 @@ namespace RemoteAction
                 case EventArgType.Bool:
                     return arg.Bool.Value;
                 case EventArgType.StoreObjectId:
-                    if (store == null) throw new ArgumentException($"Cannot resolve ${arg}, no store provided.");
+                    if (store == null)
+                    { 
+                        throw new ArgumentException($"Cannot resolve ${arg}, no store provided.");
+                    }
+                    if (!arg.StoreObjectId.HasValue)
+                    {
+                        throw new ArgumentException($"No StoreObjectId provided. Cannot resolve ${arg}.");
+                    }
+                    var resolvedObject = store.Retrieve(arg.StoreObjectId.Value);
+                    if(resolvedObject == null)
+                    {
+                        throw new ArgumentException($"StoreObjectId {arg.StoreObjectId.Value} returned no object. Cannot resolve {arg}.");
+                    }
 
-                    if (!arg.StoreObjectId.HasValue ||
-                        !store.Data.ContainsKey(arg.StoreObjectId.Value))
-                        throw new ArgumentException($"Cannot resolve ${arg}.");
-
-                    var resolvedObject = store.Data[arg.StoreObjectId.Value];
                     Logger.Debug(
                         "[{id}] Resolved store RPC arg: {object} [{type}]",
                         arg.StoreObjectId.Value,
                         resolvedObject,
                         resolvedObject.GetType());
-                    // store.Remove(arg.StoreObjectId.Value);
                     return resolvedObject;
                 case EventArgType.CurrentCampaign:
                     return Campaign.Current;

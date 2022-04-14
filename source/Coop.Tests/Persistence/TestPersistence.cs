@@ -57,7 +57,7 @@ namespace Coop.Tests.Persistence
     public class TestEnvironmentClient
     {
         public Mock<IEnvironmentClient> Mock { get; }
-        public TestEnvironmentClient(RemoteStore store)
+        public TestEnvironmentClient(RemoteStoreClient store)
         {
             Mock = new Mock<IEnvironmentClient>();
             Mock.Setup(env => env.Store).Returns(store);
@@ -69,7 +69,7 @@ namespace Coop.Tests.Persistence
         public Mock<IEnvironmentServer> Mock { get; }
         public EventBroadcastingQueue EventQueue { get; }
 
-        public TestEnvironmentServer(SharedRemoteStore store)
+        public TestEnvironmentServer(RemoteStoreServer store)
         {
             EventQueue = new EventBroadcastingQueue(store, TimeSpan.FromSeconds(5));
             Mock = new Mock<IEnvironmentServer>();

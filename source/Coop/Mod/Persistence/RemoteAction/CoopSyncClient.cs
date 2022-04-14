@@ -32,7 +32,7 @@ namespace Coop.Mod.Persistence.RemoteAction
         /// <inheritdoc cref="ISynchronization.Broadcast(InvokableId, object, object[])"/>
         public override void Broadcast([CanBeNull] EntityId[] affectedEntities, InvokableId id, object instance, object[] args)
         {
-            RemoteStore store = m_ClientAccess.GetStore();
+            RemoteStoreClient store = m_ClientAccess.GetStore();
             RailClientRoom room = m_ClientAccess.GetRoom();
             if (store == null)
             {
@@ -64,7 +64,7 @@ namespace Coop.Mod.Persistence.RemoteAction
         /// <inheritdoc cref="SyncBuffered.BroadcastBufferedChanges(FieldChangeBuffer)"/>
         protected override void BroadcastBufferedChanges(FieldChangeBuffer buffer)
         {
-            RemoteStore store = m_ClientAccess.GetStore();
+            RemoteStoreClient store = m_ClientAccess.GetStore();
             RailClientRoom room = m_ClientAccess.GetRoom();
             
             foreach (var change in buffer.FetchChanges())
@@ -106,7 +106,7 @@ namespace Coop.Mod.Persistence.RemoteAction
         }
         #region Private
 
-        private List<Argument> ProduceArguments(RemoteStore store, EInvokableFlag flags, object[] args)
+        private List<Argument> ProduceArguments(RemoteStoreClient store, EInvokableFlag flags, object[] args)
         {
             var bTransferByValue = flags.HasFlag(EInvokableFlag.TransferArgumentsByValue);
             return args.Select(

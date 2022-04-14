@@ -4,7 +4,6 @@ using CoopFramework;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Connection.Server;
-using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using RemoteAction;
 using Sync.Behaviour;
@@ -23,12 +22,17 @@ namespace Coop.Mod.Persistence.RemoteAction
     /// </summary>
     public class CoopSyncServer : SyncBuffered
     {
+        public CoopSyncServer([NotNull] IServerAccess access)
+        {
+            m_ServerAccess = access;
+        }
+
         /// <inheritdoc cref="ISynchronization.Broadcast(InvokableId, object, object[])"/>
         public override void Broadcast([CanBeNull] EntityId[] affectedEntities, InvokableId id, object instance, object[] args)
         {
-            RailServerRoom room = CoopServer.Instance?.Persistence?.Room;
-            SharedRemoteStore store = CoopServer.Instance?.SyncedObjectStore;
-            EventBroadcastingQueue queue = CoopServer.Instance?.Persistence?.EventQueue;
+            RailServerRoom room = m_ServerAccess.GetRoom();
+            RemoteStoreServer store = m_ServerAccess.GetStore();
+            EventBroadcastingQueue queue = m_ServerAccess.GetQueue();
             if (store == null)
             {
                 Logger.Error("RemoteStore is null. Cannot broadcast {Call}", Sync.Registry.IdToInvokable[id]);
@@ -58,10 +62,10 @@ namespace Coop.Mod.Persistence.RemoteAction
         /// <inheritdoc cref="SyncBuffered.BroadcastBufferedChanges(FieldChangeBuffer)"/>
         protected override void BroadcastBufferedChanges(FieldChangeBuffer buffer)
         {
-            RailServerRoom room = CoopServer.Instance?.Persistence?.Room;
-            SharedRemoteStore store = CoopServer.Instance?.SyncedObjectStore;
-            EventBroadcastingQueue queue = CoopServer.Instance?.Persistence?.EventQueue;
-            
+            RailServerRoom room = m_ServerAccess.GetRoom();
+            RemoteStoreServer store = m_ServerAccess.GetStore();
+            EventBroadcastingQueue queue = m_ServerAccess.GetQueue();
+
             foreach (var change in buffer.FetchChanges())
             {
                 if (store == null)
@@ -111,6 +115,7 @@ namespace Coop.Mod.Persistence.RemoteAction
         }
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        [NotNull] private readonly IServerAccess m_ServerAccess;
         #endregion
     }
 }

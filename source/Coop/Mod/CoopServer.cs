@@ -35,6 +35,7 @@ using System.Text;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.Mod.GameSync;
 using Coop.Mod.GameSync.Party;
+using RailgunNet.Connection.Server;
 
 namespace Coop.Mod
 {
@@ -47,7 +48,7 @@ namespace Coop.Mod
         }
     }
 
-    public class CoopServer : IDisposable
+    public class CoopServer : IDisposable, IServerAccess
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -71,7 +72,7 @@ namespace Coop.Mod
         ///     is started, otherwise null.
         /// </summary>
         [CanBeNull]
-        public SharedRemoteStore SyncedObjectStore { get; private set; }
+        public RemoteStoreServer SyncedObjectStore { get; private set; }
 
         [CanBeNull] public CoopServerRail Persistence { get; private set; }
 
@@ -104,14 +105,14 @@ namespace Coop.Mod
                 Server.EType eServerType = Server.EType.Threaded;
                 Current = new Server(eServerType);
 
-                SyncedObjectStore = new SharedRemoteStore(new SerializableFactory());
+                SyncedObjectStore = new RemoteStoreServer(new SerializableFactory());
                 m_GameEnvironmentServer = new GameEnvironmentServer();
                 Persistence = new CoopServerRail(
                     Current,
                     SyncedObjectStore,
                     Registry.Server(m_GameEnvironmentServer),
                     config.EventBroadcastTimeout);
-                Synchronization = new CoopSyncServer();
+                Synchronization = new CoopSyncServer(this);
                 Initializer.SetupSyncAfterLoad();
 
                 Current.Updateables.Add(Persistence);
@@ -341,5 +342,22 @@ namespace Coop.Mod
             MobilePartyManaged.MakeManaged(party, false);
             Persistence.MobilePartyEntityManager.GrantPartyControl(party, Persistence.ConnectedClients.Last());
         }
+
+        #region IServerAccess
+        public RemoteStoreServer GetStore()
+        {
+            return SyncedObjectStore;
+        }
+
+        public RailServerRoom GetRoom()
+        {
+            return Persistence.Room;
+        }
+
+        public EventBroadcastingQueue GetQueue()
+        {
+            return Persistence.EventQueue;
+        }
+        #endregion
     }
 }

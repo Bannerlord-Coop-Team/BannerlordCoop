@@ -335,6 +335,7 @@
     <Compile Include="Mod\Persistence\RemoteAction\EventBroadcastingQueue.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventMethodCall.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\IClientAccess.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\IServerAccess.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityClient.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityServer.cs" />
     <Compile Include="Mod\Persistence\World\WorldState.cs" />
