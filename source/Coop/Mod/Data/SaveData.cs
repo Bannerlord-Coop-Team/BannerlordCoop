@@ -103,14 +103,14 @@ namespace Coop.Mod.Data
                 return null;
             }
 
-            LoadGameResult loadResult = SaveLoad.LoadSaveGameData(stream);
+            LoadResult loadResult = SaveLoad.LoadSaveGameData(stream);
             if (loadResult == null)
             {
                 Logger.Error("Unable to load world state. Abort.");
                 return null;
             }
 
-            if (loadResult.LoadResult.Successful)
+            if (loadResult.Successful)
             {
                 Logger.Info(loadResult.ToFriendlyString());
             }
@@ -119,7 +119,7 @@ namespace Coop.Mod.Data
                 Logger.Error(loadResult.ToFriendlyString());
             }
 
-            return loadResult.LoadResult;
+            return loadResult;
         }
 
         private InMemDriver DeserializeWorldState(ArraySegment<byte> rawData)

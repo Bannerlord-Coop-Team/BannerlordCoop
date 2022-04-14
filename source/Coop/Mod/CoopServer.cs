@@ -157,9 +157,8 @@ namespace Coop.Mod
 #if DEBUG
             try
             {
-                LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(
-                    saveName,
-                    Utilities.GetModulesNames());
+                LoadResult saveGameData = MBSaveLoad.LoadSaveGameData(
+                    saveName);
                 MBGameManager.StartNewGame(CreateGameManager(saveGameData));
             }
             catch (IOException ex)
@@ -169,19 +168,19 @@ namespace Coop.Mod
 #endif
         }
 
-        public ServerGameManager CreateGameManager(LoadGameResult saveGameData = null)
-        {
-            if (saveGameData != null)
-            {
-                gameManager = CreateGameManager(saveGameData.LoadResult);
-            }
-            else
-            {
-                gameManager = new ServerGameManager();
-            }
+        //public ServerGameManager CreateGameManager(LoadGameResult saveGameData = null)
+        //{
+        //    if (saveGameData != null)
+        //    {
+        //        gameManager = CreateGameManager(saveGameData.LoadResult);
+        //    }
+        //    else
+        //    {
+        //        gameManager = new ServerGameManager();
+        //    }
 
-            return gameManager;
-        }
+        //    return gameManager;
+        //}
 
         public ServerGameManager CreateGameManager(LoadResult loadResult = null)
         {
