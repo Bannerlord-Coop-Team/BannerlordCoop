@@ -226,14 +226,6 @@ namespace Coop.Mod
                 Instance.OnAfterRegisterObjectWithoutInitialization(__instance);
             }
         }
-        //[HarmonyPatch(typeof(Hero), "OnBeforeLoad")] Not used, replacement?
-        //private static class Hero_OnBeforeLoad
-        //{
-        //    static void Postfix(Hero __instance)
-        //    {
-        //        Instance.OnAfterRegisterObjectWithoutInitialization(__instance);
-        //    }
-        //}
         [HarmonyPatch(typeof(Kingdom), "OnBeforeLoad")]
         private static class Kingdom_OnBeforeLoad
         {

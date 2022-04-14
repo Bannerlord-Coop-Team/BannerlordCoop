@@ -114,29 +114,6 @@ namespace Coop.Mod
             return sRet;
         }
 
-        //public static string ToFriendlyString(this LoadResult loadResult)
-        //{
-        //    string sRet = "Loading " + (loadResult.Successful ? "success. " : "failed. ");
-        //    if (loadResult.MetaData == null)
-        //    {
-        //        sRet += "No meta data";
-        //    }
-        //    else
-        //    {
-        //        sRet += loadResult.MetaData;
-        //    }
-
-        //    sRet += Environment.NewLine;
-
-        //    sRet += loadResult.Errors.Length + " errors:";
-        //    foreach (LoadError error in loadResult.Errors)
-        //    {
-        //        sRet += Environment.NewLine + error.ToFriendlyString();
-        //    }
-
-        //    return sRet;
-        //}
-
         public static string ToFriendlyString(this LoadError error)
         {
             return $"Error: {error.Message}";

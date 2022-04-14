@@ -168,20 +168,6 @@ namespace Coop.Mod
 #endif
         }
 
-        //public ServerGameManager CreateGameManager(LoadGameResult saveGameData = null)
-        //{
-        //    if (saveGameData != null)
-        //    {
-        //        gameManager = CreateGameManager(saveGameData.LoadResult);
-        //    }
-        //    else
-        //    {
-        //        gameManager = new ServerGameManager();
-        //    }
-
-        //    return gameManager;
-        //}
-
         public ServerGameManager CreateGameManager(LoadResult loadResult = null)
         {
             if (loadResult != null)
