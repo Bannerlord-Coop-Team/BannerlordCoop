@@ -92,7 +92,6 @@ namespace Coop.Mod.Persistence.Party
         protected override void OnAdded()
         {
             State.OnPositionChanged += UpdateLocalPosition;
-            State.OnMovementChanged += UpdateLocalMovement;
             State.OnPlayerControlledChanged += OnPlayerControlledChanged;
         }
 
@@ -102,7 +101,6 @@ namespace Coop.Mod.Persistence.Party
         protected override void OnRemoved()
         {
             State.OnPlayerControlledChanged -= OnPlayerControlledChanged;
-            State.OnMovementChanged -= UpdateLocalMovement;
             State.OnPositionChanged -= UpdateLocalPosition;
         }
 
@@ -142,12 +140,12 @@ namespace Coop.Mod.Persistence.Party
             {
                 // Remote controlled entity
                 Vec2 moveDir = (AuthState.MapPosition.Vec2 - State.MapPosition.Vec2).Normalized();
-                m_Environment.ScopeEntered(party, AuthState.MapPosition, moveDir, AuthState.Movement.ToData());
+                m_Environment.ScopeEntered(party, AuthState.MapPosition, moveDir);
             }
             else
             {
                 // We are the controller
-                m_Environment.ScopeEntered(party, State.MapPosition, null, State.Movement.ToData());
+                m_Environment.ScopeEntered(party, State.MapPosition, null);
             }
         }
 
@@ -180,21 +178,6 @@ namespace Coop.Mod.Persistence.Party
         }
 
         /// <summary>
-        ///     Handler to apply a received move command for this party.
-        /// </summary>
-        /// <exception cref="Exception"></exception>
-        private void UpdateLocalMovement()
-        {
-            if (!TryGetParty(out MobileParty party))
-            {
-                return;
-            }
-
-            MovementData data = AuthState != null ? AuthState.Movement.ToData() : State.Movement.ToData();
-            m_Environment.SetAuthoritative(party, data);
-            Replay.ReplayRecording?.Invoke(Id, party, data);
-        }
-        /// <summary>
         ///     Handler to apply a changed position from the server to the local game state.
         /// </summary>
         private void UpdateLocalPosition()
@@ -214,15 +197,18 @@ namespace Coop.Mod.Persistence.Party
                 NextState != null && IsValidCoordinate(NextState.MapPosition))
             {
                 // Remote controlled entity
-                Vec2 moveDir = (NextState.MapPosition.Vec2 - State.MapPosition.Vec2).Normalized();
+                Vec2 moveDir = (NextState.MapPosition.Vec2 - AuthState.MapPosition.Vec2).Normalized();
                 m_Environment.SetAuthoritative(party, AuthState.MapPosition, moveDir);
+                Replay.ReplayRecording?.Invoke(Id, party, AuthState.MapPosition);
             }
             else
             {
                 // We are the controller
                 m_Environment.SetAuthoritative(party, State.MapPosition, null);
+                Replay.ReplayRecording?.Invoke(Id, party, State.MapPosition);
             }
         }
+
         /// <summary>
         ///     Returns whether the given vector is a valid map coordinate.
         /// </summary>

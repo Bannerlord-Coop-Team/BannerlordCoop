@@ -36,25 +36,8 @@ namespace Coop.Mod.Persistence.Party
             }
         }
 
-        /// <summary>
-        ///     Movement data for the party.
-        /// </summary>
         [Mutable]
-        public MovementState Movement
-        {
-            get => m_Movement;
-            set
-            {
-                if (!m_Movement.Equals(value))
-                {
-                    m_Movement = value;
-                    OnMovementChanged?.Invoke();
-                }
-            }
-        }
-
-        [Mutable]
-        public MapPosition MapPosition
+        public MapVec2 MapPosition
         {
             get => m_MapPosition;
             set
@@ -68,14 +51,12 @@ namespace Coop.Mod.Persistence.Party
         }
 
         public event Action OnPositionChanged;
-        public event Action OnMovementChanged;
         public event Action OnPlayerControlledChanged;
 
         #region Private
 
         private bool m_IsPlayerControlled;
-        private MovementState m_Movement = new MovementState();
-        private MapPosition m_MapPosition = new MapPosition(Vec2.Invalid);
+        private MapVec2 m_MapPosition = new MapVec2(Vec2.Invalid);
 
         #endregion
     }
@@ -155,19 +136,19 @@ namespace Coop.Mod.Persistence.Party
     ///     Describes a position on the campaign map. Basically just a wrapper around <see cref="Vec2" /> so it can be
     ///     used in Railgun with its own encoder / decoder and custom precision for campaign map coordinates.
     /// </summary>
-    public readonly struct MapPosition
+    public readonly struct MapVec2
     {
-        public static implicit operator MapPosition(Vec2 v)
+        public static implicit operator MapVec2(Vec2 v)
         {
-            return new MapPosition(v);
+            return new MapVec2(v);
         }
 
-        public static implicit operator Vec2(MapPosition p)
+        public static implicit operator Vec2(MapVec2 p)
         {
             return p.Vec2;
         }
 
-        public MapPosition(Vec2 pos)
+        public MapVec2(Vec2 pos)
         {
             Vec2 = pos;
         }
@@ -176,10 +157,10 @@ namespace Coop.Mod.Persistence.Party
 
         public override bool Equals(object obj)
         {
-            return obj is MapPosition position && Equals(position);
+            return obj is MapVec2 position && Equals(position);
         }
 
-        private bool Equals(MapPosition other)
+        private bool Equals(MapVec2 other)
         {
             return Compare.CoordinatesEqual(Vec2, other.Vec2);
         }
@@ -191,23 +172,23 @@ namespace Coop.Mod.Persistence.Party
     }
 
     /// <summary>
-    ///     Railgun encoder & decoder for a <see cref="MapPosition" />.
+    ///     Railgun encoder & decoder for a <see cref="MapVec2" />.
     /// </summary>
-    public static class MapPositionSerializer
+    public static class MapVec2Serializer
     {
         public static Compression.Coordinate2d CoordinateCompressor { get; } =
             new Compression.Coordinate2d();
 
         [Encoder]
-        public static void WriteMovementState(this RailBitBuffer buffer, MapPosition state)
+        public static void WriteMapVec2(this RailBitBuffer buffer, MapVec2 state)
         {
             CoordinateCompressor.WriteVec2(buffer, state.Vec2);
         }
 
         [Decoder]
-        public static MapPosition ReadMovementState(this RailBitBuffer buffer)
+        public static MapVec2 ReadMapVec2(this RailBitBuffer buffer)
         {
-            return new MapPosition(CoordinateCompressor.ReadVec2(buffer));
+            return new MapVec2(CoordinateCompressor.ReadVec2(buffer));
         }
     }
 }

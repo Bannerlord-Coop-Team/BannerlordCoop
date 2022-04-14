@@ -18,7 +18,7 @@ namespace Coop.Mod.DebugUtil
         public CampaignTime time;
         public EntityId entityId;
         public MobileParty party;
-        public MovementData movement;
+        public MapVec2 position;
         public bool applied = false;
 
         public override bool Equals(object obj)
@@ -26,7 +26,7 @@ namespace Coop.Mod.DebugUtil
             return obj is ReplayEvent other &&
                 this.entityId == other.entityId &&
                 this.party?.Id == other.party?.Id &&
-                this.movement.Equals(other.movement);
+                this.position.Equals(other.position);
         }
 
         public override int GetHashCode()
@@ -46,7 +46,7 @@ namespace Coop.Mod.DebugUtil
             buffer.WriteCampaignTime(replay.time);
             buffer.WriteEntityId(replay.entityId);
             buffer.WriteGUID(CoopObjectManager.GetGuid(replay.party));
-            buffer.WriteMovementData(replay.movement);
+            buffer.WriteMapVec2(replay.position);
         }
 
         [Decoder]
@@ -57,7 +57,7 @@ namespace Coop.Mod.DebugUtil
                 time = buffer.ReadCampaignTime(),
                 entityId = buffer.ReadEntityId(),
                 party = (MobileParty)CoopObjectManager.GetObject(buffer.ReadGUID()),
-                movement = buffer.ReadMovementData(),
+                position = buffer.ReadMapVec2()
             };
         }
     }

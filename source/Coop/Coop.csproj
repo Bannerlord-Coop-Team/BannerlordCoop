@@ -259,7 +259,10 @@
     <Compile Include="Mod\Data\SaveData.cs" />
     <Compile Include="Mod\Extentions\CampaignObjectManagerExtentions.cs" />
     <Compile Include="Mod\GameSync\Bandit\BanditPartyComponentSync.cs" />
+    <Compile Include="Mod\GameSync\Bandit\BanditCampaignBehaviorSync.cs" />
+    <Compile Include="Mod\GameSync\Caravan\CaravansCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
+    <Compile Include="Mod\GameSync\Villager\VillagerCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
     <Compile Include="Mod\ObjectManagerAdapter.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />
@@ -296,7 +299,6 @@
     <Compile Include="Mod\GameSync\Caravan\CaravanPartyComponentSync.cs" />
     <Compile Include="Mod\GameSync\FiefSync.cs" />
     <Compile Include="Mod\GameSync\HeroSync.cs" />
-    <Compile Include="Mod\GameSync\MobilePartySync.cs" />
     <Compile Include="Mod\GameSync\SettlementSync.cs" />
     <Compile Include="Mod\Patch\World\TimeSynchronization.cs" />
     <Compile Include="Mod\Patch\CampaignPatches\SetTimeSpeedPatch.cs" />

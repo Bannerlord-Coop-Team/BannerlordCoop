@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Common;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
+using Coop.Mod.Scope;
 using CoopFramework;
 using HarmonyLib;
 using JetBrains.Annotations;
@@ -45,7 +46,7 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         {
             // Define the patched fields for target movement & current position
             MovementOrderGroup =
-                new FieldAccessGroup<MobileParty, MovementData>(new FieldAccess[] 
+                new FieldAccessGroup<MobileParty, MovementData>(new FieldAccess[]
                 {
                     Field<AiBehavior>("_defaultBehavior"),
                     Field<Settlement>("_targetSettlement"),
@@ -60,11 +61,11 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             TargetPartySetter = Setter(nameof(MobileParty.TargetParty));
             TargetPositionSetter = Setter(nameof(MobileParty.TargetPosition));
             TickAi = Method("TickAi");
-            
+
             Sync = new MobilePartySync(MovementOrderGroup, MapPosition);
 
-            // Synchronize setters for the target movement fields
-            When(GameLoop & CoopConditions.ControlsParty)
+            // On clients, send the movement orders for our party to the server
+            When(GameLoop & CoopConditions.IsRemoteClient & CoopConditions.ControlsParty)
                 .Changes(MovementOrderGroup)
                 .Through(
                     DefaultBehaviourSetter,
@@ -72,6 +73,16 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                     TargetPartySetter,
                     TargetPositionSetter)
                 .Broadcast(() => Sync);
+
+            // Movement orders are only applied on the server and for the controlled parties.
+            When(GameLoop & !CoopConditions.ControlsParty)
+                .Changes(MovementOrderGroup)
+                .Through(
+                    DefaultBehaviourSetter,
+                    TargetSettlementSetter,
+                    TargetPartySetter,
+                    TargetPositionSetter)
+                .Revert();
 
             AutoWrapAllInstances(party => new CampaignMapMovement(party));
         }
@@ -116,38 +127,28 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 }
             }
         }
-        
+
+        public static void SetMovement(MobileParty party, MovementData data)
+        {
+            MovementOrderGroup.SetTyped(party, data);
+            DefaultBehaviorNeedsUpdate(party) = Coop.IsServer;
+
+            if (party.IsRemotePlayerMainParty())
+            // That is a remote player moving. We need to update the local MainParty as well
+            // because Campaign.Tick will otherwise not update the AI decisions and just
+            // ignore some actions (for example EngageParty).
+            {
+                DefaultBehaviorNeedsUpdate(Campaign.Current.MainParty) = true;
+            }
+            party.Ai.SetDoNotMakeNewDecisions(true);
+            party.ComputeSpeed();
+        }
+
         /// <summary>
         ///     All created <see cref="CampaignMapMovement"/> instances sorted by the <see cref="MBGUID"/> of the
         ///     managed party.
         /// </summary>
         public static Dictionary<Guid, CampaignMapMovement> Instances = new Dictionary<Guid, CampaignMapMovement>();
-        /// <summary>
-        ///     Callback when the movement data of a party was changed by the server.
-        /// </summary>
-        /// <param name="party"></param>
-        /// <param name="data"></param>
-        public static void RemoteMovementChanged(MobileParty party, MovementData data)
-        {
-            if (!data.IsValid())
-            {
-                string sMessage = $"Received inconsistent data for {party}: {data}. Ignored";
-#if DEBUG
-                Logger.Warn(sMessage);
-                // throw new InvalidStateException(sMessage);
-#else
-                Logger.Warn(sMessage);
-                return;
-#endif
-            }
-
-            Guid partyGuid = CoopObjectManager.GetGuid(party);
-
-            if (Instances.TryGetValue(partyGuid, out CampaignMapMovement wrapper))
-            {
-                wrapper.SetMovementGoal(party, data);
-            }
-        }
 
         /// <summary>
         ///     Callback when the world map position of a mobile party was changed by the server.
@@ -158,19 +159,39 @@ namespace Coop.Mod.Patch.MobilePartyPatches
         public static void RemoteMapPositionChanged(MobileParty party, Vec2 posCurrent, Vec2? facingDirection)
         {
             Guid partyGuid = CoopObjectManager.GetGuid(party);
-
-            if (Instances.TryGetValue(partyGuid, out CampaignMapMovement wrapper))
-            {
-                wrapper.SetPosition(party, posCurrent, facingDirection);
-            }
+            GetInstance(party).SetPosition(party, posCurrent, facingDirection);
         }
-        
+        private static CampaignMapMovement GetInstance(MobileParty party)
+        {
+            Guid partyGuid = CoopObjectManager.GetGuid(party);
+            if (!Instances.TryGetValue(partyGuid, out CampaignMapMovement wrapper))
+            {
+                foreach (var instance in Instances)
+                {
+                    if (instance.Value.TryGetInstance(out MobileParty managed))
+                    {
+                        if (managed == party)
+                        {
+                            Logger.Error($"guid missmatch for CampaignMapMovement instance for {party}. Locally {instance.Key}, requested {partyGuid}. Reassigning.");
+                            CampaignMapMovement syncInstance = instance.Value;
+                            Instances.Remove(instance.Key);
+                            Instances.Add(partyGuid, syncInstance);
+                            return syncInstance;
+                        }
+                    }
+                }
+
+                Logger.Warn($"CampaignMapMovement missing for {party}. Creating...");
+                return new CampaignMapMovement(party);
+            }
+            return wrapper;
+        }
+
 
         #region Instance
         public CampaignMapMovement([NotNull] MobileParty instance) : base(instance)
         {
             Guid partyGuid = CoopObjectManager.GetGuid(instance);
-
             Instances[partyGuid] = this;
             if (!Coop.IsController(instance))
             {
@@ -187,11 +208,6 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 Instances.Remove(item.Key);
             }
         }
-        private void SetMovementGoal(MobileParty party, MovementData data)
-        {
-            m_TargetMovementData = data;
-            ApplyServersideState(party);
-        }
         private void SetPosition(MobileParty party, Vec2 position, Vec2? facingDirection)
         {
             m_NextPosition = position;
@@ -207,8 +223,13 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 // The arbiter only needs to update player parties
                 return;
             }
-            
-            const float fAllowedLocalOffsetPlayer = 2.0f;
+
+            if(!party.IsInClientScope())
+            {
+                return;
+            }
+
+            const float fAllowedLocalOffsetPlayer = 1.0f;
             const float fAllowedLocalOffsetNPC = 0.0001f;
             if (m_NextPosition.IsValid &&
                 !Compare.CoordinatesEqual(party.Position2D, m_NextPosition))
@@ -218,37 +239,27 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 fDistSqrAllowed *= fDistSqrAllowed;
                 if (fDistSqr > fDistSqrAllowed)
                 {
-                     MapPositionSetter.Invoke(EOriginator.RemoteAuthority, party, new object[] {m_NextPosition});
+                    MapPositionSetter.Invoke(EOriginator.RemoteAuthority, party, new object[] { m_NextPosition });
                 }
+            }
 
-                if (m_FacingDirection.HasValue && m_FacingDirection.Value != Vec2.Zero)
+            if (m_FacingDirection.HasValue && m_FacingDirection.Value != Vec2.Zero)
+            {
+                // Remote controlled instance. Update the movement command to give the appearance that party actually has an objective...
+                Vec2 predictedPos = m_NextPosition + (m_FacingDirection.Value * 1f);
+                MovementOrderGroup.SetTyped(party, new MovementData()
                 {
-                    Vec2 predictedPos = m_NextPosition + (m_FacingDirection.Value * 5f);
-                    m_TargetMovementData = new MovementData()
-                    {
-                        DefaultBehaviour = AiBehavior.GoToPoint,
-                        TargetParty = null,
-                        TargetSettlement = null,
-                        TargetPosition = predictedPos
-                    };
-                }
-            }
-
-            if (m_TargetMovementData == null || !m_TargetMovementData.IsValid())
-            {
-                return;
-            }
-            
-            MovementData currentMovementData = party.GetMovementData();
-            if (!currentMovementData.Equals(m_TargetMovementData))
-            {
-                MovementOrderGroup.SetTyped(party, m_TargetMovementData);
+                    DefaultBehaviour = AiBehavior.GoToPoint,
+                    TargetParty = null,
+                    TargetSettlement = null,
+                    TargetPosition = predictedPos
+                });
                 DefaultBehaviorNeedsUpdate(party) = Coop.IsServer;
 
                 if (party.IsRemotePlayerMainParty())
-                    // That is a remote player moving. We need to update the local MainParty as well
-                    // because Campaign.Tick will otherwise not update the AI decisions and just
-                    // ignore some actions (for example EngageParty).
+                // That is a remote player moving. We need to update the local MainParty as well
+                // because Campaign.Tick will otherwise not update the AI decisions and just
+                // ignore some actions (for example EngageParty).
                 {
                     DefaultBehaviorNeedsUpdate(Campaign.Current.MainParty) = true;
                 }
@@ -256,11 +267,6 @@ namespace Coop.Mod.Patch.MobilePartyPatches
                 party.ComputeSpeed();
             }
         }
-
-        /// <summary>
-        ///     The target movement data of this mobile party as dictated by the server.
-        /// </summary>
-        [CanBeNull] private MovementData m_TargetMovementData;
 
         private Vec2 m_NextPosition = Vec2.Invalid;
         private Vec2? m_FacingDirection = null;

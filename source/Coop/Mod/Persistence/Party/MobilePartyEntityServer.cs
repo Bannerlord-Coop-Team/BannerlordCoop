@@ -18,6 +18,12 @@ namespace Coop.Mod.Persistence.Party
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         [NotNull] private readonly IEnvironmentServer m_Environment;
         private bool m_bIsRegisteredAsController;
+
+        public MobileParty Instance
+        {
+            [CanBeNull]
+            get => m_Instance;
+        }
         [CanBeNull] private MobileParty m_Instance;
 
         public MobilePartyEntityServer([NotNull] IEnvironmentServer environment)
@@ -62,6 +68,24 @@ namespace Coop.Mod.Persistence.Party
             m_Environment.PartySync?.Unregister(this);
             m_bIsRegisteredAsController = false;
         }
+
+        /// <summary>
+        ///     Applies a movement issued by the controller of this instance to the local game state.
+        /// </summary>
+        /// <param name="data"></param>
+        public void ApplyPlayerMove(MovementData data)
+        {
+            if(m_Instance == null)
+            {
+                Logger.Warn(
+                    "{Player controlled party {PartyId} not found on server. Desync!",
+                    State.PartyId);
+                return;
+            }
+
+            m_Environment.SetMovement(m_Instance, data);
+        }
+
         #region IMovementHandler
 
         public Tick Tick => Room?.Tick ?? Tick.INVALID;
@@ -74,20 +98,8 @@ namespace Coop.Mod.Persistence.Party
         /// <exception cref="ArgumentException"></exception>
         public void RequestMovement(MovementData data)
         {
-            if (State.IsPlayerControlled)
-            {
-                Logger.Trace(
-                    "[{tick}] Player controlled entity move {id} to '{position}'.",
-                    Room.Tick,
-                    Id,
-                    data);
-            }
-
-            State.Movement.DefaultBehavior = data.DefaultBehaviour;
-            State.Movement.TargetPosition = data.TargetPosition;
-            State.Movement.TargetPartyIndex = CoopObjectManager.GetGuid(data.TargetParty);
-            State.Movement.SettlementIndex =
-                CoopObjectManager.GetGuid(data.TargetSettlement);
+            throw new InvalidOperationException(
+                "Server should not publish change in movement commands.");
         }
 
         /// <summary>
@@ -148,7 +160,6 @@ namespace Coop.Mod.Persistence.Party
             RegisterAsDefaultController(m_Instance);
 
             // Get initial state from the game object.
-            MovementData movement = null;
             Vec2? position = null;
             // TODO: this should really be done in the main thread, but it is currently not really feasible because
             //       every party gets added individually to RailGun. This would result in thousands of separate calls
@@ -156,10 +167,8 @@ namespace Coop.Mod.Persistence.Party
             //       first unpausing the game. Fixed with the dedicated server.
             // GameLoopRunner.RunOnMainThread(() =>
             // {
-                movement = m_Instance.GetMovementData();
                 position = m_Instance.Position2D;
             // });
-            RequestMovement(movement);
             RequestPosition(position.Value);
         }
 

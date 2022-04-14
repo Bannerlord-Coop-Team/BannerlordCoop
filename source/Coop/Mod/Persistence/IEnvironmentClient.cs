@@ -15,11 +15,6 @@ namespace Coop.Mod.Persistence
     public interface IEnvironmentClient
     {
         /// <summary>
-        ///     Set the movement data of the given party as an authoritative action.
-        /// </summary>
-        void SetAuthoritative(MobileParty party, MovementData data);
-
-        /// <summary>
         ///     Set the current position of the given party as an authoritative action.
         /// </summary>
         /// <param name="mManagedParty"></param>
@@ -73,8 +68,7 @@ namespace Coop.Mod.Persistence
         /// <param name="party"></param>
         /// <param name="mapPosition"></param>
         /// <param name="facingDirection"></param>
-        /// <param name="movementData"></param>
-        void ScopeEntered([NotNull] MobileParty party, Vec2 mapPosition, Vec2? facingDirection, MovementData movementData);
+        void ScopeEntered([NotNull] MobileParty party, Vec2 mapPosition, Vec2? facingDirection);
         /// <summary>
         ///     Called when a party leaves the scope of the local client.
         /// </summary>

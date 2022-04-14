@@ -52,9 +52,9 @@ namespace Coop.Mod
             CoopClient.Instance.SyncedObjectStore ??
             throw new InvalidOperationException("Client not initialized.");
         
-        public void ScopeEntered(MobileParty party, Vec2 mapPosition, Vec2? facingDirection, MovementData movementData)
+        public void ScopeEntered(MobileParty party, Vec2 mapPosition, Vec2? facingDirection)
         {
-            MobilePartyScopeHelper.Enter(party, mapPosition, facingDirection, movementData);
+            MobilePartyScopeHelper.Enter(party, mapPosition, facingDirection);
         }
 
         public void ScopeLeft(MobileParty party)
@@ -66,10 +66,6 @@ namespace Coop.Mod
         public MobileParty GetMobilePartyById(Guid guid)
         {
             return CoopObjectManager.GetObject<MobileParty>(guid);
-        }
-        public void SetAuthoritative(MobileParty party, MovementData data)
-        {
-            CampaignMapMovement.RemoteMovementChanged(party, data);
         }
         public void SetAuthoritative(MobileParty party, Vec2 position, Vec2? facingDirection)
         {
