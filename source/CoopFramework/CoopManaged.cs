@@ -19,21 +19,35 @@ namespace CoopFramework
     ///     Base class to extend a type to be managed by the Coop framework. A coop managed class can be extended
     ///     with additional data and generate patches for the original class at runtime. 
     /// </summary>
-    public abstract class CoopManaged<TSelf, TExtended> : DefaultConditions where TExtended : class
+    public abstract class CoopManaged<TSelf, TExtended> : DefaultConditions 
+        where TExtended : class
+        where TSelf : class
     {
+        #region Instance lookup
+        /// <summary>
+        ///     All created <see cref="CampaignMapMovement"/> instances.
+        /// </summary>
+        protected static readonly ConditionalWeakTable<TExtended, TSelf> Instances = new ConditionalWeakTable<TExtended, TSelf>();
+        #endregion
+
         /// <summary>
         ///     Creates synchronization for a given instance of <typeparamref name="TExtended" />.
         /// </summary>
         /// <param name="instance">Instance that should be synchronized.</param>
         /// <exception cref="ArgumentOutOfRangeException">When the instance is null.</exception>
-        public CoopManaged([NotNull] TExtended instance)
+        protected CoopManaged([NotNull] TExtended instance)
         {
-            if (instance == null) throw new ArgumentNullException(nameof(instance));
-            if(!CoopObjectManager.ContainsElement(instance))
+            if (instance == null) 
             {
-                CoopObjectManager.AddObject(instance);
+                throw new ArgumentNullException(nameof(instance));
             }
-            Instance = new WeakReference<TExtended>(instance, true);
+            if (Instances.TryGetValue(instance, out TSelf existingInstance))
+            {
+                throw new InvalidOperationException($"{instance} already has a corresponding CoopManaged instance {existingInstance}. Cannot create another one.");
+            }
+
+            Instances.Add(instance, this as TSelf);
+            ManagedInstance = new WeakReference<TExtended>(instance, true);
             SetupHandlers(this);
         }
 
@@ -156,7 +170,7 @@ namespace CoopFramework
         /// <returns></returns>
         protected bool TryGetInstance(out TExtended resolvedInstance)
         {
-            if (Instance.TryGetTarget(out resolvedInstance)) return true;
+            if (ManagedInstance.TryGetTarget(out resolvedInstance)) return true;
 
             Logger.Debug("Coop synced {Instance} seems to have expired. Removed.", ToString());
             lock (m_AutoWrappedInstances)
@@ -207,7 +221,7 @@ namespace CoopFramework
         ///     Returns the instance that is being managed by this <see cref="TSelf" />.
         /// </summary>
         [NotNull]
-        private WeakReference<TExtended> Instance { get; set; }
+        private WeakReference<TExtended> ManagedInstance { get; set; }
 
         /// <summary>
         ///     Called when a new instance of <see cref="TSelf" /> was automatically created.
@@ -279,8 +293,7 @@ namespace CoopFramework
                     RemoveHandlers(instance, accessor);
             }
 
-            Instance = new WeakReference<TExtended>(null);
-            CoopObjectManager.RemoveObject(instance);
+            ManagedInstance = new WeakReference<TExtended>(null);
         }
 
         /// <summary>
@@ -354,7 +367,7 @@ namespace CoopFramework
                 lock (m_AutoWrappedInstances)
                 {
                     var managedInstances = m_AutoWrappedInstances
-                        .Where(wrapper => wrapper.Instance.TryGetTarget(out var o) && o == instance)
+                        .Where(wrapper => wrapper.ManagedInstance.TryGetTarget(out var o) && o == instance)
                         .ToList();
                     foreach (var managedInstance in managedInstances)
                     {
@@ -389,7 +402,7 @@ namespace CoopFramework
         {
             lock (m_AutoWrappedInstances)
             {
-                m_AutoWrappedInstances.RemoveAll(managed => !managed.Instance.TryGetTarget(out var intance));
+                m_AutoWrappedInstances.RemoveAll(managed => !managed.ManagedInstance.TryGetTarget(out var intance));
             }
         }
 
@@ -542,7 +555,7 @@ namespace CoopFramework
             FieldBehaviourBuilder[] behaviours)
         {
             TExtended instanceResolved = null; // stays null for static calls
-            if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
+            if (self != null && !self.ManagedInstance.TryGetTarget(out instanceResolved))
             {
                 // The instance went out of scope?
                 Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
@@ -572,7 +585,7 @@ namespace CoopFramework
             FieldBase field)
         {
             TExtended instanceResolved = null; // stays null for static calls
-            if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
+            if (self != null && !self.ManagedInstance.TryGetTarget(out instanceResolved))
             {
                 // The instance went out of scope?
                 Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
@@ -591,7 +604,7 @@ namespace CoopFramework
         }
         public override string ToString()
         {
-            return $"CoopManaged: {Instance}";
+            return $"CoopManaged: {ManagedInstance}";
         }
 
         [CanBeNull] private static ObjectLifetimeObserver<TExtended> m_LifetimeObserver;

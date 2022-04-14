@@ -39,8 +39,10 @@ namespace RemoteAction
                     return null;
                 case EventArgType.MBObjectManager:
                     return MBObjectManager.Instance;
-                case EventArgType.MBObject:
-                    return CoopObjectManager.GetObject(arg.GUID.Value);
+                case EventArgType.CoopObjectManagerId:
+                    return CoopObjectManager.GetObject(arg.CoopObjectManagerId.Value);
+                case EventArgType.Guid:
+                    return arg.Guid.Value;
                 case EventArgType.Int:
                     return arg.Int.Value;
                 case EventArgType.Float:
@@ -112,13 +114,13 @@ namespace RemoteAction
                 case MBObjectManager _:
                     return Argument.MBObjectManager;
                 case Guid guid:
-                    return new Argument(guid);
+                    return new Argument(guid, false);
                 case int i:
                     return new Argument(i);
                 case float f:
                     return new Argument(f);
                 case MBObjectBase mbObject:
-                    return bTransferByValue ? new Argument(store.Insert(obj)) : new Argument(CoopObjectManager.GetGuid(mbObject));
+                    return bTransferByValue ? new Argument(store.Insert(obj)) : new Argument(CoopObjectManager.GetGuid(mbObject), true);
                 case Campaign campaign:
                     if (campaign == Campaign.Current) return Argument.CurrentCampaign;
                     // New campaign? Send by value

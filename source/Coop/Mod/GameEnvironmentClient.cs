@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using Common;
+using Coop.Mod.GameSync;
+using Coop.Mod.GameSync.Party;
 using Coop.Mod.Patch;
-using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Scope;
@@ -46,7 +47,7 @@ namespace Coop.Mod
         }
 
         public IEnumerable<MobileParty> PlayerMainParties => PlayerControlledMainParties;
-        public MobilePartySync PartySync { get; } = CampaignMapMovement.Sync;
+        public MobilePartyMovementSync PartySync { get; } = MobilePartyManaged.MovementSync;
 
         public RemoteStore Store =>
             CoopClient.Instance.SyncedObjectStore ??
@@ -69,7 +70,7 @@ namespace Coop.Mod
         }
         public void SetAuthoritative(MobileParty party, Vec2 position, Vec2? facingDirection)
         {
-            CampaignMapMovement.RemoteMapPositionChanged(party, position, facingDirection);
+            MobilePartyManaged.AuthoritativePositionChange(party, position, facingDirection);
         }
         #endregion
     }

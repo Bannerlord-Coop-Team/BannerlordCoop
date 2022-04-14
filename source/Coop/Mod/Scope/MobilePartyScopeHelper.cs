@@ -1,4 +1,5 @@
-﻿using Coop.Mod.Patch.MobilePartyPatches;
+﻿using Coop.Mod.GameSync;
+using Coop.Mod.GameSync.Party;
 using Coop.Mod.Persistence.Party;
 using JetBrains.Annotations;
 using System.Runtime.CompilerServices;
@@ -44,10 +45,13 @@ namespace Coop.Mod.Scope
             }
 
             party.IsActive = true;
-            party.IsVisible = true;
-
-            // TODO: make sure the party visuals are correct
-            CampaignMapMovement.RemoteMapPositionChanged(party, position, facingDirection);
+            bool shouldBeVisble = party.CurrentSettlement == null; // Parties inside of settlements should stay invisible. Otherwise they just stand around the gate.
+            if (shouldBeVisble) 
+            {
+                party.IsVisible = true;
+            }
+            party.Party.Visuals.SetMapIconAsDirty();
+            MobilePartyManaged.AuthoritativePositionChange(party, position, facingDirection);
         }
         /// <summary>
         ///     To be called when a <see cref="MobileParty"/> leaves the scope of this game instance.
@@ -66,6 +70,9 @@ namespace Coop.Mod.Scope
 
             party.IsActive = false;
             party.IsVisible = false;
+            party.Party.Visuals.SetMapIconAsDirty();
+            party.SetMoveModeHold();
+            party.DisableAi();
         }
 
         /// <summary>

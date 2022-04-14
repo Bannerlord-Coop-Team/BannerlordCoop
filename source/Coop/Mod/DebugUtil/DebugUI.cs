@@ -30,6 +30,7 @@ using TaleWorlds.Engine;
 using Registry = Sync.Registry;
 using Logger = NLog.Logger;
 using SandBox.View.Map;
+using Coop.Mod.GameSync.Party;
 
 namespace Coop.Mod.DebugUtil
 {
@@ -89,7 +90,7 @@ namespace Coop.Mod.DebugUtil
             if (objects == null || objects.Count <= 0 || !Imgui.TreeNode("Coop object managers"))
                 return;
    
-            foreach (KeyValuePair<Type, List<Guid>> objectsManaged in objects)
+            foreach (KeyValuePair<Type, List<Guid>> objectsManaged in objects.OrderBy(pair => pair.Key.Name))
             {
                 string sName = $"{objectsManaged.Key.Name} ({objectsManaged.Value.Count.ToString()})";
 
@@ -105,9 +106,16 @@ namespace Coop.Mod.DebugUtil
                 Imgui.Text("Action");
                 Imgui.NextColumn();
 
-                objectsManaged.Value.ForEach(guid =>
+                var iterCopy = objectsManaged.Value.ToArray(); // Make a copy for iteration because updates to the list can come in asynchronously.
+                foreach(var guid in iterCopy)
                 {
                     object objectOfGuuid = CoopObjectManager.GetObject(guid);
+                    if(objectOfGuuid == null)
+                    {
+                        // This is a valid state. The store uses a `ConditionalWeakTable` which, with current .NET version, does not offer a way
+                        // to get a callback when an entry is removed. The AssociatedGuids can thus get outdated and contain expired objects.
+                        continue;
+                    }
 
                     Imgui.Text(guid.ToString());
                     Imgui.NextColumn();
@@ -137,7 +145,7 @@ namespace Coop.Mod.DebugUtil
                         }
                     }
                     Imgui.NextColumn();
-                });
+                };
 
                 Imgui.Columns();
                 Imgui.TreePop();
@@ -614,6 +622,19 @@ namespace Coop.Mod.DebugUtil
             
             Imgui.SameLine(400);
             Imgui.Checkbox("Show whole map", ref DebugShowWholeMapPatch.IsCheatEnabled);
+            
+            foreach(MobileParty playerParty in CoopServer.Instance?.Persistence?.MobilePartyEntityManager?.PlayerControlledParties)
+            {
+                if(playerParty == null || Campaign.Current?.MainParty == null)
+                {
+                    continue;
+                }
+
+                if(Imgui.Button($"Teleport to me: {playerParty}"))
+                {
+                    MobilePartyManaged.AuthoritativePositionChange(playerParty, Campaign.Current.MainParty.Position2D, null);
+                }
+            }
 
             if (startServerResult != null)
             {

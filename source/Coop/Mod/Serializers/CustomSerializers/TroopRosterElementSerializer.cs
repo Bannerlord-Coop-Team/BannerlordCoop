@@ -45,7 +45,7 @@ namespace Coop.Mod.Serializers.Custom
 
             rosterElement.Character = CoopObjectManager.GetObject<CharacterObject>(characterObjectGuid);
 
-            return rosterElement;
+            return (TroopRosterElement)base.Deserialize(rosterElement);
         }
     }
 }

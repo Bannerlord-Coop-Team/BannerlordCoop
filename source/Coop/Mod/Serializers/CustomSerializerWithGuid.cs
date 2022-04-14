@@ -20,12 +20,15 @@ namespace Coop.Mod.Serializers
 
         protected override object Deserialize(object newObj)
         {
-            if (!CoopObjectManager.RegisterExistingObject(Guid, newObj))
+            object existingObj = CoopObjectManager.GetObject(Guid);
+            if(existingObj != null)
             {
-                return CoopObjectManager.GetObject(Guid);
+                return existingObj;
             }
 
-            return base.Deserialize(newObj);
+            object deserialized = base.Deserialize(newObj);
+            CoopObjectManager.RegisterExistingObject(Guid, deserialized);
+            return deserialized;
         }
     }
 }

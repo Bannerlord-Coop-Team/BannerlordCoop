@@ -112,46 +112,51 @@ namespace Coop.Mod.DebugUtil
             return Replay.Stop();
         }
 
-        [CommandLineFunctionality.CommandLineArgumentFunction(
-            "disable_inconsistent_state_warnings",
-            sGroupName)]
-        public static string DisableWarn(List<string> parameters)
-        {
-            string help =
-                "Disable(1) or enable(0) to show warnings about inconsistent internal state\n" +
-                "Usage:\n" +
-                $"\t{sGroupName}.disable_inconsistent_state_warnings 1";
-            if (parameters.Count < 1)
-            {
-                return help;
-            }
-
-            MobilePartyEntityManager mobilePartyEntityManager = CoopServer.Instance?.Persistence?.MobilePartyEntityManager;
-            if (mobilePartyEntityManager == null)
-            {
-                return "Server not started.";
-            }
-
-            if (parameters[0] == "1")
-            {
-                mobilePartyEntityManager.SuppressInconsistentStateWarnings = true;
-                return "Inconsistent state warnings disabled.";
-            }
-
-            if (parameters[0] == "0")
-            {
-                mobilePartyEntityManager.SuppressInconsistentStateWarnings = false;
-                return "Inconsistent state warnings enabled.";
-            }
-
-            return help;
-        }
-
         [CommandLineFunctionality.CommandLineArgumentFunction("spawn_party", sTestGroupName)]
         public static string Spawn(List<string> parameters)
         {
-            MobileParty party = PartySpawnHelper.SpawnTestersNear(Campaign.Current.MainParty);
+            if (parameters.Count != 0 && parameters.Count != 1)
+            {
+                return $"Usage: \"{sTestGroupName}.spawn_party [spawnDistanceFromMainParty]";
+            }
+            
+            float spawnDistance = 5;
+            if(parameters.Count == 1)
+            {
+                if(!float.TryParse(parameters[0], out float spawnDistanceArg))
+                {
+                    return $"Usage: \"{sTestGroupName}.spawn_party [spawnDistanceFromMainParty]. Provided argument '{parameters[0]}' is not a valid spawnDistance.";
+                }
+                spawnDistance = spawnDistanceArg;
+            }
+
+            MobileParty party = PartySpawnHelper.SpawnTestersNearby(Campaign.Current.MainParty.Position2D, spawnDistance);
             return $"Spawned {party}.";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("start_dance", sTestGroupName)]
+        public static string StartDanceParty(List<string> parameters)
+        {
+            if (parameters.Count != 1 || !uint.TryParse(parameters[0], out uint numberOfDancers))
+            {
+                return $"Usage: \"{sTestGroupName}.start_dance [numberOfDancers]";
+            }
+
+            PartySyncDebugBehavior.StartDancing(new PartySyncDebugBehavior.DanceParams 
+            { 
+                center = Campaign.Current.MainParty.Position2D,
+                radius = 3f,
+                animationLength = CampaignTime.Hours(1),
+                numberOfDancers = numberOfDancers
+            });
+            return "(>'-')> <('-'<) ^('-')^ v('-')v(>'-')>";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("stop_dance", sTestGroupName)]
+        public static string StopDanceParty(List<string> parameters)
+        {
+            PartySyncDebugBehavior.StopDancing();
+            return "";
         }
     }
 }

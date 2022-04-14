@@ -9,11 +9,13 @@ namespace Coop.Mod.GameSync.Bandit
     {
         static VillagerCampaignBehaviorSync()
         {
-            // For now, disable all spawning
-            When(GameLoop)
+            // Disable campaign ticks client side
+            When(GameLoop & CoopConditions.IsRemoteClient)
                 .Calls(
-                    Method("CreateVillagerParty"))
-                .Skip();
+                    Method(nameof(VillagerCampaignBehavior.DailyTick)),
+                    Method("HourlyTickParty"),
+                    Method("HourlyTickSettlement")
+                ).Skip();
 
             ApplyStaticPatches();
             AutoWrapAllInstances(i => new VillagerCampaignBehaviorSync(i));

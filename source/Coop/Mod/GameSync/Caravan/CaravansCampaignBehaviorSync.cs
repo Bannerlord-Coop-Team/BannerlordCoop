@@ -8,17 +8,13 @@ namespace Coop.Mod.GameSync.Bandit
     {
         static CaravansCampaignBehaviorSync()
         {
-            // For now, disable all spawning
-            When(GameLoop)
-                .Calls(
-                    Method(nameof(CaravansCampaignBehavior.SpawnCaravan)))
-                .Skip();
-
-            // On client, disable caravan decision making
+            // Disable campaign ticks client side
             When(GameLoop & CoopConditions.IsRemoteClient)
                 .Calls(
-                    Method(nameof(CaravansCampaignBehavior.HourlyTickParty)))
-                .Skip();
+                    Method(nameof(CaravansCampaignBehavior.DailyTick)),
+                    Method("DailyTickHero"),
+                    Method("HourlyTickParty")
+                ).Skip();
 
             ApplyStaticPatches();
             AutoWrapAllInstances(i => new CaravansCampaignBehaviorSync(i));

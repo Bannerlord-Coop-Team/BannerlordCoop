@@ -54,16 +54,28 @@ namespace Coop.Tests.Persistence.RPC
                 }
             }
         }
-        
+
         [Fact]
-        private void MBGuidHash()
+        private void CoopObjectManagerIdHash()
         {
             const int seed = 44;
             Random random = new Random(seed);
             for (int i = 0; i < numberOfTests; ++i)
             {
                 Guid guid = Guid.NewGuid();
-                Assert.Equal(new Argument(guid).GetHashCode(), new Argument(guid).GetHashCode());
+                Assert.Equal(new Argument(guid, true).GetHashCode(), new Argument(guid, true).GetHashCode());
+            }
+        }
+
+        [Fact]
+        private void GuidHash()
+        {
+            const int seed = 44;
+            Random random = new Random(seed);
+            for (int i = 0; i < numberOfTests; ++i)
+            {
+                Guid guid = Guid.NewGuid();
+                Assert.Equal(new Argument(guid, false).GetHashCode(), new Argument(guid, false).GetHashCode());
             }
         }
         

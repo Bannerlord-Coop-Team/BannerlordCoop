@@ -20,8 +20,11 @@ namespace RemoteAction
             buffer.Write(NumberOfBitsForArgType, Convert.ToByte(arg.EventType));
             switch (arg.EventType)
             {
-                case EventArgType.MBObject:
-                    buffer.WriteGUID(arg.GUID.Value);
+                case EventArgType.CoopObjectManagerId:
+                    buffer.WriteGUID(arg.CoopObjectManagerId.Value);
+                    break;
+                case EventArgType.Guid:
+                    buffer.WriteGUID(arg.Guid.Value);
                     break;
                 case EventArgType.Null:
                     // Empty
@@ -64,8 +67,10 @@ namespace RemoteAction
             var eType = (EventArgType) buffer.Read(NumberOfBitsForArgType);
             switch (eType)
             {
-                case EventArgType.MBObject:
-                    return new Argument(buffer.ReadGUID());
+                case EventArgType.CoopObjectManagerId:
+                    return new Argument(buffer.ReadGUID(), true);
+                case EventArgType.Guid:
+                    return new Argument(buffer.ReadGUID(), false);
                 case EventArgType.MBObjectManager:
                     return Argument.MBObjectManager;
                 case EventArgType.Null:

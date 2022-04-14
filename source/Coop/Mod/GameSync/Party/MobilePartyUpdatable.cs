@@ -1,8 +1,9 @@
 ﻿using System;
 using Common;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Patch.MobilePartyPatches
+namespace Coop.Mod.GameSync.Party
 {
     /// <summary>
     ///     Updatable that applies all known serverside state of a mobile party to the local game state.
@@ -16,7 +17,11 @@ namespace Coop.Mod.Patch.MobilePartyPatches
             {
                 return;
             }
-            CampaignMapMovement.ApplyAuthoritativeState();
+
+            foreach(MobileParty party in Campaign.Current.MobileParties)
+            {
+                MobilePartyManaged.ApplyAuthoritativeState(party);
+            }
         }
 
         public int Priority { get; } = UpdatePriority.MainLoop.ApplyAuthoritativeMobilePartyState;
