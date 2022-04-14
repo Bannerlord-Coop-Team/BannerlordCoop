@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.CampaignSystem.Settlement;
 
@@ -57,9 +58,6 @@ namespace Coop.Mod.Serializers.Custom
                         SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
                         break;
                     
-                    case "SiegeLanes":
-                        SNNSO.Add(fieldInfo, new SiegeLaneSerializer((SiegeLane)value));
-                        break;
                     case "Culture":
                         SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)value));
                         break;

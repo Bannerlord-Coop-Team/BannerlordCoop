@@ -51,15 +51,13 @@ namespace Coop.Mod
             //MBGameManager.StartNewGame(new ClientManager(loadResult));
         }
 
-        public static LoadGameResult LoadSaveGameData(ISaveDriver driver)
+        public static LoadResult LoadSaveGameData(ISaveDriver driver)
         {
             List<ModuleInfo> currentModules = GetModules();
             LoadResult loadResult = SaveManager.Load(Main.LOAD_GAME, driver, true);
             if (loadResult.Successful)
             {
-                return new LoadGameResult(
-                    loadResult,
-                    CheckModules(driver.LoadMetaData(Main.LOAD_GAME), currentModules));
+                return loadResult;
             }
 
             Logger.Error("{loadResult}", loadResult.ToFriendlyString());
@@ -67,16 +65,16 @@ namespace Coop.Mod
             return null;
         }
 
-        private static List<ModuleCheckResult> CheckModules(
-            MetaData fileMetaData,
-            List<ModuleInfo> loadedModules)
-        {
-            return Utils.InvokePrivateMethod<List<ModuleCheckResult>>(
-                typeof(MBSaveLoad),
-                "CheckModules",
-                null,
-                new object[] {fileMetaData, loadedModules});
-        }
+        //private static List<ModuleCheckResult> CheckModules(
+        //    MetaData fileMetaData,
+        //    List<ModuleInfo> loadedModules)
+        //{
+        //    return Utils.InvokePrivateMethod<List<ModuleCheckResult>>(
+        //        typeof(MBSaveLoad),
+        //        "CheckModules",
+        //        null,
+        //        new object[] {fileMetaData, loadedModules});
+        //}
 
         private static List<ModuleInfo> GetModules()
         {
