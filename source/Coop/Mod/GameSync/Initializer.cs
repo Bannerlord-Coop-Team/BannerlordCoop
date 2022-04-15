@@ -44,7 +44,7 @@ namespace Coop.Mod.GameSync
                 return;
             }
 
-            Logger.Debug($"{entity} entered scope of {controller}");
+            Logger.Trace($"{entity} entered scope of {controller}");
 
             // Roster might be out of date. We could keep track of what we last sent the client and only send an update if
             // it is actually outdated. But as of right now, this does seems like a lot of effort for little benefit. Easier

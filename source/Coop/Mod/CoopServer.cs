@@ -289,6 +289,7 @@ namespace Coop.Mod
 
                 // Create save data, this contains player id and MBGUID <> Guid id assosiations
                 CoopObjectManager.AddObject(newHero.PartyBelongedTo);
+                CoopObjectManager.AddObject(newHero.CharacterObject);
                 SaveData saveData = new SaveData(CoopObjectManager.AddObject(newHero));
 
                 connection.Send(new Packet(EPacket.Server_GameData, saveData));
@@ -318,6 +319,7 @@ namespace Coop.Mod
                 s.Append($"Guid: {guid}\n");
                 object obj = CoopObjectManager.GetObject(guid);
                 Type t = obj.GetType();
+                s.Append($"Type: {t}\n");
                 PropertyInfo[] props = t.GetProperties();
                 foreach (PropertyInfo p in props)
                 {

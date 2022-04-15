@@ -94,6 +94,15 @@ namespace Coop.Mod.GameSync.Roster
             if (owner != null &&
                 CoopServer.Instance.Persistence.MobilePartyEntityManager.TryGetEntity(owner, out MobilePartyEntityServer entity))
             {
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    CharacterObject character = roster.GetCharacterAtIndex(i);
+                    if(character != null)
+                    {
+                        CharacterObjectSync.AssertCharacterIsRegistered(character);
+                    }
+                }
+
                 // The party this roster belongs to is managed. Send and update.
                 var entities = new EntityId[] { entity.Id };
                 CoopServer.Instance.Synchronization.Broadcast(entities, OnTroopRosterUpdateRPC.Id, null, new object[] { owner, roster });

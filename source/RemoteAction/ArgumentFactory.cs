@@ -63,12 +63,6 @@ namespace RemoteAction
                     {
                         throw new ArgumentException($"StoreObjectId {arg.StoreObjectId.Value} returned no object. Cannot resolve {arg}.");
                     }
-
-                    Logger.Debug(
-                        "[{id}] Resolved store RPC arg: {object} [{type}]",
-                        arg.StoreObjectId.Value,
-                        resolvedObject,
-                        resolvedObject.GetType());
                     return resolvedObject;
                 case EventArgType.CurrentCampaign:
                     return Campaign.Current;

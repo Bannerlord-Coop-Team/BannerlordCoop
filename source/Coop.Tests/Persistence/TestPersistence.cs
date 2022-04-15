@@ -71,7 +71,7 @@ namespace Coop.Tests.Persistence
 
         public TestEnvironmentServer(RemoteStoreServer store)
         {
-            EventQueue = new EventBroadcastingQueue(store, TimeSpan.FromSeconds(5));
+            EventQueue = new EventBroadcastingQueue(store, TimeSpan.FromSeconds(60));
             Mock = new Mock<IEnvironmentServer>();
             Mock.Setup(env => env.Store).Returns(store);
             Mock.Setup(env => env.EventQueue).Returns(EventQueue);

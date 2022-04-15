@@ -100,6 +100,18 @@ namespace Coop.Mod.Managers
             foreach (MobileParty party in MobileParty.All)
             {
                 CoopObjectManager.AddObject(party);
+
+                // As of 1.7.1 there seem to be characters that are not in CharacterObject.All, but
+                // are still used as Character in TroopRosterElements.
+                TroopRoster roster = party.MemberRoster;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    CharacterObject character = roster.GetCharacterAtIndex(i);
+                    if (character != null)
+                    {
+                        CoopObjectManager.AddObject(character);
+                    }
+                }
             }
 
             foreach (CharacterObject characterObject in CharacterObject.All)
