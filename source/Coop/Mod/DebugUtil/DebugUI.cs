@@ -228,8 +228,7 @@ namespace Coop.Mod.DebugUtil
         }
 
         /// <summary>
-        /// Displaying information on persistence (entry point), the sub-sections are <c>DisplayPersistenceInfo</c>,
-        /// <c>DisplayClientRpcInfo</c> and <c>DisplayEntities</c>.
+        /// Displaying information on persistence (entry point).
         /// </summary>
         private void DisplayPersistenceMenu()
         {
@@ -238,7 +237,6 @@ namespace Coop.Mod.DebugUtil
 
             DisplayPersistenceInfo();
             DisplayClientRpcInfo();
-            DisplayEntities();
 
             Imgui.TreePop();
         }
@@ -317,7 +315,7 @@ namespace Coop.Mod.DebugUtil
 
 #if DEBUG
                 CallStatistics history = CoopClient.Instance?.Synchronization.BroadcastHistory;
-                Imgui.Columns(2);
+                Imgui.Columns(3);
 
                 Imgui.Text("Tick");
                 foreach (CallTrace trace in history)
@@ -326,10 +324,34 @@ namespace Coop.Mod.DebugUtil
                 }
 
                 Imgui.NextColumn();
-                Imgui.Text("Call");
+                Imgui.Text("Call / Field");
                 foreach (CallTrace trace in history)
                 {
-                    Imgui.Text(trace.Call.ToString());
+                    if(trace.Call.HasValue && Registry.IdToInvokable.TryGetValue(trace.Call.Value, out Invokable invokable))
+                    {
+                        Imgui.Text(invokable.ToString());
+                    }
+                    else if (trace.Value.HasValue && Registry.IdToField.TryGetValue(trace.Value.Value, out FieldBase field))
+                    {
+                        Imgui.Text(field.ToString());
+                    }
+                    else
+                    {
+                        Imgui.Text("-");
+                    }
+                }
+
+                Imgui.NextColumn();
+                Imgui.Text("Arguments");
+                foreach (CallTrace trace in history)
+                {
+                    if(trace.Arguments == null)
+                    {
+                        Imgui.Text("");
+                        continue;
+                    }
+
+                    Imgui.Text(String.Join(",", trace.Arguments.Select(o => o?.ToString())));
                 }
 
                 Imgui.Columns();
@@ -338,60 +360,6 @@ namespace Coop.Mod.DebugUtil
 #else
                 DisplayDebugDisabledText();
 #endif
-            }
-
-            Imgui.TreePop();
-        }
-
-        private void DisplayEntities()
-        {
-            if (!Imgui.TreeNode("Parties"))
-                return;
-
-            if (CoopServer.Instance?.Persistence?.MobilePartyEntityManager == null)
-            {
-                RailClientRoom clientRoom = CoopClient.Instance?.Persistence?.Room;
-                if (clientRoom != null)
-                {
-                    var entities = clientRoom.Entities
-                        .OfType<MobilePartyEntityClient>()
-                        .ToList().OrderBy(o => o.State.PartyId);
-                    foreach (MobilePartyEntityClient entity in entities)
-                    {
-                        Imgui.Text(entity.ToString());
-                    }
-                }
-            }
-            else
-            {
-                MobilePartyEntityManager manager = CoopServer.Instance.Persistence.MobilePartyEntityManager;
-
-                Imgui.SliderFloat("ClientScopeRange = ClientParty.SeeingRange * <this slider value>", ref manager.ClientScopeRangeFactor, 0f, 3f);
-
-                Imgui.Columns(2);
-                Imgui.Separator();
-                Imgui.Text("ID");
-                var parties = manager.ServerPartyEntities.ToList();
-                foreach (RailEntityServer entity in parties)
-                {
-                    if (entity != null)
-                    {
-                        Imgui.Text(entity.Id.ToString());
-                    }
-                }
-
-                Imgui.NextColumn();
-                Imgui.Text("Entity");
-                Imgui.Separator();
-                foreach (RailEntityServer entity in parties)
-                {
-                    if (entity != null)
-                    {
-                        Imgui.Text(entity.ToString());
-                    }
-                }
-
-                Imgui.Columns();
             }
 
             Imgui.TreePop();

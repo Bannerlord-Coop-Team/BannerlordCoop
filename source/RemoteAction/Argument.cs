@@ -256,7 +256,7 @@ namespace RemoteAction
                 case EventArgType.Bool:
                     return Bool.ToString();
                 case EventArgType.StoreObjectId:
-                    return StoreObjectId.ToString();
+                    return $"StoreObjectId: {StoreObjectId.ToString()}";
                 case EventArgType.CurrentCampaign:
                     return "Campaign.Current";
                 case EventArgType.SmallObjectRaw:
