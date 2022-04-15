@@ -354,7 +354,7 @@ namespace Coop.Tests.Persistence.RPC
             // Since we've just started the room the ticks will be lower values which fit into 1 byte each.
             // This is a rough estimate, it doesn't need to be accurate.
             int keepAliveSize = conClient0ToServer.SendBuffer[0].Length;
-            Assert.True(keepAliveSize < 10);
+            Assert.True(keepAliveSize < 16);
 
             // Call method & finish the store sync to get those messages out of the way
             string sMessage = "Hello World";

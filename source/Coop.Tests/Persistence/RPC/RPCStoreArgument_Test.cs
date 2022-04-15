@@ -142,6 +142,15 @@ namespace Coop.Tests.Persistence.RPC
             AssertIsStorePacket(m_Environment.ConnectionsRaw.ConnectionsClient[0].SendBuffer[0], EPacket.StoreDataRetrieved, objectId);
             Assert.Single(m_Environment.ConnectionsRaw.ConnectionsClient[1].SendBuffer);
             AssertIsStorePacket(m_Environment.ConnectionsRaw.ConnectionsClient[1].SendBuffer[0], EPacket.StoreDataRetrieved, objectId);
+            UpdateClients();
+
+            // The event queue will remove the unneeded objects on the next update
+            m_Environment.EventQueue.Update(TimeSpan.Zero);
+            Assert.Empty(m_StoreServer.Data);
+            Assert.Single(m_Environment.ConnectionsRaw.ConnectionsServer[0].SendBuffer);
+            AssertIsStorePacket(m_Environment.ConnectionsRaw.ConnectionsServer[0].SendBuffer[0], EPacket.StoreRemove, objectId);
+            Assert.Single(m_Environment.ConnectionsRaw.ConnectionsServer[1].SendBuffer);
+            AssertIsStorePacket(m_Environment.ConnectionsRaw.ConnectionsServer[1].SendBuffer[0], EPacket.StoreRemove, objectId);
         }
 
         private static void AssertIsStorePacket(byte[] payload, EPacket expectedType, ObjectId expectedId)

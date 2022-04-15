@@ -109,13 +109,33 @@ namespace Sync.Store
         }
         
         /// <summary>
-        ///     Disconnects a remote store
+        ///     Disconnects a remote store.
         /// </summary>
         /// <param name="connection"></param>
         public void RemoveConnection(ConnectionBase connection)
         {
             connection.Dispatcher.UnregisterPacketHandlers(this);
             m_Connections.Remove(connection);
+        }
+
+        /// <summary>
+        ///     Removes an entry from the store. It is the callers responsibility to
+        ///     make sure that no one accesses the value after it has been removed.
+        /// </summary>
+        /// <param name="id"></param>
+        public void Remove(ObjectId id)
+        {
+            if (!m_Data.TryGetValue(id, out object data))
+            {
+                return;
+            }
+
+            foreach (ConnectionBase connection in m_Connections)
+            {
+                connection.Send(new Packet(EPacket.StoreRemove, id));
+            }
+            m_State.Remove(id);
+            m_Data.Remove(id);
         }
         public IReadOnlyDictionary<ObjectId, SharedObject> State => m_State;
 
@@ -208,12 +228,7 @@ namespace Sync.Store
                 bool doRemove = OnObjectRetrieved(id, m_State[id]);
                 if (doRemove)
                 {
-                    foreach (ConnectionBase connection in m_Connections)
-                    {
-                        connection.Send(new Packet(EPacket.StoreRemove, id));
-                    }
-                    m_State.Remove(id);
-                    m_Data.Remove(id);
+                    Remove(id);
                 }
             }
             
@@ -321,12 +336,7 @@ namespace Sync.Store
                 bool doRemove = OnObjectRetrieved.Invoke(id, shared);
                 if (doRemove)
                 {
-                    foreach (ConnectionBase connection in m_Connections)
-                    {
-                        connection.Send(new Packet(EPacket.StoreRemove, id));
-                    }
-                    m_State.Remove(id);
-                    m_Data.Remove(id);
+                    Remove(id);
                 }
             }
         }
