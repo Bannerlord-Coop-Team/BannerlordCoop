@@ -48,16 +48,17 @@ namespace Coop.Mod.GameSync.Hideout
                     settlementsSpotted.Add(settlement.Id, new List<MBGUID>());
                 }
 
-                // TODO: Find a way to calculate the hideout Spotting distance for each player.
-                float hideoutSpottingDistance = Campaign.Current.Models.MapVisibilityModel.GetHideoutSpottingDistance();
-                
                 foreach (var playerControlledParty in CoopServer.Instance.Persistence.MobilePartyEntityManager.PlayerControlledParties)
                 {
-                    List<MBGUID> playersSettlement = settlementsSpotted[settlement.Id];
+                   List<MBGUID> playersSettlement = settlementsSpotted[settlement.Id];
                     if (playersSettlement.Contains(playerControlledParty.Id))
                     {
                         return;
                     }
+
+                    float hideoutSpottingDistance = (playerControlledParty.HasPerk(DefaultPerks.Scouting.RumourNetwork, true))
+                        ? playerControlledParty.SeeingRange * 1.2f * (1f + DefaultPerks.Scouting.RumourNetwork.SecondaryBonus * 0.01f)
+                        : playerControlledParty.SeeingRange * 1.2f;
 
                     float partyDistanceSquared = playerControlledParty.Position2D.DistanceSquared(settlement.Position2D);
                     bool isSpotted = partyDistanceSquared < hideoutSpottingDistance * hideoutSpottingDistance;
