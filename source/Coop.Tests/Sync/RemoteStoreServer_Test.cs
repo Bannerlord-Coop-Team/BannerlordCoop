@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Coop.Tests.Sync
 {
-    public class SharedRemoteStore_Test
+    public class RemoteStoreServer_Test
     {
         [Fact]
         private void DataIsBroadcastToOtherClients()
@@ -14,6 +14,7 @@ namespace Coop.Tests.Sync
 
             var client0 = env.StoresClient[0];
             var client1 = env.StoresClient[1];
+            var server = env.StoreServer;
 
             var id = client0.Insert(message);
             Assert.Contains(id, client0.Data);
@@ -33,11 +34,9 @@ namespace Coop.Tests.Sync
             Assert.Equal(message, client1.Data[id] as string);
 
             // Client1 ACK -> Server
+            Assert.False(server.State[id].IsAvailableEverywhere());
             env.ExecuteSendsClients();
-            Assert.False(client0.State[id].Acknowledged);
-            // Server ACK -> Client 0
-            env.ExecuteSendsServer();
-            Assert.True(client0.State[id].Acknowledged);
+            Assert.True(server.State[id].IsAvailableEverywhere());
 
             // Object is present and equal in all stores
             Assert.Equal(message, client0.Data[id] as string);
@@ -74,7 +73,7 @@ namespace Coop.Tests.Sync
             var id = client0.Insert(message);
 
             ObjectId? handlerArgument = null;
-            env.StoreServer.OnObjectDistributed += objectId => { handlerArgument = objectId; };
+            env.StoreServer.OnObjectAvailable += objectId => { handlerArgument = objectId; };
 
             // Client0 Add -> Server
             env.ExecuteSendsClients();
@@ -90,42 +89,6 @@ namespace Coop.Tests.Sync
 
             // Server ACK -> Client 0
             env.ExecuteSendsServer();
-        }
-
-        [Fact]
-        private void ServerAckIsDelayedWithMultipleClients()
-        {
-            var env = new TestEnvironment(2);
-            var message = "Hello World";
-
-            var client0 = env.StoresClient[0];
-            var id = client0.Insert(message);
-            Assert.True(client0.State[id].Sent);
-            Assert.False(client0.State[id].Acknowledged);
-
-            // Client0 Add -> Server
-            env.ExecuteSendsClients();
-            Assert.False(client0.State[id].Acknowledged);
-
-            // Server Add -> Client1
-            env.ExecuteSendsServer();
-            var client1 = env.StoresClient[1];
-            Assert.Contains(id, client1.State);
-            Assert.False(
-                client0.State[id]
-                    .Acknowledged); // Delayed until client 1 ACK is processed by server
-
-            // Client1 ACK -> Server
-            env.ExecuteSendsClients();
-            Assert.False(
-                client0.State[id]
-                    .Acknowledged); // Delayed until client 1 ACK is processed by server
-
-            // Server ACK -> Client 0
-            env.ExecuteSendsServer();
-            Assert.True(
-                client0.State[id]
-                    .Acknowledged); // Delayed until client 1 ACK is processed by server
         }
 
         [Fact]
@@ -146,26 +109,6 @@ namespace Coop.Tests.Sync
             Assert.Contains(id, env.StoreServer.Data);
             Assert.Contains(id, client0.Data);
             Assert.Contains(id, client1.Data);
-        }
-
-        [Fact]
-        private void ServerSendsAckWithOneClient()
-        {
-            var env = new TestEnvironment(1);
-            var message = "Hello World";
-
-            var client0 = env.StoresClient[0];
-            var id = client0.Insert(message);
-            Assert.True(client0.State[id].Sent);
-            Assert.False(client0.State[id].Acknowledged);
-
-            // Client0 Add -> Server
-            env.ExecuteSendsClients();
-            Assert.False(client0.State[id].Acknowledged);
-
-            // Server ACK -> Client0
-            env.ExecuteSendsServer();
-            Assert.True(client0.State[id].Acknowledged);
         }
     }
 }

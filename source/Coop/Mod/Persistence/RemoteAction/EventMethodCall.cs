@@ -5,6 +5,7 @@ using RailgunNet;
 using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
+using RailgunNet.System.Types;
 using RailgunNet.Util;
 using RemoteAction;
 using Sync;
@@ -43,7 +44,9 @@ namespace Coop.Mod.Persistence.RemoteAction
         }
 
         [EventData] public MethodCall Call { get; set; }
+        [EventData] public EntityId[] Entities { get; set; }
         public override IEnumerable<Argument> Arguments => Call.Arguments;
+        public override IEnumerable<EntityId> AffectedEntities => Entities;
 
         public override bool IsValid()
         {

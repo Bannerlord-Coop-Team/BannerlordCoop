@@ -1,6 +1,8 @@
 ﻿using System;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.Tests.Sync;
+using Network;
+using Network.Protocol;
 using RailgunNet.System.Encoding;
 using RemoteAction;
 using Sync.Store;
@@ -15,11 +17,13 @@ namespace Coop.Tests.Persistence.RPC
         {
             m_StoreClient0 = m_Environment.StoresClient[0];
             m_StoreClient1 = m_Environment.StoresClient[1];
+            m_StoreServer = m_Environment.StoreServer;
         }
 
         private readonly TestEnvironment m_Environment = new TestEnvironment(2);
-        private readonly RemoteStore m_StoreClient0;
-        private readonly RemoteStore m_StoreClient1;
+        private readonly RemoteStoreClient m_StoreClient0;
+        private readonly RemoteStoreClient m_StoreClient1;
+        private readonly RemoteStoreServer m_StoreServer;
 
         private readonly RailBitBuffer buffer = new RailBitBuffer();
 
@@ -113,7 +117,7 @@ namespace Coop.Tests.Persistence.RPC
         }
 
         [Fact]
-        private void ObjectIsRemovedFromStoreAfterResolve()
+        private void ObjectIsRetrievedFromStoreOnResolve()
         {
             // Create
             DateTime time = DateTime.Now; // Just an arbitrary type that supports serialization.
@@ -122,6 +126,11 @@ namespace Coop.Tests.Persistence.RPC
             Assert.Equal(EventArgType.StoreObjectId, arg.EventType);
             Assert.True(arg.StoreObjectId.HasValue);
             Assert.Contains(arg.StoreObjectId.Value, m_StoreClient0.Data);
+            m_Environment.ExecuteSendsClients(); // Client0 -> Server StoreInsert
+            m_Environment.ExecuteSendsServer(); // Server -> Client 1 StoreInsert
+            Assert.Empty(m_Environment.ConnectionsRaw.ConnectionsClient[0].SendBuffer);
+            Assert.Contains(arg.StoreObjectId.Value, m_StoreClient1.Data);
+            Assert.Contains(arg.StoreObjectId.Value, m_StoreServer.Data);
 
             // Serialize
             buffer.EncodeEventArg(arg);
@@ -131,9 +140,11 @@ namespace Coop.Tests.Persistence.RPC
             Assert.Equal(arg, argDeserialized);
 
             // Resolve
+            Assert.Empty(m_Environment.ConnectionsRaw.ConnectionsClient[0].SendBuffer);
             object resolved = ArgumentFactory.Resolve(m_StoreClient0, argDeserialized);
             Assert.NotNull(resolved);
-            Assert.Empty(m_StoreClient0.Data);
+            Assert.Single(m_Environment.ConnectionsRaw.ConnectionsClient[0].SendBuffer);
+            AssertIsStorePacket(m_Environment.ConnectionsRaw.ConnectionsClient[0].SendBuffer[0], EPacket.StoreDataRetrieved, arg.StoreObjectId.Value);
         }
 
         [Fact]
@@ -243,6 +254,15 @@ namespace Coop.Tests.Persistence.RPC
             Assert.NotNull(resolvedClient1);
             Assert.IsType<Tuple<bool, float>>(resolvedClient1);
             Assert.Equal(toBeTransfered, (Tuple<bool, float>) resolvedClient1);
+        }
+
+        private static void AssertIsStorePacket(byte[] payload, EPacket expectedType, ObjectId expectedId)
+        {
+            Packet packet = new PacketReader().Read(new ByteReader(new ArraySegment<byte>(payload)));
+            Assert.Equal(expectedType, packet.Type);
+            Assert.Equal(4, packet.Payload.Count); // uint32
+            uint uiMessageId = new ByteReader(packet.Payload).Binary.ReadUInt32();
+            Assert.Equal(expectedId, new ObjectId(uiMessageId));
         }
     }
 }

@@ -50,20 +50,19 @@ namespace RemoteAction
                 case EventArgType.Bool:
                     return arg.Bool.Value;
                 case EventArgType.StoreObjectId:
-                    if (store == null) throw new ArgumentException($"Cannot resolve ${arg}, no store provided.");
-
-                    if (!arg.StoreObjectId.HasValue ||
-                        !store.Data.ContainsKey(arg.StoreObjectId.Value))
-                        throw new ArgumentException($"Cannot resolve ${arg}.");
-
-                    var resolvedObject = store.Data[arg.StoreObjectId.Value];
-                    Logger.Debug(
-                        "[{id}] Resolved store RPC arg: {object} [{type}]",
-                        arg.StoreObjectId.Value,
-                        resolvedObject,
-                        resolvedObject.GetType());
-                    // TODO find a way to remove without breaking everything
-                    store.Remove(arg.StoreObjectId.Value);
+                    if (store == null)
+                    { 
+                        throw new ArgumentException($"Cannot resolve ${arg}, no store provided.");
+                    }
+                    if (!arg.StoreObjectId.HasValue)
+                    {
+                        throw new ArgumentException($"No StoreObjectId provided. Cannot resolve ${arg}.");
+                    }
+                    var resolvedObject = store.Retrieve(arg.StoreObjectId.Value);
+                    if(resolvedObject == null)
+                    {
+                        throw new ArgumentException($"StoreObjectId {arg.StoreObjectId.Value} returned no object. Cannot resolve {arg}.");
+                    }
                     return resolvedObject;
                 case EventArgType.CurrentCampaign:
                     return Campaign.Current;
@@ -119,8 +118,10 @@ namespace RemoteAction
                     return new Argument(i);
                 case float f:
                     return new Argument(f);
-                case MBObjectBase mbObject:
-                    return bTransferByValue ? new Argument(store.Insert(obj)) : new Argument(CoopObjectManager.GetGuid(mbObject), true);
+                case MBObjectBase o:
+                    return bTransferByValue ? new Argument(store.Insert(o)) : new Argument(CoopObjectManager.GetGuid(o), true);
+                case TroopRoster t:
+                    return new Argument(store.Insert(t));
                 case Campaign campaign:
                     if (campaign == Campaign.Current) return Argument.CurrentCampaign;
                     // New campaign? Send by value

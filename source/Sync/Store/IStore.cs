@@ -1,4 +1,5 @@
-﻿using System;
+﻿using JetBrains.Annotations;
+using System;
 using System.Collections.Generic;
 
 namespace Sync.Store
@@ -58,15 +59,15 @@ namespace Sync.Store
     }
 
     /// <summary>
-    ///     Interface for a storage of arbitrary serializable data.
+    ///     Interface for a shared object storage with a client  server model. It is intended for 
+    ///     short term storage. Object lifetime in the store is controlled by the server.
+    ///     
+    ///     Data can be accessed through <see cref="Retrieve(ObjectId)"/>. Be aware that accessing
+    ///     data informs the server about the access. The server may decide to remove the object 
+    ///     from the store.
     /// </summary>
     public interface IStore
     {
-        /// <summary>
-        ///     Access the stored data.
-        /// </summary>
-        IReadOnlyDictionary<ObjectId, object> Data { get; }
-
         /// <summary>
         ///     Serialize an object.
         /// </summary>
@@ -80,27 +81,26 @@ namespace Sync.Store
         /// <param name="raw"></param>
         /// <returns></returns>
         object Deserialize(byte[] raw);
-        
+
+        /// <summary>
+        ///     Inserts an object into the store. 
+        /// </summary>
+        /// <param name="obj"></param>
+        /// <returns></returns>
+        ObjectId Insert(object obj);
+
         /// <summary>
         ///     Inserts an object into the store.
         /// </summary>
         /// <param name="obj"></param>
         /// <returns></returns>
-        ObjectId Insert(object obj);
-        
-        /// <summary>
-        ///     Inserts an already serialized object into the store.
-        /// </summary>
-        /// <param name="obj">Object to insert</param>
-        /// <param name="serialized">Serialized obj</param>
-        /// <returns></returns>
         ObjectId Insert(object obj, byte[] serialized);
-        
+
         /// <summary>
-        ///     Removes an object from the store.
+        ///     Access an object. Be aware that this is communicated to the server. The server
+        ///     may decide to remove the object after the client has accessed it.
         /// </summary>
         /// <param name="id"></param>
-        /// <returns></returns>
-        bool Remove(ObjectId id);
+        [CanBeNull] object Retrieve(ObjectId id);
     }
 }

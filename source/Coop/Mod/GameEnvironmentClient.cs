@@ -49,7 +49,7 @@ namespace Coop.Mod
         public IEnumerable<MobileParty> PlayerMainParties => PlayerControlledMainParties;
         public MobilePartyMovementSync PartySync { get; } = MobilePartyManaged.MovementSync;
 
-        public RemoteStore Store =>
+        public RemoteStoreClient Store =>
             CoopClient.Instance.SyncedObjectStore ??
             throw new InvalidOperationException("Client not initialized.");
         

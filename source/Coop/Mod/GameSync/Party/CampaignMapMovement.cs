@@ -73,13 +73,6 @@ namespace Coop.Mod.GameSync.Party
 
         public void ApplyAuthoritativeState(MobileParty party)
         {
-            if (Coop.IsArbiter &&
-                !party.IsAnyPlayerMainParty())
-            {
-                // The arbiter only needs to update player parties
-                return;
-            }
-
             if (!party.IsInClientScope())
             {
                 return;
@@ -99,7 +92,8 @@ namespace Coop.Mod.GameSync.Party
                 }
             }
 
-            if (m_FacingDirection.HasValue && m_FacingDirection.Value != Vec2.Zero)
+            bool extrapolateFacingDirection = party != MobileParty.MainParty;
+            if (extrapolateFacingDirection && m_FacingDirection.HasValue && m_FacingDirection.Value != Vec2.Zero)
             {
                 // Remote controlled instance. Update the movement command to give the appearance that party actually has an objective...
                 Vec2 predictedPos = m_NextPosition + m_FacingDirection.Value * 1f;

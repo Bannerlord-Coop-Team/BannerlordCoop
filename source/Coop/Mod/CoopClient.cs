@@ -64,12 +64,6 @@ namespace Coop.Mod
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
         private readonly UpdateableList m_Updateables = new UpdateableList();
 
-        /// <summary>
-        ///     Internal data storage for <see cref="SyncedObjectStore" />.
-        /// </summary>
-        private readonly Dictionary<ObjectId, object> m_SyncedObjects =
-            new Dictionary<ObjectId, object>();
-
         private MBGameManager gameManager;
 
         private int m_ReconnectAttempts = MaxReconnectAttempts;
@@ -77,7 +71,7 @@ namespace Coop.Mod
         #endregion
         public Action<PersistenceClient> OnPersistenceInitialized;
 
-        public Action<RemoteStore> RemoteStoreCreated;
+        public Action<RemoteStoreClient> RemoteStoreCreated;
 
         public CoopClient(ClientConfiguration config)
         {
@@ -102,7 +96,7 @@ namespace Coop.Mod
         ///     Object store shared with the server if connected. Otherwise null.
         /// </summary>
         [CanBeNull]
-        public RemoteStore SyncedObjectStore { get; private set; }
+        public RemoteStoreClient SyncedObjectStore { get; private set; }
 
         [CanBeNull] public PersistenceClient Persistence { get; private set; }
         
@@ -134,7 +128,7 @@ namespace Coop.Mod
             }
         }
 
-        public RemoteStore GetStore()
+        public RemoteStoreClient GetStore()
         {
             return SyncedObjectStore;
         }
@@ -213,7 +207,7 @@ namespace Coop.Mod
                             new Client_Request_Party(new PlatformAPI().GetPlayerID().ToString()).Serialize()));
                 }
 
-                SyncedObjectStore = new RemoteStore(m_SyncedObjects, con, new SerializableFactory());
+                SyncedObjectStore = new RemoteStoreClient(con, new SerializableFactory());
                 RemoteStoreCreated?.Invoke(SyncedObjectStore);
 
                 #region events

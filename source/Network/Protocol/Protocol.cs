@@ -27,10 +27,16 @@ namespace Network.Protocol
         Server_GameData, // Contains data for all current heros
 
         Sync,
-        StoreAdd, // Adds an object to the global object store
-        StoreAck, // Sent after receiving an object via StoreAdd
+        #region IStore
+        StoreInsert,                /* Sent when a store instance adds an object to the global object store. 
+                                       May be sent by server and clients. */
+        StoreInsertAck,             /* Sent by clients in response StoreAdd, after an object has been received & deserialized. */
+        StoreDataRetrieved,         /* Sent by clients when they retrieved an object from the store. */
+        StoreRemove,                /* Sent by the server when an object needs to be removed from the store. */
+        #endregion
+
         KeepAlive,
-        Persistence, // Will be forwarded to the game state persistence layer.
+        Persistence,    // Will be forwarded to the game state persistence layer.
 
         CreateObject,
 #if DEBUG

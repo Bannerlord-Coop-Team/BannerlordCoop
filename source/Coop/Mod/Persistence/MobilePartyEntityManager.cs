@@ -83,18 +83,25 @@ namespace Coop.Mod.Persistence
         }
 
         /// <summary>
-        ///     Returns a copy of all currently known <see cref="MobileParty"/> that have a corresponding entity.
+        ///     Returns the corresponding entity for a mobile party, if it exists.
         /// </summary>
-        public IReadOnlyCollection<MobileParty> Parties
+        public bool TryGetEntity(MobileParty p, out MobilePartyEntityServer e)
         {
-            get
-            {
-                lock (m_Lock)
-                {
-                    return m_Parties.Keys.ToList();
-                }
-            }
+            return m_Parties.TryGetValue(p, out e);
         }
+
+        /// <summary>
+        ///     Called when a mobile party entity enters the scope of the client, immediately before 
+        ///     sending the current state. The state of the entity may be changed in this callback.
+        /// </summary>
+        public event Action<RailController, MobilePartyEntityServer> OnBeforePartyScopeEnter;
+
+        /// <summary>
+        ///     Called when a mobile party entity leaves the scope of the client, immediately before
+        ///     sending the freeze to the client. Changes to state of the entity in this callback
+        ///     will not be synced to the client until the entity enters the scope again.
+        /// </summary>
+        public event Action<RailController, MobilePartyEntityServer> OnBeforePartyScopeLeave;
 
         /// <summary>
         ///     Called for each player controlled entity when the controlling player leaves the game.
@@ -118,7 +125,7 @@ namespace Coop.Mod.Persistence
                     throw new Exception("Connected clients should always be scoped!");
                 }
                 controller.Scope.Evaluator = new CoopRailScopeEvaluator(
-                    room.Clients.Count == 1,    // the first client is always the arbiter.
+                    room.Clients.Count == 1,    // the first client is always the one running on the server game instance.
                     () =>
                 {
                     if (m_ClientControlledParties.TryGetValue((RailServerPeer) controller, out MobileParty party))
@@ -128,8 +135,14 @@ namespace Coop.Mod.Persistence
                     return null;
                 },
                 GetScopeRange);
+                controller.Scope.OnBeforeScopeEnter += BeforeScopeEnter;
+                controller.Scope.OnBeforeScopeLeave += BeforeScopeLeave;
             };
-            
+            room.ClientLeft += controller =>
+            {
+                controller.Scope.OnBeforeScopeEnter -= BeforeScopeEnter;
+                controller.Scope.OnBeforeScopeLeave -= BeforeScopeLeave;
+            };
             WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
         }
 
@@ -140,7 +153,7 @@ namespace Coop.Mod.Persistence
             {
                 return entity.Instance.SeeingRange * ClientScopeRangeFactor;
             }
-            return 50f * ClientScopeRangeFactor;
+            return 0f;
         }
         public void AddParty(MobileParty party)
         {
@@ -304,7 +317,7 @@ namespace Coop.Mod.Persistence
             lock (m_Lock)
             {
                 foreach (RailEntityServer controlledEntity in m_Room
-                                                              .Entities.Where(
+                                                              .Entities.Values.Where(
                                                                   e => e.Controller == peer)
                                                               .Select(e => e as RailEntityServer))
                 {
@@ -313,7 +326,42 @@ namespace Coop.Mod.Persistence
                 }
             }
         }
-        
+        private Dictionary<RailController, Dictionary<MobilePartyEntityServer, bool>> m_RemoteIsFrozen = new Dictionary<RailController, Dictionary<MobilePartyEntityServer, bool>> { };
+        private void BeforeScopeEnter(RailController controller, RailEntityServer entity)
+        {
+            if (entity is MobilePartyEntityServer partyEntity)
+            {
+                if (!m_RemoteIsFrozen.TryGetValue(controller, out Dictionary<MobilePartyEntityServer, bool> frozenLookup))
+                {
+                    m_RemoteIsFrozen.Add(controller, new Dictionary<MobilePartyEntityServer, bool> { });
+                    frozenLookup = m_RemoteIsFrozen[controller];
+                }
+
+                if(!frozenLookup.TryGetValue(partyEntity, out bool wasFrozen) || wasFrozen)
+                {
+                    OnBeforePartyScopeEnter?.Invoke(controller, partyEntity);
+                    frozenLookup[partyEntity] = false;
+                }
+            }
+        }
+        private void BeforeScopeLeave(RailController controller, RailEntityServer entity)
+        {
+            if (entity is MobilePartyEntityServer partyEntity)
+            {
+                if (!m_RemoteIsFrozen.TryGetValue(controller, out Dictionary<MobilePartyEntityServer, bool> frozenLookup))
+                {
+                    m_RemoteIsFrozen.Add(controller, new Dictionary<MobilePartyEntityServer, bool> { });
+                    frozenLookup = m_RemoteIsFrozen[controller];
+                }
+
+                if (!frozenLookup.TryGetValue(partyEntity, out bool wasFrozen) || !wasFrozen)
+                {
+                    OnBeforePartyScopeLeave?.Invoke(controller, partyEntity);
+                    frozenLookup[partyEntity] = true;
+                }
+            }
+        }
+
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly object m_Lock = new object();

@@ -17,19 +17,15 @@ namespace Coop.Tests.Sync
                 .Zip(connections.ConnectionsServer, (c, s) => (c, s))
             )
             {
-                StoresClient.Add(
-                    new RemoteStore(
-                        new Dictionary<ObjectId, object>(),
-                        con.client,
-                        new SerializableFactory()));
+                StoresClient.Add(new RemoteStoreClient(con.client,new SerializableFactory()));
                 StoreServer.AddConnection(con.server);
             }
         }
 
-        public List<RemoteStore> StoresClient { get; } = new List<RemoteStore>();
+        public List<RemoteStoreClient> StoresClient { get; } = new List<RemoteStoreClient>();
 
-        public SharedRemoteStore StoreServer { get; } =
-            new SharedRemoteStore(new SerializableFactory());
+        public RemoteStoreServer StoreServer { get; } =
+            new RemoteStoreServer(new SerializableFactory());
 
         public TestConnections Connections { get; }
     }

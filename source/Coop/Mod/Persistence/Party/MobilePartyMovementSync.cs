@@ -5,6 +5,8 @@ using Coop.Mod.GameSync;
 using CoopFramework;
 using JetBrains.Annotations;
 using NLog;
+using RailgunNet.Logic;
+using RailgunNet.System.Types;
 using RemoteAction;
 using Sync.Call;
 using Sync.Value;
@@ -40,11 +42,8 @@ namespace Coop.Mod.Persistence.Party
         ///     No implementation provided as <see cref="CampaignMapMovement" /> does not define any method patch
         ///     that need to be synchronized.
         /// </summary>
-        /// <param name="id"></param>
-        /// <param name="instance"></param>
-        /// <param name="args"></param>
         /// <exception cref="NotImplementedException"></exception>
-        public override void Broadcast(InvokableId id, object instance, object[] args)
+        public override void Broadcast([CanBeNull] EntityId[] affectedEntities, InvokableId id, object instance, object[] args)
         {
             // We didn't patch any methods, so this is never called.
             throw new InvalidOperationException("CampaignMapMovement was changed, but MobilePartySync not expanded.");
@@ -128,14 +127,6 @@ namespace Coop.Mod.Persistence.Party
                     Logger.Debug("Got FieldChangeBuffer for unmanaged {party}. Ignored.", party);
                     continue;
                 }
-
-                // MovementData before = change.Value.OriginalValue as MovementData;
-                // if (!Coop.IsController(party))
-                // {
-                //     // Revert the local changes, we will receive the correct one from the server.
-                //     SetAuthoritative(party, before);
-                //     continue;
-                // }
 
                 MovementData requested = change.Value.RequestedValue as MovementData;
                 BroadcastHistory.Push(new CallTrace

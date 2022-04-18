@@ -25,7 +25,7 @@ namespace Coop.Mod
 
         public CoopServerRail(
             [NotNull] Server server,
-            [NotNull] SharedRemoteStore store,
+            [NotNull] RemoteStoreServer store,
             [NotNull] RailRegistry registry,
             TimeSpan eventTimeout)
         {

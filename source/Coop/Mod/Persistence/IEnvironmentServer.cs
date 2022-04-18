@@ -15,10 +15,10 @@ namespace Coop.Mod.Persistence
     {
 
         /// <summary>
-        ///     Returns the shared object store for this server.
+        ///     Returns the object store for this server.
         /// </summary>
         [NotNull]
-        SharedRemoteStore Store { get; }
+        RemoteStoreServer Store { get; }
 
         /// <summary>
         ///     Returns the queue to broadcast events to all clients. NotNull if persistence is initialized.

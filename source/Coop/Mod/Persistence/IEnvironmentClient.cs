@@ -42,7 +42,7 @@ namespace Coop.Mod.Persistence
         ///     Returns the object store shared with all other clients.
         /// </summary>
         [NotNull]
-        RemoteStore Store { get; }
+        RemoteStoreClient Store { get; }
 
         /// <summary>
         ///     Sets whether a party is controlled by a human player (locally or remote). Called

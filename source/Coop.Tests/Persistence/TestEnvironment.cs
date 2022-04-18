@@ -10,6 +10,7 @@ using Coop.NetImpl.LiteNet;
 using Coop.Tests.Sync;
 using JetBrains.Annotations;
 using RailgunNet.Connection.Client;
+using RailgunNet.Connection.Server;
 using RailgunNet.Factory;
 using RailgunNet.Logic;
 using RemoteAction;
@@ -72,7 +73,7 @@ namespace Coop.Tests.Persistence
             
             
 
-            foreach (((RailNetPeerWrapper First, RailNetPeerWrapper Second) First, RemoteStore
+            foreach (((RailNetPeerWrapper First, RailNetPeerWrapper Second) First, RemoteStoreClient
                 Second) it in RailPeerClient.Zip(RailPeerServer, (c, s) => (c, s)).Zip(StoresClient, (c, s) => (c, s)))
             {
                 var client = it.First.First;
@@ -105,9 +106,9 @@ namespace Coop.Tests.Persistence
 
         [NotNull] public TestPersistence Persistence { get; private set; }
 
-        public List<RemoteStore> StoresClient => Stores.StoresClient;
+        public List<RemoteStoreClient> StoresClient => Stores.StoresClient;
 
-        public SharedRemoteStore StoreServer => Stores.StoreServer;
+        public RemoteStoreServer StoreServer => Stores.StoreServer;
 
         public List<RailNetPeerWrapper> RailPeerClient =>
             Connections.ConnectionsClient.Select(c => c.GameStatePersistence)
@@ -145,15 +146,15 @@ namespace Coop.Tests.Persistence
         private class ClientAccess : IClientAccess
         {
             private readonly RailClientRoom m_Room;
-            private readonly RemoteStore m_Store;
+            private readonly RemoteStoreClient m_Store;
 
-            public ClientAccess(RemoteStore store, RailClientRoom room)
+            public ClientAccess(RemoteStoreClient store, RailClientRoom room)
             {
                 m_Store = store;
                 m_Room = room;
             }
 
-            public RemoteStore GetStore()
+            public RemoteStoreClient GetStore()
             {
                 return m_Store;
             }
@@ -161,6 +162,39 @@ namespace Coop.Tests.Persistence
             public RailClientRoom GetRoom()
             {
                 return m_Room;
+            }
+        }
+        
+        public IServerAccess GetServerAccess()
+        {
+            return new ServerAccess(StoreServer, Persistence.Server.Room, EventQueue);
+        }
+
+        private class ServerAccess : IServerAccess
+        {
+            private readonly RailServerRoom m_Room;
+            private readonly RemoteStoreServer m_Store;
+            private readonly EventBroadcastingQueue m_Queue;
+            public ServerAccess(RemoteStoreServer store, RailServerRoom room, EventBroadcastingQueue queue)
+            {
+                m_Store = store;
+                m_Room = room;
+                m_Queue = queue;
+            }
+
+            public RailServerRoom GetRoom()
+            {
+                return m_Room;
+            }
+
+            public RemoteStoreServer GetStore()
+            {
+                return m_Store;
+            }
+
+            public EventBroadcastingQueue GetQueue()
+            {
+                return m_Queue;
             }
         }
     }

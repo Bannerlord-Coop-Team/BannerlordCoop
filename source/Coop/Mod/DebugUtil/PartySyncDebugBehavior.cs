@@ -63,6 +63,15 @@ namespace Coop.Mod.DebugUtil
             DespawnTestParties();
         }
 
+        public static void AddToCounts(int i)
+        {
+            foreach(MobileParty p in m_CreatedParties)
+            {
+                TroopRosterElement first = p.MemberRoster.GetTroopRoster().First();
+                p.MemberRoster.AddToCountsAtIndex(0, i);
+            }
+        }
+
         private static void SpawnTestParties(Vec2 position, uint numberOfParties)
         {
             for(int i = 0; i < numberOfParties; ++i)
