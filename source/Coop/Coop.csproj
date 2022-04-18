@@ -262,6 +262,8 @@
     <Compile Include="Mod\GameSync\Bandit\BanditPartyComponentSync.cs" />
     <Compile Include="Mod\GameSync\Bandit\BanditCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Caravan\CaravansCampaignBehaviorSync.cs" />
+    <Compile Include="Mod\GameSync\Hideout\HideoutBehavior.cs" />
+    <Compile Include="Mod\GameSync\Hideout\HideoutSync.cs" />
     <Compile Include="Mod\GameSync\Roster\CharacterObjectSync.cs" />
     <Compile Include="Mod\GameSync\Initializer.cs" />
     <Compile Include="Mod\GameSync\Party\MapMovementPatches.cs" />
