@@ -37,28 +37,33 @@ namespace Coop.Mod.GameSync.Hideout
                 return;
             }
 
-            if (settlement.IsHideout && settlement.Hideout.IsInfested && !settlement.Hideout.IsSpotted)
+            bool canBeSpotted = settlement.IsHideout && settlement.Hideout.IsInfested;
+            int spottedByCount = settlementsSpotted.TryGetValue(settlement.Id, out var spottedBy) ? spottedBy.Count : 0;
+            int maxSpottedByCount = CoopServer.Instance.Persistence.MobilePartyEntityManager.PlayerControlledParties.Count;
+
+            if (canBeSpotted && spottedByCount < maxSpottedByCount)
             {
+                if (!settlementsSpotted.ContainsKey(settlement.Id))
+                {
+                    settlementsSpotted.Add(settlement.Id, new List<MBGUID>());
+                }
+
+                // TODO: Find a way to calculate the hideout Spotting distance for each player.
                 float hideoutSpottingDistance = Campaign.Current.Models.MapVisibilityModel.GetHideoutSpottingDistance();
                 
                 foreach (var playerControlledParty in CoopServer.Instance.Persistence.MobilePartyEntityManager.PlayerControlledParties)
                 {
-                    float partyDistanceSquared = playerControlledParty.Position2D.DistanceSquared(settlement.Position2D);
-                    float num2 = 1f - partyDistanceSquared / (hideoutSpottingDistance * hideoutSpottingDistance);
-
-                    if (num2 > 0f && settlement.Parties.Count > 0 && MBRandom.RandomFloat < partyDistanceSquared)
+                    List<MBGUID> playersSettlement = settlementsSpotted[settlement.Id];
+                    if (playersSettlement.Contains(playerControlledParty.Id))
                     {
-                        if (!settlementsSpotted.ContainsKey(settlement.Id))
-                        {
-                            settlementsSpotted.Add(settlement.Id, new List<MBGUID>());
-                        }
+                        return;
+                    }
 
-                        List<MBGUID> playersSettlement = settlementsSpotted[settlement.Id];
-                        if (playersSettlement.Contains(playerControlledParty.Id))
-                        {
-                            return;
-                        }
+                    float partyDistanceSquared = playerControlledParty.Position2D.DistanceSquared(settlement.Position2D);
+                    bool isSpotted = partyDistanceSquared < hideoutSpottingDistance * hideoutSpottingDistance;
 
+                    if (isSpotted && settlement.Parties.Count > 0 && MBRandom.RandomFloat < partyDistanceSquared)
+                    {
                         playersSettlement.Add(playerControlledParty.Id);
                         HideoutSync.BroadcastHideoutDiscovery(playerControlledParty, settlement);
                     }
