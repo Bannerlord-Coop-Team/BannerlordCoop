@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using Coop.Mod.Persistence;
 using Network.Infrastructure;
@@ -169,6 +170,47 @@ namespace Coop.Mod.DebugUtil
 
             PartySyncDebugBehavior.AddToCounts(i);
             return "";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("teleport_to_me", sTestGroupName)]
+        public static string TeleportToMe(List<string> parameters)
+        {
+            if (parameters.Count != 1)
+            {
+                return $"Usage: \"{sTestGroupName}.teleport_to_me [id_entity] \n player is missing.";
+            }
+
+            var playerParty = CoopServer.Instance.Persistence.MobilePartyEntityManager.PlayerControlledParties.
+                FirstOrDefault(p => p.Name.ToString() == parameters[0]);
+            
+            if (playerParty == null)
+            {
+                return "Mobile party not found";
+            }
+
+            playerParty.Position2D = MobileParty.MainParty.Position2D;
+            return $"{playerParty.Name} has been teleported to server position.";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("move_player_to_hideout", sTestGroupName)]
+        public static string MovePlayerToHideout(List<string> parameters)
+        {
+            var playerParty = CoopServer.Instance.Persistence.MobilePartyEntityManager.PlayerControlledParties.FirstOrDefault();
+
+            if (playerParty == null)
+            {
+                return "Player party is null";
+            }
+
+            Settlement hideoutInfested = Settlement.All.FirstOrDefault(s => s.IsHideout && s.Parties.Count > 0);
+
+            if (hideoutInfested == null)
+            {
+                return "All hideouts are empty!";
+            }
+
+            playerParty.Position2D = hideoutInfested.Position2D;
+            return $"{playerParty.Name} has been teleported to settlement {hideoutInfested.Name}";
         }
     }
 }
