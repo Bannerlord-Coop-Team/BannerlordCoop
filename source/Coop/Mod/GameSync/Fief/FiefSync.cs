@@ -17,7 +17,7 @@ namespace Coop.Mod.GameSync
         {
             When(GameLoop)
                 .Calls(Setter(nameof(Fief.FoodStocks)))
-                .Broadcast(() => CoopClient.Instance.Synchronization, authority: EAuthority.ServerAuthorityOnly)
+                .Broadcast(() => CoopClient.Instance.Synchronization)
                 .DelegateTo(IsServer);
 
             AutoWrapAllInstances(c => new FiefSync(c));
