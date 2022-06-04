@@ -262,8 +262,7 @@
     <Compile Include="Mod\GameSync\Bandit\BanditPartyComponentSync.cs" />
     <Compile Include="Mod\GameSync\Bandit\BanditCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Caravan\CaravansCampaignBehaviorSync.cs" />
-    <Compile Include="Mod\GameSync\Fief\FiefPatch.cs" />
-    <Compile Include="Mod\GameSync\Fief\FiefSync.cs" />
+    <Compile Include="Mod\GameSync\Fief\FiefCommnads.cs" />
     <Compile Include="Mod\GameSync\Hideout\HideoutBehavior.cs" />
     <Compile Include="Mod\GameSync\Hideout\HideoutSync.cs" />
     <Compile Include="Mod\GameSync\Roster\CharacterObjectSync.cs" />
@@ -305,7 +304,7 @@
     <Compile Include="Mod\Patch\TemporaryTypesPatch.cs" />
     <Compile Include="Mod\Patch\World\SaveManager.cs" />
     <Compile Include="Mod\GameSync\Caravan\CaravanPartyComponentSync.cs" />
-    <Compile Include="Mod\GameSync\FiefSync.cs" />
+    <Compile Include="Mod\GameSync\Fief\FiefSync.cs" />
     <Compile Include="Mod\GameSync\HeroSync.cs" />
     <Compile Include="Mod\GameSync\SettlementSync.cs" />
     <Compile Include="Mod\Patch\World\TimeSynchronization.cs" />
