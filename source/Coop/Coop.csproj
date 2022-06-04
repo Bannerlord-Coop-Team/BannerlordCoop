@@ -274,7 +274,6 @@
     <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
-    <Compile Include="Mod\ObjectManagerAdapter.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />
     <Compile Include="Mod\DebugUtil\CLICommands.cs" />
     <Compile Include="Mod\DebugUtil\DebugConsole.cs" />
@@ -439,6 +438,7 @@
     <Compile Include="NetImpl\LiteNet\RailNetPeerWrapper.cs" />
     <Compile Include="NetImpl\PlatformAPI.cs" />
     <Compile Include="NetImpl\Steam\NetworkSteam.cs" />
+    <Compile Include="ObjectManagerAdapter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Mod\TestingCommands.cs" />
   </ItemGroup>

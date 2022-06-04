@@ -5,19 +5,14 @@ using System.Text;
 using System.Threading.Tasks;
 using HarmonyLib;
 
-namespace Coop.Mod.GameSync.Fief
+namespace Coop.Mod.GameSync
 {
-    [HarmonyPatch(typeof(TaleWorlds.CampaignSystem.Fief), "FoodStocks", MethodType.Setter)]
-    class FiefPatch
-    {
-        static void Postfix(TaleWorlds.CampaignSystem.Fief __instance)
-        {
-            if (!Coop.IsServer)
-            {
-                return;
-            }
-
-            FiefSync.BroadcastChangeFoodStock(__instance);
-        }
-    }
+    //[HarmonyPatch(typeof(Activator), "CreateInstance")]
+    //class FiefPatch
+    //{
+    //    static bool Prefix()
+    //    {
+    //        return true;
+    //    }
+    //}
 }

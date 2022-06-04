@@ -1,4 +1,5 @@
-﻿using CoopFramework;
+﻿using Common;
+using CoopFramework;
 using JetBrains.Annotations;
 using Sync.Behaviour;
 using System;
@@ -8,16 +9,16 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 
-namespace Coop.Mod.Patch.World
+namespace Coop.Mod.GameSync
 {
     class FiefSync : CoopManaged<FiefSync, Fief>
     {
         static FiefSync()
         {
-            //When(GameLoop)
-            //    .Calls(Setter(nameof(Fief.FoodStocks)))
-            //    .Broadcast(() => CoopClient.Instance.Synchronization)
-            //    .DelegateTo(IsServer);
+            When(GameLoop)
+                .Calls(Setter(nameof(Fief.FoodStocks)))
+                .Broadcast(() => CoopClient.Instance.Synchronization)
+                .DelegateTo(IsServer);
 
             AutoWrapAllInstances(c => new FiefSync(c));
         }
@@ -28,7 +29,18 @@ namespace Coop.Mod.Patch.World
 
         private static ECallPropagation IsServer(IPendingMethodCall call)
         {
-            return Coop.IsServer ? ECallPropagation.CallOriginal : ECallPropagation.Skip;
+            return !Coop.IsClientInGame || Coop.IsServer ? ECallPropagation.CallOriginal : ECallPropagation.Skip;
         }
+
+        #region Utils
+        public static FiefSync MakeManaged(Fief fief)
+        {
+            if (Instances.TryGetValue(fief, out FiefSync instance))
+            {
+                return instance;
+            }
+            return new FiefSync(fief);
+        }
+        #endregion
     }
 }

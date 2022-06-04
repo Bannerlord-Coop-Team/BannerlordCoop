@@ -27,6 +27,7 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Missions;
+using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
 
@@ -122,7 +123,9 @@ namespace Coop.Mod
             AddBehavior<HideoutBehavior>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
+            bool t = Coop.IsCoopGameSession();
             CoopFramework.CoopFramework.InitPatches(ObjectManagerAdapter.Instance, Coop.IsCoopGameSession);
+
 
             // Skip startup splash screen
 #if DEBUG
