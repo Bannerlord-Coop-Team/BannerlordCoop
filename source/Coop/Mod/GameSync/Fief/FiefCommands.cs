@@ -16,7 +16,7 @@ using TaleWorlds.Library;
 
 namespace Coop.Mod.GameSync
 {
-    class FiefCommnads
+    class FiefCommands
     {
         private const string sGroupName = "coop";
         private const string sTestGroupName = "test";
