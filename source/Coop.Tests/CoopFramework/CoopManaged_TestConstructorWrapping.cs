@@ -16,6 +16,7 @@ namespace Coop.Tests.CoopFramework
         {
             RuntimeHelpers.RunClassConstructor(typeof(CoopManagedFoo).TypeHandle);
             RuntimeHelpers.RunClassConstructor(typeof(CoopManagedBaz).TypeHandle);
+            RuntimeHelpers.RunClassConstructor(typeof(CoopManagedParent).TypeHandle);
         }
 
         [Fact]
@@ -104,6 +105,58 @@ namespace Coop.Tests.CoopFramework
             Assert.True(managedFinalizerCalled);
         }
 
+        [Fact]
+        private void ChildIsAutomaticallyPatched()
+        {
+            var child = new Child();
+            Assert.Equal(51, child.MyValue);
+            child.MyValue = 100;
+            Assert.Equal(51, child.MyValue); // Suppressed
+        }
+
+        [Fact]
+        private void ChildFromActivatorAutomaticallyPatched()
+        {
+            var child = Activator.CreateInstance<Child>();
+            Assert.Equal(51, child.MyValue);
+            child.MyValue = 100;
+            Assert.Equal(51, child.MyValue); // Suppressed
+        }
+
+        [Fact]
+        private void ChildIsReleased()
+        {
+            WeakReference<Child> reference = null;
+            var managedFinalizerCalled = false;
+            new Action(() =>
+            {
+                var child = new Child();
+
+                // Set finalizer callback on the managed instance
+                var managedParent = CoopManagedParent.CreatedInstances[child];
+                CoopManagedParent.CreatedInstances.Remove(child);
+                managedParent.OnFinalizerCalled = () => {
+                    managedFinalizerCalled = true;
+                };
+
+                reference = new WeakReference<Child>(child, false);
+                child = null;
+            })();
+
+            // Release the instance
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            Assert.False(reference.TryGetTarget(out var restoredChild));
+            Assert.Null(restoredChild);
+
+            // Check if the managed instance was released as well. Since Baz does not have a destructor, we have to
+            // wait for the internal garbage collection of CoopManaged.
+            Thread.Sleep(CoopManagedBaz.GCInterval_ms + 50);
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            Assert.True(managedFinalizerCalled);
+        }
+
         private class Foo
         {
             public Action OnFinalizerCalled;
@@ -169,6 +222,42 @@ namespace Coop.Tests.CoopFramework
             {
                 OnFinalizerCalled?.Invoke();
             }
+        }
+
+        public abstract class Parent
+        {
+            public virtual int MyValue { get; set; } = 51;
+        }
+
+        private class CoopManagedParent : CoopManaged<CoopManagedParent, Parent>
+        {
+            public static readonly Dictionary<Parent, CoopManagedParent> CreatedInstances =
+                new Dictionary<Parent, CoopManagedParent>();
+
+            public Action OnFinalizerCalled;
+
+            static CoopManagedParent()
+            {
+                When(GameLoop)
+                    .Calls(Setter(nameof(Parent.MyValue)))
+                    .Skip();
+
+                AutoWrapAllInstances(instance => new CoopManagedParent(instance));
+            }
+
+            public CoopManagedParent([NotNull] Parent instance) : base(instance)
+            {
+                CreatedInstances[instance] = this;
+            }
+
+            ~CoopManagedParent()
+            {
+                OnFinalizerCalled?.Invoke();
+            }
+        }
+
+        private class Child : Parent
+        {
         }
     }
 }

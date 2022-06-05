@@ -132,7 +132,7 @@ namespace Sync.Patch
         public MethodPatch<TPatch> Postfix(
             MethodBase method)
         {
-            if (method.DeclaringType != m_Declaring)
+            if (!m_Declaring.IsAssignableFrom(method.DeclaringType))
                 throw new ArgumentException(
                     $"Provided method {method} is not declared in {m_Declaring}",
                     nameof(method));

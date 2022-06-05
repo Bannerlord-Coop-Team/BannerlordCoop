@@ -14,7 +14,7 @@ namespace Coop.Mod.Patch.World
     {
         static VillageSync()
         {
-            AutoWrapAllInstances(c => new VillageSync(c));
+            //AutoWrapAllInstances(c => new VillageSync(c));
         }
 
         public VillageSync([NotNull] Village instance) : base(instance)

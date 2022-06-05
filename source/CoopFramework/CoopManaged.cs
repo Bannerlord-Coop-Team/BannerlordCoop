@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Common;
 using HarmonyLib;
 using JetBrains.Annotations;
@@ -52,7 +53,6 @@ namespace CoopFramework
         }
 
         #region Patcher
-
         /// <summary>
         ///     Enables an automatic injection of this synchronization class into every instance of <see cref="TExtended" />
         ///     that is being created.
@@ -187,7 +187,7 @@ namespace CoopFramework
         ///     needs to be tracked manually. This constant defines the interval in which a check is performed to
         ///     release automatically created <typeparamref name="TSelf" /> wrapper instance.
         /// </summary>
-        public const int GCInterval_ms = 500;
+        public const int GCInterval_ms = 5000;
 
         /// <summary>
         ///     Returns all instances of this <see cref="TSelf" /> that very automatically created because
@@ -358,8 +358,6 @@ namespace CoopFramework
         /// <param name="factoryMethod">Factory to create a <typeparamref name="TSelf" /> instance.</param>
         private static void HookIntoObjectLifetime(Func<TExtended, TSelf> factoryMethod)
         {
-            var objectManager = CoopFramework.ObjectManager;
-            var isManagedClass = objectManager?.Manages<TExtended>() ?? false;
             m_LifetimeObserver = new ObjectLifetimeObserver<TExtended>();
             m_LifetimeObserver.AfterCreateObject += instance => OnAutoConstructed(factoryMethod(instance));
             m_LifetimeObserver.AfterRemoveObject += instance =>
@@ -377,20 +375,21 @@ namespace CoopFramework
                 }
             };
 
-            if (isManagedClass)
+            m_LifetimeObserver.PatchConstruction();
+            if (!m_LifetimeObserver.PatchDeconstruction())
             {
-                objectManager.Register<TExtended>(m_LifetimeObserver);
-            }
-            else
-            {
-                m_LifetimeObserver.PatchConstruction();
-                if (!m_LifetimeObserver.PatchDeconstruction())
+                Logger.Debug(
+                    $"Class {typeof(TExtended)} has no destructor. Auto unwrapping not possible. Registering with GC to prevent memory leaks.");
+                
+                
+                GCTask = Task.Run(async () =>
                 {
-                    Logger.Debug(
-                        $"Class {typeof(TExtended)} has no destructor. Auto unwrapping not possible. Registering with GC to prevent memory leaks.");
-                    TimerGC = new Timer(state => UnwrapUnusedAutoInstances());
-                    TimerGC.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(GCInterval_ms));
-                }
+                    while (!GCTaskCancellationToken.IsCancellationRequested)
+                    {
+                        await Task.Delay(GCInterval_ms);
+                        UnwrapUnusedAutoInstances();
+                    }
+                });
             }
         }
 
@@ -402,7 +401,11 @@ namespace CoopFramework
         {
             lock (m_AutoWrappedInstances)
             {
-                m_AutoWrappedInstances.RemoveAll(managed => !managed.ManagedInstance.TryGetTarget(out var intance));
+                m_AutoWrappedInstances.RemoveAll(managed =>
+                {
+                    return !managed.ManagedInstance.TryGetTarget(out var intance);
+                }
+                );
             }
         }
 
@@ -608,7 +611,8 @@ namespace CoopFramework
         }
 
         [CanBeNull] private static ObjectLifetimeObserver<TExtended> m_LifetimeObserver;
-        [CanBeNull] private static Timer TimerGC;
+        [CanBeNull] private static Task GCTask;
+        [CanBeNull] private static CancellationToken GCTaskCancellationToken = new CancellationToken();
         [NotNull] private static readonly FieldChangeStack FieldStack = new FieldChangeStack();
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();

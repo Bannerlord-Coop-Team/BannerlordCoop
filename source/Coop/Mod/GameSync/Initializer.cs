@@ -24,6 +24,11 @@ namespace Coop.Mod.GameSync
                 MobilePartyManaged.MakeManaged(party, false);
             }
 
+            foreach (Town town in Town.AllFiefs)
+            {
+                FiefSync.MakeManaged(town);
+            }
+
             if(Coop.IsServer)
             {
                 CoopServer.Instance.Persistence.MobilePartyEntityManager.OnBeforePartyScopeEnter += OnBeforePartyScopeEnter;
