@@ -21,6 +21,12 @@ namespace Coop.Mod.GameSync
         private const string sGroupName = "coop";
         private const string sTestGroupName = "test";
 
+
+        /// <summary>
+        /// Sets food stocks for a given Fief
+        /// </summary>
+        /// <param name="parameters">Expects a Fief and a value to assign food stocks</param>
+        /// <returns>Changed value or whether a fief is not found.</returns>
         [CommandLineFunctionality.CommandLineArgumentFunction("set_food_stocks", sTestGroupName)]
         public static string SetFoodStocks(List<string> parameters)
         {
@@ -43,6 +49,11 @@ namespace Coop.Mod.GameSync
             return $"Fief {fief.Name} changed from {oldFoodStocks} to {fief.FoodStocks}";
         }
 
+        /// <summary>
+        /// Gets food stocks for a given Fief
+        /// </summary>
+        /// <param name="parameters">Expects a Fief to retrieve food stocks</param>
+        /// <returns>Food stocks value or whether a fief is not found.</returns>
         [CommandLineFunctionality.CommandLineArgumentFunction("get_food_stocks", sTestGroupName)]
         public static string GetFoodStocks(List<string> parameters)
         {
@@ -62,55 +73,15 @@ namespace Coop.Mod.GameSync
             return $"Fief {fief.Name} foodstocks is {fief.FoodStocks}";
         }
 
+        /// <summary>
+        /// Gets first Fief from AllFiefs
+        /// </summary>
+        /// <param name="parameters">Expects no parameters</param>
+        /// <returns>Name of Fief</returns>
         [CommandLineFunctionality.CommandLineArgumentFunction("get_fief", sTestGroupName)]
         public static string GetFief(List<string> parameters)
         {
             return $"Fief \"{Town.AllFiefs.First().Name}\"";
         }
-
-        //private static Invokable OnChangeFoodStockRPC;
-
-        ///// <summary>
-        /////     Initialize RPCs on client and server side.
-        ///// </summary>
-        //[PatchInitializer]
-        //private static void InitRPC()
-        //{
-        //    OnChangeFoodStockRPC = new Invokable(typeof(FiefSync).GetMethod(nameof(FiefSync.OnChangeFoodStock),
-        //        BindingFlags.NonPublic | BindingFlags.Static));
-        //}
-
-        //private static void OnChangeFoodStock(Guid fiefGuid, float foodStocks)
-        //{
-        //    if (Coop.IsServer)
-        //    {
-        //        return;
-        //    }
-
-        //    TaleWorlds.CampaignSystem.Fief fief = CoopObjectManager.GetObject<TaleWorlds.CampaignSystem.Fief>(fiefGuid);
-
-        //    if (fief == null)
-        //    {
-        //        return;
-        //    }
-
-        //    InformationManager.DisplayMessage(new InformationMessage($"New food stocks {fief.Name}: {foodStocks}"));
-        //    fief.FoodStocks = foodStocks;
-        //}
-
-        //public static void BroadcastChangeFoodStock(TaleWorlds.CampaignSystem.Fief fief)
-        //{
-        //    if (fief != null)
-        //    {
-        //        Guid fiefGuid = CoopObjectManager.GetGuid(fief);
-
-        //        if (fiefGuid == Guid.Empty)
-        //        {
-        //            return;
-        //        }
-
-        //        CoopServer.Instance.Synchronization.Broadcast(OnChangeFoodStockRPC.Id, null, new object[] { fiefGuid, fief.FoodStocks });
-        //    }
-        //}
     }
 }
