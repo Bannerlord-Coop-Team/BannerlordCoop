@@ -9,7 +9,6 @@ using Sync;
 using Sync.Behaviour;
 using Sync.Patch;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 
 namespace Coop.Mod.Patch
 {

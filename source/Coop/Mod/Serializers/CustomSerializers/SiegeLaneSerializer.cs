@@ -1,5 +1,5 @@
 ﻿using System;
-using static TaleWorlds.CampaignSystem.Settlement;
+using static TaleWorlds.CampaignSystem.Settlements.Settlement;
 
 namespace Coop.Mod.Serializers.Custom
 {

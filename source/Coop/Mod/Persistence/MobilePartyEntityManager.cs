@@ -13,6 +13,7 @@ using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using RailgunNet.Util;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using Vec2 = TaleWorlds.Library.Vec2;
 
 namespace Coop.Mod.Persistence
@@ -155,7 +156,7 @@ namespace Coop.Mod.Persistence
             }
             return 0f;
         }
-        public void AddParty(MobileParty party)
+        public void AddParty(TaleWorlds.CampaignSystem.Party.MobileParty party)
         {
             lock (m_Lock)
             {

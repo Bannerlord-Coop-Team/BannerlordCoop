@@ -5,6 +5,8 @@ using System.Net;
 using Coop.Mod.Persistence;
 using Network.Infrastructure;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.DebugUtil

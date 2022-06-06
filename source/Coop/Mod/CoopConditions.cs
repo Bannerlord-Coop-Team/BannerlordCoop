@@ -1,5 +1,6 @@
 ﻿using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod
 {

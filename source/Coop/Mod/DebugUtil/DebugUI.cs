@@ -32,6 +32,7 @@ using Logger = NLog.Logger;
 using SandBox.View.Map;
 using Coop.Mod.GameSync.Party;
 using RailgunNet.System.Types;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod.DebugUtil
 {

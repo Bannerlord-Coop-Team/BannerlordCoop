@@ -5,6 +5,7 @@ using NLog;
 using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using Logger = NLog.Logger;
 

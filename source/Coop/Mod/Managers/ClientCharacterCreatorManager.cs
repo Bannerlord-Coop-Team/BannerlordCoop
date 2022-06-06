@@ -4,6 +4,7 @@ using StoryMode;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.ScreenSystem;
 using System.Reflection;
 using TaleWorlds.Library;
 using Sync.Store;
@@ -20,6 +21,9 @@ using Coop.Mod.Serializers;
 using SandBox;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace Coop.Mod.Managers
 {

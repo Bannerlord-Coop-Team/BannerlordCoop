@@ -36,6 +36,7 @@ using Coop.Mod.Persistence.RemoteAction;
 using Coop.Mod.GameSync;
 using Coop.Mod.GameSync.Party;
 using RailgunNet.Connection.Server;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod
 {

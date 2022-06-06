@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using System.Reflection;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod.Extentions
 {

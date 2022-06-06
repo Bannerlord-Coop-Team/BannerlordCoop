@@ -27,6 +27,7 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Missions;
+using TaleWorlds.ScreenSystem;
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
 
