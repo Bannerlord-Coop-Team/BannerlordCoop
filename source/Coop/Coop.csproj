@@ -274,6 +274,7 @@
     <Compile Include="Mod\GameSync\Party\MobilePartyLifetimeBehavior.cs" />
     <Compile Include="Mod\GameSync\Party\MobilePartyManaged.cs" />
     <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
+    <Compile Include="Mod\GameSync\Town\TownCommands.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />
@@ -318,7 +319,7 @@
     <Compile Include="Mod\Patch\Exceptions.cs" />
     <Compile Include="Mod\Patch\World\TimeControl.cs" />
     <Compile Include="Mod\Patch\Utils.cs" />
-    <Compile Include="Mod\GameSync\TownSync.cs" />
+    <Compile Include="Mod\GameSync\Town\TownSync.cs" />
     <Compile Include="Mod\GameSync\VillageSync.cs" />
     <Compile Include="Mod\Persistence\Compare.cs" />
     <Compile Include="Mod\Persistence\Compression.cs" />
