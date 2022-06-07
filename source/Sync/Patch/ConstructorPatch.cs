@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Reflection;
 using JetBrains.Annotations;
 
@@ -20,8 +21,11 @@ namespace Sync.Patch
         public ConstructorPatch<TPatch> PostfixAll()
         {
             foreach (var info in m_Declaring.GetConstructors(BindingFlags.Public | BindingFlags.Static |
-                                                             BindingFlags.Instance | BindingFlags.NonPublic |
-                                                             BindingFlags.DeclaredOnly)) Postfix(info);
+                                                       BindingFlags.Instance | BindingFlags.NonPublic |
+                                                       BindingFlags.DeclaredOnly))
+            {
+                Postfix(info);
+            }
 
             return this;
         }
