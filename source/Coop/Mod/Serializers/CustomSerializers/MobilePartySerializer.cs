@@ -110,7 +110,7 @@ namespace Coop.Mod.Serializers.Custom
                     case "_pureSpeedExplainer":
                         // Calculated on client side
                         break;
-                    case "<TaleWorlds.CampaignSystem.ILocatable<TaleWorlds.CampaignSystem.MobileParty>.NextLocatable>k__BackingField":
+                    case "<TaleWorlds.CampaignSystem.Map.ILocatable<TaleWorlds.CampaignSystem.Party.MobileParty>.NextLocatable>k__BackingField":
                         // Not used by TW even
                         break;
                     case "<AiBehaviorObject>k__BackingField":

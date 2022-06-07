@@ -60,6 +60,10 @@ namespace Coop.Mod.Serializers
                         // DeterministicRandom
                         SNNSO.Add(fieldInfo, new Custom.DeterministicRandomSerializer((DeterministicRandom)value));
                         break;
+                    case "_lastEatingTime":
+                        //CampaignTime
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
+                        break;
                     case "_owner":
                         // Not needed, populated at deserialize
                         break;

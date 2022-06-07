@@ -105,6 +105,7 @@ namespace Coop.Mod.Serializers
                     case "<Fiefs>k__BackingField":
                     case "_villagesReadOnlyCache":
                     case "_settlementsReadOnlyCache":
+                    case "_clanMidSettlement":
                     case "<Lords>k__BackingField":
                     case "<Heroes>k__BackingField":
                     case "<WarPartyComponents>k__BackingField":

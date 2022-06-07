@@ -57,6 +57,10 @@ namespace Coop.Mod.Serializers.Custom
                         // DeterministicRandom
                         SNNSO.Add(fieldInfo, new DeterministicRandomSerializer((DeterministicRandom)value));
                         break;
+                    case "_lastEatingTime":
+                        //CampaignTime
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
+                        break;
                     // References
                     case "<MobileParty>k__BackingField":
                     case "<Settlement>k__BackingField":
