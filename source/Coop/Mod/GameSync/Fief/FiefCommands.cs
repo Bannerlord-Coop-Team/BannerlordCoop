@@ -11,6 +11,7 @@ using CoopFramework;
 using RailgunNet.System.Types;
 using Sync.Call;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
