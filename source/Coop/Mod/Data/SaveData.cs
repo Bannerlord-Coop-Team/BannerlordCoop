@@ -175,94 +175,36 @@ namespace Coop.Mod.Data
         /// <returns>true if all Guid associations were found, false otherwise</returns>
         public static bool AssociateObjectsFromMBGUID(Dictionary<MBGUID, Guid> GuidAssociations)
         {
-            foreach (MBObjectBase mbObject in Hero.AllAliveHeroes)
+            List<MBObjectBase> objects = new List<MBObjectBase>();
+
+            objects.AddRange(Hero.AllAliveHeroes);
+            objects.AddRange(Hero.DeadOrDisabledHeroes);
+            objects.AddRange(Town.AllFiefs);
+            objects.AddRange(Village.All);
+            objects.AddRange(Kingdom.All);
+            objects.AddRange(MobileParty.All);
+            objects.AddRange(CharacterObject.All);
+            objects.AddRange(Clan.All);
+
+
+            foreach (MBObjectBase mbObject in objects)
             {
-                if (GuidAssociations.ContainsKey(mbObject.Id))
-                {
-                    CoopObjectManager.Assert(GuidAssociations[mbObject.Id], mbObject);
-                    GuidAssociations.Remove(mbObject.Id);
-                }
+                Associate(GuidAssociations, mbObject);
             }
 
-            foreach (MBObjectBase mbObject in Hero.DeadOrDisabledHeroes)
+            foreach (Settlement settlement in Settlement.All)
             {
-                if (GuidAssociations.ContainsKey(mbObject.Id))
-                {
-                    CoopObjectManager.Assert(GuidAssociations[mbObject.Id], mbObject);
-                    GuidAssociations.Remove(mbObject.Id);
-                }
-            }
+                Associate(GuidAssociations, settlement);
 
-            foreach (MBObjectBase mbObject in Settlement.All)
-            {
-                if (GuidAssociations.ContainsKey(mbObject.Id))
+                foreach (SettlementComponent component in settlement.SettlementComponents)
                 {
-                    CoopObjectManager.Assert(GuidAssociations[mbObject.Id], mbObject);
-                    GuidAssociations.Remove(mbObject.Id);
-                }
-            }
-
-            foreach (MBObjectBase mbObject in Town.AllFiefs)
-            {
-                if (GuidAssociations.ContainsKey(mbObject.Id))
-                {
-                    CoopObjectManager.Assert(GuidAssociations[mbObject.Id], mbObject);
-                    GuidAssociations.Remove(mbObject.Id);
-                }
-            }
-
-            foreach (MBObjectBase mbObject in Village.All)
-            {
-                if (GuidAssociations.ContainsKey(mbObject.Id))
-                {
-                    CoopObjectManager.Assert(GuidAssociations[mbObject.Id], mbObject);
-                    GuidAssociations.Remove(mbObject.Id);
+                    Associate(GuidAssociations, component);
                 }
             }
 
             foreach (MBObjectBase mbObject in Campaign.Current.Factions)
             {
-                if (GuidAssociations.ContainsKey(mbObject.Id))
-                {
-                    CoopObjectManager.Assert(GuidAssociations[mbObject.Id], mbObject);
-                    GuidAssociations.Remove(mbObject.Id);
-                }
-            }
-
-            foreach (MBObjectBase mbObject in Kingdom.All)
-            {
-                if (GuidAssociations.ContainsKey(mbObject.Id))
-                {
-                    CoopObjectManager.Assert(GuidAssociations[mbObject.Id], mbObject);
-                    GuidAssociations.Remove(mbObject.Id);
-                }
-            }
-
-            foreach (MBObjectBase mbObject in MobileParty.All)
-            {
-                if (GuidAssociations.ContainsKey(mbObject.Id))
-                {
-                    CoopObjectManager.Assert(GuidAssociations[mbObject.Id], mbObject);
-                    GuidAssociations.Remove(mbObject.Id);
-                }
-            }
-
-            foreach (CharacterObject mbObject in CharacterObject.All)
-            {
-                if (GuidAssociations.ContainsKey(mbObject.Id))
-                {
-                    CoopObjectManager.Assert(GuidAssociations[mbObject.Id], mbObject);
-                    GuidAssociations.Remove(mbObject.Id);
-                }
-            }
-
-            foreach (MBObjectBase mbObject in Clan.All)
-            {
-                if (GuidAssociations.ContainsKey(mbObject.Id))
-                {
-                    CoopObjectManager.Assert(GuidAssociations[mbObject.Id], mbObject);
-                    GuidAssociations.Remove(mbObject.Id);
-                }
+                Associate(GuidAssociations, mbObject);
             }
 
             
@@ -274,7 +216,7 @@ namespace Coop.Mod.Data
                 CoopClient.Instance.Session.Connection.Send(
                     new Network.Protocol.Packet(
                         Network.Protocol.EPacket.BadID,
-                        Common.CommonSerializer.Serialize(unresolved))
+                        CommonSerializer.Serialize(unresolved))
                     );
             }
 #endif
@@ -282,5 +224,14 @@ namespace Coop.Mod.Data
             return GuidAssociations.Count == 0;
         }
         #endregion
+
+        private static void Associate(Dictionary<MBGUID, Guid>  GuidAssociations, MBObjectBase mbObject)
+        {
+            if (GuidAssociations.ContainsKey(mbObject.Id))
+            {
+                CoopObjectManager.Assert(GuidAssociations[mbObject.Id], mbObject);
+                GuidAssociations.Remove(mbObject.Id);
+            }
+        }
     }
 }

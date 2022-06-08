@@ -70,6 +70,10 @@ namespace Coop.Mod.Managers
             foreach(Settlement settlement in Settlement.All)
             {
                 CoopObjectManager.AddObject(settlement);
+                foreach (SettlementComponent component in settlement.SettlementComponents)
+                {
+                    CoopObjectManager.AddObject(component);
+                }
             }
 
             foreach (Town town in Town.AllFiefs)
