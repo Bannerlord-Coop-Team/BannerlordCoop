@@ -64,7 +64,7 @@ namespace Coop.Mod.GameSync.Party
                 DefaultBehaviorNeedsUpdate(Campaign.Current.MainParty) = true;
             }
             party.Ai.SetDoNotMakeNewDecisions(true);
-            party.ComputeSpeed();
+            party.ValidateSpeed();
         }
         public void SetPosition(MobileParty party, Vec2 position, Vec2? facingDirection)
         {
@@ -115,7 +115,7 @@ namespace Coop.Mod.GameSync.Party
                     DefaultBehaviorNeedsUpdate(Campaign.Current.MainParty) = true;
                 }
                 party.Ai.SetDoNotMakeNewDecisions(true);
-                party.ComputeSpeed();
+                party.ValidateSpeed();
             }
         }
 

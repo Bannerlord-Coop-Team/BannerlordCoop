@@ -7,7 +7,6 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Engine.Screens;
 using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade.View.Missions;
 using TaleWorlds.ScreenSystem;
 
 namespace Coop.Mod.UI

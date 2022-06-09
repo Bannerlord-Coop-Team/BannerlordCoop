@@ -26,11 +26,11 @@ using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.MountAndBlade.View.Missions;
 using TaleWorlds.ScreenSystem;
 using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
+using TaleWorlds.MountAndBlade.View;
 
 namespace Coop.Mod
 {

@@ -33,7 +33,7 @@ namespace Coop.Mod.DebugUtil
                     position,
                     spawnRadius,
                     spawnRadius);
-                party.DisableAi();
+                party.Ai.DisableAi();
                 party.SetPartyUsedByQuest(true);
                 party.Party.SetCustomOwner(s.Owner);
             });

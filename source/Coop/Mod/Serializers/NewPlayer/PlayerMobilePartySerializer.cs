@@ -131,6 +131,18 @@ namespace Coop.Mod.Serializers
                     case "_targetSettlement":
                         // TODO Joke Fix this
                         break;
+                    case "_lastCalculatedBaseSpeedExplained":
+                        //Fix if needed?
+                        break;
+                    case "<DoNotAttackMainPartyUntil>k__BackingField":
+                        //Fix if needed?
+                        break;
+                    case "_lastNavigationFace":
+                        //Fix if needed?
+                        break;
+                    case "_currentNavigationFace":
+                        //Fix if needed?
+                        break;
                     case "<AiBehaviorObject>k__BackingField":
                         break;
                     default:

@@ -24,6 +24,8 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.MountAndBlade.GauntletUI.BodyGenerator;
+using TaleWorlds.MountAndBlade.ViewModelCollection.FaceGenerator;
 
 namespace Coop.Mod.Managers
 {
@@ -149,7 +151,7 @@ namespace Coop.Mod.Managers
             //Campaign.Current.CampaignObjectManager.RemoveMobileParty(party);
             foreach (Settlement settlement in list)
             {
-                settlement.OnRelatedPartyRemoved(party);
+                settlement.SettlementComponent.OnRelatedPartyRemoved(party);
             }
         }
 
@@ -157,10 +159,10 @@ namespace Coop.Mod.Managers
         {
             if (GameStateManager.Current.ActiveState is VideoPlaybackState videoPlaybackState)
             {
-                if (ScreenManager.TopScreen is VideoPlaybackGauntletScreen)
+                if (ScreenManager.TopScreen is GauntletVideoPlaybackScreen)
                 {
-                    VideoPlaybackGauntletScreen videoPlaybackScreen = ScreenManager.TopScreen as VideoPlaybackGauntletScreen;
-                    FieldInfo fieldInfo = typeof(VideoPlaybackGauntletScreen).GetField("_videoPlayerView", BindingFlags.NonPublic | BindingFlags.Instance);
+                    GauntletVideoPlaybackScreen videoPlaybackScreen = ScreenManager.TopScreen as GauntletVideoPlaybackScreen;
+                    FieldInfo fieldInfo = typeof(GauntletVideoPlaybackScreen).GetField("_videoPlayerView", BindingFlags.NonPublic | BindingFlags.Instance);
                     VideoPlayerView videoPlayerView = (VideoPlayerView)fieldInfo.GetValue(videoPlaybackScreen);
                     videoPlayerView.StopVideo();
                     videoPlaybackState.OnVideoFinished();

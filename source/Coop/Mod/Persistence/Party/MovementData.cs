@@ -68,8 +68,8 @@ namespace Coop.Mod.Persistence.Party
 
         public int NumberOfFleeingsAtLastTravel
         {
-            get => (int) Values[(int) Field.NumberOfFleeingsAtLastTravel];
-            set => Values[(int) Field.NumberOfFleeingsAtLastTravel] = value;
+            get => (int)Values[(int)Field.NumberOfFleeingsAtLastTravel];
+            set => Values[(int)Field.NumberOfFleeingsAtLastTravel] = value;
         }
 
         private List<object> Values { get; }

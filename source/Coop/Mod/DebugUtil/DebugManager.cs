@@ -166,7 +166,6 @@ namespace Coop.Mod.DebugUtil
 
         public void RenderDebugText3D(Vec3 position, string text, uint color = uint.MaxValue, int screenPosOffsetX = 0, int screenPosOffsetY = 0, float time = 0)
         {
-            throw new System.NotImplementedException();
         }
 
         public void SetTestModeEnabled(bool testModeEnabled)
@@ -178,6 +177,10 @@ namespace Coop.Mod.DebugUtil
         }
 
         public void DoDelayedexit(int returnCode)
+        {
+        }
+
+        public void RenderDebugRectWithColor(float left, float bottom, float right, float top, uint color = uint.MaxValue)
         {
         }
     }

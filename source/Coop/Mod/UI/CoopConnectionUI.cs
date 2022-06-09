@@ -5,7 +5,6 @@ using TaleWorlds.Engine.Screens;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade.View.Missions;
 using System;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem.Load;
