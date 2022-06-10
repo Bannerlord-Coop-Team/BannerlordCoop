@@ -42,9 +42,8 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony, Version=2.0.4.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>..\packages\Lib.Harmony.2.0.4\lib\net472\0Harmony.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="0Harmony, Version=2.2.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Lib.Harmony.2.2.1\lib\net472\0Harmony.dll</HintPath>
     </Reference>
     <Reference Include="Extensions.Data.xxHash, Version=1.0.2.0, Culture=neutral, PublicKeyToken=null">
       <HintPath>..\packages\xxHash.NET.1.0.2\lib\net40\Extensions.Data.xxHash.dll</HintPath>
@@ -95,6 +94,8 @@
     <Compile Include="Call\Prefix.cs" />
     <Compile Include="Patch\ConstructorPatch.cs" />
     <Compile Include="Patch\DestructorPatch.cs" />
+    <Compile Include="Patch\FieldPatch.cs" />
+    <Compile Include="Patch\FieldPatchFactory.cs" />
     <Compile Include="Patch\GetPrefixBuilder.cs" />
     <Compile Include="Patch\MethodPatch.cs" />
     <Compile Include="Patch\MethodPatchFactory.cs" />
@@ -126,6 +127,10 @@
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
       <Name>Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\HarmonyTranspilerTools\HarmonyTranspilerTools\HarmonyTranspilerTools.csproj">
+      <Project>{ebc486f6-bc37-453b-895d-6da22f4310dd}</Project>
+      <Name>HarmonyTranspilerTools</Name>
     </ProjectReference>
     <ProjectReference Include="..\Network\Network.csproj">
       <Project>{b0ff5e24-4d98-4ec8-bbce-6cdb85cb685d}</Project>

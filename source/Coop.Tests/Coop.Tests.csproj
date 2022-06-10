@@ -36,6 +36,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CoopFramework\CoopFramework.csproj" />
     <ProjectReference Include="..\Coop\Coop.csproj" />
+    <ProjectReference Include="..\HarmonyTranspilerTools\HarmonyTranspilerTools\HarmonyTranspilerTools.csproj" />
     <ProjectReference Include="..\RemoteAction\RemoteAction.csproj" />
   </ItemGroup>
 

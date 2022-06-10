@@ -40,6 +40,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DeployMod", "DeployMod\Depl
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Tests", "Common.Tests\Common.Tests.csproj", "{52CC5E00-CAA6-4B05-A713-4D387B60B138}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HarmonyTranspilerTools", "HarmonyTranspilerTools\HarmonyTranspilerTools\HarmonyTranspilerTools.csproj", "{EBC486F6-BC37-453B-895D-6DA22F4310DD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -165,6 +167,14 @@ Global
 		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Release|Any CPU.Build.0 = Release|x64
 		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Release|x64.ActiveCfg = Release|x64
 		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Release|x64.Build.0 = Release|x64
+		{EBC486F6-BC37-453B-895D-6DA22F4310DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EBC486F6-BC37-453B-895D-6DA22F4310DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EBC486F6-BC37-453B-895D-6DA22F4310DD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EBC486F6-BC37-453B-895D-6DA22F4310DD}.Debug|x64.Build.0 = Debug|Any CPU
+		{EBC486F6-BC37-453B-895D-6DA22F4310DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EBC486F6-BC37-453B-895D-6DA22F4310DD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EBC486F6-BC37-453B-895D-6DA22F4310DD}.Release|x64.ActiveCfg = Release|Any CPU
+		{EBC486F6-BC37-453B-895D-6DA22F4310DD}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
