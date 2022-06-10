@@ -126,25 +126,7 @@ namespace Sync.Patch
                 {
                     if (instr.operand as FieldInfo == field)
                     {
-                        for (int j = i; j < codeInstructions.Count; j++)
-                        {
-                            if (codeInstructions[j].opcode == OpCodes.Call &&
-                                codeInstructions[j].operand as MethodInfo != hookMethod)
-                            {
-                                codeInstructions.RemoveAt(i);
-                                codeInstructions.InsertRange(i, byRefInterceptBlockPre);
-                                codeInstructions.RemoveAt(classRefernceStack.Pop());
-
-                                i += byRefInterceptBlockPre.Length - 2;
-
-                                j += byRefInterceptBlockPre.Length - 2;
-
-                                codeInstructions.InsertRange(j + 1, byRefInterceptBlockPost);
-                                break;
-                            }
-                        }
-
-                        
+                        // TODO intercept by ref                       
 
                     }
                     else
