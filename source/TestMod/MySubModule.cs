@@ -28,6 +28,7 @@ using LiteNetLib;
 using MissionsShared;
 using ProtoBuf;
 using System.Collections.Concurrent;
+using TaleWorlds.ObjectSystem;
 
 namespace CoopTestMod
 {
@@ -88,9 +89,7 @@ namespace CoopTestMod
         private UIntPtr otherAgentPtr;
         private const int bufSize = 1024;
         private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile",BindingFlags.NonPublic|BindingFlags.Instance);
-        private ConcurrentDictionary<int, ConcurrentDictionary<uint, AgentState>> playerTickInfo = new ConcurrentDictionary<int, ConcurrentDictionary<uint, AgentState>>();
-        Func<UIntPtr, Vec3> getPosition;
-        PositionRefDelegate setPosition;
+        private static ConcurrentDictionary<int, ConcurrentDictionary<uint, Agent>> playerTickInfo = new ConcurrentDictionary<int, ConcurrentDictionary<uint, Agent>>();
         List<MatrixFrame> _initialSpawnFrames;
         MatrixFrame randomElement2;
         float t;
@@ -103,6 +102,7 @@ namespace CoopTestMod
         bool isServer = false;
         uint packetId = 1;
         uint currentId = 0;
+        ConcurrentQueue<AgentState> agentSpawnQueue = new ConcurrentQueue<AgentState>();
 
         Vec2 mInputVector;
         AnimFlags mFlags1;
@@ -121,9 +121,12 @@ namespace CoopTestMod
         public static object MyAgent { get; private set; }
 
         // custom delegate is needed since SetPosition uses a ref Vec3
-        delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
+        //delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
 
 
+        private static ConcurrentDictionary<uint, AgentUpdate> agentUpdateState = new ConcurrentDictionary<uint, AgentUpdate>();
+
+        private PlayerTickInfo playerMainTickInfo = new PlayerTickInfo();
 
 
         // utility to keep trying to connect to server if it fails
@@ -142,11 +145,27 @@ namespace CoopTestMod
 
         public class AgentState
         {
-            public bool loaded = false;
-            public Agent agent = null;
+            public CharacterObject character;
+            public MatrixFrame matrix;
+            public int clientId;
+            public uint id;
 
-            public AgentState(Agent agent)
+            public AgentState(int clientId, uint id, CharacterObject character, MatrixFrame matrix)
             {
+                this.character = character;
+                this.matrix = matrix;
+                this.clientId = clientId;
+                this.id = id;
+            }
+        }
+
+        public class AgentUpdate
+        {
+            public Agent agent;
+            public PlayerTickInfo playerTickInfo;
+            public AgentUpdate(PlayerTickInfo playerTickInfo, Agent agent)
+            {
+                this.playerTickInfo = playerTickInfo;
                 this.agent = agent;
             }
         }
@@ -173,193 +192,198 @@ namespace CoopTestMod
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
             Agent agent = mission.SpawnAgent(agentBuildData2.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);
-            
             return agent;
         }
         
         private void UpdatePlayerTick(PlayerTickInfo info, Agent agent)
         {
-            if (Mission.Current != null && agent != null && Mission.Current.IsLoadingFinished)
+            try
             {
-                if (agent.Health <= 0)
+                if (Mission.Current != null && agent != null && Mission.Current.IsLoadingFinished)
                 {
-                    return;
-                }
-
-                Vec3 pos = new Vec3(info.PosX, info.PosY, info.PosZ);
-
-                if (agent.GetPathDistanceToPoint(ref pos) > 0.3f)
-                {
-                    agent.TeleportToPosition(pos);
-                }
-
-                //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-                //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-
-                //InformationManager.DisplayMessage(new InformationMessage(ch1.ToString()));
-
-
-                agent.EventControlFlags = 0U;
-                if (info.crouchMode)
-                {
-                    agent.EventControlFlags |= Agent.EventControlFlag.Crouch;
-                }
-                else
-                {
-                    agent.EventControlFlags |= Agent.EventControlFlag.Stand;
-                }
-
-
-                agent.LookDirection = new Vec3(info.LookDirectionX, info.LookDirectionY, info.LookDirectionZ);
-                agent.MovementInputVector = new Vec2(info.InputVectorX, info.InputVectorY);
-                uint eventFlag = info.EventFlag;
-                if (eventFlag == 1u)
-                {
-                    agent.EventControlFlags |= Agent.EventControlFlag.Dismount;
-                }
-                if (eventFlag == 2u)
-                {
-                    agent.EventControlFlags |= Agent.EventControlFlag.Mount;
-                }
-                if (eventFlag == 0x400u)
-                {
-                    InformationManager.DisplayMessage(new InformationMessage("Toggled"));
-                    agent.EventControlFlags |= Agent.EventControlFlag.ToggleAlternativeWeapon;
-                }
-
-
-                if (agent.HasMount)
-                {
-                    agent.MountAgent.SetMovementDirection(new Vec2(info.MountInputVectorX, info.MountInputVectorY));
-
-                    //Currently not doing anything afaik
-                    //if (otherAgent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.MountAgent.GetCurrentAction(1).Index != mCacheIndex2)
-                    //{
-                    //    string mActionName2 = MBAnimation.GetActionNameWithCode(mCacheIndex2);
-                    //    otherAgent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)mFlags2, startProgress: mProgress2);
-                    //}
-                    //else
-                    //{
-                    //    otherAgent.MountAgent.SetCurrentActionProgress(1, mProgress2);
-                    //}
-                }
-
-
-                if (agent.GetCurrentAction(0) == ActionIndexCache.act_none || agent.GetCurrentAction(0).Index != info.Action0Index)
-                {
-                    string actionName1 = MBAnimation.GetActionNameWithCode(info.Action0Index);
-                    agent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)info.Action0Flag, startProgress: info.Action0Progress);
-
-                }
-                else
-                {
-                    agent.SetCurrentActionProgress(0, info.Action0Progress);
-                }
-                agent.MovementFlags = 0U;
-
-                if ((int)info.Action0CodeType >= (int)Agent.ActionCodeType.DefendAllBegin && (int)info.Action0CodeType <= (int)Agent.ActionCodeType.DefendAllEnd)
-
-                {
-                    agent.MovementFlags = (Agent.MovementControlFlag)info.MovementFlag;
-                    return;
-                }
-
-
-
-                //// we either don't have an action so set it to the new one or the receive action is different than our current action
-
-                if ((Agent.ActionCodeType)info.Action1CodeType != Agent.ActionCodeType.BlockedMelee)
-                {
-                    if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != info.Action1Index)
+                    if (agent.Health <= 0)
                     {
-                        string actionName2 = MBAnimation.GetActionNameWithCode(info.Action1Index);
-                        agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)info.Action1Flag, startProgress: info.Action1Progress);
+                        return;
+                    }
+
+                    Vec3 pos = new Vec3(info.PosX, info.PosY, info.PosZ);
+
+                    if (agent.GetPathDistanceToPoint(ref pos) > 0.3f)
+                    {
+                        agent.TeleportToPosition(pos);
+                    }
+
+                    //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
+                    //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+
+                    //InformationManager.DisplayMessage(new InformationMessage(ch1.ToString()));
+
+
+                    agent.EventControlFlags = 0U;
+                    if (info.crouchMode)
+                    {
+                        agent.EventControlFlags |= Agent.EventControlFlag.Crouch;
+                    }
+                    else
+                    {
+                        agent.EventControlFlags |= Agent.EventControlFlag.Stand;
+                    }
+
+
+                    agent.LookDirection = new Vec3(info.LookDirectionX, info.LookDirectionY, info.LookDirectionZ);
+                    agent.MovementInputVector = new Vec2(info.InputVectorX, info.InputVectorY);
+                    uint eventFlag = info.EventFlag;
+                    if (eventFlag == 1u)
+                    {
+                        agent.EventControlFlags |= Agent.EventControlFlag.Dismount;
+                    }
+                    if (eventFlag == 2u)
+                    {
+                        agent.EventControlFlags |= Agent.EventControlFlag.Mount;
+                    }
+                    if (eventFlag == 0x400u)
+                    {
+                        InformationManager.DisplayMessage(new InformationMessage("Toggled"));
+                        agent.EventControlFlags |= Agent.EventControlFlag.ToggleAlternativeWeapon;
+                    }
+
+
+                    if (agent.HasMount)
+                    {
+                        agent.MountAgent.SetMovementDirection(new Vec2(info.MountInputVectorX, info.MountInputVectorY));
+
+                        //Currently not doing anything afaik
+                        //if (otherAgent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.MountAgent.GetCurrentAction(1).Index != mCacheIndex2)
+                        //{
+                        //    string mActionName2 = MBAnimation.GetActionNameWithCode(mCacheIndex2);
+                        //    otherAgent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)mFlags2, startProgress: mProgress2);
+                        //}
+                        //else
+                        //{
+                        //    otherAgent.MountAgent.SetCurrentActionProgress(1, mProgress2);
+                        //}
+                    }
+
+
+                    if (agent.GetCurrentAction(0) == ActionIndexCache.act_none || agent.GetCurrentAction(0).Index != info.Action0Index)
+                    {
+                        string actionName1 = MBAnimation.GetActionNameWithCode(info.Action0Index);
+                        agent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)info.Action0Flag, startProgress: info.Action0Progress);
 
                     }
                     else
                     {
-                        agent.SetCurrentActionProgress(1, info.Action1Progress);
+                        agent.SetCurrentActionProgress(0, info.Action0Progress);
                     }
+                    agent.MovementFlags = 0U;
+
+                    if ((int)info.Action0CodeType >= (int)Agent.ActionCodeType.DefendAllBegin && (int)info.Action0CodeType <= (int)Agent.ActionCodeType.DefendAllEnd)
+
+                    {
+                        agent.MovementFlags = (Agent.MovementControlFlag)info.MovementFlag;
+                        return;
+                    }
+
+
+
+                    //// we either don't have an action so set it to the new one or the receive action is different than our current action
+
+                    if ((Agent.ActionCodeType)info.Action1CodeType != Agent.ActionCodeType.BlockedMelee)
+                    {
+                        if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != info.Action1Index)
+                        {
+                            string actionName2 = MBAnimation.GetActionNameWithCode(info.Action1Index);
+                            agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)info.Action1Flag, startProgress: info.Action1Progress);
+
+                        }
+                        else
+                        {
+                            agent.SetCurrentActionProgress(1, info.Action1Progress);
+                        }
+                    }
+                    else
+                    {
+
+                        agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
+                    }
+
+                    //otherAgent.MovementFlags = 0U;
+                    //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
+
+                    //InformationManager.DisplayMessage(new InformationMessage(Agent.Main.Position + ""));
+
+                    //if (health != otherAgent.Health)
+                    //{
+                    //    //InformationManager.DisplayMessage(new InformationMessage("otherAgent.Health: " + otherAgent.Health));
+                    //    //InformationManager.DisplayMessage(new InformationMessage("damageTaken: " + damageTaken));
+                    //    //InformationManager.DisplayMessage(new InformationMessage("health: " + health));
+
+                    //    if (otherAgent.Health < 0)
+                    //    {
+                    //        otherAgent.MakeDead(true, otherAgent.GetCurrentAction(1)); //Which action do we require or what does it do?
+                    //    }
+                    //}
+
+
+                    //if (eventFlag != 0)
+                    //{
+                    //    otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+
+                    //}
+
+                    //if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none && otherAgent.CurrentGuardMode == Agent.GuardMode.None)
+                    //{
+                    //    otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
+                    //}
+
+
+                    /*
+                    if (otherAgent == Agent.ActionCodeType.)
+                    {
+                        InformationManager.DisplayMessage(new InformationMessage(otherAgent.CrouchMode.ToString()));
+                        otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
+                    } */
+
+                    // if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none)
+                    // {
+                    //    InformationManager.DisplayMessage(new InformationMessage(otherAgent.GetCurrentActionType(1).ToString()));
+                    // }
+
+
+                    //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
+                    //otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
+                    //otherAgent.AttackDirectionToMovementFlag(direction);
+                    //otherAgent.DefendDirectionToMovementFlag(direction);
+
+                    // otherAgent.EnforceShieldUsage(direction);
+                    //InformationManager.DisplayMessage(new InformationMessage("Received: " + ((Agent.EventControlFlag)eventFlag).ToString()));
+
+
+
+                    //InformationManager.DisplayMessage(new InformationMessage("Received : X: " +  lookDirectionX + " Y: " + lookDirectionY + " | Z: " + lookDirectionZ));
+
+
+
+                    //InformationManager.DisplayMessage(new InformationMessage("Receiving: " + ((Agent.EventControlFlag)eventFlag).ToString()));
+
+                    //otherAgent.SetTargetPositionAndDirection(targetPosition, targetDirection);
+
+
+                    //otherAgent.SetCurrentActionProgress(1, progress2);
+
+                    //string actionName3 = MBAnimation.GetActionNameWithCode(cacheIndex3);
+                    //otherAgent.SetActionChannel(2, ActionIndexCache.Create(actionName3), additionalFlags: (ulong)flags3, startProgress: progress3);
+                    //otherAgent.SetCurrentActionProgress(2, progress3);
+
+
+
+
+
                 }
-                else
-                {
-
-                    agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
-                }
-
-                //otherAgent.MovementFlags = 0U;
-                //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-
-                //InformationManager.DisplayMessage(new InformationMessage(Agent.Main.Position + ""));
-
-                //if (health != otherAgent.Health)
-                //{
-                //    //InformationManager.DisplayMessage(new InformationMessage("otherAgent.Health: " + otherAgent.Health));
-                //    //InformationManager.DisplayMessage(new InformationMessage("damageTaken: " + damageTaken));
-                //    //InformationManager.DisplayMessage(new InformationMessage("health: " + health));
-
-                //    if (otherAgent.Health < 0)
-                //    {
-                //        otherAgent.MakeDead(true, otherAgent.GetCurrentAction(1)); //Which action do we require or what does it do?
-                //    }
-                //}
-
-
-                //if (eventFlag != 0)
-                //{
-                //    otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-
-                //}
-
-                //if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none && otherAgent.CurrentGuardMode == Agent.GuardMode.None)
-                //{
-                //    otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
-                //}
-
-
-                /*
-                if (otherAgent == Agent.ActionCodeType.)
-                {
-                    InformationManager.DisplayMessage(new InformationMessage(otherAgent.CrouchMode.ToString()));
-                    otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
-                } */
-
-                // if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none)
-                // {
-                //    InformationManager.DisplayMessage(new InformationMessage(otherAgent.GetCurrentActionType(1).ToString()));
-                // }
-
-
-                //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-                //otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
-                //otherAgent.AttackDirectionToMovementFlag(direction);
-                //otherAgent.DefendDirectionToMovementFlag(direction);
-
-                // otherAgent.EnforceShieldUsage(direction);
-                //InformationManager.DisplayMessage(new InformationMessage("Received: " + ((Agent.EventControlFlag)eventFlag).ToString()));
-
-
-
-                //InformationManager.DisplayMessage(new InformationMessage("Received : X: " +  lookDirectionX + " Y: " + lookDirectionY + " | Z: " + lookDirectionZ));
-
-
-
-                //InformationManager.DisplayMessage(new InformationMessage("Receiving: " + ((Agent.EventControlFlag)eventFlag).ToString()));
-
-                //otherAgent.SetTargetPositionAndDirection(targetPosition, targetDirection);
-
-
-                //otherAgent.SetCurrentActionProgress(1, progress2);
-
-                //string actionName3 = MBAnimation.GetActionNameWithCode(cacheIndex3);
-                //otherAgent.SetActionChannel(2, ActionIndexCache.Create(actionName3), additionalFlags: (ulong)flags3, startProgress: progress3);
-                //otherAgent.SetCurrentActionProgress(2, progress3);
-
-
-
-
+            }catch{
 
             }
+           
         }
 
         protected override void OnSubModuleLoad()
@@ -407,25 +431,33 @@ namespace CoopTestMod
                         {
                             if (!playerTickInfo.ContainsKey(payload.ClientId))
                             {
-                                playerTickInfo[payload.ClientId] = new ConcurrentDictionary<uint, AgentState>();
+                                playerTickInfo[payload.ClientId] = new ConcurrentDictionary<uint, Agent>();
                             }
 
-                            ConcurrentDictionary<uint, AgentState> playerTickClientDict = playerTickInfo[payload.ClientId];
+                            ConcurrentDictionary<uint, Agent> playerTickClientDict = playerTickInfo[payload.ClientId];
                             foreach(PlayerTickInfo tickInfo in payload.PlayerTick)
                             {
-                                if (!playerTickClientDict.ContainsKey(tickInfo.Id))
+                                // if it contains the agent, update it
+                                if (playerTickClientDict.ContainsKey(tickInfo.Id))
+                                {
+                                    //GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
+                                    //if (gameEntity != null)
+                                    //{
+
+                                    //    playerTickClientDict[tickInfo.Id] = SpawnAgent(CharacterObject.PlayerCharacter, gameEntity.GetFrame());
+                                    //}
+                                    agentUpdateState[tickInfo.Id] = new AgentUpdate(tickInfo, playerTickClientDict[tickInfo.Id]);
+                                    //UpdatePlayerTick(tickInfo, playerTickClientDict[tickInfo.Id]);
+                                }
+                                // it doesn't contain the agent so it add to be spawned
+                                else
                                 {
                                     GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
                                     if (gameEntity != null)
                                     {
-
-                                        playerTickClientDict[tickInfo.Id] = new AgentState(SpawnAgent(CharacterObject.PlayerCharacter, gameEntity.GetFrame()));
+                                        agentSpawnQueue.Enqueue(new AgentState(payload.ClientId, tickInfo.Id, CharacterObject.PlayerCharacter, gameEntity.GetFrame()));
+                                        playerTickInfo[payload.ClientId][tickInfo.Id] = null;
                                     }
-                                }
-                                else if (playerTickClientDict[tickInfo.Id].loaded)
-                                {
-                                    
-                                    UpdatePlayerTick(tickInfo, playerTickClientDict[tickInfo.Id].agent);
                                 }
 
                             }
@@ -452,87 +484,21 @@ namespace CoopTestMod
                     client.PollEvents();
                     Thread.Sleep(5); // approx. 60hz
 
-                    
-                    if (Mission.Current != null &&  Mission.Current.MainAgent != null && !Mission.Current.IsMissionEnding)
+
+                    FromClientTickMessage message = new FromClientTickMessage();
+                    List<PlayerTickInfo> agentsList = new List<PlayerTickInfo>();
+                    agentsList.Add(playerMainTickInfo);
+                    message.AgentsTickInfo = agentsList;
+                    MemoryStream stream = new MemoryStream();
+                    Serializer.SerializeWithLengthPrefix<FromClientTickMessage>(stream, message, PrefixStyle.Fixed32BigEndian);
+                    MemoryStream strm = new MemoryStream();
+                    message.AgentCount = 1;
+                    using (System.IO.BinaryWriter writer = new System.IO.BinaryWriter(strm))
                     {
-                        FromClientTickMessage message = new FromClientTickMessage();
-                        List<PlayerTickInfo> agentsList = new List<PlayerTickInfo>();
-                        PlayerTickInfo mainCharacter = new PlayerTickInfo();
-                            Vec3 myPos = Mission.Current.MainAgent.Position;
-                        //Vec3 myPos = Vec3.Invalid;
-                        uint movementFlag = (uint)Mission.Current.MainAgent.MovementFlags;
-                        uint eventFlag = (uint)Mission.Current.MainAgent.EventControlFlags;
-                        Vec2 movementDirection = Mission.Current.MainAgent.GetMovementDirection();
-                        Vec2 inputVector = Mission.Current.MainAgent.MovementInputVector;
-                        ActionIndexCache cache0 = ActionIndexCache.act_none;
-                        float progress0 = 0f;
-                        AnimFlags flags0 = 0;
-                        ActionIndexCache cache1 = ActionIndexCache.act_none;
-                        float progress1 = 0f;
-                        AnimFlags flags1 = 0;
-                        Vec3 lookDirection = Mission.Current.MainAgent.LookDirection;
-                        Agent.ActionCodeType actionTypeCh0 = Agent.ActionCodeType.Other;
-                        Agent.ActionCodeType actionTypeCh1 = Agent.ActionCodeType.Other;
-                        //int damage = MissionOnAgentHitPatch.DamageDone;
-                        mCache1 = ActionIndexCache.act_none;
-                        if (Mission.Current.MainAgent.Health > 0f)
-                        {
-                            cache0 = Mission.Current.MainAgent.GetCurrentAction(0);
-                            progress0 = Mission.Current.MainAgent.GetCurrentActionProgress(0);
-                            flags0 = Mission.Current.MainAgent.GetCurrentAnimationFlag(0);
-                            cache1 = Mission.Current.MainAgent.GetCurrentAction(1);
-                            progress1 = Mission.Current.MainAgent.GetCurrentActionProgress(1);
-                            flags1 = Mission.Current.MainAgent.GetCurrentAnimationFlag(1);
-                            actionTypeCh0 = Mission.Current.MainAgent.GetCurrentActionType(0);
-                            actionTypeCh1 = Mission.Current.MainAgent.GetCurrentActionType(1);
-
-                            if (Mission.Current.MainAgent.HasMount)
-                            {
-                                mInputVector = Mission.Current.MainAgent.MountAgent.GetMovementDirection();
-                                mFlags1 = Mission.Current.MainAgent.MountAgent.GetCurrentAnimationFlag(1);
-                                mProgress1 = Mission.Current.MainAgent.MountAgent.GetCurrentActionProgress(1);
-                                mCache1 = Mission.Current.MainAgent.MountAgent.GetCurrentAction(1);
-                            }
-
-                        }
-                        else
-                        {
-                            mCache1 = ActionIndexCache.act_none;
-                        }
-                        mainCharacter.PosX = myPos.X;
-                        mainCharacter.PosY = myPos.Y;
-                        mainCharacter.PosZ = myPos.Z;
-                        mainCharacter.MovementFlag = movementFlag;
-                        mainCharacter.EventFlag = eventFlag;
-                        mainCharacter.MovementDirectionX = movementDirection.X;
-                        mainCharacter.MovementDirectionY = movementDirection.Y;
-                        mainCharacter.InputVectorX = inputVector.X;
-                        mainCharacter.InputVectorY = inputVector.Y;
-                        mainCharacter.Action0CodeType = (int)actionTypeCh0;
-                        mainCharacter.Action0Index = cache0.Index;
-                        mainCharacter.Action0Progress = progress0;
-                        mainCharacter.Action0Flag = (ulong)flags0;
-                        mainCharacter.Action1CodeType = (int)actionTypeCh1;
-                        mainCharacter.Action1Index = cache1.Index;
-                        mainCharacter.Action1Progress = progress1;
-                        mainCharacter.Action1Flag = (ulong)flags1;
-                        mainCharacter.LookDirectionX = lookDirection.X;
-                        mainCharacter.LookDirectionY = lookDirection.Y;
-                        mainCharacter.LookDirectionZ = lookDirection.Z;
-                        mainCharacter.crouchMode = Mission.Current.MainAgent.CrouchMode;
-                        agentsList.Add(mainCharacter);
-                        message.AgentsTickInfo = agentsList;
-                        MemoryStream stream = new MemoryStream();
-                        Serializer.SerializeWithLengthPrefix<FromClientTickMessage>(stream, message, PrefixStyle.Fixed32BigEndian);
-                        MemoryStream strm = new MemoryStream();
-                        message.AgentCount = 1;
-                        using (System.IO.BinaryWriter writer = new System.IO.BinaryWriter(strm))
-                        {
-                            writer.Write((uint)MessageType.PlayerSync);
-                            writer.Write(stream.ToArray());
-                        }
-                        client.SendToAll(strm.ToArray(), DeliveryMethod.ReliableSequenced);
+                        writer.Write((uint)MessageType.PlayerSync);
+                        writer.Write(stream.ToArray());
                     }
+                    client.SendToAll(strm.ToArray(), DeliveryMethod.ReliableSequenced);
 
                 }
 
@@ -696,7 +662,7 @@ namespace CoopTestMod
             {
                 foreach(Agent a in Mission.Current.Agents)
                 {
-                    InformationManager.DisplayMessage(new InformationMessage(a.Character.Id.ToString()));
+                    //InformationManager.DisplayMessage(new InformationMessage(a.Character.Id.ToString()));
                 }
                 
             }
@@ -777,11 +743,129 @@ namespace CoopTestMod
                 //_player = Mission.Current.MainAgent;
             }
         }
+        [HarmonyPatch(typeof(Mission), "FinalizeMission")]
+        public class OnMissionExit
+        {
+            public static void Postfix()
+            {
+
+
+                agentUpdateState.Clear();
+                playerTickInfo.Clear();
+                //GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
+                //if (gameEntity != null)
+                //{
+                //    InformationManager.DisplayMessage(new InformationMessage(gameEntity.GetGlobalFrame().ToString()));
+                //    //_player.TeleportToPosition(gameEntity.GetGlobalFrame().origin);
+                //}
+                //else
+                //{
+                //    InformationManager.DisplayMessage(new InformationMessage("It's null!"));
+                //}
+                //_player = Mission.Current.MainAgent;
+            }
+        }
 
 
 
         protected override void OnApplicationTick(float dt)
         {
+            InformationManager.DisplayMessage(new InformationMessage("Peer ID: " + myPeerId.ToString()));
+
+            // Press slash next to spawn in the arena
+            if (!battleLoaded && Mission.Current != null && Mission.Current.IsLoadingFinished)
+            {
+                // again theres gotta be a better way to check if missions finish loading? A custom mission maybe in the future
+                battleLoaded = true;
+                Mission.Current.AddMissionBehavior(new CustomMissionBehavior());
+                StartArenaFight();
+            }
+
+            while (!agentSpawnQueue.IsEmpty())
+            {
+                AgentState agentState;
+                agentSpawnQueue.TryDequeue(out agentState);
+                playerTickInfo[agentState.clientId][agentState.id] = SpawnAgent(agentState.character, agentState.matrix);
+                
+            }
+            foreach(AgentUpdate agentUpdate in agentUpdateState.Values)
+            {
+                if(agentUpdate.agent != null && agentUpdate.playerTickInfo != null)
+                {
+                    UpdatePlayerTick(agentUpdate.playerTickInfo, agentUpdate.agent);
+                }
+                    
+            }
+            if (Mission.Current != null && Mission.Current.MainAgent != null && !Mission.Current.IsMissionEnding)
+            {
+                try
+                {
+                    Vec3 myPos = Mission.Current.MainAgent.Position;
+                    //Vec3 myPos = Vec3.Invalid;
+                    uint movementFlag = (uint)Mission.Current.MainAgent.MovementFlags;
+                    uint eventFlag = (uint)Mission.Current.MainAgent.EventControlFlags;
+                    Vec2 movementDirection = Mission.Current.MainAgent.GetMovementDirection();
+                    Vec2 inputVector = Mission.Current.MainAgent.MovementInputVector;
+                    ActionIndexCache cache0 = ActionIndexCache.act_none;
+                    float progress0 = 0f;
+                    AnimFlags flags0 = 0;
+                    ActionIndexCache cache1 = ActionIndexCache.act_none;
+                    float progress1 = 0f;
+                    AnimFlags flags1 = 0;
+                    Vec3 lookDirection = Mission.Current.MainAgent.LookDirection;
+                    Agent.ActionCodeType actionTypeCh0 = Agent.ActionCodeType.Other;
+                    Agent.ActionCodeType actionTypeCh1 = Agent.ActionCodeType.Other;
+                    //int damage = MissionOnAgentHitPatch.DamageDone;
+                    mCache1 = ActionIndexCache.act_none;
+                    if (Mission.Current.MainAgent.Health > 0f)
+                    {
+                        cache0 = Mission.Current.MainAgent.GetCurrentAction(0);
+                        progress0 = Mission.Current.MainAgent.GetCurrentActionProgress(0);
+                        flags0 = Mission.Current.MainAgent.GetCurrentAnimationFlag(0);
+                        cache1 = Mission.Current.MainAgent.GetCurrentAction(1);
+                        progress1 = Mission.Current.MainAgent.GetCurrentActionProgress(1);
+                        flags1 = Mission.Current.MainAgent.GetCurrentAnimationFlag(1);
+                        actionTypeCh0 = Mission.Current.MainAgent.GetCurrentActionType(0);
+                        actionTypeCh1 = Mission.Current.MainAgent.GetCurrentActionType(1);
+
+                        if (Mission.Current.MainAgent.HasMount)
+                        {
+                            mInputVector = Mission.Current.MainAgent.MountAgent.GetMovementDirection();
+                            mFlags1 = Mission.Current.MainAgent.MountAgent.GetCurrentAnimationFlag(1);
+                            mProgress1 = Mission.Current.MainAgent.MountAgent.GetCurrentActionProgress(1);
+                            mCache1 = Mission.Current.MainAgent.MountAgent.GetCurrentAction(1);
+                        }
+
+                    }
+                    else
+                    {
+                        mCache1 = ActionIndexCache.act_none;
+                    }
+                    playerMainTickInfo.PosX = myPos.X;
+                    playerMainTickInfo.PosY = myPos.Y;
+                    playerMainTickInfo.PosZ = myPos.Z;
+                    playerMainTickInfo.MovementFlag = movementFlag;
+                    playerMainTickInfo.EventFlag = eventFlag;
+                    playerMainTickInfo.MovementDirectionX = movementDirection.X;
+                    playerMainTickInfo.MovementDirectionY = movementDirection.Y;
+                    playerMainTickInfo.InputVectorX = inputVector.X;
+                    playerMainTickInfo.InputVectorY = inputVector.Y;
+                    playerMainTickInfo.Action0CodeType = (int)actionTypeCh0;
+                    playerMainTickInfo.Action0Index = cache0.Index;
+                    playerMainTickInfo.Action0Progress = progress0;
+                    playerMainTickInfo.Action0Flag = (ulong)flags0;
+                    playerMainTickInfo.Action1CodeType = (int)actionTypeCh1;
+                    playerMainTickInfo.Action1Index = cache1.Index;
+                    playerMainTickInfo.Action1Progress = progress1;
+                    playerMainTickInfo.Action1Flag = (ulong)flags1;
+                    playerMainTickInfo.LookDirectionX = lookDirection.X;
+                    playerMainTickInfo.LookDirectionY = lookDirection.Y;
+                    playerMainTickInfo.LookDirectionZ = lookDirection.Z;
+                    playerMainTickInfo.crouchMode = Mission.Current.MainAgent.CrouchMode;
+                }
+                catch { }
+
+            }
             if (!subModuleLoaded && Module.CurrentModule.LoadingFinished)
             {
                 // sub module is loaded. Isnt there a proper callback for this?
@@ -800,16 +884,6 @@ namespace CoopTestMod
                 //start it
                 MBGameManager.StartNewGame(manager);
             }
-
-            // Press slash next to spawn in the arena
-            if (!battleLoaded && Mission.Current != null && Mission.Current.IsLoadingFinished)
-            {
-                // again theres gotta be a better way to check if missions finish loading? A custom mission maybe in the future
-                battleLoaded = true;
-                Mission.Current.AddMissionBehavior(new CustomMissionBehavior());
-                StartArenaFight();
-            }
-
 
             if (Input.IsKeyReleased(InputKey.Slash))
             {

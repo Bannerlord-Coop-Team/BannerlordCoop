@@ -27,7 +27,7 @@ namespace CoopTestMod
         public override void OnLoadFinished()
         {
             base.OnLoadFinished();
-            // get the settlement first
+            //get the settlement first
             Settlement settlement = Settlement.Find("town_ES3");
 
             // get its arena
