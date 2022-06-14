@@ -27,7 +27,7 @@ namespace Coop.Mod.Patch.CampaignPatches
         /// <summary>
         /// Grants access to the private field of the property <see cref="TaleWorlds.CampaignSystem.Campaign.TimeControlMode"/> used to override the setter logic.
         /// </summary>
-        static readonly AccessTools.FieldRef<Campaign, CampaignTimeControlMode> _timeControlModeRef = 
+        static readonly AccessTools.FieldRef<Campaign, CampaignTimeControlMode> _timeControlModeRef =
             AccessTools.FieldRefAccess<Campaign, CampaignTimeControlMode>("_timeControlMode");
 
         /// <summary>
@@ -40,7 +40,7 @@ namespace Coop.Mod.Patch.CampaignPatches
         [HarmonyPatch(MethodType.Setter)]
         static bool Prefix(Campaign __instance, ref CampaignTimeControlMode value)
         {
-            if (__instance != null && !__instance.TimeControlModeLock && 
+            if (__instance != null && !__instance.TimeControlModeLock &&
                 value != __instance.TimeControlMode && TimeControl.CanSyncTimeControlMode)
             {
                 _timeControlModeRef(__instance) = value;
