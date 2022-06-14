@@ -4,6 +4,7 @@ using MiscUtil.IO;
 using MissionsShared;
 using ProtoBuf;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -23,10 +24,10 @@ namespace MissionsServer
 
 
             //each clients most updated location of its agents
-            Dictionary<int, List<PlayerTickInfo>> playerSyncDict = new Dictionary<int, List<PlayerTickInfo>>();
+            ConcurrentDictionary<int, List<PlayerTickInfo>> playerSyncDict = new ConcurrentDictionary<int, List<PlayerTickInfo>>();
 
             //location id maps to a set of clients
-            Dictionary<string, HashSet<int>> clientsLocation = new Dictionary<string, HashSet<int>>(); 
+            ConcurrentDictionary<string, HashSet<int>> clientsLocation = new ConcurrentDictionary<string, HashSet<int>>(); 
             
 
             EventBasedNetListener listener = new EventBasedNetListener();
@@ -66,6 +67,7 @@ namespace MissionsServer
                 //NetDataWriter writer = new NetDataWriter();                 // Create writer class
                 //writer.Put("Hello client!");                                // Put some string
                 //peer.Send(writer, DeliveryMethod.ReliableOrdered);             // Send with reliability
+                Console.WriteLine("Client Connected, assigned ID: " + peer.Id);
                 NetDataWriter writer = new NetDataWriter();
                 writer.Put((uint)MessageType.ConnectionId);
                 writer.Put(peer.Id);
@@ -76,7 +78,45 @@ namespace MissionsServer
             listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod) =>
             {
                 MissionsShared.MessageType messageType = (MessageType)dataReader.GetUInt();
-                if (messageType == MessageType.PlayerSync)
+                if(messageType == MessageType.EnterLocation)
+                {
+                    string locationName = dataReader.GetString();
+                    if (!clientsLocation.ContainsKey(locationName))
+                    {
+                        clientsLocation[locationName] = new HashSet<int>();
+                    }
+                    clientsLocation[locationName].Add(fromPeer.Id);
+                    foreach (int clientId in clientsLocation[locationName])
+                    {
+                        NetDataWriter writer = new NetDataWriter();
+                        writer.Put((uint)MessageType.EnterLocation);
+                        foreach(int cId in clientsLocation[locationName])
+                        {
+                            writer.Put(cId);
+                        }
+                        Console.WriteLine("Sending: " + writer.Data.Length);
+                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
+
+                    }
+                }
+                else if(messageType == MessageType.ExitLocation)
+                {
+                    string locationName = dataReader.GetString();
+                    if (!clientsLocation.ContainsKey(locationName))
+                    {
+                        return;
+                    }
+                    foreach(int clientId in clientsLocation[locationName].Where(c => c != fromPeer.Id))
+                    {
+                        NetDataWriter writer = new NetDataWriter();
+                        writer.Put((uint)MessageType.ExitLocation);
+                        writer.Put(fromPeer.Id);
+                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
+
+                    }
+                    clientsLocation[locationName].Remove(fromPeer.Id);
+                }
+                else if (messageType == MessageType.PlayerSync)
                 {
                     byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
                     Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
@@ -86,7 +126,6 @@ namespace MissionsServer
                     
                     //playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
                     playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
-                    //Console.WriteLine("Recieved Update from Client: " + fromPeer.Id + " with info : \n" + msg.AgentsTickInfo.First());
                 }
 
             };
@@ -113,35 +152,46 @@ namespace MissionsServer
             {
                 // receiver updates from clients 
                 server.PollEvents();
-
-
-                // broadcast changes to all clients
-                MemoryStream stream = new MemoryStream();
-                FromServerTickMessage message = new FromServerTickMessage();
                 
-                foreach(KeyValuePair<int, List<PlayerTickInfo>> player in playerSyncDict)
-                {
-                    FromServerTickPayload payload = new FromServerTickPayload();
-                    payload.ClientId = player.Key;
-                    payload.PlayerTick = player.Value;
-                    message.ClientTicks.Add(payload);
-                    
-                    
-                    
-                }
-                Serializer.SerializeWithLengthPrefix<FromServerTickMessage>(stream, message, PrefixStyle.Fixed32BigEndian);
-                MemoryStream stream2 = new MemoryStream();
-                using (BinaryWriter writer = new BinaryWriter(stream2))
-                {
-                    writer.Write((uint)MessageType.PlayerSync);
-                    writer.Write(stream.ToArray());
-                    
-                }
-                //foreach(NetPeer peer in server.ConnectedPeerList)
-                //{
 
-                //}
-                server.SendToAll(stream2.ToArray(), DeliveryMethod.ReliableSequenced);
+                // get all the clients in each location
+                foreach(HashSet<int> clients in clientsLocation.Values)
+                {
+
+
+                    // create stream for actual data
+                    MemoryStream stream = new MemoryStream();
+
+                    // create message from server payload to be sent to all clients in one location
+                    FromServerTickMessage message = new FromServerTickMessage();
+
+
+                    // get each clients id
+                    foreach (int clientId in clients)
+                    {
+                        //grab the client's player tick info list
+                        FromServerTickPayload payload = new FromServerTickPayload();
+                        payload.ClientId = clientId;
+                        payload.PlayerTick = playerSyncDict[clientId];
+                        message.ClientTicks.Add(payload);
+                    }
+                    Serializer.SerializeWithLengthPrefix<FromServerTickMessage>(stream, message, PrefixStyle.Fixed32BigEndian);
+                    MemoryStream stream2 = new MemoryStream();
+
+                    using (BinaryWriter writer = new BinaryWriter(stream2))
+                    {
+                        writer.Write((uint)MessageType.PlayerSync);
+                        writer.Write(stream.ToArray());
+
+                    }
+
+                    foreach (int clientId in clients)
+                    {
+                        NetPeer peer = server.GetPeerById(clientId);
+                        if (peer == null) return;
+                        peer.Send(stream2.ToArray(), DeliveryMethod.ReliableSequenced);
+                    }
+                }
                 
                 
                 //MemoryStream stream = new MemoryStream();

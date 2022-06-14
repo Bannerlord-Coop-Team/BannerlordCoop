@@ -9,10 +9,7 @@ namespace MissionsShared
         EnterLocation,
         ExitLocation,
         PlayerSync,
-        ConnectionId
-    }
-    public class MissionsShared
-    {
-
+        ConnectionId,
+        PeersAtLocation
     }
 }
