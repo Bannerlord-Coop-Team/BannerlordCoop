@@ -18,10 +18,10 @@ namespace Coop.Mod.Patch.World
         public static bool CanSyncTimeControlMode = false;
         static TimeControl()
         {
-            When(GameLoop & CanChangeTimeClientside)
+            When(GameLoop)
                 .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)))
                 .Broadcast(() => CoopClient.Instance.Synchronization, new CanChangeTimeServerside())
-                .Skip();
+                .DelegateTo(IsServerOrAllClientsPlaying);
 
             When(GameLoop)
                 .Calls(Setter(nameof(Campaign.IsMainPartyWaiting)))
@@ -47,7 +47,12 @@ namespace Coop.Mod.Patch.World
         public TimeControl([NotNull] Campaign instance) : base(instance)
         {
         }
-        
+
+        private static ECallPropagation IsServerOrAllClientsPlaying(IPendingMethodCall call)
+        {
+            return Coop.IsServer || CoopServer.Instance.AreAllClientsPlaying ? ECallPropagation.CallOriginal : ECallPropagation.Skip;
+        }
+
         private static ECallPropagation SetIsMainPartyWaiting(IPendingMethodCall call)
         {
             IEnvironmentClient env = CoopClient.Instance?.Persistence?.Environment;
