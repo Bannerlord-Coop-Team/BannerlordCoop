@@ -19,7 +19,7 @@ namespace Coop.Mod.Patch.World
         static TimeControl()
         {
             When(GameLoop)
-                .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)))
+                .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)),Method(nameof(Campaign.SetTimeSpeed)))
                 .Broadcast(() => CoopClient.Instance.Synchronization, new CanChangeTimeServerside())
                 .DelegateTo(IsServer);
 
