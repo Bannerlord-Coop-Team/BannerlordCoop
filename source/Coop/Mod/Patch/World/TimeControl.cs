@@ -18,10 +18,10 @@ namespace Coop.Mod.Patch.World
         public static bool CanSyncTimeControlMode = false;
         static TimeControl()
         {
-            When(GameLoop)
-                .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)),Method(nameof(Campaign.SetTimeSpeed)))
+            When(GameLoop & CanChangeTimeClientside)
+                .Calls(Setter(nameof(Campaign.TimeControlMode)), Setter(nameof(Campaign.TimeControlModeLock)))
                 .Broadcast(() => CoopClient.Instance.Synchronization, new CanChangeTimeServerside())
-                .DelegateTo(IsServer);
+                .Skip();
 
             When(GameLoop)
                 .Calls(Setter(nameof(Campaign.IsMainPartyWaiting)))
