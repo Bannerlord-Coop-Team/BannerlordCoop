@@ -70,14 +70,14 @@ namespace Coop.Mod.Patch.World
         
         private static readonly Condition CanChangeTimeClientside = new Condition((eOrigin, _) => CanSyncTimeControlMode);
         #region Utils
-        public static TimeControl Instance()
-        {
-            if (Instances.TryGetValue(Campaign.Current, out TimeControl instance))
-            {
-                return instance;
-            }
-            return new TimeControl(Campaign.Current);
-        }
+        //public static TimeControl Instance()
+        //{
+        //    if (Instances.TryGetValue(Campaign.Current, out TimeControl instance))
+        //    {
+        //        return instance;
+        //    }
+        //    return new TimeControl(Campaign.Current);
+        //}
         #endregion
     }
 }
