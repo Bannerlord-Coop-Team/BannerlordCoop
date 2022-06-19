@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Common;
@@ -322,7 +320,6 @@ namespace CoopFramework
         private static readonly List<CoopManaged<TSelf, TExtended>> m_AutoWrappedInstances =
             new List<CoopManaged<TSelf, TExtended>>();
 
-
         /// <summary>
         ///     Internal implementation for the method call interface.
         /// </summary>
@@ -394,7 +391,7 @@ namespace CoopFramework
                     }
                 });
             }
-            GetUninitializedObjectPatch.LifeTimeObservers.TryAdd(typeof(TExtended),m_LifetimeObserver);
+            CoopFramework.ObjectManager.Register<TExtended>(m_LifetimeObserver);
         }
 
         /// <summary>
@@ -622,18 +619,5 @@ namespace CoopFramework
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         #endregion
-    }
-
-    [HarmonyPatch(typeof(FormatterServices), nameof(FormatterServices.GetUninitializedObject))]
-    internal class GetUninitializedObjectPatch
-    {
-        internal readonly static ConcurrentDictionary<Type, IObjectLifetimeObserver> LifeTimeObservers = new ConcurrentDictionary<Type, IObjectLifetimeObserver>();
-        static void Postfix(Type type, object __result)
-        {
-            if (LifeTimeObservers.ContainsKey(type))
-            {
-                LifeTimeObservers[type].AfterRegisterObject(__result);
-            }
-        }
     }
 }

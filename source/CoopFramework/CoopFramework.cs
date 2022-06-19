@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
-using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
 
@@ -41,7 +40,7 @@ namespace CoopFramework
             var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
             AppDomain.CurrentDomain.AssemblyLoad += (sender, args) => PatchAssembly(args.LoadedAssembly);
             foreach (var assembly in loadedAssemblies) PatchAssembly(assembly);
-            new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.CoopFramework").PatchAll();
+
             m_Initialized = true;
         }
 
