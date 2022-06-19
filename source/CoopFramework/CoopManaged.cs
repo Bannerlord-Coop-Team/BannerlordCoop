@@ -391,7 +391,6 @@ namespace CoopFramework
                     }
                 });
             }
-            CoopFramework.ObjectManager.Register<TExtended>(m_LifetimeObserver);
         }
 
         /// <summary>
