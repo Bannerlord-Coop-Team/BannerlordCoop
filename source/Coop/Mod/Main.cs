@@ -31,8 +31,6 @@ using TaleWorlds.ScreenSystem;
 using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod
 {
@@ -127,38 +125,6 @@ namespace Coop.Mod
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
             bool t = Coop.IsCoopGameSession();
-            GetUninitializedObjectPatch.RegisterType = (dict,type,result) =>
-            {
-                if (type == typeof(Game))
-                {
-                    Game game = (Game)result;
-                    if (game.GameType is Campaign campaign)
-                    {
-                        dict[typeof(Campaign)].AfterRegisterObject(campaign);
-                        foreach (var mobileparty in campaign.MobileParties)
-                        {
-                            if (dict.ContainsKey(mobileparty.GetType()))
-                            {
-                                dict[mobileparty.GetType()].AfterRegisterObject(mobileparty);
-                            }
-                        }
-                        foreach (var settlement in campaign.Settlements)
-                        {
-                            foreach (var settlementcomponent in settlement.SettlementComponents)
-                            {
-                                if (dict.ContainsKey(settlementcomponent.GetType()))
-                                {
-                                    dict[settlementcomponent.GetType()].AfterRegisterObject(settlementcomponent);
-                                }
-                            }
-                        }
-                    }
-                }
-                else if(dict.ContainsKey(type))
-                {
-                    dict[type].AfterRegisterObject(result);
-                }
-            };
             CoopFramework.CoopFramework.InitPatches(ObjectManagerAdapter.Instance, Coop.IsCoopGameSession);
 
 

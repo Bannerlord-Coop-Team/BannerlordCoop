@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Common;
 using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
@@ -392,7 +394,7 @@ namespace CoopFramework
                     }
                 });
             }
-            GetUninitializedObjectPatch.AddLifeTimeObserver(typeof(TExtended),m_LifetimeObserver);
+            GetUninitializedObjectPatch.LifeTimeObservers.TryAdd(typeof(TExtended),m_LifetimeObserver);
         }
 
         /// <summary>
@@ -623,18 +625,15 @@ namespace CoopFramework
     }
 
     [HarmonyPatch(typeof(FormatterServices), nameof(FormatterServices.GetUninitializedObject))]
-    public class GetUninitializedObjectPatch
+    internal class GetUninitializedObjectPatch
     {
-        private readonly static Dictionary<Type, IObjectLifetimeObserver> LifeTimeObservers = new Dictionary<Type, IObjectLifetimeObserver>();
-        public static Action<IReadOnlyDictionary<Type,IObjectLifetimeObserver>,Type, object> RegisterType;
-
-        internal static void AddLifeTimeObserver(Type type, IObjectLifetimeObserver observer)
-        {
-            LifeTimeObservers.Add(type, observer);
-        }
+        internal readonly static ConcurrentDictionary<Type, IObjectLifetimeObserver> LifeTimeObservers = new ConcurrentDictionary<Type, IObjectLifetimeObserver>();
         static void Postfix(Type type, object __result)
         {
-            RegisterType(LifeTimeObservers,type,__result);
+            if (LifeTimeObservers.ContainsKey(type))
+            {
+                LifeTimeObservers[type].AfterRegisterObject(__result);
+            }
         }
     }
 }
