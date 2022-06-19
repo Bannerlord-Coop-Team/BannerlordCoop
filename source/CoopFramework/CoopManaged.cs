@@ -359,7 +359,20 @@ namespace CoopFramework
         private static void HookIntoObjectLifetime(Func<TExtended, TSelf> factoryMethod)
         {
             m_LifetimeObserver = new ObjectLifetimeObserver<TExtended>();
-            m_LifetimeObserver.AfterCreateObject += instance => OnAutoConstructed(factoryMethod(instance));
+            m_LifetimeObserver.AfterCreateObject += instance =>
+            {
+                if (m_AutoWrappedInstances.All(i =>
+                {
+                    if (i.ManagedInstance.TryGetTarget(out TExtended inst))
+                    {
+                        return inst != instance;
+                    }
+                    return true;
+                }))
+                {
+                    OnAutoConstructed(factoryMethod(instance));
+                }
+            };
             m_LifetimeObserver.AfterRemoveObject += instance =>
             {
                 lock (m_AutoWrappedInstances)

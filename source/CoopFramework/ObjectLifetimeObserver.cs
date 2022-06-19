@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using JetBrains.Annotations;
 using NLog;
 using Sync.Behaviour;
 using Sync.Patch;
+using TaleWorlds.SaveSystem;
 
 namespace CoopFramework
 {
@@ -61,7 +64,18 @@ namespace CoopFramework
             m_ConstructorPatch = new ConstructorPatch<ObjectLifetimeObserver<T>>(typeof(T)).PostfixAll();
             if (!m_ConstructorPatch.Methods.Any())
                 return false;
-
+            m_LoadInitializationPatch = new MethodPatch<ObjectLifetimeObserver<T>>(typeof(T));
+            foreach (var method in typeof(T).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic).Where(m => m.GetCustomAttributes(typeof(LoadInitializationCallback), false).Any()))
+            {
+                m_LoadInitializationPatch.Postfix(method.Name);
+            }
+            foreach (var methodAccess in m_LoadInitializationPatch.Methods)
+            {
+                methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
+                {
+                    AfterRegisterObject(instance as T);
+                });
+            }
             foreach (var methodAccess in m_ConstructorPatch.Methods)
                 methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
                 {
@@ -92,6 +106,7 @@ namespace CoopFramework
 
         [CanBeNull] private static ConstructorPatch<ObjectLifetimeObserver<T>> m_ConstructorPatch;
         [CanBeNull] private static DestructorPatch<ObjectLifetimeObserver<T>> m_DestructorPatch;
+        [CanBeNull] private static MethodPatch<ObjectLifetimeObserver<T>> m_LoadInitializationPatch;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         #endregion

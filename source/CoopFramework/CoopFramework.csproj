@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net472</TargetFramework>
@@ -20,6 +20,12 @@
     <ItemGroup>
       <PackageReference Include="Lib.Harmony" Version="2.0.4" />
       <PackageReference Include="NLog" Version="4.7.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="TaleWorlds.SaveSystem">
+        <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
+      </Reference>
     </ItemGroup>
 
 </Project>
