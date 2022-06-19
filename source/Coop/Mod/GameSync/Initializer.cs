@@ -34,6 +34,8 @@ namespace Coop.Mod.GameSync
 
             //TimeControl.Instance();
 
+            TimeControl.Instance();
+
             if(Coop.IsServer)
             {
                 CoopServer.Instance.Persistence.MobilePartyEntityManager.OnBeforePartyScopeEnter += OnBeforePartyScopeEnter;
