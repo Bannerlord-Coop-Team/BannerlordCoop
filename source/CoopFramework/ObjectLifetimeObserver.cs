@@ -64,18 +64,7 @@ namespace CoopFramework
             m_ConstructorPatch = new ConstructorPatch<ObjectLifetimeObserver<T>>(typeof(T)).PostfixAll();
             if (!m_ConstructorPatch.Methods.Any())
                 return false;
-            m_LoadInitializationPatch = new MethodPatch<ObjectLifetimeObserver<T>>(typeof(T));
-            foreach (var method in typeof(T).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic).Where(m => m.GetCustomAttributes(typeof(LoadInitializationCallback), false).Any()))
-            {
-                m_LoadInitializationPatch.Postfix(method.Name);
-            }
-            foreach (var methodAccess in m_LoadInitializationPatch.Methods)
-            {
-                methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
-                {
-                    AfterRegisterObject(instance as T);
-                });
-            }
+            PatchLoadInitializationCallbacks();
             foreach (var methodAccess in m_ConstructorPatch.Methods)
                 methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
                 {
@@ -83,6 +72,38 @@ namespace CoopFramework
                 });
             return true;
         }
+        /// <summary>
+        ///     Patches all methods with <see cref="LoadInitializationCallback"/> LoadInitializationCallback attribute up the hierarchy. 
+        ///     This method is needed because constructors are not called at some classes, when loading a saved game, but for these classes there is a method
+        ///     in the hierarchy, that has this attribute./>.
+        /// </summary>
+        private void PatchLoadInitializationCallbacks()
+        {
+            Type current = typeof(T);
+            m_LoadInitializationPatch = new List<MethodPatch<ObjectLifetimeObserver<T>>>();
+            while (current != typeof(object))
+            {
+                    var patch = new MethodPatch<ObjectLifetimeObserver<T>>(current);
+                    var methods = current.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Where(m => m.GetCustomAttributes(typeof(LoadInitializationCallback), false).Any()).ToList();
+                    foreach (var method in methods)
+                    {
+                        patch.Postfix(method.Name);
+                    }
+                    foreach (var methodAccess in patch.Methods)
+                    {
+                        methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
+                        {
+                            if (instance is T)
+                            {
+                                AfterRegisterObject(instance as T);
+                            }
+                        });
+                    }
+                    m_LoadInitializationPatch.Add(patch);
+                current = current.BaseType;
+            }
+        }
+
 
         /// <summary>
         ///     Patches all desctructors of <typeparamref name="T"/>
@@ -106,7 +127,7 @@ namespace CoopFramework
 
         [CanBeNull] private static ConstructorPatch<ObjectLifetimeObserver<T>> m_ConstructorPatch;
         [CanBeNull] private static DestructorPatch<ObjectLifetimeObserver<T>> m_DestructorPatch;
-        [CanBeNull] private static MethodPatch<ObjectLifetimeObserver<T>> m_LoadInitializationPatch;
+        [CanBeNull] private static List<MethodPatch<ObjectLifetimeObserver<T>>> m_LoadInitializationPatch;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         #endregion

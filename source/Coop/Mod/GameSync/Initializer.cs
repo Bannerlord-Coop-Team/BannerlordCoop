@@ -22,18 +22,6 @@ namespace Coop.Mod.GameSync
         /// </summary>
         public static void SetupSyncAfterLoad()
         {
-            //foreach (MobileParty party in MobileParty.All)
-            //{
-            //    MobilePartyManaged.MakeManaged(party, false);
-            //}
-
-            foreach (Town town in Town.AllFiefs)
-            {
-                FiefSync.MakeManaged(town);
-            }
-
-            //TimeControl.Instance();
-
             if(Coop.IsServer)
             {
                 CoopServer.Instance.Persistence.MobilePartyEntityManager.OnBeforePartyScopeEnter += OnBeforePartyScopeEnter;
