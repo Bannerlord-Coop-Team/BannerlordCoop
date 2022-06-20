@@ -260,20 +260,25 @@ namespace CoopFramework
             foreach (var behaviour in behaviours)
             {
                 if (!behaviour.AppliesTo(eOriginator, instanceResolved)) continue;
-                if (behaviour.DoBroadcast)
+                ECallPropagation prop = ECallPropagation.CallOriginal;
+                if (behaviour.MethodCallHandler != null)
+                { 
+                    prop = behaviour.MethodCallHandler.Invoke(new PendingMethodCall(invokableId,
+                        behaviour.SynchronizationFactory,
+                        instanceResolved,
+                        args)); 
+                }
+                if (behaviour.DoBroadcast && behaviour.CallPropagationBehaviour != ECallPropagation.Skip && (behaviour.MethodCallHandler == null || prop != ECallPropagation.Skip))
                     behaviour.SynchronizationFactory()?.Broadcast(invokableId, instanceResolved, args);
-
                 if (behaviour.MethodCallHandlerInstance != null)
                     return behaviour.MethodCallHandlerInstance.Invoke(self,
                         new PendingMethodCall(invokableId, behaviour.SynchronizationFactory, instanceResolved, args));
                 if (behaviour.MethodCallHandler != null)
-                    return behaviour.MethodCallHandler.Invoke(new PendingMethodCall(invokableId,
-                        behaviour.SynchronizationFactory,
-                        instanceResolved,
-                        args));
+                { 
+                    return prop; 
+                }
                 if (behaviour.CallPropagationBehaviour == ECallPropagation.Skip) return ECallPropagation.Skip;
             }
-
             return ECallPropagation.CallOriginal;
         }
 
