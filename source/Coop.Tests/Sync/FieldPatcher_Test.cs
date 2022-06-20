@@ -17,10 +17,17 @@ namespace Coop.Tests.Sync
     {
         public int MyVar = 0;
         public int MyVar2 = 0;
+        public static int MyStaticVar = 0;
         public void AssignFieldWithParam(int x = 5)
         {
             //FieldPatcher_Test.InterceptMethod(x, ref MyVar);
             MyVar = x;
+        }
+
+        public void AssignStaticFieldWithParam(int x = 5)
+        {
+            //FieldPatcher_Test.InterceptMethod(x, ref MyStaticVar);
+            MyStaticVar = x;
         }
 
         public void AssignMultiFieldsWithParam(int x = 5)
@@ -70,12 +77,18 @@ namespace Coop.Tests.Sync
             x = value;
         }
     }
+
     public class FieldPatcher_Test
     {
         static int Calls = 0;
         static int Temp;
-        public static void InterceptMethod(int value, ref int variable)
+        static bool Allowed;
+        public static void InterceptMethod<T>(T variable, object instance, FieldInfo field)
         {
+            if (Allowed)
+            {
+                field.SetValue(instance, variable);
+            }
             Calls += 1;
         }
 
@@ -93,6 +106,25 @@ namespace Coop.Tests.Sync
             TestClass testClass = new TestClass();
 
             testClass.AssignFieldWithParam(100);
+
+            Assert.Equal(1, Calls);
+            Assert.Equal(0, testClass.MyVar);
+        }
+
+        [Fact]
+        private void SingleStaticAssignmentInterception()
+        {
+            MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignStaticFieldWithParam));
+            MethodInfo intercept = typeof(FieldPatcher_Test).GetMethod(nameof(FieldPatcher_Test.InterceptMethod));
+            FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyStaticVar));
+
+            FieldPatchFactory.hookMethod = intercept;
+            FieldPatchFactory.GeneratePatch(field, caller, intercept);
+            FieldPatchFactory.ReplaceMethod(caller);
+
+            TestClass testClass = new TestClass();
+
+            testClass.AssignStaticFieldWithParam(100);
 
             Assert.Equal(1, Calls);
             Assert.Equal(0, testClass.MyVar);
@@ -179,6 +211,5 @@ namespace Coop.Tests.Sync
             Assert.Equal(3, Calls);
             Assert.Equal(0, testClass.MyVar);
         }
-
     }
 }

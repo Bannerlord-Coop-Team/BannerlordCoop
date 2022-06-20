@@ -4,6 +4,6 @@
 [submodule "source/BannerlordTestingEssentials"]
 	path = source/BannerlordTestingEssentials
 	url = git@github.com:Bannerlord-Coop-Team/BannerlordTestingEssentials.git
-[submodule "source/--force"]
+[submodule "source/HarmonyTranspilerTools"]
 	path = source/HarmonyTranspilerTools
 	url = https://github.com/garrettluskey/HarmonyTranspilerTools.git
