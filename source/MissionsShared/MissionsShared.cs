@@ -10,6 +10,7 @@ namespace MissionsShared
         ExitLocation,
         PlayerSync,
         ConnectionId,
-        PeersAtLocation
+        PeersAtLocation,
+        PlayerDamage
     }
 }

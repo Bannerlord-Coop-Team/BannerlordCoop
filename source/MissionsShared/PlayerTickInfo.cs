@@ -68,10 +68,14 @@ namespace MissionsShared
         public ulong MountAction1Flag { get; set; }
         [ProtoMember(27)]
         public int MountAction1Index{ get; set; }
+        [ProtoMember(28)]
+        public int MainHandIndex { get; set; }
+        [ProtoMember(29)]
+        public int OffHandIndex { get; set; }
 
 
 
-       
+
 
         public PlayerTickInfo() { }
 

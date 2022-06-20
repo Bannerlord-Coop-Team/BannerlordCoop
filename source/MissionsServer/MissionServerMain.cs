@@ -27,7 +27,10 @@ namespace MissionsServer
             ConcurrentDictionary<int, List<PlayerTickInfo>> playerSyncDict = new ConcurrentDictionary<int, List<PlayerTickInfo>>();
 
             //location id maps to a set of clients
-            ConcurrentDictionary<string, HashSet<int>> clientsLocation = new ConcurrentDictionary<string, HashSet<int>>(); 
+            ConcurrentDictionary<string, HashSet<int>> locationToClients = new ConcurrentDictionary<string, HashSet<int>>();
+
+            //id to location dictionary
+            ConcurrentDictionary<int, string> clientToLocation = new ConcurrentDictionary<int, string>();
             
 
             EventBasedNetListener listener = new EventBasedNetListener();
@@ -81,16 +84,17 @@ namespace MissionsServer
                 if(messageType == MessageType.EnterLocation)
                 {
                     string locationName = dataReader.GetString();
-                    if (!clientsLocation.ContainsKey(locationName))
+                    if (!locationToClients.ContainsKey(locationName))
                     {
-                        clientsLocation[locationName] = new HashSet<int>();
+                        locationToClients[locationName] = new HashSet<int>();
                     }
-                    clientsLocation[locationName].Add(fromPeer.Id);
-                    foreach (int clientId in clientsLocation[locationName])
+                    clientToLocation[fromPeer.Id] = locationName;
+                    locationToClients[locationName].Add(fromPeer.Id);
+                    foreach (int clientId in locationToClients[locationName])
                     {
                         NetDataWriter writer = new NetDataWriter();
                         writer.Put((uint)MessageType.EnterLocation);
-                        foreach(int cId in clientsLocation[locationName])
+                        foreach(int cId in locationToClients[locationName])
                         {
                             writer.Put(cId);
                         }
@@ -102,11 +106,12 @@ namespace MissionsServer
                 else if(messageType == MessageType.ExitLocation)
                 {
                     string locationName = dataReader.GetString();
-                    if (!clientsLocation.ContainsKey(locationName))
+                    if (!locationToClients.ContainsKey(locationName))
                     {
                         return;
                     }
-                    foreach(int clientId in clientsLocation[locationName].Where(c => c != fromPeer.Id))
+                    clientToLocation.TryRemove(fromPeer.Id, out _);
+                    foreach(int clientId in locationToClients[locationName].Where(c => c != fromPeer.Id))
                     {
                         NetDataWriter writer = new NetDataWriter();
                         writer.Put((uint)MessageType.ExitLocation);
@@ -114,7 +119,7 @@ namespace MissionsServer
                         server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
 
                     }
-                    clientsLocation[locationName].Remove(fromPeer.Id);
+                    locationToClients[locationName].Remove(fromPeer.Id);
                 }
                 else if (messageType == MessageType.PlayerSync)
                 {
@@ -126,6 +131,24 @@ namespace MissionsServer
                     
                     //playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
                     playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
+                }
+                else if(messageType == MessageType.PlayerDamage)
+                {
+                    string location = clientToLocation[fromPeer.Id];
+                    uint effectedId = dataReader.GetUInt();
+                    uint effectorId = dataReader.GetUInt();
+                    float damage = dataReader.GetFloat();
+                    NetDataWriter writer = new NetDataWriter();
+                    writer.Put((uint)MessageType.PlayerDamage);
+                    writer.Put(fromPeer.Id);
+                    writer.Put(effectedId);
+                    writer.Put(effectorId);
+                    writer.Put(damage);
+                    Console.WriteLine("Received damage from: " + fromPeer.Id + " to agent: " + effectedId + " from agent: " + effectorId + " of " + damage);
+                    foreach(int client in locationToClients[location].Where(c => c!= fromPeer.Id))
+                    {
+                        server.GetPeerById(client).Send(writer, DeliveryMethod.ReliableOrdered);
+                    }
                 }
 
             };
@@ -155,7 +178,7 @@ namespace MissionsServer
                 
 
                 // get all the clients in each location
-                foreach(HashSet<int> clients in clientsLocation.Values)
+                foreach(HashSet<int> clients in locationToClients.Values)
                 {
 
 
