@@ -11,6 +11,7 @@ namespace MissionsShared
         PlayerSync,
         ConnectionId,
         PeersAtLocation,
-        PlayerDamage
+        PlayerDamage,
+        BoardGame
     }
 }

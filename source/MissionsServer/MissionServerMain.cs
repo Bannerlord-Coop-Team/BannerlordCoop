@@ -150,6 +150,18 @@ namespace MissionsServer
                         server.GetPeerById(client).Send(writer, DeliveryMethod.ReliableOrdered);
                     }
                 }
+                else if(messageType == MessageType.BoardGame)
+                {
+                    string locationName = clientToLocation[fromPeer.Id];
+                    foreach (int clientId in locationToClients[locationName].Where(c => c != fromPeer.Id))
+                    {
+                        NetDataWriter writer = new NetDataWriter();
+                        writer.Put((uint)MessageType.BoardGame);
+                        writer.Put(dataReader.RawData);
+                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
+
+                    }
+                }
 
             };
 
