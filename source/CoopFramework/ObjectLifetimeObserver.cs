@@ -6,6 +6,7 @@ using JetBrains.Annotations;
 using NLog;
 using Sync.Behaviour;
 using Sync.Patch;
+using TaleWorlds.ObjectSystem;
 using TaleWorlds.SaveSystem;
 
 namespace CoopFramework
@@ -73,35 +74,27 @@ namespace CoopFramework
             return true;
         }
         /// <summary>
-        ///     Patches all methods with <see cref="LoadInitializationCallback"/> LoadInitializationCallback attribute up the hierarchy. 
+        ///     Patches the first method with <see cref="LoadInitializationCallback"/> LoadInitializationCallback attribute, but if none is found, then we check 
+        ///     if T is subclass of MBObjectBase and patch it's first method with the given attribute.. 
         ///     This method is needed because constructors are not called at some classes, when loading a saved game, but for these classes there is a method
         ///     in the hierarchy, that has this attribute./>.
         /// </summary>
         private void PatchLoadInitializationCallbacks()
         {
-            Type current = typeof(T);
-            m_LoadInitializationPatch = new List<MethodPatch<ObjectLifetimeObserver<T>>>();
-            while (current != typeof(object))
+            bool HasAny = typeof(T).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy).Any(m => m.GetCustomAttributes(typeof(LoadInitializationCallback), false).Any());
+            Type t = (HasAny) ? typeof(T) : ((typeof(T).IsSubclassOf(typeof(MBObjectBase)))?typeof(MBObjectBase): null);
+            if (t is null)
+                return;
+            var methods = t.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy).Where(m => m.GetCustomAttributes(typeof(LoadInitializationCallback), false).Any()).ToList();
+            var patch = new MethodPatch<ObjectLifetimeObserver<T>>(t);
+            patch.Postfix(methods[0].Name);
+            patch.Methods.First().Postfix.SetGlobalHandler((origin, instance, args) =>
             {
-                    var patch = new MethodPatch<ObjectLifetimeObserver<T>>(current);
-                    var methods = current.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Where(m => m.GetCustomAttributes(typeof(LoadInitializationCallback), false).Any()).ToList();
-                    foreach (var method in methods)
-                    {
-                        patch.Postfix(method.Name);
-                    }
-                    foreach (var methodAccess in patch.Methods)
-                    {
-                        methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
-                        {
-                            if (instance is T)
-                            {
-                                AfterRegisterObject(instance as T);
-                            }
-                        });
-                    }
-                    m_LoadInitializationPatch.Add(patch);
-                current = current.BaseType;
-            }
+                if (instance is T)
+                {
+                    AfterRegisterObject(instance as T);
+                }
+            });
         }
 
 

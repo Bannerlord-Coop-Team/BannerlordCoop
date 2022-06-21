@@ -23,6 +23,9 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Reference Include="TaleWorlds.ObjectSystem">
+        <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
+      </Reference>
       <Reference Include="TaleWorlds.SaveSystem">
         <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
       </Reference>
