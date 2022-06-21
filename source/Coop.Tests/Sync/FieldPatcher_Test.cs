@@ -83,6 +83,12 @@ namespace Coop.Tests.Sync
         static int Calls = 0;
         static int Temp;
         static bool Allowed;
+
+        public FieldPatcher_Test()
+        {
+            Calls = 0;
+        }
+
         public static void InterceptMethod<T>(T variable, object instance, FieldInfo field)
         {
             if (Allowed)
