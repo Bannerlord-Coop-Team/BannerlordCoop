@@ -9,7 +9,6 @@
     <Import_RootNamespace>MissionsShared</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)BoardGameMoveEvent.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MissionsShared.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)FromClientTickMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)FromServerTickMessage.cs" />
