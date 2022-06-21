@@ -2,6 +2,7 @@
 using JetBrains.Annotations;
 using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace Coop.Mod.GameSync.Villager
 {

@@ -14,6 +14,7 @@ using Sync.Behaviour;
 using Sync.Call;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 

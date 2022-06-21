@@ -6,7 +6,8 @@ using Sync;
 using Sync.Call;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 

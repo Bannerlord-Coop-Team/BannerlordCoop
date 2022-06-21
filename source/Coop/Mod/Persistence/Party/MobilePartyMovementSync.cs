@@ -11,6 +11,7 @@ using RemoteAction;
 using Sync.Call;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;

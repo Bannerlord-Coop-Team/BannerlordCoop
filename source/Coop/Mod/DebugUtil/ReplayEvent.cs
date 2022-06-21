@@ -6,6 +6,7 @@ using RemoteAction;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 using Common;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod.DebugUtil
 {

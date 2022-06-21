@@ -6,6 +6,8 @@ using Common;
 using RailgunNet.System.Encoding;
 using RemoteAction;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 

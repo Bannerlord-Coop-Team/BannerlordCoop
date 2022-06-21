@@ -1,6 +1,7 @@
 ﻿using System;
 using Common;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.GameSync.Party

@@ -5,6 +5,7 @@ using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 

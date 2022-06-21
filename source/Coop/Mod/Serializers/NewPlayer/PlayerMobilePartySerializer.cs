@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -120,8 +123,10 @@ namespace Coop.Mod.Serializers
                     case "_pureSpeedExplainer":
                         // TODO Joke Fix this
                         break;
-                    case "<TaleWorlds.CampaignSystem.ILocatable<TaleWorlds.CampaignSystem.MobileParty>.NextLocatable>k__BackingField":
+                    case "<TaleWorlds.CampaignSystem.Map.ILocatable<TaleWorlds.CampaignSystem.Party.MobileParty>.NextLocatable>k__BackingField":
                         // TODO Joke Fix this
+                        //Suggestion: Remove FieldInfos, that has CachedData attribute from NonSerializableObjects list.
+                        //So we won't have these empty cases.
                         break;
                     case "_targetSettlement":
                         // TODO Joke Fix this

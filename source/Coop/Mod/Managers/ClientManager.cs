@@ -11,6 +11,10 @@ using TaleWorlds.ObjectSystem;
 using StoryMode;
 using System.Diagnostics;
 using Common;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Locations;
 
 namespace Coop.Mod.Managers
 {

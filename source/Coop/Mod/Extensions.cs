@@ -6,6 +6,8 @@ using Coop.Mod.Patch;
 using Coop.Mod.Persistence.Party;
 using Sync.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.SaveSystem;

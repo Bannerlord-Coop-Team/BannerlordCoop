@@ -3,6 +3,7 @@ using RailgunNet.Logic;
 using RailgunNet.System.Encoding;
 using RemoteAction;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 

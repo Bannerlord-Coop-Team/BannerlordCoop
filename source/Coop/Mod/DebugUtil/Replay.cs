@@ -10,6 +10,7 @@ using RailgunNet.System.Encoding;
 using RailgunNet.System.Types;
 using RailgunNet.Util;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod.DebugUtil
 {

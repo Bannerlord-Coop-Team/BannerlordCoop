@@ -13,6 +13,7 @@ using TaleWorlds.ObjectSystem;
 using System.Runtime.Serialization;
 using TaleWorlds.Localization;
 using Common;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace Coop.Mod.Serializers
 {

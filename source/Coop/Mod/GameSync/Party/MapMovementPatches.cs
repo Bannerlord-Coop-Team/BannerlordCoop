@@ -2,6 +2,7 @@
 using Sync.Call;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.GameSync.Party

@@ -14,6 +14,10 @@ using System.Reflection;
 using TaleWorlds.ObjectSystem;
 using Common;
 using NLog;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
 namespace Coop.Mod.Managers
 {

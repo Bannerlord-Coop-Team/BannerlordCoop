@@ -2,6 +2,7 @@
 using TaleWorlds.CampaignSystem;
 using System.Reflection;
 using Common;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Mod.Serializers.Custom
 {

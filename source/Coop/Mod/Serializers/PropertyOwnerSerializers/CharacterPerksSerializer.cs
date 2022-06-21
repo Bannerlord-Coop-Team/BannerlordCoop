@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Xml;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 
 namespace Coop.Mod.Serializers
