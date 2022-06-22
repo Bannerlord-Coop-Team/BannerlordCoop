@@ -62,10 +62,10 @@ namespace CoopFramework
         /// <returns>Have any constructors been patched?</returns>
         public bool PatchConstruction()
         {
+            PatchLoadInitializationCallbacks();
             m_ConstructorPatch = new ConstructorPatch<ObjectLifetimeObserver<T>>(typeof(T)).PostfixAll();
             if (!m_ConstructorPatch.Methods.Any())
                 return false;
-            PatchLoadInitializationCallbacks();
             foreach (var methodAccess in m_ConstructorPatch.Methods)
                 methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
                 {
@@ -81,13 +81,15 @@ namespace CoopFramework
         /// </summary>
         private void PatchLoadInitializationCallbacks()
         {
-            bool HasAny = typeof(T).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy).Any(m => m.GetCustomAttributes(typeof(LoadInitializationCallback), false).Any());
-            Type t = (HasAny) ? typeof(T) : ((typeof(T).IsSubclassOf(typeof(MBObjectBase)))?typeof(MBObjectBase): null);
-            if (t is null)
+            Type type = CoopFramework.LoadInitializationCallbacks.Keys.ToList().Find(t => typeof(T) == t);
+            if (type is null)
+            {
+                type = CoopFramework.LoadInitializationCallbacks.Keys.ToList().Find(t => typeof(T).IsSubclassOf(t));
+            }
+            if (type is null)
                 return;
-            var methods = t.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy).Where(m => m.GetCustomAttributes(typeof(LoadInitializationCallback), false).Any()).ToList();
-            var patch = new MethodPatch<ObjectLifetimeObserver<T>>(t);
-            patch.Postfix(methods[0].Name);
+            var patch = new MethodPatch<ObjectLifetimeObserver<T>>(type);
+            patch.Postfix(CoopFramework.LoadInitializationCallbacks[type].Name);
             patch.Methods.First().Postfix.SetGlobalHandler((origin, instance, args) =>
             {
                 if (instance is T)
