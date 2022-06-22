@@ -128,10 +128,6 @@
       <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
       <Name>Common</Name>
     </ProjectReference>
-    <ProjectReference Include="..\HarmonyTranspilerTools\HarmonyTranspilerTools\HarmonyTranspilerTools.csproj">
-      <Project>{ebc486f6-bc37-453b-895d-6da22f4310dd}</Project>
-      <Name>HarmonyTranspilerTools</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Network\Network.csproj">
       <Project>{b0ff5e24-4d98-4ec8-bbce-6cdb85cb685d}</Project>
       <Name>Network</Name>

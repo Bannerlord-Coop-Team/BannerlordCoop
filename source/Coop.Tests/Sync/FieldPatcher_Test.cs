@@ -1,5 +1,4 @@
 ﻿using HarmonyLib;
-using HarmonyTranspilerTools;
 using Sync.Patch;
 using System;
 using System.Collections.Generic;
