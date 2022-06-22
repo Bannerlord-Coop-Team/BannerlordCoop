@@ -453,7 +453,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingFramework\BannerlordSystemTestingFramework.csproj">
-      <Project>{68cefb0c-37f7-4f86-8e8d-1d3baf1e7277}</Project>
+      <Project>{68CEFB0C-37F7-4F86-8E8D-1D3BAF1E7277}</Project>
       <Name>BannerlordSystemTestingFramework</Name>
     </ProjectReference>
     <ProjectReference Include="..\Common\Common.csproj">

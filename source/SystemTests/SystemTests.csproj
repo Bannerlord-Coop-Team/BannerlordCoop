@@ -78,13 +78,13 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingLibrary\BannerlordSystemTestingLibrary.csproj">
-      <Project>{510eaa3b-cf7d-46f9-87aa-5cb89a4e3a01}</Project>
-      <Name>BannerlordSystemTestingLibrary</Name>
-    </ProjectReference>
+    <Analyzer Include="..\packages\xunit.analyzers.0.10.0\analyzers\dotnet\cs\xunit.analyzers.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Analyzer Include="..\packages\xunit.analyzers.0.10.0\analyzers\dotnet\cs\xunit.analyzers.dll" />
+    <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingLibrary\BannerlordSystemTestingLibrary.csproj">
+      <Project>{510EAA3B-CF7D-46F9-87AA-5CB89A4E3A01}</Project>
+      <Name>BannerlordSystemTestingLibrary</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -23,8 +23,6 @@
     </Target>
 
     <ItemGroup>
-      <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingFramework\BannerlordSystemTestingFramework.csproj" />
-      <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingLibrary\BannerlordSystemTestingLibrary.csproj" />
       <ProjectReference Include="..\ClientDebug\ClientDebug.csproj" />
       <ProjectReference Include="..\Common\Common.csproj" />
       <ProjectReference Include="..\Coop\Coop.csproj" />
