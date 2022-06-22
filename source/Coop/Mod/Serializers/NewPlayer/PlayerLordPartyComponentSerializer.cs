@@ -2,6 +2,7 @@
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace Coop.Mod.Serializers
 {

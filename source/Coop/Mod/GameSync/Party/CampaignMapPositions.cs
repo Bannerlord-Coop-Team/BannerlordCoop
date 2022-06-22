@@ -5,6 +5,7 @@ using Coop.Mod.Persistence;
 using HarmonyLib;
 using Sync.Value;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.DotNet;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;

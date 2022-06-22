@@ -7,6 +7,7 @@ using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using Moq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using Xunit;
 
 namespace Coop.Tests.Persistence

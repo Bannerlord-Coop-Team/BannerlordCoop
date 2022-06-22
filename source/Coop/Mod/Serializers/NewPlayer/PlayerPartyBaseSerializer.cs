@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -57,6 +59,10 @@ namespace Coop.Mod.Serializers
                     case "Random":
                         // DeterministicRandom
                         SNNSO.Add(fieldInfo, new Custom.DeterministicRandomSerializer((DeterministicRandom)value));
+                        break;
+                    case "_lastEatingTime":
+                        //CampaignTime
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_owner":
                         // Not needed, populated at deserialize

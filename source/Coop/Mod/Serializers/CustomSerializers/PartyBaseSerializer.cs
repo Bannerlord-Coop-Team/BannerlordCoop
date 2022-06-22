@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
 namespace Coop.Mod.Serializers.Custom
@@ -54,6 +56,10 @@ namespace Coop.Mod.Serializers.Custom
                     case "Random":
                         // DeterministicRandom
                         SNNSO.Add(fieldInfo, new DeterministicRandomSerializer((DeterministicRandom)value));
+                        break;
+                    case "_lastEatingTime":
+                        //CampaignTime
+                        SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));
                         break;
                     // References
                     case "<MobileParty>k__BackingField":

@@ -12,6 +12,8 @@ using HarmonyLib;
 using RailgunNet.System.Types;
 using Sync.Call;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace Coop.Mod.GameSync.Hideout
@@ -72,7 +74,7 @@ namespace Coop.Mod.GameSync.Hideout
                 return;
             }
 
-            typeof(TaleWorlds.CampaignSystem.Hideout).GetMethod("OnHideoutIsEmpty", BindingFlags.Instance | BindingFlags.NonPublic)
+            typeof(TaleWorlds.CampaignSystem.Settlements.Hideout).GetMethod("OnHideoutIsEmpty", BindingFlags.Instance | BindingFlags.NonPublic)
                 ?.Invoke(settlement.Hideout, new object[] { });
         }
 

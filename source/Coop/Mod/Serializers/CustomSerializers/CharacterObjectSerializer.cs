@@ -6,6 +6,7 @@ using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.Localization;
 using Common;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace Coop.Mod.Serializers.Custom
 {

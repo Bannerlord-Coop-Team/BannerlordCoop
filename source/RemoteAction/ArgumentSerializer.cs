@@ -4,7 +4,7 @@ using System.Reflection;
 using RailgunNet.System.Encoding;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace RemoteAction
 {

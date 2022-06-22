@@ -15,6 +15,7 @@ using System.Linq;
 using Coop.Mod.UI;
 using TaleWorlds.InputSystem;
 using TaleWorlds.TwoDimension;
+using TaleWorlds.ScreenSystem;
 
 namespace Coop.Mod
 {

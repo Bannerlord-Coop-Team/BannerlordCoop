@@ -1,7 +1,7 @@
 ﻿using CoopFramework;
 using JetBrains.Annotations;
 using Sync.Behaviour;
-using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace Coop.Mod.GameSync.Bandit
 {

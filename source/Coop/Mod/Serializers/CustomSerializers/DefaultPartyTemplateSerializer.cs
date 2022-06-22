@@ -1,5 +1,6 @@
 ﻿using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod.Serializers.Custom
 {

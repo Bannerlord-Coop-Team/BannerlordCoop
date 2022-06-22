@@ -1,6 +1,7 @@
 ﻿using Common;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.CampaignSystem.Hero;
 
 namespace Coop.Mod.Serializers.Custom

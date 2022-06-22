@@ -8,6 +8,7 @@ using NLog;
 using RailgunNet;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.ObjectSystem;
 
 namespace RemoteAction

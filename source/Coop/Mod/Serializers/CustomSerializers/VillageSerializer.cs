@@ -3,9 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
-using static TaleWorlds.CampaignSystem.Village;
+using static TaleWorlds.CampaignSystem.Settlements.Village;
 
 namespace Coop.Mod.Serializers.Custom
 {

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using TaleWorlds.Core;
 using System.Linq;
 using TaleWorlds.Localization;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Mod.Serializers.Custom
 {

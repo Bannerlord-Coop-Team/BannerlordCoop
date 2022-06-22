@@ -6,6 +6,8 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -103,6 +105,7 @@ namespace Coop.Mod.Serializers
                     case "<Fiefs>k__BackingField":
                     case "_villagesReadOnlyCache":
                     case "_settlementsReadOnlyCache":
+                    case "_clanMidSettlement":
                     case "<Lords>k__BackingField":
                     case "<Heroes>k__BackingField":
                     case "<WarPartyComponents>k__BackingField":

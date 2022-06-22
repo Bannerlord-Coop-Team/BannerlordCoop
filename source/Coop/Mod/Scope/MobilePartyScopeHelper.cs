@@ -4,6 +4,7 @@ using Coop.Mod.Persistence.Party;
 using JetBrains.Annotations;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.Scope

@@ -4,6 +4,7 @@ using Coop.Mod.Persistence.Party;
 using JetBrains.Annotations;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
