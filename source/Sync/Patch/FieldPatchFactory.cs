@@ -4,6 +4,8 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
+using Sync.Call;
+using Sync.Value;
 
 namespace Sync.Patch
 {
@@ -11,12 +13,16 @@ namespace Sync.Patch
     {
         private static MethodInfo _transpiler = typeof(FieldPatchFactory).GetMethod("Transpiler", BindingFlags.NonPublic | BindingFlags.Static);
 
-        private static Dictionary<MethodBase, List<FieldInfo>> _fields = new Dictionary<MethodBase, List<FieldInfo>>();
+        private static Dictionary<MethodBase, List<FieldBase>> _fields = new Dictionary<MethodBase, List<FieldBase>>();
+
+        private static readonly Dictionary<MethodBase, MethodInfo> Transpilers =
+            new Dictionary<MethodBase, MethodInfo>();
 
         public static MethodInfo hookMethod { get; set; }
         public static FieldInfo tempField { get; set; }
 
-        public static void ReplaceMethod(MethodInfo method)
+        public static void AddTranspiler(PatchedInvokable access,
+                                         MethodInfo dispatcher)
         {
             lock (Patcher.HarmonyLock)
             {
@@ -27,14 +33,16 @@ namespace Sync.Patch
                     debug = true
 #endif
                 };
-                Patcher.HarmonyInstance.Patch(method, transpiler: patch);
+                MethodInfo patchedMethod = Patcher.HarmonyInstance.Patch(access.Original, transpiler: patch);
+
+                Transpilers.Add(access.Original, patchedMethod);
             }
         }
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instr, MethodBase original)
         {
             List<CodeInstruction> lInstrs = instr.ToList();
-            foreach(FieldInfo field in _fields[original])
+            foreach(FieldBase field in _fields[original])
             {
                 ReplaceNativeAssign(lInstrs, field, hookMethod);
             }
@@ -43,21 +51,32 @@ namespace Sync.Patch
         }
 
         public static void GeneratePatch(
-            FieldInfo field,
+            FieldId fieldId,
             MethodInfo caller,
             MethodInfo interceptMethod)
         {
-            if (_fields.ContainsKey(caller))
+            var field = Registry.IdToField[fieldId];
+            if (_fields.ContainsKey(caller) &&
+                !_fields[caller].Contains(field))
             {
                 _fields[caller].Add(field);
             }
             else
             {
-                _fields.Add(caller, new List<FieldInfo> { field });
+                _fields.Add(caller, new List<FieldBase> { field });
             }
         }
 
-        static void ReplaceNativeAssign(List<CodeInstruction> codeInstructions, FieldInfo field, MethodInfo hookMethod)
+        public static void UnpatchAll()
+        {
+            lock (Patcher.HarmonyLock)
+            {
+                Patcher.HarmonyInstance.UnpatchAll();
+                Transpilers.Clear();
+            }
+        }
+
+        static void ReplaceNativeAssign(List<CodeInstruction> codeInstructions, FieldBase field, MethodInfo hookMethod)
         {
             // Validation
             //if (hookMethod.GetParameters().Length != 2)

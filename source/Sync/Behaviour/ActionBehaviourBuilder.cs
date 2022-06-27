@@ -1,24 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using JetBrains.Annotations;
 using Sync.Call;
 using Sync.Value;
 
 namespace Sync.Behaviour
 {
     /// <summary>
-    ///     Builder class to define the behaviour of a patched method call, property getter / setter or monitored
+    ///     Builder class to define the behavior of a patched method call, property getter / setter or monitored
     ///     field change.
     /// </summary>
     public class ActionBehaviourBuilder : ConditionalBehaviour
     {
-        public ActionBehaviourBuilder([CamBeNull] Condition condition) : base(condition)
+        public ActionBehaviourBuilder([CanBeNull] Condition condition) : base(condition)
         {
         }
         /// <summary>
-        ///     Constructs a new behaviour for method calls.
+        ///     Constructs a new behavior for method calls.
         /// </summary>
-        /// <param name="methods">Methods that the behaviour applies to.</param>
+        /// <param name="methods">Methods that the behavior applies to.</param>
         /// <returns></returns>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
         public CallBehaviourBuilder Calls(params PatchedInvokable[] methods)
@@ -32,9 +33,9 @@ namespace Sync.Behaviour
             return behaviour;
         }
         /// <summary>
-        ///     Constructs a new behaviour for monitored field changes.
+        ///     Constructs a new behavior for monitored field changes.
         /// </summary>
-        /// <param name="fields">Fields that the behaviour applies to.</param>
+        /// <param name="fields">Fields that the behavior applies to.</param>
         /// <returns></returns>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
         public FieldAccessBehaviourBuilder Changes(params FieldAccess[] fields)
@@ -49,9 +50,9 @@ namespace Sync.Behaviour
             return fieldChangeAction;
         }
         /// <summary>
-        ///     Constructs a new behaviour for a monitored field group.
+        ///     Constructs a new behavior for a monitored field group.
         /// </summary>
-        /// <param name="accessGroup">Field group that the behaviour applies to.</param>
+        /// <param name="accessGroup">Field group that the behavior applies to.</param>
         /// <returns></returns>
         public FieldAccessBehaviourBuilder Changes(FieldAccessGroup accessGroup)
         {
@@ -62,13 +63,13 @@ namespace Sync.Behaviour
 
         #region Getters
         /// <summary>
-        ///     Returns all defined call behaviours.
+        ///     Returns all defined call behavior.
         /// </summary>
         public Dictionary<InvokableId, CallBehaviourBuilder> CallBehaviours { get; } =
             new Dictionary<InvokableId, CallBehaviourBuilder>();
 
         /// <summary>
-        ///     Returns all defined monitored field change behaviours.
+        ///     Returns all defined monitored field change behavior.
         /// </summary>
         public Dictionary<FieldId, FieldAccessBehaviourBuilder> FieldChangeAction { get; } =
             new Dictionary<FieldId, FieldAccessBehaviourBuilder>();
@@ -80,7 +81,7 @@ namespace Sync.Behaviour
         private void Register(InvokableId key, CallBehaviourBuilder behaviourBuilder)
         {
             if (CallBehaviours.ContainsKey(key))
-                throw new Exception($"There's already a behaviour registered for the method '{key}'.");
+                throw new Exception($"There's already a behavior registered for the method '{key}'.");
 
             CallBehaviours[key] = behaviourBuilder;
         }
@@ -88,15 +89,11 @@ namespace Sync.Behaviour
         private void Register(FieldId key, FieldAccessBehaviourBuilder change)
         {
             if (FieldChangeAction.ContainsKey(key))
-                throw new Exception($"There's already a behaviour registered for the field '{key}'.");
+                throw new Exception($"There's already a behavior registered for the field '{key}'.");
 
             FieldChangeAction[key] = change;
         }
 
         #endregion
-    }
-
-    public class CamBeNullAttribute : Attribute
-    {
     }
 }

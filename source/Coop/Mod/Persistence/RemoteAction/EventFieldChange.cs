@@ -52,16 +52,16 @@ namespace Coop.Mod.Persistence.RemoteAction
                     if (!IsValid())
                     {
                         ActionValidator.TryGet(Field.Id, out IActionValidator validator);
-                        Logger.Info("[{EventId}] Broadcast FieldChange '{Field}' rejected by {Validator}: {Reason}", EventId, Field, validator.GetType().Name, validator.GetReasonForRejection());
+                        Logger.Info($"[{EventId}] Broadcast FieldChange '{Field}' rejected by {validator.GetType().Name}: {validator.GetReasonForRejection()}");
                         return;
                     }
 
-                    Logger.Trace("[{EventId}] Broadcast FieldChange: {Field}", EventId, Field);
+                    Logger.Trace($"[{EventId}] Broadcast FieldChange: {Field}");
                     m_EnvironmentServer.EventQueue.Add(serverRoom, this);
                 }
                 else if (room is RailClientRoom)
                 {
-                    Logger.Trace("[{EventId}] FieldChange: {Field}", EventId, Field);
+                    Logger.Trace($"[{EventId}] FieldChange: {Field}");
                     // TODO: The call is not synchronized to a campaign time at this point. We probably want an execution queue of some sorts that executes the call at the right point in time.
                     field.Set(
                         ArgumentFactory.Resolve(m_EnvironmentClient.Store, Field.Instance),
@@ -70,7 +70,7 @@ namespace Coop.Mod.Persistence.RemoteAction
             }
             else
             {
-                Logger.Warn("[{EventId}] Unknown FieldChange: {Field}", EventId, Field);
+                Logger.Warn($"[{EventId}] Unknown FieldChange: {Field}");
             }
         }
     }

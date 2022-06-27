@@ -13,10 +13,10 @@ namespace Sync.Value
     /// <typeparam name="TFieldType">Type of the field itself.</typeparam>
     public class FieldAccess<TDeclaring, TFieldType> : FieldAccess
     {
-        public FieldAccess(FieldInfo memberInfo) : base(typeof(TDeclaring), memberInfo)
+        public FieldAccess(FieldInfo fieldInfo) : base(typeof(TDeclaring), fieldInfo)
         {
-            if (memberInfo.GetUnderlyingType() != typeof(TFieldType))
-                throw new ArgumentException("Unexpected underlying type.", nameof(memberInfo));
+            if (fieldInfo.GetUnderlyingType() != typeof(TFieldType))
+                throw new ArgumentException("Unexpected underlying type.", nameof(fieldInfo));
         }
 
         public TFieldType GetTyped(TDeclaring target)
@@ -35,13 +35,13 @@ namespace Sync.Value
     /// </summary>
     public abstract class FieldAccess : FieldBase
     {
-        [NotNull] public readonly FieldInfo MemberInfo;
+        [NotNull] public readonly FieldInfo FieldInfo;
 
-        protected FieldAccess(Type declaringType, [NotNull] FieldInfo memberInfo) : base(declaringType)
+        protected FieldAccess(Type declaringType, [NotNull] FieldInfo fieldInfo) : base(declaringType)
         {
-            MemberInfo = memberInfo;
-            m_GetterLocal = InvokableFactory.CreateUntypedGetter<object>(memberInfo);
-            m_Setter = InvokableFactory.CreateUntypedSetter<object>(memberInfo);
+            FieldInfo = fieldInfo;
+            m_GetterLocal = InvokableFactory.CreateUntypedGetter<object>(fieldInfo);
+            m_Setter = InvokableFactory.CreateUntypedSetter<object>(fieldInfo);
         }
 
         /// <inheritdoc />
@@ -60,7 +60,7 @@ namespace Sync.Value
 
         public override string ToString()
         {
-            return $"{DeclaringType?.Name}.{MemberInfo.Name}";
+            return $"{DeclaringType?.Name}.{FieldInfo.Name}";
         }
 
         #region Private

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using Sync.Call;
 using Sync.Value;
 
@@ -11,6 +12,11 @@ namespace Sync.Behaviour
     /// </summary>
     public class FieldAccessBehaviourBuilder
     {
+        /// <summary>
+        ///     The method associations to all fields that need to be intercepted.
+        /// </summary>
+        public readonly static Dictionary<PatchedInvokable, List<FieldId>> MethodsWithPatchedFields =
+            new Dictionary<PatchedInvokable, List<FieldId>>();
         public FieldAccessBehaviourBuilder(IEnumerable<FieldId> fieldIds, Condition condition)
         {
             m_FieldIds = fieldIds;
@@ -35,6 +41,19 @@ namespace Sync.Behaviour
         {
             Accessors.AddRange(accessors);
             Behaviour = new FieldBehaviourBuilder(m_FieldIds, m_Condition);
+
+            foreach(var accessor in Accessors)
+            {
+                if (MethodsWithPatchedFields.ContainsKey(accessor))
+                {
+                    MethodsWithPatchedFields[accessor].AddRange(m_FieldIds);
+                }
+                else
+                {
+                    MethodsWithPatchedFields.Add(accessor, new List<FieldId>(m_FieldIds));
+                }
+            }
+
             return Behaviour;
         }
 

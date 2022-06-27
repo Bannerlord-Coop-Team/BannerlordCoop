@@ -45,6 +45,12 @@ namespace Sync.Call
         public Postfix Postfix { get; } = new Postfix();
 
         /// <summary>
+        ///     Get the transpiler for this method call.
+        /// </summary>
+        [NotNull]
+        public Transpiler Transpiler { get; } = new Transpiler();
+
+        /// <summary>
         ///     The type that declares this callable.
         /// </summary>
         [NotNull]

@@ -92,6 +92,7 @@
     <Compile Include="Call\PatchedInvokable.cs" />
     <Compile Include="Call\Postfix.cs" />
     <Compile Include="Call\Prefix.cs" />
+    <Compile Include="Call\Transpiler.cs" />
     <Compile Include="Patch\ConstructorPatch.cs" />
     <Compile Include="Patch\DestructorPatch.cs" />
     <Compile Include="Patch\FieldPatch.cs" />
@@ -119,6 +120,7 @@
     <Compile Include="Value\FieldBase.cs" />
     <Compile Include="Value\FieldChangeRequest.cs" />
     <Compile Include="Value\FieldId.cs" />
+    <Compile Include="Value\FieldPatch.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
