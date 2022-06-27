@@ -62,7 +62,7 @@ namespace CoopFramework
         /// <returns>Have any constructors been patched?</returns>
         public bool PatchConstruction()
         {
-            PatchLoadInitializationCallbacks();
+            //PatchLoadInitializationCallbacks();
             m_ConstructorPatch = new ConstructorPatch<ObjectLifetimeObserver<T>>(typeof(T)).PostfixAll();
             if (!m_ConstructorPatch.Methods.Any())
                 return false;
@@ -73,31 +73,31 @@ namespace CoopFramework
                 });
             return true;
         }
-        /// <summary>
-        ///     Patches the first method with <see cref="LoadInitializationCallback"/> LoadInitializationCallback attribute, but if none is found, then we check 
-        ///     if T is subclass of MBObjectBase and patch it's first method with the given attribute.. 
-        ///     This method is needed because constructors are not called at some classes, when loading a saved game, but for these classes there is a method
-        ///     in the hierarchy, that has this attribute./>.
-        /// </summary>
-        private void PatchLoadInitializationCallbacks()
-        {
-            Type type = CoopFramework.LoadInitializationCallbacks.Keys.ToList().Find(t => typeof(T) == t);
-            if (type is null)
-            {
-                type = CoopFramework.LoadInitializationCallbacks.Keys.ToList().Find(t => typeof(T).IsSubclassOf(t));
-            }
-            if (type is null)
-                return;
-            var patch = new MethodPatch<ObjectLifetimeObserver<T>>(type);
-            patch.Postfix(CoopFramework.LoadInitializationCallbacks[type].Name);
-            patch.Methods.First().Postfix.SetGlobalHandler((origin, instance, args) =>
-            {
-                if (instance is T)
-                {
-                    AfterRegisterObject(instance as T);
-                }
-            });
-        }
+        ///// <summary>
+        /////     Patches the first method with <see cref="LoadInitializationCallback"/> LoadInitializationCallback attribute, but if none is found, then we check 
+        /////     if T is subclass of MBObjectBase and patch it's first method with the given attribute.. 
+        /////     This method is needed because constructors are not called at some classes, when loading a saved game, but for these classes there is a method
+        /////     in the hierarchy, that has this attribute./>.
+        ///// </summary>
+        //private void PatchLoadInitializationCallbacks()
+        //{
+        //    Type type = CoopFramework.LoadInitializationCallbacks.Keys.ToList().Find(t => typeof(T) == t);
+        //    if (type is null)
+        //    {
+        //        type = CoopFramework.LoadInitializationCallbacks.Keys.ToList().Find(t => typeof(T).IsSubclassOf(t));
+        //    }
+        //    if (type is null)
+        //        return;
+        //    var patch = new MethodPatch<ObjectLifetimeObserver<T>>(type);
+        //    patch.Postfix(CoopFramework.LoadInitializationCallbacks[type].Name);
+        //    patch.Methods.First().Postfix.SetGlobalHandler((origin, instance, args) =>
+        //    {
+        //        if (instance is T)
+        //        {
+        //            AfterRegisterObject(instance as T);
+        //        }
+        //    });
+        //}
 
 
         /// <summary>

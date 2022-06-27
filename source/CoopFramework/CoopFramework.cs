@@ -23,7 +23,7 @@ namespace CoopFramework
         /// </summary>
         [CanBeNull] public static IObjectManager ObjectManager { get; private set; }
 
-        internal static readonly Dictionary<Type, MethodInfo> LoadInitializationCallbacks = new Dictionary<Type, MethodInfo>();
+        internal static readonly Dictionary<Type,IObjectLifetimeObserver> MethodsByType = new Dictionary<Type, IObjectLifetimeObserver>();
 
         /// <summary>
         ///     Initializes all patches that are generated through <see cref="CoopManaged{TSelf,TExtended}"/>.
@@ -42,20 +42,39 @@ namespace CoopFramework
             }
 
             var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-            loadedAssemblies.ToList().ForEach(a =>
-            a.GetTypes().
-            Where(t => t.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).
-            Any(m => m.GetCustomAttributes<LoadInitializationCallback>().Any())).ToList().ForEach(
-                type => 
-                LoadInitializationCallbacks.Add(
-                type,
-                type
-                .GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                .Where(m => m.GetCustomAttributes<LoadInitializationCallback>().Any()).First())));
+            //loadedAssemblies.ToList().ForEach(a =>
+            //a.GetTypes().
+            //Where(t => t.GetMethods(BindingFlags.Instance | | BindingFlags.Public | BindingFlags.NonPublic).
+            //Any(m => m.GetCustomAttributes<LoadInitializationCallback>().Any())).ToList().ForEach(
+            //    type => 
+            //    LoadInitializationCallbacks.Add(
+            //    type,
+            //    type
+            //    .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            //    .Where(m => m.GetCustomAttributes<LoadInitializationCallback>().Any()).First())));
             AppDomain.CurrentDomain.AssemblyLoad += (sender, args) => PatchAssembly(args.LoadedAssembly);
             foreach (var assembly in loadedAssemblies) PatchAssembly(assembly);
 
             m_Initialized = true;
+        }
+        /// <summary>
+        /// This method tries to register an object to the CoopFramework. 
+        /// If we have an observer for the type, then we register the object. 
+        /// if we do not have an observer we return false.
+        /// </summary>
+        /// <param name="obj">The object we are trying to register.</param>
+        /// <returns>the result of registering the object.</returns>
+        public static bool TryRegister(object obj)
+        {
+            if (obj is null)
+                return false;
+            Type t = obj.GetType();
+            if (MethodsByType.ContainsKey(t))
+            {
+                MethodsByType[t].AfterRegisterObject(obj);
+                return true;
+            }
+            return false;
         }
 
         #region Private
