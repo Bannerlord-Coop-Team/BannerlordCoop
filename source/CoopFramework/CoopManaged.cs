@@ -391,7 +391,6 @@ namespace CoopFramework
                     }
                 });
             }
-            CoopFramework.MethodsByType.Add(typeof(TExtended),m_LifetimeObserver);
         }
 
         /// <summary>

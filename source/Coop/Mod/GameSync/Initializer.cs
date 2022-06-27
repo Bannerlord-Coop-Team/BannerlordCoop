@@ -5,10 +5,8 @@ using Coop.Mod.Persistence.Party;
 using NLog;
 using RailgunNet.Logic;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
@@ -19,63 +17,14 @@ namespace Coop.Mod.GameSync
 {
     public class Initializer
     {
-
         /// <summary>
         ///     Called after a game has been fully loaded in order to setup the game sync.
         /// </summary>
         public static void SetupSyncAfterLoad()
         {
-            List<object> Objects = new List<object>();
-            RegisterIfNotRegistered(Objects,Campaign.Current);
-            Type type = typeof(Campaign);
-            BindingFlags bindingFlags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic;
-            MemberInfo[] members = type.GetFields(bindingFlags).Cast<MemberInfo>()
-                .Concat(type.GetProperties(bindingFlags)).ToArray();
-            foreach (MemberInfo member in members)
-            {
-                object obj = null;
-                Type MemberType = null;
-                if (typeof(FieldInfo).IsAssignableFrom(member.GetType()))
-                {
-                    FieldInfo fieldInfo = (FieldInfo)member;
-                    obj = fieldInfo.GetValue(Campaign.Current);
-                    MemberType = fieldInfo.FieldType;
-                }
-                else if (typeof(PropertyInfo).IsAssignableFrom(member.GetType()))
-                {
-                    PropertyInfo propertyInfo = (PropertyInfo)member;
-                    obj = propertyInfo.GetValue(Campaign.Current);
-                    MemberType = propertyInfo.PropertyType;
-                }
-                if (obj is null && MemberType is null)
-                    continue;
-                if (typeof(IEnumerable).IsAssignableFrom(MemberType))
-                {
-                    foreach (var o in (IEnumerable)obj)
-                    {
-                        RegisterIfNotRegistered(Objects,o);
-                    }
-                }
-                else
-                {
-                    RegisterIfNotRegistered(Objects, obj);
-                }
-            }
-
-            if (Coop.IsServer)
+            if(Coop.IsServer)
             {
                 CoopServer.Instance.Persistence.MobilePartyEntityManager.OnBeforePartyScopeEnter += OnBeforePartyScopeEnter;
-            }
-        }
-
-        private static void RegisterIfNotRegistered(List<object> Objects,object obj)
-        {
-            if (!Objects.Contains(obj))
-            {
-                if (CoopFramework.CoopFramework.TryRegister(obj))
-                {
-                    Objects.Add(obj);
-                }
             }
         }
 
