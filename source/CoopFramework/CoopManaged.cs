@@ -263,10 +263,10 @@ namespace CoopFramework
                 ECallPropagation prop = ECallPropagation.CallOriginal;
                 if (behaviour.MethodCallHandler != null)
                 { 
-                    prop = behaviour.MethodCallHandler.Invoke(new PendingMethodCall(invokableId,
+                    prop = behaviour.MethodCallHandler?.Invoke(new PendingMethodCall(invokableId,
                         behaviour.SynchronizationFactory,
                         instanceResolved,
-                        args)); 
+                        args)) ?? prop; 
                 }
                 if (behaviour.DoBroadcast && behaviour.CallPropagationBehaviour != ECallPropagation.Skip && (behaviour.MethodCallHandler == null || prop != ECallPropagation.Skip))
                     behaviour.SynchronizationFactory()?.Broadcast(invokableId, instanceResolved, args);
