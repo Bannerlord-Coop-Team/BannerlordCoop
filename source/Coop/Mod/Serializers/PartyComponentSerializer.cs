@@ -235,7 +235,7 @@ namespace Coop.Mod.Serializers.Custom
                 typeof(CaravanPartyComponent),
                 BindingFlags.Instance | BindingFlags.NonPublic, 
                 null, 
-                new object[] { null, null },
+                new object[] { null, null, null },
                 null);
             return CaravanPartyComponent;
         }

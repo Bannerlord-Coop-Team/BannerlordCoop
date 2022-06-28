@@ -132,7 +132,10 @@ namespace RemoteAction
         /// </summary>
         public Argument(Guid guid, bool isCoopObjectReference) : this()
         {
-            if(isCoopObjectReference)
+            if (guid == System.Guid.Empty)
+                throw new ArgumentNullException("Guid is invalid.");
+
+            if (isCoopObjectReference)
             {
                 EventType = EventArgType.CoopObjectManagerId;
                 CoopObjectManagerId = guid;
