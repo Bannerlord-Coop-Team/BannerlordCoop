@@ -40,18 +40,15 @@ namespace CoopFramework
                 Logger.Error("CoopFramework.InitPatches can only be called once.");
                 return;
             }
-
             var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-            loadedAssemblies.ToList().ForEach(a =>
-            a.GetTypes().
-            Where(t => t.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).
-            Any(m => m.GetCustomAttributes<LoadInitializationCallback>().Any())).ToList().ForEach(
-                type => 
-                LoadInitializationCallbacks.Add(
-                type,
-                type
-                .GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                .Where(m => m.GetCustomAttributes<LoadInitializationCallback>().Any()).First())));
+            BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            foreach (Assembly assembly in loadedAssemblies)
+            {
+                foreach (Type type in assembly.GetTypes().Where(t => t.GetMethods(Flags).Any(m => m.GetCustomAttributes<LoadInitializationCallback>().Any())))
+                {
+                    LoadInitializationCallbacks.Add(type, type.GetMethods(Flags).Where(m => m.GetCustomAttributes<LoadInitializationCallback>().Any()).First());
+                }
+            }
             AppDomain.CurrentDomain.AssemblyLoad += (sender, args) => PatchAssembly(args.LoadedAssembly);
             foreach (var assembly in loadedAssemblies) PatchAssembly(assembly);
 

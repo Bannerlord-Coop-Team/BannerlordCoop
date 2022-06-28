@@ -81,16 +81,12 @@ namespace CoopFramework
         /// </summary>
         private void PatchLoadInitializationCallbacks()
         {
-            Type type = CoopFramework.LoadInitializationCallbacks.Keys.ToList().Find(t => typeof(T) == t);
-            if (type is null)
-            {
-                type = CoopFramework.LoadInitializationCallbacks.Keys.ToList().Find(t => typeof(T).IsSubclassOf(t));
-            }
+            Type type = CoopFramework.LoadInitializationCallbacks.Keys.ToList().Find(t => t.IsAssignableFrom(typeof(T)));
             if (type is null)
                 return;
             var patch = new MethodPatch<ObjectLifetimeObserver<T>>(type);
             patch.Postfix(CoopFramework.LoadInitializationCallbacks[type].Name);
-            patch.Methods.First().Postfix.SetGlobalHandler((origin, instance, args) =>
+            patch.Methods.Single().Postfix.SetGlobalHandler((origin, instance, args) =>
             {
                 if (instance is T)
                 {
