@@ -37,6 +37,8 @@ namespace MissionsServer
             NetManager server = new NetManager(listener);
 
 
+
+
             //local test
             //FromClientTickMessage message = new FromClientTickMessage();
             //message.AgentCount = 1;
@@ -131,13 +133,14 @@ namespace MissionsServer
                     
                     //playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
                     playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
+                    //Console.WriteLine("Received Update from: " + fromPeer.Id + " of # " + msg.AgentsTickInfo + " at location " + clientToLocation[fromPeer.Id]);
                 }
                 else if(messageType == MessageType.PlayerDamage)
                 {
                     string location = clientToLocation[fromPeer.Id];
-                    uint effectedId = dataReader.GetUInt();
-                    uint effectorId = dataReader.GetUInt();
-                    float damage = dataReader.GetFloat();
+                    string effectedId = dataReader.GetString();
+                    string effectorId = dataReader.GetString();
+                    int damage = dataReader.GetInt();
                     NetDataWriter writer = new NetDataWriter();
                     writer.Put((uint)MessageType.PlayerDamage);
                     writer.Put(fromPeer.Id);
@@ -145,10 +148,24 @@ namespace MissionsServer
                     writer.Put(effectorId);
                     writer.Put(damage);
                     Console.WriteLine("Received damage from: " + fromPeer.Id + " to agent: " + effectedId + " from agent: " + effectorId + " of " + damage);
-                    foreach(int client in locationToClients[location].Where(c => c!= fromPeer.Id))
+                    foreach(int client in locationToClients[location])
                     {
                         server.GetPeerById(client).Send(writer, DeliveryMethod.ReliableOrdered);
                     }
+                }
+
+                else if(messageType == MessageType.AddAgent)
+                {
+                    int senderClientId = fromPeer.Id;
+                    int agentIndex = dataReader.GetInt();
+                    string id = ServerAgentManager.Instance().getAgentID(senderClientId, agentIndex);
+                    NetDataWriter writer = new NetDataWriter();
+                    writer.Put((uint)MessageType.AddAgent);
+                    writer.Put(agentIndex);
+                    writer.Put(id);
+                    server.GetPeerById(fromPeer.Id).Send(writer, DeliveryMethod.ReliableOrdered);
+                    Console.WriteLine(fromPeer.Id + " has added new agent with ID: " + id);
+                   
                 }
 
             };
@@ -195,6 +212,10 @@ namespace MissionsServer
                         //grab the client's player tick info list
                         FromServerTickPayload payload = new FromServerTickPayload();
                         payload.ClientId = clientId;
+                        if (!playerSyncDict.ContainsKey(clientId))
+                        {
+                            continue;
+                        }
                         payload.PlayerTick = playerSyncDict[clientId];
                         message.ClientTicks.Add(payload);
                     }

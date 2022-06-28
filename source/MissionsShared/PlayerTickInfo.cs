@@ -15,7 +15,7 @@ namespace MissionsShared
     public class PlayerTickInfo
     {
         [ProtoMember(1)]
-        public uint Id { get; set; }
+        public string Id { get; set; }
         [ProtoMember(2)]
         public float PosX { get;  set; }
         [ProtoMember(3)]

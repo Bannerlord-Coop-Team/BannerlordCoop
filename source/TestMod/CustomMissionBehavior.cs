@@ -14,7 +14,6 @@ namespace CoopTestMod
 
         public override void OnAgentBuild(Agent agent, Banner banner)
         {
-            InformationManager.DisplayMessage(new InformationMessage("Agent Created!"));
         }
     }
 }

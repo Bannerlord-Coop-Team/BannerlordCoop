@@ -16,19 +16,13 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using TaleWorlds.SaveSystem.Load;
-using TaleWorlds.MountAndBlade.Diamond;
 using HarmonyLib;
 using NetworkMessages.FromServer;
-using TaleWorlds.MountAndBlade.ComponentInterfaces;
 using SandBox;
-using TaleWorlds.Engine.Screens;
-using TaleWorlds.GauntletUI;
-using TaleWorlds.MountAndBlade.GauntletUI;
 using LiteNetLib;
 using MissionsShared;
 using ProtoBuf;
 using System.Collections.Concurrent;
-using TaleWorlds.ObjectSystem;
 using LiteNetLib.Utils;
 
 namespace CoopTestMod
@@ -47,35 +41,6 @@ namespace CoopTestMod
         }
     }
 
-
-    //[Serializable]
-    //public class AgentSerilizer : CustomSerializer
-    //{
-    //    public AgentSerilizer(Agent agent) : base(agent)
-    //    {
-
-    //    }
-    //    Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
-    //    public override object Deserialize()
-    //    {
-
-
-
-    //        foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
-    //        {
-    //            entry.Key.SetValue(newClan, entry.Value.Deserialize());
-    //        }
-    //        base.Deserialize(newClan);
-    //    }
-
-    //    public override void ResolveReferenceGuids()
-    //    {
-    //        throw new NotImplementedException();
-    //    }
-    //}
-
-
-
     public class MySubModule : MBSubModuleBase
     {
 
@@ -84,9 +49,8 @@ namespace CoopTestMod
 
         private Socket sender;
         private Socket receiver;
-        private const int bufSize = 1024;
         //private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile",BindingFlags.NonPublic|BindingFlags.Instance);
-        private static ConcurrentDictionary<int, ConcurrentDictionary<uint, Agent>> playerTickInfo = new ConcurrentDictionary<int, ConcurrentDictionary<uint, Agent>>();
+        private static ConcurrentDictionary<int, ConcurrentDictionary<string, Agent>> playerTickInfo = new ConcurrentDictionary<int, ConcurrentDictionary<string, Agent>>();
         List<MatrixFrame> _initialSpawnFrames;
         float t;
         AgentBuildData agentBuildData;
@@ -94,9 +58,15 @@ namespace CoopTestMod
         bool subModuleLoaded = false;
         bool battleLoaded = false;
         bool isServer = false;
-        ConcurrentQueue<AgentState> agentSpawnQueue = new ConcurrentQueue<AgentState>();
 
+        ConcurrentQueue<AgentState> agentSpawnQueue = new ConcurrentQueue<AgentState>();
         ConcurrentQueue<int> despawnAgentQueue = new ConcurrentQueue<int>();
+
+
+        ConcurrentQueue<(int, int, string, bool)> agentCreationQueue = new ConcurrentQueue<(int, int, string, bool)>();
+
+
+        HashSet<uint> serverAgents = new HashSet<uint>();
 
         Vec2 mInputVector;
         AnimFlags mFlags1;
@@ -120,31 +90,23 @@ namespace CoopTestMod
         //delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
 
 
-        private static ConcurrentDictionary<uint, AgentUpdate> agentUpdateState = new ConcurrentDictionary<uint, AgentUpdate>();
+        private static ConcurrentDictionary<string, AgentUpdate> agentUpdateState = new ConcurrentDictionary<string, AgentUpdate>();
 
         private PlayerTickInfo playerMainTickInfo = new PlayerTickInfo();
 
 
-        // utility to keep trying to connect to server if it fails
-        public bool ClientConnect(IPEndPoint remoteEP)
-        {
-            try
-            {
-                sender.Connect(remoteEP);
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
+        private static ConcurrentQueue<(int, string, string, float)> damageQueue = new ConcurrentQueue<(int, string, string, float)>();
+
+
+        private static ConcurrentDictionary<int, PlayerTickInfo> hostPlayerTickInfo = new ConcurrentDictionary<int, PlayerTickInfo>();
+
 
         public class AgentState
         {
             public int clientId;
-            public uint id;
+            public string id;
 
-            public AgentState(int clientId, uint id)
+            public AgentState(int clientId, string id)
             {
                 this.clientId = clientId;
                 this.id = id;
@@ -163,25 +125,12 @@ namespace CoopTestMod
             }
         }
 
-        // thread to allow connections and handle data sent by the client
-
-        public void initSockets(string ipAddress, int sendPort, int recvPort)
-        {
-            sender = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            receiver = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-
-            receiver.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.ReuseAddress, true);
-            receiver.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), recvPort));
-
-            sender.Connect(IPAddress.Parse(ipAddress), sendPort);
-        }
-
         private Agent SpawnAgent(CharacterObject character, MatrixFrame frame)
         {
             agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             Mission mission = Mission.Current;
-            agentBuildData2 = agentBuildData.Team(Mission.Current.PlayerTeam).InitialPosition(frame.origin);
+            agentBuildData2 = agentBuildData.Team(Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
             Agent agent = mission.SpawnAgent(agentBuildData2.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);
@@ -201,7 +150,7 @@ namespace CoopTestMod
 
                 Vec3 pos = new Vec3(info.PosX, info.PosY, info.PosZ);
 
-                if (agent.GetPathDistanceToPoint(ref pos) > 5f)
+                if (agent.GetPathDistanceToPoint(ref pos) > 1f)
                 {
                     agent.TeleportToPosition(pos);
                 }
@@ -270,13 +219,23 @@ namespace CoopTestMod
                 }
                 agent.MovementFlags = 0U;
 
-                if ((int)info.Action0CodeType >= (int)Agent.ActionCodeType.DefendAllBegin && (int)info.Action0CodeType <= (int)Agent.ActionCodeType.DefendAllEnd)
+                if ((int)info.Action1CodeType >= (int)Agent.ActionCodeType.DefendAllBegin && (int)info.Action1CodeType <= (int)Agent.ActionCodeType.DefendAllEnd)
 
                 {
                     agent.MovementFlags = (Agent.MovementControlFlag)info.MovementFlag;
                     return;
                 }
 
+
+                if ((EquipmentIndex)info.MainHandIndex != agent.GetWieldedItemIndex(Agent.HandIndex.MainHand))
+                {
+                    agent.SetWieldedItemIndexAsClient(Agent.HandIndex.MainHand, (EquipmentIndex)info.MainHandIndex, false, false, agent.WieldedWeapon.CurrentUsageIndex);
+                }
+
+                if ((EquipmentIndex)info.OffHandIndex != agent.GetWieldedItemIndex(Agent.HandIndex.OffHand))
+                {
+                    agent.SetWieldedItemIndexAsClient(Agent.HandIndex.OffHand, (EquipmentIndex)info.OffHandIndex, false, false, agent.WieldedOffhandWeapon.CurrentUsageIndex);
+                }
 
 
                 //// we either don't have an action so set it to the new one or the receive action is different than our current action
@@ -422,7 +381,7 @@ namespace CoopTestMod
                                 return;
                             }
 
-                            ConcurrentDictionary<uint, Agent> playerTickClientDict = playerTickInfo[payload.ClientId];
+                            ConcurrentDictionary<string, Agent> playerTickClientDict = playerTickInfo[payload.ClientId];
                             foreach (PlayerTickInfo tickInfo in payload.PlayerTick)
                             {
                                 // if it contains the agent, update it
@@ -465,7 +424,7 @@ namespace CoopTestMod
                             int peerId = dataReader.GetInt();
                             if (peerId == myPeerId) continue;
                             if (playerTickInfo.ContainsKey(peerId)) continue;
-                            playerTickInfo[peerId] = new ConcurrentDictionary<uint, Agent>();
+                            playerTickInfo[peerId] = new ConcurrentDictionary<string, Agent>();
                             //InformationManager.DisplayMessage(new InformationMessage("Entered Location: " + peerId));
                         }
                         //playerTickInfo[id] = new ConcurrentDictionary<uint, Agent>();
@@ -481,6 +440,25 @@ namespace CoopTestMod
                     {
                         myPeerId = dataReader.GetInt();
                     }
+
+                    else if (messageType == MessageType.PlayerDamage)
+                    {
+                        int peerId = dataReader.GetInt();
+
+                        string effectedId = dataReader.GetString();
+                        string effectorId = dataReader.GetString();
+                        int damage = dataReader.GetInt();
+                        damageQueue.Enqueue((peerId, effectedId, effectorId, damage));
+
+
+                    }
+
+                    else if (messageType == MessageType.AddAgent)
+                    {
+                        int index = dataReader.GetInt();
+                        string id = dataReader.GetString();
+                        agentCreationQueue.Enqueue((myPeerId, index, id, true));
+                    }
                     // received something from server
 
                     dataReader.Recycle();
@@ -492,13 +470,17 @@ namespace CoopTestMod
 
 
                     FromClientTickMessage message = new FromClientTickMessage();
-                    List<PlayerTickInfo> agentsList = new List<PlayerTickInfo>();
-                    agentsList.Add(playerMainTickInfo);
+                    List<PlayerTickInfo> agentsList = hostPlayerTickInfo.Values.ToList();
                     message.AgentsTickInfo = agentsList;
                     MemoryStream stream = new MemoryStream();
                     Serializer.SerializeWithLengthPrefix<FromClientTickMessage>(stream, message, PrefixStyle.Fixed32BigEndian);
                     MemoryStream strm = new MemoryStream();
-                    message.AgentCount = 1;
+                    message.AgentCount = hostPlayerTickInfo.Count;
+
+                    if (message.AgentCount <= 0)
+                    {
+                        continue;
+                    }
                     using (System.IO.BinaryWriter writer = new System.IO.BinaryWriter(strm))
                     {
                         writer.Write((uint)MessageType.PlayerSync);
@@ -572,7 +554,7 @@ namespace CoopTestMod
 
 
             ////spawn another instance of the player, uncontroller (this should get synced when someone joins)
-            //_otherAgent = SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement2, false);
+            //SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement, false);
 
 
             //otherAgentHealth = _otherAgent.Health;
@@ -611,10 +593,6 @@ namespace CoopTestMod
         }
 
 
-        public void SpawnAgentAtLocation()
-        {
-
-        }
 
         // ripped straight out of arena spawns
         private Agent SpawnArenaAgent(CharacterObject character, MatrixFrame frame, bool isMain)
@@ -636,12 +614,68 @@ namespace CoopTestMod
             else
             {
 
-                agent.Controller = Agent.ControllerType.None;
+                agent.Controller = Agent.ControllerType.AI;
 
             }
 
             return agent;
         }
+
+
+
+
+
+        [HarmonyPatch(typeof(Mission), "DecideAgentHitParticles")]
+        public class AgentBloodPatch
+        {
+
+
+
+            static bool Prefix()
+            {
+                return false; // make sure you only skip if really necessary
+            }
+            //public static void Postfix(Agent affectedAgent, Agent affectorAgent, float damagedHp)
+            //{
+            //    NetDataWriter writer = new NetDataWriter();
+            //    writer.Put((uint)MessageType.PlayerDamage);
+            //    writer.Put(affectedAgent.Character.Id.SubId);
+            //    writer.Put(affectorAgent.Character.Id.SubId);
+            //    writer.Put(damagedHp);
+            //    client.SendToAll(writer, DeliveryMethod.ReliableOrdered);
+            //    InformationManager.DisplayMessage(new InformationMessage("Damaged: " + damagedHp));
+            //}
+        }
+
+        [HarmonyPatch(typeof(Mission), "RegisterBlow")]
+        public class AgentDamagePatch
+        {
+
+
+
+            static bool Prefix(Agent attacker, Agent victim, GameEntity realHitEntity, Blow b, ref AttackCollisionData collisionData, in MissionWeapon attackerWeapon, ref CombatLogData combatLogData)
+            {
+                NetDataWriter writer = new NetDataWriter();
+                writer.Put((uint)MessageType.PlayerDamage);
+                if(b.Position == Vec3.One)
+                {
+                    InformationManager.DisplayMessage(new InformationMessage("This is a server message processing..."));
+                    return true;
+                }
+                if((attacker.Team != Mission.Current.PlayerTeam || !ClientAgentManager.Instance().IsNetworkAgent(victim.Index)))
+                {
+                    InformationManager.DisplayMessage(new InformationMessage("This is a damage to a local agent, ignoring..."));
+                    return true;
+                }
+                writer.Put(ClientAgentManager.Instance().getIdFromIndex(victim.Index));
+                writer.Put(ClientAgentManager.Instance().getIdFromIndex(attacker.Index));
+                InformationManager.DisplayMessage(new InformationMessage("Sending Damage: " + b.InflictedDamage + " to server "));
+                writer.Put(b.InflictedDamage);
+                client.SendToAll(writer, DeliveryMethod.ReliableOrdered);
+                return false; // make sure you only skip if really necessary
+            }
+        }
+
 
 
 
@@ -660,344 +694,383 @@ namespace CoopTestMod
                 writer.Put((uint)MessageType.EnterLocation);
                 writer.Put(scene);
                 client.SendToAll(writer, DeliveryMethod.ReliableSequenced);
-
-               // InformationManager.DisplayMessage(new InformationMessage(Mission.Current.SceneName));
-
-                // InformationManager.DisplayMessage(new InformationMessage(scene));
             }
         }
 
-            //[HarmonyPatch(typeof(Mission), "AfterStart")]
-            //public class CampaignPatch
-            //{
+
+        [HarmonyPatch(typeof(Mission), "SpawnAgent")]
+        public class CampaignAgentSpawnedPatch
+        {
 
 
-            //    public static void Postfix()
-            //    {
-            //        foreach (Agent a in Mission.Current.Agents)
-            //        {
-            //            //InformationManager.DisplayMessage(new InformationMessage(a.Character.Id.ToString()));
-            //        }
-
-            //    }
-            //}
-
-
-            [HarmonyPatch(typeof(Mission), "OnAgentHit")]
-            public class MissionOnAgentHitPatch
+            public static void Postfix(AgentBuildData agentBuildData, bool spawnFromAgentVisuals, int formationTroopCount, ref Agent __result)
             {
-                private static int damageDone;
-                public static int DamageDone
-                {
-                    get
-                    {
-                        return damageDone;
-                    }
-                }
-
-                public static void Postfix(int damage)
-                {
-                    //InformationManager.DisplayMessage(new InformationMessage(damage.ToString()));
-                    damageDone = damage;
-                }
-            }
-
-            [HarmonyPatch(typeof(SandboxAgentApplyDamageModel), "CalculateEffectiveMissileSpeed")]
-            public class CalculateEffectiveMissileSpeedPatch
-            {
-                public static void Postfix(float __result)
-                {
-                    OnAgentShootMissilePatch.num = __result;
-                }
-            }
-
-            [HarmonyPatch(typeof(Mission), "AddMissileAux")]
-            public class AddMissileAuxPatch
-            {
-                public static void Postfix(int __result, Vec3 direction)
-                {
-                    OnAgentShootMissilePatch.num3 = __result;
-                    OnAgentShootMissilePatch.direction = direction;
-                }
-            }
-
-            [HarmonyPatch(typeof(Mission), "OnAgentShootMissile")]
-            public class OnAgentShootMissilePatch
-            {
-                public static CreateMissile Message;
-                public static int num3;
-                public static Vec3 direction;
-                public static float num;
-                public static void Postfix(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity,
-                    Mat3 orientation, bool hasRigidBody, bool isPrimaryWeaponShot, int forcedMissileIndex)
-                {
-                    if (shooterAgent.Equals(MySubModule.MyAgent))
-                    {
-                        MySubModule.MyAgentShot = true;
-                        Message = new CreateMissile(num3, shooterAgent, weaponIndex, MissionWeapon.Invalid, position, direction, num, orientation, hasRigidBody, null, isPrimaryWeaponShot);
-                    }
-                }
-            }
-
-            [HarmonyPatch(typeof(MissionState), "FinishMissionLoading")]
-            public class OnSceneCreatedPatch
-            {
-                public static void Postfix()
-                {
-                    GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
-                    if (gameEntity != null)
-                    {
-                        //InformationManager.DisplayMessage(new InformationMessage(gameEntity.GetGlobalFrame().ToString()));
-                        //_player.TeleportToPosition(gameEntity.GetGlobalFrame().origin);
-                    }
-                    else
-                    {
-                        //InformationManager.DisplayMessage(new InformationMessage("It's null!"));
-                    }
-                    //_player = Mission.Current.MainAgent;
-                }
-            }
-            [HarmonyPatch(typeof(Mission), "FinalizeMission")]
-            public class OnMissionExit
-            {
-                public static void Postfix()
-                {
-
-
-                    agentUpdateState.Clear();
-                    playerTickInfo.Clear();
-                    NetDataWriter writer = new NetDataWriter();
-                    writer.Put((uint)MessageType.ExitLocation);
-                    writer.Put(currentScene);
-                    client.SendToAll(writer, DeliveryMethod.ReliableSequenced);
-                    //GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
-                    //if (gameEntity != null)
-                    //{
-                    //    InformationManager.DisplayMessage(new InformationMessage(gameEntity.GetGlobalFrame().ToString()));
-                    //    //_player.TeleportToPosition(gameEntity.GetGlobalFrame().origin);
-                    //}
-                    //else
-                    //{
-                    //    InformationManager.DisplayMessage(new InformationMessage("It's null!"));
-                    //}
-                    //_player = Mission.Current.MainAgent;
-                }
-            }
-
-
-
-            protected override void OnApplicationTick(float dt)
-            {
-                //InformationManager.DisplayMessage(new InformationMessage("Peer ID: " + myPeerId.ToString()));
-
-
-
-
-
-
-                // Press slash next to spawn in the arena
-                //if (!battleLoaded && Mission.Current != null && Mission.Current.IsLoadingFinished)
+                //if (__result.Origin.IsUnderPlayersCommand)
                 //{
-                //    // again theres gotta be a better way to check if missions finish loading? A custom mission maybe in the future
-                //    battleLoaded = true;
-                //    Mission.Current.AddMissionBehavior(new CustomMissionBehavior());
-                //    StartArenaFight();
+                //    NetDataWriter writer = new NetDataWriter();
+                //    writer.Put(__result.Index);
                 //}
-
-                if (!subModuleLoaded && Module.CurrentModule.LoadingFinished)
-                {
-                    // sub module is loaded. Isnt there a proper callback for this?
-                    subModuleLoaded = true;
-
-                    //Get all the save sames
-                    SaveGameFileInfo[] games = MBSaveLoad.GetSaveFiles();
-
-
-                    // just load the first one. 
-                    LoadResult result = SaveManager.Load(games[0].Name, new AsyncFileSaveDriver(), true);
-
-                    // Create our own game manager. This will help us override the OnLoaded callback and load the town
-                    CustomSandboxGame manager = new CustomSandboxGame(result);
-
-                    //start it
-                    MBGameManager.StartNewGame(manager);
-                }
-
-
-                if (Mission.Current == null || !Mission.Current.IsLoadingFinished)
+                if (Mission.Current == null || Mission.Current.PlayerTeam == null) return;
+                if (__result.Team != Mission.Current.PlayerTeam)
                 {
                     return;
                 }
+                NetDataWriter writer = new NetDataWriter();
+                writer.Put((uint)MessageType.AddAgent);
+                writer.Put(__result.Index);
+                client.SendToAll(writer, DeliveryMethod.ReliableOrdered);
+                InformationManager.DisplayMessage(new InformationMessage("Created Agent: " + __result.Name + " which is under my command? " + (__result.Team == Mission.Current.PlayerTeam)));
 
-                while (!despawnAgentQueue.IsEmpty())
+            }
+        }
+
+
+
+
+
+        [HarmonyPatch(typeof(SandboxAgentApplyDamageModel), "CalculateEffectiveMissileSpeed")]
+        public class CalculateEffectiveMissileSpeedPatch
+        {
+            public static void Postfix(float __result)
+            {
+                OnAgentShootMissilePatch.num = __result;
+            }
+        }
+
+        [HarmonyPatch(typeof(Mission), "AddMissileAux")]
+        public class AddMissileAuxPatch
+        {
+            public static void Postfix(int __result, Vec3 direction)
+            {
+                OnAgentShootMissilePatch.num3 = __result;
+                OnAgentShootMissilePatch.direction = direction;
+            }
+        }
+
+        [HarmonyPatch(typeof(Mission), "OnAgentShootMissile")]
+        public class OnAgentShootMissilePatch
+        {
+            public static CreateMissile Message;
+            public static int num3;
+            public static Vec3 direction;
+            public static float num;
+            public static void Postfix(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity,
+                Mat3 orientation, bool hasRigidBody, bool isPrimaryWeaponShot, int forcedMissileIndex)
+            {
+                if (shooterAgent.Equals(MySubModule.MyAgent))
                 {
-                    int clientId = -1;
-                    despawnAgentQueue.TryDequeue(out clientId);
-                    foreach (Agent agent in playerTickInfo[clientId].Values)
+                    MySubModule.MyAgentShot = true;
+                    Message = new CreateMissile(num3, shooterAgent, weaponIndex, MissionWeapon.Invalid, position, direction, num, orientation, hasRigidBody, null, isPrimaryWeaponShot);
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(MissionState), "FinishMissionLoading")]
+        public class OnSceneCreatedPatch
+        {
+            public static void Postfix()
+            {
+                GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
+                if (gameEntity != null)
+                {
+                    //InformationManager.DisplayMessage(new InformationMessage(gameEntity.GetGlobalFrame().ToString()));
+                    //_player.TeleportToPosition(gameEntity.GetGlobalFrame().origin);
+                }
+                else
+                {
+                    //InformationManager.DisplayMessage(new InformationMessage("It's null!"));
+                }
+                //_player = Mission.Current.MainAgent;
+            }
+        }
+        [HarmonyPatch(typeof(Mission), "FinalizeMission")]
+        public class OnMissionExit
+        {
+            public static void Postfix()
+            {
+
+                hostPlayerTickInfo.Clear();
+                agentUpdateState.Clear();
+                playerTickInfo.Clear();
+                NetDataWriter writer = new NetDataWriter();
+                writer.Put((uint)MessageType.ExitLocation);
+                writer.Put(currentScene);
+                client.SendToAll(writer, DeliveryMethod.ReliableSequenced);
+                //GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
+                //if (gameEntity != null)
+                //{
+                //    InformationManager.DisplayMessage(new InformationMessage(gameEntity.GetGlobalFrame().ToString()));
+                //    //_player.TeleportToPosition(gameEntity.GetGlobalFrame().origin);
+                //}
+                //else
+                //{
+                //    InformationManager.DisplayMessage(new InformationMessage("It's null!"));
+                //}
+                //_player = Mission.Current.MainAgent;
+            }
+        }
+
+
+
+        protected override void OnApplicationTick(float dt)
+        {
+            //InformationManager.DisplayMessage(new InformationMessage("Peer ID: " + myPeerId.ToString()));
+
+
+            if (Mission.Current != null && Agent.Main != null)
+            {
+                //InformationManager.DisplayMessage(new InformationMessage(Agent.Main.GetWieldedItemIndex(Agent.HandIndex.MainHand)));
+                //Agent.Main.SetWieldedItemIndexAsClient()
+                //    Agent.Main.WieldedWeapon.CurrentUsageIndex
+            }
+
+
+
+            //Press slash next to spawn in the arena
+            if (!battleLoaded && Mission.Current != null && Mission.Current.IsLoadingFinished)
+            {
+                // again theres gotta be a better way to check if missions finish loading? A custom mission maybe in the future
+                battleLoaded = true;
+                Mission.Current.AddMissionBehavior(new CustomMissionBehavior());
+                StartArenaFight();
+            }
+
+            if (!subModuleLoaded && Module.CurrentModule.LoadingFinished)
+            {
+                // sub module is loaded. Isnt there a proper callback for this?
+                subModuleLoaded = true;
+
+                //Get all the save sames
+                SaveGameFileInfo[] games = MBSaveLoad.GetSaveFiles();
+
+
+                // just load the first one. 
+                LoadResult result = SaveManager.Load(games[0].Name, new AsyncFileSaveDriver(), true);
+
+                // Create our own game manager. This will help us override the OnLoaded callback and load the town
+                CustomSandboxGame manager = new CustomSandboxGame(result);
+
+                //start it
+                MBGameManager.StartNewGame(manager);
+            }
+
+
+            if (Mission.Current == null || !Mission.Current.IsLoadingFinished)
+            {
+                return;
+            }
+
+            if (Input.IsKeyReleased(InputKey.Numpad3))
+            {
+                string scene = Mission.Current.SceneName;
+                currentScene = scene;
+                foreach (Agent a in Mission.Current.AllAgents)
+                {
+                    if (a == null || a.Origin == null)
                     {
-                        agent.FadeOut(false, true);
+                        continue;
                     }
-
-                    foreach (uint agentId in playerTickInfo[clientId].Keys)
-                    {
-                        agentUpdateState.TryRemove(agentId, out _);
-                    }
-
-                    playerTickInfo[clientId].Clear();
-                    playerTickInfo.TryRemove(clientId, out _);
-
-
+                    InformationManager.DisplayMessage(new InformationMessage("Player: " + a.Name + a.Origin.IsUnderPlayersCommand));
                 }
 
+                // InformationManager.DisplayMessage(new InformationMessage(Mission.Current.SceneName));
 
-                while (!agentSpawnQueue.IsEmpty())
+                InformationManager.DisplayMessage(new InformationMessage("Loaded Scene: " + scene));
+                InformationManager.DisplayMessage(new InformationMessage("Is Field Battle: " + Mission.Current.IsFieldBattle.ToString()));
+            }
+
+
+            while (!despawnAgentQueue.IsEmpty())
+            {
+                int clientId = -1;
+                despawnAgentQueue.TryDequeue(out clientId);
+                foreach (Agent agent in playerTickInfo[clientId].Values)
                 {
-                    AgentState agentState;
-                    agentSpawnQueue.TryDequeue(out agentState);
-                    GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
-                    if (gameEntity == null) return;
-                    playerTickInfo[agentState.clientId][agentState.id] = SpawnAgent(CharacterObject.PlayerCharacter, gameEntity.GetFrame());
-
-                }
-                foreach (AgentUpdate agentUpdate in agentUpdateState.Values)
-                {
-                    if (agentUpdate.agent != null && agentUpdate.playerTickInfo != null)
-                    {
-                        //InformationManager.ClearAllMessages();
-                        //InformationManager.DisplayMessage(new InformationMessage("Received Update: " + agentUpdate.playerTickInfo));
-                        UpdatePlayerTick(agentUpdate.playerTickInfo, agentUpdate.agent);
-                    }
-
-                }
-                if (Mission.Current != null && Mission.Current.MainAgent != null && !Mission.Current.IsMissionEnding)
-                {
-                    try
-                    {
-                        Vec3 myPos = Mission.Current.MainAgent.Position;
-                        //Vec3 myPos = Vec3.Invalid;
-                        uint movementFlag = (uint)Mission.Current.MainAgent.MovementFlags;
-                        uint eventFlag = (uint)Mission.Current.MainAgent.EventControlFlags;
-                        Vec2 movementDirection = Mission.Current.MainAgent.GetMovementDirection();
-                        Vec2 inputVector = Mission.Current.MainAgent.MovementInputVector;
-                        ActionIndexCache cache0 = ActionIndexCache.act_none;
-                        float progress0 = 0f;
-                        AnimFlags flags0 = 0;
-                        ActionIndexCache cache1 = ActionIndexCache.act_none;
-                        float progress1 = 0f;
-                        AnimFlags flags1 = 0;
-                        Vec3 lookDirection = Mission.Current.MainAgent.LookDirection;
-                        Agent.ActionCodeType actionTypeCh0 = Agent.ActionCodeType.Other;
-                        Agent.ActionCodeType actionTypeCh1 = Agent.ActionCodeType.Other;
-                        //int damage = MissionOnAgentHitPatch.DamageDone;
-                        mCache1 = ActionIndexCache.act_none;
-                        if (Mission.Current.MainAgent.Health > 0f)
-                        {
-                            cache0 = Mission.Current.MainAgent.GetCurrentAction(0);
-                            progress0 = Mission.Current.MainAgent.GetCurrentActionProgress(0);
-                            flags0 = Mission.Current.MainAgent.GetCurrentAnimationFlag(0);
-                            cache1 = Mission.Current.MainAgent.GetCurrentAction(1);
-                            progress1 = Mission.Current.MainAgent.GetCurrentActionProgress(1);
-                            flags1 = Mission.Current.MainAgent.GetCurrentAnimationFlag(1);
-                            actionTypeCh0 = Mission.Current.MainAgent.GetCurrentActionType(0);
-                            actionTypeCh1 = Mission.Current.MainAgent.GetCurrentActionType(1);
-
-                            if (Mission.Current.MainAgent.HasMount)
-                            {
-                                mInputVector = Mission.Current.MainAgent.MountAgent.GetMovementDirection();
-                                mFlags1 = Mission.Current.MainAgent.MountAgent.GetCurrentAnimationFlag(1);
-                                mProgress1 = Mission.Current.MainAgent.MountAgent.GetCurrentActionProgress(1);
-                                mCache1 = Mission.Current.MainAgent.MountAgent.GetCurrentAction(1);
-                            }
-
-                        }
-                        else
-                        {
-                            mCache1 = ActionIndexCache.act_none;
-                        }
-                        playerMainTickInfo.PosX = myPos.X;
-                        playerMainTickInfo.PosY = myPos.Y;
-                        playerMainTickInfo.PosZ = myPos.Z;
-                        playerMainTickInfo.MovementFlag = movementFlag;
-                        playerMainTickInfo.EventFlag = eventFlag;
-                        playerMainTickInfo.MovementDirectionX = movementDirection.X;
-                        playerMainTickInfo.MovementDirectionY = movementDirection.Y;
-                        playerMainTickInfo.InputVectorX = inputVector.X;
-                        playerMainTickInfo.InputVectorY = inputVector.Y;
-                        playerMainTickInfo.Action0CodeType = (int)actionTypeCh0;
-                        playerMainTickInfo.Action0Index = cache0.Index;
-                        playerMainTickInfo.Action0Progress = progress0;
-                        playerMainTickInfo.Action0Flag = (ulong)flags0;
-                        playerMainTickInfo.Action1CodeType = (int)actionTypeCh1;
-                        playerMainTickInfo.Action1Index = cache1.Index;
-                        playerMainTickInfo.Action1Progress = progress1;
-                        playerMainTickInfo.Action1Flag = (ulong)flags1;
-                        playerMainTickInfo.LookDirectionX = lookDirection.X;
-                        playerMainTickInfo.LookDirectionY = lookDirection.Y;
-                        playerMainTickInfo.LookDirectionZ = lookDirection.Z;
-                        playerMainTickInfo.crouchMode = Mission.Current.MainAgent.CrouchMode;
-                    }
-                    catch { }
-
+                    agent.FadeOut(false, true);
                 }
 
-                if (Input.IsKeyReleased(InputKey.Slash))
+                foreach (string agentId in playerTickInfo[clientId].Keys)
                 {
+                    agentUpdateState.TryRemove(agentId, out _);
+                }
 
-                    //FieldInfo IMBNetwork = typeof(MBAPI).GetField("IMBNetwork", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                playerTickInfo[clientId].Clear();
+                playerTickInfo.TryRemove(clientId, out _);
 
 
-                    if (isServer)
+            }
+
+
+            while (!agentSpawnQueue.IsEmpty())
+            {
+                AgentState agentState;
+                agentSpawnQueue.TryDequeue(out agentState);
+                GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
+                if (gameEntity == null) return;
+                Agent agent = SpawnAgent(CharacterObject.PlayerCharacter, gameEntity.GetFrame());
+                NetworkAgent networkAgent = new NetworkAgent(agentState.clientId, agent.Index, agentState.id, agent, false);
+                ClientAgentManager.Instance().addNetworkAgent(networkAgent);
+                //uint id = agent.Character.Id.SubId;
+                playerTickInfo[agentState.clientId][agentState.id] = agent;
+
+            }
+            foreach (AgentUpdate agentUpdate in agentUpdateState.Values)
+            {
+                if (agentUpdate.agent != null && agentUpdate.playerTickInfo != null)
+                {
+                    //InformationManager.ClearAllMessages();
+                    //InformationManager.DisplayMessage(new InformationMessage("Received Update: " + agentUpdate.playerTickInfo));
+                    UpdatePlayerTick(agentUpdate.playerTickInfo, agentUpdate.agent);
+                }
+
+            }
+
+            while (!damageQueue.IsEmpty())
+            {
+                (int, string, string, float) d;
+                damageQueue.TryDequeue(out d);
+                InformationManager.DisplayMessage(new InformationMessage("Damaged from: " + d.Item1 + " from agent : " + d.Item2 + " to agent: " + d.Item3 + " of " + d.Item4));
+                Agent effectectedAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().getIndexFromId(d.Item2));
+                Agent effectorAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().getIndexFromId(d.Item3));
+                Blow b = new Blow();
+                b.InflictedDamage = (int)d.Item4;
+                b.OwnerId = effectorAgent.Index;
+                b.Position = Vec3.One;
+                effectectedAgent.RegisterBlow(b);
+
+            }
+
+
+            while (!agentCreationQueue.IsEmpty())
+            {
+                (int, int, string, bool) agentCreationState;
+                agentCreationQueue.TryDequeue(out agentCreationState);
+                Agent agent = Mission.Current.FindAgentWithIndex(agentCreationState.Item2);
+                NetworkAgent networkAgent = new NetworkAgent(agentCreationState.Item1, agentCreationState.Item2, agentCreationState.Item3, agent, agentCreationState.Item4);
+                ClientAgentManager.Instance().addNetworkAgent(networkAgent);
+                InformationManager.DisplayMessage(new InformationMessage("A new agent was added from the network with Peer ID: " + agentCreationState.Item1 + " | Index: " + agentCreationState.Item2 + " | Server ID: " + agentCreationState.Item3 + " | Network Host: " + agentCreationState.Item4));
+            }
+
+            if (Input.IsKeyReleased(InputKey.Numpad5))
+            {
+
+                Blow b = new Blow(Mission.Current.MainAgent.Index);
+                b.InflictedDamage = 20;
+                //_player.Health = 0;
+                Mission.Current.MainAgent.RegisterBlow(b);
+
+
+
+            }
+
+            if (Input.IsKeyReleased(InputKey.Numpad6))
+            {
+
+                InformationManager.DisplayMessage(new InformationMessage(Mission.Current.FindAgentWithIndex(1).Health.ToString()));
+
+
+
+            }
+
+
+
+            if (Mission.Current == null || Mission.Current.MainAgent == null || Mission.Current.IsMissionEnding)
+            {
+                return;
+            }
+
+            foreach(NetworkAgent agent in ClientAgentManager.Instance().getHostNetworkAgents())
+            {
+                if(agent.AgentID != null)
+                {
+                }
+                Agent mbAgent = agent.Agent;
+                try
+                {
+                    Vec3 myPos = mbAgent.Position;
+                    //Vec3 myPos = Vec3.Invalid;
+                    uint movementFlag = (uint)mbAgent.MovementFlags;
+                    uint eventFlag = (uint)mbAgent.EventControlFlags;
+                    Vec2 movementDirection = mbAgent.GetMovementDirection();
+                    Vec2 inputVector = mbAgent.MovementInputVector;
+                    ActionIndexCache cache0 = ActionIndexCache.act_none;
+                    float progress0 = 0f;
+                    AnimFlags flags0 = 0;
+                    ActionIndexCache cache1 = ActionIndexCache.act_none;
+                    float progress1 = 0f;
+                    AnimFlags flags1 = 0;
+                    Vec3 lookDirection = mbAgent.LookDirection;
+                    Agent.ActionCodeType actionTypeCh0 = Agent.ActionCodeType.Other;
+                    Agent.ActionCodeType actionTypeCh1 = Agent.ActionCodeType.Other;
+                    //int damage = MissionOnAgentHitPatch.DamageDone;
+                    mCache1 = ActionIndexCache.act_none;
+                    if (mbAgent.Health > 0f)
                     {
-                        InformationManager.DisplayMessage(new InformationMessage("I am Server"));
-                        try
+                        cache0 = mbAgent.GetCurrentAction(0);
+                        progress0 = mbAgent.GetCurrentActionProgress(0);
+                        flags0 = mbAgent.GetCurrentAnimationFlag(0);
+                        cache1 = mbAgent.GetCurrentAction(1);
+                        progress1 = mbAgent.GetCurrentActionProgress(1);
+                        flags1 = mbAgent.GetCurrentAnimationFlag(1);
+                        actionTypeCh0 = mbAgent.GetCurrentActionType(0);
+                        actionTypeCh1 = mbAgent.GetCurrentActionType(1);
+
+                        if (mbAgent.HasMount)
                         {
-                            GameNetwork.Initialize(new GameNetworkHandler());
-                            GameNetwork.InitializeCompressionInfos();
-                            FieldInfo IMBAgentField = typeof(GameNetwork).GetField("IMBAgent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-                            MethodInfo method2 = typeof(GameNetwork).GetMethod("PreStartMultiplayerOnServer", BindingFlags.Static | BindingFlags.NonPublic);
-                            MethodInfo method = typeof(GameNetwork).GetMethod("InitializeServerSide", BindingFlags.Static | BindingFlags.NonPublic);
-
-                            if (method != null)
-                            {
-                                //MBCommon.CurrentGameType = (GameNetwork.IsDedicatedServer ? MBCommon.GameType.MultiServer : MBCommon.GameType.MultiClientServer);
-                                GameNetwork.ClientPeerIndex = -1;
-
-
-                                method.Invoke(null, new object[] { 15801 });
-                                //GameNetwork.StartMultiplayerOnClient("127.0.0.1", 15801, 1, 1);
-                                //BannerlordNetwork.StartMultiplayerLobbyMission(LobbyMissionType.Custom);
-                            }
-                            else
-                            {
-                                InformationManager.DisplayMessage(new InformationMessage("Not found!"));
-                            }
-
-                            //GameNetwork.StartMultiplayerOnServer(15801);
-                        }
-                        catch (Exception ex)
-                        {
-                            File.AppendAllText("wouterror.txt", ex.Message);
+                            mInputVector = mbAgent.MountAgent.GetMovementDirection();
+                            mFlags1 = mbAgent.MountAgent.GetCurrentAnimationFlag(1);
+                            mProgress1 = mbAgent.MountAgent.GetCurrentActionProgress(1);
+                            mCache1 = mbAgent.MountAgent.GetCurrentAction(1);
                         }
 
                     }
                     else
                     {
-                        InformationManager.DisplayMessage(new InformationMessage("I am client"));
-                        //MethodInfo initServer = IMBNetwork.GetValue(null).GetType().GetMethod("InitializeClientSide");
-                        //initServer.Invoke(IMBNetwork.GetValue(null), new object[] { "127.0.0.1", 14890, 0, 0 });
-                        GameNetwork.Initialize(new GameNetworkHandler());
-                        GameNetwork.InitializeCompressionInfos();
-                        GameNetwork.StartMultiplayerOnClient("127.0.0.1", 15801, 1, 1);
-                        BannerlordNetwork.StartMultiplayerLobbyMission(LobbyMissionType.Custom);
-
-
-
+                        mCache1 = ActionIndexCache.act_none;
                     }
-
+                    PlayerTickInfo tickInfo;
+                    if (hostPlayerTickInfo.ContainsKey(mbAgent.Index))
+                    {
+                        tickInfo = hostPlayerTickInfo[mbAgent.Index];   
+                    }
+                    else { 
+                        tickInfo = new PlayerTickInfo();
+                        hostPlayerTickInfo[mbAgent.Index] = tickInfo;
+                    }
+                    tickInfo.Id = agent.AgentID;
+                    tickInfo.PosX = myPos.X;
+                    tickInfo.PosY = myPos.Y;
+                    tickInfo.PosZ = myPos.Z;
+                    tickInfo.MovementFlag = movementFlag;
+                    tickInfo.EventFlag = eventFlag;
+                    tickInfo.MovementDirectionX = movementDirection.X;
+                    tickInfo.MovementDirectionY = movementDirection.Y;
+                    tickInfo.InputVectorX = inputVector.X;
+                    tickInfo.InputVectorY = inputVector.Y;
+                    tickInfo.Action0CodeType = (int)actionTypeCh0;
+                    tickInfo.Action0Index = cache0.Index;
+                    tickInfo.Action0Progress = progress0;
+                    tickInfo.Action0Flag = (ulong)flags0;
+                    tickInfo.Action1CodeType = (int)actionTypeCh1;
+                    tickInfo.Action1Index = cache1.Index;
+                    tickInfo.Action1Progress = progress1;
+                    tickInfo.Action1Flag = (ulong)flags1;
+                    tickInfo.LookDirectionX = lookDirection.X;
+                    tickInfo.LookDirectionY = lookDirection.Y;
+                    tickInfo.LookDirectionZ = lookDirection.Z;
+                    tickInfo.crouchMode = Mission.Current.MainAgent.CrouchMode;
+                    tickInfo.MainHandIndex = (int)Mission.Current.MainAgent.GetWieldedItemIndex(Agent.HandIndex.MainHand);
+                    tickInfo.OffHandIndex = (int)Mission.Current.MainAgent.GetWieldedItemIndex(Agent.HandIndex.OffHand);
 
                 }
-
-
+                catch { }
             }
+
+            
+
         }
+
+
+
     }
+}
