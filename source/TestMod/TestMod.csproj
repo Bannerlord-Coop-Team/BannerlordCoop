@@ -249,11 +249,13 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ClientAgentManager.cs" />
     <Compile Include="CustomGameNetworkHandler.cs" />
     <Compile Include="CustomMissionBehavior.cs" />
     <Compile Include="CustomSandboxGame.cs" />
     <Compile Include="IOCreateMissile.cs" />
     <Compile Include="MySubModule.cs" />
+    <Compile Include="NetworkAgent.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
