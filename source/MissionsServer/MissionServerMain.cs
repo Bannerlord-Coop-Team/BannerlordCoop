@@ -112,8 +112,14 @@ namespace MissionsServer
                     {
                         return;
                     }
+                    
+                    foreach (PlayerTickInfo info in playerSyncDict[fromPeer.Id])
+                    {
+                        ServerAgentManager.Instance().RemoveAgent(info.Id);
+                        Console.WriteLine("Client ID " + fromPeer.Id + " has removed agent: " + info.Id);
+                    }
                     clientToLocation.TryRemove(fromPeer.Id, out _);
-                    foreach(int clientId in locationToClients[locationName].Where(c => c != fromPeer.Id))
+                    foreach (int clientId in locationToClients[locationName].Where(c => c != fromPeer.Id))
                     {
                         NetDataWriter writer = new NetDataWriter();
                         writer.Put((uint)MessageType.ExitLocation);
@@ -122,6 +128,7 @@ namespace MissionsServer
 
                     }
                     locationToClients[locationName].Remove(fromPeer.Id);
+                    playerSyncDict.TryRemove(fromPeer.Id, out _);
                 }
                 else if (messageType == MessageType.PlayerSync)
                 {
@@ -158,7 +165,7 @@ namespace MissionsServer
                 {
                     int senderClientId = fromPeer.Id;
                     int agentIndex = dataReader.GetInt();
-                    string id = ServerAgentManager.Instance().getAgentID(senderClientId, agentIndex);
+                    string id = ServerAgentManager.Instance().GetAgentID(senderClientId, agentIndex);
                     NetDataWriter writer = new NetDataWriter();
                     writer.Put((uint)MessageType.AddAgent);
                     writer.Put(agentIndex);

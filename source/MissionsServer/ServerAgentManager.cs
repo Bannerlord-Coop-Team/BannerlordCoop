@@ -22,7 +22,7 @@ namespace MissionsServer
             }
             return instance;
         }
-        public string getAgentID(int clientId, int agentIndex)
+        public string GetAgentID(int clientId, int agentIndex)
         {
             if(clientInfoToAgentIDMap.ContainsKey((clientId, agentIndex)))
             {
@@ -34,9 +34,16 @@ namespace MissionsServer
             return agentID;
         }
 
-        public (int, int) getClientInfo(string agentId)
+        public (int, int) GetClientInfo(string agentId)
         {
             return agentIDToClientInfoMap[agentId];
+        }
+
+        public void RemoveAgent(string agentId)
+        {
+            (int, int) clientInfo = this.GetClientInfo(agentId);
+            this.agentIDToClientInfoMap.TryRemove(agentId, out _);
+            this.clientInfoToAgentIDMap.TryRemove(clientInfo, out _);
         }
     }
 }

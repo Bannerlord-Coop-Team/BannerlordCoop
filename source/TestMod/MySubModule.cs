@@ -66,7 +66,6 @@ namespace CoopTestMod
         ConcurrentQueue<(int, int, string, bool)> agentCreationQueue = new ConcurrentQueue<(int, int, string, bool)>();
 
 
-        HashSet<uint> serverAgents = new HashSet<uint>();
 
         Vec2 mInputVector;
         AnimFlags mFlags1;
@@ -433,8 +432,8 @@ namespace CoopTestMod
 
                     else if (messageType == MessageType.ExitLocation)
                     {
-                        int peerId = dataReader.GetInt();
-                        despawnAgentQueue.Enqueue(peerId);
+                        int clientId = dataReader.GetInt();
+                        despawnAgentQueue.Enqueue(clientId);
                     }
                     else if (messageType == MessageType.ConnectionId)
                     {
@@ -667,8 +666,8 @@ namespace CoopTestMod
                     InformationManager.DisplayMessage(new InformationMessage("This is a damage to a local agent, ignoring..."));
                     return true;
                 }
-                writer.Put(ClientAgentManager.Instance().getIdFromIndex(victim.Index));
-                writer.Put(ClientAgentManager.Instance().getIdFromIndex(attacker.Index));
+                writer.Put(ClientAgentManager.Instance().GetIdFromIndex(victim.Index));
+                writer.Put(ClientAgentManager.Instance().GetIdFromIndex(attacker.Index));
                 InformationManager.DisplayMessage(new InformationMessage("Sending Damage: " + b.InflictedDamage + " to server "));
                 writer.Put(b.InflictedDamage);
                 client.SendToAll(writer, DeliveryMethod.ReliableOrdered);
@@ -711,10 +710,14 @@ namespace CoopTestMod
                 //    writer.Put(__result.Index);
                 //}
                 if (Mission.Current == null || Mission.Current.PlayerTeam == null) return;
-                if (__result.Team != Mission.Current.PlayerTeam)
+                try
                 {
-                    return;
+                    if (__result.Team != Mission.Current.PlayerTeam)
+                    {
+                        return;
+                    }
                 }
+                catch { }
                 NetDataWriter writer = new NetDataWriter();
                 writer.Put((uint)MessageType.AddAgent);
                 writer.Put(__result.Index);
@@ -789,6 +792,7 @@ namespace CoopTestMod
             public static void Postfix()
             {
 
+                ClientAgentManager.Instance().ClearAll();
                 hostPlayerTickInfo.Clear();
                 agentUpdateState.Clear();
                 playerTickInfo.Clear();
@@ -882,16 +886,15 @@ namespace CoopTestMod
 
             while (!despawnAgentQueue.IsEmpty())
             {
-                int clientId = -1;
+                int clientId ;
                 despawnAgentQueue.TryDequeue(out clientId);
-                foreach (Agent agent in playerTickInfo[clientId].Values)
-                {
-                    agent.FadeOut(false, true);
-                }
 
                 foreach (string agentId in playerTickInfo[clientId].Keys)
                 {
+                    int index = ClientAgentManager.Instance().GetIndexFromId(agentId);
+                    Mission.Current.FindAgentWithIndex(index).FadeOut(false, true);
                     agentUpdateState.TryRemove(agentId, out _);
+
                 }
 
                 playerTickInfo[clientId].Clear();
@@ -909,7 +912,7 @@ namespace CoopTestMod
                 if (gameEntity == null) return;
                 Agent agent = SpawnAgent(CharacterObject.PlayerCharacter, gameEntity.GetFrame());
                 NetworkAgent networkAgent = new NetworkAgent(agentState.clientId, agent.Index, agentState.id, agent, false);
-                ClientAgentManager.Instance().addNetworkAgent(networkAgent);
+                ClientAgentManager.Instance().AddNetworkAgent(networkAgent);
                 //uint id = agent.Character.Id.SubId;
                 playerTickInfo[agentState.clientId][agentState.id] = agent;
 
@@ -930,8 +933,8 @@ namespace CoopTestMod
                 (int, string, string, float) d;
                 damageQueue.TryDequeue(out d);
                 InformationManager.DisplayMessage(new InformationMessage("Damaged from: " + d.Item1 + " from agent : " + d.Item2 + " to agent: " + d.Item3 + " of " + d.Item4));
-                Agent effectectedAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().getIndexFromId(d.Item2));
-                Agent effectorAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().getIndexFromId(d.Item3));
+                Agent effectectedAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().GetIndexFromId(d.Item2));
+                Agent effectorAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().GetIndexFromId(d.Item3));
                 Blow b = new Blow();
                 b.InflictedDamage = (int)d.Item4;
                 b.OwnerId = effectorAgent.Index;
@@ -947,7 +950,7 @@ namespace CoopTestMod
                 agentCreationQueue.TryDequeue(out agentCreationState);
                 Agent agent = Mission.Current.FindAgentWithIndex(agentCreationState.Item2);
                 NetworkAgent networkAgent = new NetworkAgent(agentCreationState.Item1, agentCreationState.Item2, agentCreationState.Item3, agent, agentCreationState.Item4);
-                ClientAgentManager.Instance().addNetworkAgent(networkAgent);
+                ClientAgentManager.Instance().AddNetworkAgent(networkAgent);
                 InformationManager.DisplayMessage(new InformationMessage("A new agent was added from the network with Peer ID: " + agentCreationState.Item1 + " | Index: " + agentCreationState.Item2 + " | Server ID: " + agentCreationState.Item3 + " | Network Host: " + agentCreationState.Item4));
             }
 
@@ -979,10 +982,11 @@ namespace CoopTestMod
                 return;
             }
 
-            foreach(NetworkAgent agent in ClientAgentManager.Instance().getHostNetworkAgents())
+            foreach(NetworkAgent agent in ClientAgentManager.Instance().GetHostNetworkAgents())
             {
-                if(agent.AgentID != null)
+                if(agent.Agent == null)
                 {
+                    return;
                 }
                 Agent mbAgent = agent.Agent;
                 try
