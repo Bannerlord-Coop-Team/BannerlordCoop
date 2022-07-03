@@ -7,13 +7,13 @@
     public enum EFieldChangeAction
     {
         /// <summary>
-        ///     The change to the field is kept.
+        ///     The change to the field is allowed.
         /// </summary>
-        Keep,
+        Allow,
 
         /// <summary>
-        ///     The change to the field is reverted.
+        ///     The change to the field is denied.
         /// </summary>
-        Revert
+        Deny
     }
 }

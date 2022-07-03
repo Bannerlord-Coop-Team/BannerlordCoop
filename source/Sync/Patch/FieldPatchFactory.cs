@@ -9,20 +9,32 @@ using Sync.Value;
 
 namespace Sync.Patch
 {
-    public class FieldPatchFactory
+    public class FieldPatcher
     {
-        private static MethodInfo _transpiler = typeof(FieldPatchFactory).GetMethod("Transpiler", BindingFlags.NonPublic | BindingFlags.Static);
+        #region Static
+        static void GenericIntercept<T>(T newValue, object instance, int id)
+        {
+            FieldPatch patch = FieldPatch.FieldPatches[id];
+            lock(patch.Field)
+            {
+                if (patch.ChangeAllowed() == Behaviour.EFieldChangeAction.Allow)
+                {
+                    patch.Field.SetValue(instance, newValue);
+                }
+            }
+        }
 
-        private static Dictionary<MethodBase, List<FieldBase>> _fields = new Dictionary<MethodBase, List<FieldBase>>();
+        private static MethodInfo _hookMethod = typeof(FieldPatcher).GetMethod(nameof(FieldPatcher.GenericIntercept), BindingFlags.NonPublic | BindingFlags.Static);
+
+        private static MethodInfo _transpiler = typeof(FieldPatcher).GetMethod(nameof(FieldPatcher.Transpiler), BindingFlags.NonPublic | BindingFlags.Static);
+
+        private static Dictionary<MethodBase, List<FieldPatch>> _fields = new Dictionary<MethodBase, List<FieldPatch>>();
 
         private static readonly Dictionary<MethodBase, MethodInfo> Transpilers =
             new Dictionary<MethodBase, MethodInfo>();
+        #endregion
 
-        public static MethodInfo hookMethod { get; set; }
-        public static FieldInfo tempField { get; set; }
-
-        public static void AddTranspiler(PatchedInvokable access,
-                                         MethodInfo dispatcher)
+        public static void AddTranspiler(PatchedInvokable access)
         {
             lock (Patcher.HarmonyLock)
             {
@@ -35,27 +47,32 @@ namespace Sync.Patch
                 };
                 MethodInfo patchedMethod = Patcher.HarmonyInstance.Patch(access.Original, transpiler: patch);
 
-                Transpilers.Add(access.Original, patchedMethod);
+                if (Transpilers.ContainsKey(access.Original))
+                {
+                    Transpilers[access.Original] = patchedMethod;
+                }
+                else
+                {
+                    Transpilers.Add(access.Original, patchedMethod);
+                }
             }
         }
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instr, MethodBase original)
         {
             List<CodeInstruction> lInstrs = instr.ToList();
-            foreach(FieldBase field in _fields[original])
+            foreach(FieldPatch field in _fields[original])
             {
-                ReplaceNativeAssign(lInstrs, field, hookMethod);
+                ReplaceNativeAssign(lInstrs, field);
             }
             
             return lInstrs;
         }
 
         public static void GeneratePatch(
-            FieldId fieldId,
-            MethodInfo caller,
-            MethodInfo interceptMethod)
+            FieldPatch field,
+            MethodInfo caller)
         {
-            var field = Registry.IdToField[fieldId];
             if (_fields.ContainsKey(caller) &&
                 !_fields[caller].Contains(field))
             {
@@ -63,7 +80,7 @@ namespace Sync.Patch
             }
             else
             {
-                _fields.Add(caller, new List<FieldBase> { field });
+                _fields.Add(caller, new List<FieldPatch> { field });
             }
         }
 
@@ -76,31 +93,8 @@ namespace Sync.Patch
             }
         }
 
-        static void ReplaceNativeAssign(List<CodeInstruction> codeInstructions, FieldBase field, MethodInfo hookMethod)
+        static void ReplaceNativeAssign(List<CodeInstruction> codeInstructions, FieldPatch fieldPatch)
         {
-            // Validation
-            //if (hookMethod.GetParameters().Length != 2)
-            //{
-            //    throw new InvalidOperationException("Invalid parameters. " +
-            //        "Hook method expects (int value, ref int field) parameters");
-            //}
-
-            //Type parameterValueType = hookMethod.GetParameters()[0].ParameterType;
-
-            //if (!parameterValueType.IsAssignableFrom(field.FieldType))
-            //{
-            //    throw new InvalidCastException("Invalid parameter type. " +
-            //        $"expected {field.FieldType} but got {parameterValueType}");
-            //}
-
-            //Type fieldReferenceType = hookMethod.GetParameters()[1].ParameterType;
-
-            //if (!fieldReferenceType.IsAssignableFrom(field.FieldType.MakeByRefType()))
-            //{
-            //    throw new InvalidCastException("Invalid parameter type. " +
-            //        $"expected {field.FieldType} but got {fieldReferenceType}");
-            //}
-
             MethodInfo getTypeFromHandle = typeof(Type).GetMethod("GetTypeFromHandle");
 
             MethodInfo GetField = typeof(Type).GetMethod(
@@ -113,52 +107,31 @@ namespace Sync.Patch
                     typeof(BindingFlags),
                 }, 
                 null);
-            
+
+            FieldInfo field = fieldPatch.Field;
+
             var isPublic = field.IsPublic ? BindingFlags.Public : BindingFlags.NonPublic;
             var isStatic = field.IsStatic ? BindingFlags.Static : BindingFlags.Instance;
 
             CodeInstruction[] assignmentInterceptBlock =
             {
                 new CodeInstruction(OpCodes.Ldarg_0),
-                new CodeInstruction(OpCodes.Ldtoken, field.DeclaringType),
-                new CodeInstruction(OpCodes.Call, getTypeFromHandle),
-                new CodeInstruction(OpCodes.Ldstr, field.Name),
-                new CodeInstruction(OpCodes.Ldc_I4, (int)(isPublic | isStatic)),
-                new CodeInstruction(OpCodes.Callvirt, GetField),
-                new CodeInstruction(OpCodes.Call, hookMethod.MakeGenericMethod(field.FieldType)),
+                new CodeInstruction(OpCodes.Ldc_I4, fieldPatch.Id),
+                new CodeInstruction(OpCodes.Call, _hookMethod.MakeGenericMethod(field.FieldType)),
 
             };
 
             CodeInstruction[] assignmentInterceptBlockStatic =
             {
                 new CodeInstruction(OpCodes.Ldnull),
-                new CodeInstruction(OpCodes.Ldtoken, field.DeclaringType),
-                new CodeInstruction(OpCodes.Call, getTypeFromHandle),
-                new CodeInstruction(OpCodes.Ldstr, field.Name),
-                new CodeInstruction(OpCodes.Ldc_I4, (int)(isPublic | isStatic)),
-                new CodeInstruction(OpCodes.Callvirt, GetField),
-                new CodeInstruction(OpCodes.Call, hookMethod.MakeGenericMethod(field.FieldType)),
-            };
-
-            CodeInstruction[] byRefInterceptBlockPre =
-            {
-                new CodeInstruction(OpCodes.Ldsflda, tempField),
-            };
-
-            CodeInstruction[] byRefInterceptBlockPost =
-            {
-                new CodeInstruction(OpCodes.Ldsfld, tempField),
-                new CodeInstruction(OpCodes.Ldarg_0),
-                new CodeInstruction(OpCodes.Ldflda, field),
-                new CodeInstruction(OpCodes.Call, hookMethod),
+                new CodeInstruction(OpCodes.Ldc_I4, fieldPatch.Id),
+                new CodeInstruction(OpCodes.Call, _hookMethod.MakeGenericMethod(field.FieldType)),
             };
 
             Stack<int> classRefernceStack = new Stack<int>();
 
             for (int i = 0; i < codeInstructions.Count; i++)
             {
-                
-
                 var instr = codeInstructions[i];
                 if (instr.opcode == OpCodes.Ldarg_0)
                 {

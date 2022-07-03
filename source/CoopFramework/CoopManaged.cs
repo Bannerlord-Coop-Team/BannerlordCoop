@@ -425,9 +425,10 @@ namespace CoopFramework
             }
 
 
+            // TODO
             //foreach (var patchedField in Util.SortByField(m_DefinedBehaviours))
             //    SetupFieldHandlers(self, patchedField.Key, patchedField.Value);
-            SetupFieldHandlers(self, Util.SortByFieldAccessors(m_DefinedBehaviours));
+
         }
 
         /// <summary>
@@ -549,99 +550,7 @@ namespace CoopFramework
             {
                 IEnumerable<FieldId> _fields = FieldAccessBehaviourBuilder.MethodsWithPatchedFields[accessor].Distinct();
 
-                foreach(var field in _fields)
-                {
-                    if(ActionValidatorRegistry.)
-                    FieldInfo fieldInfo = 
-                }
-                FieldPatchFactory.GeneratePatch()
                 FieldAccessBehaviourBuilder.MethodsWithPatchedFields.Remove(accessor);
-            }
-
-            var method = Registry.IdToInvokable[id];
-            var fields = relevantBehaviours.SelectMany(b => b.);
-
-            var methodRelevantBehaviours = relevantBehaviours
-                    .Where(f => f..Contains(accessor))
-                    .Select(f => f.Behaviour).ToArray();
-            FieldPatchFactory.GeneratePatch()
-            method.
-            
-            foreach (var accessor in accessors)
-            {
-                var methodRelevantBehaviours = relevantBehaviours
-                    .Where(f => f.Accessors.Contains(accessor))
-                    .Select(f => f.Behaviour).ToArray();
-
-                foreach (var field in methodRelevantBehaviours)
-                {
-                    field.SynchronizationFactory
-                }
-
-                var intercept = accessor.Transpiler.GlobalHandler;
-                accessor.Transpiler.SetGlobalHandler((eOrigin, target) =>
-                {
-
-
-                    if (!CoopFramework.IsEnabled || target != null)
-                        // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
-                        return ECallPropagation.CallOriginal;
-                    if (intercept?.Invoke(eOrigin, null) == ECallPropagation.Skip) return ECallPropagation.Skip;
-                    return DispatchFieldIntercept(self, eOrigin, methodRelevantBehaviours, field);
-                });
-
-
-                if (self == null)
-                {
-                    var prefix = accessor.Prefix.GlobalPrefixHandler;
-                    if (prefix != null)
-                        // Allow for incremental patching by combining the existing handler with the new one
-                        accessor.Prefix.RemoveGlobalHandler();
-
-
-                    var postfix = accessor.Postfix.GlobalHandler;
-                    if (postfix != null)
-                        // Allow for incremental patching by combining the existing handler with the new one
-                        accessor.Postfix.RemoveGlobalHandler();
-                    accessor.Postfix.SetGlobalHandler((eOrigin, target, args) =>
-                    {
-                        if (!CoopFramework.IsEnabled || target != null)
-                            // Default behaviour: instance methods are handled by the corresponding CoopManaged instance.
-                            return;
-                        DispatchPostfix(null, eOrigin, methodRelevantBehaviours);
-                        postfix?.Invoke(eOrigin, null, args);
-                    });
-                }
-                else
-                {
-                    // Instance patch
-                    var prefix = accessor.Prefix.GetHandler(instanceResolved);
-                    if (prefix != null)
-                        // Allow for incremental patching by combining the existing handler with the new one
-                        accessor.Prefix.RemoveHandler(instanceResolved);
-
-                    accessor.Prefix.SetHandler(instanceResolved,
-                        (origin, args) =>
-                        {
-                            if (!CoopFramework.IsEnabled) return ECallPropagation.CallOriginal;
-                            if (prefix?.Invoke(origin, args) == ECallPropagation.Skip) return ECallPropagation.Skip;
-                            return DispatchPrefix(self, origin, methodRelevantBehaviours, field);
-                        });
-
-                    var postfix = accessor.Postfix.GetHandler(instanceResolved);
-                    if (postfix != null)
-                        // Allow for incremental patching by combining the existing handler with the new one
-                        accessor.Postfix.RemoveHandler(instanceResolved);
-
-                    accessor.Postfix.SetHandler(instanceResolved,
-                        (origin, args) =>
-                        {
-                            if (!CoopFramework.IsEnabled) return;
-
-                            DispatchPostfix(self, origin, methodRelevantBehaviours);
-                            postfix?.Invoke(origin, args);
-                        });
-                }
             }
         }
 
@@ -668,7 +577,7 @@ namespace CoopFramework
             {
                 if (!behaviour.AppliesTo(eOriginator, instanceResolved)) return;
 
-                var changes = FieldStack.PopUntilMarker(behaviour.Action == EFieldChangeAction.Revert);
+                var changes = FieldStack.PopUntilMarker(behaviour.Action == EFieldChangeAction.Deny);
                 if (behaviour.DoBroadcast) behaviour.SynchronizationFactory()?.Broadcast(changes);
             }
         }

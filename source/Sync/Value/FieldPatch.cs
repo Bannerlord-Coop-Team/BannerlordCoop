@@ -1,29 +1,36 @@
-﻿using System;
+﻿using Sync.Behaviour;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Sync.Value
 {
-    public class FieldPatch
+    // TODO add documentation
+    public readonly struct FieldPatch
     {
-        public Dictionary<Tuple<MethodBase, FieldInfo>, FieldPatch> FieldPatches { get; } =
-            new Dictionary<Tuple<MethodBase, FieldInfo>, FieldPatch>();
+        static int _nextId = 0;
 
-        MethodInfo caller;
-        MethodInfo interceptMethod;
-        FieldInfo field;
+        public static ConcurrentDictionary<int, FieldPatch> FieldPatches { get; } =
+            new ConcurrentDictionary<int, FieldPatch>();
 
-        public FieldPatch(MethodInfo caller, FieldInfo field, MethodInfo intercept)
+        public delegate EFieldChangeAction ChangeAllowedDelegate();
+
+        public readonly int Id;
+        public readonly ChangeAllowedDelegate ChangeAllowed;
+        public readonly FieldInfo Field;
+
+        public FieldPatch(FieldInfo field, ChangeAllowedDelegate changeAllowedDelegate)
         {
-            this.caller = caller;
-            this.field = field;
+            ChangeAllowed = changeAllowedDelegate;
+            Field = field;
 
-            interceptMethod = intercept;
+            Id = Interlocked.Increment(ref _nextId);
+            FieldPatches.TryAdd(Id, this);
         }
-
-        
     }
 }

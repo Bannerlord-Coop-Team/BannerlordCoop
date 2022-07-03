@@ -95,7 +95,6 @@
     <Compile Include="Call\Transpiler.cs" />
     <Compile Include="Patch\ConstructorPatch.cs" />
     <Compile Include="Patch\DestructorPatch.cs" />
-    <Compile Include="Patch\FieldPatch.cs" />
     <Compile Include="Patch\FieldPatchFactory.cs" />
     <Compile Include="Patch\GetPrefixBuilder.cs" />
     <Compile Include="Patch\MethodPatch.cs" />

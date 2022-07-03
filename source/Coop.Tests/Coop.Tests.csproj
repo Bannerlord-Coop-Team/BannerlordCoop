@@ -37,6 +37,7 @@
     <ProjectReference Include="..\CoopFramework\CoopFramework.csproj" />
     <ProjectReference Include="..\Coop\Coop.csproj" />
     <ProjectReference Include="..\RemoteAction\RemoteAction.csproj" />
+    <ProjectReference Include="..\Sync\Sync.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,1 @@
+Create an environment variable called "COOP_LOG" and point it to this folder.

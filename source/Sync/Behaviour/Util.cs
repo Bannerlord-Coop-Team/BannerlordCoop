@@ -57,46 +57,5 @@ namespace Sync.Behaviour
 
             return applicableBehaviours;
         }
-
-        /// <summary>
-        ///     Sorts a behaviour list by the <see cref="FieldId"/> of the fields they apply to.
-        /// </summary>
-        /// <param name="allBehaviours"></param>
-        /// <returns></returns>
-        public static Dictionary<PatchedInvokable, List<FieldAccessBehaviourBuilder>> SortByFieldAccessors(
-            List<ActionBehaviourBuilder> allBehaviours)
-        {
-            var applicableAccessors =
-                new Dictionary<PatchedInvokable, List<FieldAccessBehaviourBuilder>>();
-
-
-
-            foreach (var patchedField in patchedFields)
-            {
-                var fieldBehaviours = allBehaviours
-                    .Where(a => a.FieldChangeAction.ContainsKey(patchedField))
-                    .Select(a => a.FieldChangeAction[patchedField]);
-
-                foreach(var fieldBehavior in fieldBehaviours)
-                {
-                    foreach(var accessor in fieldBehavior.Accessors)
-                    {
-                        if (applicableAccessors.ContainsKey(accessor))
-                        {
-                            if (!applicableAccessors[accessor].Contains(fieldBehavior))
-                            {
-                                applicableAccessors[accessor].Add(fieldBehavior);
-                            }
-                        }
-                        else
-                        {
-                            applicableAccessors.Add(accessor, new List<FieldAccessBehaviourBuilder>(fieldBehaviours));
-                        }
-                    }
-                }
-            }
-
-            return applicableAccessors;
-        }
     }
 }

@@ -87,7 +87,7 @@ namespace Sync.Value
         public override string ToString()
         {
             return
-                $"{typeof(TValueObject).Name} {DeclaringType?.Name}.[{string.Join(", ", Fields.Select(f => f.MemberInfo.Name))}])";
+                $"{typeof(TValueObject).Name} {DeclaringType?.Name}.[{string.Join(", ", Fields.Select(f => f.FieldInfo.Name))}])";
         }
     }
 

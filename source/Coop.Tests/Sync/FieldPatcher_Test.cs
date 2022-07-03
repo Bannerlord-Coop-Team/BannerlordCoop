@@ -1,5 +1,9 @@
 ﻿using HarmonyLib;
+using Sync;
+using Sync.Behaviour;
+using Sync.Call;
 using Sync.Patch;
+using Sync.Value;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,7 +19,7 @@ namespace Coop.Tests.Sync
     class TestClass
     {
         public int MyVar = 0;
-        public int MyVar2 = 0;
+        public int MyVar2 = 2;
         public static int MyStaticVar = 0;
         public void AssignFieldWithParam(int x = 5)
         {
@@ -77,42 +81,168 @@ namespace Coop.Tests.Sync
         }
     }
 
-    public class FieldPatcher_Test
+    [Collection("FieldPatcher")]
+    public class FieldPatcherAllow_Test
     {
-        static int Calls = 0;
-        static int Temp;
-        static bool Allowed;
-
-        public FieldPatcher_Test()
+        public EFieldChangeAction ChangeGate()
         {
-            Calls = 0;
+            return EFieldChangeAction.Allow;
         }
 
-        public static void InterceptMethod<T>(T variable, object instance, FieldInfo field)
+        [Fact]
+        private void AllowSingleAssignmentInterception()
         {
-            if (Allowed)
-            {
-                field.SetValue(instance, variable);
-            }
-            Calls += 1;
+            MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignFieldWithParam));
+            FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
+
+            FieldPatch patch = new FieldPatch(field, ChangeGate);
+            PatchedInvokable invokable = new PatchedInvokable(caller, typeof(TestClass));
+
+            FieldPatcher.GeneratePatch(patch, caller);
+            FieldPatcher.AddTranspiler(invokable);
+
+            TestClass testClass = new TestClass();
+
+            testClass.AssignFieldWithParam(100);
+
+            Assert.Equal(100, testClass.MyVar);
+        }
+
+        [Fact]
+        private void AllowSingleStaticAssignmentInterception()
+        {
+            MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignStaticFieldWithParam));
+            FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyStaticVar));
+
+            FieldPatch patch = new FieldPatch(field, ChangeGate);
+            PatchedInvokable invokable = new PatchedInvokable(caller, typeof(TestClass));
+
+            FieldPatcher.GeneratePatch(patch, caller);
+            FieldPatcher.AddTranspiler(invokable);
+
+            TestClass testClass = new TestClass();
+
+            testClass.AssignStaticFieldWithParam(100);
+
+            Assert.Equal(100, TestClass.MyStaticVar);
+        }
+
+        [Fact]
+        private void AllowMultiAssignmentInterception()
+        {
+            MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignMultiFieldsWithParam));
+            FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
+            FieldInfo field2 = typeof(TestClass).GetField(nameof(TestClass.MyVar2));
+
+            FieldPatch patch = new FieldPatch(field, ChangeGate);
+            FieldPatch patch2 = new FieldPatch(field2, ChangeGate);
+            PatchedInvokable invokable = new PatchedInvokable(caller, typeof(TestClass));
+
+            FieldPatcher.GeneratePatch(patch, caller);
+            FieldPatcher.GeneratePatch(patch2, caller);
+            FieldPatcher.AddTranspiler(invokable);
+
+            TestClass testClass = new TestClass();
+
+            int value = 100;
+            testClass.AssignMultiFieldsWithParam(value);
+
+            Assert.Equal(value, testClass.MyVar);
+            Assert.Equal(testClass.MyVar * value + 1000, testClass.MyVar2);
+        }
+
+        [Fact]
+        private void AllowLargeAssignmentInterception()
+        {
+            MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignMultiFieldsWithParamLarge));
+            FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
+
+            FieldPatch patch = new FieldPatch(field, ChangeGate);
+            PatchedInvokable invokable = new PatchedInvokable(caller, typeof(TestClass));
+
+            FieldPatcher.GeneratePatch(patch, caller);
+            FieldPatcher.AddTranspiler(invokable);
+
+            TestClass testClass = new TestClass();
+
+            testClass.AssignMultiFieldsWithParamLarge(100);
+
+            Assert.Equal(testClass.MyVar2, testClass.MyVar);
+        }
+
+        // TODO manage byRef
+        //[Fact]
+        //private void ByRefAssignmentInterception()
+        //{
+        //    MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignFieldByRef));
+        //    FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
+        //    FieldInfo tmpField = typeof(FieldPatcher_Test).GetField(nameof(Temp), BindingFlags.NonPublic | BindingFlags.Static);
+
+        //    FieldPatcher.hookMethod = intercept;
+        //    FieldPatcher.tempField = tmpField;
+        //    FieldPatcher.GeneratePatch(field, caller, intercept);
+        //    FieldPatcher.ReplaceMethod(caller);
+
+        //    TestClass testClass = new TestClass();
+
+        //    testClass.AssignFieldByRef(100);
+
+        //    Assert.Equal(1, Calls);
+        //    Assert.Equal(0, testClass.MyVar);
+        //}
+
+        //[Fact]
+        //private void ByRefAssignmentInterceptionLarge()
+        //{
+        //    MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignMultiFieldsByRefLarge));
+        //    MethodInfo intercept = typeof(FieldPatcher_Test).GetMethod(nameof(FieldPatcher_Test.InterceptMethod));
+        //    FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
+        //    FieldInfo tmpField = typeof(FieldPatcher_Test).GetField(nameof(Temp), BindingFlags.NonPublic | BindingFlags.Static);
+
+        //    FieldPatcher.hookMethod = intercept;
+        //    FieldPatcher.tempField = tmpField;
+        //    FieldPatcher.GeneratePatch(field, caller, intercept);
+        //    FieldPatcher.ReplaceMethod(caller);
+
+        //    TestClass testClass = new TestClass();
+
+        //    testClass.AssignMultiFieldsByRefLarge(100);
+
+        //    Assert.Equal(3, Calls);
+        //    Assert.Equal(0, testClass.MyVar);
+        //}
+    }
+
+    [Collection("FieldPatcher")]
+    public class FieldPatcherDeny_Test
+    {
+        public FieldPatcherDeny_Test()
+        {
+            FieldPatch.FieldPatches.Clear();
+            FieldPatcher.UnpatchAll();
+        }
+
+        public EFieldChangeAction ChangeGate()
+        {
+            return EFieldChangeAction.Deny;
         }
 
         [Fact]
         private void SingleAssignmentInterception()
         {
             MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignFieldWithParam));
-            MethodInfo intercept = typeof(FieldPatcher_Test).GetMethod(nameof(FieldPatcher_Test.InterceptMethod));
             FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
 
-            FieldPatchFactory.hookMethod = intercept;
-            FieldPatchFactory.GeneratePatch(field, caller, intercept);
-            FieldPatchFactory.ReplaceMethod(caller);
+            FieldPatch patch = new FieldPatch(field, ChangeGate);
+            PatchedInvokable invokable = new PatchedInvokable(caller, typeof(TestClass));
+
+            FieldPatcher.GeneratePatch(patch, caller);
+            FieldPatcher.AddTranspiler(invokable);
 
             TestClass testClass = new TestClass();
 
             testClass.AssignFieldWithParam(100);
 
-            Assert.Equal(1, Calls);
             Assert.Equal(0, testClass.MyVar);
         }
 
@@ -120,101 +250,103 @@ namespace Coop.Tests.Sync
         private void SingleStaticAssignmentInterception()
         {
             MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignStaticFieldWithParam));
-            MethodInfo intercept = typeof(FieldPatcher_Test).GetMethod(nameof(FieldPatcher_Test.InterceptMethod));
             FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyStaticVar));
 
-            FieldPatchFactory.hookMethod = intercept;
-            FieldPatchFactory.GeneratePatch(field, caller, intercept);
-            FieldPatchFactory.ReplaceMethod(caller);
+            FieldPatch patch = new FieldPatch(field, ChangeGate);
+            PatchedInvokable invokable = new PatchedInvokable(caller, typeof(TestClass));
+
+            FieldPatcher.GeneratePatch(patch, caller);
+            FieldPatcher.AddTranspiler(invokable);
 
             TestClass testClass = new TestClass();
 
             testClass.AssignStaticFieldWithParam(100);
 
-            Assert.Equal(1, Calls);
-            Assert.Equal(0, testClass.MyVar);
+            Assert.Equal(0, TestClass.MyStaticVar);
         }
 
         [Fact]
         private void MultiAssignmentInterception()
         {
             MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignMultiFieldsWithParam));
-            MethodInfo intercept = typeof(FieldPatcher_Test).GetMethod(nameof(FieldPatcher_Test.InterceptMethod));
             FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
             FieldInfo field2 = typeof(TestClass).GetField(nameof(TestClass.MyVar2));
 
-            FieldPatchFactory.hookMethod = intercept;
-            FieldPatchFactory.GeneratePatch(field, caller, intercept);
-            FieldPatchFactory.GeneratePatch(field2, caller, intercept);
-            FieldPatchFactory.ReplaceMethod(caller);
+            FieldPatch patch = new FieldPatch(field, ChangeGate);
+            FieldPatch patch2 = new FieldPatch(field2, ChangeGate);
+            PatchedInvokable invokable = new PatchedInvokable(caller, typeof(TestClass));
+
+            FieldPatcher.GeneratePatch(patch, caller);
+            FieldPatcher.GeneratePatch(patch2, caller);
+            FieldPatcher.AddTranspiler(invokable);
 
             TestClass testClass = new TestClass();
 
             testClass.AssignMultiFieldsWithParam(100);
 
-            Assert.Equal(2, Calls);
             Assert.Equal(0, testClass.MyVar);
+            Assert.Equal(2, testClass.MyVar2);
         }
 
         [Fact]
         private void LargeAssignmentInterception()
         {
             MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignMultiFieldsWithParamLarge));
-            MethodInfo intercept = typeof(FieldPatcher_Test).GetMethod(nameof(FieldPatcher_Test.InterceptMethod));
             FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
 
-            FieldPatchFactory.hookMethod = intercept;
-            FieldPatchFactory.GeneratePatch(field, caller, intercept);
-            FieldPatchFactory.ReplaceMethod(caller);
+            FieldPatch patch = new FieldPatch(field, ChangeGate);
+            PatchedInvokable invokable = new PatchedInvokable(caller, typeof(TestClass));
+
+            FieldPatcher.GeneratePatch(patch, caller);
+            FieldPatcher.AddTranspiler(invokable);
 
             TestClass testClass = new TestClass();
 
             testClass.AssignMultiFieldsWithParamLarge(100);
 
-            Assert.Equal(4, Calls);
             Assert.Equal(0, testClass.MyVar);
         }
 
-        [Fact]
-        private void ByRefAssignmentInterception()
-        {
-            MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignFieldByRef));
-            MethodInfo intercept = typeof(FieldPatcher_Test).GetMethod(nameof(FieldPatcher_Test.InterceptMethod));
-            FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
-            FieldInfo tmpField = typeof(FieldPatcher_Test).GetField(nameof(Temp), BindingFlags.NonPublic | BindingFlags.Static);
+        // TODO manage byRef
+        //[Fact]
+        //private void ByRefAssignmentInterception()
+        //{
+        //    MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignFieldByRef));
+        //    FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
+        //    FieldInfo tmpField = typeof(FieldPatcher_Test).GetField(nameof(Temp), BindingFlags.NonPublic | BindingFlags.Static);
 
-            FieldPatchFactory.hookMethod = intercept;
-            FieldPatchFactory.tempField = tmpField;
-            FieldPatchFactory.GeneratePatch(field, caller, intercept);
-            FieldPatchFactory.ReplaceMethod(caller);
+        //    FieldPatcher.hookMethod = intercept;
+        //    FieldPatcher.tempField = tmpField;
+        //    FieldPatcher.GeneratePatch(field, caller, intercept);
+        //    FieldPatcher.ReplaceMethod(caller);
 
-            TestClass testClass = new TestClass();
+        //    TestClass testClass = new TestClass();
 
-            testClass.AssignFieldByRef(100);
+        //    testClass.AssignFieldByRef(100);
 
-            Assert.Equal(1, Calls);
-            Assert.Equal(0, testClass.MyVar);
-        }
+        //    Assert.Equal(1, Calls);
+        //    Assert.Equal(0, testClass.MyVar);
+        //}
 
-        [Fact]
-        private void ByRefAssignmentInterceptionLarge()
-        {
-            MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignMultiFieldsByRefLarge));
-            MethodInfo intercept = typeof(FieldPatcher_Test).GetMethod(nameof(FieldPatcher_Test.InterceptMethod));
-            FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
-            FieldInfo tmpField = typeof(FieldPatcher_Test).GetField(nameof(Temp), BindingFlags.NonPublic | BindingFlags.Static);
+        //[Fact]
+        //private void ByRefAssignmentInterceptionLarge()
+        //{
+        //    MethodInfo caller = typeof(TestClass).GetMethod(nameof(TestClass.AssignMultiFieldsByRefLarge));
+        //    MethodInfo intercept = typeof(FieldPatcher_Test).GetMethod(nameof(FieldPatcher_Test.InterceptMethod));
+        //    FieldInfo field = typeof(TestClass).GetField(nameof(TestClass.MyVar));
+        //    FieldInfo tmpField = typeof(FieldPatcher_Test).GetField(nameof(Temp), BindingFlags.NonPublic | BindingFlags.Static);
 
-            FieldPatchFactory.hookMethod = intercept;
-            FieldPatchFactory.tempField = tmpField;
-            FieldPatchFactory.GeneratePatch(field, caller, intercept);
-            FieldPatchFactory.ReplaceMethod(caller);
+        //    FieldPatcher.hookMethod = intercept;
+        //    FieldPatcher.tempField = tmpField;
+        //    FieldPatcher.GeneratePatch(field, caller, intercept);
+        //    FieldPatcher.ReplaceMethod(caller);
 
-            TestClass testClass = new TestClass();
+        //    TestClass testClass = new TestClass();
 
-            testClass.AssignMultiFieldsByRefLarge(100);
+        //    testClass.AssignMultiFieldsByRefLarge(100);
 
-            Assert.Equal(3, Calls);
-            Assert.Equal(0, testClass.MyVar);
-        }
+        //    Assert.Equal(3, Calls);
+        //    Assert.Equal(0, testClass.MyVar);
+        //}
     }
 }

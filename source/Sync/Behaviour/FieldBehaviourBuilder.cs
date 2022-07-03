@@ -24,7 +24,7 @@ namespace Sync.Behaviour
         /// <summary>
         ///     The action to be taken after the field was changed through a known accessor.
         /// </summary>
-        public EFieldChangeAction Action { get; private set; } = EFieldChangeAction.Keep;
+        public EFieldChangeAction Action { get; private set; } = EFieldChangeAction.Allow;
 
         /// <summary>
         ///     Whether or not the change shall be broadcast sent to the server in order to broadcast it.
@@ -32,6 +32,7 @@ namespace Sync.Behaviour
         public bool DoBroadcast { get; private set; }
 
         public Func<ISynchronization> SynchronizationFactory { get; private set; }
+        public Func<EFieldChangeAction> FieldAssignmentHandler { get; private set; }
 
         /// <summary>
         ///     The changed field value will be broadcast to all clients as an authoritative change. The change
@@ -43,7 +44,9 @@ namespace Sync.Behaviour
             [NotNull] IActionValidator validator = null)
         {
             SynchronizationFactory = syncFactory;
-            DoBroadcast = true;
+
+            DoBroadcast = FieldAssignmentHandler?.Invoke() == EFieldChangeAction.Allow;
+
             if (validator != null)
                 foreach (var id in m_FieldIds)
                     ActionValidatorRegistry.Register(id, validator);
@@ -55,7 +58,7 @@ namespace Sync.Behaviour
         /// </summary>
         public void Keep()
         {
-            Action = EFieldChangeAction.Keep;
+            Action = EFieldChangeAction.Allow;
         }
 
         /// <summary>
@@ -63,7 +66,18 @@ namespace Sync.Behaviour
         /// </summary>
         public void Revert()
         {
-            Action = EFieldChangeAction.Revert;
+            Action = EFieldChangeAction.Deny;
+        }
+
+        /// <summary>
+        ///     Delegate the call to a static handler. The handler can control the field assignment
+        ///     at runtime using the provided <see cref="IPendingMethodCall" /> argument.
+        ///     1st argument:   The method call that is being processed.
+        /// </summary>
+        /// <param name="handler"></param>
+        public void DelegateTo(Func<EFieldChangeAction> handler)
+        {
+            FieldAssignmentHandler = handler;
         }
     }
 }
