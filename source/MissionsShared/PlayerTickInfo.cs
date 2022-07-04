@@ -72,6 +72,23 @@ namespace MissionsShared
         public int MainHandIndex { get; set; }
         [ProtoMember(29)]
         public int OffHandIndex { get; set; }
+        [ProtoMember(30)]
+        public float MountMovementDirectionX { get; set; }
+        [ProtoMember(31)]
+        public float MountMovementDirectionY { get; set; }
+        [ProtoMember(32)]
+        public float MountLookDirectionX { get; set; }
+        [ProtoMember(33)]
+        public float MountLookDirectionY { get; set; }
+        [ProtoMember(34)]
+        public float MountLookDirectionZ { get; set; }
+
+        [ProtoMember(35)]
+        public float MountPositionX { get; set; }
+        [ProtoMember(36)]
+        public float MountPositionY { get; set; }
+        [ProtoMember(37)]
+        public float MountPositionZ { get; set; }
 
 
 

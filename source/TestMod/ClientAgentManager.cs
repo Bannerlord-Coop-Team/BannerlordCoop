@@ -80,5 +80,15 @@ namespace CoopTestMod
             indexToNetworkAgent.Clear();
 
         }
+
+        public int AgentCount()
+        {
+            return indexToNetworkAgent.Count;
+        }
+
+        public NetworkAgent GetNetworkAgent(string id)
+        {
+            return indexToNetworkAgent[agentIdToIndexMap[id]];
+        }
     }
 }

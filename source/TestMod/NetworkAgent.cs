@@ -23,5 +23,7 @@ namespace CoopTestMod
             IsHostSyncAgent = isHostSyncAgent;
             AgentIndex = agentIndex;
         }
+
+        public void AddMBAgent(Agent agent) { Agent = agent; }
     }
 }

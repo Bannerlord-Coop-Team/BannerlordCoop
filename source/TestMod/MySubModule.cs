@@ -44,33 +44,18 @@ namespace CoopTestMod
     public class MySubModule : MBSubModuleBase
     {
 
-
-
-
-        private Socket sender;
-        private Socket receiver;
         //private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile",BindingFlags.NonPublic|BindingFlags.Instance);
-        private static ConcurrentDictionary<int, ConcurrentDictionary<string, Agent>> playerTickInfo = new ConcurrentDictionary<int, ConcurrentDictionary<string, Agent>>();
         List<MatrixFrame> _initialSpawnFrames;
-        float t;
+
         AgentBuildData agentBuildData;
         AgentBuildData agentBuildData2;
         bool subModuleLoaded = false;
         bool battleLoaded = false;
-        bool isServer = false;
 
-        ConcurrentQueue<AgentState> agentSpawnQueue = new ConcurrentQueue<AgentState>();
-        ConcurrentQueue<int> despawnAgentQueue = new ConcurrentQueue<int>();
-
-
-        ConcurrentQueue<(int, int, string, bool)> agentCreationQueue = new ConcurrentQueue<(int, int, string, bool)>();
+        //ConcurrentQueue<AgentState> agentSpawnQueue = new ConcurrentQueue<AgentState>();
+        //ConcurrentQueue<int> despawnAgentQueue = new ConcurrentQueue<int>();
 
 
-
-        Vec2 mInputVector;
-        AnimFlags mFlags1;
-        float mProgress1;
-        ActionIndexCache mCache1;
 
         EventBasedNetListener listener;
         private static NetManager client;
@@ -89,13 +74,9 @@ namespace CoopTestMod
         //delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
 
 
+        private static ConcurrentDictionary<int, ConcurrentDictionary<string, Agent>> playerTickInfo = new ConcurrentDictionary<int, ConcurrentDictionary<string, Agent>>();
+
         private static ConcurrentDictionary<string, AgentUpdate> agentUpdateState = new ConcurrentDictionary<string, AgentUpdate>();
-
-        private PlayerTickInfo playerMainTickInfo = new PlayerTickInfo();
-
-
-        private static ConcurrentQueue<(int, string, string, float)> damageQueue = new ConcurrentQueue<(int, string, string, float)>();
-
 
         private static ConcurrentDictionary<int, PlayerTickInfo> hostPlayerTickInfo = new ConcurrentDictionary<int, PlayerTickInfo>();
 
@@ -142,6 +123,9 @@ namespace CoopTestMod
         {
             if (Mission.Current != null && agent != null && Mission.Current.IsLoadingFinished)
             {
+                
+
+
                 if (agent.Health <= 0)
                 {
                     return;
@@ -149,15 +133,12 @@ namespace CoopTestMod
 
                 Vec3 pos = new Vec3(info.PosX, info.PosY, info.PosZ);
 
+
                 if (agent.GetPathDistanceToPoint(ref pos) > 1f)
                 {
                     agent.TeleportToPosition(pos);
                 }
 
-                //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-                //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-
-                //InformationManager.DisplayMessage(new InformationMessage(ch1.ToString()));
 
                 agent.EventControlFlags = 0U;
                 if (info.crouchMode)
@@ -173,6 +154,7 @@ namespace CoopTestMod
 
                 agent.LookDirection = new Vec3(info.LookDirectionX, info.LookDirectionY, info.LookDirectionZ);
                 agent.MovementInputVector = new Vec2(info.InputVectorX, info.InputVectorY);
+
                 uint eventFlag = info.EventFlag;
                 if (eventFlag == 1u)
                 {
@@ -189,21 +171,7 @@ namespace CoopTestMod
                 }
 
 
-                if (agent.HasMount)
-                {
-                    agent.MountAgent.SetMovementDirection(new Vec2(info.MountInputVectorX, info.MountInputVectorY));
 
-                    //Currently not doing anything afaik
-                    //if (otherAgent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || otherAgent.MountAgent.GetCurrentAction(1).Index != mCacheIndex2)
-                    //{
-                    //    string mActionName2 = MBAnimation.GetActionNameWithCode(mCacheIndex2);
-                    //    otherAgent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)mFlags2, startProgress: mProgress2);
-                    //}
-                    //else
-                    //{
-                    //    otherAgent.MountAgent.SetCurrentActionProgress(1, mProgress2);
-                    //}
-                }
 
 
                 if (agent.GetCurrentAction(0) == ActionIndexCache.act_none || agent.GetCurrentAction(0).Index != info.Action0Index)
@@ -257,74 +225,32 @@ namespace CoopTestMod
 
                     agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
                 }
-
-                //otherAgent.MovementFlags = 0U;
-                //otherAgent.MovementFlags = (Agent.MovementControlFlag)movementFlag;
-
-                //InformationManager.DisplayMessage(new InformationMessage(Agent.Main.Position + ""));
-
-                //if (health != otherAgent.Health)
-                //{
-                //    //InformationManager.DisplayMessage(new InformationMessage("otherAgent.Health: " + otherAgent.Health));
-                //    //InformationManager.DisplayMessage(new InformationMessage("damageTaken: " + damageTaken));
-                //    //InformationManager.DisplayMessage(new InformationMessage("health: " + health));
-
-                //    if (otherAgent.Health < 0)
-                //    {
-                //        otherAgent.MakeDead(true, otherAgent.GetCurrentAction(1)); //Which action do we require or what does it do?
-                //    }
-                //}
-
-
-                //if (eventFlag != 0)
-                //{
-                //    otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-
-                //}
-
-                //if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none && otherAgent.CurrentGuardMode == Agent.GuardMode.None)
-                //{
-                //    otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
-                //}
-
-
-                /*
-                if (otherAgent == Agent.ActionCodeType.)
+                if (agent.HasMount)
                 {
-                    InformationManager.DisplayMessage(new InformationMessage(otherAgent.CrouchMode.ToString()));
-                    otherAgent.EventControlFlags = Agent.EventControlFlag.Stand;
-                } */
+                    Vec3 mountPos = new Vec3(info.MountPositionX, info.MountPositionY, info.MountPositionZ);
 
-                // if (otherAgent.GetCurrentAction(1) != ActionIndexCache.act_none)
-                // {
-                //    InformationManager.DisplayMessage(new InformationMessage(otherAgent.GetCurrentActionType(1).ToString()));
-                // }
+                    if (agent.MountAgent.GetPathDistanceToPoint(ref mountPos) > 5f)
+                    {
+                        agent.MountAgent.TeleportToPosition(mountPos);
+                    }
+                    agent.MountAgent.SetMovementDirection(new Vec2(info.MovementDirectionX, info.MovementDirectionY));
 
+                    //Currently not doing anything afaik
+                    if (agent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.MountAgent.GetCurrentAction(1).Index != info.MountAction1Index)
+                    {
+                        string mActionName2 = MBAnimation.GetActionNameWithCode(info.MountAction1Index);
+                        agent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)info.MountAction1Flag, startProgress: info.MountAction1Progress);
+                    }
+                    else
+                    {
+                        agent.MountAgent.SetCurrentActionProgress(1, info.MountAction1Progress);
+                    }
+                    agent.MountAgent.LookDirection = new Vec3(info.LookDirectionZ, info.MountLookDirectionY, info.MountLookDirectionZ);
+                    agent.MountAgent.MovementInputVector = new Vec2(info.MountInputVectorX, info.MountInputVectorY);
+                    return;
 
-                //otherAgent.EventControlFlags = (Agent.EventControlFlag)eventFlag;
-                //otherAgent.SetMovementDirection(new Vec2(moveX, moveY));
-                //otherAgent.AttackDirectionToMovementFlag(direction);
-                //otherAgent.DefendDirectionToMovementFlag(direction);
+                }
 
-                // otherAgent.EnforceShieldUsage(direction);
-                //InformationManager.DisplayMessage(new InformationMessage("Received: " + ((Agent.EventControlFlag)eventFlag).ToString()));
-
-
-
-                //InformationManager.DisplayMessage(new InformationMessage("Received : X: " +  lookDirectionX + " Y: " + lookDirectionY + " | Z: " + lookDirectionZ));
-
-
-
-                //InformationManager.DisplayMessage(new InformationMessage("Receiving: " + ((Agent.EventControlFlag)eventFlag).ToString()));
-
-                //otherAgent.SetTargetPositionAndDirection(targetPosition, targetDirection);
-
-
-                //otherAgent.SetCurrentActionProgress(1, progress2);
-
-                //string actionName3 = MBAnimation.GetActionNameWithCode(cacheIndex3);
-                //otherAgent.SetActionChannel(2, ActionIndexCache.Create(actionName3), additionalFlags: (ulong)flags3, startProgress: progress3);
-                //otherAgent.SetCurrentActionProgress(2, progress3);
 
 
 
@@ -358,7 +284,96 @@ namespace CoopTestMod
                 listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod) =>
                 {
                     MissionsShared.MessageType messageType = (MessageType)dataReader.GetUInt();
-                    if (messageType == MissionsShared.MessageType.PlayerSync)
+                 
+
+
+                    if (messageType == MessageType.EnterLocation)
+                    {
+                        while (!dataReader.EndOfData)
+                        {
+
+                            int peerId = dataReader.GetInt();
+                            if (peerId == myPeerId) continue;
+                            if (playerTickInfo.ContainsKey(peerId)) continue;
+                            playerTickInfo[peerId] = new ConcurrentDictionary<string, Agent>();
+                            //InformationManager.DisplayMessage(new InformationMessage("Entered Location: " + peerId));
+                        }
+                        //playerTickInfo[id] = new ConcurrentDictionary<uint, Agent>();
+
+                    }
+
+                    else if (messageType == MessageType.ExitLocation)
+                    {
+                        int clientId = dataReader.GetInt();
+                        if (clientId == myPeerId)
+                        {
+                            ClientAgentManager.Instance().ClearAll();
+                            hostPlayerTickInfo.Clear();
+                            agentUpdateState.Clear();
+                            playerTickInfo.Clear();
+                            return;
+                        }
+                        MissionTaskManager.Instance().AddTask(clientId, new Action<object>((object obj) => {
+                            int cId = (int)obj;
+
+                            foreach (string agentId in playerTickInfo[cId].Keys)
+                            {
+                                int index = ClientAgentManager.Instance().GetIndexFromId(agentId);
+                                Mission.Current.FindAgentWithIndex(index).FadeOut(false, true);
+                                agentUpdateState.TryRemove(agentId, out _);
+
+                            }
+
+                            playerTickInfo[cId].Clear();
+                            playerTickInfo.TryRemove(cId, out _);
+                        }));
+                        
+                    }
+                    else if (messageType == MessageType.ConnectionId)
+                    {
+                        myPeerId = dataReader.GetInt();
+                    }
+
+                    else if (messageType == MessageType.PlayerDamage)
+                    {
+                        int peerId = dataReader.GetInt();
+
+                        string effectedId = dataReader.GetString();
+                        string effectorId = dataReader.GetString();
+                        int damage = dataReader.GetInt();
+                        MissionTaskManager.Instance().AddTask((peerId, effectedId, effectorId, damage), new Action<object>((object obj) => {
+                            (int, string, string, int) d = ((int, string, string, int))obj;
+                            InformationManager.DisplayMessage(new InformationMessage("Damaged from: " + d.Item1 + " from agent : " + d.Item2 + " to agent: " + d.Item3 + " of " + d.Item4));
+                            Agent effectectedAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().GetIndexFromId(d.Item2));
+                            Agent effectorAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().GetIndexFromId(d.Item3));
+                            Blow b = new Blow();
+                            b.InflictedDamage = (int)d.Item4;
+                            b.OwnerId = effectorAgent.Index;
+                            b.Position = Vec3.One;
+                            effectectedAgent.RegisterBlow(b);
+
+                        }));
+
+
+                    }
+
+                    else if (messageType == MessageType.AddAgent)
+                    {
+                        int index = dataReader.GetInt();
+                        string id = dataReader.GetString();
+                        //agentCreationQueue.Enqueue((myPeerId, index, id, true));
+                        MissionTaskManager.Instance().AddTask((myPeerId, index, id, true), new Action<object>((object obj) => {
+
+                            (int, int, string, bool) agentCreationState = ((int, int, string, bool))obj;
+                            Agent agent = Mission.Current.FindAgentWithIndex(agentCreationState.Item2);
+                            NetworkAgent networkAgent = new NetworkAgent(agentCreationState.Item1, agentCreationState.Item2, agentCreationState.Item3, agent, agentCreationState.Item4);
+                            ClientAgentManager.Instance().AddNetworkAgent(networkAgent);
+                            InformationManager.DisplayMessage(new InformationMessage("A new agent was added from the network with Peer ID: " + agentCreationState.Item1 + " | Index: " + agentCreationState.Item2 + " | Server ID: " + agentCreationState.Item3 + " | Network Host: " + agentCreationState.Item4));
+                        
+                        }));
+                       
+                    }
+                    else if (messageType == MissionsShared.MessageType.PlayerSync)
                     {
                         byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
                         Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
@@ -377,6 +392,7 @@ namespace CoopTestMod
                         {
                             if (!playerTickInfo.ContainsKey(payload.ClientId))
                             {
+                                InformationManager.DisplayMessage(new InformationMessage("Client ID isn't valid"));
                                 return;
                             }
 
@@ -398,7 +414,19 @@ namespace CoopTestMod
                                 // it doesn't contain the agent so it add to be spawned
                                 else
                                 {
-                                    agentSpawnQueue.Enqueue(new AgentState(payload.ClientId, tickInfo.Id));
+                                    InformationManager.DisplayMessage(new InformationMessage("No agent was found; a new agent will be queued to spawn for: " + tickInfo.Id));
+                                    MissionTaskManager.Instance().AddTask(new AgentState(payload.ClientId, tickInfo.Id), new Action<object>((object obj) =>
+                                    {
+                                        AgentState agentState = (AgentState)obj;
+                                        GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
+                                        if (gameEntity == null) return;
+                                        Agent agent = SpawnAgent(CharacterObject.PlayerCharacter, gameEntity.GetFrame());
+                                        NetworkAgent networkAgent = new NetworkAgent(agentState.clientId, agent.Index, agentState.id, agent, false);
+                                        ClientAgentManager.Instance().AddNetworkAgent(networkAgent);
+                                        //uint id = agent.Character.Id.SubId;
+                                        playerTickInfo[agentState.clientId][agentState.id] = agent;
+                                        InformationManager.DisplayMessage(new InformationMessage("A new agent was spawned: " + agentState.id + " from client: " + agentState.clientId));
+                                    }));
                                     playerTickInfo[payload.ClientId][tickInfo.Id] = null;
                                 }
 
@@ -412,51 +440,6 @@ namespace CoopTestMod
 
 
 
-                    }
-
-
-                    else if (messageType == MessageType.EnterLocation)
-                    {
-                        while (!dataReader.EndOfData)
-                        {
-
-                            int peerId = dataReader.GetInt();
-                            if (peerId == myPeerId) continue;
-                            if (playerTickInfo.ContainsKey(peerId)) continue;
-                            playerTickInfo[peerId] = new ConcurrentDictionary<string, Agent>();
-                            //InformationManager.DisplayMessage(new InformationMessage("Entered Location: " + peerId));
-                        }
-                        //playerTickInfo[id] = new ConcurrentDictionary<uint, Agent>();
-
-                    }
-
-                    else if (messageType == MessageType.ExitLocation)
-                    {
-                        int clientId = dataReader.GetInt();
-                        despawnAgentQueue.Enqueue(clientId);
-                    }
-                    else if (messageType == MessageType.ConnectionId)
-                    {
-                        myPeerId = dataReader.GetInt();
-                    }
-
-                    else if (messageType == MessageType.PlayerDamage)
-                    {
-                        int peerId = dataReader.GetInt();
-
-                        string effectedId = dataReader.GetString();
-                        string effectorId = dataReader.GetString();
-                        int damage = dataReader.GetInt();
-                        damageQueue.Enqueue((peerId, effectedId, effectorId, damage));
-
-
-                    }
-
-                    else if (messageType == MessageType.AddAgent)
-                    {
-                        int index = dataReader.GetInt();
-                        string id = dataReader.GetString();
-                        agentCreationQueue.Enqueue((myPeerId, index, id, true));
                     }
                     // received something from server
 
@@ -549,46 +532,7 @@ namespace CoopTestMod
 
             //// spawn an instance of the player (controlled by default)
             SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement, true);
-            //MyAgent = _player;
-
-
-            ////spawn another instance of the player, uncontroller (this should get synced when someone joins)
-            //SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement, false);
-
-
-            //otherAgentHealth = _otherAgent.Health;
-
-
-            //// Our agent's pointer; set it to 0 first
-            //playerPtr = UIntPtr.Zero;
-
-
-            //// other agent's pointer
-            //otherAgentPtr = (UIntPtr)_otherAgent.GetType().GetField("_pointer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_otherAgent);
-
-
-            //// Find out agent's pointer from our agent instance
-            //playerPtr = (UIntPtr)_player.GetType().GetField("_pointer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_player);
-
-
-            //// set the weapons to the available weapons
-            //_player.WieldInitialWeapons();
-            //_otherAgent.WieldInitialWeapons();
-
-
-            ////// From MBAPI, get the private interface IMBAgent
-            //FieldInfo IMBAgentField = typeof(MBAPI).GetField("IMBAgent", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-
-            //// get the set and get method of position
-            //MethodInfo getPositionMethod = IMBAgentField.GetValue(null).GetType().GetMethod("GetPosition");
-            //MethodInfo setPositionMethod = IMBAgentField.GetValue(null).GetType().GetMethod("SetPosition");
-
-
-            //// set the delegates to the method pointers. In case Agent class isn't enough we can invoke IMAgent directly.
-            //getPosition = (Func<UIntPtr, Vec3>)Delegate.CreateDelegate
-            //    (typeof(Func<UIntPtr, Vec3>), IMBAgentField.GetValue(null), getPositionMethod);
-
-            //setPosition = (PositionRefDelegate)Delegate.CreateDelegate(typeof(PositionRefDelegate), IMBAgentField.GetValue(null), setPositionMethod);
+            
         }
 
 
@@ -632,18 +576,8 @@ namespace CoopTestMod
 
             static bool Prefix()
             {
-                return false; // make sure you only skip if really necessary
+                return false;
             }
-            //public static void Postfix(Agent affectedAgent, Agent affectorAgent, float damagedHp)
-            //{
-            //    NetDataWriter writer = new NetDataWriter();
-            //    writer.Put((uint)MessageType.PlayerDamage);
-            //    writer.Put(affectedAgent.Character.Id.SubId);
-            //    writer.Put(affectorAgent.Character.Id.SubId);
-            //    writer.Put(damagedHp);
-            //    client.SendToAll(writer, DeliveryMethod.ReliableOrdered);
-            //    InformationManager.DisplayMessage(new InformationMessage("Damaged: " + damagedHp));
-            //}
         }
 
         [HarmonyPatch(typeof(Mission), "RegisterBlow")]
@@ -686,7 +620,6 @@ namespace CoopTestMod
 
             public static void Postfix()
             {
-
                 string scene = Mission.Current.SceneName;
                 currentScene = scene;
                 NetDataWriter writer = new NetDataWriter();
@@ -709,6 +642,7 @@ namespace CoopTestMod
                 //    NetDataWriter writer = new NetDataWriter();
                 //    writer.Put(__result.Index);
                 //}
+                
                 if (Mission.Current == null || Mission.Current.PlayerTeam == null) return;
                 try
                 {
@@ -796,6 +730,7 @@ namespace CoopTestMod
                 hostPlayerTickInfo.Clear();
                 agentUpdateState.Clear();
                 playerTickInfo.Clear();
+                MissionTaskManager.Instance().Clear();
                 NetDataWriter writer = new NetDataWriter();
                 writer.Put((uint)MessageType.ExitLocation);
                 writer.Put(currentScene);
@@ -883,76 +818,27 @@ namespace CoopTestMod
                 InformationManager.DisplayMessage(new InformationMessage("Is Field Battle: " + Mission.Current.IsFieldBattle.ToString()));
             }
 
+            MissionTaskManager.Instance().ApplyPendingTasks();
 
-            while (!despawnAgentQueue.IsEmpty())
-            {
-                int clientId ;
-                despawnAgentQueue.TryDequeue(out clientId);
-
-                foreach (string agentId in playerTickInfo[clientId].Keys)
-                {
-                    int index = ClientAgentManager.Instance().GetIndexFromId(agentId);
-                    Mission.Current.FindAgentWithIndex(index).FadeOut(false, true);
-                    agentUpdateState.TryRemove(agentId, out _);
-
-                }
-
-                playerTickInfo[clientId].Clear();
-                playerTickInfo.TryRemove(clientId, out _);
-
-
-            }
-
-
-            while (!agentSpawnQueue.IsEmpty())
-            {
-                AgentState agentState;
-                agentSpawnQueue.TryDequeue(out agentState);
-                GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
-                if (gameEntity == null) return;
-                Agent agent = SpawnAgent(CharacterObject.PlayerCharacter, gameEntity.GetFrame());
-                NetworkAgent networkAgent = new NetworkAgent(agentState.clientId, agent.Index, agentState.id, agent, false);
-                ClientAgentManager.Instance().AddNetworkAgent(networkAgent);
-                //uint id = agent.Character.Id.SubId;
-                playerTickInfo[agentState.clientId][agentState.id] = agent;
-
-            }
             foreach (AgentUpdate agentUpdate in agentUpdateState.Values)
             {
                 if (agentUpdate.agent != null && agentUpdate.playerTickInfo != null)
                 {
                     //InformationManager.ClearAllMessages();
                     //InformationManager.DisplayMessage(new InformationMessage("Received Update: " + agentUpdate.playerTickInfo));
+                    if (!ClientAgentManager.Instance().ContainsAgent(agentUpdate.playerTickInfo.Id))
+                    {
+                        Mission.Current.FindAgentWithIndex(agentUpdate.agent.Index).FadeOut(true, true); ;
+                        agentUpdateState.TryRemove(agentUpdate.playerTickInfo.Id, out _);
+                        return;
+                    }
                     UpdatePlayerTick(agentUpdate.playerTickInfo, agentUpdate.agent);
                 }
 
             }
 
-            while (!damageQueue.IsEmpty())
-            {
-                (int, string, string, float) d;
-                damageQueue.TryDequeue(out d);
-                InformationManager.DisplayMessage(new InformationMessage("Damaged from: " + d.Item1 + " from agent : " + d.Item2 + " to agent: " + d.Item3 + " of " + d.Item4));
-                Agent effectectedAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().GetIndexFromId(d.Item2));
-                Agent effectorAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().GetIndexFromId(d.Item3));
-                Blow b = new Blow();
-                b.InflictedDamage = (int)d.Item4;
-                b.OwnerId = effectorAgent.Index;
-                b.Position = Vec3.One;
-                effectectedAgent.RegisterBlow(b);
-
-            }
-
-
-            while (!agentCreationQueue.IsEmpty())
-            {
-                (int, int, string, bool) agentCreationState;
-                agentCreationQueue.TryDequeue(out agentCreationState);
-                Agent agent = Mission.Current.FindAgentWithIndex(agentCreationState.Item2);
-                NetworkAgent networkAgent = new NetworkAgent(agentCreationState.Item1, agentCreationState.Item2, agentCreationState.Item3, agent, agentCreationState.Item4);
-                ClientAgentManager.Instance().AddNetworkAgent(networkAgent);
-                InformationManager.DisplayMessage(new InformationMessage("A new agent was added from the network with Peer ID: " + agentCreationState.Item1 + " | Index: " + agentCreationState.Item2 + " | Server ID: " + agentCreationState.Item3 + " | Network Host: " + agentCreationState.Item4));
-            }
+            
+            
 
             if (Input.IsKeyReleased(InputKey.Numpad5))
             {
@@ -969,7 +855,8 @@ namespace CoopTestMod
             if (Input.IsKeyReleased(InputKey.Numpad6))
             {
 
-                InformationManager.DisplayMessage(new InformationMessage(Mission.Current.FindAgentWithIndex(1).Health.ToString()));
+                InformationManager.DisplayMessage(new InformationMessage("There are ticks for: " + playerTickInfo.Count.ToString()));
+                //InformationManager.DisplayMessage(new InformationMessage("There are spawn queues for " + agentSpawnQueue.Count));
 
 
 
@@ -1007,7 +894,6 @@ namespace CoopTestMod
                     Agent.ActionCodeType actionTypeCh0 = Agent.ActionCodeType.Other;
                     Agent.ActionCodeType actionTypeCh1 = Agent.ActionCodeType.Other;
                     //int damage = MissionOnAgentHitPatch.DamageDone;
-                    mCache1 = ActionIndexCache.act_none;
                     if (mbAgent.Health > 0f)
                     {
                         cache0 = mbAgent.GetCurrentAction(0);
@@ -1019,18 +905,6 @@ namespace CoopTestMod
                         actionTypeCh0 = mbAgent.GetCurrentActionType(0);
                         actionTypeCh1 = mbAgent.GetCurrentActionType(1);
 
-                        if (mbAgent.HasMount)
-                        {
-                            mInputVector = mbAgent.MountAgent.GetMovementDirection();
-                            mFlags1 = mbAgent.MountAgent.GetCurrentAnimationFlag(1);
-                            mProgress1 = mbAgent.MountAgent.GetCurrentActionProgress(1);
-                            mCache1 = mbAgent.MountAgent.GetCurrentAction(1);
-                        }
-
-                    }
-                    else
-                    {
-                        mCache1 = ActionIndexCache.act_none;
                     }
                     PlayerTickInfo tickInfo;
                     if (hostPlayerTickInfo.ContainsKey(mbAgent.Index))
@@ -1040,6 +914,25 @@ namespace CoopTestMod
                     else { 
                         tickInfo = new PlayerTickInfo();
                         hostPlayerTickInfo[mbAgent.Index] = tickInfo;
+                    }
+
+                    tickInfo.MountAction1Index = ActionIndexCache.act_none.Index;
+                    if (mbAgent.HasMount)
+                    {
+                        tickInfo.MountInputVectorX = mbAgent.MountAgent.MovementInputVector.X;
+                        tickInfo.MountInputVectorY = mbAgent.MountAgent.MovementInputVector.Y;
+                        tickInfo.MountAction1Flag = (ulong)mbAgent.MountAgent.GetCurrentAnimationFlag(1);
+                        tickInfo.MountAction1Progress = mbAgent.MountAgent.GetCurrentActionProgress(1);
+                        tickInfo.MountAction1Index = mbAgent.MountAgent.GetCurrentAction(1).Index;
+                        tickInfo.MountLookDirectionX = mbAgent.MountAgent.LookDirection.X;
+                        tickInfo.MountLookDirectionY = mbAgent.MountAgent.LookDirection.Y;
+                        tickInfo.MountLookDirectionZ = mbAgent.MountAgent.LookDirection.Z;
+                        tickInfo.MountMovementDirectionX = mbAgent.MountAgent.GetMovementDirection().X;
+                        tickInfo.MountMovementDirectionY = mbAgent.MountAgent.GetMovementDirection().Y;
+                        tickInfo.MountPositionX = mbAgent.MountAgent.Position.X;
+                        tickInfo.MountPositionY = mbAgent.MountAgent.Position.Y;
+                        tickInfo.MountPositionZ = mbAgent.MountAgent.Position.Z;
+
                     }
                     tickInfo.Id = agent.AgentID;
                     tickInfo.PosX = myPos.X;

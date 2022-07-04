@@ -27,7 +27,7 @@ namespace MissionsServer
             ConcurrentDictionary<int, List<PlayerTickInfo>> playerSyncDict = new ConcurrentDictionary<int, List<PlayerTickInfo>>();
 
             //location id maps to a set of clients
-            ConcurrentDictionary<string, HashSet<int>> locationToClients = new ConcurrentDictionary<string, HashSet<int>>();
+            ConcurrentDictionary<string, ConcurrentDictionary<int, byte>> locationToClients = new ConcurrentDictionary<string, ConcurrentDictionary<int, byte>>();
 
             //id to location dictionary
             ConcurrentDictionary<int, string> clientToLocation = new ConcurrentDictionary<int, string>();
@@ -88,15 +88,15 @@ namespace MissionsServer
                     string locationName = dataReader.GetString();
                     if (!locationToClients.ContainsKey(locationName))
                     {
-                        locationToClients[locationName] = new HashSet<int>();
+                        locationToClients[locationName] = new ConcurrentDictionary<int, byte>();
                     }
                     clientToLocation[fromPeer.Id] = locationName;
-                    locationToClients[locationName].Add(fromPeer.Id);
-                    foreach (int clientId in locationToClients[locationName])
+                    locationToClients[locationName][fromPeer.Id] = 1;
+                    foreach (int clientId in locationToClients[locationName].Keys)
                     {
                         NetDataWriter writer = new NetDataWriter();
                         writer.Put((uint)MessageType.EnterLocation);
-                        foreach(int cId in locationToClients[locationName])
+                        foreach(int cId in locationToClients[locationName].Keys)
                         {
                             writer.Put(cId);
                         }
@@ -119,7 +119,7 @@ namespace MissionsServer
                         Console.WriteLine("Client ID " + fromPeer.Id + " has removed agent: " + info.Id);
                     }
                     clientToLocation.TryRemove(fromPeer.Id, out _);
-                    foreach (int clientId in locationToClients[locationName].Where(c => c != fromPeer.Id))
+                    foreach (int clientId in locationToClients[locationName].Keys)
                     {
                         NetDataWriter writer = new NetDataWriter();
                         writer.Put((uint)MessageType.ExitLocation);
@@ -127,7 +127,8 @@ namespace MissionsServer
                         server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
 
                     }
-                    locationToClients[locationName].Remove(fromPeer.Id);
+                    locationToClients[locationName].TryRemove(fromPeer.Id, out _);
+                    playerSyncDict[fromPeer.Id].Clear();
                     playerSyncDict.TryRemove(fromPeer.Id, out _);
                 }
                 else if (messageType == MessageType.PlayerSync)
@@ -155,7 +156,7 @@ namespace MissionsServer
                     writer.Put(effectorId);
                     writer.Put(damage);
                     Console.WriteLine("Received damage from: " + fromPeer.Id + " to agent: " + effectedId + " from agent: " + effectorId + " of " + damage);
-                    foreach(int client in locationToClients[location])
+                    foreach(int client in locationToClients[location].Keys)
                     {
                         server.GetPeerById(client).Send(writer, DeliveryMethod.ReliableOrdered);
                     }
@@ -202,7 +203,7 @@ namespace MissionsServer
                 
 
                 // get all the clients in each location
-                foreach(HashSet<int> clients in locationToClients.Values)
+                foreach(ConcurrentDictionary<int, byte> clients in locationToClients.Values)
                 {
 
 
@@ -214,7 +215,7 @@ namespace MissionsServer
 
 
                     // get each clients id
-                    foreach (int clientId in clients)
+                    foreach (int clientId in clients.Keys)
                     {
                         //grab the client's player tick info list
                         FromServerTickPayload payload = new FromServerTickPayload();
@@ -236,11 +237,11 @@ namespace MissionsServer
 
                     }
 
-                    foreach (int clientId in clients)
+                    foreach (int clientId in clients.Keys)
                     {
                         NetPeer peer = server.GetPeerById(clientId);
                         if (peer == null) return;
-                        peer.Send(stream2.ToArray(), DeliveryMethod.ReliableSequenced);
+                        peer.Send(stream2.ToArray(), DeliveryMethod.Sequenced);
                     }
                 }
                 
