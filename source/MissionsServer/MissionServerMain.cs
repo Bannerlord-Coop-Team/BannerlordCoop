@@ -72,7 +72,7 @@ namespace MissionsServer
                 //NetDataWriter writer = new NetDataWriter();                 // Create writer class
                 //writer.Put("Hello client!");                                // Put some string
                 //peer.Send(writer, DeliveryMethod.ReliableOrdered);             // Send with reliability
-                Console.WriteLine("Client Connected, assigned ID: " + peer.Id);
+                //Console.WriteLine("Client Connected, assigned ID: " + peer.Id);
                 NetDataWriter writer = new NetDataWriter();
                 writer.Put((uint)MessageType.ConnectionId);
                 writer.Put(peer.Id);
@@ -100,9 +100,16 @@ namespace MissionsServer
                         {
                             writer.Put(cId);
                         }
-                        Console.WriteLine("Sending: " + writer.Data.Length);
-                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
+                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableOrdered);
 
+                    }
+
+                    foreach (int clientId in playerSyncDict.Keys)
+                    {
+                        foreach (PlayerTickInfo info in playerSyncDict[clientId])
+                        {
+                            Console.WriteLine("Client " + clientId + " has " + info.Id);
+                        }
                     }
                 }
                 else if(messageType == MessageType.ExitLocation)
@@ -124,12 +131,19 @@ namespace MissionsServer
                         NetDataWriter writer = new NetDataWriter();
                         writer.Put((uint)MessageType.ExitLocation);
                         writer.Put(fromPeer.Id);
-                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
+                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableOrdered);
 
                     }
                     locationToClients[locationName].TryRemove(fromPeer.Id, out _);
                     playerSyncDict[fromPeer.Id].Clear();
                     playerSyncDict.TryRemove(fromPeer.Id, out _);
+                    foreach(int clientId in playerSyncDict.Keys)
+                    {
+                        foreach(PlayerTickInfo info in playerSyncDict[clientId])
+                        {
+                            Console.WriteLine("Client " + clientId + " has " + info.Id);
+                        }
+                    }
                 }
                 else if (messageType == MessageType.PlayerSync)
                 {
@@ -138,8 +152,12 @@ namespace MissionsServer
 
                     MemoryStream stream = new MemoryStream(serializedLocation);
                     FromClientTickMessage msg = Serializer.DeserializeWithLengthPrefix<FromClientTickMessage>(stream, PrefixStyle.Fixed32BigEndian);
-                    
+
                     //playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
+                    if (!clientToLocation.ContainsKey(fromPeer.Id))
+                    {
+                        return;
+                    }
                     playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
                     //Console.WriteLine("Received Update from: " + fromPeer.Id + " of # " + msg.AgentsTickInfo + " at location " + clientToLocation[fromPeer.Id]);
                 }
@@ -171,8 +189,8 @@ namespace MissionsServer
                     writer.Put((uint)MessageType.AddAgent);
                     writer.Put(agentIndex);
                     writer.Put(id);
-                    server.GetPeerById(fromPeer.Id).Send(writer, DeliveryMethod.ReliableOrdered);
-                    Console.WriteLine(fromPeer.Id + " has added new agent with ID: " + id);
+                    server.GetPeerById(fromPeer.Id).Send(writer, DeliveryMethod.Unreliable);
+                   Console.WriteLine(fromPeer.Id + " has added new agent with ID: " + id);
                    
                 }
 
@@ -241,7 +259,7 @@ namespace MissionsServer
                     {
                         NetPeer peer = server.GetPeerById(clientId);
                         if (peer == null) return;
-                        peer.Send(stream2.ToArray(), DeliveryMethod.ReliableOrdered);
+                        peer.Send(stream2.ToArray(), DeliveryMethod.Sequenced);
                     }
                 }
                 

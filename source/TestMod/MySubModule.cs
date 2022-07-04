@@ -43,7 +43,7 @@ namespace CoopTestMod
             {
                 // again theres gotta be a better way to check if missions finish loading? A custom mission maybe in the future
                 battleLoaded = true;
-                networkBehavior.StartArenaFight();
+                //networkBehavior.StartArenaFight();
             }
 
             if (!subModuleLoaded && TaleWorlds.MountAndBlade.Module.CurrentModule.LoadingFinished)
@@ -63,6 +63,24 @@ namespace CoopTestMod
 
                 //start it
                 MBGameManager.StartNewGame(manager);
+            }
+
+            if (Input.IsKeyReleased(InputKey.Numpad6))
+            {
+
+                InformationManager.DisplayMessage(new InformationMessage("There are ticks for: " + networkBehavior.GetPlayerSyncDict().Count.ToString()));
+                foreach (int clientId in networkBehavior.GetPlayerSyncDict().Keys)
+                {
+                    foreach (string info in networkBehavior.GetPlayerSyncDict()[clientId].Keys)
+                    {
+                        InformationManager.DisplayMessage(new InformationMessage("Agent " + info + " from " + clientId));
+                    }
+                }
+
+                //InformationManager.DisplayMessage(new InformationMessage("There are spawn queues for " + agentSpawnQueue.Count));
+
+
+
             }
         }
     }

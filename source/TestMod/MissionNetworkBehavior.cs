@@ -90,11 +90,13 @@ namespace CoopTestMod
                                 int index = ClientAgentManager.Instance().GetIndexFromId(agentId);
                                 Mission.Current.FindAgentWithIndex(index).FadeOut(false, true);
                                 agentUpdateState.TryRemove(agentId, out _);
+                                InformationManager.DisplayMessage(new InformationMessage("Removed Agent with Index: " + index));
 
                             }
 
                             playerTickInfo[cId].Clear();
                             playerTickInfo.TryRemove(cId, out _);
+                            
                         }));
 
                     }
@@ -232,7 +234,7 @@ namespace CoopTestMod
                     MemoryStream strm = new MemoryStream();
                     message.AgentCount = hostPlayerTickInfo.Count;
 
-                    if (message.AgentCount <= 0)
+                    if (message.AgentCount <= 0 || !isInMission)
                     {
                         continue;
                     }
@@ -367,6 +369,7 @@ namespace CoopTestMod
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             Mission mission = Mission.Current;
+            agentBuildData = agentBuildData.Team(Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
             Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);
@@ -453,7 +456,7 @@ namespace CoopTestMod
                 Vec3 pos = new Vec3(info.PosX, info.PosY, info.PosZ);
 
 
-                if (agent.GetPathDistanceToPoint(ref pos) > 1f)
+                if (agent.GetPathDistanceToPoint(ref pos) > 2f)
                 {
                     agent.TeleportToPosition(pos);
                 }
@@ -544,31 +547,31 @@ namespace CoopTestMod
 
                     agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
                 }
-                if (agent.HasMount)
-                {
-                    Vec3 mountPos = new Vec3(info.MountPositionX, info.MountPositionY, info.MountPositionZ);
+                //if (agent.HasMount)
+                //{
+                //    Vec3 mountPos = new Vec3(info.MountPositionX, info.MountPositionY, info.MountPositionZ);
 
-                    if (agent.MountAgent.GetPathDistanceToPoint(ref mountPos) > 5f)
-                    {
-                        agent.MountAgent.TeleportToPosition(mountPos);
-                    }
-                    agent.MountAgent.SetMovementDirection(new Vec2(info.MovementDirectionX, info.MovementDirectionY));
+                //    if (agent.MountAgent.GetPathDistanceToPoint(ref mountPos) > 5f)
+                //    {
+                //        agent.MountAgent.TeleportToPosition(mountPos);
+                //    }
+                //    agent.MountAgent.SetMovementDirection(new Vec2(info.MovementDirectionX, info.MovementDirectionY));
 
-                    //Currently not doing anything afaik
-                    if (agent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.MountAgent.GetCurrentAction(1).Index != info.MountAction1Index)
-                    {
-                        string mActionName2 = MBAnimation.GetActionNameWithCode(info.MountAction1Index);
-                        agent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)info.MountAction1Flag, startProgress: info.MountAction1Progress);
-                    }
-                    else
-                    {
-                        agent.MountAgent.SetCurrentActionProgress(1, info.MountAction1Progress);
-                    }
-                    agent.MountAgent.LookDirection = new Vec3(info.LookDirectionZ, info.MountLookDirectionY, info.MountLookDirectionZ);
-                    agent.MountAgent.MovementInputVector = new Vec2(info.MountInputVectorX, info.MountInputVectorY);
-                    return;
+                //    //Currently not doing anything afaik
+                //    if (agent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.MountAgent.GetCurrentAction(1).Index != info.MountAction1Index)
+                //    {
+                //        string mActionName2 = MBAnimation.GetActionNameWithCode(info.MountAction1Index);
+                //        agent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)info.MountAction1Flag, startProgress: info.MountAction1Progress);
+                //    }
+                //    else
+                //    {
+                //        agent.MountAgent.SetCurrentActionProgress(1, info.MountAction1Progress);
+                //    }
+                //    agent.MountAgent.LookDirection = new Vec3(info.LookDirectionZ, info.MountLookDirectionY, info.MountLookDirectionZ);
+                //    agent.MountAgent.MovementInputVector = new Vec2(info.MountInputVectorX, info.MountInputVectorY);
+                //    return;
 
-                }
+                //}
 
 
 
@@ -577,6 +580,12 @@ namespace CoopTestMod
 
             }
 
+        }
+
+
+        public ConcurrentDictionary<int, ConcurrentDictionary<string, Agent>> GetPlayerSyncDict()
+        {
+            return playerTickInfo;
         }
 
 
@@ -615,12 +624,6 @@ namespace CoopTestMod
                 {
                     //InformationManager.ClearAllMessages();
                     //InformationManager.DisplayMessage(new InformationMessage("Received Update: " + agentUpdate.playerTickInfo));
-                    if (!ClientAgentManager.Instance().ContainsAgent(agentUpdate.Item1.Id))
-                    {
-                        Mission.Current.FindAgentWithIndex(agentUpdate.Item2.Index).FadeOut(true, true); ;
-                        agentUpdateState.TryRemove(agentUpdate.Item1.Id, out _);
-                        return;
-                    }
                     UpdatePlayerTick(agentUpdate.Item1, agentUpdate.Item2);
                 }
 
@@ -644,7 +647,12 @@ namespace CoopTestMod
             if (Input.IsKeyReleased(InputKey.Numpad6))
             {
 
-                InformationManager.DisplayMessage(new InformationMessage("There are ticks for: " + playerTickInfo.Count.ToString()));
+                foreach(string clientId in agentUpdateState.Keys)
+                {
+                    InformationManager.DisplayMessage(new InformationMessage("Agent Update state has: " + clientId));
+                   
+                }
+
                 //InformationManager.DisplayMessage(new InformationMessage("There are spawn queues for " + agentSpawnQueue.Count));
 
 
