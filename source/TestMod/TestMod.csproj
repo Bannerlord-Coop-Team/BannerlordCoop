@@ -254,6 +254,7 @@
     <Compile Include="CustomMissionBehavior.cs" />
     <Compile Include="CustomSandboxGame.cs" />
     <Compile Include="IOCreateMissile.cs" />
+    <Compile Include="MissionNetworkBehavior.cs" />
     <Compile Include="MissionTaskManager.cs" />
     <Compile Include="MySubModule.cs" />
     <Compile Include="NetworkAgent.cs" />

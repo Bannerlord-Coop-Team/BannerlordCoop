@@ -241,7 +241,7 @@ namespace MissionsServer
                     {
                         NetPeer peer = server.GetPeerById(clientId);
                         if (peer == null) return;
-                        peer.Send(stream2.ToArray(), DeliveryMethod.Sequenced);
+                        peer.Send(stream2.ToArray(), DeliveryMethod.ReliableOrdered);
                     }
                 }
                 
