@@ -193,6 +193,64 @@ namespace MissionsServer
                    Console.WriteLine(fromPeer.Id + " has added new agent with ID: " + id);
                    
                 }
+                else if (messageType == MessageType.BoardGame)
+                {
+                    string location = clientToLocation[fromPeer.Id];
+                    foreach (int clientId in locationToClients[location].Keys.Where(c => c != fromPeer.Id))
+                    {
+                        Console.WriteLine("Sending to client ");
+
+                        NetDataWriter writer = new NetDataWriter();
+                        writer.Put((uint)MessageType.BoardGame);
+                        writer.Put(dataReader.GetRemainingBytes());
+
+                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
+                    }
+                }
+                else if (messageType == MessageType.PawnCapture)
+                {
+                    string location = clientToLocation[fromPeer.Id];
+                    foreach (int clientId in locationToClients[location].Keys.Where(c => c != fromPeer.Id))
+                    {
+                        Console.WriteLine("Sending to client ");
+
+                        NetDataWriter writer = new NetDataWriter();
+                        writer.Put((uint)MessageType.PawnCapture);
+                        writer.Put(dataReader.GetRemainingBytes());
+
+                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
+                    }
+                }
+                else if (messageType == MessageType.BoardGameChallenge)
+                {
+                    string location = clientToLocation[fromPeer.Id];
+
+
+
+                    Console.WriteLine("Sending to client ");
+
+                    NetDataWriter writer = new NetDataWriter();
+                    writer.Put((uint)MessageType.BoardGameChallenge);
+                    byte[] challengeReq = dataReader.GetRemainingBytes();
+                    writer.Put(challengeReq);
+
+                    using(MemoryStream stream = new MemoryStream(challengeReq))
+                    {
+                        BoardGameChallenge boardGameChallenge = Serializer.DeserializeWithLengthPrefix<BoardGameChallenge>(stream, PrefixStyle.Fixed32BigEndian);
+                        var test = ServerAgentManager.Instance().GetClientInfo(boardGameChallenge.OtherAgentId.ToString());
+                        server.GetPeerById(test.Item1).Send(writer, DeliveryMethod.ReliableOrdered);
+                    }
+
+                    
+
+                    
+
+                    //foreach (int clientId in locationToClients[location].Keys.Where(c => c != fromPeer.Id))
+                    //{
+
+
+                    //}
+                }
 
             };
 

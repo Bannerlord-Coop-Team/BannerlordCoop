@@ -249,6 +249,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AgentInteractionPatch.cs" />
+    <Compile Include="BoardGameAICanMakeMovePatch.cs" />
+    <Compile Include="BoardGamePlayerInputPatches.cs" />
     <Compile Include="ClientAgentManager.cs" />
     <Compile Include="CustomSandboxGame.cs" />
     <Compile Include="IOCreateMissile.cs" />

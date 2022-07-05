@@ -3,6 +3,8 @@ using LiteNetLib;
 using LiteNetLib.Utils;
 using MissionsShared;
 using ProtoBuf;
+using SandBox.BoardGames;
+using SandBox.BoardGames.MissionLogics;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -11,6 +13,8 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
@@ -27,7 +31,7 @@ namespace CoopTestMod
         // LiteNetLib listener
         private EventBasedNetListener listener;
         // LiteNetLib Client
-        private static NetManager client;
+        public static NetManager client;
         // My Peer from LiteNetLib
         private int myPeerId = -1;
         // Current Cutscene loaded, empty by default
@@ -65,7 +69,7 @@ namespace CoopTestMod
                     // first 32 bits is always the message type
                     MissionsShared.MessageType messageType = (MessageType)dataReader.GetUInt();
 
-                    
+
                     // different behavior based on message type
                     if (messageType == MessageType.EnterLocation)
                     {
@@ -94,7 +98,8 @@ namespace CoopTestMod
                             return;
                         }
                         // otherwise, add a task for the game thread to process some client exiting
-                        MissionTaskManager.Instance().AddTask(clientId, new Action<object>((object obj) => {
+                        MissionTaskManager.Instance().AddTask(clientId, new Action<object>((object obj) =>
+                        {
                             int cId = (int)obj;
                             // loop through the client and remove all of its agents
                             foreach (string agentId in playerTickInfo[cId].Keys)
@@ -108,7 +113,7 @@ namespace CoopTestMod
 
                             playerTickInfo[cId].Clear();
                             playerTickInfo.TryRemove(cId, out _);
-                            
+
                         }));
 
                     }
@@ -127,7 +132,8 @@ namespace CoopTestMod
                         // retrieve the peer Id of the sender, effected id, effector id, and the damage
                         // then register an event to the game thread to apply the damage. Note: Vec3.One for the position is used as an indicator that this is a server damage.
                         // this must be resolved at a later time
-                        MissionTaskManager.Instance().AddTask((peerId, effectedId, effectorId, damage), new Action<object>((object obj) => {
+                        MissionTaskManager.Instance().AddTask((peerId, effectedId, effectorId, damage), new Action<object>((object obj) =>
+                        {
                             (int, string, string, int) d = ((int, string, string, int))obj;
                             InformationManager.DisplayMessage(new InformationMessage("Damaged from: " + d.Item1 + " from agent : " + d.Item2 + " to agent: " + d.Item3 + " of " + d.Item4));
                             Agent effectectedAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().GetIndexFromId(d.Item2));
@@ -143,13 +149,118 @@ namespace CoopTestMod
 
                     }
 
+                    else if (messageType == MessageType.BoardGameChallenge)
+                    {
+                        byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
+                        Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
+                        BoardGameChallenge message;
+
+                        InformationManager.DisplayMessage(new InformationMessage(serializedLocation.Length.ToString()));
+
+                        MemoryStream stream = new MemoryStream(serializedLocation);
+                        message = Serializer.DeserializeWithLengthPrefix<BoardGameChallenge>(stream, PrefixStyle.Fixed32BigEndian);
+
+                        MissionTaskManager.Instance().AddTask((message.ChallengeRequest, message.ChallengeResponse, message.OtherAgentId), new Action<object>((object obj) =>
+                        {
+                            (bool, bool, int) d = ((bool, bool, int))obj;
+
+                            if (d.Item1)
+                            {
+                                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Accept", "Pussy out",
+                                    new Action(() => { AgentInteractionPatch.AcceptGameRequest(d.Item3); }), new Action(() => { })));
+                            }
+                            else if (d.Item2)
+                            {
+                                //PreplaceUnitsPatch.isChallenged = true;
+
+                                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                                boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
+                                boardGameLogic.StartBoardGame();
+                            }
+                        }));
+                    }
+
+                    else if (messageType == MessageType.BoardGame)
+                    {
+                        byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
+                        Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
+                        BoardGameMoveEvent message;
+                        MemoryStream stream = new MemoryStream(serializedLocation);
+                        message = Serializer.DeserializeWithLengthPrefix<BoardGameMoveEvent>(stream, PrefixStyle.Fixed32BigEndian);
+
+                        MissionTaskManager.Instance().AddTask((message.toIndex, message.fromIndex), new Action<object>((object obj) =>
+                        {
+                            (int, int) d = ((int, int))obj;
+
+                            var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                            BoardGameBase boardGame = boardGameLogic.Board;
+
+                            if (boardGame == null)
+                                return;
+
+                            var unitToMove = boardGame.PlayerTwoUnits[d.Item2];
+                            var goalTile = boardGame.Tiles[d.Item1];
+
+                            if (boardGame is BoardGamePuluc)
+                            {
+                                goalTile = boardGame.Tiles[10 - d.Item1];
+                            }
+
+                            if (unitToMove == null || goalTile == null)
+                                return;
+
+                            var boardType = boardGame.GetType();
+
+                            boardType.GetProperty("SelectedUnit", BindingFlags.NonPublic | BindingFlags.Instance)?
+                                .SetValue(boardGame, unitToMove);
+
+                            var movePawnToTileMethod = boardType.GetMethod("MovePawnToTile", BindingFlags.NonPublic | BindingFlags.Instance);
+                            movePawnToTileMethod?.Invoke(boardGame, new object[] { unitToMove, goalTile, false, true });
+
+
+                        }));
+
+                        //InformationManager.DisplayMessage(new InformationMessage($"Move received from server, unit id: {message.fromIndex}"));
+                    }
+                    else if (messageType == MessageType.PawnCapture)
+                    {
+                        byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
+                        Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
+                        PawnCapturedEvent message;
+                        MemoryStream stream = new MemoryStream(serializedLocation);
+                        message = Serializer.DeserializeWithLengthPrefix<PawnCapturedEvent>(stream, PrefixStyle.Fixed32BigEndian);
+
+                        MissionTaskManager.Instance().AddTask((message.fromIndex), new Action<object>((object obj) =>
+                        {
+                            int d = (int)obj;
+
+                            var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                            BoardGameBase boardGame = boardGameLogic.Board;
+
+                            if (boardGame == null)
+                                return;
+
+                            var unitToMove = boardGame.PlayerTwoUnits[d];
+
+                            if (unitToMove == null)
+                                return;
+
+                            boardGame.SetPawnCaptured(unitToMove);
+
+                            boardGame.GetType().GetMethod("EndTurn", BindingFlags.NonPublic | BindingFlags.Instance)?
+                                .Invoke(boardGame, new object[] { });
+
+                        }));
+                    }
+
                     else if (messageType == MessageType.AddAgent)
                     {
                         int index = dataReader.GetInt();
                         string id = dataReader.GetString();
                         // register an event for the game thread to add agent
                         // server returns the server generated id and the index it corresponds to in the local game
-                        MissionTaskManager.Instance().AddTask((myPeerId, index, id, true), new Action<object>((object obj) => {
+                        MissionTaskManager.Instance().AddTask((myPeerId, index, id, true), new Action<object>((object obj) =>
+                        {
 
                             (int, int, string, bool) agentCreationState = ((int, int, string, bool))obj;
                             Agent agent = Mission.Current.FindAgentWithIndex(agentCreationState.Item2);
@@ -387,7 +498,7 @@ namespace CoopTestMod
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             Mission mission = Mission.Current;
-            agentBuildData = agentBuildData.Team(Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
+            agentBuildData = agentBuildData.Team(Mission.Current.PlayerAllyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
             Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);
