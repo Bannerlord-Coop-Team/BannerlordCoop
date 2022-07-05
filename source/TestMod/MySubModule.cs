@@ -12,7 +12,7 @@ namespace CoopTestMod
     public class MySubModule : MBSubModuleBase
     {
         // initialize the network connection
-        MissionNetworkBehavior networkBehavior = new MissionNetworkBehavior();
+        MissionNetworkBehavior networkBehavior;
         private bool subModuleLoaded = false;
         private bool battleLoaded = false;
         public override void OnBeforeMissionBehaviorInitialize(Mission mission)
