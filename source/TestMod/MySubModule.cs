@@ -1,26 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
-using TaleWorlds.Core;
+﻿using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.CampaignSystem;
-using Module = TaleWorlds.MountAndBlade.Module;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.InputSystem;
-using System.IO;
-using TaleWorlds.Library;
-using System.Linq;
-using TaleWorlds.Engine;
-using System.Threading;
 using TaleWorlds.SaveSystem.Load;
-using HarmonyLib;
-using NetworkMessages.FromServer;
-using SandBox;
-using LiteNetLib;
-using MissionsShared;
-using ProtoBuf;
-using System.Collections.Concurrent;
-using LiteNetLib.Utils;
+using System.Reflection;
 
 namespace CoopTestMod
 {
@@ -28,17 +11,33 @@ namespace CoopTestMod
 
     public class MySubModule : MBSubModuleBase
     {
+        // initialize the network connection
         MissionNetworkBehavior networkBehavior = new MissionNetworkBehavior();
         private bool subModuleLoaded = false;
         private bool battleLoaded = false;
         public override void OnBeforeMissionBehaviorInitialize(Mission mission)
         {
+            // add the network behavior
             mission.AddMissionBehavior(networkBehavior);
+        }
+
+        protected override void OnSubModuleLoad()
+        {
+            networkBehavior = new MissionNetworkBehavior();
+            //DEBUG: skip intro
+            FieldInfo splashScreen = TaleWorlds.MountAndBlade.Module.CurrentModule.GetType().GetField("_splashScreenPlayed", BindingFlags.Instance | BindingFlags.NonPublic);
+            splashScreen.SetValue(TaleWorlds.MountAndBlade.Module.CurrentModule, true);
         }
 
 
         protected override void OnApplicationTick(float dt)
         {
+
+            // NOTE
+            // ALL THE CODE BELOW IS FOR DEBUGGING AND AUTO LOADING A SAVE
+            //
+
+
             if (!battleLoaded && Mission.Current != null && Mission.Current.IsLoadingFinished)
             {
                 // again theres gotta be a better way to check if missions finish loading? A custom mission maybe in the future
@@ -65,6 +64,7 @@ namespace CoopTestMod
                 MBGameManager.StartNewGame(manager);
             }
 
+            // debug numpad 6 output
             if (Input.IsKeyReleased(InputKey.Numpad6))
             {
 
@@ -76,10 +76,6 @@ namespace CoopTestMod
                         InformationManager.DisplayMessage(new InformationMessage("Agent " + info + " from " + clientId));
                     }
                 }
-
-                //InformationManager.DisplayMessage(new InformationMessage("There are spawn queues for " + agentSpawnQueue.Count));
-
-
 
             }
         }

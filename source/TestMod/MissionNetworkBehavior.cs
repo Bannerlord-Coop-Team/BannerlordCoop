@@ -21,28 +21,35 @@ namespace CoopTestMod
 {
     public class MissionNetworkBehavior : MissionBehavior
     {
-        public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;        
+        // Mission Behavior type, required by MissionBehavior
+        public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;       
+        
+        // LiteNetLib listener
         private EventBasedNetListener listener;
+        // LiteNetLib Client
         private static NetManager client;
+        // My Peer from LiteNetLib
         private int myPeerId = -1;
+        // Current Cutscene loaded, empty by default
         private static string currentScene = "";
+        // Map Client Peer ID to a dictionary of agents. Each agent can be accessed with the server's agent ID
         private static ConcurrentDictionary<int, ConcurrentDictionary<string, Agent>> playerTickInfo = new ConcurrentDictionary<int, ConcurrentDictionary<string, Agent>>();
+        // Map server agent ID to a pair of PlayerTickInfo object and the MB Agent Object
         private static ConcurrentDictionary<string, (PlayerTickInfo, Agent)> agentUpdateState = new ConcurrentDictionary<string, (PlayerTickInfo, Agent)>();
+        // Map the index of the agent to its player tick info. This will be used in the network thread to send the info
         private static ConcurrentDictionary<int, PlayerTickInfo> hostPlayerTickInfo = new ConcurrentDictionary<int, PlayerTickInfo>();
+        // Atomic boolean to indicate if the mission running. This is to avoid using Mission.Current
         private static volatile bool isInMission = false;
 
 
 
         public MissionNetworkBehavior()
         {
+            // start harmony patch
             new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop").PatchAll();
 
-            //skip intro
-            FieldInfo splashScreen = TaleWorlds.MountAndBlade.Module.CurrentModule.GetType().GetField("_splashScreenPlayed", BindingFlags.Instance | BindingFlags.NonPublic);
-            splashScreen.SetValue(TaleWorlds.MountAndBlade.Module.CurrentModule, true);
 
-
-            // pass /server or /client to start as either or
+            // start network thread
             Thread thread = new Thread(() =>
             {
                 Thread.CurrentThread.IsBackground = true;
@@ -50,14 +57,19 @@ namespace CoopTestMod
                 client = new NetManager(listener);
                 client.Start();
                 client.Connect("localhost" /* host ip or name */, 9050 /* port */, "SomeConnectionKey" /* text key or NetDataWriter */);
+
+                // register events
+
                 listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod) =>
                 {
+                    // first 32 bits is always the message type
                     MissionsShared.MessageType messageType = (MessageType)dataReader.GetUInt();
 
-
                     
+                    // different behavior based on message type
                     if (messageType == MessageType.EnterLocation)
                     {
+                        // grab all existing peers at the location
                         while (!dataReader.EndOfData)
                         {
 
@@ -65,15 +77,14 @@ namespace CoopTestMod
                             if (peerId == myPeerId) continue;
                             if (playerTickInfo.ContainsKey(peerId)) continue;
                             playerTickInfo[peerId] = new ConcurrentDictionary<string, Agent>();
-                            //InformationManager.DisplayMessage(new InformationMessage("Entered Location: " + peerId));
                         }
-                        //playerTickInfo[id] = new ConcurrentDictionary<uint, Agent>();
 
                     }
 
                     else if (messageType == MessageType.ExitLocation)
                     {
                         int clientId = dataReader.GetInt();
+                        // If we are leaving from a mission, remove and clear all network related memory
                         if (clientId == myPeerId)
                         {
                             ClientAgentManager.Instance().ClearAll();
@@ -82,9 +93,10 @@ namespace CoopTestMod
                             playerTickInfo.Clear();
                             return;
                         }
+                        // otherwise, add a task for the game thread to process some client exiting
                         MissionTaskManager.Instance().AddTask(clientId, new Action<object>((object obj) => {
                             int cId = (int)obj;
-
+                            // loop through the client and remove all of its agents
                             foreach (string agentId in playerTickInfo[cId].Keys)
                             {
                                 int index = ClientAgentManager.Instance().GetIndexFromId(agentId);
@@ -100,18 +112,21 @@ namespace CoopTestMod
                         }));
 
                     }
+                    // when connecting, server will return you peer Id
                     else if (messageType == MessageType.ConnectionId)
                     {
                         myPeerId = dataReader.GetInt();
                     }
-
                     else if (messageType == MessageType.PlayerDamage)
                     {
                         int peerId = dataReader.GetInt();
-
                         string effectedId = dataReader.GetString();
                         string effectorId = dataReader.GetString();
                         int damage = dataReader.GetInt();
+
+                        // retrieve the peer Id of the sender, effected id, effector id, and the damage
+                        // then register an event to the game thread to apply the damage. Note: Vec3.One for the position is used as an indicator that this is a server damage.
+                        // this must be resolved at a later time
                         MissionTaskManager.Instance().AddTask((peerId, effectedId, effectorId, damage), new Action<object>((object obj) => {
                             (int, string, string, int) d = ((int, string, string, int))obj;
                             InformationManager.DisplayMessage(new InformationMessage("Damaged from: " + d.Item1 + " from agent : " + d.Item2 + " to agent: " + d.Item3 + " of " + d.Item4));
@@ -132,7 +147,8 @@ namespace CoopTestMod
                     {
                         int index = dataReader.GetInt();
                         string id = dataReader.GetString();
-                        //agentCreationQueue.Enqueue((myPeerId, index, id, true));
+                        // register an event for the game thread to add agent
+                        // server returns the server generated id and the index it corresponds to in the local game
                         MissionTaskManager.Instance().AddTask((myPeerId, index, id, true), new Action<object>((object obj) => {
 
                             (int, int, string, bool) agentCreationState = ((int, int, string, bool))obj;
@@ -157,34 +173,26 @@ namespace CoopTestMod
                         message = Serializer.DeserializeWithLengthPrefix<FromServerTickMessage>(stream, PrefixStyle.Fixed32BigEndian);
 
                         // get all the client info that does not belong to me
-                        List<FromServerTickPayload> serverPaylod = message.ClientTicks.Where(client => client.ClientId != myPeerId).ToList();
-
-
-                        // grab the first client's first agent -- needs to be changed.
-
-
                         foreach (FromServerTickPayload payload in message.ClientTicks.Where(client => client.ClientId != myPeerId))
                         {
+                            // if no key exists for the client, terminate
                             if (!playerTickInfo.ContainsKey(payload.ClientId))
                             {
                                 InformationManager.DisplayMessage(new InformationMessage("Client ID isn't valid"));
                                 return;
                             }
 
+                            // retireve the agent information from client ID
                             ConcurrentDictionary<string, Agent> playerTickClientDict = playerTickInfo[payload.ClientId];
+
+                            // loop through each tick into in the payload
                             foreach (PlayerTickInfo tickInfo in payload.PlayerTick)
                             {
                                 // if it contains the agent, update it
                                 if (playerTickClientDict.ContainsKey(tickInfo.Id))
                                 {
-                                    //GameEntity gameEntity = Mission.Current.Scene.FindEntityWithTag("spawnpoint_player");
-                                    //if (gameEntity != null)
-                                    //{
-
-                                    //    playerTickClientDict[tickInfo.Id] = SpawnAgent(CharacterObject.PlayerCharacter, gameEntity.GetFrame());
-                                    //}
+                                    // queue the change to the game thread
                                     agentUpdateState[tickInfo.Id] = (tickInfo, playerTickClientDict[tickInfo.Id]);
-                                    //UpdatePlayerTick(tickInfo, playerTickClientDict[tickInfo.Id]);
                                 }
                                 // it doesn't contain the agent so it add to be spawned
                                 else
@@ -202,6 +210,7 @@ namespace CoopTestMod
                                         playerTickInfo[agentState.Item1][agentState.Item2] = agent;
                                         InformationManager.DisplayMessage(new InformationMessage("A new agent was spawned: " + agentState.Item2 + " from client: " + agentState.Item1));
                                     }));
+                                    // set the tick info agent to null to avoid accidental override of the old agent
                                     playerTickInfo[payload.ClientId][tickInfo.Id] = null;
                                 }
 
@@ -209,15 +218,12 @@ namespace CoopTestMod
 
                         }
 
-                        //PlayerTickInfo info = message.ClientTicks.Where(client => client.ClientId != myPeerId).First().PlayerTick.First();
-
 
 
 
 
                     }
-                    // received something from server
-
+                    // recycle reader
                     dataReader.Recycle();
                 };
                 while (true)
@@ -225,7 +231,7 @@ namespace CoopTestMod
                     client.PollEvents();
                     Thread.Sleep(5); // approx. 60hz
 
-
+                    // retrieve local host tick info for all the agent
                     FromClientTickMessage message = new FromClientTickMessage();
                     List<PlayerTickInfo> agentsList = hostPlayerTickInfo.Values.ToList();
                     message.AgentsTickInfo = agentsList;
@@ -234,6 +240,7 @@ namespace CoopTestMod
                     MemoryStream strm = new MemoryStream();
                     message.AgentCount = hostPlayerTickInfo.Count;
 
+                    // if no agents exist to send or we are not in a mission, terminate
                     if (message.AgentCount <= 0 || !isInMission)
                     {
                         continue;
@@ -243,6 +250,7 @@ namespace CoopTestMod
                         writer.Write((uint)MessageType.PlayerSync);
                         writer.Write(stream.ToArray());
                     }
+                    // send unreiable...we don't need data arrival guarantees for the server syncs
                     client.SendToAll(strm.ToArray(), DeliveryMethod.Unreliable);
 
                 }
@@ -254,19 +262,16 @@ namespace CoopTestMod
 
 
 
-
+        // this patch stops blood from showing
         [HarmonyPatch(typeof(Mission), "DecideAgentHitParticles")]
         public class AgentBloodPatch
         {
-
-
-
             static bool Prefix()
             {
                 return false;
             }
         }
-
+        // this patch overrides the damage calculation and applicaiton to the agent
         [HarmonyPatch(typeof(Mission), "RegisterBlow")]
         public class AgentDamagePatch
         {
@@ -275,31 +280,39 @@ namespace CoopTestMod
 
             static bool Prefix(Agent attacker, Agent victim, GameEntity realHitEntity, Blow b, ref AttackCollisionData collisionData, in MissionWeapon attackerWeapon, ref CombatLogData combatLogData)
             {
+                // all damages must be send to the server
                 NetDataWriter writer = new NetDataWriter();
                 writer.Put((uint)MessageType.PlayerDamage);
+                // this is to verify if the damage is from the server.
+                // NOTE: this must be changed
                 if (b.Position == Vec3.One)
                 {
                     InformationManager.DisplayMessage(new InformationMessage("This is a server message processing..."));
                     return true;
                 }
+                // Check if the damage is local agent to a local agent. 
+                // We don't need to let everyone know about this.
+                // This should be changed in the future.
                 if ((attacker.Team != Mission.Current.PlayerTeam || !ClientAgentManager.Instance().IsNetworkAgent(victim.Index)))
                 {
                     InformationManager.DisplayMessage(new InformationMessage("This is a damage to a local agent, ignoring..."));
                     return true;
                 }
+
+                // Otherwise the damage is from a network agent to another network (non-local) agent, so send it to the server
                 writer.Put(ClientAgentManager.Instance().GetIdFromIndex(victim.Index));
                 writer.Put(ClientAgentManager.Instance().GetIdFromIndex(attacker.Index));
                 InformationManager.DisplayMessage(new InformationMessage("Sending Damage: " + b.InflictedDamage + " to server "));
                 writer.Put(b.InflictedDamage);
                 client.SendToAll(writer, DeliveryMethod.ReliableOrdered);
-                return false; // make sure you only skip if really necessary
+                return false; // override the game damage and don't apply it
             }
         }
 
 
 
 
-        // get the scene ID, pass it to the server
+        // Callback for when the mission started; let the server know which scene you are at
         [HarmonyPatch(typeof(Mission), "AfterStart")]
         public class CampaignMissionPatch
         {
@@ -317,7 +330,7 @@ namespace CoopTestMod
             }
         }
 
-
+        // patch for the agent spawn; deconflict network spawn from local spawn
         [HarmonyPatch(typeof(Mission), "SpawnAgent")]
         public class CampaignAgentSpawnedPatch
         {
@@ -325,16 +338,18 @@ namespace CoopTestMod
 
             public static void Postfix(AgentBuildData agentBuildData, bool spawnFromAgentVisuals, int formationTroopCount, ref Agent __result)
             {
-
+                // if the player isn't in a team, continue
                 if (Mission.Current == null || Mission.Current.PlayerTeam == null) return;
                 try
                 {
+                    // if the player isn't in our team, we don't care, spawn them as usual
                     if (__result.Team != Mission.Current.PlayerTeam)
                     {
                         return;
                     }
                 }
                 catch { }
+                // if they are in our team, pass them to the server to generate an ID for them and return them back to us.
                 NetDataWriter writer = new NetDataWriter();
                 writer.Put((uint)MessageType.AddAgent);
                 writer.Put(__result.Index);
@@ -343,6 +358,8 @@ namespace CoopTestMod
 
             }
         }
+
+        // exiting a mission, clear all network related memory and let the server know
         [HarmonyPatch(typeof(Mission), "FinalizeMission")]
         public class OnMissionExit
         {
@@ -363,7 +380,8 @@ namespace CoopTestMod
         }
 
 
-
+        // Spawn an agent based on its character object and frame. For now, Main agent character object is used
+        // This should be the real character object in the future
         private Agent SpawnAgent(CharacterObject character, MatrixFrame frame)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
@@ -378,6 +396,7 @@ namespace CoopTestMod
             return agent;
         }
 
+        // DEBUG METHOD: To spawn in Arena and test fights
         private Agent SpawnArenaAgent(CharacterObject character, MatrixFrame frame, bool isMain)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
@@ -404,6 +423,7 @@ namespace CoopTestMod
             return agent;
         }
 
+        // DEBUG METHOD: Starts an Arena fight
         public void StartArenaFight()
         {
             //reset teams if any exists
@@ -441,28 +461,33 @@ namespace CoopTestMod
 
         }
 
+        // Update Player tick from the game thread
         private void UpdatePlayerTick(PlayerTickInfo info, Agent agent)
         {
             if (Mission.Current != null && agent != null && Mission.Current.IsLoadingFinished)
             {
 
 
-
+                // if the player is dead, dont sync anything
                 if (agent.Health <= 0)
                 {
                     return;
                 }
 
+                // get the position
                 Vec3 pos = new Vec3(info.PosX, info.PosY, info.PosZ);
 
-
-                if (agent.GetPathDistanceToPoint(ref pos) > 2f)
+                // if the distance between the local agent and the info passed from the server is greater than 1 unit, teleport the agent
+                if (agent.GetPathDistanceToPoint(ref pos) > 1f)
                 {
                     agent.TeleportToPosition(pos);
                 }
 
 
+                // Set the agent's flags to 0 ie nothing
                 agent.EventControlFlags = 0U;
+
+                // if the agent is crouching, add that event
                 if (info.crouchMode)
                 {
 
@@ -473,41 +498,50 @@ namespace CoopTestMod
                     agent.EventControlFlags |= Agent.EventControlFlag.Stand;
                 }
 
-
+                // apply the agent's look direction
                 agent.LookDirection = new Vec3(info.LookDirectionX, info.LookDirectionY, info.LookDirectionZ);
+
+                // apply the agent's movement input vector...Is this necessary?
                 agent.MovementInputVector = new Vec2(info.InputVectorX, info.InputVectorY);
 
+                // Now check the flags given to us from the server
                 uint eventFlag = info.EventFlag;
                 if (eventFlag == 1u)
                 {
+                    // dismount
                     agent.EventControlFlags |= Agent.EventControlFlag.Dismount;
                 }
                 if (eventFlag == 2u)
                 {
+                    // mount
                     agent.EventControlFlags |= Agent.EventControlFlag.Mount;
                 }
                 if (eventFlag == 0x400u)
                 {
-                    //InformationManager.DisplayMessage(new InformationMessage("Toggled"));
+                    // switch weapon
                     agent.EventControlFlags |= Agent.EventControlFlag.ToggleAlternativeWeapon;
                 }
 
 
 
 
-
+                // apply the animation on channel 0 if none exists
                 if (agent.GetCurrentAction(0) == ActionIndexCache.act_none || agent.GetCurrentAction(0).Index != info.Action0Index)
                 {
                     string actionName1 = MBAnimation.GetActionNameWithCode(info.Action0Index);
                     agent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (ulong)info.Action0Flag, startProgress: info.Action0Progress);
 
                 }
+                // otherwise continue the existing animation
                 else
                 {
                     agent.SetCurrentActionProgress(0, info.Action0Progress);
                 }
+
+                // Set the movement flags to none
                 agent.MovementFlags = 0U;
 
+                // Check the action of the agent; if they are defending, apply the defending movement flag
                 if ((int)info.Action1CodeType >= (int)Agent.ActionCodeType.DefendAllBegin && (int)info.Action1CodeType <= (int)Agent.ActionCodeType.DefendAllEnd)
 
                 {
@@ -515,28 +549,32 @@ namespace CoopTestMod
                     return;
                 }
 
-
+                // Check if there is a change on the right hand
                 if ((EquipmentIndex)info.MainHandIndex != agent.GetWieldedItemIndex(Agent.HandIndex.MainHand))
                 {
+                    // set the weapon to whatever index the server passed
                     agent.SetWieldedItemIndexAsClient(Agent.HandIndex.MainHand, (EquipmentIndex)info.MainHandIndex, false, false, agent.WieldedWeapon.CurrentUsageIndex);
                 }
+                // check if there is a change on the left hand
 
                 if ((EquipmentIndex)info.OffHandIndex != agent.GetWieldedItemIndex(Agent.HandIndex.OffHand))
                 {
+                    // set the index to the weapon wielded
                     agent.SetWieldedItemIndexAsClient(Agent.HandIndex.OffHand, (EquipmentIndex)info.OffHandIndex, false, false, agent.WieldedOffhandWeapon.CurrentUsageIndex);
                 }
 
 
-                //// we either don't have an action so set it to the new one or the receive action is different than our current action
-
+                // Check if there is a melee; this breaks the game if we don't do it.
                 if ((Agent.ActionCodeType)info.Action1CodeType != Agent.ActionCodeType.BlockedMelee)
                 {
+                    // if the animation is none, start it
                     if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != info.Action1Index)
                     {
                         string actionName2 = MBAnimation.GetActionNameWithCode(info.Action1Index);
                         agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (ulong)info.Action1Flag, startProgress: info.Action1Progress);
 
                     }
+                    // otherwise continue it
                     else
                     {
                         agent.SetCurrentActionProgress(1, info.Action1Progress);
@@ -544,34 +582,36 @@ namespace CoopTestMod
                 }
                 else
                 {
-
+                    // otherwise just cancel it
                     agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
                 }
-                //if (agent.HasMount)
-                //{
-                //    Vec3 mountPos = new Vec3(info.MountPositionX, info.MountPositionY, info.MountPositionZ);
 
-                //    if (agent.MountAgent.GetPathDistanceToPoint(ref mountPos) > 5f)
-                //    {
-                //        agent.MountAgent.TeleportToPosition(mountPos);
-                //    }
-                //    agent.MountAgent.SetMovementDirection(new Vec2(info.MovementDirectionX, info.MovementDirectionY));
+                // repeat this process for the mount
+                if (agent.HasMount)
+                {
+                    Vec3 mountPos = new Vec3(info.MountPositionX, info.MountPositionY, info.MountPositionZ);
 
-                //    //Currently not doing anything afaik
-                //    if (agent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.MountAgent.GetCurrentAction(1).Index != info.MountAction1Index)
-                //    {
-                //        string mActionName2 = MBAnimation.GetActionNameWithCode(info.MountAction1Index);
-                //        agent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)info.MountAction1Flag, startProgress: info.MountAction1Progress);
-                //    }
-                //    else
-                //    {
-                //        agent.MountAgent.SetCurrentActionProgress(1, info.MountAction1Progress);
-                //    }
-                //    agent.MountAgent.LookDirection = new Vec3(info.LookDirectionZ, info.MountLookDirectionY, info.MountLookDirectionZ);
-                //    agent.MountAgent.MovementInputVector = new Vec2(info.MountInputVectorX, info.MountInputVectorY);
-                //    return;
+                    if (agent.MountAgent.GetPathDistanceToPoint(ref mountPos) > 5f)
+                    {
+                        agent.MountAgent.TeleportToPosition(mountPos);
+                    }
+                    agent.MountAgent.SetMovementDirection(new Vec2(info.MovementDirectionX, info.MovementDirectionY));
 
-                //}
+                    //Currently not doing anything afaik
+                    if (agent.MountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.MountAgent.GetCurrentAction(1).Index != info.MountAction1Index)
+                    {
+                        string mActionName2 = MBAnimation.GetActionNameWithCode(info.MountAction1Index);
+                        agent.MountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (ulong)info.MountAction1Flag, startProgress: info.MountAction1Progress);
+                    }
+                    else
+                    {
+                        agent.MountAgent.SetCurrentActionProgress(1, info.MountAction1Progress);
+                    }
+                    agent.MountAgent.LookDirection = new Vec3(info.LookDirectionZ, info.MountLookDirectionY, info.MountLookDirectionZ);
+                    agent.MountAgent.MovementInputVector = new Vec2(info.MountInputVectorX, info.MountInputVectorY);
+                    return;
+
+                }
 
 
 
@@ -591,88 +631,49 @@ namespace CoopTestMod
 
         public override void OnMissionTick(float dt)
         {
-
-            if (Mission.Current == null || !Mission.Current.IsLoadingFinished)
+            // if the mission is null or not yet loaded, skip it; This check is not necessary anymore
+            if (Mission.Current == null || !Mission.Current.IsLoadingFinished || Mission.Current.MainAgent == null || Mission.Current.IsMissionEnding)
             {
                 return;
             }
 
-            if (Input.IsKeyReleased(InputKey.Numpad3))
-            {
-                string scene = Mission.Current.SceneName;
-                currentScene = scene;
-                foreach (Agent a in Mission.Current.AllAgents)
-                {
-                    if (a == null || a.Origin == null)
-                    {
-                        continue;
-                    }
-                    InformationManager.DisplayMessage(new InformationMessage("Player: " + a.Name + a.Origin.IsUnderPlayersCommand));
-                }
 
-                // InformationManager.DisplayMessage(new InformationMessage(Mission.Current.SceneName));
-
-                InformationManager.DisplayMessage(new InformationMessage("Loaded Scene: " + scene));
-                InformationManager.DisplayMessage(new InformationMessage("Is Field Battle: " + Mission.Current.IsFieldBattle.ToString()));
-            }
-
+            // Apply all the pending tasks that have been queued by the network server
             MissionTaskManager.Instance().ApplyPendingTasks();
 
+            // Loop through all the agent updates that have been queued by the server
             foreach ((PlayerTickInfo, Agent) agentUpdate in agentUpdateState.Values)
             {
                 if (agentUpdate.Item1 != null && agentUpdate.Item2 != null)
                 {
-                    //InformationManager.ClearAllMessages();
-                    //InformationManager.DisplayMessage(new InformationMessage("Received Update: " + agentUpdate.playerTickInfo));
+                    // update the game state from this information
                     UpdatePlayerTick(agentUpdate.Item1, agentUpdate.Item2);
                 }
 
             }
 
-
-
-
-            if (Input.IsKeyReleased(InputKey.Numpad5))
-            {
-
-                Blow b = new Blow(Mission.Current.MainAgent.Index);
-                b.InflictedDamage = 20;
-                //_player.Health = 0;
-                Mission.Current.MainAgent.RegisterBlow(b);
-
-
-
-            }
-
+            // this is DEBUG
             if (Input.IsKeyReleased(InputKey.Numpad6))
             {
-
                 foreach(string clientId in agentUpdateState.Keys)
                 {
                     InformationManager.DisplayMessage(new InformationMessage("Agent Update state has: " + clientId));
                    
                 }
-
-                //InformationManager.DisplayMessage(new InformationMessage("There are spawn queues for " + agentSpawnQueue.Count));
-
-
-
             }
 
-
-
-            if (Mission.Current == null || Mission.Current.MainAgent == null || Mission.Current.IsMissionEnding)
-            {
-                return;
-            }
-
+            // loop through all the local agents from the client
             foreach (NetworkAgent agent in ClientAgentManager.Instance().GetHostNetworkAgents())
             {
+                // if no MB agent has been created yet, skip this update
                 if (agent.Agent == null)
                 {
                     return;
                 }
+                // otherwise grab it
                 Agent mbAgent = agent.Agent;
+                
+                // Everything below retrieves the needed data from MBAgent to generate a PlayerTickInfo
                 try
                 {
                     Vec3 myPos = mbAgent.Position;
@@ -704,16 +705,19 @@ namespace CoopTestMod
 
                     }
                     PlayerTickInfo tickInfo;
+                    // if  key exists for this agent, retrieve ot
                     if (hostPlayerTickInfo.ContainsKey(mbAgent.Index))
                     {
                         tickInfo = hostPlayerTickInfo[mbAgent.Index];
                     }
+                    // otherwise create one
                     else
                     {
                         tickInfo = new PlayerTickInfo();
                         hostPlayerTickInfo[mbAgent.Index] = tickInfo;
                     }
 
+                    // do the same for the mount
                     tickInfo.MountAction1Index = ActionIndexCache.act_none.Index;
                     if (mbAgent.HasMount)
                     {

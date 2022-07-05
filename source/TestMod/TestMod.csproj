@@ -250,8 +250,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ClientAgentManager.cs" />
-    <Compile Include="CustomGameNetworkHandler.cs" />
-    <Compile Include="CustomMissionBehavior.cs" />
     <Compile Include="CustomSandboxGame.cs" />
     <Compile Include="IOCreateMissile.cs" />
     <Compile Include="MissionNetworkBehavior.cs" />

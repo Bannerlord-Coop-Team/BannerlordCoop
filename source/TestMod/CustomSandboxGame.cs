@@ -45,7 +45,7 @@ namespace CoopTestMod
             //return arena scenae name of current town
             int upgradeLevel = settlement.IsTown ? settlement.Town.GetWallLevel() : 1;
 
-            //Open a new arena mission with the scene
+            //Open a new arena mission with the scene; commented out because we are not doing Arena testing right now
             //Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(locationWithId.GetSceneName(upgradeLevel), "", false), (Mission mission) => new MissionBehavior[]
             //   {
             //                    new MissionOptionsComponent(),
@@ -63,7 +63,7 @@ namespace CoopTestMod
             //                    new MissionAgentHandler(locationWithId, null)
             //   }, true, true);
 
-            MouseManager.ShowCursor(false);
+            //MouseManager.ShowCursor(false);
 
 
         }
