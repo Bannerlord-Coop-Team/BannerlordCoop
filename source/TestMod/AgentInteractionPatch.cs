@@ -28,6 +28,8 @@ namespace CoopTestMod
                 if (agent.Character.IsPlayerCharacter)
                 {
                     int index = agent.Index;
+                    InformationManager.DisplayMessage(new InformationMessage($"Interact with agent {index}"));
+
                     InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Challenge", "Pussy out",
                         new Action(() => { SendGameRequest(index); }) , new Action(() => { })));
 
@@ -38,11 +40,10 @@ namespace CoopTestMod
             }
         }
 
-        public static void AcceptGameRequest(int index)
+        public static void AcceptGameRequest()
         {
             BoardGameChallenge boardGameChallenge = new BoardGameChallenge();
             boardGameChallenge.ChallengeResponse = true;
-            boardGameChallenge.OtherAgentId = ClientAgentManager.Instance().GetIdFromIndex(index);
 
             var netDataWriter = new NetDataWriter();
             netDataWriter.Put((uint)MessageType.BoardGameChallenge);
@@ -58,7 +59,6 @@ namespace CoopTestMod
             boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
             boardGameLogic.SetStartingPlayer(true);
             boardGameLogic.StartBoardGame();
-            //boardGameLogic.Board.GetType().GetProperty("RotateBoard", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(boardGameLogic.Board, true);
 
             MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
         }

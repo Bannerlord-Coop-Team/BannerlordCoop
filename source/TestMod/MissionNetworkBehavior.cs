@@ -160,19 +160,17 @@ namespace CoopTestMod
                         MemoryStream stream = new MemoryStream(serializedLocation);
                         message = Serializer.DeserializeWithLengthPrefix<BoardGameChallenge>(stream, PrefixStyle.Fixed32BigEndian);
 
-                        MissionTaskManager.Instance().AddTask((message.ChallengeRequest, message.ChallengeResponse, message.OtherAgentId), new Action<object>((object obj) =>
+                        MissionTaskManager.Instance().AddTask((message.ChallengeRequest, message.ChallengeResponse), new Action<object>((object obj) =>
                         {
-                            (bool, bool, int) d = ((bool, bool, int))obj;
+                            (bool, bool) d = ((bool, bool))obj;
 
                             if (d.Item1)
                             {
                                 InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Accept", "Pussy out",
-                                    new Action(() => { AgentInteractionPatch.AcceptGameRequest(d.Item3); }), new Action(() => { })));
+                                    new Action(() => { AgentInteractionPatch.AcceptGameRequest(); }), new Action(() => { })));
                             }
                             else if (d.Item2)
                             {
-                                //PreplaceUnitsPatch.isChallenged = true;
-
                                 MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
                                 boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
                                 boardGameLogic.StartBoardGame();

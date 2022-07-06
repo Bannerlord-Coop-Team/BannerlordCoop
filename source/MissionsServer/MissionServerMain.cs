@@ -21,8 +21,6 @@ namespace MissionsServer
         
         static void Main(string[] args)
         {
-
-
             //each clients most updated location of its agents
             ConcurrentDictionary<int, List<PlayerTickInfo>> playerSyncDict = new ConcurrentDictionary<int, List<PlayerTickInfo>>();
 
@@ -31,6 +29,9 @@ namespace MissionsServer
 
             //id to location dictionary
             ConcurrentDictionary<int, string> clientToLocation = new ConcurrentDictionary<int, string>();
+
+            // Board game specific: store all the requests pending
+            ConcurrentDictionary<int, int> pendingBoardGamesRequest = new ConcurrentDictionary<int, int>();
             
 
             EventBasedNetListener listener = new EventBasedNetListener();
@@ -225,8 +226,6 @@ namespace MissionsServer
                 {
                     string location = clientToLocation[fromPeer.Id];
 
-
-
                     Console.WriteLine("Sending to client ");
 
                     NetDataWriter writer = new NetDataWriter();
@@ -234,24 +233,23 @@ namespace MissionsServer
                     byte[] challengeReq = dataReader.GetRemainingBytes();
                     writer.Put(challengeReq);
 
-                    using(MemoryStream stream = new MemoryStream(challengeReq))
+                    byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
+                    Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
+
+                    MemoryStream stream = new MemoryStream(challengeReq);
+                    BoardGameChallenge boardGameChallenge = Serializer.DeserializeWithLengthPrefix<BoardGameChallenge>(stream, PrefixStyle.Fixed32BigEndian);
+
+                    if(pendingBoardGamesRequest.TryRemove(fromPeer.Id, out var opposingPeerId))
                     {
-                        BoardGameChallenge boardGameChallenge = Serializer.DeserializeWithLengthPrefix<BoardGameChallenge>(stream, PrefixStyle.Fixed32BigEndian);
-                        var test = ServerAgentManager.Instance().GetClientInfo(boardGameChallenge.OtherAgentId.ToString());
-                        server.GetPeerById(test.Item1).Send(writer, DeliveryMethod.ReliableOrdered);
+                        server.GetPeerById(opposingPeerId)?.Send(writer, DeliveryMethod.ReliableOrdered);
+                    } else
+                    {
+                        var (peerId, _) = ServerAgentManager.Instance().GetClientInfo(boardGameChallenge.OtherAgentId);
+                        pendingBoardGamesRequest.TryAdd(peerId, fromPeer.Id);
+
+                        server.GetPeerById(peerId)?.Send(writer, DeliveryMethod.ReliableOrdered);
                     }
-
-                    
-
-                    
-
-                    //foreach (int clientId in locationToClients[location].Keys.Where(c => c != fromPeer.Id))
-                    //{
-
-
-                    //}
                 }
-
             };
 
             List<FromServerTickPayload> GeneratePlayerPayload(HashSet<int> clientIds)
