@@ -426,27 +426,27 @@ namespace CoopTestMod
         }
 
 
+
         [HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
         public class SetGameOverPatch
         {
-            static bool Prefix(GameOverEnum gameOverInfo)
+            static bool Prefix(MissionBoardGameLogic __instance, GameOverEnum gameOverInfo)
             {
-                Mission.Current.MainAgent.ClearTargetFrame();
-                InformationManager.DisplayMessage(new InformationMessage(gameOverInfo.ToString()));
+                // Closing the view (I don't know if the clear target frame is usefull)
+                __instance.Handler?.Uninstall();
+
+                Action eventGameEnded = typeof(MissionBoardGameLogic).GetField("GameEnded", BindingFlags.NonPublic | BindingFlags.Instance)
+                    ?.GetValue(__instance) as Action;
+                eventGameEnded?.Invoke();
                 return false;
             }
         }
-
+        
         [HarmonyPatch(typeof(MissionBoardGameLogic), "StartConversationWithOpponentAfterGameEnd")]
         public class SetGameOverConversationPatch
         {
             static bool Prefix()
             {
-
-
-                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-                //Close view, might work to call GameEnded()
-
                 return false;
             }
         }
