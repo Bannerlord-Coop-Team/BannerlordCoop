@@ -120,13 +120,7 @@ namespace RemoteAction
                 case float f:
                     return new Argument(f);
                 case MBObjectBase o:
-                    Guid id = CoopObjectManager.GetGuid(o);
-                    if (id != Guid.Empty && !bTransferByValue)
-                    {
-                        return new Argument(CoopObjectManager.GetGuid(o), true);
-                    }
-                    return new Argument(store.Insert(o));
-
+                    return bTransferByValue ? new Argument(store.Insert(o)) : new Argument(CoopObjectManager.GetGuid(o), true);
                 case TroopRoster t:
                     return new Argument(store.Insert(t));
                 case Campaign campaign:

@@ -1,13 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using JetBrains.Annotations;
 using NLog;
 using Sync.Behaviour;
 using Sync.Patch;
-using TaleWorlds.ObjectSystem;
-using TaleWorlds.SaveSystem;
 
 namespace CoopFramework
 {
@@ -62,10 +58,10 @@ namespace CoopFramework
         /// <returns>Have any constructors been patched?</returns>
         public bool PatchConstruction()
         {
-            PatchLoadInitializationCallbacks();
             m_ConstructorPatch = new ConstructorPatch<ObjectLifetimeObserver<T>>(typeof(T)).PostfixAll();
             if (!m_ConstructorPatch.Methods.Any())
                 return false;
+
             foreach (var methodAccess in m_ConstructorPatch.Methods)
                 methodAccess.Postfix.SetGlobalHandler((origin, instance, args) =>
                 {
@@ -73,28 +69,6 @@ namespace CoopFramework
                 });
             return true;
         }
-        /// <summary>
-        ///     Patches the first method with <see cref="LoadInitializationCallback"/> LoadInitializationCallback attribute, but if none is found, then we check 
-        ///     if T is subclass of MBObjectBase and patch it's first method with the given attribute.. 
-        ///     This method is needed because constructors are not called at some classes, when loading a saved game, but for these classes there is a method
-        ///     in the hierarchy, that has this attribute./>.
-        /// </summary>
-        private void PatchLoadInitializationCallbacks()
-        {
-            Type type = CoopFramework.LoadInitializationCallbacks.Keys.ToList().Find(t => t.IsAssignableFrom(typeof(T)));
-            if (type is null)
-                return;
-            var patch = new MethodPatch<ObjectLifetimeObserver<T>>(type);
-            patch.Postfix(CoopFramework.LoadInitializationCallbacks[type].Name);
-            patch.Methods.Single().Postfix.SetGlobalHandler((origin, instance, args) =>
-            {
-                if (instance is T)
-                {
-                    AfterRegisterObject(instance as T);
-                }
-            });
-        }
-
 
         /// <summary>
         ///     Patches all desctructors of <typeparamref name="T"/>
@@ -118,7 +92,6 @@ namespace CoopFramework
 
         [CanBeNull] private static ConstructorPatch<ObjectLifetimeObserver<T>> m_ConstructorPatch;
         [CanBeNull] private static DestructorPatch<ObjectLifetimeObserver<T>> m_DestructorPatch;
-        [CanBeNull] private static List<MethodPatch<ObjectLifetimeObserver<T>>> m_LoadInitializationPatch;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         #endregion

@@ -45,11 +45,6 @@ namespace Coop.Mod.Patch.World
             }
         }
 
-        private static ECallPropagation IsServer(IPendingMethodCall call)
-        {
-            return Coop.IsServer ? ECallPropagation.CallOriginal : ECallPropagation.Skip;
-        }
-
         public TimeControl([NotNull] Campaign instance) : base(instance)
         {
         }
