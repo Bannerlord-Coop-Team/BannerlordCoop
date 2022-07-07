@@ -5,6 +5,7 @@ using MissionsShared;
 using ProtoBuf;
 using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;
+using SandBox.ViewModelCollection.BoardGame;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -20,6 +21,8 @@ using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
+using TaleWorlds.ScreenSystem;
 
 namespace CoopTestMod
 {
@@ -160,20 +163,24 @@ namespace CoopTestMod
                         MemoryStream stream = new MemoryStream(serializedLocation);
                         message = Serializer.DeserializeWithLengthPrefix<BoardGameChallenge>(stream, PrefixStyle.Fixed32BigEndian);
 
-                        MissionTaskManager.Instance().AddTask((message.ChallengeRequest, message.ChallengeResponse), new Action<object>((object obj) =>
+                        MissionTaskManager.Instance().AddTask((message.ChallengeRequest, message.ChallengeResponse, message.SenderAgentId, message.OtherAgentId), new Action<object>((object obj) =>
                         {
-                            (bool, bool) d = ((bool, bool))obj;
+                            (bool, bool, string, string) d = ((bool, bool, string, string))obj;
 
                             if (d.Item1)
                             {
                                 InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Accept", "Pussy out",
-                                    new Action(() => { AgentInteractionPatch.AcceptGameRequest(); }), new Action(() => { })));
+                                    new Action(() => { AgentInteractionPatch.AcceptGameRequest(d.Item3, d.Item4 ); }), new Action(() => { })));
                             }
                             else if (d.Item2)
                             {
                                 MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
                                 boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
                                 boardGameLogic.StartBoardGame();
+
+                                Agent opposingAgent = ClientAgentManager.Instance().GetNetworkAgent(d.Item4).Agent;
+                                boardGameLogic.GetType().GetProperty("OpposingAgent", BindingFlags.Public | BindingFlags.Instance).SetValue(boardGameLogic, opposingAgent);
+
                             }
                         }));
                     }
@@ -185,7 +192,7 @@ namespace CoopTestMod
                         BoardGameMoveEvent message;
                         MemoryStream stream = new MemoryStream(serializedLocation);
                         message = Serializer.DeserializeWithLengthPrefix<BoardGameMoveEvent>(stream, PrefixStyle.Fixed32BigEndian);
-
+                        
                         MissionTaskManager.Instance().AddTask((message.toIndex, message.fromIndex), new Action<object>((object obj) =>
                         {
                             (int, int) d = ((int, int))obj;
@@ -419,7 +426,30 @@ namespace CoopTestMod
         }
 
 
+        [HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
+        public class SetGameOverPatch
+        {
+            static bool Prefix(GameOverEnum gameOverInfo)
+            {
+                Mission.Current.MainAgent.ClearTargetFrame();
+                InformationManager.DisplayMessage(new InformationMessage(gameOverInfo.ToString()));
+                return false;
+            }
+        }
 
+        [HarmonyPatch(typeof(MissionBoardGameLogic), "StartConversationWithOpponentAfterGameEnd")]
+        public class SetGameOverConversationPatch
+        {
+            static bool Prefix()
+            {
+
+
+                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                //Close view, might work to call GameEnded()
+
+                return false;
+            }
+        }
 
         // Callback for when the mission started; let the server know which scene you are at
         [HarmonyPatch(typeof(Mission), "AfterStart")]

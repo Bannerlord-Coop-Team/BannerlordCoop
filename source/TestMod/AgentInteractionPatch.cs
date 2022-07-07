@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -27,11 +28,12 @@ namespace CoopTestMod
             {
                 if (agent.Character.IsPlayerCharacter)
                 {
-                    int index = agent.Index;
-                    InformationManager.DisplayMessage(new InformationMessage($"Interact with agent {index}"));
+                    int senderIndex = userAgent.Index;
+                    int otherIndex = agent.Index;
+                    InformationManager.DisplayMessage(new InformationMessage($"Interact with agent {otherIndex}"));
 
                     InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Challenge", "Pussy out",
-                        new Action(() => { SendGameRequest(index); }) , new Action(() => { })));
+                        new Action(() => { SendGameRequest(senderIndex, otherIndex); }) , new Action(() => { })));
 
                     return false;
                 }
@@ -40,10 +42,12 @@ namespace CoopTestMod
             }
         }
 
-        public static void AcceptGameRequest()
+        public static void AcceptGameRequest(string senderID, string otherID)
         {
             BoardGameChallenge boardGameChallenge = new BoardGameChallenge();
+
             boardGameChallenge.ChallengeResponse = true;
+            boardGameChallenge.OtherAgentId = otherID;
 
             var netDataWriter = new NetDataWriter();
             netDataWriter.Put((uint)MessageType.BoardGameChallenge);
@@ -59,17 +63,24 @@ namespace CoopTestMod
             boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
             boardGameLogic.SetStartingPlayer(true);
             boardGameLogic.StartBoardGame();
+            Agent opposingAgent = ClientAgentManager.Instance().GetNetworkAgent(senderID).Agent;
+
+
+            boardGameLogic.GetType().GetProperty("OpposingAgent", BindingFlags.Public | BindingFlags.Instance).SetValue(boardGameLogic, opposingAgent);
 
             MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
         }
 
-        private static void SendGameRequest(int index)
+        private static void SendGameRequest(int senderIndex, int otherIndex)
         {
             InformationManager.DisplayMessage(new InformationMessage("Challenge Sent"));
             BoardGameChallenge boardGameChallenge = new BoardGameChallenge();
 
             boardGameChallenge.ChallengeRequest = true;
-            boardGameChallenge.OtherAgentId = ClientAgentManager.Instance().GetIdFromIndex(index);
+            boardGameChallenge.OtherAgentId = ClientAgentManager.Instance().GetIdFromIndex(otherIndex);
+            boardGameChallenge.SenderAgentId = ClientAgentManager.Instance().GetIdFromIndex(senderIndex);
+
+
 
             var netDataWriter = new NetDataWriter();
             netDataWriter.Put((uint)MessageType.BoardGameChallenge);

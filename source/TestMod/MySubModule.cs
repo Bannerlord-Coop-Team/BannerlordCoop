@@ -4,6 +4,7 @@ using TaleWorlds.SaveSystem;
 using TaleWorlds.InputSystem;
 using TaleWorlds.SaveSystem.Load;
 using System.Reflection;
+using SandBox.BoardGames.MissionLogics;
 
 namespace CoopTestMod
 {
@@ -77,6 +78,12 @@ namespace CoopTestMod
                     }
                 }
 
+            }
+            if (Input.IsKeyReleased(InputKey.Numpad7)) 
+            {
+                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+
+                InformationManager.DisplayMessage(new InformationMessage(boardGameLogic.OpposingAgent.Index.ToString()));
             }
         }
     }
