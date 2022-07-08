@@ -174,6 +174,8 @@ namespace CoopTestMod
                             }
                             else if (d.Item2)
                             {
+                                PreplaceUnitsPatch.isChallenged = true;
+
                                 MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
                                 boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
                                 boardGameLogic.SetStartingPlayer(false);
