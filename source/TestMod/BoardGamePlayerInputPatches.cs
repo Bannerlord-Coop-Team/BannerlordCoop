@@ -34,6 +34,7 @@ namespace CoopTestMod
             BoardGameMoveEvent boardGameMoveEvent = new BoardGameMoveEvent();
             boardGameMoveEvent.fromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(__result.Unit);
             boardGameMoveEvent.toIndex = boardGameLogic.Board.Tiles.IndexOf(__result.GoalTile);
+            
 
             var netDataWriter = new NetDataWriter();
             netDataWriter.Put((uint)MessageType.BoardGame);
@@ -43,19 +44,6 @@ namespace CoopTestMod
                 Serializer.SerializeWithLengthPrefix<BoardGameMoveEvent>(memoryStream, boardGameMoveEvent, PrefixStyle.Fixed32BigEndian);
                 netDataWriter.Put(memoryStream.ToArray());
             }
-
-            //InformationManager.DisplayMessage(new InformationMessage(
-            //    $"Sending move to server relay, unit id:{boardGameMoveEvent.fromIndex}, tileIndex:{boardGameMoveEvent.toIndex}"));
-
-            InformationManager.DisplayMessage(new InformationMessage("End Turn Local"));
-
-            //typeof(BoardGameBase).GetMethod("EndTurn", BindingFlags.NonPublic | BindingFlags.Instance)
-            //    .Invoke(boardGameLogic.Board, new object[] { });
-
-            //typeof(BoardGameBase).GetMethod("SwitchPlayerTurn", BindingFlags.NonPublic | BindingFlags.Instance)
-            //    .Invoke(boardGameLogic.Board, new object[] { });
-            //InformationManager.DisplayMessage(new InformationMessage("Switch Turn Local"));
-
 
             MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
         }

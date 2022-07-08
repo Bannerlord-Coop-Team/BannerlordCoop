@@ -176,6 +176,7 @@ namespace CoopTestMod
                             {
                                 MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
                                 boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
+                                boardGameLogic.SetStartingPlayer(false);
                                 boardGameLogic.StartBoardGame();
 
                                 Agent opposingAgent = ClientAgentManager.Instance().GetNetworkAgent(d.Item4).Agent;
@@ -438,6 +439,11 @@ namespace CoopTestMod
                 Action eventGameEnded = typeof(MissionBoardGameLogic).GetField("GameEnded", BindingFlags.NonPublic | BindingFlags.Instance)
                     ?.GetValue(__instance) as Action;
                 eventGameEnded?.Invoke();
+
+                __instance.Board.Reset();
+                typeof(MissionBoardGameLogic).GetProperty("OpposingAgent", BindingFlags.Public | BindingFlags.Instance).SetValue(__instance, null);
+                typeof(MissionBoardGameLogic).GetProperty("IsGameInProgress", BindingFlags.Public | BindingFlags.Instance).SetValue(__instance, false);
+
                 return false;
             }
         }

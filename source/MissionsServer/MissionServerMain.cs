@@ -233,8 +233,7 @@ namespace MissionsServer
                     byte[] challengeReq = dataReader.GetRemainingBytes();
                     writer.Put(challengeReq);
 
-                    byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
-                    Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
+                    Console.WriteLine("Recieved Gameboard Byte Size: " + challengeReq.Length);
 
                     MemoryStream stream = new MemoryStream(challengeReq);
                     BoardGameChallenge boardGameChallenge = Serializer.DeserializeWithLengthPrefix<BoardGameChallenge>(stream, PrefixStyle.Fixed32BigEndian);
@@ -242,7 +241,8 @@ namespace MissionsServer
                     if(pendingBoardGamesRequest.TryRemove(fromPeer.Id, out var opposingPeerId))
                     {
                         server.GetPeerById(opposingPeerId)?.Send(writer, DeliveryMethod.ReliableOrdered);
-                    } else
+                    } 
+                    else
                     {
                         var (peerId, _) = ServerAgentManager.Instance().GetClientInfo(boardGameChallenge.OtherAgentId);
                         pendingBoardGamesRequest.TryAdd(peerId, fromPeer.Id);

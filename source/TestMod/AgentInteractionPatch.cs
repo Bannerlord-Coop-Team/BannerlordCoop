@@ -3,6 +3,7 @@ using LiteNetLib;
 using LiteNetLib.Utils;
 using MissionsShared;
 using ProtoBuf;
+using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;
 using SandBox.Conversation.MissionLogics;
 using System;
@@ -26,19 +27,26 @@ namespace CoopTestMod
         {
             static bool Prefix(ref Agent userAgent, ref Agent agent)
             {
-                if (agent.Character.IsPlayerCharacter)
+                if (!agent.Character.IsPlayerCharacter)
                 {
-                    int senderIndex = userAgent.Index;
-                    int otherIndex = agent.Index;
-                    InformationManager.DisplayMessage(new InformationMessage($"Interact with agent {otherIndex}"));
+                    return true;
 
-                    InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Challenge", "Pussy out",
-                        new Action(() => { SendGameRequest(senderIndex, otherIndex); }) , new Action(() => { })));
-
-                    return false;
                 }
 
-                return true;
+                if (!ClientAgentManager.Instance().IsNetworkAgent(agent.Index))
+                {
+                    return true;
+                }
+
+                int senderIndex = userAgent.Index;
+                int otherIndex = agent.Index;
+                InformationManager.DisplayMessage(new InformationMessage($"Interact with agent {otherIndex}"));
+
+                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Challenge", "Pussy out",
+                    new Action(() => { SendGameRequest(senderIndex, otherIndex); }), new Action(() => { })));
+
+                return false;
+
             }
         }
 
@@ -61,10 +69,15 @@ namespace CoopTestMod
             MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
 
             boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
+
+            //if ((PlayerTurn)(boardGameLogic.GetType().GetField("_startingPlayer", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(boardGameLogic)) != PlayerTurn.PlayerOne)
+            //{
+            //    boardGameLogic.SetStartingPlayer(true);
+            //}
+
             boardGameLogic.SetStartingPlayer(true);
             boardGameLogic.StartBoardGame();
             Agent opposingAgent = ClientAgentManager.Instance().GetNetworkAgent(senderID).Agent;
-
 
             boardGameLogic.GetType().GetProperty("OpposingAgent", BindingFlags.Public | BindingFlags.Instance).SetValue(boardGameLogic, opposingAgent);
 
