@@ -19,93 +19,144 @@ using TaleWorlds.MountAndBlade;
 
 namespace CoopTestMod
 {
-    [HarmonyPatch(typeof(BoardGameBase), "HandlePlayerInput")]
-    public class HandlePlayerInputPatch
+    public class BoardGamePlayerInputPatches
     {
-        static void Postfix(ref Move __result)
+
+        private static bool forceRemove = false;
+    
+        [HarmonyPatch(typeof(BoardGameBase), "HandlePlayerInput")]
+        public class HandlePlayerInputPatch
         {
-            if (!__result.IsValid)
+            static void Postfix(ref Move __result)
             {
-                return;
-            }
+                if (!__result.IsValid)
+                {
+                    return;
+                }
 
-            MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
 
-            BoardGameMoveEvent boardGameMoveEvent = new BoardGameMoveEvent();
-            boardGameMoveEvent.fromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(__result.Unit);
-            boardGameMoveEvent.toIndex = boardGameLogic.Board.Tiles.IndexOf(__result.GoalTile);
+                BoardGameMoveEvent boardGameMoveEvent = new BoardGameMoveEvent();
+                boardGameMoveEvent.fromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(__result.Unit);
+                boardGameMoveEvent.toIndex = boardGameLogic.Board.Tiles.IndexOf(__result.GoalTile);
             
 
-            var netDataWriter = new NetDataWriter();
-            netDataWriter.Put((uint)MessageType.BoardGame);
+                var netDataWriter = new NetDataWriter();
+                netDataWriter.Put((uint)MessageType.BoardGame);
 
-            using (var memoryStream = new MemoryStream())
-            {
-                Serializer.SerializeWithLengthPrefix<BoardGameMoveEvent>(memoryStream, boardGameMoveEvent, PrefixStyle.Fixed32BigEndian);
-                netDataWriter.Put(memoryStream.ToArray());
-            }
-
-            MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
-        }
-    }
-
-    [HarmonyPatch(typeof(BoardGameKonane), "HandlePreMovementStage")]
-    public class HandlePreMovementStagePatch
-    {
-        public static void Prefix()
-        {
-
-            if (Mission.Current.InputManager.IsHotKeyPressed("BoardGamePawnSelect"))
-            {
-                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-                PawnCapturedEvent pawnCapturedEvent = new PawnCapturedEvent();
-
-                PawnBase hoveredPawnIfAny = (PawnBase)typeof(BoardGameBase).GetMethod("GetHoveredPawnIfAny", BindingFlags.NonPublic | BindingFlags.Instance)?
-                    .Invoke(boardGameLogic.Board, new object[] { });
-
-                if (hoveredPawnIfAny != null && ((BoardGameKonane)boardGameLogic.Board).RemovablePawns.Contains(hoveredPawnIfAny))
+                using (var memoryStream = new MemoryStream())
                 {
-                    pawnCapturedEvent.fromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(hoveredPawnIfAny);
+                    Serializer.SerializeWithLengthPrefix<BoardGameMoveEvent>(memoryStream, boardGameMoveEvent, PrefixStyle.Fixed32BigEndian);
+                    netDataWriter.Put(memoryStream.ToArray());
+                }
 
-                    var netDataWriter = new NetDataWriter();
-                    netDataWriter.Put((uint)MessageType.PawnCapture);
+                MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
+            }
+        }
 
-                    using (var memoryStream = new MemoryStream())
+        [HarmonyPatch(typeof(BoardGameKonane), "HandlePreMovementStage")]
+        public class HandlePreMovementStagePatch
+        {
+            public static void Prefix()
+            {
+
+                if (Mission.Current.InputManager.IsHotKeyPressed("BoardGamePawnSelect"))
+                {
+                    MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                    PawnCapturedEvent pawnCapturedEvent = new PawnCapturedEvent();
+
+                    PawnBase hoveredPawnIfAny = (PawnBase)typeof(BoardGameBase).GetMethod("GetHoveredPawnIfAny", BindingFlags.NonPublic | BindingFlags.Instance)?
+                        .Invoke(boardGameLogic.Board, new object[] { });
+
+                    if (hoveredPawnIfAny != null && ((BoardGameKonane)boardGameLogic.Board).RemovablePawns.Contains(hoveredPawnIfAny))
                     {
-                        Serializer.SerializeWithLengthPrefix<PawnCapturedEvent>(memoryStream, pawnCapturedEvent, PrefixStyle.Fixed32BigEndian);
-                        netDataWriter.Put(memoryStream.ToArray());
-                    }
-                    //InformationManager.DisplayMessage(new InformationMessage(
-                    //   $"Sending PawnCapture to server relay, unit id:{pawnCapturedEvent.fromIndex}"));
+                        pawnCapturedEvent.fromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(hoveredPawnIfAny);
 
-                    MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
+                        var netDataWriter = new NetDataWriter();
+                        netDataWriter.Put((uint)MessageType.PawnCapture);
+
+                        using (var memoryStream = new MemoryStream())
+                        {
+                            Serializer.SerializeWithLengthPrefix<PawnCapturedEvent>(memoryStream, pawnCapturedEvent, PrefixStyle.Fixed32BigEndian);
+                            netDataWriter.Put(memoryStream.ToArray());
+                        }
+                        //InformationManager.DisplayMessage(new InformationMessage(
+                        //   $"Sending PawnCapture to server relay, unit id:{pawnCapturedEvent.fromIndex}"));
+
+                        MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
+                    }
                 }
             }
         }
-    }
 
-    [HarmonyPatch(typeof(BoardGameSeega), "PreplaceUnits")]
-    public class PreplaceUnitsPatch
-    {
-
-        public static bool isChallenged = false;
-
-        static bool Prefix()
+        [HarmonyPatch(typeof(BoardGameSeega), "FocusBlockingPawns")]
+        public class FocusBlockingPawnsPatch
         {
-            if (isChallenged) { return true; }
+            public static void Postfix()
+            {
+                forceRemove = true;
+            }
+        }
 
-            var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+        [HarmonyPatch(typeof(BoardGameSeega), "SetPawnCaptured")]
+        public class SetPawnCapturedSeegaPatch
+        {
 
-            BoardGameSeega seegaBoardGame = (BoardGameSeega)boardGameLogic.Board;
+            public static void Prefix(PawnBase pawn, bool aiSimulation)
+            {
+                //Only call SetPawnCaptured when it's a forceful remove as a result of no moves available as otherwise it gets handled locally from the move
+                if (!forceRemove)
+                {
+                    return;
+                }
 
-            var MovePawnToTileDelayedMethod = seegaBoardGame.GetType().GetMethod("MovePawnToTileDelayed", BindingFlags.NonPublic | BindingFlags.Instance);
+                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                PawnCapturedEvent pawnCapturedEvent = new PawnCapturedEvent();
 
-            MovePawnToTileDelayedMethod.Invoke(seegaBoardGame, new object[] { seegaBoardGame.PlayerTwoUnits[0], seegaBoardGame.GetTile(0, 2), false, false, 0.55f });
-            MovePawnToTileDelayedMethod.Invoke(seegaBoardGame, new object[] { seegaBoardGame.PlayerOneUnits[0], seegaBoardGame.GetTile(2, 0), false, false, 0.7f });
-            MovePawnToTileDelayedMethod.Invoke(seegaBoardGame, new object[] { seegaBoardGame.PlayerTwoUnits[1], seegaBoardGame.GetTile(4, 2), false, false, 0.85f });
-            MovePawnToTileDelayedMethod.Invoke(seegaBoardGame, new object[] { seegaBoardGame.PlayerOneUnits[1], seegaBoardGame.GetTile(2, 4), false, false, 1f });
+                InformationManager.DisplayMessage(new InformationMessage("PawnSetCaptured"));
 
-            return false;
+                //Probably the reason it does not work, too tired at the moment to debug this
+                pawnCapturedEvent.fromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(pawn);
+
+                var netDataWriter = new NetDataWriter();
+                netDataWriter.Put((uint)MessageType.PawnCapture);
+
+                using (var memoryStream = new MemoryStream())
+                {
+                    Serializer.SerializeWithLengthPrefix<PawnCapturedEvent>(memoryStream, pawnCapturedEvent, PrefixStyle.Fixed32BigEndian);
+                    netDataWriter.Put(memoryStream.ToArray());
+                }
+
+
+                MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
+
+                forceRemove = false;
+            }
+        }
+
+        [HarmonyPatch(typeof(BoardGameSeega), "PreplaceUnits")]
+        public class PreplaceUnitsPatch
+        {
+
+            public static bool isChallenged = false;
+
+            static bool Prefix()
+            {
+                if (isChallenged) { return true; }
+
+                var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+
+                BoardGameSeega seegaBoardGame = (BoardGameSeega)boardGameLogic.Board;
+
+                var MovePawnToTileDelayedMethod = seegaBoardGame.GetType().GetMethod("MovePawnToTileDelayed", BindingFlags.NonPublic | BindingFlags.Instance);
+
+                MovePawnToTileDelayedMethod.Invoke(seegaBoardGame, new object[] { seegaBoardGame.PlayerTwoUnits[0], seegaBoardGame.GetTile(0, 2), false, false, 0.55f });
+                MovePawnToTileDelayedMethod.Invoke(seegaBoardGame, new object[] { seegaBoardGame.PlayerOneUnits[0], seegaBoardGame.GetTile(2, 0), false, false, 0.7f });
+                MovePawnToTileDelayedMethod.Invoke(seegaBoardGame, new object[] { seegaBoardGame.PlayerTwoUnits[1], seegaBoardGame.GetTile(4, 2), false, false, 0.85f });
+                MovePawnToTileDelayedMethod.Invoke(seegaBoardGame, new object[] { seegaBoardGame.PlayerOneUnits[1], seegaBoardGame.GetTile(2, 4), false, false, 1f });
+
+                return false;
+            }
         }
     }
 }

@@ -174,7 +174,7 @@ namespace CoopTestMod
                             }
                             else if (d.Item2)
                             {
-                                PreplaceUnitsPatch.isChallenged = true;
+                                BoardGamePlayerInputPatches.PreplaceUnitsPatch.isChallenged = true;
 
                                 MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
                                 boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
@@ -211,7 +211,14 @@ namespace CoopTestMod
 
                             if (boardGame is BoardGamePuluc)
                             {
-                                goalTile = boardGame.Tiles[10 - d.Item1];
+                                if (d.Item1 == 11)
+                                {
+                                    goalTile = boardGame.Tiles[11];
+                                }
+                                else
+                                {
+                                    goalTile = boardGame.Tiles[10 - d.Item1];
+                                }
                             }
 
                             if (unitToMove == null || goalTile == null)
@@ -252,7 +259,7 @@ namespace CoopTestMod
 
                             if (unitToMove == null)
                                 return;
-
+                            InformationManager.DisplayMessage(new InformationMessage("Pawn Captured"));
                             boardGame.SetPawnCaptured(unitToMove);
 
                             boardGame.GetType().GetMethod("EndTurn", BindingFlags.NonPublic | BindingFlags.Instance)?

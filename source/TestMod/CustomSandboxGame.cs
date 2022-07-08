@@ -30,7 +30,7 @@ namespace CoopTestMod
         {
             base.OnLoadFinished();
             //get the settlement first
-            Settlement settlement = Settlement.Find("town_ES3");
+            Settlement settlement = Settlement.Find("town_A7");
 
             // get its arena
             Location locationWithId = settlement.LocationComplex.GetLocationWithId("arena");
