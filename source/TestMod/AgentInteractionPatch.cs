@@ -79,8 +79,7 @@ namespace CoopTestMod
             boardGameLogic.StartBoardGame();
             Agent opposingAgent = ClientAgentManager.Instance().GetNetworkAgent(senderID).Agent;
 
-            boardGameLogic.GetType().GetProperty("OpposingAgent", BindingFlags.Public | BindingFlags.Instance).SetValue(boardGameLogic, opposingAgent);
-
+            boardGameLogic.GetType().GetProperty("OpposingAgent", BindingFlags.Public | BindingFlags.Instance)?.SetValue(boardGameLogic, opposingAgent);
             MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
         }
 

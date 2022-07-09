@@ -225,7 +225,6 @@ namespace MissionsServer
                 else if (messageType == MessageType.BoardGameChallenge)
                 {
                     string location = clientToLocation[fromPeer.Id];
-
                     Console.WriteLine("Sending to client ");
 
                     NetDataWriter writer = new NetDataWriter();
@@ -249,6 +248,15 @@ namespace MissionsServer
 
                         server.GetPeerById(peerId)?.Send(writer, DeliveryMethod.ReliableOrdered);
                     }
+                } else if(messageType == MessageType.BoardGameForfeit)
+                {
+                    string agentToSendId = dataReader.GetString();
+
+                    NetDataWriter writer = new NetDataWriter();
+                    writer.Put((uint) MessageType.BoardGameForfeit);
+
+                    var (peerId, _) = ServerAgentManager.Instance().GetClientInfo(agentToSendId);
+                    server.GetPeerById(peerId)?.Send(writer, DeliveryMethod.ReliableOrdered);
                 }
             };
 

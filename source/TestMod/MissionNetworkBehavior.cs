@@ -266,8 +266,11 @@ namespace CoopTestMod
                                 .Invoke(boardGame, new object[] { });
 
                         }));
+                    } else if(messageType == MessageType.BoardGameForfeit)
+                    {
+                        var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                        boardGameLogic.AIForfeitGame();
                     }
-
                     else if (messageType == MessageType.AddAgent)
                     {
                         int index = dataReader.GetInt();
@@ -401,9 +404,6 @@ namespace CoopTestMod
         [HarmonyPatch(typeof(Mission), "RegisterBlow")]
         public class AgentDamagePatch
         {
-
-
-
             static bool Prefix(Agent attacker, Agent victim, GameEntity realHitEntity, Blow b, ref AttackCollisionData collisionData, in MissionWeapon attackerWeapon, ref CombatLogData combatLogData)
             {
                 // all damages must be send to the server
@@ -463,6 +463,25 @@ namespace CoopTestMod
             static bool Prefix()
             {
                 return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(MissionBoardGameLogic), nameof(MissionBoardGameLogic.ForfeitGame))]
+        public class ForfeitGamePatch
+        {
+            static void Prefix(MissionBoardGameLogic __instance)
+            {
+                var otherAgent = __instance.OpposingAgent;
+                var otherAgentId = ClientAgentManager.Instance().GetIdFromIndex(otherAgent.Index);
+
+                if (otherAgentId == null)
+                    return;
+
+                NetDataWriter writer = new NetDataWriter();
+                writer.Put((uint) MessageType.BoardGameForfeit);
+                writer.Put(otherAgentId);
+
+                client.SendToAll(writer, DeliveryMethod.ReliableUnordered);
             }
         }
 

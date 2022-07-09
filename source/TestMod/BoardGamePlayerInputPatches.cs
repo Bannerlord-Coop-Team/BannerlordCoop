@@ -21,7 +21,6 @@ namespace CoopTestMod
 {
     public class BoardGamePlayerInputPatches
     {
-
         private static bool forceRemove = false;
     
         [HarmonyPatch(typeof(BoardGameBase), "HandlePlayerInput")]
