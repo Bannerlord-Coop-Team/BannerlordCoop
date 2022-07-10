@@ -112,10 +112,9 @@ namespace CoopTestMod
                 MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
                 PawnCapturedEvent pawnCapturedEvent = new PawnCapturedEvent();
 
-                InformationManager.DisplayMessage(new InformationMessage("PawnSetCaptured"));
-
                 //Probably the reason it does not work, too tired at the moment to debug this
-                pawnCapturedEvent.fromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(pawn);
+                pawnCapturedEvent.fromIndex = boardGameLogic.Board.PlayerTwoUnits.IndexOf(pawn);
+                InformationManager.DisplayMessage(new InformationMessage("PlayerOneUnitsIndex: " + pawnCapturedEvent.fromIndex));
 
                 var netDataWriter = new NetDataWriter();
                 netDataWriter.Put((uint)MessageType.PawnCapture);

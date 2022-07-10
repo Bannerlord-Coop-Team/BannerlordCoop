@@ -255,15 +255,20 @@ namespace CoopTestMod
                             if (boardGame == null)
                                 return;
 
-                            var unitToMove = boardGame.PlayerTwoUnits[d];
+                            var unitToMove = boardGame.PlayerOneUnits[d];
 
                             if (unitToMove == null)
                                 return;
+
                             InformationManager.DisplayMessage(new InformationMessage("Pawn Captured"));
                             boardGame.SetPawnCaptured(unitToMove);
 
-                            boardGame.GetType().GetMethod("EndTurn", BindingFlags.NonPublic | BindingFlags.Instance)?
-                                .Invoke(boardGame, new object[] { });
+                            //Where else is this used than Seega?
+                            if (!(boardGame is BoardGameSeega))
+                            {
+                                boardGame.GetType().GetMethod("EndTurn", BindingFlags.NonPublic | BindingFlags.Instance)?
+                                    .Invoke(boardGame, new object[] { });
+                            }
 
                         }));
                     } else if(messageType == MessageType.BoardGameForfeit)
