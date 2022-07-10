@@ -5,6 +5,7 @@ using MissionsShared;
 using ProtoBuf;
 using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;
+using SandBox.BoardGames.Pawns;
 using SandBox.ViewModelCollection.BoardGame;
 using System;
 using System.Collections.Concurrent;
@@ -249,13 +250,21 @@ namespace CoopTestMod
                         {
                             int d = (int)obj;
 
+                            PawnBase unitToMove;
                             var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
                             BoardGameBase boardGame = boardGameLogic.Board;
 
                             if (boardGame == null)
                                 return;
 
-                            var unitToMove = boardGame.PlayerOneUnits[d];
+                            if (boardGame is BoardGameSeega)
+                            {
+                                unitToMove = boardGame.PlayerOneUnits[d];
+                            }
+                            else
+                            {
+                                unitToMove = boardGame.PlayerTwoUnits[d];
+                            }
 
                             if (unitToMove == null)
                                 return;
