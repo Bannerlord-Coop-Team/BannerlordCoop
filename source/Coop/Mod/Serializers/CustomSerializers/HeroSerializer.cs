@@ -114,6 +114,9 @@ namespace Coop.Mod.Serializers.Custom
                     case "<Issue>k__BackingField":
                         // TODO: Fix this joke
                         break;
+                    case "<BannerItem>k__BackingField":
+                        // TODO: Fix this joke
+                        break;
                     case "_characterObject":
                     case "<Template>k__BackingField":
                     case "_clan":

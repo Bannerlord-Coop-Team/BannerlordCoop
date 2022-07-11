@@ -1,5 +1,6 @@
 ﻿using Coop.Mod.GameSync.Party;
 using Coop.Mod.GameSync.Roster;
+using Coop.Mod.Patch.World;
 using Coop.Mod.Persistence.Party;
 using NLog;
 using RailgunNet.Logic;
@@ -31,7 +32,9 @@ namespace Coop.Mod.GameSync
                 FiefSync.MakeManaged(town);
             }
 
-            if(Coop.IsServer)
+            TimeControl.Instance();
+
+            if (Coop.IsServer)
             {
                 CoopServer.Instance.Persistence.MobilePartyEntityManager.OnBeforePartyScopeEnter += OnBeforePartyScopeEnter;
             }

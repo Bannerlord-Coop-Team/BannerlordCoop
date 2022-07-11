@@ -295,6 +295,8 @@
     <Compile Include="Mod\MbLogTarget.cs" />
     <Compile Include="Mod\GameSync\Party\CampaignMapMovement.cs" />
     <Compile Include="Mod\GameSync\Party\CampaignMapPositions.cs" />
+    <Compile Include="Mod\Patch\CampaignPatches\CompanionsCampaignBehaviorPatches.cs" />
+    <Compile Include="Mod\Patch\Hero\HeroPatches.cs" />
     <Compile Include="Mod\Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />
     <Compile Include="Mod\GameSync\Party\MobilePartyUpdatable.cs" />
     <Compile Include="Mod\Patch\Party\GarrisonTroopsCampaignBehavior.cs" />
@@ -310,6 +312,7 @@
     <Compile Include="Mod\GameSync\Fief\FiefSync.cs" />
     <Compile Include="Mod\GameSync\HeroSync.cs" />
     <Compile Include="Mod\GameSync\SettlementSync.cs" />
+    <Compile Include="Mod\Patch\World\TimeCommands.cs" />
     <Compile Include="Mod\Patch\World\TimeSynchronization.cs" />
     <Compile Include="Mod\Patch\CampaignPatches\SetTimeSpeedPatch.cs" />
     <Compile Include="Mod\Patch\CampaignPatches\TimeControlModePatch.cs" />
