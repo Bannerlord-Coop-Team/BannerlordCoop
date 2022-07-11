@@ -67,7 +67,7 @@ namespace Coop.Mod
         /// <returns></returns>
         private static string GetLogFileName()
         {
-            return $"{Environment.GetEnvironmentVariable("COOP_LOG", EnvironmentVariableTarget.User)}/Coop_{(Utilities.GetFullCommandLineString().Contains("/server") ? "server" : "client")}.log";
+            return $"{Directory.GetCurrentDirectory()}/Coop_{(Utilities.GetFullCommandLineString().Contains("/server") ? "server" : "client")}.log";
         }
 
         /// <summary>
