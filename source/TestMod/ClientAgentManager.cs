@@ -1,15 +1,18 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace CoopTestMod
 {
+    // This class allows the client to manage agents. Mainly converting them back and forth between network IDs and indexes 
     public class ClientAgentManager
     {
         private static ClientAgentManager instance;
         private ConcurrentDictionary<string, int> agentIdToIndexMap = new ConcurrentDictionary<string, int>();
         private ConcurrentDictionary<int, string> agentIndexToNetworkIdMap = new ConcurrentDictionary<int, string>();
         private ConcurrentDictionary<int, NetworkAgent> indexToNetworkAgent = new ConcurrentDictionary<int, NetworkAgent>();
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public static ClientAgentManager Instance()
         {
             if (instance == null)

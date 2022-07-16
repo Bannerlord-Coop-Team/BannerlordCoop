@@ -21,8 +21,6 @@ namespace MissionsServer
         
         static void Main(string[] args)
         {
-
-
             //each clients most updated location of its agents
             ConcurrentDictionary<int, List<PlayerTickInfo>> playerSyncDict = new ConcurrentDictionary<int, List<PlayerTickInfo>>();
 
@@ -31,6 +29,9 @@ namespace MissionsServer
 
             //id to location dictionary
             ConcurrentDictionary<int, string> clientToLocation = new ConcurrentDictionary<int, string>();
+
+            // Board game specific: store all the requests pending
+            ConcurrentDictionary<int, int> pendingBoardGamesRequest = new ConcurrentDictionary<int, int>();
             
 
             EventBasedNetListener listener = new EventBasedNetListener();
@@ -72,7 +73,7 @@ namespace MissionsServer
                 //NetDataWriter writer = new NetDataWriter();                 // Create writer class
                 //writer.Put("Hello client!");                                // Put some string
                 //peer.Send(writer, DeliveryMethod.ReliableOrdered);             // Send with reliability
-                Console.WriteLine("Client Connected, assigned ID: " + peer.Id);
+                //Console.WriteLine("Client Connected, assigned ID: " + peer.Id);
                 NetDataWriter writer = new NetDataWriter();
                 writer.Put((uint)MessageType.ConnectionId);
                 writer.Put(peer.Id);
@@ -100,9 +101,16 @@ namespace MissionsServer
                         {
                             writer.Put(cId);
                         }
-                        Console.WriteLine("Sending: " + writer.Data.Length);
-                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
+                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableOrdered);
 
+                    }
+
+                    foreach (int clientId in playerSyncDict.Keys)
+                    {
+                        foreach (PlayerTickInfo info in playerSyncDict[clientId])
+                        {
+                            Console.WriteLine("Client " + clientId + " has " + info.Id);
+                        }
                     }
                 }
                 else if(messageType == MessageType.ExitLocation)
@@ -124,12 +132,19 @@ namespace MissionsServer
                         NetDataWriter writer = new NetDataWriter();
                         writer.Put((uint)MessageType.ExitLocation);
                         writer.Put(fromPeer.Id);
-                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
+                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableOrdered);
 
                     }
                     locationToClients[locationName].TryRemove(fromPeer.Id, out _);
                     playerSyncDict[fromPeer.Id].Clear();
                     playerSyncDict.TryRemove(fromPeer.Id, out _);
+                    foreach(int clientId in playerSyncDict.Keys)
+                    {
+                        foreach(PlayerTickInfo info in playerSyncDict[clientId])
+                        {
+                            Console.WriteLine("Client " + clientId + " has " + info.Id);
+                        }
+                    }
                 }
                 else if (messageType == MessageType.PlayerSync)
                 {
@@ -138,8 +153,12 @@ namespace MissionsServer
 
                     MemoryStream stream = new MemoryStream(serializedLocation);
                     FromClientTickMessage msg = Serializer.DeserializeWithLengthPrefix<FromClientTickMessage>(stream, PrefixStyle.Fixed32BigEndian);
-                    
+
                     //playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
+                    if (!clientToLocation.ContainsKey(fromPeer.Id))
+                    {
+                        return;
+                    }
                     playerSyncDict[fromPeer.Id] = msg.AgentsTickInfo;
                     //Console.WriteLine("Received Update from: " + fromPeer.Id + " of # " + msg.AgentsTickInfo + " at location " + clientToLocation[fromPeer.Id]);
                 }
@@ -171,11 +190,74 @@ namespace MissionsServer
                     writer.Put((uint)MessageType.AddAgent);
                     writer.Put(agentIndex);
                     writer.Put(id);
-                    server.GetPeerById(fromPeer.Id).Send(writer, DeliveryMethod.ReliableOrdered);
-                    Console.WriteLine(fromPeer.Id + " has added new agent with ID: " + id);
+                    server.GetPeerById(fromPeer.Id).Send(writer, DeliveryMethod.Unreliable);
+                   Console.WriteLine(fromPeer.Id + " has added new agent with ID: " + id);
                    
                 }
+                else if (messageType == MessageType.BoardGame)
+                {
+                    string location = clientToLocation[fromPeer.Id];
+                    foreach (int clientId in locationToClients[location].Keys.Where(c => c != fromPeer.Id))
+                    {
+                        Console.WriteLine("Sending to client ");
 
+                        NetDataWriter writer = new NetDataWriter();
+                        writer.Put((uint)MessageType.BoardGame);
+                        writer.Put(dataReader.GetRemainingBytes());
+
+                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
+                    }
+                }
+                else if (messageType == MessageType.PawnCapture)
+                {
+                    string location = clientToLocation[fromPeer.Id];
+                    foreach (int clientId in locationToClients[location].Keys.Where(c => c != fromPeer.Id))
+                    {
+                        Console.WriteLine("Sending to client ");
+
+                        NetDataWriter writer = new NetDataWriter();
+                        writer.Put((uint)MessageType.PawnCapture);
+                        writer.Put(dataReader.GetRemainingBytes());
+
+                        server.GetPeerById(clientId).Send(writer, DeliveryMethod.ReliableSequenced);
+                    }
+                }
+                else if (messageType == MessageType.BoardGameChallenge)
+                {
+                    string location = clientToLocation[fromPeer.Id];
+                    Console.WriteLine("Sending to client ");
+
+                    NetDataWriter writer = new NetDataWriter();
+                    writer.Put((uint)MessageType.BoardGameChallenge);
+                    byte[] challengeReq = dataReader.GetRemainingBytes();
+                    writer.Put(challengeReq);
+
+                    Console.WriteLine("Recieved Gameboard Byte Size: " + challengeReq.Length);
+
+                    MemoryStream stream = new MemoryStream(challengeReq);
+                    BoardGameChallenge boardGameChallenge = Serializer.DeserializeWithLengthPrefix<BoardGameChallenge>(stream, PrefixStyle.Fixed32BigEndian);
+
+                    if(pendingBoardGamesRequest.TryRemove(fromPeer.Id, out var opposingPeerId))
+                    {
+                        server.GetPeerById(opposingPeerId)?.Send(writer, DeliveryMethod.ReliableOrdered);
+                    } 
+                    else
+                    {
+                        var (peerId, _) = ServerAgentManager.Instance().GetClientInfo(boardGameChallenge.OtherAgentId);
+                        pendingBoardGamesRequest.TryAdd(peerId, fromPeer.Id);
+
+                        server.GetPeerById(peerId)?.Send(writer, DeliveryMethod.ReliableOrdered);
+                    }
+                } else if(messageType == MessageType.BoardGameForfeit)
+                {
+                    string agentToSendId = dataReader.GetString();
+
+                    NetDataWriter writer = new NetDataWriter();
+                    writer.Put((uint) MessageType.BoardGameForfeit);
+
+                    var (peerId, _) = ServerAgentManager.Instance().GetClientInfo(agentToSendId);
+                    server.GetPeerById(peerId)?.Send(writer, DeliveryMethod.ReliableOrdered);
+                }
             };
 
             List<FromServerTickPayload> GeneratePlayerPayload(HashSet<int> clientIds)

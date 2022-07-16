@@ -12,6 +12,10 @@ namespace MissionsShared
         ConnectionId,
         PeersAtLocation,
         PlayerDamage, 
-        AddAgent
+        AddAgent,
+        BoardGameChallenge,
+        BoardGame,
+        BoardGameForfeit,
+        PawnCapture
     }
 }

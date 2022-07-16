@@ -4,6 +4,9 @@ using System.Runtime.CompilerServices;
 
 namespace CoopTestMod
 {
+    // this class helps queue tasks to the game thread.
+    // queue tasks from the network thread and process them (with ApplyPendingTasks) to the game thread
+    // TODO: create a priority to how the tasks are processed 
     public class MissionTaskManager
     {
         private static ConcurrentQueue<(object, Action<object>)> Queue { get; set; }

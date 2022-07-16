@@ -235,6 +235,10 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.ScreenSystem, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.Starter.DotNetCore">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Starter.DotNetCore.dll</HintPath>
     </Reference>
@@ -249,11 +253,13 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AgentInteractionPatch.cs" />
+    <Compile Include="BoardGameAICanMakeMovePatch.cs" />
+    <Compile Include="BoardGamePlayerInputPatches.cs" />
     <Compile Include="ClientAgentManager.cs" />
-    <Compile Include="CustomGameNetworkHandler.cs" />
-    <Compile Include="CustomMissionBehavior.cs" />
     <Compile Include="CustomSandboxGame.cs" />
     <Compile Include="IOCreateMissile.cs" />
+    <Compile Include="MissionNetworkBehavior.cs" />
     <Compile Include="MissionTaskManager.cs" />
     <Compile Include="MySubModule.cs" />
     <Compile Include="NetworkAgent.cs" />
