@@ -252,11 +252,25 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
+    <Compile Include="Mod\CoopBattle\BattleNetwork.cs" />
+    <Compile Include="Mod\CoopBattle\BattleNetworkMessages.cs" />
+    <Compile Include="Mod\CoopBattle\BattlePlayer.cs" />
+    <Compile Include="Mod\CoopBattle\IBattlePlayerNetwork.cs" />
+    <Compile Include="Mod\CoopBattle\IMissionInterface.cs" />
+    <Compile Include="Mod\CoopBattle\INetworkObject.cs" />
+    <Compile Include="Mod\CoopBattle\MissionInfos.cs" />
+    <Compile Include="Mod\CoopBattle\MissionMessages.cs" />
+    <Compile Include="Mod\CoopBattle\NetworkLooseWeapon.cs" />
+    <Compile Include="Mod\CoopBattle\NetworkSiegeEngine.cs" />
+    <Compile Include="Mod\CoopBattle\NetworkMount.cs" />
+    <Compile Include="Mod\CoopBattle\NetworkAgent.cs" />
     <Compile Include="Mod\CoopClientSM.cs" />
     <Compile Include="Mod\CoopConditions.cs" />
+    <Compile Include="Mod\CoopBattle\CoopMission.cs" />
     <Compile Include="Mod\GameSync\Bandit\BanditPartyComponentSync.cs" />
     <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
+    <Compile Include="Mod\MissionManager.cs" />
     <Compile Include="Mod\ObjectManagerAdapter.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />
     <Compile Include="Mod\DebugUtil\CLICommands.cs" />
@@ -327,6 +341,7 @@
     <Compile Include="Mod\Persistence\World\WorldEntityServer.cs" />
     <Compile Include="Mod\Persistence\World\WorldState.cs" />
     <Compile Include="Mod\CoopServerRail.cs" />
+    <Compile Include="Mod\Player.cs" />
     <Compile Include="Mod\SaveGameData.cs" />
     <Compile Include="Mod\SaveLoad.cs" />
     <Compile Include="Mod\GameData.cs" />

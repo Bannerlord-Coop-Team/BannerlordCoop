@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,11 +10,11 @@ namespace Coop.Mod.CoopBattle
     public class BattleNetwork
     {
 
-        public MessageBroker messageBroker;
+        public IMessageBroker messageBroker;
 
         public BattlePlayer player;
 
-        public List<CoopAgent> networkAgents;
+        public List<NetworkAgent> networkAgents;
 
         public List<INetworkInterface> connectedClients;
 

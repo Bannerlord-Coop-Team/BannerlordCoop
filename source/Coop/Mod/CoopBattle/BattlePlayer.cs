@@ -8,7 +8,7 @@ namespace Coop.Mod.CoopBattle
 {
     public class BattlePlayer
     {
-        public List<CoopAgent> controlledAgents;
-        public List<CoopAgent> controlledAiAgents;
+        public List<NetworkAgent> controlledAgents;
+        public List<NetworkAgent> controlledAiAgents;
     }
 }
