@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using Coop.Mod.Persistence;
 using Network.Infrastructure;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 
 namespace Coop.Mod.DebugUtil
@@ -26,7 +29,7 @@ namespace Coop.Mod.DebugUtil
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("show_debug_ui", sGroupName)]
-        public static string ShowDebugUi(List<string> parameters)
+        public static string ToggleDebugUI(List<string> parameters)
         {
             if (m_DebugUI == null)
             {
@@ -34,7 +37,8 @@ namespace Coop.Mod.DebugUtil
                 Main.Instance.Updateables.Add(m_DebugUI);
             }
 
-            m_DebugUI.Visible = true;
+            m_DebugUI.Visible = !m_DebugUI.Visible;
+
             return "";
         }
 
@@ -111,46 +115,104 @@ namespace Coop.Mod.DebugUtil
             return Replay.Stop();
         }
 
-        [CommandLineFunctionality.CommandLineArgumentFunction(
-            "disable_inconsistent_state_warnings",
-            sGroupName)]
-        public static string DisableWarn(List<string> parameters)
-        {
-            string help =
-                "Disable(1) or enable(0) to show warnings about inconsistent internal state\n" +
-                "Usage:\n" +
-                $"\t{sGroupName}.disable_inconsistent_state_warnings 1";
-            if (parameters.Count < 1)
-            {
-                return help;
-            }
-
-            MobilePartyEntityManager mobilePartyEntityManager = CoopServer.Instance?.Persistence?.MobilePartyEntityManager;
-            if (mobilePartyEntityManager == null)
-            {
-                return "Server not started.";
-            }
-
-            if (parameters[0] == "1")
-            {
-                mobilePartyEntityManager.SuppressInconsistentStateWarnings = true;
-                return "Inconsistent state warnings disabled.";
-            }
-
-            if (parameters[0] == "0")
-            {
-                mobilePartyEntityManager.SuppressInconsistentStateWarnings = false;
-                return "Inconsistent state warnings enabled.";
-            }
-
-            return help;
-        }
-
         [CommandLineFunctionality.CommandLineArgumentFunction("spawn_party", sTestGroupName)]
         public static string Spawn(List<string> parameters)
         {
-            MobileParty party = PartySpawnHelper.SpawnTestersNear(Campaign.Current.MainParty);
+            if (parameters.Count != 0 && parameters.Count != 1)
+            {
+                return $"Usage: \"{sTestGroupName}.spawn_party [spawnDistanceFromMainParty]";
+            }
+            
+            float spawnDistance = 5;
+            if(parameters.Count == 1)
+            {
+                if(!float.TryParse(parameters[0], out float spawnDistanceArg))
+                {
+                    return $"Usage: \"{sTestGroupName}.spawn_party [spawnDistanceFromMainParty]. Provided argument '{parameters[0]}' is not a valid spawnDistance.";
+                }
+                spawnDistance = spawnDistanceArg;
+            }
+
+            MobileParty party = PartySpawnHelper.SpawnTestersNearby(Campaign.Current.MainParty.Position2D, spawnDistance);
             return $"Spawned {party}.";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("start_dance", sTestGroupName)]
+        public static string StartDanceParty(List<string> parameters)
+        {
+            if (parameters.Count != 1 || !uint.TryParse(parameters[0], out uint numberOfDancers))
+            {
+                return $"Usage: \"{sTestGroupName}.start_dance [numberOfDancers]";
+            }
+
+            PartySyncDebugBehavior.StartDancing(new PartySyncDebugBehavior.DanceParams 
+            { 
+                center = Campaign.Current.MainParty.Position2D,
+                radius = 3f,
+                animationLength = CampaignTime.Hours(1),
+                numberOfDancers = numberOfDancers
+            });
+            return "(>'-')> <('-'<) ^('-')^ v('-')v(>'-')>";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("stop_dance", sTestGroupName)]
+        public static string StopDanceParty(List<string> parameters)
+        {
+            PartySyncDebugBehavior.StopDancing();
+            return "";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("change_dancer_troop_count", sTestGroupName)]
+        public static string ChangeDancerCount(List<string> parameters)
+        {
+            if (parameters.Count != 1 || !int.TryParse(parameters[0], out int i))
+            {
+                return $"Usage: \"{sTestGroupName}.change_dancer_troop_count [numberToAdd] \n numberToAdd can be negative.";
+            }
+
+            PartySyncDebugBehavior.AddToCounts(i);
+            return "";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("teleport_to_me", sTestGroupName)]
+        public static string TeleportToMe(List<string> parameters)
+        {
+            if (parameters.Count != 1)
+            {
+                return $"Usage: \"{sTestGroupName}.teleport_to_me [id_entity] \n player is missing.";
+            }
+
+            var playerParty = CoopServer.Instance.Persistence.MobilePartyEntityManager.PlayerControlledParties.
+                FirstOrDefault(p => p.Name.ToString() == parameters[0]);
+            
+            if (playerParty == null)
+            {
+                return "Mobile party not found";
+            }
+
+            playerParty.Position2D = MobileParty.MainParty.Position2D;
+            return $"{playerParty.Name} has been teleported to server position.";
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("move_player_to_hideout", sTestGroupName)]
+        public static string MovePlayerToHideout(List<string> parameters)
+        {
+            var playerParty = CoopServer.Instance.Persistence.MobilePartyEntityManager.PlayerControlledParties.FirstOrDefault();
+
+            if (playerParty == null)
+            {
+                return "Player party is null";
+            }
+
+            Settlement hideoutInfested = Settlement.All.FirstOrDefault(s => s.IsHideout && s.Parties.Count > 0);
+
+            if (hideoutInfested == null)
+            {
+                return "All hideouts are empty!";
+            }
+
+            playerParty.Position2D = hideoutInfested.Position2D;
+            return $"{playerParty.Name} has been teleported to settlement {hideoutInfested.Name}";
         }
     }
 }

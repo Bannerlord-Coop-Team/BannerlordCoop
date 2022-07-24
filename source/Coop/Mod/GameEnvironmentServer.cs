@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Common;
+using Coop.Mod.GameSync;
+using Coop.Mod.GameSync.Party;
 using Coop.Mod.Patch;
-using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.RemoteAction;
@@ -11,6 +13,7 @@ using RemoteAction;
 using Sync;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod
@@ -21,26 +24,14 @@ namespace Coop.Mod
 
         public EventBroadcastingQueue EventQueue => CoopServer.Instance.Persistence?.EventQueue;
 
-        private Dictionary<MBGUID, MobileParty> m_PartyCache = new Dictionary<MBGUID, MobileParty>();
-
-        public MobileParty GetMobilePartyById(MBGUID guid)
+        public MobileParty GetMobilePartyById(Guid guid)
         {
-            if (!m_PartyCache.TryGetValue(guid, out MobileParty ret))
-            {
-                GameLoopRunner.RunOnMainThread(
-                    () =>
-                    {
-                        // Update the whole cache since we're already in the game loop thread. Doesn't happen that often.
-                        m_PartyCache = MobileParty.All.AsParallel().ToDictionary(party => party.Id);
-                        ret = m_PartyCache[guid];
-                    });
-            }
-            return ret;
+            return CoopObjectManager.GetObject<MobileParty>(guid);
         }
 
-        public MobilePartySync PartySync { get; } = CampaignMapMovement.Sync;
+        public MobilePartyMovementSync PartySync { get; } = MobilePartyManaged.MovementSync;
 
-        public SharedRemoteStore Store =>
+        public RemoteStoreServer Store =>
             CoopServer.Instance.SyncedObjectStore ??
             throw new InvalidOperationException("Client not initialized.");
 
@@ -53,6 +44,11 @@ namespace Coop.Mod
         public void UnlockTimeControl()
         {
             Campaign.Current.SetTimeControlModeLock(false);
+        }
+
+        public void SetMovement(MobileParty party, MovementData data)
+        {
+            MobilePartyManaged.AuthoritativeMovementChange(party, data);
         }
     }
 }

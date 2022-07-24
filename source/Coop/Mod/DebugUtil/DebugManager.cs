@@ -28,7 +28,7 @@ namespace Coop.Mod.DebugUtil
                     CallerLine);
                 if (Debugger.IsAttached)
                 {
-                    Debugger.Break();
+                    //Debugger.Break();
                 }
             }
         }
@@ -55,7 +55,7 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
-        public void BeginTelemetryScope(TelemetryLevelMask levelMask, string scopeName)
+        public void BeginTelemetryScopeInternal(TelemetryLevelMask levelMask, string scopeName)
         {
         }
 
@@ -69,7 +69,7 @@ namespace Coop.Mod.DebugUtil
             Logger.Debug("{message}", message);
         }
 
-        public void EndTelemetryScope()
+        public void EndTelemetryScopeInternal()
         {
         }
 
@@ -149,6 +149,36 @@ namespace Coop.Mod.DebugUtil
         public void WriteDebugLineOnScreen(string message)
         {
             Logger.Debug("{message}", message);
+        }
+
+        public void ShowError(string message)
+        {
+            Logger.Error("{message}", message);
+        }
+
+        public void BeginTelemetryScopeBaseLevelInternal(TelemetryLevelMask levelMask, string scopeName)
+        {
+        }
+
+        public void EndTelemetryScopeBaseLevelInternal()
+        {
+        }
+
+        public void RenderDebugText3D(Vec3 position, string text, uint color = uint.MaxValue, int screenPosOffsetX = 0, int screenPosOffsetY = 0, float time = 0)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public void SetTestModeEnabled(bool testModeEnabled)
+        {
+        }
+
+        public void AbortGame()
+        {
+        }
+
+        public void DoDelayedexit(int returnCode)
+        {
         }
     }
 }

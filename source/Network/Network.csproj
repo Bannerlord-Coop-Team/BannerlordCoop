@@ -79,7 +79,6 @@
     <Compile Include="Infrastructure\IGameStatePersistence.cs" />
     <Compile Include="Infrastructure\INetwork.cs" />
     <Compile Include="Infrastructure\INetworkConnection.cs" />
-    <Compile Include="Infrastructure\ISaveData.cs" />
     <Compile Include="Infrastructure\NetworkConfiguration.cs" />
     <Compile Include="Infrastructure\ServerSM.cs" />
     <Compile Include="MemoryStreamSegment.cs" />

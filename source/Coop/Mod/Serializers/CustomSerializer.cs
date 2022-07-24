@@ -12,6 +12,7 @@ namespace Coop.Mod.Serializers
     public interface ICustomSerializer
     {
         object Deserialize();
+        void ResolveReferenceGuids();
     }
 
     [Serializable]
@@ -24,7 +25,7 @@ namespace Coop.Mod.Serializers
         [NonSerialized]
         public readonly List<FieldInfo> NonSerializableObjects = new List<FieldInfo>();
         [NonSerialized]
-        public readonly List<ICollection> NonSerializableCollections = new List<ICollection>();
+        public readonly List<FieldInfo> NonSerializableCollections = new List<FieldInfo>();
 
         protected CustomSerializer() { }
 
@@ -40,28 +41,29 @@ namespace Coop.Mod.Serializers
                     if(field.FieldType.GetInterface(nameof(ICollection)) != null)
                     {
                         // If collection is serializable add to Collections list
-                        if(IsCollectionSerializableRecursive(field.FieldType))
+                        if(field.FieldType.IsSerializable &&
+                           IsCollectionSerializableRecursive(field.FieldType))
                         {
                             Collections.Add(field, (ICollection)field.GetValue(obj));
                         }
                         // otherwise, add to NonSerializableCollections list
                         else
                         {
-                            NonSerializableCollections.Add((ICollection)field.GetValue(obj));
+                            NonSerializableCollections.Add(field);
                         }
                         
                     }
-                    else if (field.FieldType.IsSerializable)
+                    else if (field.FieldType == typeof(Action))
+                    {
+                        NonSerializableObjects.Add(field);
+                    }
+                    else if (IsSerializable(field.FieldType))
                     {
                         SerializableObjects.Add(field, field.GetValue(obj));
                     }
                     else
                     {
-                        object value = field.GetValue(obj);
-                        if (value != null)
-                        {
-                            NonSerializableObjects.Add(field);
-                        }
+                        NonSerializableObjects.Add(field);
                     }
                 }
             }
@@ -88,12 +90,27 @@ namespace Coop.Mod.Serializers
         }
 
         /// <summary>
+        /// Any assigned Guids are replaced with actual object references.
+        /// </summary>
+        public abstract void ResolveReferenceGuids();
+
+        /// <summary>
         /// Get all fields from type
         /// </summary>
         /// <returns>FieldInfo[]</returns>
         protected FieldInfo[] GetFields()
         {
-            return ObjectType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            return GetFields(ObjectType);
+        }
+
+        private FieldInfo[] GetFields(Type ObjectType)
+        {
+            List<FieldInfo> fields = new List<FieldInfo>(ObjectType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
+            if (ObjectType.BaseType != null)
+            {
+                fields.AddRange(GetFields(ObjectType.BaseType));
+            }
+            return fields.ToArray();
         }
 
         /// <summary>
@@ -123,10 +140,15 @@ namespace Coop.Mod.Serializers
                 }
                 else
                 {
-                    return elementType.IsSerializable;
+                    result &= IsSerializable(elementType);
                 }
             }
             return result;
+        }
+
+        private bool IsSerializable(Type type)
+        {
+            return !SerializerConfig.MarkAsNonSerializable.Contains(type) && type.IsSerializable;
         }
     }
 }

@@ -2,7 +2,9 @@
 using Coop.Mod.Persistence.RemoteAction;
 using JetBrains.Annotations;
 using Sync.Store;
+using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Persistence
@@ -14,10 +16,10 @@ namespace Coop.Mod.Persistence
     {
 
         /// <summary>
-        ///     Returns the shared object store for this server.
+        ///     Returns the object store for this server.
         /// </summary>
         [NotNull]
-        SharedRemoteStore Store { get; }
+        RemoteStoreServer Store { get; }
 
         /// <summary>
         ///     Returns the queue to broadcast events to all clients. NotNull if persistence is initialized.
@@ -31,11 +33,18 @@ namespace Coop.Mod.Persistence
         /// <param name="guid"></param>
         /// <returns></returns>
         [CanBeNull]
-        MobileParty GetMobilePartyById(MBGUID guid);
+        MobileParty GetMobilePartyById(Guid guid);
         
         /// <summary>
         ///     Gets the synchronization for <see cref="MobileParty"/> instances.
         /// </summary>
-        MobilePartySync PartySync { get; }
+        MobilePartyMovementSync PartySync { get; }
+
+        /// <summary>
+        ///     Set movement data for a given party.
+        /// </summary>
+        /// <param name="party"></param>
+        /// <param name="data"></param>
+        void SetMovement(MobileParty party, MovementData data);
     }
 }

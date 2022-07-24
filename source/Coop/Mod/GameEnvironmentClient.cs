@@ -1,13 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Common;
+using Coop.Mod.GameSync;
+using Coop.Mod.GameSync.Party;
 using Coop.Mod.Patch;
-using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Scope;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
@@ -25,7 +28,7 @@ namespace Coop.Mod
 
         public CampaignTime AuthoritativeTime { get; set; } = CampaignTime.Never;
 
-        public void SetIsPlayerControlled(MBGUID guid, bool isPlayerControlled)
+        public void SetIsPlayerControlled(Guid guid, bool isPlayerControlled)
         {
             MobileParty party = GetMobilePartyById(guid);
 
@@ -45,15 +48,15 @@ namespace Coop.Mod
         }
 
         public IEnumerable<MobileParty> PlayerMainParties => PlayerControlledMainParties;
-        public MobilePartySync PartySync { get; } = CampaignMapMovement.Sync;
+        public MobilePartyMovementSync PartySync { get; } = MobilePartyManaged.MovementSync;
 
-        public RemoteStore Store =>
+        public RemoteStoreClient Store =>
             CoopClient.Instance.SyncedObjectStore ??
             throw new InvalidOperationException("Client not initialized.");
         
-        public void ScopeEntered(MobileParty party, Vec2 mapPosition, Vec2? facingDirection, MovementData movementData)
+        public void ScopeEntered(MobileParty party, Vec2 mapPosition, Vec2? facingDirection)
         {
-            MobilePartyScopeHelper.Enter(party, mapPosition, facingDirection, movementData);
+            MobilePartyScopeHelper.Enter(party, mapPosition, facingDirection);
         }
 
         public void ScopeLeft(MobileParty party)
@@ -62,17 +65,13 @@ namespace Coop.Mod
         }
 
         #region Game state access
-        public MobileParty GetMobilePartyById(MBGUID guid)
+        public MobileParty GetMobilePartyById(Guid guid)
         {
-            return MobileParty.All.SingleOrDefault(p => p.Id == guid);
-        }
-        public void SetAuthoritative(MobileParty party, MovementData data)
-        {
-            CampaignMapMovement.RemoteMovementChanged(party, data);
+            return CoopObjectManager.GetObject<MobileParty>(guid);
         }
         public void SetAuthoritative(MobileParty party, Vec2 position, Vec2? facingDirection)
         {
-            CampaignMapMovement.RemoteMapPositionChanged(party, position, facingDirection);
+            MobilePartyManaged.AuthoritativePositionChange(party, position, facingDirection);
         }
         #endregion
     }

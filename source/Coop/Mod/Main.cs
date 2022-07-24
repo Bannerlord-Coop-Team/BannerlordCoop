@@ -1,10 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
+using Coop.Mod.GameSync;
+using Coop.Mod.GameSync.Hideout;
+using Coop.Mod.GameSync.Party;
 using Coop.Mod.Patch;
 using Coop.Mod.Patch.MobilePartyPatches;
 using Coop.Mod.UI;
@@ -23,6 +27,8 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Missions;
+using TaleWorlds.ScreenSystem;
+using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
 
@@ -39,7 +45,9 @@ namespace Coop.Mod
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private bool m_IsFirstTick = true;
 
-#region MainMenuButtons
+        private bool _isDebugToggled = false;
+
+        #region MainMenuButtons
         public static InitialStateOption CoopCampaign =
             new InitialStateOption(
                 "CoOp Campaign",
@@ -72,7 +80,7 @@ namespace Coop.Mod
                             new object[] { }));
 #endif
                 },
-                () => { return false; }
+                () => { return (false, new TextObject()); }
             );
 
         public static InitialStateOption JoinCoopGame =
@@ -81,12 +89,13 @@ namespace Coop.Mod
               new TextObject("Join Co-op Campaign"),
               9991,
               JoinWindow,
-              () => { return false; }
+              () => { return (false, new TextObject()); }
             );
-#endregion
+        #endregion
 
         public Main()
         {
+
             Debug.DebugManager = Debugging.DebugManager;
             MBDebug.DisableLogging = false;
 
@@ -104,16 +113,20 @@ namespace Coop.Mod
 
         public override void NoHarmonyInit()
         {
-            initLogger();
+            DebugLogging.Initialize();
         }
 
         public override void NoHarmonyLoad()
         {
             AddBehavior<InitServerBehaviour>();
             AddBehavior<GameLoadedBehaviour>();
+            AddBehavior<MobilePartyLifetimeBehavior>();
+            AddBehavior<HideoutBehavior>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
+            bool t = Coop.IsCoopGameSession();
             CoopFramework.CoopFramework.InitPatches(ObjectManagerAdapter.Instance, Coop.IsCoopGameSession);
+
 
             // Skip startup splash screen
 #if DEBUG
@@ -131,11 +144,36 @@ namespace Coop.Mod
             // Apply all patches via harmony
             harmony.PatchAll();
 
-#region ButtonAssignment
+            var isServer = false;
+
+            var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
+
+
+#if DEBUG
+
+
+            if (args.Contains("/server"))
+            {
+                AddBehavior<PartySyncDebugBehavior>();
+                isServer = true;
+                //TODO add name to args
+                
+            }
+            else if (args.Contains("/client"))
+            {
+                isServer = false;
+            }
+
+#else
+                        ScreenManager.PushScreen(
+                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                                new object[] { }));
+#endif
+            #region ButtonAssignment
             CoopCampaign =
                 new InitialStateOption(
                     "CoOp Campaign",
-                    new TextObject("Host Co-op Campaign"),
+                    new TextObject(isServer ? "Host Co-op Campaign" : "Join Co-op Campaign"),
                     9990,
                     () =>
                     {
@@ -168,21 +206,23 @@ namespace Coop.Mod
                                 new object[] { }));
 #endif
                     },
-                    () => { return false; });
 
+                    () => { return (false, new TextObject()); }
+                );
+        
             JoinCoopGame =
                 new InitialStateOption(
                   "Join Coop Game",
                   new TextObject("Join Co-op Campaign"),
                   9991,
                   JoinWindow,
-                  () => { return false; }
+              () => { return (false, new TextObject()); }
                 );
 
             Module.CurrentModule.AddInitialStateOption(CoopCampaign);
 
-            Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
-#endregion
+            //Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
+            #endregion
         }
 
         protected override void OnSubModuleUnloaded()
@@ -207,6 +247,7 @@ namespace Coop.Mod
         {
             base.OnGameEnd(game);
             CoopServer.Instance.ShutDownServer();
+            DebugLogging.Shutdown();
         }
 
         protected override void OnApplicationTick(float dt)
@@ -218,39 +259,23 @@ namespace Coop.Mod
             }
 
             base.OnApplicationTick(dt);
-            if (Input.IsKeyDown(InputKey.LeftControl) && Input.IsKeyDown(InputKey.Tilde))
-            {
-                CLICommands.ShowDebugUi(new List<string>());
-                // DebugConsole.Toggle();
+
+            if (Input.IsKeyDown(InputKey.LeftControl) && Input.IsKeyDown(InputKey.Tilde) && this._isDebugToggled == false) {
+                CLICommands.ToggleDebugUI(new List<string>());
+                this._isDebugToggled = true;
+            } else if(Input.IsKeyReleased(InputKey.LeftControl) || Input.IsKeyReleased(InputKey.Tilde)) {
+                this._isDebugToggled = false;
             }
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
             Updateables.MakeUnion(SyncBufferManager.ProcessBufferedChanges).UpdateAll(frameTime);
         }
 
-        private void initLogger()
-        {
-            // NoHarmony
-            Logging = true;
-
-            // NLog
-            Target.Register<MbLogTarget>("MbLog");
-            Mod.Logging.Init(
-                new Target[]
-                {
-                    new MbLogTarget
-                    {
-                        Layout = Layout.FromString("[${level:uppercase=true}] ${message}")
-                    }
-                });
-        }
-
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            Exception ex = (Exception) e.ExceptionObject;
+            Exception ex = (Exception)e.ExceptionObject;
             Logger.Fatal(ex, "Unhandled exception");
         }
-
 
         internal static bool DisableIntroVideo = true;
 
@@ -261,7 +286,6 @@ namespace Coop.Mod
         internal static bool DontGroupThirdPartyMenuOptions = true;
 
         internal static bool QuartermasterIsClanWide = true;
-
 
         internal static void JoinWindow()
         {

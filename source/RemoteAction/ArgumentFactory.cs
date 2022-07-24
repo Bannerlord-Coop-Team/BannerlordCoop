@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using Common;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.ObjectSystem;
 
 namespace RemoteAction
@@ -38,8 +40,10 @@ namespace RemoteAction
                     return null;
                 case EventArgType.MBObjectManager:
                     return MBObjectManager.Instance;
-                case EventArgType.MBObject:
-                    return MBObjectManager.Instance.GetObject(arg.MbGUID.Value);
+                case EventArgType.CoopObjectManagerId:
+                    return CoopObjectManager.GetObject(arg.CoopObjectManagerId.Value);
+                case EventArgType.Guid:
+                    return arg.Guid.Value;
                 case EventArgType.Int:
                     return arg.Int.Value;
                 case EventArgType.Float:
@@ -47,20 +51,19 @@ namespace RemoteAction
                 case EventArgType.Bool:
                     return arg.Bool.Value;
                 case EventArgType.StoreObjectId:
-                    if (store == null) throw new ArgumentException($"Cannot resolve ${arg}, no store provided.");
-
-                    if (!arg.StoreObjectId.HasValue ||
-                        !store.Data.ContainsKey(arg.StoreObjectId.Value))
-                        throw new ArgumentException($"Cannot resolve ${arg}.");
-
-                    var resolvedObject = store.Data[arg.StoreObjectId.Value];
-                    Logger.Debug(
-                        "[{id}] Resolved store RPC arg: {object} [{type}]",
-                        arg.StoreObjectId.Value,
-                        resolvedObject,
-                        resolvedObject.GetType());
-                    // TODO find a way to remove without breaking everything
-                    //store.Remove(arg.StoreObjectId.Value);
+                    if (store == null)
+                    { 
+                        throw new ArgumentException($"Cannot resolve ${arg}, no store provided.");
+                    }
+                    if (!arg.StoreObjectId.HasValue)
+                    {
+                        throw new ArgumentException($"No StoreObjectId provided. Cannot resolve ${arg}.");
+                    }
+                    var resolvedObject = store.Retrieve(arg.StoreObjectId.Value);
+                    if(resolvedObject == null)
+                    {
+                        throw new ArgumentException($"StoreObjectId {arg.StoreObjectId.Value} returned no object. Cannot resolve {arg}.");
+                    }
                     return resolvedObject;
                 case EventArgType.CurrentCampaign:
                     return Campaign.Current;
@@ -110,14 +113,16 @@ namespace RemoteAction
                     return new Argument(b);
                 case MBObjectManager _:
                     return Argument.MBObjectManager;
-                case MBGUID guid:
-                    return new Argument(guid);
+                case Guid guid:
+                    return new Argument(guid, false);
                 case int i:
                     return new Argument(i);
                 case float f:
                     return new Argument(f);
-                case MBObjectBase mbObject:
-                    return bTransferByValue ? new Argument(store.Insert(obj)) : new Argument(mbObject.Id);
+                case MBObjectBase o:
+                    return bTransferByValue ? new Argument(store.Insert(o)) : new Argument(CoopObjectManager.GetGuid(o), true);
+                case TroopRoster t:
+                    return new Argument(store.Insert(t));
                 case Campaign campaign:
                     if (campaign == Campaign.Current) return Argument.CurrentCampaign;
                     // New campaign? Send by value

@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Common;
 using Coop.Mod.Patch;
 using Coop.Mod.Persistence.Party;
 using Sync.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.SaveSystem;
@@ -26,11 +29,11 @@ namespace Coop.Mod
                 DefaultBehaviour = state.DefaultBehavior,
                 TargetPosition = state.TargetPosition,
                 TargetParty = state.TargetPartyIndex != Coop.InvalidId
-                    ? MBObjectManager.Instance.GetObject(state.TargetPartyIndex) as
+                    ? CoopObjectManager.GetObject(state.TargetPartyIndex) as
                         MobileParty
                     : null,
                 TargetSettlement = state.SettlementIndex != Coop.InvalidId
-                    ? MBObjectManager.Instance.GetObject(
+                    ? CoopObjectManager.GetObject(
                         state.SettlementIndex) as Settlement
                     : null
             };
@@ -46,8 +49,8 @@ namespace Coop.Mod
             {
                 DefaultBehavior = data.DefaultBehaviour,
                 TargetPosition = data.TargetPosition,
-                TargetPartyIndex = data.TargetParty?.Id ?? Coop.InvalidId,
-                SettlementIndex = data.TargetSettlement?.Id ?? Coop.InvalidId
+                TargetPartyIndex = CoopObjectManager.GetGuid(data.TargetParty),
+                SettlementIndex = CoopObjectManager.GetGuid(data.TargetSettlement)
             };
         }
         /// <summary>
@@ -93,45 +96,21 @@ namespace Coop.Mod
         {
             return Coop.IsRemotePlayerMainParty(party);
         }
-        public static string ToFriendlyString(this LoadGameResult loadResult)
+        public static string ToFriendlyString(this LoadResult loadResult)
         {
-            if (!loadResult.LoadResult.Successful)
+            if (!loadResult.Successful)
             {
                 return "Error during load.";
             }
 
             string sRet = "Loading successful.";
-            if (loadResult.ModuleCheckResults.Count > 0)
+            if (loadResult.MetaData.GetModules().Length > 0)
             {
                 sRet += "Module missmatches in loaded file:";
-                for (int i = 0; i < loadResult.ModuleCheckResults.Count; i++)
+                for (int i = 0; i < loadResult.MetaData.GetModules().Length; i++)
                 {
-                    ModuleCheckResult module = loadResult.ModuleCheckResults[i];
-                    sRet += Environment.NewLine + $"[{i}] {module.ModuleName}: {module.Type}.";
+                    sRet += Environment.NewLine + $"[{i}] {loadResult.MetaData.GetModules()[i]}.";
                 }
-            }
-
-            return sRet;
-        }
-
-        public static string ToFriendlyString(this LoadResult loadResult)
-        {
-            string sRet = "Loading " + (loadResult.Successful ? "success. " : "failed. ");
-            if (loadResult.MetaData == null)
-            {
-                sRet += "No meta data";
-            }
-            else
-            {
-                sRet += loadResult.MetaData;
-            }
-
-            sRet += Environment.NewLine;
-
-            sRet += loadResult.Errors.Length + " errors:";
-            foreach (LoadError error in loadResult.Errors)
-            {
-                sRet += Environment.NewLine + error.ToFriendlyString();
             }
 
             return sRet;

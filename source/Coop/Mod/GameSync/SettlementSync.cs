@@ -9,6 +9,8 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Mod.Patch.World
 {
@@ -75,7 +77,7 @@ namespace Coop.Mod.Patch.World
             //    .Broadcast(() => CoopClient.Instance.Synchronization)
             //    .DelegateTo(IsServer);            
 
-            AutoWrapAllInstances(c => new SettlementSync(c));
+            //AutoWrapAllInstances(c => new SettlementSync(c));
 
             //When(GameLoop)
             //    .Calls(Method(typeof(EnterSettlementAction), "ApplyInternal"))
@@ -87,7 +89,7 @@ namespace Coop.Mod.Patch.World
             //    .Broadcast(() => CoopClient.Instance.Synchronization)
             //    .DelegateTo(IsClientParty);
 
-            ApplyStaticPatches();
+            //ApplyStaticPatches();
         }
 
         public SettlementSync([NotNull] Settlement instance) : base(instance)

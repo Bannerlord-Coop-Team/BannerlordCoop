@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Medallion.Threading;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -306,7 +306,7 @@ namespace Coop.Lib.NoHarmony
             if (mode != TaskMode.Add)
             {
                 RemoveType cgb = campaign.GetCampaignBehavior<RemoveType>();
-                CampaignEvents.RemoveListeners(cgb);
+                CampaignEventDispatcher.Instance.RemoveListeners(cgb);
                 cbm.RemoveBehavior<RemoveType>();
             }
 

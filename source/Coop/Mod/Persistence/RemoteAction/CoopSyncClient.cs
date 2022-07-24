@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Common;
 using CoopFramework;
 using JetBrains.Annotations;
 using NLog;
 using RailgunNet.Connection.Client;
+using RailgunNet.Logic;
+using RailgunNet.System.Types;
 using RemoteAction;
 using Sync;
 using Sync.Behaviour;
@@ -28,9 +31,9 @@ namespace Coop.Mod.Persistence.RemoteAction
             m_ClientAccess = access;
         }
         /// <inheritdoc cref="ISynchronization.Broadcast(InvokableId, object, object[])"/>
-        public override void Broadcast(InvokableId id, object instance, object[] args)
+        public override void Broadcast([CanBeNull] EntityId[] affectedEntities, InvokableId id, object instance, object[] args)
         {
-            RemoteStore store = m_ClientAccess.GetStore();
+            RemoteStoreClient store = m_ClientAccess.GetStore();
             RailClientRoom room = m_ClientAccess.GetRoom();
             if (store == null)
             {
@@ -55,13 +58,14 @@ namespace Coop.Mod.Persistence.RemoteAction
                     evt =>
                     {
                         evt.Call = call;
+                        evt.Entities = affectedEntities;
                         BroadcastHistory.Push(evt.Call, room.Tick);
                     });
         }
         /// <inheritdoc cref="SyncBuffered.BroadcastBufferedChanges(FieldChangeBuffer)"/>
         protected override void BroadcastBufferedChanges(FieldChangeBuffer buffer)
         {
-            RemoteStore store = m_ClientAccess.GetStore();
+            RemoteStoreClient store = m_ClientAccess.GetStore();
             RailClientRoom room = m_ClientAccess.GetRoom();
             
             foreach (var change in buffer.FetchChanges())
@@ -103,7 +107,7 @@ namespace Coop.Mod.Persistence.RemoteAction
         }
         #region Private
 
-        private List<Argument> ProduceArguments(RemoteStore store, EInvokableFlag flags, object[] args)
+        private List<Argument> ProduceArguments(RemoteStoreClient store, EInvokableFlag flags, object[] args)
         {
             var bTransferByValue = flags.HasFlag(EInvokableFlag.TransferArgumentsByValue);
             return args.Select(

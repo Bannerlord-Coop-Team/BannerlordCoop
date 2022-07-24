@@ -22,13 +22,12 @@ namespace Coop.Tests
                 CallBase = true
             };
             m_Server.Object.Start(config);
-            m_NetManagerServer = new LiteNetManagerServer(m_Server.Object, m_WorldData.Object);
+            m_NetManagerServer = new LiteNetManagerServer(m_Server.Object);
             m_NetManagerServer.StartListening();
         }
 
         private readonly LiteNetManagerServer m_NetManagerServer;
         private readonly Mock<Server> m_Server;
-        private readonly Mock<ISaveData> m_WorldData = TestUtils.CreateMockSaveData();
         private readonly CoopClient m_Client = new CoopClient(new ClientConfiguration());
         private readonly TimeSpan m_FrameTime = TimeSpan.FromMilliseconds(15);
         private readonly TimeSpan m_DisconnectTimeout = TimeSpan.FromMilliseconds(100);

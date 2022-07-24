@@ -1,30 +1,46 @@
-﻿using System;
+﻿using Common;
+using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
+using static TaleWorlds.CampaignSystem.Hero;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    internal class HeroLastSeenInformationSerializer : ICustomSerializer
+    public class HeroLastSeenInformationSerializer : ICustomSerializer
     {
-        private SettlementSerializer lastSeenPlace;
+        [NonSerialized]
+        HeroLastSeenInformation newHeroLastSeenInformation;
+
+        private Guid lastSeenPlace;
         private CampaignTimeSerializer lastSeenDate;
         private bool isSettlementNearby;
 
-        public HeroLastSeenInformationSerializer(Hero.HeroLastSeenInformation heroLastSeenInformation)
+        public HeroLastSeenInformationSerializer(HeroLastSeenInformation heroLastSeenInformation)
         {
-            lastSeenPlace = new SettlementSerializer(heroLastSeenInformation.LastSeenPlace);
+            if(heroLastSeenInformation.LastSeenPlace != null)
+            {
+                lastSeenPlace = CoopObjectManager.GetGuid(heroLastSeenInformation.LastSeenPlace);
+            }
+            
             lastSeenDate = new CampaignTimeSerializer(heroLastSeenInformation.LastSeenDate);
             isSettlementNearby = heroLastSeenInformation.IsNearbySettlement;
         }
 
         public object Deserialize()
         {
-            return new Hero.HeroLastSeenInformation
+            newHeroLastSeenInformation = new HeroLastSeenInformation
             { 
-                LastSeenPlace = (Settlement)lastSeenPlace.Deserialize(),
+                LastSeenPlace = null,
                 LastSeenDate = (CampaignTime)lastSeenDate.Deserialize(),
                 IsNearbySettlement = isSettlementNearby,
             };
+            return newHeroLastSeenInformation;
+        }
+
+        public void ResolveReferenceGuids()
+        {
+            newHeroLastSeenInformation.LastSeenPlace = CoopObjectManager.GetObject<Settlement>(lastSeenPlace);
         }
     }
 }

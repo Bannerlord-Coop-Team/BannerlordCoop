@@ -26,12 +26,12 @@ namespace Coop.Mod.Patch.CampaignPatches
         static void Prefix(Campaign __instance, int speed)
         {
 
-            if ( ShouldEnableTimeControlMode(__instance.TimeControlMode, speed) )
+            if (ShouldEnableTimeControlMode(__instance.TimeControlMode, speed))
             {
                 TimeControl.CanSyncTimeControlMode = true;
             }
 
-		}
+        }
 
         private static bool ShouldEnableTimeControlMode(CampaignTimeControlMode campaignTimeControlMode, int speed)
         {

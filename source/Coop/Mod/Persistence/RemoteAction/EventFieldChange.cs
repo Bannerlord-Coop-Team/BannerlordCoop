@@ -6,6 +6,7 @@ using RailgunNet;
 using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Logic;
+using RailgunNet.System.Types;
 using RailgunNet.Util;
 using RemoteAction;
 using Sync.Behaviour;
@@ -35,6 +36,7 @@ namespace Coop.Mod.Persistence.RemoteAction
         [EventData] public FieldChange Field { get; set; }
 
         public override IEnumerable<Argument> Arguments => Field.Arguments;
+        public override IEnumerable<EntityId> AffectedEntities => null;
 
         public override bool IsValid()
         {

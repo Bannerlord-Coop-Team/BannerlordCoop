@@ -4,7 +4,7 @@ using System.Reflection;
 using RailgunNet.System.Encoding;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace RemoteAction
 {
@@ -20,8 +20,11 @@ namespace RemoteAction
             buffer.Write(NumberOfBitsForArgType, Convert.ToByte(arg.EventType));
             switch (arg.EventType)
             {
-                case EventArgType.MBObject:
-                    buffer.WriteMBGUID(arg.MbGUID.Value);
+                case EventArgType.CoopObjectManagerId:
+                    buffer.WriteGUID(arg.CoopObjectManagerId.Value);
+                    break;
+                case EventArgType.Guid:
+                    buffer.WriteGUID(arg.Guid.Value);
                     break;
                 case EventArgType.Null:
                     // Empty
@@ -64,8 +67,10 @@ namespace RemoteAction
             var eType = (EventArgType) buffer.Read(NumberOfBitsForArgType);
             switch (eType)
             {
-                case EventArgType.MBObject:
-                    return new Argument(buffer.ReadMBGUID());
+                case EventArgType.CoopObjectManagerId:
+                    return new Argument(buffer.ReadGUID(), true);
+                case EventArgType.Guid:
+                    return new Argument(buffer.ReadGUID(), false);
                 case EventArgType.MBObjectManager:
                     return Argument.MBObjectManager;
                 case EventArgType.Null:

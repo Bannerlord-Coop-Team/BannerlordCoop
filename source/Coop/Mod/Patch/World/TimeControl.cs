@@ -6,6 +6,7 @@ using RemoteAction;
 using Sync;
 using Sync.Behaviour;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod.Patch.World
 {
@@ -43,6 +44,7 @@ namespace Coop.Mod.Patch.World
                 return "Some players are currently connecting";
             }
         }
+
         public TimeControl([NotNull] Campaign instance) : base(instance)
         {
         }
@@ -67,5 +69,15 @@ namespace Coop.Mod.Patch.World
         }
         
         private static readonly Condition CanChangeTimeClientside = new Condition((eOrigin, _) => CanSyncTimeControlMode);
+        #region Utils
+        public static TimeControl Instance()
+        {
+            if (Instances.TryGetValue(Campaign.Current, out TimeControl instance))
+            {
+                return instance;
+            }
+            return new TimeControl(Campaign.Current);
+        }
+        #endregion
     }
 }

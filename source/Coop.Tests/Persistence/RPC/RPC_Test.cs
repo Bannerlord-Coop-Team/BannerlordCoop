@@ -84,7 +84,7 @@ namespace Coop.Tests.Persistence.RPC
         {
             Packet packet =
                 new PacketReader().Read(new ByteReader(new ArraySegment<byte>(payload)));
-            Assert.Equal(EPacket.StoreAck, packet.Type);
+            Assert.Equal(EPacket.StoreInsertAck, packet.Type);
             Assert.Equal(4, packet.Payload.Count); // uint32
             uint uiMessageId = new ByteReader(packet.Payload).Binary.ReadUInt32();
             Assert.Equal(expectedId, new ObjectId(uiMessageId));
@@ -140,7 +140,7 @@ namespace Coop.Tests.Persistence.RPC
             ObjectId messageId = arg0.StoreObjectId.Value;
 
             // Verify arg0 was put into store
-            RemoteStore store = m_Environment.StoresClient[ClientId0];
+            RemoteStoreClient store = m_Environment.StoresClient[ClientId0];
             Assert.Single(store.Data);
             Assert.True(store.Data.ContainsKey(messageId));
             object storeData = store.Data[messageId];
@@ -153,7 +153,7 @@ namespace Coop.Tests.Persistence.RPC
             Assert.Single(conClientToServer.SendBuffer);
             byte[] payload = conClientToServer.SendBuffer[0];
             EPacket eType = PacketReader.DecodePacketType(payload[0]);
-            Assert.Equal(EPacket.StoreAdd, eType);
+            Assert.Equal(EPacket.StoreInsert, eType);
 
             // Verify the payload in StoreAdd
             Packet packet =
@@ -166,7 +166,7 @@ namespace Coop.Tests.Persistence.RPC
         private void ClientReceivesAck()
         {
             RailClient client0 = Persistence.Clients[ClientId0];
-            RemoteStore client0Store = m_Environment.StoresClient[ClientId0];
+            RemoteStoreServer serverStore = m_Environment.StoreServer;
             InMemoryConnection conClient0ToServer =
                 m_Environment.ConnectionsRaw.ConnectionsClient[ClientId0];
             InMemoryConnection conServerToClient0 =
@@ -191,19 +191,18 @@ namespace Coop.Tests.Persistence.RPC
             ObjectId messageId = args[0].StoreObjectId.Value;
 
             // Client0 is waiting for the ACK
-            Assert.Single(client0Store.State);
-            Assert.True(client0Store.State.ContainsKey(messageId));
-            Assert.True(client0Store.State[messageId].Sent);
-            Assert.False(client0Store.State[messageId].Acknowledged);
+            Assert.Single(serverStore.State);
+            Assert.True(serverStore.State.ContainsKey(messageId));
+            Assert.Equal(2, serverStore.State[messageId].RemoteState.Count);
+            Assert.True(serverStore.State[messageId].RemoteState.ContainsKey(m_Environment.Connections.ConnectionsServer[ClientId0]));
+            Assert.True(serverStore.State[messageId].RemoteState.ContainsKey(m_Environment.Connections.ConnectionsServer[ClientId1]));
 
             // Let client 1 receive and return ACK
             conServerToClient1.ExecuteSends();
-            conClient1ToServer.ExecuteSends();
 
-            // The server will relay ACK to client 0
-            Assert.False(client0Store.State[messageId].Acknowledged);
-            conServerToClient0.ExecuteSends();
-            Assert.True(client0Store.State[messageId].Acknowledged);
+            Assert.False(serverStore.State[messageId].RemoteState[m_Environment.Connections.ConnectionsServer[ClientId1]].DidSendInsertAck);
+            conClient1ToServer.ExecuteSends();
+            Assert.True(serverStore.State[messageId].RemoteState[m_Environment.Connections.ConnectionsServer[ClientId1]].DidSendInsertAck);
         }
 
         [Fact]
@@ -355,7 +354,7 @@ namespace Coop.Tests.Persistence.RPC
             // Since we've just started the room the ticks will be lower values which fit into 1 byte each.
             // This is a rough estimate, it doesn't need to be accurate.
             int keepAliveSize = conClient0ToServer.SendBuffer[0].Length;
-            Assert.True(keepAliveSize < 10);
+            Assert.True(keepAliveSize < 16);
 
             // Call method & finish the store sync to get those messages out of the way
             string sMessage = "Hello World";
@@ -412,7 +411,7 @@ namespace Coop.Tests.Persistence.RPC
         private void OtherClientReceivesObject()
         {
             RailClient client0 = Persistence.Clients[ClientId0];
-            RemoteStore client1Store = m_Environment.StoresClient[ClientId1];
+            RemoteStoreClient client1Store = m_Environment.StoresClient[ClientId1];
             InMemoryConnection conClient0ToServer =
                 m_Environment.ConnectionsRaw.ConnectionsClient[ClientId0];
             InMemoryConnection conServerToClient1 =
@@ -475,7 +474,7 @@ namespace Coop.Tests.Persistence.RPC
             Assert.Single(conServerToClient1.SendBuffer);
             byte[] payloadAdd = conServerToClient1.SendBuffer[0];
             EPacket eTypeAdd = PacketReader.DecodePacketType(payloadAdd[0]);
-            Assert.Equal(EPacket.StoreAdd, eTypeAdd);
+            Assert.Equal(EPacket.StoreInsert, eTypeAdd);
             Assert.Empty(conServerToClient0.SendBuffer); // But nothing back to client 0
 
             // Let the client 1 receive the StoreAdd. Client 1 returns an ACK
@@ -486,10 +485,6 @@ namespace Coop.Tests.Persistence.RPC
             // Receive the ACK on the server
             Assert.Empty(conServerToClient0.SendBuffer);
             conClient1ToServer.ExecuteSends();
-
-            // The server will ACK back to client 0
-            Assert.Single(conServerToClient0.SendBuffer);
-            AssertIsAckPacket(conServerToClient0.SendBuffer[0], messageId);
         }
 
         [Fact]

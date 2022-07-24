@@ -1,16 +1,20 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    public class MobilePartySerializer : CustomSerializer
+    public class MobilePartySerializer : CustomSerializerWithGuid
     {
         /// <summary>
         /// Used for circular reference
@@ -19,22 +23,22 @@ namespace Coop.Mod.Serializers
         public MobileParty mobileParty;
 
         /// <summary>
-        /// Used for circular reference
-        /// </summary>
-        [NonSerialized]
-        Hero hero;
-
-        /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
-        Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, Guid> references = new Dictionary<FieldInfo, Guid>();
 
-        List<string> attachedPartiesNames = new List<string>();
+        List<Guid> attachedParties = new List<Guid>();
+
         string stringId;
-        
+        string name;
+
         public MobilePartySerializer(MobileParty mobileParty) : base(mobileParty)
         {
             stringId = mobileParty.StringId;
+            name = mobileParty.Name.ToString();
+
+            List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
 
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
@@ -50,11 +54,8 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
-                    case "_currentSettlement":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
-                        break;
-                    case "<LastVisitedSettlement>k__BackingField":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
                         break;
                     case "<Ai>k__BackingField":
                         // PartyAi
@@ -97,71 +98,84 @@ namespace Coop.Mod.Serializers
                         MBReadOnlyList<MobileParty> attachedParties = (MBReadOnlyList<MobileParty>)value;
                         foreach(MobileParty attachedParty in attachedParties)
                         {
-                            attachedPartiesNames.Add(attachedParty.Name.ToString());
+                            this.attachedParties.Add(CoopObjectManager.GetGuid(attachedParty));
                         }
-                        break;
-                    case "_actualClan":
-                        SNNSO.Add(fieldInfo, new ClanSerializer((Clan)value));
                         break;
                     case "<StationaryStartTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "_partyComponent":
-                        // Handle on deserialize
+                        SNNSO.Add(fieldInfo, new PartyComponentSerializer((PartyComponent)value));
+                        break;
+                    case "_pureSpeedExplainer":
+                        // Calculated on client side
+                        break;
+                    case "<TaleWorlds.CampaignSystem.Map.ILocatable<TaleWorlds.CampaignSystem.Party.MobileParty>.NextLocatable>k__BackingField":
+                        // Not used by TW even
+                        break;
+                    case "<AiBehaviorObject>k__BackingField":
+                        // AI not used
+                        break;
+                    case "<MoveTargetParty>k__BackingField":
+                    case "<LastVisitedSettlement>k__BackingField":
+                    case "_currentSettlement":
+                    case "_actualClan":
+                    case "_targetSettlement":
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+                        break;
+                    case "<CustomName>k__BackingField":
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
                         break;
                     default:
-                        throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
+                        UnmanagedFields.Add(fieldInfo);
+                        break;
                 }
             }
 
             // TODO manage collections
 
-            // Remove non serializable objects before serialization
-            // They are marked as nonserializable in CustomSerializer but still tries to serialize???
-            NonSerializableCollections.Clear();
-            NonSerializableObjects.Clear();
-        }
-
-        /// <summary>
-        /// For assigning PlayerHeroSerializer reference for deserialization
-        /// </summary>
-        /// <param name="hero">PlayerHeroSerializer used by partyBaseSerializer</param>
-        public void SetHeroReference(Hero hero)
-        {
-            this.hero = hero;
+            if (!UnmanagedFields.IsEmpty())
+            {
+                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
+            }
         }
 
         public override object Deserialize()
         {
-            MobileParty newMobileParty = MBObjectManager.Instance.CreateObject<MobileParty>(stringId);
-
-            // Circular referenced object needs assignment before deserialize
-            if (hero == null)
-            {
-                throw new SerializationException("Must set hero reference before deserializing. Use SetHeroReference()");
-            }
+            mobileParty = MBObjectManager.Instance.CreateObject<MobileParty>(stringId);
 
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
-                // Pass references to specified serializers
-                switch (entry.Value)
-                {
-                    case PartyBaseSerializer partyBaseSerializer:
-                        partyBaseSerializer.SetHeroReference(hero);
-                        partyBaseSerializer.SetMobilePartyReference(newMobileParty);
-                        entry.Key.SetValue(newMobileParty, partyBaseSerializer.Deserialize(newMobileParty.Party));
-                        break;
-                    case ClanSerializer clanSerializer:
-                        clanSerializer.SetHeroReference(hero);
-                        break;
-                    default:
-                        entry.Key.SetValue(newMobileParty, entry.Value.Deserialize());
-                        break;
-                }
+                entry.Key.SetValue(mobileParty, entry.Value.Deserialize());
             }
 
-            return base.Deserialize(newMobileParty);
+            return base.Deserialize(mobileParty);
+        }
+
+        public override void ResolveReferenceGuids()
+        {
+            if (mobileParty == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            foreach(KeyValuePair<FieldInfo, Guid> reference in references)
+            {
+                reference.Key.SetValue(mobileParty, CoopObjectManager.GetObject(reference.Value));
+            }
+
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
+            }
+
+            List<MobileParty> attachedParties = this.attachedParties
+                .Select(x => CoopObjectManager.GetObject<MobileParty>(x)).ToList();
+
+            mobileParty.GetType()
+                .GetField("<AttachedParties>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(mobileParty, new MBReadOnlyList<MobileParty>(attachedParties));
         }
     }
 }

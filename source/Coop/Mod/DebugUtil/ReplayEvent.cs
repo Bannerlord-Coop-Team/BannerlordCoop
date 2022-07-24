@@ -5,6 +5,8 @@ using Coop.Mod.Persistence.Party;
 using RemoteAction;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
+using Common;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod.DebugUtil
 {
@@ -17,7 +19,7 @@ namespace Coop.Mod.DebugUtil
         public CampaignTime time;
         public EntityId entityId;
         public MobileParty party;
-        public MovementData movement;
+        public MapVec2 position;
         public bool applied = false;
 
         public override bool Equals(object obj)
@@ -25,7 +27,7 @@ namespace Coop.Mod.DebugUtil
             return obj is ReplayEvent other &&
                 this.entityId == other.entityId &&
                 this.party?.Id == other.party?.Id &&
-                this.movement.Equals(other.movement);
+                this.position.Equals(other.position);
         }
 
         public override int GetHashCode()
@@ -44,8 +46,8 @@ namespace Coop.Mod.DebugUtil
         {
             buffer.WriteCampaignTime(replay.time);
             buffer.WriteEntityId(replay.entityId);
-            buffer.WriteMBGUID(replay.party.Id);
-            buffer.WriteMovementData(replay.movement);
+            buffer.WriteGUID(CoopObjectManager.GetGuid(replay.party));
+            buffer.WriteMapVec2(replay.position);
         }
 
         [Decoder]
@@ -55,8 +57,8 @@ namespace Coop.Mod.DebugUtil
             {
                 time = buffer.ReadCampaignTime(),
                 entityId = buffer.ReadEntityId(),
-                party = (MobileParty)MBObjectManager.Instance.GetObject(buffer.ReadMBGUID()),
-                movement = buffer.ReadMovementData(),
+                party = (MobileParty)CoopObjectManager.GetObject(buffer.ReadGUID()),
+                position = buffer.ReadMapVec2()
             };
         }
     }

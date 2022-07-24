@@ -1,4 +1,9 @@
-﻿using TaleWorlds.CampaignSystem;
+﻿using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
@@ -6,31 +11,32 @@ namespace Coop.Mod.DebugUtil
 {
     public static class PartySpawnHelper
     {
-        private static readonly int TesterCount = 0;
-
-        public static MobileParty SpawnTestersNear(MobileParty nearbyParty)
+        public static MobileParty SpawnTestersNearby(Vec2 position, float spawnRadius)
         {
-            // Init party
-            MobileParty party =
-                MBObjectManager.Instance.CreateObject<MobileParty>(
-                    "coop_mod_testers_" + TesterCount);
-            TroopRoster roster = TroopRoster.CreateDummyTroopRoster();
-            CharacterObject obj =
-                Campaign.Current.ObjectManager.GetObject<CharacterObject>(
-                    "tutorial_placeholder_volunteer");
-            roster.AddToCounts(obj, 5 - roster.TotalManCount);
-            TroopRoster prisonerRoster = TroopRoster.CreateDummyTroopRoster();
-            party.InitializeMobileParty(
-                roster,
-                prisonerRoster,
-                nearbyParty.Position2D,
-                5f,
-                2f);
-            party.SetCustomName(new TextObject("testers"));
-            party.Party.Owner = null;
-            party.Party.Visuals.SetMapIconAsDirty();
+            // We need to assign an owner to the party, otherwise the Bannerlord main loop runs into a segfault.
+            // We'll just pick the owner of a random nearby settlement.
+            Settlement s = Settlement.FindSettlementsAroundPosition(position, 100).First();
+            return MobileParty.CreateParty("coop_testers", null, delegate(MobileParty party)
+            {
+                party.Aggressiveness = 0;
+                party.IsActive = true;
+                party.IsVisible = true;
+                party.Party.Visuals.SetMapIconAsDirty();
+                party.SetCustomName(new TextObject("Testers"));                
 
-            return party;
+                CharacterObject obj = Campaign.Current.ObjectManager.GetObject<CharacterObject>("gear_practice_dummy_empire");
+                TroopRoster roster = new TroopRoster(party.Party);
+                roster.AddToCounts(obj, 5 - roster.TotalManCount);
+                party.InitializeMobilePartyAroundPosition(
+                    roster,
+                    new TroopRoster(party.Party),
+                    position,
+                    spawnRadius,
+                    spawnRadius);
+                party.DisableAi();
+                party.SetPartyUsedByQuest(true);
+                party.Party.SetCustomOwner(s.Owner);
+            });
         }
     }
 }

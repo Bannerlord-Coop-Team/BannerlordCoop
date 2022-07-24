@@ -1,14 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
+using Common;
 using Coop.Mod.Persistence;
+using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
+using CoopFramework;
 using Moq;
 using RailgunNet.Connection.Client;
 using RailgunNet.Connection.Server;
 using RailgunNet.Factory;
 using Sync.Store;
+using Sync.Value;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Tests.Persistence
@@ -52,13 +57,10 @@ namespace Coop.Tests.Persistence
     public class TestEnvironmentClient
     {
         public Mock<IEnvironmentClient> Mock { get; }
-        private readonly Dictionary<MBGUID, MobileParty> Parties;
-        public TestEnvironmentClient(RemoteStore store, Dictionary<MBGUID, MobileParty> mobileParties)
+        public TestEnvironmentClient(RemoteStoreClient store)
         {
-            Parties = mobileParties;
             Mock = new Mock<IEnvironmentClient>();
             Mock.Setup(env => env.Store).Returns(store);
-            Mock.Setup(env => env.GetMobilePartyById(It.IsAny<MBGUID>())).Returns((MBGUID id) => Parties[id]);
         }
     }
 
@@ -66,16 +68,13 @@ namespace Coop.Tests.Persistence
     {
         public Mock<IEnvironmentServer> Mock { get; }
         public EventBroadcastingQueue EventQueue { get; }
-        private readonly Dictionary<MBGUID, MobileParty> Parties;
 
-        public TestEnvironmentServer(SharedRemoteStore store, Dictionary<MBGUID, MobileParty> mobileParties)
+        public TestEnvironmentServer(RemoteStoreServer store)
         {
-            Parties = mobileParties;
-            EventQueue = new EventBroadcastingQueue(store, TimeSpan.FromSeconds(5));
+            EventQueue = new EventBroadcastingQueue(store, TimeSpan.FromSeconds(60));
             Mock = new Mock<IEnvironmentServer>();
             Mock.Setup(env => env.Store).Returns(store);
             Mock.Setup(env => env.EventQueue).Returns(EventQueue);
-            Mock.Setup(env => env.GetMobilePartyById(It.IsAny<MBGUID>())).Returns((MBGUID id) => Parties[id]);
         }
     }
 }

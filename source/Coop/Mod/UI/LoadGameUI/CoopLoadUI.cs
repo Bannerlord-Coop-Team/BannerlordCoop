@@ -12,6 +12,7 @@ using TaleWorlds.Engine;
 using TaleWorlds.Localization;
 using System.Linq;
 using TaleWorlds.SaveSystem;
+using TaleWorlds.ScreenSystem;
 
 namespace Coop.Mod.UI
 {
@@ -38,18 +39,18 @@ namespace Coop.Mod.UI
 
 		public new void ExecuteSaveLoad()
 		{
-			LoadGameResult saveGameData = MBSaveLoad.LoadSaveGameData(Save.Name, Utilities.GetModulesNames());
+			LoadResult saveGameData = MBSaveLoad.LoadSaveGameData(Save.Name);
 			if (saveGameData != null)
 			{
-				if (saveGameData.ModuleCheckResults.Count > 0)
+				if (saveGameData.MetaData.GetModules().Length > 0)
 				{
 					InformationManager.ShowInquiry(new InquiryData(new TextObject("{=kJtNMYum}Module mismatch", null).ToString(), new TextObject("{=lh0so0uX}Do you want to load the saved game with different modules?", null).ToString(), true, true, new TextObject("{=aeouhelq}Yes", null).ToString(), new TextObject("{=8OkPHu4f}No", null).ToString(), delegate ()
 					{
-						StartGame(saveGameData.LoadResult);
+						StartGame(saveGameData);
 					}, null, ""), false);
 					return;
 				}
-				StartGame(saveGameData.LoadResult);
+				StartGame(saveGameData);
 			}
 		}
 

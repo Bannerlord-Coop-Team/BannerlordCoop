@@ -19,9 +19,9 @@ namespace Coop.NetImpl.LiteNet
         private TimeSpan m_SinceLastDiscovery;
         private TimeSpan m_SinceLastKeepAlive;
 
-        public LiteNetManagerServer(Server server, ISaveData worldData)
+        public LiteNetManagerServer(Server server)
         {
-            if (server?.ActiveConfig == null || worldData == null)
+            if (server?.ActiveConfig == null)
             {
                 throw new ArgumentNullException();
             }
@@ -36,12 +36,12 @@ namespace Coop.NetImpl.LiteNet
             m_Server = server;
             if (m_Config.NetworkConfiguration.WanAddress != null)
             {
-                m_wanManager = CreateNetManager(worldData);
+                m_wanManager = CreateNetManager();
             }
 
             if (m_Config.NetworkConfiguration.LanAddress != null)
             {
-                m_lanManager = CreateNetManager(worldData);
+                m_lanManager = CreateNetManager();
             }
 
             m_SinceLastDiscovery = TimeSpan.Zero;
@@ -71,10 +71,10 @@ namespace Coop.NetImpl.LiteNet
         }
         public int Priority { get; } = UpdatePriority.ServerThread.PollNetwork;
 
-        private NetManager CreateNetManager(ISaveData worldData)
+        private NetManager CreateNetManager()
         {
             return NetManagerFactory.Create(
-                new LiteNetListenerServer(m_Server, worldData),
+                new LiteNetListenerServer(m_Server),
                 m_Config.NetworkConfiguration);
         }
 

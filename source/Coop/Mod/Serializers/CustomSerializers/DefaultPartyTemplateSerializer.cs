@@ -1,12 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
-using System.Reflection;
+using TaleWorlds.CampaignSystem.Party;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     /// <summary>
     /// Used as a part of the ClanSerializer to break down the PartyTemplateObject field
@@ -32,6 +28,11 @@ namespace Coop.Mod.Serializers
             }
 
             return null;
+        }
+
+        public void ResolveReferenceGuids()
+        {
+            // No references
         }
     }
 }

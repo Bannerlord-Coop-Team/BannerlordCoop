@@ -30,7 +30,7 @@ namespace Coop.Mod.Persistence.Party
                     room.Tick,
                     EntityId,
                     Movement.ToString());
-                entity.State.Movement = Movement;
+                entity.ApplyPlayerMove(Movement.ToData());
             }
             else
             {

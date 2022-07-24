@@ -21,7 +21,8 @@ namespace Coop.Client.UI.CharacterCreationVM
 			int currentStageIndex, 
 			int totalStagesCount, 
 			int furthestIndex, 
-			Action<int> goToIndex) 
+			Action<int> goToIndex,
+			bool isBannerAndClanNameSet) 
 			: base(characterCreation, 
 					affirmativeAction, 
 					affirmativeActionText, 
@@ -30,7 +31,8 @@ namespace Coop.Client.UI.CharacterCreationVM
 					currentStageIndex, 
 					totalStagesCount, 
 					furthestIndex, 
-					goToIndex)
+					goToIndex,
+					isBannerAndClanNameSet)
 		{ }
 	}
 

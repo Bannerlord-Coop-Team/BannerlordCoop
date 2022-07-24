@@ -14,7 +14,7 @@ namespace Coop.Mod
         /// <summary>
         /// A client is receiving world data.
         /// </summary>
-        SendingWorldData,
+        SendingGameData,
 
         /// <summary>
         /// A client is playing.
@@ -45,25 +45,25 @@ namespace Coop.Mod
     class CoopServerSM : CoopStateMachine<ECoopServerState, ECoopServerTrigger>
     {
         public readonly StateConfiguration PreparingState;
-        public readonly StateConfiguration SendingWorldDataState;
+        public readonly StateConfiguration SendingGameDataState;
         public readonly StateConfiguration PlayingState;
         public readonly StateMachine<ECoopServerState, ECoopServerTrigger>.TriggerWithParameters<ConnectionServer> 
-            SendWorldDataTrigger;
+            SendGameDataTrigger;
 
         public CoopServerSM() : base(ECoopServerState.Preparing)
         {
 
             // Server wait for client connect
             PreparingState = StateMachine.Configure(ECoopServerState.Preparing);
-            PreparingState.Permit(ECoopServerTrigger.RequiresWorldData, ECoopServerState.SendingWorldData);
-            PreparingState.Permit(ECoopServerTrigger.DeclineWorldData, ECoopServerState.Playing);
 
+            PreparingState.Permit(ECoopServerTrigger.RequiresWorldData, ECoopServerState.SendingGameData);
 
             // Send world data
-            SendWorldDataTrigger = StateMachine.SetTriggerParameters<ConnectionServer>(ECoopServerTrigger.RequiresWorldData);
+            SendGameDataTrigger = StateMachine.SetTriggerParameters<ConnectionServer>(ECoopServerTrigger.RequiresWorldData);
 
-            SendingWorldDataState = StateMachine.Configure(ECoopServerState.SendingWorldData);
-            SendingWorldDataState.Permit(ECoopServerTrigger.ClientLoaded, ECoopServerState.Playing);
+            SendingGameDataState = StateMachine.Configure(ECoopServerState.SendingGameData);
+
+            SendingGameDataState.Permit(ECoopServerTrigger.ClientLoaded, ECoopServerState.Playing);
 
             // Server playing
             PlayingState = StateMachine.Configure(ECoopServerState.Playing);

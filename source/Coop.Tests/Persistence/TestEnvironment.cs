@@ -1,13 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.NetImpl.LiteNet;
 using Coop.Tests.Sync;
 using JetBrains.Annotations;
 using RailgunNet.Connection.Client;
+using RailgunNet.Connection.Server;
 using RailgunNet.Factory;
 using RailgunNet.Logic;
 using RemoteAction;
@@ -19,7 +22,6 @@ namespace Coop.Tests.Persistence
 {
     public class TestEnvironment
     {
-        public Dictionary<MBGUID, MobileParty> Parties = new Dictionary<MBGUID, MobileParty>();
         public TestEnvironment(int iNumberOfClients)
         {
             ConnectionsRaw = new TestConnectionsRaw(iNumberOfClients);
@@ -41,19 +43,44 @@ namespace Coop.Tests.Persistence
 
             // Railgun
             RailSynchronizedFactory.Detect(Assembly.GetAssembly(typeof(RailBitBufferExtensions)));
-            ServerEnvironment = new TestEnvironmentServer(StoreServer, Parties);
+            ServerEnvironment = new TestEnvironmentServer(StoreServer);
             EventQueue = ServerEnvironment.EventQueue;
-            var registryServer = serverRegistryCreator(ServerEnvironment.Mock.Object);
-            Persistence = new TestPersistence(registryServer);
+            try
+            {
+                var registryServer = serverRegistryCreator(ServerEnvironment.Mock.Object);
+                Persistence = new TestPersistence(registryServer);
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                StringBuilder sb = new StringBuilder();
+                foreach (Exception exSub in ex.LoaderExceptions)
+                {
+                    sb.AppendLine(exSub.Message);
+                    FileNotFoundException exFileNotFound = exSub as FileNotFoundException;
+                    if (exFileNotFound != null)
+                    {
+                        if (!string.IsNullOrEmpty(exFileNotFound.FusionLog))
+                        {
+                            sb.AppendLine("Fusion Log:");
+                            sb.AppendLine(exFileNotFound.FusionLog);
+                        }
+                    }
+                    sb.AppendLine();
+                }
+                string errorMessage = sb.ToString();
+                throw new Exception(errorMessage);
+            }
+            
+            
 
-            foreach (((RailNetPeerWrapper First, RailNetPeerWrapper Second) First, RemoteStore
+            foreach (((RailNetPeerWrapper First, RailNetPeerWrapper Second) First, RemoteStoreClient
                 Second) it in RailPeerClient.Zip(RailPeerServer, (c, s) => (c, s)).Zip(StoresClient, (c, s) => (c, s)))
             {
                 var client = it.First.First;
                 var server = it.First.Second;
                 var store = it.Second;
 
-                var clientEnvironment = new TestEnvironmentClient(store, Parties);
+                var clientEnvironment = new TestEnvironmentClient(store);
                 ClientEnvironments.Add(clientEnvironment);
                 var registryClient =
                     clientRegistryCreator(clientEnvironment.Mock.Object);
@@ -79,9 +106,9 @@ namespace Coop.Tests.Persistence
 
         [NotNull] public TestPersistence Persistence { get; private set; }
 
-        public List<RemoteStore> StoresClient => Stores.StoresClient;
+        public List<RemoteStoreClient> StoresClient => Stores.StoresClient;
 
-        public SharedRemoteStore StoreServer => Stores.StoreServer;
+        public RemoteStoreServer StoreServer => Stores.StoreServer;
 
         public List<RailNetPeerWrapper> RailPeerClient =>
             Connections.ConnectionsClient.Select(c => c.GameStatePersistence)
@@ -119,15 +146,15 @@ namespace Coop.Tests.Persistence
         private class ClientAccess : IClientAccess
         {
             private readonly RailClientRoom m_Room;
-            private readonly RemoteStore m_Store;
+            private readonly RemoteStoreClient m_Store;
 
-            public ClientAccess(RemoteStore store, RailClientRoom room)
+            public ClientAccess(RemoteStoreClient store, RailClientRoom room)
             {
                 m_Store = store;
                 m_Room = room;
             }
 
-            public RemoteStore GetStore()
+            public RemoteStoreClient GetStore()
             {
                 return m_Store;
             }
@@ -135,6 +162,39 @@ namespace Coop.Tests.Persistence
             public RailClientRoom GetRoom()
             {
                 return m_Room;
+            }
+        }
+        
+        public IServerAccess GetServerAccess()
+        {
+            return new ServerAccess(StoreServer, Persistence.Server.Room, EventQueue);
+        }
+
+        private class ServerAccess : IServerAccess
+        {
+            private readonly RailServerRoom m_Room;
+            private readonly RemoteStoreServer m_Store;
+            private readonly EventBroadcastingQueue m_Queue;
+            public ServerAccess(RemoteStoreServer store, RailServerRoom room, EventBroadcastingQueue queue)
+            {
+                m_Store = store;
+                m_Room = room;
+                m_Queue = queue;
+            }
+
+            public RailServerRoom GetRoom()
+            {
+                return m_Room;
+            }
+
+            public RemoteStoreServer GetStore()
+            {
+                return m_Store;
+            }
+
+            public EventBroadcastingQueue GetQueue()
+            {
+                return m_Queue;
             }
         }
     }

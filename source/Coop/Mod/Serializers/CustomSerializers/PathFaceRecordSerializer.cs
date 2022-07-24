@@ -1,11 +1,10 @@
 ﻿using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    internal class PathFaceRecordSerializer : ICustomSerializer
+    public class PathFaceRecordSerializer : ICustomSerializer
     {
         private int pathFaceIndex;
         private int pathFaceGroupIndex;
@@ -21,6 +20,11 @@ namespace Coop.Mod.Serializers
         public object Deserialize()
         {
             return new PathFaceRecord(pathFaceIndex, pathFaceGroupIndex, pathFaceIslandIndex);
+        }
+
+        public void ResolveReferenceGuids()
+        {
+            // No references
         }
     }
 }

@@ -4,6 +4,7 @@ using Coop.Mod.Persistence.Party;
 using JetBrains.Annotations;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
@@ -14,11 +15,6 @@ namespace Coop.Mod.Persistence
     /// </summary>
     public interface IEnvironmentClient
     {
-        /// <summary>
-        ///     Set the movement data of the given party as an authoritative action.
-        /// </summary>
-        void SetAuthoritative(MobileParty party, MovementData data);
-
         /// <summary>
         ///     Set the current position of the given party as an authoritative action.
         /// </summary>
@@ -41,13 +37,13 @@ namespace Coop.Mod.Persistence
         /// <summary>
         ///     Gets the synchronization for <see cref="MobileParty"/> instances.
         /// </summary>
-        MobilePartySync PartySync { get; }
+        MobilePartyMovementSync PartySync { get; }
 
         /// <summary>
         ///     Returns the object store shared with all other clients.
         /// </summary>
         [NotNull]
-        RemoteStore Store { get; }
+        RemoteStoreClient Store { get; }
 
         /// <summary>
         ///     Sets whether a party is controlled by a human player (locally or remote). Called
@@ -57,7 +53,7 @@ namespace Coop.Mod.Persistence
         ///     Party guid, to be resolved using <see cref="GetMobilePartyById" />
         /// </param>
         /// <param name="isPlayerControlled"></param>
-        void SetIsPlayerControlled(MBGUID guid, bool isPlayerControlled);
+        void SetIsPlayerControlled(Guid guid, bool isPlayerControlled);
 
         /// <summary>
         ///     Returns a party given its guid.
@@ -65,7 +61,7 @@ namespace Coop.Mod.Persistence
         /// <param name="guid"></param>
         /// <returns></returns>
         [CanBeNull]
-        MobileParty GetMobilePartyById(MBGUID guid);
+        MobileParty GetMobilePartyById(Guid guid);
 
         /// <summary>
         ///     Called when a party enter the scope of the local client.
@@ -73,8 +69,7 @@ namespace Coop.Mod.Persistence
         /// <param name="party"></param>
         /// <param name="mapPosition"></param>
         /// <param name="facingDirection"></param>
-        /// <param name="movementData"></param>
-        void ScopeEntered([NotNull] MobileParty party, Vec2 mapPosition, Vec2? facingDirection, MovementData movementData);
+        void ScopeEntered([NotNull] MobileParty party, Vec2 mapPosition, Vec2? facingDirection);
         /// <summary>
         ///     Called when a party leaves the scope of the local client.
         /// </summary>

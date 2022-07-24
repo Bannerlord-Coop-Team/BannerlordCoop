@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Reflection;
 using JetBrains.Annotations;
 using Sync.Behaviour;
 
@@ -10,9 +11,14 @@ namespace Sync.Call
     /// </summary>
     public class Invokable
     {
-        public Invokable([NotNull] MethodBase original)
+        public Invokable([NotNull] MethodBase original, EInvokableFlag flags = EInvokableFlag.None)
         {
+            if(original == null)
+            {
+                throw new ArgumentNullException(nameof(original));
+            }
             Original = original;
+            Flags = flags;
             Id = Registry.Register(this);
         }
 
@@ -51,6 +57,11 @@ namespace Sync.Call
         public void AddFlags(EInvokableFlag flag)
         {
             Flags |= flag;
+        }
+
+        public override string ToString()
+        {
+            return $"{Original}";
         }
     }
 }

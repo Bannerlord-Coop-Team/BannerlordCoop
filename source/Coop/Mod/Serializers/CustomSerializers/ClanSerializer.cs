@@ -1,33 +1,38 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    class ClanSerializer : CustomSerializer
+    public class ClanSerializer : CustomSerializerWithGuid
     {
-        /// <summary>
-        /// Used for circular reference
-        /// </summary>
         [NonSerialized]
-        Hero _leader;
+        Clan newClan;
+
+        List<Guid> Supporters = new List<Guid>();
+        List<Guid> Companions = new List<Guid>(); 
+        List<Guid> CommanderHeroes = new List<Guid>(); //Does it refer to the lordscache or the heroescache in Bannerlord code? Which is missing from the switch case?
+
+        
 
         /// <summary>
         /// Serialized Natively Non Serializable Objects (SNNSO)
         /// </summary>
-        Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
-       
+        readonly Dictionary<FieldInfo, ICustomSerializer> SNNSO = new Dictionary<FieldInfo, ICustomSerializer>();
+        readonly Dictionary<FieldInfo, Guid> references = new Dictionary<FieldInfo, Guid>();
+
         public ClanSerializer(Clan clan) : base(clan)
         {
+            List<string> UnmanagedFields = new List<string>();
+
             foreach (FieldInfo fieldInfo in NonSerializableObjects)
             {
                 // Get value from fieldInfo
@@ -42,6 +47,14 @@ namespace Coop.Mod.Serializers
                 // Assign serializer to nonserializable objects
                 switch (fieldInfo.Name)
                 {
+                    case "<Id>k__BackingField":
+                        // Ignore current MB id
+                        break;
+                    case "<Name>k__BackingField":
+                    case "<InformalName>k__BackingField":
+                    case "<EncyclopediaText>k__BackingField":
+                        SNNSO.Add(fieldInfo, new TextObjectSerializer((TextObject)value));
+                        break;
                     case "<Culture>k__BackingField":
                         SNNSO.Add(fieldInfo, new CultureObjectSerializer((CultureObject)value));
                         break;
@@ -49,34 +62,33 @@ namespace Coop.Mod.Serializers
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
                         break;
                     case "<SupporterNotables>k__BackingField":
-                        foreach (Hero hero in (MBReadOnlyList<Hero>)value)
+                        foreach (Guid supporters in CoopObjectManager.GetGuids((MBReadOnlyList<Hero>)value))
                         {
-                            throw new Exception("Should be no Supporters");
+                            Supporters.Add(supporters);
                         }
                         break;
                     case "<Companions>k__BackingField":
-                        foreach (Hero hero in (MBReadOnlyList<Hero>)value)
+                        foreach (Guid companions in CoopObjectManager.GetGuids((MBReadOnlyList<Hero>)value))
                         {
-                            throw new Exception("Should be no compainions");
+                            Companions.Add(companions);
                         }
                         break;
                     case "<CommanderHeroes>k__BackingField":
-                        foreach (Hero hero in (MBReadOnlyList<Hero>)value)
+                        foreach (Guid commanderheroes in CoopObjectManager.GetGuids((MBReadOnlyList<Hero>)value))
                         {
-                            throw new Exception("Should be no Commanders");
+                            CommanderHeroes.Add(commanderheroes);
                         }
                         break;
                     case "_basicTroop":
-                        SNNSO.Add(fieldInfo, new BasicTroopSerializer((CharacterObject)value));
-                        break;
                     case "_leader":
                         // Assigned by SetHeroReference on deserialization
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     case "_banner":
                         SNNSO.Add(fieldInfo, new BannerSerializer((Banner)value));
                         break;
                     case "_home":
-                        SNNSO.Add(fieldInfo, new SettlementSerializer((Settlement)value));
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
                         break;
                     case "<NotAttackableByPlayerUntilTime>k__BackingField":
                         SNNSO.Add(fieldInfo, new CampaignTimeSerializer((CampaignTime)value));
@@ -84,49 +96,76 @@ namespace Coop.Mod.Serializers
                     case "_defaultPartyTemplate":
                         SNNSO.Add(fieldInfo, new DefaultPartyTemplateSerializer((PartyTemplateObject)value));
                         break;
+                    case "_kingdom":
+                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+                        break;
+                    case "OnPartiesAndLordsCacheUpdated":
+                        // Event for clans, add for all clans on kingdom deserialize
+                        break;
                     default:
-                        throw new NotImplementedException("Cannot serialize " + fieldInfo.Name);
+                        UnmanagedFields.Add(fieldInfo.Name);
+                        break;
                 }
             }
 
-            // TODO manage collections
-
-            // Remove non serializable objects before serialization
-            // They are marked as nonserializable in CustomSerializer but still tries to serialize???
-            NonSerializableCollections.Clear();
-            NonSerializableObjects.Clear();
-        }
-
-        /// <summary>
-        /// For assigning PlayerHeroSerializer reference for deserialization
-        /// </summary>
-        /// <param name="leader">PlayerHeroSerializer used by _leader</param>
-        public void SetHeroReference(Hero leader)
-        {
-            _leader = leader;
+            if (!UnmanagedFields.IsEmpty())
+            {
+                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
+            }            
         }
 
         public override object Deserialize()
         {
-
-            Clan newClan = MBObjectManager.Instance.CreateObject<Clan>();
-
-            // Circular referenced object needs assignment before deserialize
-            if (_leader == null)
-            {
-                throw new SerializationException("Must set hero reference before deserializing. Use SetHeroReference()");
-            }
+            newClan = MBObjectManager.Instance.CreateObject<Clan>();
 
             // Circular referenced objects
-            newClan.GetType().GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(newClan, _leader);
+            newClan.GetType().GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(newClan, null);
 
             // Objects requiring a custom serializer
             foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
             {
                 entry.Key.SetValue(newClan, entry.Value.Deserialize());
             }
-            
+
             return base.Deserialize(newClan);
+        }
+
+        public override void ResolveReferenceGuids()
+        {
+            if (newClan == null)
+            {
+                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+            }
+
+            foreach (KeyValuePair<FieldInfo, ICustomSerializer> entry in SNNSO)
+            {
+                entry.Value.ResolveReferenceGuids();
+            }
+
+            foreach (KeyValuePair<FieldInfo, Guid> entry in references)
+            {
+                FieldInfo field = entry.Key;
+                Guid id = entry.Value;
+
+                field.SetValue(newClan, CoopObjectManager.GetObject(id));
+            }
+
+            //Deserialize the lists
+            List<Hero> lCompanions= new List<Hero>();
+            List<Hero> lSupporters = new List<Hero>();
+            List<Hero> lCommanderHeroes = new List<Hero>();
+            foreach (Guid companionId in Companions)
+            {
+                lCompanions.Add((Hero)CoopObjectManager.GetObject(companionId));
+            }
+            foreach (Guid supporterId in Supporters)
+            {
+                lSupporters.Add((Hero)CoopObjectManager.GetObject(supporterId));
+            }
+            foreach (Guid commanderheroesId in CommanderHeroes)
+            {
+                lCommanderHeroes.Add((Hero)CoopObjectManager.GetObject(commanderheroesId));
+            }
         }
     }
 }

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Mod.Patch.World
 {
@@ -14,7 +15,7 @@ namespace Coop.Mod.Patch.World
     {
         static VillageSync()
         {
-            AutoWrapAllInstances(c => new VillageSync(c));
+            //AutoWrapAllInstances(c => new VillageSync(c));
         }
 
         public VillageSync([NotNull] Village instance) : base(instance)

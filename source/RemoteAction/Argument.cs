@@ -4,8 +4,10 @@ using Sync.Store;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace RemoteAction
 {
@@ -14,23 +16,25 @@ namespace RemoteAction
     ///     ATTENTION: The used state transfer library, Railgun, is intended to reliably distribute
     ///     very small amount of data that is to be applied at a synchronized point in time on all clients.
     ///     Maximum payload data in a single event is tiny <see cref="RailgunNet.RailConfig.MAXSIZE_EVENT" />.
-    ///     Larger objects need be transferred using a <see cref="Sync.Store.RemoteStore" /> and then referenced
+    ///     Larger objects need be transferred using a <see cref="Sync.Store.RemoteStoreClient" /> and then referenced
     ///     in a <see cref="EventArgType.StoreObjectId" />. The <see cref="ArgumentFactory.Create" />
     ///     can take care of this.
     ///     To add a new argument type:
     ///     1. Add enum entry
     ///     2. Extended <see cref="Argument" /> to store the new type in some way
-    ///     3. Implement <see cref="ArgumentFactory.Resolve" />
-    ///     4. Implement <see cref="ArgumentFactory.Create" />
-    ///     5. Implement encoder & decoder in <see cref="ArgumentSerializer" />
-    ///     6. Add case for the new type in <see cref="Argument.ToString" />
-    ///     7. Add new argument type to hash <see cref="Argument.GetHashCode" />
+    ///     3. Implement <see cref="Argument.ToString"/>
+    ///     4. Implement <see cref="ArgumentFactory.Resolve" />
+    ///     5. Implement <see cref="ArgumentFactory.Create" />
+    ///     6. Implement encoder & decoder in <see cref="ArgumentSerializer" />
+    ///     7. Add case for the new type in <see cref="Argument.ToString" />
+    ///     8. Add new argument type to hash <see cref="Argument.GetHashCode" />
     /// </summary>
     public enum EventArgType
     {
         Null,
         MBObjectManager,
-        MBObject,
+        CoopObjectManagerId,
+        Guid,
         Int,
         Float,
         Bool,
@@ -63,9 +67,13 @@ namespace RemoteAction
         /// </summary>
         public EventArgType EventType { get; }
         /// <summary>
-        ///     The contained <see cref="MBGUID"/> for <see cref="EventArgType.MBObject"/>, otherwise null. 
+        ///     An object reference in the <see cref="Common.CoopObjectManager"/>.
         /// </summary>
-        public MBGUID? MbGUID { get; }
+        public Guid? CoopObjectManagerId { get; }
+        /// <summary>
+        ///     A GUID. Not necessarily for any specfic use, transfered by value.
+        /// </summary>
+        public Guid? Guid { get; }
         /// <summary>
         ///     The contained <see cref="int"/> for <see cref="EventArgType.Int"/>, otherwise null. 
         /// </summary>
@@ -98,7 +106,6 @@ namespace RemoteAction
         /// <summary>
         ///     Constructs a new argument for <see cref="EventArgType.Int"/>.
         /// </summary>
-        /// <param name="i"></param>
         public Argument(int i) : this()
         {
             EventType = EventArgType.Int;
@@ -107,7 +114,6 @@ namespace RemoteAction
         /// <summary>
         ///     Constructs a new argument for <see cref="EventArgType.Float"/>.
         /// </summary>
-        /// <param name="i"></param>
         public Argument(float f) : this()
         {
             EventType = EventArgType.Float;
@@ -116,25 +122,33 @@ namespace RemoteAction
         /// <summary>
         ///     Constructs a new argument for <see cref="EventArgType.Bool"/>.
         /// </summary>
-        /// <param name="i"></param>
         public Argument(bool b) : this()
         {
             EventType = EventArgType.Bool;
             Bool = b;
         }
         /// <summary>
-        ///     Constructs a new argument for <see cref="EventArgType.MBObject"/>.
+        ///     Constructs a new argument for <see cref="EventArgType.CoopObjectManagerId"/>.
         /// </summary>
-        /// <param name="i"></param>
-        public Argument(MBGUID guid) : this()
+        public Argument(Guid guid, bool isCoopObjectReference) : this()
         {
-            EventType = EventArgType.MBObject;
-            MbGUID = guid;
+            if (guid == System.Guid.Empty)
+                throw new ArgumentNullException("Guid is invalid.");
+
+            if (isCoopObjectReference)
+            {
+                EventType = EventArgType.CoopObjectManagerId;
+                CoopObjectManagerId = guid;
+            }
+            else
+            {
+                EventType = EventArgType.Guid;
+                Guid = guid;
+            }
         }
         /// <summary>
         ///     Constructs a new argument for <see cref="EventArgType.StoreObjectId"/>.
         /// </summary>
-        /// <param name="i"></param>
         public Argument(ObjectId id) : this()
         {
             EventType = EventArgType.StoreObjectId;
@@ -144,7 +158,6 @@ namespace RemoteAction
         /// <summary>
         ///     Constructs a new argument for <see cref="EventArgType.CampaignBehavior"/>.
         /// </summary>
-        /// <param name="i"></param>
         public Argument(CampaignBehaviorBase campaignBehavior) : this()
         {
             EventType = EventArgType.CampaignBehavior;
@@ -185,8 +198,11 @@ namespace RemoteAction
                     break;
                 case EventArgType.MBObjectManager:
                     break;
-                case EventArgType.MBObject:
-                    argHash = MbGUID.Value.GetHashCode();
+                case EventArgType.CoopObjectManagerId:
+                    argHash = CoopObjectManagerId.Value.GetHashCode();
+                    break;
+                case EventArgType.Guid:
+                    argHash = Guid.Value.GetHashCode();
                     break;
                 case EventArgType.Int:
                     argHash = Int.Value.GetHashCode();
@@ -201,6 +217,15 @@ namespace RemoteAction
                     break;
                 case EventArgType.SmallObjectRaw:
                     argHash = Raw.GetHashCode();
+                    break;
+                case EventArgType.Bool:
+                    argHash = Bool.GetHashCode();
+                    break;
+                case EventArgType.CampaignBehavior:
+                    argHash = CampaignBehavior.GetHashCode();
+                    break;
+                case EventArgType.PartyComponent:
+                    argHash = MobilePartyComponent.GetHashCode();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -219,14 +244,16 @@ namespace RemoteAction
                     return "null";
                 case EventArgType.MBObjectManager:
                     return "MBObjectManager";
-                case EventArgType.MBObject:
-                    object obj = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject(MbGUID.Value);
+                case EventArgType.CoopObjectManagerId:
+                    object obj = Common.CoopObjectManager.GetObject(CoopObjectManagerId.Value);
                     if (obj is MobileParty party)
                         return string.Format(
                             "\"{0, 4}:{1}\"",
                             party.Party.Index,
                             party.Party.Name);
                     return $"\"{obj}\"";
+                case EventArgType.Guid:
+                    return Guid.ToString();
                 case EventArgType.Int:
                     return Int.ToString();
                 case EventArgType.Float:
@@ -234,7 +261,7 @@ namespace RemoteAction
                 case EventArgType.Bool:
                     return Bool.ToString();
                 case EventArgType.StoreObjectId:
-                    return StoreObjectId.ToString();
+                    return $"StoreObjectId: {StoreObjectId.ToString()}";
                 case EventArgType.CurrentCampaign:
                     return "Campaign.Current";
                 case EventArgType.SmallObjectRaw:

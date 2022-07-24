@@ -1,12 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.Serialization.Formatters.Binary;
 using Common;
+using Coop.Mod.Config;
+using Coop.Mod.Data;
+using Coop.Mod.GameSync;
 using Coop.Mod.Managers;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.RemoteAction;
 using Coop.Mod.Serializers;
+using Coop.Mod.Serializers.Custom;
 using Coop.NetImpl;
 using Coop.NetImpl.LiteNet;
 using CoopFramework;
@@ -19,9 +25,21 @@ using RailgunNet.Connection.Client;
 using RailgunNet.Logic;
 using Sync.Store;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
+using System.Reflection;
 using Logger = NLog.Logger;
+using SandBox.View.Map;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade.View;
+using TaleWorlds.Engine;
+using SandBox;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.Engine.Screens;
+using TaleWorlds.ScreenSystem;
 
 namespace Coop.Mod
 {
@@ -47,40 +65,30 @@ namespace Coop.Mod
         [NotNull] private readonly LiteNetManagerClient m_NetManager;
         private readonly UpdateableList m_Updateables = new UpdateableList();
 
-        /// <summary>
-        ///     Internal data storage for <see cref="SyncedObjectStore" />.
-        /// </summary>
-        private readonly Dictionary<ObjectId, object> m_SyncedObjects =
-            new Dictionary<ObjectId, object>();
-
         private MBGameManager gameManager;
 
         private int m_ReconnectAttempts = MaxReconnectAttempts;
-        private Hero m_Hero;
-        private MBGUID m_HeroGUID;
-        private ObjectId m_HeroId;
+        private Guid m_HeroGUID;
         #endregion
         public Action<PersistenceClient> OnPersistenceInitialized;
 
-        public Action<RemoteStore> RemoteStoreCreated;
+        public Action<RemoteStoreClient> RemoteStoreCreated;
 
         public CoopClient(ClientConfiguration config)
         {
-            Session = new GameSession(new GameData());
+            Session = new GameSession();
             Session.OnConnectionDestroyed += ConnectionDestroyed;
             m_NetManager = new LiteNetManagerClient(Session, config);
             m_Updateables.Add(m_NetManager);
             Events = new CoopEvents();
             m_CoopClientSM = new CoopClientSM();
             Synchronization = new CoopSyncClient(this);
-            
+
             #region State Machine Callbacks
             m_CoopClientSM.CharacterCreationState.OnEntry(CreateCharacter);
-            m_CoopClientSM.ReceivingWorldDataState.OnEntry(SendClientRequestInitialWorldData);
-            m_CoopClientSM.LoadingState.OnEntry(SendGameLoading);
+            m_CoopClientSM.ReceivingGameDataState.OnEntry(SendClientRequestInitialWorldData);
             m_CoopClientSM.PlayingState.OnEntry(SendGameLoaded);
             #endregion
-
 
             Init();
         }
@@ -89,11 +97,11 @@ namespace Coop.Mod
         ///     Object store shared with the server if connected. Otherwise null.
         /// </summary>
         [CanBeNull]
-        public RemoteStore SyncedObjectStore { get; private set; }
+        public RemoteStoreClient SyncedObjectStore { get; private set; }
 
         [CanBeNull] public PersistenceClient Persistence { get; private set; }
         
-        [NotNull] public SyncBuffered Synchronization { get; }
+        [NotNull] public CoopSyncClient Synchronization { get; }
 
         [NotNull] public GameSession Session { get; }
 
@@ -121,7 +129,7 @@ namespace Coop.Mod
             }
         }
 
-        public RemoteStore GetStore()
+        public RemoteStoreClient GetStore()
         {
             return SyncedObjectStore;
         }
@@ -164,13 +172,13 @@ namespace Coop.Mod
             if (Persistence == null)
             {
                 Persistence = new PersistenceClient(new GameEnvironmentClient());
+
                 m_Updateables.Add(Persistence);
                 OnPersistenceInitialized?.Invoke(Persistence);
             }
 
             Persistence.SetConnection(con);
         }
-
         private void ConnectionCreated(ConnectionClient con)
         {
             if (con == null)
@@ -187,7 +195,7 @@ namespace Coop.Mod
             {
                 if (Coop.IsServer)
                 {
-                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
+                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.IsServer);
                 }
                 else
                 {
@@ -200,7 +208,7 @@ namespace Coop.Mod
                             new Client_Request_Party(new PlatformAPI().GetPlayerID().ToString()).Serialize()));
                 }
 
-                SyncedObjectStore = new RemoteStore(m_SyncedObjects, con, new SerializableFactory());
+                SyncedObjectStore = new RemoteStoreClient(con, new SerializableFactory());
                 RemoteStoreCreated?.Invoke(SyncedObjectStore);
 
                 #region events
@@ -208,8 +216,9 @@ namespace Coop.Mod
                 #endregion
 
                 // Handler Registration
-                Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
-                Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveSyncPacket);
+                //Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveInitialWorldData);
+                Session.Connection.Dispatcher.RegisterPacketHandler(ReceivePartyId);
+                Session.Connection.Dispatcher.RegisterPacketHandler(ReceiveGameData);
 
                 Session.Connection.Dispatcher.RegisterStateMachine(this, m_CoopClientSM);
             }
@@ -222,20 +231,10 @@ namespace Coop.Mod
                 gameManager = new ClientCharacterCreatorManager();
                 MBGameManager.StartNewGame(gameManager);
 
-                ClientCharacterCreatorManager.OnGameLoadFinishedEvent += (object source, EventArgs e) =>
-                {
-                    if(e is HeroEventArgs args)
-                    {
-                        m_HeroId = args.HeroId;
+                ClientCharacterCreatorManager.OnCharacterCreationFinishedEvent += CharacterCreationOver;
 
-                        CharacterCreationOver();
-                    }
-                    else
-                    {
-                        throw new Exception("EventArgs not of type HeroEventArgs");
-                    }
-                    
-                };
+                // Remove listener when disconnected
+                Session.OnConnectionDestroyed += (reason) => { ClientCharacterCreatorManager.OnCharacterCreationFinishedEvent -= CharacterCreationOver; };
             }
         }
 
@@ -279,8 +278,7 @@ namespace Coop.Mod
         [GameClientPacketHandler(ECoopClientState.MainManu, EPacket.Server_NotifyCharacterExists)]
         private void ReceiveCharacterExists(ConnectionBase connection, Packet packet)
         {
-            m_HeroGUID = MBGUIDSerializer.Deserialize(new ByteReader(packet.Payload));
-            //m_Hero = (Hero)MBObjectManager.Instance.GetObject(m_HeroGUID);
+            m_HeroGUID = CommonSerializer.Deserialize<Guid>(packet.Payload);
             m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterExists);
         }
         #endregion
@@ -289,16 +287,40 @@ namespace Coop.Mod
 
         public void CharacterCreationOver()
         {
-            GetStore().OnObjectAcknowledged += (id, obj) =>
+            PlayerHeroSerializer playerHeroSerialized = new PlayerHeroSerializer(Hero.MainHero);
+            byte[] data = CommonSerializer.Serialize(playerHeroSerialized);
+
+            Session.Connection.Send(
+                new Packet(
+                    EPacket.Client_RequestGameData,
+                    data));
+
+            m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterCreated);
+        }
+
+        [GameClientPacketHandler(ECoopClientState.ReceivingGameData, EPacket.Server_GameData)]
+        public void ReceiveGameData(ConnectionBase connection, Packet packet)
+        {
+            SaveData saveData = SaveData.Deserialize(packet.Payload);
+
+            m_HeroGUID = saveData.PlayerId;
+
+            if (Game.Current != null)
             {
-                if (id == m_HeroId)
-                {
-                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.CharacterCreated);
-                    if (obj is Hero hero)
-                    {
-                        m_Hero = hero;
-                    }
-                }
+                ScreenManager.PopScreen();
+                GameStateManager.Current.CleanStates(0);
+                GameStateManager.Current = TaleWorlds.MountAndBlade.Module.CurrentModule.GlobalGameStateManager;
+            }
+
+            gameManager = new ClientManager(saveData.LoadResult, saveData.PlayerId);
+
+            MBGameManager.StartNewGame(gameManager);
+
+            ClientManager.OnPostLoadFinishedEvent += (sender, eventArgs) =>
+            {
+                saveData.AssosiateIds();
+
+                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
             };
         }
         #endregion
@@ -312,74 +334,15 @@ namespace Coop.Mod
                 new Packet(
                     EPacket.Client_DeclineWorldData,
                     new Client_DeclineWorldData().Serialize()));
-                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
+                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameDataReceived);
                 m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded);
             }
             else
             {
                 Session.Connection.Send(
-                new Packet(
-                    EPacket.Client_RequestWorldData,
-                    new Client_RequestWorldData().Serialize()));
+                    new Packet(EPacket.Client_RequestWorldData));
             }
             
-        }
-
-        [GameClientPacketHandler(ECoopClientState.ReceivingWorldData, EPacket.Server_WorldData)]
-        private void ReceiveInitialWorldData(ConnectionBase connection, Packet packet)
-        {
-            bool bSuccess = false;
-            try
-            {
-                bSuccess = Session.World.Receive(packet.Payload);
-            }
-            catch (Exception e)
-            {
-                Logger.Error(
-                    e,
-                    "World data received from server could not be parsed . Disconnect {client}.",
-                    this);
-            }
-
-            if (bSuccess)
-            {
-                m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.WorldDataReceived);
-                if(m_HeroGUID == new MBGUID(0))
-                {
-                    gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_Hero);
-                }
-                else
-                {
-                    gameManager = new ClientManager(((GameData)Session.World).LoadResult, m_HeroGUID);
-                }
-
-                
-                MBGameManager.StartNewGame(gameManager);
-                ClientManager.OnPreLoadFinishedEvent += (source, e) => {
-                    CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, SendPlayerPartyChanged);
-                };
-                ClientManager.OnPostLoadFinishedEvent += (source, e) => {
-                    m_CoopClientSM.StateMachine.Fire(ECoopClientTrigger.GameLoaded); 
-                };
-            }
-            else
-            {
-                Logger.Error(
-                    "World data received from server could not be parsed. Disconnect {client}.",
-                    this);
-                Session.Connection.Disconnect(EDisconnectReason.WorldDataTransferIssue);
-            }
-        }
-        #endregion
-
-        #region  ClientLoading
-        private void SendGameLoading()
-        {
-            // TODO add loading and loaded messages
-            //Session.Connection.Send(
-            //    new Packet(
-            //        EPacket.Client_Joined,
-            //        new Client_GameLoading().Serialize()));
         }
         #endregion
 
@@ -387,32 +350,22 @@ namespace Coop.Mod
         public void SendGameLoaded()
         {
             Session.Connection.Send(
-                new Packet(
-                    EPacket.Client_Loaded,
-                    new Client_Joined().Serialize()));
+                new Packet(EPacket.Client_Loaded));
             TryInitPersistence();
-        }
-
-        private void SendPlayerPartyChanged(Hero hero, MobileParty party)
-        {
+            if(!Coop.IsServer)
+            {
+                // When the server is running in the same game instance, sync is already initialized.
+                Initializer.SetupSyncAfterLoad();
+            }            
             Session.Connection.Send(
-                new Packet(
-                    EPacket.Client_PartyChanged,
-                    new MBGUIDSerializer(party.Id).Serialize()));
+                new Packet(EPacket.Client_PartyChanged, CommonSerializer.Serialize(m_HeroGUID)));
         }
+		
 
-
-        [GameClientPacketHandler(ECoopClientState.Playing, EPacket.Sync)]
-        private void ReceiveSyncPacket(ConnectionBase connection, Packet packet)
+        [GameClientPacketHandler(ECoopClientState.CharacterCreation, EPacket.Server_HeroId)]
+        private void ReceivePartyId(ConnectionBase connection, Packet packet)
         {
-            try
-            {
-                Session.World.Receive(packet.Payload);
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Sync data received from server could not be parsed. Ignored.");
-            }
+            m_HeroGUID = CommonSerializer.Deserialize<Guid>(packet.Payload);
         }
         #endregion
 
@@ -439,7 +392,7 @@ namespace Coop.Mod
 
             return sRet;
         }
-    }
 
-    
+        
+    }
 }

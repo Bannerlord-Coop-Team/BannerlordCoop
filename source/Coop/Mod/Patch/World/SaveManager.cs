@@ -15,14 +15,14 @@ namespace Coop.Mod.Patch.World
 {
     class CoopSaveManager
     {
-        public static readonly Dictionary<string, MBGUID> PlayerParties = new Dictionary<string, MBGUID>();
+        public static readonly Dictionary<string, Guid> PlayerParties = new Dictionary<string, Guid>();
     }
 
 
     [HarmonyPatch(typeof(Game), "Save")]
     class SavePatch
     {
-        
+
         static void Postfix()
         {
             SavePlayers();
@@ -37,56 +37,6 @@ namespace Coop.Mod.Patch.World
                 foreach (string key in CoopSaveManager.PlayerParties.Keys)
                 {
                     sw.WriteLine($"{key} {CoopSaveManager.PlayerParties[key]}");
-                }
-            }
-        }
-    }
-
-    [HarmonyPatch(typeof(Game), "LoadSaveGame")]
-    class LoadPatch
-    {
-        static void Postfix()
-        {
-            LoadPlayers();
-        }
-
-        public static void LoadPlayers()
-        {
-            string pattern = $"({Campaign.Current.UniqueGameId})([0-9-]+)";
-            string path = BasePath.Name + "Modules/Coop/";
-
-            Dictionary<DateTime, string> creationTimes = new Dictionary<DateTime, string>();
-
-            foreach (string filepath in Directory.GetFiles(path)) {
-                if (filepath.Contains(Campaign.Current.UniqueGameId))
-                {
-                    creationTimes.Add(File.GetCreationTime(filepath), filepath);
-                }                
-            }
-            if(creationTimes.Count > 0)
-            {
-                DateTime latestDate = creationTimes.Max(kvp => kvp.Key);
-                string filePath = creationTimes[latestDate];
-
-                foreach (string line in File.ReadAllLines(filePath))
-                {
-                    string[] data = line.Split(' ');
-
-                    string clientId = data[0];
-                    uint partyId = uint.Parse(data[1]);
-
-                    MBGUID partyGUID = new MBGUID(partyId);
-                    if (CoopSaveManager.PlayerParties.ContainsKey(clientId))
-                    {
-                        if(CoopSaveManager.PlayerParties[clientId] != partyGUID)
-                        {
-                            throw new Exception("Party GUID does not equal saved ID when loading from file.");
-                        }
-                    }
-                    else
-                    {
-                        CoopSaveManager.PlayerParties.Add(clientId, partyGUID);
-                    }
                 }
             }
         }

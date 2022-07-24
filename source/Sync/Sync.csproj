@@ -102,8 +102,8 @@
     <Compile Include="Patch\PropertyPatch.cs" />
     <Compile Include="Store\ISerializableFactory.cs" />
     <Compile Include="Store\IStore.cs" />
-    <Compile Include="Store\RemoteStore.cs" />
-    <Compile Include="Store\SharedRemoteStore.cs" />
+    <Compile Include="Store\RemoteStoreClient.cs" />
+    <Compile Include="Store\RemoteStoreServer.cs" />
     <Compile Include="Store\StoreSerializer.cs" />
     <Compile Include="Registry.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Common;
 using Coop.Mod.Patch.Party;
 using Coop.Mod.Persistence.Party;
 using Coop.Mod.Persistence.World;
@@ -12,6 +13,7 @@ using RailgunNet.Logic;
 using RailgunNet.System.Types;
 using RailgunNet.Util;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using Vec2 = TaleWorlds.Library.Vec2;
 
 namespace Coop.Mod.Persistence
@@ -51,7 +53,6 @@ namespace Coop.Mod.Persistence
         }
 
         public WorldEntityServer WorldEntityServer { get; private set; }
-        public bool SuppressInconsistentStateWarnings { get; set; } = false;
 
         /// <summary>
         ///     Returns a copy of all currently known <see cref="RailEntityServer"/>.
@@ -69,18 +70,39 @@ namespace Coop.Mod.Persistence
         }
 
         /// <summary>
-        ///     Returns a copy of all currently known <see cref="MobileParty"/> that have a corresponding entity.
+        ///     Returns a copy of all parties currently controlled by a player.
         /// </summary>
-        public IReadOnlyCollection<MobileParty> Parties
+        public IReadOnlyCollection<MobileParty> PlayerControlledParties
         {
             get
             {
-                lock (m_Lock)
+                lock(m_Lock)
                 {
-                    return m_Parties.Keys.ToList();
+                    return m_ClientControlledParties.Values.ToList();
                 }
             }
         }
+
+        /// <summary>
+        ///     Returns the corresponding entity for a mobile party, if it exists.
+        /// </summary>
+        public bool TryGetEntity(MobileParty p, out MobilePartyEntityServer e)
+        {
+            return m_Parties.TryGetValue(p, out e);
+        }
+
+        /// <summary>
+        ///     Called when a mobile party entity enters the scope of the client, immediately before 
+        ///     sending the current state. The state of the entity may be changed in this callback.
+        /// </summary>
+        public event Action<RailController, MobilePartyEntityServer> OnBeforePartyScopeEnter;
+
+        /// <summary>
+        ///     Called when a mobile party entity leaves the scope of the client, immediately before
+        ///     sending the freeze to the client. Changes to state of the entity in this callback
+        ///     will not be synced to the client until the entity enters the scope again.
+        /// </summary>
+        public event Action<RailController, MobilePartyEntityServer> OnBeforePartyScopeLeave;
 
         /// <summary>
         ///     Called for each player controlled entity when the controlling player leaves the game.
@@ -104,7 +126,7 @@ namespace Coop.Mod.Persistence
                     throw new Exception("Connected clients should always be scoped!");
                 }
                 controller.Scope.Evaluator = new CoopRailScopeEvaluator(
-                    room.Clients.Count == 1,    // the first client is always the arbiter.
+                    room.Clients.Count == 1,    // the first client is always the one running on the server game instance.
                     () =>
                 {
                     if (m_ClientControlledParties.TryGetValue((RailServerPeer) controller, out MobileParty party))
@@ -114,48 +136,56 @@ namespace Coop.Mod.Persistence
                     return null;
                 },
                 GetScopeRange);
+                controller.Scope.OnBeforeScopeEnter += BeforeScopeEnter;
+                controller.Scope.OnBeforeScopeLeave += BeforeScopeLeave;
             };
-            
-            WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
-
-            // Parties
-            foreach (MobileParty party in Campaign.Current.MobileParties)
+            room.ClientLeft += controller =>
             {
-                MobilePartyEntityServer entity = room.AddNewEntity<MobilePartyEntityServer>(
-                    e => e.State.PartyId = party.Id);
-                m_Parties.Add(party, entity);
-            }
-
-            CampaignEvents.OnPartyDisbandedEvent.AddNonSerializedListener(this, OnPartyRemoved);
-            CampaignEvents.OnPartyRemovedEvent.AddNonSerializedListener(this, OnPartyRemoved);
-            
-            CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, OnPartyAdded);
-            BanditsCampaignBehaviorPatch.OnBanditAdded += (sender, e) => OnPartyAdded(e);
-
-            // Settlements
+                controller.Scope.OnBeforeScopeEnter -= BeforeScopeEnter;
+                controller.Scope.OnBeforeScopeLeave -= BeforeScopeLeave;
+            };
+            WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
         }
 
-        public float ClientRailScopeRange = 25f;
+        public float ClientScopeRangeFactor = 1f;
         private float GetScopeRange(MobilePartyEntityServer entity)
         {
-            return ClientRailScopeRange;
-        }
-        public void AddParty(MobileParty party)
-        {
-            if (m_Parties.ContainsKey(party))
+            if(entity.Instance != null)
             {
-                return;
+                return entity.Instance.SeeingRange * ClientScopeRangeFactor;
             }
-
-            MobilePartyEntityServer entity =
-                m_Room.AddNewEntity<MobilePartyEntityServer>(
-                    e => e.State.PartyId = party.Id);
-            Logger.Debug("Added new entity {}.", entity);
-
+            return 0f;
+        }
+        public void AddParty(TaleWorlds.CampaignSystem.Party.MobileParty party)
+        {
             lock (m_Lock)
             {
-                 m_Parties.Add(party, entity);
+                if (m_Parties.ContainsKey(party))
+                {
+                    return;
+                }
+
+                m_PartiesToAdd.Add(party);
             }
+        }
+
+        public void RemoveParty(MobileParty party)
+        {
+            RailEntityServer entityToRemove;
+            lock (m_Lock)
+            {
+                if (!m_Parties.ContainsKey(party))
+                {
+                    return;
+                }
+
+                entityToRemove = m_Parties[party];
+                m_Parties.Remove(party);
+                m_PartiesToAdd.Remove(party);
+            }
+
+            m_Room.MarkForRemoval(entityToRemove);
+            Logger.Debug("Marked entity {EntityToRemove} for removal", entityToRemove);
         }
 
         public void GrantPartyControl(MobileParty party, RailServerPeer peer)
@@ -175,17 +205,33 @@ namespace Coop.Mod.Persistence
                     m_PendingGrantControl[party] = peer;
                     return;
                 }
-                if (!m_ClientControlledParties.ContainsKey(peer))
+                
+            }
+            grantControl(correspondingEntity, party, peer);
+        }
+
+        #region Private
+        private void grantControl(MobilePartyEntityServer entity, MobileParty party, RailServerPeer peer)
+        {
+            lock (m_Lock)
+            {
+                if (m_ClientControlledParties.TryGetValue(peer, out MobileParty controlledParty))
+                {
+                    RailEntityServer controlledEntity = peer.ControlledEntities.FirstOrDefault() as RailEntityServer;
+                    Logger.Warn($"Client {peer} may only control 1 party at a time. Revoking control over {controlledParty}.");
+                    peer.RevokeControl(controlledEntity);
+                    m_ClientControlledParties[peer] = party;
+                }
+                else
                 {
                     m_ClientControlledParties.Add(peer, party);
                 }
             }
-            peer.GrantControl(correspondingEntity);
+            peer.GrantControl(entity);
             party.Ai.SetDoNotMakeNewDecisions(true);
             Logger.Info("{Party} control granted to {Peer}", party, peer.Identifier);
         }
 
-        #region Private
         private void AddPendingParties(Tick tick)
         {
             foreach (var (party, controller) in GetPartiesToBeAdded())
@@ -198,19 +244,20 @@ namespace Coop.Mod.Persistence
                     m_Parties.Add(party, null); // Reserve to prevent duplicate entity creation
                 }
 
+                Guid partyGuid = CoopObjectManager.GetGuid(party);
+
                 // Need to leave m_Lock, otherwise the entity creation might deadlock since it needs to makes game state queries in the main thread
                 MobilePartyEntityServer entity =
                     m_Room.AddNewEntity<MobilePartyEntityServer>(
                         e =>
                         {
-                            e.State.PartyId = party.Id;
+                            e.State.PartyId = partyGuid;
                         });
                 Logger.Debug("Added new entity {}.", entity);
 
                 if (controller != null)
                 {
-                    controller.GrantControl(entity);
-                    party.Ai.SetDoNotMakeNewDecisions(true);
+                    grantControl(entity, party, controller);
                 }
 
                 lock (m_Lock)
@@ -251,53 +298,15 @@ namespace Coop.Mod.Persistence
             return toBeAdded;
         }
 
-        private void OnPartyRemoved(PartyBase partyBase)
-        {
-            OnPartyRemoved(partyBase.MobileParty);
-        }
-
-        private void OnPartyRemoved(MobileParty party)
-        {
-            RailEntityServer entityToRemove;
-            lock (m_Lock)
-            {
-                if (!m_Parties.ContainsKey(party))
-                {
-                    if (!SuppressInconsistentStateWarnings)
-                    {
-                        Logger.Warn(
-                            "Inconsistent internal state: {Party} was removed, but never added",
-                            party);
-                    }
-
-                    return;
-                }
-
-                entityToRemove = m_Parties[party];
-                m_Parties.Remove(party);
-                m_PartiesToAdd.Remove(party);
-            }
-
-            m_Room.MarkForRemoval(entityToRemove);
-            Logger.Debug("Marked entity {EntityToRemove} for removal", entityToRemove);
-        }
-
         private void OnPartyAdded(MobileParty party)
         {
-            if (party.Id == Coop.InvalidId)
+            if (CoopObjectManager.GetGuid(party) == Coop.InvalidId)
             {
-                throw new Exception($"Invalid party id in {party}");
+                Logger.Warn($"{party} not present in CoopObjectManager. Somehow bypassed CoopManager. Will not be synced.");
+                return;
             }
 
-            lock (m_Lock)
-            {
-                if (m_Parties.ContainsKey(party))
-                {
-                    return;
-                }
-
-                m_PartiesToAdd.Add(party);
-            }
+            
         }
         private void OnClientAdded(RailServerPeer peer)
         {
@@ -309,7 +318,7 @@ namespace Coop.Mod.Persistence
             lock (m_Lock)
             {
                 foreach (RailEntityServer controlledEntity in m_Room
-                                                              .Entities.Where(
+                                                              .Entities.Values.Where(
                                                                   e => e.Controller == peer)
                                                               .Select(e => e as RailEntityServer))
                 {
@@ -318,7 +327,42 @@ namespace Coop.Mod.Persistence
                 }
             }
         }
-        
+        private Dictionary<RailController, Dictionary<MobilePartyEntityServer, bool>> m_RemoteIsFrozen = new Dictionary<RailController, Dictionary<MobilePartyEntityServer, bool>> { };
+        private void BeforeScopeEnter(RailController controller, RailEntityServer entity)
+        {
+            if (entity is MobilePartyEntityServer partyEntity)
+            {
+                if (!m_RemoteIsFrozen.TryGetValue(controller, out Dictionary<MobilePartyEntityServer, bool> frozenLookup))
+                {
+                    m_RemoteIsFrozen.Add(controller, new Dictionary<MobilePartyEntityServer, bool> { });
+                    frozenLookup = m_RemoteIsFrozen[controller];
+                }
+
+                if(!frozenLookup.TryGetValue(partyEntity, out bool wasFrozen) || wasFrozen)
+                {
+                    OnBeforePartyScopeEnter?.Invoke(controller, partyEntity);
+                    frozenLookup[partyEntity] = false;
+                }
+            }
+        }
+        private void BeforeScopeLeave(RailController controller, RailEntityServer entity)
+        {
+            if (entity is MobilePartyEntityServer partyEntity)
+            {
+                if (!m_RemoteIsFrozen.TryGetValue(controller, out Dictionary<MobilePartyEntityServer, bool> frozenLookup))
+                {
+                    m_RemoteIsFrozen.Add(controller, new Dictionary<MobilePartyEntityServer, bool> { });
+                    frozenLookup = m_RemoteIsFrozen[controller];
+                }
+
+                if (!frozenLookup.TryGetValue(partyEntity, out bool wasFrozen) || !wasFrozen)
+                {
+                    OnBeforePartyScopeLeave?.Invoke(controller, partyEntity);
+                    frozenLookup[partyEntity] = true;
+                }
+            }
+        }
+
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly object m_Lock = new object();

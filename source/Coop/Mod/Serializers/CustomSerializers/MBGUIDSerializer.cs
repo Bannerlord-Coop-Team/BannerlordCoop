@@ -1,13 +1,15 @@
 ﻿using Network;
 using System;
-using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
-    class MBGUIDSerializer : ICustomSerializer
+    public class MBGUIDSerializer : ICustomSerializer
     {
         private uint id;
         public MBGUIDSerializer(MBGUID _MBGUID)
@@ -31,6 +33,11 @@ namespace Coop.Mod.Serializers
         public object Deserialize()
         {
             return new MBGUID(id);
+        }
+
+        public void ResolveReferenceGuids()
+        {
+            throw new NotImplementedException();
         }
     }
 }

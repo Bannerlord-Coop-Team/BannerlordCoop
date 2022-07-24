@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
+using Common;
 using HarmonyLib;
 using JetBrains.Annotations;
 using NLog;
@@ -18,22 +20,39 @@ namespace CoopFramework
     ///     Base class to extend a type to be managed by the Coop framework. A coop managed class can be extended
     ///     with additional data and generate patches for the original class at runtime. 
     /// </summary>
-    public abstract class CoopManaged<TSelf, TExtended> : DefaultConditions where TExtended : class
+    public abstract class CoopManaged<TSelf, TExtended> : DefaultConditions 
+        where TExtended : class
+        where TSelf : class
     {
+        #region Instance lookup
+        /// <summary>
+        ///     All created <see cref="CampaignMapMovement"/> instances.
+        /// </summary>
+        protected static readonly ConditionalWeakTable<TExtended, TSelf> Instances = new ConditionalWeakTable<TExtended, TSelf>();
+        #endregion
+
         /// <summary>
         ///     Creates synchronization for a given instance of <typeparamref name="TExtended" />.
         /// </summary>
         /// <param name="instance">Instance that should be synchronized.</param>
         /// <exception cref="ArgumentOutOfRangeException">When the instance is null.</exception>
-        public CoopManaged([NotNull] TExtended instance)
+        protected CoopManaged([NotNull] TExtended instance)
         {
-            if (instance == null) throw new ArgumentNullException(nameof(instance));
-            Instance = new WeakReference<TExtended>(instance, true);
+            if (instance == null) 
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
+            if (Instances.TryGetValue(instance, out TSelf existingInstance))
+            {
+                throw new InvalidOperationException($"{instance} already has a corresponding CoopManaged instance {existingInstance}. Cannot create another one.");
+            }
+
+            Instances.Add(instance, this as TSelf);
+            ManagedInstance = new WeakReference<TExtended>(instance, true);
             SetupHandlers(this);
         }
 
         #region Patcher
-
         /// <summary>
         ///     Enables an automatic injection of this synchronization class into every instance of <see cref="TExtended" />
         ///     that is being created.
@@ -151,9 +170,9 @@ namespace CoopFramework
         /// <returns></returns>
         protected bool TryGetInstance(out TExtended resolvedInstance)
         {
-            if (Instance.TryGetTarget(out resolvedInstance)) return true;
+            if (ManagedInstance.TryGetTarget(out resolvedInstance)) return true;
 
-            Logger.Warn("Coop synced {Instance} seems to have expired", ToString());
+            Logger.Debug("Coop synced {Instance} seems to have expired. Removed.", ToString());
             lock (m_AutoWrappedInstances)
             {
                 // If the wrapper was automatically created, delete it
@@ -168,7 +187,7 @@ namespace CoopFramework
         ///     needs to be tracked manually. This constant defines the interval in which a check is performed to
         ///     release automatically created <typeparamref name="TSelf" /> wrapper instance.
         /// </summary>
-        public const int GCInterval_ms = 500;
+        public const int GCInterval_ms = 5000;
 
         /// <summary>
         ///     Returns all instances of this <see cref="TSelf" /> that very automatically created because
@@ -202,7 +221,7 @@ namespace CoopFramework
         ///     Returns the instance that is being managed by this <see cref="TSelf" />.
         /// </summary>
         [NotNull]
-        private WeakReference<TExtended> Instance { get; set; }
+        private WeakReference<TExtended> ManagedInstance { get; set; }
 
         /// <summary>
         ///     Called when a new instance of <see cref="TSelf" /> was automatically created.
@@ -274,7 +293,7 @@ namespace CoopFramework
                     RemoveHandlers(instance, accessor);
             }
 
-            Instance = new WeakReference<TExtended>(null);
+            ManagedInstance = new WeakReference<TExtended>(null);
         }
 
         /// <summary>
@@ -339,8 +358,6 @@ namespace CoopFramework
         /// <param name="factoryMethod">Factory to create a <typeparamref name="TSelf" /> instance.</param>
         private static void HookIntoObjectLifetime(Func<TExtended, TSelf> factoryMethod)
         {
-            var objectManager = CoopFramework.ObjectManager;
-            var isManagedClass = objectManager?.Manages<TExtended>() ?? false;
             m_LifetimeObserver = new ObjectLifetimeObserver<TExtended>();
             m_LifetimeObserver.AfterCreateObject += instance => OnAutoConstructed(factoryMethod(instance));
             m_LifetimeObserver.AfterRemoveObject += instance =>
@@ -348,7 +365,7 @@ namespace CoopFramework
                 lock (m_AutoWrappedInstances)
                 {
                     var managedInstances = m_AutoWrappedInstances
-                        .Where(wrapper => wrapper.Instance.TryGetTarget(out var o) && o == instance)
+                        .Where(wrapper => wrapper.ManagedInstance.TryGetTarget(out var o) && o == instance)
                         .ToList();
                     foreach (var managedInstance in managedInstances)
                     {
@@ -358,20 +375,21 @@ namespace CoopFramework
                 }
             };
 
-            if (isManagedClass)
+            m_LifetimeObserver.PatchConstruction();
+            if (!m_LifetimeObserver.PatchDeconstruction())
             {
-                objectManager.Register<TExtended>(m_LifetimeObserver);
-            }
-            else
-            {
-                m_LifetimeObserver.PatchConstruction();
-                if (!m_LifetimeObserver.PatchDeconstruction())
+                Logger.Debug(
+                    $"Class {typeof(TExtended)} has no destructor. Auto unwrapping not possible. Registering with GC to prevent memory leaks.");
+                
+                
+                GCTask = Task.Run(async () =>
                 {
-                    Logger.Debug(
-                        $"Class {typeof(TExtended)} has no destructor. Auto unwrapping not possible. Registering with GC to prevent memory leaks.");
-                    TimerGC = new Timer(state => UnwrapUnusedAutoInstances());
-                    TimerGC.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(GCInterval_ms));
-                }
+                    while (!GCTaskCancellationToken.IsCancellationRequested)
+                    {
+                        await Task.Delay(GCInterval_ms);
+                        UnwrapUnusedAutoInstances();
+                    }
+                });
             }
         }
 
@@ -383,7 +401,11 @@ namespace CoopFramework
         {
             lock (m_AutoWrappedInstances)
             {
-                m_AutoWrappedInstances.RemoveAll(managed => !managed.Instance.TryGetTarget(out var intance));
+                m_AutoWrappedInstances.RemoveAll(managed =>
+                {
+                    return !managed.ManagedInstance.TryGetTarget(out var intance);
+                }
+                );
             }
         }
 
@@ -536,7 +558,7 @@ namespace CoopFramework
             FieldBehaviourBuilder[] behaviours)
         {
             TExtended instanceResolved = null; // stays null for static calls
-            if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
+            if (self != null && !self.ManagedInstance.TryGetTarget(out instanceResolved))
             {
                 // The instance went out of scope?
                 Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
@@ -566,7 +588,7 @@ namespace CoopFramework
             FieldBase field)
         {
             TExtended instanceResolved = null; // stays null for static calls
-            if (self != null && !self.Instance.TryGetTarget(out instanceResolved))
+            if (self != null && !self.ManagedInstance.TryGetTarget(out instanceResolved))
             {
                 // The instance went out of scope?
                 Logger.Warn("Coop synced {Instance} seems to have expired", self.ToString());
@@ -583,9 +605,14 @@ namespace CoopFramework
 
             return ECallPropagation.CallOriginal;
         }
+        public override string ToString()
+        {
+            return $"CoopManaged: {ManagedInstance}";
+        }
 
         [CanBeNull] private static ObjectLifetimeObserver<TExtended> m_LifetimeObserver;
-        [CanBeNull] private static Timer TimerGC;
+        [CanBeNull] private static Task GCTask;
+        [CanBeNull] private static CancellationToken GCTaskCancellationToken = new CancellationToken();
         [NotNull] private static readonly FieldChangeStack FieldStack = new FieldChangeStack();
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();

@@ -237,6 +237,9 @@
     <Reference Include="TaleWorlds.SaveSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.ScreenSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.Starter.DotNetCore">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Starter.DotNetCore.dll</HintPath>
     </Reference>
@@ -251,6 +254,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Mod\Config\RequiredSyncTypes.cs" />
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Mod\CoopBattle\BattleNetwork.cs" />
     <Compile Include="Mod\CoopBattle\BattleNetworkMessages.cs" />
@@ -267,8 +271,25 @@
     <Compile Include="Mod\CoopClientSM.cs" />
     <Compile Include="Mod\CoopConditions.cs" />
     <Compile Include="Mod\CoopBattle\CoopMission.cs" />
+    <Compile Include="Mod\Config\ManagedTypesConfig.cs" />
+    <Compile Include="Mod\CoopClientSM.cs" />
+    <Compile Include="Mod\CoopConditions.cs" />
+    <Compile Include="Mod\Data\SaveData.cs" />
+    <Compile Include="Mod\DebugUtil\PartySyncDebugBehavior.cs" />
+    <Compile Include="Mod\Extentions\CampaignObjectManagerExtentions.cs" />
     <Compile Include="Mod\GameSync\Bandit\BanditPartyComponentSync.cs" />
+    <Compile Include="Mod\GameSync\Bandit\BanditCampaignBehaviorSync.cs" />
+    <Compile Include="Mod\GameSync\Caravan\CaravansCampaignBehaviorSync.cs" />
+    <Compile Include="Mod\GameSync\Fief\FiefCommands.cs" />
+    <Compile Include="Mod\GameSync\Hideout\HideoutBehavior.cs" />
+    <Compile Include="Mod\GameSync\Hideout\HideoutSync.cs" />
+    <Compile Include="Mod\GameSync\Roster\CharacterObjectSync.cs" />
+    <Compile Include="Mod\GameSync\Initializer.cs" />
+    <Compile Include="Mod\GameSync\Party\MapMovementPatches.cs" />
+    <Compile Include="Mod\GameSync\Party\MobilePartyLifetimeBehavior.cs" />
+    <Compile Include="Mod\GameSync\Party\MobilePartyManaged.cs" />
     <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
+    <Compile Include="Mod\GameSync\Villager\VillagerCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
     <Compile Include="Mod\MissionManager.cs" />
     <Compile Include="Mod\ObjectManagerAdapter.cs" />
@@ -284,28 +305,31 @@
     <Compile Include="Mod\Exceptions.cs" />
     <Compile Include="Mod\GameEnvironmentClient.cs" />
     <Compile Include="Mod\GameLoopRunner.cs" />
-    <Compile Include="Mod\Logging.cs" />
+    <Compile Include="Mod\DebugUtil\DebugLogging.cs" />
     <Compile Include="Mod\Managers\ClientCharacterCreatorManager.cs" />
     <Compile Include="Mod\Managers\ClientManager.cs" />
     <Compile Include="Mod\Managers\ServerManager.cs" />
     <Compile Include="Mod\MbLogTarget.cs" />
-    <Compile Include="Mod\Patch\MobilePartyPatches\CampaignMapMovement.cs" />
-    <Compile Include="Mod\Patch\MobilePartyPatches\CampaignMapPositions.cs" />
+    <Compile Include="Mod\GameSync\Party\CampaignMapMovement.cs" />
+    <Compile Include="Mod\GameSync\Party\CampaignMapPositions.cs" />
+    <Compile Include="Mod\Patch\CampaignPatches\CompanionsCampaignBehaviorPatches.cs" />
+    <Compile Include="Mod\Patch\Hero\HeroPatches.cs" />
     <Compile Include="Mod\Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />
-    <Compile Include="Mod\Patch\MobilePartyPatches\MobilePartyUpdatable.cs" />
-    <Compile Include="Mod\Patch\Party\BanditsCampaignBehavior.cs" />
+    <Compile Include="Mod\GameSync\Party\MobilePartyUpdatable.cs" />
     <Compile Include="Mod\Patch\Party\GarrisonTroopsCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyFoodCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesBuyHorseCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesSellLootCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\PartiesSellPrisonerCampaignBehavior.cs" />
     <Compile Include="Mod\Patch\Party\RecruitmentCampaignBehavior.cs" />
+    <Compile Include="Mod\Patch\Quest\BannerInvestigationQuestPatch.cs" />
+    <Compile Include="Mod\Patch\TemporaryTypesPatch.cs" />
     <Compile Include="Mod\Patch\World\SaveManager.cs" />
     <Compile Include="Mod\GameSync\Caravan\CaravanPartyComponentSync.cs" />
-    <Compile Include="Mod\GameSync\FiefSync.cs" />
+    <Compile Include="Mod\GameSync\Fief\FiefSync.cs" />
     <Compile Include="Mod\GameSync\HeroSync.cs" />
-    <Compile Include="Mod\GameSync\MobilePartySync.cs" />
     <Compile Include="Mod\GameSync\SettlementSync.cs" />
+    <Compile Include="Mod\Patch\World\TimeCommands.cs" />
     <Compile Include="Mod\Patch\World\TimeSynchronization.cs" />
     <Compile Include="Mod\Patch\CampaignPatches\SetTimeSpeedPatch.cs" />
     <Compile Include="Mod\Patch\CampaignPatches\TimeControlModePatch.cs" />
@@ -321,7 +345,7 @@
     <Compile Include="Mod\Persistence\IEnvironmentClient.cs" />
     <Compile Include="Mod\Persistence\IEnvironmentServer.cs" />
     <Compile Include="Mod\Persistence\Party\IMovementHandler.cs" />
-    <Compile Include="Mod\Persistence\Party\MobilePartySync.cs" />
+    <Compile Include="Mod\Persistence\Party\MobilePartyMovementSync.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\CoopSyncServer.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventFieldChange.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventActionBase.cs" />
@@ -337,6 +361,7 @@
     <Compile Include="Mod\Persistence\RemoteAction\EventBroadcastingQueue.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\EventMethodCall.cs" />
     <Compile Include="Mod\Persistence\RemoteAction\IClientAccess.cs" />
+    <Compile Include="Mod\Persistence\RemoteAction\IServerAccess.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityClient.cs" />
     <Compile Include="Mod\Persistence\World\WorldEntityServer.cs" />
     <Compile Include="Mod\Persistence\World\WorldState.cs" />
@@ -344,7 +369,6 @@
     <Compile Include="Mod\Player.cs" />
     <Compile Include="Mod\SaveGameData.cs" />
     <Compile Include="Mod\SaveLoad.cs" />
-    <Compile Include="Mod\GameData.cs" />
     <Compile Include="Mod\CoopEvents.cs" />
     <Compile Include="Mod\CoopClient.cs" />
     <Compile Include="Mod\CoopServer.cs" />
@@ -355,41 +379,73 @@
     <Compile Include="Mod\Main.cs" />
     <Compile Include="Mod\Scope\CoopRailScopeEvaluator.cs" />
     <Compile Include="Mod\Scope\MobilePartyScopeHelper.cs" />
+    <Compile Include="Mod\Serializers\CommonAreaSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\BannerSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\BasicTroopSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\BuildingsSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CampaignTimeSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CharacterObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ClanSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\MBGUIDSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\DefaultPartyTemplateSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\CultureObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\DeterministicRandomSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\EquipmentElementSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\EquipmentSerialzer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\FactionSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\HeroDeveloperSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\HeroLastSeenInformationSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\HeroSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\HideoutSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\ItemCategorySerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\ItemDataSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\ItemObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\ItemRosterSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\KingdomDecisionSerialzer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\KingdomSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\LocationComplexSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\LocationSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\MBBodyPropertySerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MBCharacterSkillsSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\MBGUIDSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MobilePartiesAroundPositionListSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\MobilePartySerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\NavigationPathSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\PartyBaseSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\PathFaceRecordSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\PlayerHeroSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\ProductionSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\SellLogSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\SiegeLaneSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\TownMarketDataSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\TownSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\TroopRosterElementSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\VillageMarketDataSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\VillageSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\SettlementSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\TraitObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\TroopRosterSerializer.cs" />
-    <Compile Include="Mod\Serializers\MBObjectSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\VillageTypeSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\WorkshopSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializers\WorkshopTypeSerializer.cs" />
+    <Compile Include="Mod\Serializers\CustomSerializerWithGuid.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerCharacterObjectSerializer.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerClanSerializer.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerCultureObjectSerializer.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerHeroDeveloperSerializer.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerHeroLastSeenInformationSerializer.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerLordPartyComponentSerializer.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerMobilePartiesAroundPositionListSerializer.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerMobilePartySerializer.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerHeroSerializer.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerPartyBaseSerializer.cs" />
+    <Compile Include="Mod\Serializers\NewPlayer\PlayerSettlementSerializer.cs" />
+    <Compile Include="Mod\Serializers\TextObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\PartyComponentSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializer.cs" />
-    <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterFeatsSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterPerksSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterSkillsSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterTraitsSerializer.cs" />
     <Compile Include="Mod\Serializers\SerializableFactory.cs" />
+    <Compile Include="Mod\Serializers\SerializerConfig.cs" />
     <Compile Include="Mod\UI\CharacterCreationUI\CharacterCreationUI.cs" />
     <Compile Include="Mod\UI\CoopConnectMenuVM.cs" />
     <Compile Include="Mod\UI\CoopConnectionUI.cs" />
@@ -405,6 +461,7 @@
     <Compile Include="NetImpl\LiteNet\RailNetPeerWrapper.cs" />
     <Compile Include="NetImpl\PlatformAPI.cs" />
     <Compile Include="NetImpl\Steam\NetworkSteam.cs" />
+    <Compile Include="ObjectManagerAdapter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Mod\TestingCommands.cs" />
   </ItemGroup>
@@ -460,8 +517,8 @@
   </Target>
   <PropertyGroup>
     <PostBuildEvent>powershell -ExecutionPolicy Unrestricted ^
-        -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\" ^
-        -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\\" ^
-        -Libs Coop.dll,CoopFramework.dll,Common.dll,Network.dll,Sync.dll,RemoteAction.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll</PostBuildEvent>
+            -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\" ^
+            -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\\" ^
+            -Libs Coop.dll,CoopFramework.dll,Common.dll,Network.dll,Sync.dll,RemoteAction.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll</PostBuildEvent>
   </PropertyGroup>
 </Project>

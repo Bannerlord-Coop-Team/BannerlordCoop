@@ -29,13 +29,31 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using Registry = Sync.Registry;
 using Logger = NLog.Logger;
+using SandBox.View.Map;
+using Coop.Mod.GameSync.Party;
+using RailgunNet.System.Types;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod.DebugUtil
 {
+    /// <summary>
+    /// Utility using Imgui that allows you to have a simple display to present the important information of the mood.
+    /// </summary>
     public class DebugUI : IUpdateable
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        private readonly string m_WindowTitle = "Debug UI";
+
+        public int Priority { get; } = UpdatePriority.MainLoop.DebugUI;
+
+        private HashSet<object> detailsObjects = new HashSet<object>();
+        private HashSet<object> toDeleteObjects = new HashSet<object>();
+
+        private static Dictionary<SyncBuffered, int> m_LogEntrySize = new Dictionary<SyncBuffered, int>();
+
+        private static readonly MovingAverage m_AverageEventsInQueue = new MovingAverage(60);
+
+        [CanBeNull]
+        private static DiscoveryThread m_discoveryThread = null;
 
         public bool Visible { get; set; }
 
@@ -43,32 +61,188 @@ namespace Coop.Mod.DebugUtil
         {
             if (Visible)
             {
-                Begin();
+                Imgui.BeginMainThreadScope();
+                Imgui.Begin("Debug UI");
+
                 AddButtons();
                 DisplayDiscovery();
                 DisplayConnectionInfo();
                 DisplayHarmonyPatches();
                 DisplayPersistenceMenu();
-                End();
+                DisplayCoopObjectManagers();
+
+                Imgui.End();
+
+                DisplayCoopObjectManagersWindows();
+                
+                Imgui.EndMainThreadScope();
             }
         }
-        public int Priority { get; } = UpdatePriority.MainLoop.DebugUI;
 
-        private static void DisplayPersistenceMenu()
+        private static bool showOnlyEntitiesInScope = false;
+        /// <summary>
+        /// Display the list of items saved in the <c>AssociatedGuuids</c> variable of the CoopObjectManager class 
+        /// by type group (Hero, Character, Kingdom, etc.).
+        /// 
+        /// Possibility to teleport on some elements and to open a new window with the object properties.
+        /// </summary>
+        private void DisplayCoopObjectManagers()
         {
-            if (!Imgui.TreeNode("Persistence"))
-            {
-                return;
-            }
+            Dictionary<Type, List<Guid>> objects = CoopObjectManager.GetAssociatedGuids();
 
-            DisplayPersistenceInfo();
-            DisplayClientRpcInfo();
-            DisplayEntities();
+            if (objects == null || objects.Count <= 0 || !Imgui.TreeNode("Coop object managers"))
+                return;
+
+            if (!Coop.IsServer)
+            {
+                // On server, everything is in scope. No point in showing this checkbox.
+                Imgui.Checkbox("Show only entities in scope", ref showOnlyEntitiesInScope);
+            }
+            
+            foreach (KeyValuePair<Type, List<Guid>> objectsManaged in objects.OrderBy(pair => pair.Key.Name))
+            {
+                string sName = $"{objectsManaged.Key.Name}";
+
+                if (!Imgui.TreeNode(sName))
+                    continue;
+
+                bool showRailEntity = false;
+                if (objectsManaged.Key == typeof(MobileParty))
+                {
+                    showRailEntity = true;
+                }
+
+                Imgui.Columns(showRailEntity ? 4 : 3);
+                Imgui.Separator();
+                Imgui.Text("Guid");
+                Imgui.NextColumn();
+                Imgui.Text("Object");
+                if(showRailEntity)
+                {
+                    Imgui.NextColumn();
+                    Imgui.Text("Railgun entity id");
+                }
+                Imgui.NextColumn();
+                Imgui.Text("Action");
+                Imgui.NextColumn();
+
+                var iterCopy = objectsManaged.Value.ToArray(); // Make a copy for iteration because updates to the list can come in asynchronously.
+                foreach(var guid in iterCopy)
+                {
+                    object objectOfGuuid = CoopObjectManager.GetObject(guid);
+                    if(objectOfGuuid == null)
+                    {
+                        // This is a valid state. The store uses a `ConditionalWeakTable` which, with current .NET version, does not offer a way
+                        // to get a callback when an entry is removed. The AssociatedGuids can thus get outdated and contain expired objects.
+                        continue;
+                    }
+
+                    bool hasRailSate = TryGetRailgunState(objectOfGuuid, out RailgunState railState);
+                    if ((!hasRailSate && showOnlyEntitiesInScope) || 
+                        (hasRailSate && railState.entity.IsFrozen))
+                    {
+                        continue;
+                    }
+
+                    Imgui.Text(guid.ToString());
+                    Imgui.NextColumn();
+
+                    if (objectOfGuuid is ITrackableBase)
+                    {
+                        if (Imgui.Button(objectOfGuuid.ToString()))
+                        {
+                            MapScreen.Instance.FastMoveCameraToPosition(((ITrackableBase)objectOfGuuid).GetPosition().AsVec2);
+                        }
+                    }
+                    else
+                    {
+                        Imgui.Text(objectOfGuuid.ToString());
+                    }
+                    Imgui.NextColumn();
+
+                    if(showRailEntity)
+                    {
+                        if(railState.entity == null)
+                        {
+                            Imgui.Text("-");
+                        }
+                        else
+                        {
+                            string scopeText = railState.entity.IsFrozen ? "out of scope" : "in scope";
+                            Imgui.Text($"{railState.entity.Id} [{scopeText}]");
+                        }
+                        Imgui.NextColumn();
+                    }
+
+                    if( Imgui.Button("Details###" + guid) )
+                    {
+                        if (this.detailsObjects.Contains(objectOfGuuid))
+                        {
+                            this.detailsObjects.Remove(objectOfGuuid);
+                        }
+                        else
+                        {
+                            this.detailsObjects.Add(objectOfGuuid);
+                        }
+                    }
+                    Imgui.NextColumn();
+                };
+
+                Imgui.Columns();
+                Imgui.TreePop();
+            }
 
             Imgui.TreePop();
         }
 
-        private static void DisplayPersistenceInfo()
+        /// <summary>
+        /// Display the windows opened from the Coop object managers section with the object information 
+        /// using Reflection.
+        /// </summary>
+        private void DisplayCoopObjectManagersWindows()
+        {
+            foreach (object detailObject in this.detailsObjects)
+            {
+                Imgui.Begin(detailObject.ToString());
+
+                if (Imgui.Button("Close"))
+                {
+                    this.toDeleteObjects.Add(detailObject);
+                }
+
+                Type detailObjectType = detailObject.GetType();
+
+                foreach (PropertyInfo prop in detailObjectType.GetProperties())
+                {
+                    Imgui.Text(prop.Name + ": " + prop.GetValue(detailObject, null));
+                }
+
+                Imgui.End();
+            }
+
+            foreach (object toDeleteObject in this.toDeleteObjects)
+            {
+                this.detailsObjects.Remove(toDeleteObject);
+            }
+
+            this.toDeleteObjects.Clear();
+        }
+
+        /// <summary>
+        /// Displaying information on persistence (entry point).
+        /// </summary>
+        private void DisplayPersistenceMenu()
+        {
+            if (!Imgui.TreeNode("Persistence"))
+                return;
+
+            DisplayPersistenceInfo();
+            DisplayClientRpcInfo();
+
+            Imgui.TreePop();
+        }
+
+        private void DisplayPersistenceInfo()
         {
             List<SPeer> peers = new List<SPeer>();
             if (CoopClient.Instance.Persistence != null)
@@ -118,12 +292,87 @@ namespace Coop.Mod.DebugUtil
             Imgui.Columns();
         }
 
-        private static void DisplayHarmonyPatches()
+        private void DisplayClientRpcInfo()
+        {
+            if (!Imgui.TreeNode("Client synchronized method calls"))
+                return;
+
+            if (CoopClient.Instance?.Synchronization.BroadcastHistory == null)
+            {
+                Imgui.Text("Coop client not connected.");
+            }
+            else
+            {
+                EventBroadcastingQueue queue = CoopServer.Instance.Environment?.EventQueue;
+                if (queue != null)
+                {
+                    int currentQueueSize = queue.Count;
+                    double avgSize = m_AverageEventsInQueue.Push(currentQueueSize);
+                    Imgui.Text(
+                        $"Event queue {queue.Count}/{EventBroadcastingQueue.MaximumQueueSize}.");
+                    Imgui.Text(
+                        $"    min {m_AverageEventsInQueue.AllTimeMin} / avg {Math.Round(m_AverageEventsInQueue.Average)} / max {m_AverageEventsInQueue.AllTimeMax}.");
+                }
+
+#if DEBUG
+                CallStatistics history = CoopClient.Instance?.Synchronization.BroadcastHistory;
+                Imgui.Columns(3);
+
+                Imgui.Text("Tick");
+                foreach (CallTrace trace in history)
+                {
+                    Imgui.Text(trace.Tick.ToString());
+                }
+
+                Imgui.NextColumn();
+                Imgui.Text("Call / Field");
+                foreach (CallTrace trace in history)
+                {
+                    if(trace.Call.HasValue && Registry.IdToInvokable.TryGetValue(trace.Call.Value, out Invokable invokable))
+                    {
+                        Imgui.Text(invokable.ToString());
+                    }
+                    else if (trace.Value.HasValue && Registry.IdToField.TryGetValue(trace.Value.Value, out FieldBase field))
+                    {
+                        Imgui.Text(field.ToString());
+                    }
+                    else
+                    {
+                        Imgui.Text("-");
+                    }
+                }
+
+                Imgui.NextColumn();
+                Imgui.Text("Arguments");
+                foreach (CallTrace trace in history)
+                {
+                    if(trace.Arguments == null)
+                    {
+                        Imgui.Text("");
+                        continue;
+                    }
+
+                    Imgui.Text(String.Join(",", trace.Arguments.Select(o => o?.ToString())));
+                }
+
+                Imgui.Columns();
+
+
+#else
+                DisplayDebugDisabledText();
+#endif
+            }
+
+            Imgui.TreePop();
+        }
+
+        /// <summary>
+        /// Displays all method patches using noHarmony that have been performed on the game.
+        /// </summary>
+        private void DisplayHarmonyPatches()
         {
             if (!Imgui.TreeNode("Harmony patches"))
-            {
                 return;
-            }
             
             Dictionary<MethodBase, List<InvokableId>> coopPatchMethods = new Dictionary<MethodBase, List<InvokableId>>();
             foreach (KeyValuePair<InvokableId, Invokable> registrar in Registry.IdToInvokable)
@@ -168,24 +417,17 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private static void ShowPatches(string name, 
-            ReadOnlyCollection<HarmonyLib.Patch> patches)
+        private void ShowPatches(string name, ReadOnlyCollection<HarmonyLib.Patch> patches)
         {
             List<HarmonyLib.Patch> list = patches.ToList();
-            if (list.Count == 0)
-            {
-                return;
-            }
-            
-            if (!Imgui.TreeNode($"{name} ({list.Count})"))
-            {
-                return;
-            }
 
+            if (list.Count == 0 || !Imgui.TreeNode($"{name} ({list.Count})"))
+                return;
+ 
             foreach (HarmonyLib.Patch patch in list)
             {
-                string header = patch.PatchMethod.DeclaringType?.FullName;
-                if (Imgui.TreeNode(header))
+
+                if (Imgui.TreeNode(patch.PatchMethod.DeclaringType?.FullName))
                 {
                     const float tabWidth = 200;
                     Imgui.Text("Patch method:");
@@ -221,12 +463,19 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private static Dictionary<SyncBuffered, int> m_LogEntrySize = new Dictionary<SyncBuffered, int>();
-
-        private static void ShowCoopPatchInfo(List<InvokableId> coopPatch)
+        private void ShowCoopPatchInfo(List<InvokableId> coopPatch)
         {
             const float indent = 50f;
             const float tabWidth = 200f;
+
+            void PrintField(HashSet<FieldId> relatedFields, FieldBase valueAccess, float indentF = 0f)
+            {
+                relatedFields.Add(valueAccess.Id);
+                Imgui.Text("Related FieldId:");
+                Imgui.SameLine(tabWidth + indentF);
+                Imgui.Text($"{valueAccess.Id.InternalValue} [" + valueAccess + "]");
+            }
+
             foreach (InvokableId methodId in coopPatch)
             {
                 Imgui.Text("MethodId:");
@@ -238,21 +487,15 @@ namespace Coop.Mod.DebugUtil
                 {
                     foreach (FieldId valueId in Registry.Relation[methodId])
                     {
-                        void PrintField(FieldBase valueAccess, float indentF = 0f)
-                        {
-                            relatedFields.Add(valueAccess.Id);
-                            Imgui.Text("Related FieldId:");
-                            Imgui.SameLine(tabWidth + indentF);
-                            Imgui.Text($"{valueAccess.Id.InternalValue} [" + valueAccess + "]");
-                        }
-
                         FieldBase field = Registry.IdToField[valueId];
-                        PrintField(field);
+
+                        PrintField(relatedFields, field);
+
                         if (field is FieldAccessGroup group)
                         {
                             foreach (FieldAccess groupMember in group.Fields)
                             {
-                                PrintField(groupMember, indent);
+                                PrintField(relatedFields, groupMember, indent);
                             }
                         }
                     }
@@ -335,15 +578,14 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
-        private void Begin()
-        {
-            Imgui.BeginMainThreadScope();
-            Imgui.Begin(m_WindowTitle);
-        }
-
+        /// <summary>
+        /// First section which allows a simple control like closing the UI, connecting or disconnecting the server 
+        /// and activating the "show whole map" cheat.
+        /// </summary>
         private void AddButtons()
         {
             Imgui.NewLine();
+
             string startServerResult = null;
             string connectResult = null;
 
@@ -389,6 +631,23 @@ namespace Coop.Mod.DebugUtil
             
             Imgui.SameLine(400);
             Imgui.Checkbox("Show whole map", ref DebugShowWholeMapPatch.IsCheatEnabled);
+            
+            if(Coop.IsServer && CoopServer.Instance?.Persistence?.MobilePartyEntityManager != null)
+            {
+                foreach (MobileParty playerParty in CoopServer.Instance.Persistence.MobilePartyEntityManager.PlayerControlledParties)
+                {
+                    if (playerParty == null || Campaign.Current?.MainParty == null)
+                    {
+                        continue;
+                    }
+
+                    if (Imgui.Button($"Teleport to me: {playerParty}"))
+                    {
+                        playerParty.Position2D = Campaign.Current.MainParty.Position2D;
+                    }
+                }
+            }
+            
 
             if (startServerResult != null)
             {
@@ -401,64 +660,10 @@ namespace Coop.Mod.DebugUtil
             }
         }
 
-        private static void DisplayEntities()
-        {
-            if (!Imgui.TreeNode("Parties"))
-            {
-                return;
-            }
-
-            if (CoopServer.Instance?.Persistence?.MobilePartyEntityManager == null)
-            {
-                RailClientRoom clientRoom = CoopClient.Instance?.Persistence?.Room;
-                if (clientRoom != null)
-                {
-                    var entities = clientRoom.Entities
-                        .OfType<MobilePartyEntityClient>()
-                        .ToList().OrderBy(o => o.State.PartyId);
-                    foreach (MobilePartyEntityClient entity in entities)
-                    {
-                        Imgui.Text(entity.ToString());
-                    }
-                }
-            }
-            else
-            {
-                MobilePartyEntityManager manager = CoopServer.Instance.Persistence.MobilePartyEntityManager;
-
-                Imgui.SliderFloat("Client scope range", ref manager.ClientRailScopeRange, 0f, 100f);
-
-                Imgui.Columns(2);
-                Imgui.Separator();
-                Imgui.Text("ID");
-                var parties = manager.ServerPartyEntities.ToList();
-                foreach (RailEntityServer entity in parties)
-                {
-                    if (entity != null)
-                    {
-                        Imgui.Text(entity.Id.ToString());
-                    }
-                }
-
-                Imgui.NextColumn();
-                Imgui.Text("Entity");
-                Imgui.Separator();
-                foreach (RailEntityServer entity in parties)
-                {
-                    if (entity != null)
-                    {
-                        Imgui.Text(entity.ToString());
-                    }
-                }
-
-                Imgui.Columns();
-            }
-
-            Imgui.TreePop();
-        }
-
-        [CanBeNull] private static DiscoveryThread m_discoveryThread = null;
-        private static void DisplayDiscovery()
+        /// <summary>
+        /// Display that allows you to scan your environment and check if there is a bannerlord coop server running.
+        /// </summary>
+        private void DisplayDiscovery()
         {
             if (!Imgui.TreeNode("LAN server discovery"))
             {
@@ -485,17 +690,16 @@ namespace Coop.Mod.DebugUtil
                     }
                 }
             }
+
             Imgui.Text("Scanning...");
 
             Imgui.TreePop();
         }
 
-        private static void DisplayConnectionInfo()
+        private void DisplayConnectionInfo()
         {
             if (!Imgui.TreeNode("Connectioninfo"))
-            {
                 return;
-            }
 
             Server server = CoopServer.Instance.Current;
             GameSession session = CoopClient.Instance.Session;
@@ -564,70 +768,55 @@ namespace Coop.Mod.DebugUtil
             Imgui.TreePop();
         }
 
-        private static readonly MovingAverage m_AverageEventsInQueue = new MovingAverage(60);
-
-        private static void DisplayClientRpcInfo()
-        {
-            if (!Imgui.TreeNode("Client synchronized method calls"))
-            {
-                return;
-            }
-
-            if (CoopClient.Instance?.Synchronization.BroadcastHistory == null)
-            {
-                Imgui.Text("Coop client not connected.");
-            }
-            else
-            {
-                EventBroadcastingQueue queue = CoopServer.Instance.Environment?.EventQueue;
-                if (queue != null)
-                {
-                    int currentQueueSize = queue.Count;
-                    double avgSize = m_AverageEventsInQueue.Push(currentQueueSize);
-                    Imgui.Text(
-                        $"Event queue {queue.Count}/{EventBroadcastingQueue.MaximumQueueSize}.");
-                    Imgui.Text(
-                        $"    min {m_AverageEventsInQueue.AllTimeMin} / avg {Math.Round(m_AverageEventsInQueue.Average)} / max {m_AverageEventsInQueue.AllTimeMax}.");
-                }
-
-#if DEBUG
-                CallStatistics history = CoopClient.Instance?.Synchronization.BroadcastHistory;
-                Imgui.Columns(2);
-                
-                Imgui.Text("Tick");
-                foreach (CallTrace trace in history)
-                {
-                    Imgui.Text(trace.Tick.ToString());
-                }
-                
-                Imgui.NextColumn();
-                Imgui.Text("Call");
-                foreach (CallTrace trace in history)
-                {
-                    Imgui.Text(trace.Call.ToString());
-                }
-                
-                Imgui.Columns();
-                
-                
-#else
-                    DisplayDebugDisabledText();
-#endif
-            }
-
-            Imgui.TreePop();
-        }
-
         [Conditional("DEBUG")]
-        private static void DisplayDebugDisabledText()
+        private void DisplayDebugDisabledText()
         {
             Imgui.Text("DEBUG is disabled. No information available.");
         }
 
-        private static void End()
+        private struct RailgunState
         {
-            Imgui.End();
-            Imgui.EndMainThreadScope();
+            public RailEntityBase entity;
+        }
+        private bool TryGetRailgunState(object obj, out RailgunState state)
+        {
+            state = new RailgunState {  entity = null };
+
+            if(!(obj is MobileParty party))
+            { 
+                return false;
+            }
+
+            if (Coop.IsServer)
+            {
+                MobilePartyEntityManager manager = CoopServer.Instance.Persistence.MobilePartyEntityManager;
+                if(manager != null)
+                {
+                    if(manager.TryGetEntity(party, out MobilePartyEntityServer partyEntity))
+                    {
+                        state.entity = partyEntity;
+                        return true;
+                    }
+                }
+            }
+            else
+            {
+                RailClientRoom clientRoom = CoopClient.Instance?.Persistence?.Room;
+                if (clientRoom != null)
+                {
+                    Guid guid = CoopObjectManager.GetGuid(party);
+                    MobilePartyEntityClient partyEntity = clientRoom.Entities.Values
+                        .OfType<MobilePartyEntityClient>()
+                        .FirstOrDefault(e => e.State.PartyId == guid);
+
+                    if(partyEntity != null)
+                    {
+                        state.entity = partyEntity;
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         private class SPeer
@@ -649,6 +838,7 @@ namespace Coop.Mod.DebugUtil
         private static class DebugShowWholeMapPatch
         {
             public static bool IsCheatEnabled = false;
+
             static bool Prefix(MobileParty __instance, ref float __result)
             {
                 if (IsCheatEnabled && __instance == MobileParty.MainParty)
@@ -656,11 +846,9 @@ namespace Coop.Mod.DebugUtil
                     __result = Single.MaxValue;
                     return false;
                 }
+
                 return true;
             }
         }
-        
     }
-    
-    
 }

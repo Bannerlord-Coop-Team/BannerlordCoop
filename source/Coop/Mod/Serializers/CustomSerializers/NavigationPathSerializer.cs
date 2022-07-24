@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
 using TaleWorlds.Library;
 
-namespace Coop.Mod.Serializers
+namespace Coop.Mod.Serializers.Custom
 {
     [Serializable]
     public class NavigationPathSerializer : ICustomSerializer
@@ -29,6 +27,11 @@ namespace Coop.Mod.Serializers
             }
 
             return newNavigationPath;
+        }
+
+        public void ResolveReferenceGuids()
+        {
+            // No references
         }
     }
 }

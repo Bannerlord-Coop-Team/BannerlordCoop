@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Common;
 using Coop.Mod.Persistence;
 using Coop.Mod.Persistence.Party;
 using NLog;
@@ -9,16 +10,17 @@ using RailgunNet.System.Encoding;
 using RailgunNet.System.Types;
 using RailgunNet.Util;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Mod.DebugUtil
 {
     /// <summary>
-    ///     Module for search abnormal desynchronization between two identical movement sequences.
+    ///     Module to detect desync between two identical movement sequences.
     ///     There are three steps:
     ///     <list type="table">
-    ///         <item>(1) record movements</item>
-    ///         <item>(2) playback movements</item>
-    ///         <item>(3) verify sync of movements</item>
+    ///         <item>(1) record positions</item>
+    ///         <item>(2) playback positions</item>
+    ///         <item>(3) verify sync of positions</item>
     ///     </list>
     /// </summary>
     /// <remarks>
@@ -56,7 +58,7 @@ namespace Coop.Mod.DebugUtil
 
         // point of recording movements; happen on client side
         // TODO: maybe remove recording point onto server side?
-        public static Action<EntityId, MobileParty, MovementData> ReplayRecording
+        public static Action<EntityId, MobileParty, MapVec2> ReplayRecording
         {
             get;
             private set;
@@ -257,15 +259,15 @@ namespace Coop.Mod.DebugUtil
         }
 
         /// <summary>
-        ///     Record party movement while first and second steps
+        ///     Record party position
         /// </summary>
         /// <param name="entityId"></param>
         /// <param name="party"></param>
-        /// <param name="movement"></param>
+        /// <param name="position"></param>
         private static void OnEventRecording(
             EntityId entityId,
             MobileParty party,
-            MovementData movement)
+            MapVec2 position)
         {
             RecordingEventList.Add(
                 new ReplayEvent
@@ -273,7 +275,7 @@ namespace Coop.Mod.DebugUtil
                     time = CampaignTime.Now,
                     entityId = entityId,
                     party = party,
-                    movement = movement
+                    position = position,
                 });
             if (party.IsAnyPlayerMainParty())
             {
@@ -303,20 +305,10 @@ namespace Coop.Mod.DebugUtil
                 PlaybackMainPartyList.FirstOrDefault(q => !q.applied && q.time <= now);
             if (replay != null)
             {
-                if (CoopServer.Instance.Persistence.Room.Entities.FirstOrDefault(
+                if (CoopServer.Instance.Persistence.Room.Entities.Values.FirstOrDefault(
                     q => q.Id == replay.entityId) is MobilePartyEntityServer entity)
                 {
-                    entity.State.Movement = new MovementState
-                    {
-                        DefaultBehavior = replay.movement.DefaultBehaviour,
-                        TargetPosition = replay.movement.TargetPosition,
-                        SettlementIndex = replay.movement.TargetSettlement != null ?
-                            replay.movement.TargetSettlement.Id :
-                            Coop.InvalidId,
-                        TargetPartyIndex = replay.movement.TargetParty != null ?
-                            replay.movement.TargetParty.Id :
-                            Coop.InvalidId
-                    };
+                    entity.State.MapPosition = replay.position;
                 }
 
                 replay.applied = true;

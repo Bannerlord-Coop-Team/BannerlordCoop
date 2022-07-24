@@ -3,6 +3,12 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
+using Coop.Mod.Serializers.Custom;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace Coop.Mod.Serializers
 {
@@ -47,8 +53,6 @@ namespace Coop.Mod.Serializers
                     
                 case ItemRoster itemRoster:
                     return new ItemRosterSerializer(itemRoster);
-                case MBGUID mbguid:
-                    return new MBGUIDSerializer(mbguid);
                 case MobilePartiesAroundPositionList partiesAroundPosition:
                     return new MobilePartiesAroundPositionListSerializer(partiesAroundPosition);
                 case MobileParty mobileParty:
@@ -65,8 +69,6 @@ namespace Coop.Mod.Serializers
                     return new TraitObjectSerializer(traitObject);
                 case TroopRoster troopRoster:
                     return new TroopRosterSerializer(troopRoster);
-                case CharacterFeats characterFeats:
-                    return new CharacterFeatsSerializer(characterFeats);
                 case CharacterPerks characterPerks:
                     return new CharacterPerksSerializer(characterPerks);
                 case CharacterSkills characterSkills:
@@ -84,8 +86,10 @@ namespace Coop.Mod.Serializers
         {
             switch (obj)
             {
-                case TroopRosterSerializer ser:
-                    return ser.Deserialize();
+                case ICustomSerializer ser:
+                    object ret = ser.Deserialize();
+                    ser.ResolveReferenceGuids();
+                    return ret;
                 default:
                     return obj;
             }

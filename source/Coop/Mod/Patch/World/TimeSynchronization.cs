@@ -9,7 +9,6 @@ using Sync;
 using Sync.Behaviour;
 using Sync.Patch;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
 
 namespace Coop.Mod.Patch
 {
@@ -44,7 +43,8 @@ namespace Coop.Mod.Patch
                 // Take the predicted server side campaign time
                 if (GetAuthoritativeTime == null)
                 {
-                    Logger.Warn("Invalid state. Please set GetAuthoritativeTime during initialization.");
+                    // TODO maybe remove
+                    //Logger.Warn("Invalid state. Please set GetAuthoritativeTime during initialization.");
                     return true;
                 }
 
