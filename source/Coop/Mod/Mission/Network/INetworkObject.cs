@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Coop.Mod.CoopBattle
+namespace Coop.Mod.Mission
 {
     public interface INetworkObject
     {

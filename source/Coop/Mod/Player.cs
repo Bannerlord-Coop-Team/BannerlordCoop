@@ -10,14 +10,15 @@ namespace Coop.Mod
 {
     public class Player
     {
-        private Guid playerId;
-        private Hero playerHero;
-        private NetPeer playerPeer;
+        public Guid PlayerId { get; private set; }
+        public Hero PlayerHero { get; private set; }
+        public NetPeer PlayerPeer { get; private set; }
 
-
-
-
-
-
+        public Player(Guid playerId, Hero playerHero, NetPeer playerPeer)
+        {
+            PlayerId = playerId;
+            PlayerHero = playerHero;
+            PlayerPeer = playerPeer;
+        }
     }
 }

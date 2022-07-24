@@ -4,11 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.CoopBattle
+namespace Coop.Mod.Mission
 {
     public class NetworkAgent
     {
-        public Guid networkId;
+        public Guid NetworkId { get; private set; }
 
         public void Move()
         {

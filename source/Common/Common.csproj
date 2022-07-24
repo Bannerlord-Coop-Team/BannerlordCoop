@@ -53,12 +53,16 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CommonSerializer.cs" />
+    <Compile Include="CompatibilityInfo.cs" />
+    <Compile Include="CoopObjectManager.cs" />
     <Compile Include="CoopStateMachine.cs" />
     <Compile Include="DropoutStack.cs" />
     <Compile Include="Entity\IController.cs" />
     <Compile Include="Entity\IEntity.cs" />
     <Compile Include="Entity\IWrapper.cs" />
     <Compile Include="Entity\ObjectWrapper.cs" />
+    <Compile Include="Extentions.cs" />
     <Compile Include="FrameLimiter.cs" />
     <Compile Include="Globals.cs" />
     <Compile Include="Messaging\IMessageBroker.cs" />

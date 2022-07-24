@@ -4,11 +4,18 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.CoopBattle
+namespace Coop.Mod.Mission
 {
-    public class NetworkMount
+    public class NetworkLooseWeapon : INetworkObject
     {
         public Guid networkId;
+
+        public Guid NetworkId { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+
+        public void Destroy(Type type)
+        {
+            throw new NotImplementedException();
+        }
 
         public void Move()
         {

@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.CoopBattle
+namespace Coop.Mod.Mission
 {
-    public class BattlePlayer
+    public class MissionPlayer
     {
         public List<NetworkAgent> controlledAgents;
         public List<NetworkAgent> controlledAiAgents;

@@ -40,6 +40,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="System.Data.Services" />
     <Reference Include="TaleWorlds.CampaignSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
     </Reference>
