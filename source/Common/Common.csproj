@@ -57,9 +57,10 @@
     <Compile Include="DropoutStack.cs" />
     <Compile Include="FrameLimiter.cs" />
     <Compile Include="Globals.cs" />
-    <Compile Include="IMessageBroker.cs" />
+    <Compile Include="Messaging\IMessageBroker.cs" />
     <Compile Include="IUpdatable.cs" />
-    <Compile Include="MessagePayload.cs" />
+    <Compile Include="Messaging\MessageBrokerImpl.cs" />
+    <Compile Include="Messaging\MessagePayload.cs" />
     <Compile Include="MovingAverage.cs" />
     <Compile Include="OrderedHashSet.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
