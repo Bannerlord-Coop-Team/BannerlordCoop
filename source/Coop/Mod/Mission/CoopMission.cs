@@ -21,10 +21,12 @@ namespace Coop.Mod.Mission
 
         public List<INetworkInterface> ConnectedClients;
 
+#pragma warning disable 67
         public event Action<MissionCreatedInfo> MissionCreatedEvent;
         public event Action<PlayerDisconnectedInfo> PlayerDisconnectedEvent;
         public event Action<PlayerLeftInfo> PlayerLeftMissionEvent;
         public event Action<MissionResultInfo> MissionConcludedEvent;
+#pragma warning restore 67
 
         public void ClaimControl()
         {

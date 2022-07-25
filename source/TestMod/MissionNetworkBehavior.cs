@@ -1,4 +1,6 @@
-﻿using HarmonyLib;
+﻿using Common;
+using Common.Messaging;
+using HarmonyLib;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using MissionsShared;
@@ -49,13 +51,14 @@ namespace CoopTestMod
         // Atomic boolean to indicate if the mission running. This is to avoid using Mission.Current
         private static volatile bool isInMission = false;
 
-
+        static IMessageBroker broker;
 
         public MissionNetworkBehavior()
         {
             // start harmony patch
             new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop").PatchAll();
 
+            broker.Subscribe<BoardGameMoveRequest>(HandleBoardGameMove);
 
             // start network thread
             Thread thread = new Thread(() =>
@@ -73,6 +76,8 @@ namespace CoopTestMod
                     // first 32 bits is always the message type
                     MissionsShared.MessageType messageType = (MessageType)dataReader.GetUInt();
 
+
+                    
 
                     // different behavior based on message type
                     if (messageType == MessageType.EnterLocation)
@@ -189,55 +194,8 @@ namespace CoopTestMod
                         }));
                     }
 
-                    else if (messageType == MessageType.BoardGame)
-                    {
-                        byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
-                        Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
-                        BoardGameMoveEvent message;
-                        MemoryStream stream = new MemoryStream(serializedLocation);
-                        message = Serializer.DeserializeWithLengthPrefix<BoardGameMoveEvent>(stream, PrefixStyle.Fixed32BigEndian);
-                        
-                        MissionTaskManager.Instance().AddTask((message.toIndex, message.fromIndex), new Action<object>((object obj) =>
-                        {
-                            (int, int) d = ((int, int))obj;
+                
 
-                            var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-                            BoardGameBase boardGame = boardGameLogic.Board;
-
-                            if (boardGame == null)
-                                return;
-
-                            var unitToMove = boardGame.PlayerTwoUnits[d.Item2];
-                            var goalTile = boardGame.Tiles[d.Item1];
-
-                            if (boardGame is BoardGamePuluc)
-                            {
-                                if (d.Item1 == 11)
-                                {
-                                    goalTile = boardGame.Tiles[11];
-                                }
-                                else
-                                {
-                                    goalTile = boardGame.Tiles[10 - d.Item1];
-                                }
-                            }
-
-                            if (unitToMove == null || goalTile == null)
-                                return;
-
-                            var boardType = boardGame.GetType();
-
-                            boardType.GetProperty("SelectedUnit", BindingFlags.NonPublic | BindingFlags.Instance)?
-                                .SetValue(boardGame, unitToMove);
-
-                            var movePawnToTileMethod = boardType.GetMethod("MovePawnToTile", BindingFlags.NonPublic | BindingFlags.Instance);
-                            movePawnToTileMethod?.Invoke(boardGame, new object[] { unitToMove, goalTile, false, true });
-
-
-                        }));
-
-                        //InformationManager.DisplayMessage(new InformationMessage($"Move received from server, unit id: {message.fromIndex}"));
-                    }
                     else if (messageType == MessageType.PawnCapture)
                     {
                         byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
@@ -403,6 +361,44 @@ namespace CoopTestMod
             thread.Start();
         }
 
+        #region EventHandlers
+        private void HandleBoardGameMove(MessagePayload<BoardGameMoveRequest> message)
+        {
+            BoardGameMoveRequest moveEvnt = message.What;
+
+            var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+            BoardGameBase boardGame = boardGameLogic.Board;
+
+            if (boardGame == null)
+                return;
+
+            var unitToMove = boardGame.PlayerTwoUnits[moveEvnt.FromIndex];
+            var goalTile = boardGame.Tiles[moveEvnt.ToIndex];
+
+            if (boardGame is BoardGamePuluc)
+            {
+                if (moveEvnt.ToIndex == 11)
+                {
+                    goalTile = boardGame.Tiles[11];
+                }
+                else
+                {
+                    goalTile = boardGame.Tiles[10 - moveEvnt.ToIndex];
+                }
+            }
+
+            if (unitToMove == null || goalTile == null)
+                return;
+
+            var boardType = boardGame.GetType();
+
+            boardType.GetProperty("SelectedUnit", BindingFlags.NonPublic | BindingFlags.Instance)?
+                .SetValue(boardGame, unitToMove);
+
+            var movePawnToTileMethod = boardType.GetMethod("MovePawnToTile", BindingFlags.NonPublic | BindingFlags.Instance);
+            movePawnToTileMethod?.Invoke(boardGame, new object[] { unitToMove, goalTile, false, true });
+        }
+        #endregion
 
 
         // this patch stops blood from showing

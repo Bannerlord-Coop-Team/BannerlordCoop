@@ -4,40 +4,29 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using Coop.NetImpl.LiteNet;
 using LiteNetLib;
+using LiteNetLib.Utils;
+using Xunit;
 
 namespace Coop.Tests.Mission
 {
 
     public class DistributedP2P_Test
     {
-        EventBasedNetListener server_listener = new EventBasedNetListener();
+        LiteNetP2PServer server = new LiteNetP2PServer();
         EventBasedNetListener client1_listener = new EventBasedNetListener();
         EventBasedNetListener client2_listener = new EventBasedNetListener();
 
-
+        [Fact]
         public void ConnectionTest()
         {
-
-            NetManager s = new NetManager(server_listener);
-            NetManager c1 = new NetManager(client1_listener);
-            NetManager c2 = new NetManager(client2_listener);
-
-            s.Start(4567);
-            c1.Connect("localhost", 4567, "");
-            c2.Connect("localhost", 4567, "");
-
-            server_listener.ConnectionRequestEvent += (e) =>
+            while (true)
             {
-                e.Accept();
-            };
-
-            for(int i = 0; i < 10; i++)
-            {
-                s.PollEvents();
-                c1.PollEvents();
-                c2.PollEvents();
+                server.Update();
+                Thread.Sleep(10);
             }
         }
     }

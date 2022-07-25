@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common.Messaging;
+using HarmonyLib;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using MissionsShared;
@@ -22,11 +23,13 @@ namespace CoopTestMod
     public class BoardGamePlayerInputPatches
     {
         private static bool forceRemove = false;
+
+        private static IMessageBroker broker; /* TODO Point to MissionManager broker */
     
         [HarmonyPatch(typeof(BoardGameBase), "HandlePlayerInput")]
         public class HandlePlayerInputPatch
         {
-            static void Postfix(ref Move __result)
+            static void Postfix(ref BoardGameBase __instance, ref Move __result)
             {
                 if (!__result.IsValid)
                 {
@@ -35,21 +38,13 @@ namespace CoopTestMod
 
                 MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
 
-                BoardGameMoveEvent boardGameMoveEvent = new BoardGameMoveEvent();
-                boardGameMoveEvent.fromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(__result.Unit);
-                boardGameMoveEvent.toIndex = boardGameLogic.Board.Tiles.IndexOf(__result.GoalTile);
-            
-
-                var netDataWriter = new NetDataWriter();
-                netDataWriter.Put((uint)MessageType.BoardGame);
-
-                using (var memoryStream = new MemoryStream())
+                BoardGameMoveRequest boardGameMoveEvent = new BoardGameMoveRequest()
                 {
-                    Serializer.SerializeWithLengthPrefix<BoardGameMoveEvent>(memoryStream, boardGameMoveEvent, PrefixStyle.Fixed32BigEndian);
-                    netDataWriter.Put(memoryStream.ToArray());
-                }
+                    FromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(__result.Unit),
+                    ToIndex = boardGameLogic.Board.Tiles.IndexOf(__result.GoalTile)
+                };
 
-                MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
+                broker.Publish(__instance, boardGameMoveEvent);
             }
         }
 

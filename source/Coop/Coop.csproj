@@ -458,6 +458,8 @@
     <Compile Include="NetImpl\LiteNet\LiteNetManagerServer.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetConnection.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerServer.cs" />
+    <Compile Include="NetImpl\LiteNet\LiteNetP2PClient.cs" />
+    <Compile Include="NetImpl\LiteNet\LiteNetP2PServer.cs" />
     <Compile Include="NetImpl\LiteNet\NetManagerFactory.cs" />
     <Compile Include="NetImpl\LiteNet\RailNetPeerWrapper.cs" />
     <Compile Include="NetImpl\PlatformAPI.cs" />

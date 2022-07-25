@@ -72,6 +72,7 @@
     <Compile Include="Extentions.cs" />
     <Compile Include="FrameLimiter.cs" />
     <Compile Include="Globals.cs" />
+    <Compile Include="Messaging\EMessageResponse.cs" />
     <Compile Include="Messaging\IMessageBroker.cs" />
     <Compile Include="IUpdatable.cs" />
     <Compile Include="Messaging\MessageBrokerImpl.cs" />
