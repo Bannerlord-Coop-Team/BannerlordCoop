@@ -52,7 +52,7 @@ namespace CoopTestMod
 
         public static void AcceptGameRequest(string senderID, string otherID)
         {
-            BoardGameChallenge boardGameChallenge = new BoardGameChallenge();
+            BoardGameChallengeRequest boardGameChallenge = new BoardGameChallengeRequest();
 
             boardGameChallenge.ChallengeResponse = true;
             boardGameChallenge.OtherAgentId = otherID;
@@ -62,7 +62,7 @@ namespace CoopTestMod
 
             using (var memoryStream = new MemoryStream())
             {
-                Serializer.SerializeWithLengthPrefix<BoardGameChallenge>(memoryStream, boardGameChallenge, PrefixStyle.Fixed32BigEndian);
+                Serializer.SerializeWithLengthPrefix<BoardGameChallengeRequest>(memoryStream, boardGameChallenge, PrefixStyle.Fixed32BigEndian);
                 netDataWriter.Put(memoryStream.ToArray());
             }
 
@@ -86,7 +86,7 @@ namespace CoopTestMod
         private static void SendGameRequest(int senderIndex, int otherIndex)
         {
             InformationManager.DisplayMessage(new InformationMessage("Challenge Sent"));
-            BoardGameChallenge boardGameChallenge = new BoardGameChallenge();
+            BoardGameChallengeRequest boardGameChallenge = new BoardGameChallengeRequest();
 
             boardGameChallenge.ChallengeRequest = true;
             boardGameChallenge.OtherAgentId = ClientAgentManager.Instance().GetIdFromIndex(otherIndex);
@@ -99,7 +99,7 @@ namespace CoopTestMod
 
             using (var memoryStream = new MemoryStream())
             {
-                Serializer.SerializeWithLengthPrefix<BoardGameChallenge>(memoryStream, boardGameChallenge, PrefixStyle.Fixed32BigEndian);
+                Serializer.SerializeWithLengthPrefix<BoardGameChallengeRequest>(memoryStream, boardGameChallenge, PrefixStyle.Fixed32BigEndian);
                 netDataWriter.Put(memoryStream.ToArray());
             }
 

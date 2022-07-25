@@ -235,7 +235,7 @@ namespace MissionsServer
                     Console.WriteLine("Recieved Gameboard Byte Size: " + challengeReq.Length);
 
                     MemoryStream stream = new MemoryStream(challengeReq);
-                    BoardGameChallenge boardGameChallenge = Serializer.DeserializeWithLengthPrefix<BoardGameChallenge>(stream, PrefixStyle.Fixed32BigEndian);
+                    BoardGameChallengeRequest boardGameChallenge = Serializer.DeserializeWithLengthPrefix<BoardGameChallengeRequest>(stream, PrefixStyle.Fixed32BigEndian);
 
                     if(pendingBoardGamesRequest.TryRemove(fromPeer.Id, out var opposingPeerId))
                     {
@@ -248,7 +248,8 @@ namespace MissionsServer
 
                         server.GetPeerById(peerId)?.Send(writer, DeliveryMethod.ReliableOrdered);
                     }
-                } else if(messageType == MessageType.BoardGameForfeit)
+                } 
+                else if(messageType == MessageType.BoardGameForfeit)
                 {
                     string agentToSendId = dataReader.GetString();
 

@@ -51,33 +51,24 @@ namespace CoopTestMod
         [HarmonyPatch(typeof(BoardGameKonane), "HandlePreMovementStage")]
         public class HandlePreMovementStagePatch
         {
-            public static void Prefix()
+            public static void Prefix(ref BoardGameKonane __instance)
             {
 
                 if (Mission.Current.InputManager.IsHotKeyPressed("BoardGamePawnSelect"))
                 {
                     MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-                    PawnCapturedEvent pawnCapturedEvent = new PawnCapturedEvent();
 
                     PawnBase hoveredPawnIfAny = (PawnBase)typeof(BoardGameBase).GetMethod("GetHoveredPawnIfAny", BindingFlags.NonPublic | BindingFlags.Instance)?
                         .Invoke(boardGameLogic.Board, new object[] { });
 
                     if (hoveredPawnIfAny != null && ((BoardGameKonane)boardGameLogic.Board).RemovablePawns.Contains(hoveredPawnIfAny))
                     {
-                        pawnCapturedEvent.fromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(hoveredPawnIfAny);
-
-                        var netDataWriter = new NetDataWriter();
-                        netDataWriter.Put((uint)MessageType.PawnCapture);
-
-                        using (var memoryStream = new MemoryStream())
+                        PawnCapturedRequest pawnCapturedEvent = new PawnCapturedRequest()
                         {
-                            Serializer.SerializeWithLengthPrefix<PawnCapturedEvent>(memoryStream, pawnCapturedEvent, PrefixStyle.Fixed32BigEndian);
-                            netDataWriter.Put(memoryStream.ToArray());
-                        }
-                        //InformationManager.DisplayMessage(new InformationMessage(
-                        //   $"Sending PawnCapture to server relay, unit id:{pawnCapturedEvent.fromIndex}"));
+                            FromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(hoveredPawnIfAny)
+                        };
 
-                        MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
+                        broker.Publish(boardGameLogic.Board, pawnCapturedEvent);
                     }
                 }
             }
@@ -98,30 +89,19 @@ namespace CoopTestMod
 
             public static void Prefix(PawnBase pawn, bool aiSimulation)
             {
-                //Only call SetPawnCaptured when it's a forceful remove as a result of no moves available as otherwise it gets handled locally from the move
+                //Only calls SetPawnCaptured when it's a forceful remove as a result of no moves available as otherwise it gets handled locally from the move
                 if (!forceRemove)
                 {
                     return;
                 }
 
                 MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-                PawnCapturedEvent pawnCapturedEvent = new PawnCapturedEvent();
-
-                //Probably the reason it does not work, too tired at the moment to debug this
-                pawnCapturedEvent.fromIndex = boardGameLogic.Board.PlayerTwoUnits.IndexOf(pawn);
-                InformationManager.DisplayMessage(new InformationMessage("PlayerOneUnitsIndex: " + pawnCapturedEvent.fromIndex));
-
-                var netDataWriter = new NetDataWriter();
-                netDataWriter.Put((uint)MessageType.PawnCapture);
-
-                using (var memoryStream = new MemoryStream())
+                PawnCapturedRequest pawnCapturedEvent = new PawnCapturedRequest()
                 {
-                    Serializer.SerializeWithLengthPrefix<PawnCapturedEvent>(memoryStream, pawnCapturedEvent, PrefixStyle.Fixed32BigEndian);
-                    netDataWriter.Put(memoryStream.ToArray());
-                }
+                    FromIndex = boardGameLogic.Board.PlayerTwoUnits.IndexOf(pawn)
+                };
 
-
-                MissionNetworkBehavior.client.SendToAll(netDataWriter, DeliveryMethod.ReliableSequenced);
+                broker.Publish(boardGameLogic.Board, pawnCapturedEvent);
 
                 forceRemove = false;
             }

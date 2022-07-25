@@ -59,6 +59,10 @@ namespace CoopTestMod
             new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop").PatchAll();
 
             broker.Subscribe<BoardGameMoveRequest>(HandleBoardGameMove);
+            broker.Subscribe<PawnCapturedRequest>(HandlePawnCapture);
+            broker.Subscribe<BoardGameForfeitRequest>(HandleBoardGameForfeit);
+            broker.Subscribe<BoardGameChallengeRequest>(HandleBoardGameChallenge);
+            broker.Subscribe<MissileFireRequest>(HandleMissileFire);
 
             // start network thread
             Thread thread = new Thread(() =>
@@ -158,91 +162,6 @@ namespace CoopTestMod
 
                     }
 
-                    else if (messageType == MessageType.BoardGameChallenge)
-                    {
-                        byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
-                        Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
-                        BoardGameChallenge message;
-
-                        InformationManager.DisplayMessage(new InformationMessage(serializedLocation.Length.ToString()));
-
-                        MemoryStream stream = new MemoryStream(serializedLocation);
-                        message = Serializer.DeserializeWithLengthPrefix<BoardGameChallenge>(stream, PrefixStyle.Fixed32BigEndian);
-
-                        MissionTaskManager.Instance().AddTask((message.ChallengeRequest, message.ChallengeResponse, message.SenderAgentId, message.OtherAgentId), new Action<object>((object obj) =>
-                        {
-                            (bool, bool, string, string) d = ((bool, bool, string, string))obj;
-
-                            if (d.Item1)
-                            {
-                                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Accept", "Pussy out",
-                                    new Action(() => { AgentInteractionPatch.AcceptGameRequest(d.Item3, d.Item4 ); }), new Action(() => { })));
-                            }
-                            else if (d.Item2)
-                            {
-                                BoardGamePlayerInputPatches.PreplaceUnitsPatch.isChallenged = true;
-
-                                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-                                boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
-                                boardGameLogic.SetStartingPlayer(false);
-                                boardGameLogic.StartBoardGame();
-
-                                Agent opposingAgent = ClientAgentManager.Instance().GetNetworkAgent(d.Item4).Agent;
-                                boardGameLogic.GetType().GetProperty("OpposingAgent", BindingFlags.Public | BindingFlags.Instance).SetValue(boardGameLogic, opposingAgent);
-
-                            }
-                        }));
-                    }
-
-                
-
-                    else if (messageType == MessageType.PawnCapture)
-                    {
-                        byte[] serializedLocation = new byte[dataReader.RawDataSize - dataReader.Position];
-                        Buffer.BlockCopy(dataReader.RawData, dataReader.Position, serializedLocation, 0, dataReader.RawDataSize - dataReader.Position);
-                        PawnCapturedEvent message;
-                        MemoryStream stream = new MemoryStream(serializedLocation);
-                        message = Serializer.DeserializeWithLengthPrefix<PawnCapturedEvent>(stream, PrefixStyle.Fixed32BigEndian);
-
-                        MissionTaskManager.Instance().AddTask((message.fromIndex), new Action<object>((object obj) =>
-                        {
-                            int d = (int)obj;
-
-                            PawnBase unitToMove;
-                            var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-                            BoardGameBase boardGame = boardGameLogic.Board;
-
-                            if (boardGame == null)
-                                return;
-
-                            if (boardGame is BoardGameSeega)
-                            {
-                                unitToMove = boardGame.PlayerOneUnits[d];
-                            }
-                            else
-                            {
-                                unitToMove = boardGame.PlayerTwoUnits[d];
-                            }
-
-                            if (unitToMove == null)
-                                return;
-
-                            InformationManager.DisplayMessage(new InformationMessage("Pawn Captured"));
-                            boardGame.SetPawnCaptured(unitToMove);
-
-                            //Where else is this used than Seega?
-                            if (!(boardGame is BoardGameSeega))
-                            {
-                                boardGame.GetType().GetMethod("EndTurn", BindingFlags.NonPublic | BindingFlags.Instance)?
-                                    .Invoke(boardGame, new object[] { });
-                            }
-
-                        }));
-                    } else if(messageType == MessageType.BoardGameForfeit)
-                    {
-                        var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-                        boardGameLogic.AIForfeitGame();
-                    }
                     else if (messageType == MessageType.AddAgent)
                     {
                         int index = dataReader.GetInt();
@@ -398,6 +317,83 @@ namespace CoopTestMod
             var movePawnToTileMethod = boardType.GetMethod("MovePawnToTile", BindingFlags.NonPublic | BindingFlags.Instance);
             movePawnToTileMethod?.Invoke(boardGame, new object[] { unitToMove, goalTile, false, true });
         }
+
+        private void HandlePawnCapture(MessagePayload<PawnCapturedRequest> message)
+        {
+            PawnCapturedRequest pawnCapturedEvent = message.What;
+
+            PawnBase unitToMove;
+            var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+            BoardGameBase boardGame = boardGameLogic.Board;
+
+            if (boardGame == null)
+                return;
+
+            if (boardGame is BoardGameSeega)
+            {
+                unitToMove = boardGame.PlayerOneUnits[pawnCapturedEvent.FromIndex];
+            }
+            else
+            {
+                unitToMove = boardGame.PlayerTwoUnits[pawnCapturedEvent.FromIndex];
+            }
+
+            if (unitToMove == null)
+                return;
+
+            InformationManager.DisplayMessage(new InformationMessage("Pawn Captured"));
+            boardGame.SetPawnCaptured(unitToMove);
+
+            //Where else is this used than Seega?
+            if (!(boardGame is BoardGameSeega))
+            {
+                boardGame.GetType().GetMethod("EndTurn", BindingFlags.NonPublic | BindingFlags.Instance)?
+                    .Invoke(boardGame, new object[] { });
+            }
+        }
+
+        private void HandleBoardGameForfeit(MessagePayload<BoardGameForfeitRequest> message)
+        {
+            var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+            boardGameLogic.AIForfeitGame();
+        }
+        private void HandleBoardGameChallenge(MessagePayload<BoardGameChallengeRequest> message)
+        {
+            BoardGameChallengeRequest gameChallenge = message.What;
+
+            if (gameChallenge.ChallengeRequest)
+            {
+                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Accept", "Pussy out",
+                    new Action(() => { AgentInteractionPatch.AcceptGameRequest(gameChallenge.SenderAgentId, gameChallenge.OtherAgentId); }), new Action(() => { })));
+            }
+            else if (gameChallenge.ChallengeResponse)
+            {
+                BoardGamePlayerInputPatches.PreplaceUnitsPatch.isChallenged = true;
+
+                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
+                boardGameLogic.SetStartingPlayer(false);
+                boardGameLogic.StartBoardGame();
+
+                Agent opposingAgent = ClientAgentManager.Instance().GetNetworkAgent(gameChallenge.OtherAgentId).Agent;
+                boardGameLogic.GetType().GetProperty("OpposingAgent", BindingFlags.Public | BindingFlags.Instance).SetValue(boardGameLogic, opposingAgent);
+
+            }
+        }
+        private void HandleMissileFire(MessagePayload<MissileFireRequest> message)
+        {
+            MissileFireRequest missileReq = message.What;
+
+            Agent shooterAgent = Mission.Current.FindAgentWithIndex(ClientAgentManager.Instance().GetIndexFromId(missileReq.agentID));
+            Vec3 pos = new Vec3(missileReq.posX, missileReq.posY, missileReq.posZ);
+            Vec3 dir = new Vec3(missileReq.dirX, missileReq.dirY, missileReq.dirZ);
+            Mat3 orientation = new Mat3(new Vec3(missileReq.sx, missileReq.sy, missileReq.sz), 
+                new Vec3(missileReq.fx, missileReq.fy, missileReq.fz), 
+                new Vec3(missileReq.ux, missileReq.uy, missileReq.uz));
+
+            Mission.Current.AddCustomMissile(shooterAgent, shooterAgent.WieldedWeapon, pos, dir, orientation, missileReq.baseSpeed, missileReq.speed, missileReq.hasRigidBody, null);
+        }
+
         #endregion
 
 
@@ -487,16 +483,61 @@ namespace CoopTestMod
                 if (otherAgentId == null)
                     return;
 
-                NetDataWriter writer = new NetDataWriter();
-                writer.Put((uint) MessageType.BoardGameForfeit);
-                writer.Put(otherAgentId);
+                BoardGameForfeitRequest boardGameForfeitRequest = new BoardGameForfeitRequest()
+                {
+                    OtherAgentId = otherAgentId
+                };
 
-                client.SendToAll(writer, DeliveryMethod.ReliableUnordered);
+                broker.Publish(__instance, boardGameForfeitRequest);
             }
         }
 
-        // Callback for when the mission started; let the server know which scene you are at
-        [HarmonyPatch(typeof(Mission), "AfterStart")]
+        [HarmonyPatch(typeof(Mission), "AddMissileAux")]
+        public class AddCustomMissilePatch
+        {
+            public static void Postfix(int forcedMissileIndex, bool isPrediction, Agent shooterAgent, in WeaponData weaponData, WeaponStatsData[] weaponStatsData, float damageBonus, ref Vec3 position, ref Vec3 direction, ref Mat3 orientation,
+                float baseSpeed, float speed, bool addRigidBody, GameEntity gameEntityToIgnore, bool isPrimaryWeaponShot)
+            {
+                if (shooterAgent.Team != Mission.Current.PlayerTeam) return;
+
+                MissileFireRequest missileFireEvent = new MissileFireRequest()
+                {
+                    agentID = ClientAgentManager.Instance().GetIdFromIndex(shooterAgent.Index),
+
+                    posX = position.X,
+                    posY = position.Y,
+                    posZ = position.Z,
+
+                    dirX = direction.X,
+                    dirY = direction.Y,
+                    dirZ = direction.Z,
+
+                    fx = orientation.f.X,
+                    fy = orientation.f.Y,
+                    fz = orientation.f.Z,
+
+                    sx = orientation.s.X,
+                    sy = orientation.s.Y,
+                    sz = orientation.s.Z,
+
+                    ux = orientation.u.X,
+                    uy = orientation.u.Y,
+                    uz = orientation.u.Z,
+
+                    hasRigidBody = addRigidBody,
+                    baseSpeed = baseSpeed,
+                    speed = speed,
+
+                    weaponIndex = shooterAgent.WieldedWeapon.CurrentUsageIndex
+                };
+
+                broker.Publish<MissileFireRequest>(Mission.Current, missileFireEvent);
+                
+            }
+        }
+
+                // Callback for when the mission started; let the server know which scene you are at
+                [HarmonyPatch(typeof(Mission), "AfterStart")]
         public class CampaignMissionPatch
         {
 

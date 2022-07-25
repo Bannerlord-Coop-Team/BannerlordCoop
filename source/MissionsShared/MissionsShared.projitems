@@ -9,13 +9,16 @@
     <Import_RootNamespace>MissionsShared</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)BoardGameChallenge.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)BoardGameMoveEvent.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)AddAgentRequest.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)BoardGameChallengeRequest.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)BoardGameForfeitRequest.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)BoardGameMoveRequest.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)FromServerClientsAgents.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)MissileFireRequest.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MissionsShared.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)FromClientTickMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)FromServerTickMessage.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)PawnCapturedEvent.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)PawnCapturedRequest.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)PlayerTickInfo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)FromServerTickPayload.cs" />
   </ItemGroup>

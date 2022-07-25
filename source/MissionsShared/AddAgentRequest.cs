@@ -6,9 +6,9 @@ using System.Text;
 namespace MissionsShared
 {
     [ProtoContract]
-    public class PawnCapturedEvent
+    public struct AddAgentRequest
     {
         [ProtoMember(1)]
-        public int fromIndex { get; set; }
+        public int AgentIndex;
     }
 }

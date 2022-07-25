@@ -6,18 +6,20 @@ using System.Text;
 namespace MissionsShared
 {
     [ProtoContract]
-    public class BoardGameChallenge
+    public struct BoardGameChallengeRequest
     {
         [ProtoMember(1)]
-        public bool ChallengeRequest { get; set; }
+        public bool ChallengeRequest;
 
         [ProtoMember(2)]
-        public bool ChallengeResponse { get; set; }
+        public bool ChallengeResponse;
 
         [ProtoMember(3)]
-        public string OtherAgentId { get; set; }
+        public string SenderAgentId;
 
         [ProtoMember(4)]
-        public string SenderAgentId { get; set; }
+        public string OtherAgentId;
+
+
     }
 }
