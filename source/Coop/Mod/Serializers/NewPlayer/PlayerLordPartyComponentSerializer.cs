@@ -39,6 +39,11 @@ namespace Coop.Mod.Serializers
             return lordPartyComponent;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void SetHeroReference(Hero hero)
         {
             this.hero = hero;

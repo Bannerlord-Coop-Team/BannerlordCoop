@@ -34,6 +34,11 @@ namespace Coop.Mod.Serializers.Custom
             return new EquipmentElement(newItem, newItemModifier);
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             // No references

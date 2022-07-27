@@ -12,6 +12,7 @@ namespace Coop.Mod.Serializers
     public interface ICustomSerializer
     {
         object Deserialize();
+        T Deserialize<T>();
         void ResolveReferenceGuids();
     }
 
@@ -74,6 +75,10 @@ namespace Coop.Mod.Serializers
         /// </summary>
         /// <returns>New instantiated object</returns>
         public abstract object Deserialize();
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
 
         /// <summary>
         /// Assigns natively serializable fields

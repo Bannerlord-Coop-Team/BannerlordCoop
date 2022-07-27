@@ -430,6 +430,7 @@
     <Compile Include="Mod\Serializers\CustomSerializers\WorkshopSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\WorkshopTypeSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializerWithGuid.cs" />
+    <Compile Include="Mod\Serializers\ISerializationManager.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerCharacterObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerClanSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerCultureObjectSerializer.cs" />
@@ -441,6 +442,7 @@
     <Compile Include="Mod\Serializers\NewPlayer\PlayerHeroSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerPartyBaseSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerSettlementSerializer.cs" />
+    <Compile Include="Mod\Serializers\SerializationManager.cs" />
     <Compile Include="Mod\Serializers\TextObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\PartyComponentSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializer.cs" />

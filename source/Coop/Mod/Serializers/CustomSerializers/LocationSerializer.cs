@@ -126,6 +126,11 @@ namespace Coop.Mod.Serializers.Custom
             return newLocation;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             if (locationComplexFieldInfo != null)

@@ -41,6 +41,11 @@ namespace Coop.Mod.Serializers
             return newPositionList;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             throw new NotImplementedException();

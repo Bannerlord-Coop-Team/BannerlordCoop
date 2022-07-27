@@ -63,6 +63,11 @@ namespace Coop.Mod.Serializers.Custom
             return component;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             if (component == null)
@@ -107,6 +112,11 @@ namespace Coop.Mod.Serializers.Custom
             return BanditPartyComponent;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             if (BanditPartyComponent == null)
@@ -145,6 +155,11 @@ namespace Coop.Mod.Serializers.Custom
                 null);
             return LordPartyComponent;
         }
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
 
         public void ResolveReferenceGuids()
         {
@@ -199,6 +214,11 @@ namespace Coop.Mod.Serializers.Custom
             return CustomPartyComponent;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             if (CustomPartyComponent == null)
@@ -239,6 +259,11 @@ namespace Coop.Mod.Serializers.Custom
                 null);
             return CaravanPartyComponent;
         }
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
 
         public void ResolveReferenceGuids()
         {
@@ -275,6 +300,11 @@ namespace Coop.Mod.Serializers.Custom
                 new object[] { null },
                 null);
             return VillagerPartyComponent;
+        }
+
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
         }
 
         public void ResolveReferenceGuids()
@@ -317,6 +347,11 @@ namespace Coop.Mod.Serializers.Custom
                 null);
             return newCommonAreaPartyComponent;
         }
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
 
         public void ResolveReferenceGuids()
         {
@@ -365,6 +400,11 @@ namespace Coop.Mod.Serializers.Custom
             return GarrisonPartyComponent;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             if (GarrisonPartyComponent == null)
@@ -399,6 +439,11 @@ namespace Coop.Mod.Serializers.Custom
                 new object[] { null },
                 null);
             return MilitiaPartyComponent;
+        }
+
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
         }
 
         public void ResolveReferenceGuids()

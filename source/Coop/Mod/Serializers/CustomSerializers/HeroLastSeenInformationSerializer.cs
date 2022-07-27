@@ -38,6 +38,11 @@ namespace Coop.Mod.Serializers.Custom
             return newHeroLastSeenInformation;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             newHeroLastSeenInformation.LastSeenPlace = CoopObjectManager.GetObject<Settlement>(lastSeenPlace);

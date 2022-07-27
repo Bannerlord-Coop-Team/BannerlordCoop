@@ -22,6 +22,11 @@ namespace Coop.Mod.Serializers.Custom
             return skills;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             // No references

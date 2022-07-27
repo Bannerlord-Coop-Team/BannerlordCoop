@@ -57,6 +57,11 @@ namespace Coop.Mod.Serializers.Custom
             //return base.Deserialize(itemCategory);
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             //if (itemCategory == null)

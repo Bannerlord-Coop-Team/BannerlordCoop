@@ -22,6 +22,11 @@ namespace Coop.Mod.Serializers.Custom
             return new PathFaceRecord(pathFaceIndex, pathFaceGroupIndex, pathFaceIslandIndex);
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             // No references

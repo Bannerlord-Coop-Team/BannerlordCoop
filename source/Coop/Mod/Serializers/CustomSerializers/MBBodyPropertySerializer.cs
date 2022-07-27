@@ -25,6 +25,11 @@ namespace Coop.Mod.Serializers.Custom
             return mBBodyProperty;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             // no refs
@@ -45,6 +50,11 @@ namespace Coop.Mod.Serializers.Custom
             BodyProperties newProp = new BodyProperties();
             BodyProperties.FromString(data, out newProp);
             return newProp;
+        }
+
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
         }
 
         public void ResolveReferenceGuids()

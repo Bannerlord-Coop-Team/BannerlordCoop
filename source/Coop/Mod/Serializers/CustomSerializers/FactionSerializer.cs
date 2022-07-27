@@ -32,6 +32,11 @@ namespace Coop.Mod.Serializers.Custom
             return serializer.Deserialize();
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             serializer.ResolveReferenceGuids();

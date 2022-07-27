@@ -28,6 +28,11 @@ namespace Coop.Mod.Serializers
             };
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             throw new NotImplementedException();

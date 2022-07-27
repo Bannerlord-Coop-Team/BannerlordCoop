@@ -38,6 +38,11 @@ namespace Coop.Mod.Serializers
             return node;
         }
 
+        public DType Deserialize<DType>()
+        {
+            return (DType)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             // No references
