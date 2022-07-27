@@ -22,11 +22,11 @@ namespace Coop.Mod.GameSync.Roster
     /// <summary>
     ///     Implements synchronization of TroopRoster changes. The synchronization works as follows:
     ///     
-    ///     1. Whenever a TroopRoster on the serverside is changed, a RPC is issued to transfer the updated TroopRoster. 
+    ///     1. Whenever a TroopRoster on the server-side is changed, a RPC is issued to transfer the updated TroopRoster. 
     ///        The RPC is scoped to the party that owns the TroopRoster. Meaning if the party of the roster is outside the 
     ///        scope of a client, that client will not receive an update.
     ///     2. [TODO] Since the RPC is scoped, clients will not have all TroopRoster on the map up to date. So additionally, the
-    ///        rosters are updated wheneveer a party enters the scope of a client.
+    ///        rosters are updated whenever a party enters the scope of a client.
     /// </summary>
     class TroopRosterSync
     {

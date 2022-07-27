@@ -30,6 +30,7 @@
     <StartWorkingDirectory>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client</StartWorkingDirectory>
     <StartProgram>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
     <StartArguments>/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_</StartArguments>
+    <NoWarn>67</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
@@ -254,6 +255,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Mod\Config\DefaultNetworkConfig.cs" />
     <Compile Include="Mod\Config\RequiredSyncTypes.cs" />
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Mod\Mission\CoopMission.cs" />
@@ -453,6 +455,7 @@
     <Compile Include="Mod\UI\LoadGameUI\CoopLoadUI.cs" />
     <Compile Include="NetImpl\LiteNet\DiscoveryThread.cs" />
     <Compile Include="NetImpl\LiteNet\Extensions.cs" />
+    <Compile Include="NetImpl\LiteNet\INetworkConfig.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerServer.cs" />
@@ -462,6 +465,7 @@
     <Compile Include="NetImpl\LiteNet\LiteNetP2PServer.cs" />
     <Compile Include="NetImpl\LiteNet\NetManagerFactory.cs" />
     <Compile Include="NetImpl\LiteNet\RailNetPeerWrapper.cs" />
+    <Compile Include="NetImpl\LiteNet\P2PPeer.cs" />
     <Compile Include="NetImpl\PlatformAPI.cs" />
     <Compile Include="NetImpl\Steam\NetworkSteam.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

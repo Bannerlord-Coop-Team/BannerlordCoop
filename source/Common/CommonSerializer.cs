@@ -11,11 +11,11 @@ namespace Common
 {
     public class CommonSerializer
     {
+        static readonly BinaryFormatter formatter = new BinaryFormatter();
         public static byte[] Serialize(object obj)
         {
             using(MemoryStream ms = new MemoryStream())
             {
-                BinaryFormatter formatter = new BinaryFormatter();
                 formatter.Serialize(ms, obj);
                 return ms.ToArray();
             }
