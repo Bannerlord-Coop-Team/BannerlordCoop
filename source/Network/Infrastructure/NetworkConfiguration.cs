@@ -60,17 +60,13 @@ namespace Network.Infrastructure
 
         #region P2P
         /// <summary>
-        ///     Port to initiate P2P connections.
-        /// </summary>
-        public int P2PPort { get; set; } = 50353;
-        /// <summary>
         ///     P2P Identifier.
         /// </summary>
         public string P2PToken { get; set; } = "P2PToken";
         /// <summary>
         ///     P2P NAT Type
         /// </summary>
-        public NATType NATType { get; set; } = NATType.External;
+        public NATType NATType { get; set; } = NATType.Internal;
         #endregion
     }
 }

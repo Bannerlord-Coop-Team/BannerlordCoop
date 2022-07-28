@@ -1,6 +1,7 @@
 ﻿using Common;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Network.Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -23,10 +24,10 @@ namespace Coop.NetImpl.LiteNet
         public NetPeer peerServer { get; private set; }
         public int Priority => 2;
 
-        INetworkConfig networkConfig;
-        public LiteNetP2PClient(INetworkConfig networkConfig)
+        NetworkConfiguration networkConfig;
+        public LiteNetP2PClient(NetworkConfiguration configuration)
         {
-            this.networkConfig = networkConfig;
+            this.networkConfig = configuration;
 
             netManager = new NetManager(this)
             {
@@ -56,8 +57,22 @@ namespace Coop.NetImpl.LiteNet
 
             TryPunch(instance);
 
-            peerServer = netManager.Connect(networkConfig.ServerAddress,
-                                            networkConfig.P2PPort,
+            string connectionAddress;
+            int port;
+            if (networkConfig.NATType == NATType.Internal)
+            {
+                connectionAddress = networkConfig.LanAddress.ToString();
+                port = networkConfig.LanPort;
+            }
+            else
+            {
+                connectionAddress = networkConfig.WanAddress.ToString();
+                port = networkConfig.WanPort;
+            }
+
+
+            peerServer = netManager.Connect(connectionAddress,
+                                            port,
                                             networkConfig.P2PToken);
 
             return peerServer != null;
@@ -65,8 +80,16 @@ namespace Coop.NetImpl.LiteNet
 
         private void TryPunch(string instance)
         {
-            netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.ServerAddress, networkConfig.P2PPort, instance);
+            if(networkConfig.NATType == NATType.Internal)
+            {
+                netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.LanAddress.ToString(), networkConfig.LanPort, instance);
+            }
+            else if(networkConfig.NATType == NATType.External)
+            {
+                netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.WanAddress.ToString(), networkConfig.WanPort, instance);
+            }
         }
+            
 
         public void Stop()
         {
@@ -83,9 +106,15 @@ namespace Coop.NetImpl.LiteNet
             // No requests on client
         }
 
+        static Dictionary<NATType, NatAddressType> natAddressTypeMap = new Dictionary<NATType, NatAddressType>()
+        {
+            { NATType.External, NatAddressType.External },
+            { NATType.Internal, NatAddressType.Internal },
+        };
+
         public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
         {
-            if (type == networkConfig.NATType)
+            if (type == natAddressTypeMap[networkConfig.NATType])
             {
                 netManager.Connect(targetEndPoint, token);
             }

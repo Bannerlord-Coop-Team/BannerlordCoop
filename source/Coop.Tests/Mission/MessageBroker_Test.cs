@@ -6,6 +6,7 @@ using Coop.NetImpl.LiteNet;
 using Coop.Tests.Mission.Dummy;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Network.Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,14 +21,14 @@ namespace Coop.Tests.Mission
     public class MessageBroker_Test : IDisposable
     {
         List<LiteNetP2PClient> clients = new List<LiteNetP2PClient>();
-        LiteNetP2PServer server;
+        LiteNetListenerServer server;
 
-        DefaultNetworkConfig config = new DefaultNetworkConfig();
+        NetworkConfiguration config = new NetworkConfiguration();
 
 
         public void Dispose()
         {
-            server.Stop();
+            server.NetManager.Stop();
             foreach (var client in clients)
             {
                 client.Stop();
@@ -37,7 +38,13 @@ namespace Coop.Tests.Mission
         [Fact]
         public void SendEventMessage()
         {
-            server = new LiteNetP2PServer(config);
+            Server serverSM = new Server(Server.EType.Direct);
+            server = new LiteNetListenerServer(serverSM, config);
+
+            serverSM.Start(new ServerConfiguration());
+
+            server.NetManager.Start(config.LanPort);
+
             LiteNetP2PClient client1 = new LiteNetP2PClient(config);
             LiteNetP2PClient client2 = new LiteNetP2PClient(config);
 
@@ -53,7 +60,8 @@ namespace Coop.Tests.Mission
 
             while (DateTime.Now - startTime < updateTime)
             {
-                server.Update();
+                server.NetManager.PollEvents();
+                server.NetManager.NatPunchModule.PollEvents();
                 client1.Update(TimeSpan.Zero);
                 client2.Update(TimeSpan.Zero);
                 Thread.Sleep(10);
@@ -94,7 +102,8 @@ namespace Coop.Tests.Mission
 
             while (DateTime.Now - startTime < updateTime)
             {
-                server.Update();
+                server.NetManager.PollEvents();
+                server.NetManager.NatPunchModule.PollEvents();
                 client1.Update(TimeSpan.Zero);
                 client2.Update(TimeSpan.Zero);
                 Thread.Sleep(10);

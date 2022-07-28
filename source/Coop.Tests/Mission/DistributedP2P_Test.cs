@@ -11,6 +11,7 @@ using Coop.NetImpl.LiteNet;
 using Coop.Tests.Mission.Dummy;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Network.Infrastructure;
 using Xunit;
 
 namespace Coop.Tests.Mission
@@ -19,13 +20,13 @@ namespace Coop.Tests.Mission
     public class DistributedP2P_Test : IDisposable
     {
         List<LiteNetP2PClient> clients = new List<LiteNetP2PClient>();
-        LiteNetP2PServer server;
+        LiteNetListenerServer server;
 
-        DefaultNetworkConfig config = new DefaultNetworkConfig();
+        NetworkConfiguration config = new NetworkConfiguration();
 
         public void Dispose()
         {
-            server.Stop();
+            server.NetManager.Stop();
             foreach (var client in clients)
             {
                 client.Stop();
@@ -35,7 +36,13 @@ namespace Coop.Tests.Mission
         [Fact]
         public void SendData_Test()
         {
-            server = new LiteNetP2PServer(config);
+            Server serverSM = new Server(Server.EType.Direct);
+            server = new LiteNetListenerServer(serverSM, config);
+
+            serverSM.Start(new ServerConfiguration());
+
+            server.NetManager.Start(config.LanPort);
+
             LiteNetP2PClient client1 = new LiteNetP2PClient(config);
             LiteNetP2PClient client2 = new LiteNetP2PClient(config);
 
@@ -51,7 +58,8 @@ namespace Coop.Tests.Mission
 
             while (DateTime.Now - startTime < updateTime)
             {
-                server.Update();
+                server.NetManager.PollEvents();
+                server.NetManager.NatPunchModule.PollEvents();
                 client1.Update(TimeSpan.Zero);
                 client2.Update(TimeSpan.Zero);
                 Thread.Sleep(10);
@@ -78,7 +86,8 @@ namespace Coop.Tests.Mission
 
             while (DateTime.Now - startTime < updateTime)
             {
-                server.Update();
+                server.NetManager.PollEvents();
+                server.NetManager.NatPunchModule.PollEvents();
                 client1.Update(TimeSpan.Zero);
                 client2.Update(TimeSpan.Zero);
                 Thread.Sleep(10);
@@ -106,7 +115,8 @@ namespace Coop.Tests.Mission
 
             while (DateTime.Now - startTime < updateTime)
             {
-                server.Update();
+                server.NetManager.PollEvents();
+                server.NetManager.NatPunchModule.PollEvents();
                 client1.Update(TimeSpan.Zero);
                 client2.Update(TimeSpan.Zero);
                 Thread.Sleep(10);
@@ -123,7 +133,12 @@ namespace Coop.Tests.Mission
         [InlineData(60)]
         public void N_P2PClients_Test(int N)
         {
-            server = new LiteNetP2PServer(config);
+            Server serverSM = new Server(Server.EType.Direct);
+            server = new LiteNetListenerServer(serverSM, config);
+
+            serverSM.Start(new ServerConfiguration());
+
+            server.NetManager.Start(config.LanPort);
 
             int expectedConnections = (N - 1);
 
@@ -141,7 +156,8 @@ namespace Coop.Tests.Mission
             while (DateTime.Now - startTime < updateTime &&
                    clients.Any(c => c.ConnectedPeersCount < expectedConnections))
             {
-                server.Update();
+                server.NetManager.PollEvents();
+                server.NetManager.NatPunchModule.PollEvents();
                 for (int i = 0; i < N; i++)
                 {
                     clients[i].Update(TimeSpan.Zero);
@@ -149,7 +165,7 @@ namespace Coop.Tests.Mission
                 Thread.Sleep(10);
             }
 
-            Assert.Equal(N, server.ConnectedPeersCount);
+            Assert.Equal(N, server.NetManager.ConnectedPeersCount);
 
             Assert.True(clients.All(c => c.ConnectedPeersCount == expectedConnections));
 
@@ -167,8 +183,9 @@ namespace Coop.Tests.Mission
             while (DateTime.Now - startTime < updateTime &&
                    clients.All(c => c.ConnectedPeersCount > expectedConnections - removeAmount))
             {
-                server.Update();
-                foreach(var client in clients)
+                server.NetManager.PollEvents();
+                server.NetManager.NatPunchModule.PollEvents();
+                foreach (var client in clients)
                 {
                     client.Update(TimeSpan.Zero);
                 }
@@ -176,7 +193,7 @@ namespace Coop.Tests.Mission
                 Thread.Sleep(10);
             }
 
-            Assert.Equal(N - removeAmount, server.ConnectedPeersCount);
+            Assert.Equal(N - removeAmount, server.NetManager.ConnectedPeersCount);
 
             Assert.All(clients, c => Assert.Equal(expectedConnections - removeAmount, c.ConnectedPeersCount));
         }
