@@ -7,6 +7,7 @@ using TaleWorlds.PlayerServices;
 
 namespace Common
 {
+    [Serializable]
     public readonly struct MessagePayload<T>
     {
         public object Who { get; }

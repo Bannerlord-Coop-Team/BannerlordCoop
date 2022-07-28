@@ -1,4 +1,5 @@
-﻿using LiteNetLib;
+﻿using Coop.NetImpl.LiteNet;
+using LiteNetLib;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,7 +9,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.NetImpl.LiteNet
+namespace Coop.Tests.Mission.Dummy
 {
     public class LiteNetP2PServer : INatPunchListener, INetEventListener
     {

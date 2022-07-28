@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Coop.NetImpl.LiteNet
 {
-    class P2PPeer
+    public class P2PPeer
     {
         public IPEndPoint InternalAddr { get; }
         public IPEndPoint ExternalAddr { get; }

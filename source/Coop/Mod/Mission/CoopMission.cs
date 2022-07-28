@@ -15,11 +15,9 @@ namespace Coop.Mod.Mission
 
         public IMessageBroker MessageBroker;
 
-        public MissionPlayer Player;
+        public MissionClient Player;
 
         public List<NetworkAgent> NetworkAgents;
-
-        public List<INetworkInterface> ConnectedClients;
 
         public event Action<MissionCreatedInfo> MissionCreatedEvent;
         public event Action<PlayerDisconnectedInfo> PlayerDisconnectedEvent;

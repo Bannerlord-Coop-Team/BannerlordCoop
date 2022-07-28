@@ -1,4 +1,5 @@
-﻿using LiteNetLib;
+﻿using Common;
+using LiteNetLib;
 using LiteNetLib.Utils;
 using System;
 using System.Collections.Generic;
@@ -12,15 +13,16 @@ using System.Threading.Tasks;
 
 namespace Coop.NetImpl.LiteNet
 {
-    public class LiteNetP2PClient : INatPunchListener, INetEventListener
+    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable
     {
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;
         public event EventBasedNetListener.OnNetworkReceive DataRecieved;
 
         NetManager netManager;
         string instance;
-
         public NetPeer peerServer { get; private set; }
+        public int Priority => 2;
+
         INetworkConfig networkConfig;
         public LiteNetP2PClient(INetworkConfig networkConfig)
         {
@@ -42,7 +44,7 @@ namespace Coop.NetImpl.LiteNet
             Stop();
         }
 
-        public void Update()
+        public void Update(TimeSpan frameTime)
         {
             netManager.PollEvents();
             netManager.NatPunchModule.PollEvents();

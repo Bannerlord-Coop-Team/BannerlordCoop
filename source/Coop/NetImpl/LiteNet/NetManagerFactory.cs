@@ -9,6 +9,8 @@ namespace Coop.NetImpl.LiteNet
         {
             return new NetManager(listener)
             {
+                IPv6Enabled = IPv6Mode.DualMode,
+                NatPunchEnabled = true,
                 MaxConnectAttempts = 20,
                 ReconnectDelay = (int) config.ReconnectDelay.TotalMilliseconds,
                 DisconnectTimeout = (int) config.DisconnectTimeout.TotalMilliseconds,

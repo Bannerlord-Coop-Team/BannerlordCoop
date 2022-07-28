@@ -1,6 +1,8 @@
 ﻿using Coop.Mod.Serializers;
+using ProtoBuf;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
@@ -43,14 +45,21 @@ namespace Coop.Tests.Serialization
         public void ValidSerialize_Test()
         {
             DummyObj dummyObj = new DummyObj();
+
+            // Create object serializer
             DummyObjSerializer serializer = new DummyObjSerializer(dummyObj);
+
+            // Pass serializer to serialization manager
             byte[] data = serializationManager.Serialize(serializer);
             Assert.True(data.Length > 0);
 
+            // Deserialize manager will deserialize ICustomSerializer types automatically
             DummyObj deserializedObj = serializationManager.Deserialize<DummyObj>(data);
             Assert.NotNull(deserializedObj);
 
+            // Verify references are different
             Assert.False(ReferenceEquals(dummyObj, deserializedObj));
+            // Verify values are the same
             Assert.Equal(dummyObj.RanVal, deserializedObj.RanVal);
         }
 
@@ -59,14 +68,21 @@ namespace Coop.Tests.Serialization
         {
 
             DummyObj dummyObj = new DummyObj();
+
+            // Create object serializer
             DummyObjSerializer serializer = new DummyObjSerializer(dummyObj);
+
+            // Pass serializer to serialization manager
             Assert.True(serializationManager.TrySerialize(serializer, out byte[] data));
             Assert.True(data.Length > 0);
 
+            // Deserialize manager will deserialize ICustomSerializer types automatically
             Assert.True(serializationManager.TryDeserialize(data, out DummyObj deserializedObj));
             Assert.NotNull(deserializedObj);
 
+            // Verify references are different
             Assert.False(ReferenceEquals(dummyObj, deserializedObj));
+            // Verify values are the same
             Assert.Equal(dummyObj.RanVal, deserializedObj.RanVal);
         }
 
@@ -135,6 +151,45 @@ namespace Coop.Tests.Serialization
 
             Assert.False(ReferenceEquals(dummyObj, deserializedObj));
             Assert.Equal(dummyObj.RanVal, deserializedObj.RanVal);
+        }
+
+        [ProtoContract]
+        class DummyProtoClass<T>
+        {
+            [ProtoMember(1)]
+            public int RanVal { get; set; }
+            [ProtoMember(2)]
+            public T RanObj { get; set; }
+            [ProtoMember(3)]
+            public Enum Enum { get; set; }
+        }
+
+        [Fact]
+        public void ProtoSerialize_Test()
+        {
+            DummyProtoClass<Type> dummyObj = new DummyProtoClass<Type>();
+
+            dummyObj.RanObj = typeof(int);
+
+            string d = (Base64FormattingOptions.None as Enum).ToString();
+
+            byte[] data;
+
+            using(MemoryStream stream = new MemoryStream())
+            {
+                Serializer.Serialize(stream, dummyObj);
+                data = stream.ToArray();
+            }
+
+            DummyProtoClass<Type> dummyObj2;
+
+            using (MemoryStream stream = new MemoryStream(data))
+            {
+                dummyObj2 = Serializer.Deserialize<DummyProtoClass<Type>>(stream);
+            }
+
+            Assert.False(ReferenceEquals(dummyObj, dummyObj2));
+            Assert.Equal(dummyObj.RanVal, dummyObj2.RanVal);
         }
     }
 }

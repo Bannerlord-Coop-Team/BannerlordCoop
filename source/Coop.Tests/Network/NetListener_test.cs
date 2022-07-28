@@ -22,7 +22,7 @@ namespace Coop.Tests.Network
         {
             // Setup server mock
             m_Server = new Mock<Server>(Server.EType.Threaded);
-            m_ListenerServer = new LiteNetListenerServer(m_Server.Object);
+            m_ListenerServer = new LiteNetListenerServer(m_Server.Object, new NetworkConfiguration());
             m_ServerSideConnected = new List<ConnectionBase>();
             m_ServerSideDisconnects = new List<(ConnectionBase, EDisconnectReason)>();
             m_Server.Setup(server => server.CanPlayerJoin()).Returns(true);

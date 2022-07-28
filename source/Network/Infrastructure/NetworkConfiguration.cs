@@ -4,6 +4,12 @@ using Network.Protocol;
 
 namespace Network.Infrastructure
 {
+    public enum NATType
+    {
+        Internal,
+        External,
+    }
+
     /// <summary>
     ///     Network settings for both client & server.
     /// </summary>
@@ -51,5 +57,20 @@ namespace Network.Infrastructure
         ///     Update cycle time for the network receiver.
         /// </summary>
         public TimeSpan UpdateTime { get; set; } = TimeSpan.FromMilliseconds(15);
+
+        #region P2P
+        /// <summary>
+        ///     Port to initiate P2P connections.
+        /// </summary>
+        public int P2PPort { get; set; } = 50353;
+        /// <summary>
+        ///     P2P Identifier.
+        /// </summary>
+        public string P2PToken { get; set; } = "P2PToken";
+        /// <summary>
+        ///     P2P NAT Type
+        /// </summary>
+        public NATType NATType { get; set; } = NATType.External;
+        #endregion
     }
 }

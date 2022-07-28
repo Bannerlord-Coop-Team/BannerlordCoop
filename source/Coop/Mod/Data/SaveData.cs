@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Serialization;
 using Coop.Mod.Serializers.Custom;
 using Network;
 using NLog;
@@ -276,7 +277,7 @@ namespace Coop.Mod.Data
                 CoopClient.Instance.Session.Connection.Send(
                     new Network.Protocol.Packet(
                         Network.Protocol.EPacket.BadID,
-                        Common.CommonSerializer.Serialize(unresolved))
+                        CommonSerializer.Serialize(unresolved))
                     );
             }
 #endif

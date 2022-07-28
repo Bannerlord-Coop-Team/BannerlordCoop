@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Coop.Mod.Config;
 using Coop.NetImpl.LiteNet;
+using Coop.Tests.Mission.Dummy;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Xunit;
@@ -51,17 +52,18 @@ namespace Coop.Tests.Mission
             while (DateTime.Now - startTime < updateTime)
             {
                 server.Update();
-                client1.Update();
-                client2.Update();
+                client1.Update(TimeSpan.Zero);
+                client2.Update(TimeSpan.Zero);
                 Thread.Sleep(10);
             }
 
+            // Client 1 to client 2
             string sentStr = "hi";
-            int calls = 0;
+            int c2Calls = 0;
 
             client2.DataRecieved += (sender, e, t) =>
             {
-                calls += 1;
+                c2Calls += 1;
 
                 string rxStr = e.GetString();
 
@@ -77,12 +79,40 @@ namespace Coop.Tests.Mission
             while (DateTime.Now - startTime < updateTime)
             {
                 server.Update();
-                client1.Update();
-                client2.Update();
+                client1.Update(TimeSpan.Zero);
+                client2.Update(TimeSpan.Zero);
                 Thread.Sleep(10);
             }
 
-            Assert.Equal(1, calls);
+            Assert.Equal(1, c2Calls);
+
+            // Client 2 to client 1
+            int c1Calls = 0;
+
+            client1.DataRecieved += (sender, e, t) =>
+            {
+                c1Calls += 1;
+
+                string rxStr = e.GetString();
+
+                Assert.Equal(sentStr, rxStr);
+            };
+
+            writer = new NetDataWriter();
+            writer.Put(sentStr);
+            client2.SendAll(writer, DeliveryMethod.ReliableSequenced);
+
+            startTime = DateTime.Now;
+
+            while (DateTime.Now - startTime < updateTime)
+            {
+                server.Update();
+                client1.Update(TimeSpan.Zero);
+                client2.Update(TimeSpan.Zero);
+                Thread.Sleep(10);
+            }
+
+            Assert.Equal(1, c1Calls);
         }
         
 
@@ -114,7 +144,7 @@ namespace Coop.Tests.Mission
                 server.Update();
                 for (int i = 0; i < N; i++)
                 {
-                    clients[i].Update();
+                    clients[i].Update(TimeSpan.Zero);
                 }
                 Thread.Sleep(10);
             }
@@ -140,7 +170,7 @@ namespace Coop.Tests.Mission
                 server.Update();
                 foreach(var client in clients)
                 {
-                    client.Update();
+                    client.Update(TimeSpan.Zero);
                 }
 
                 Thread.Sleep(10);

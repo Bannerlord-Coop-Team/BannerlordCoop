@@ -2,6 +2,7 @@
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using Common;
+using Common.Serialization;
 using JetBrains.Annotations;
 
 namespace Sync.Store

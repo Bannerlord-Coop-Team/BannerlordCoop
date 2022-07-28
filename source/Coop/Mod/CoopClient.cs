@@ -40,6 +40,7 @@ using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.Engine.Screens;
 using TaleWorlds.ScreenSystem;
+using Common.Serialization;
 
 namespace Coop.Mod
 {

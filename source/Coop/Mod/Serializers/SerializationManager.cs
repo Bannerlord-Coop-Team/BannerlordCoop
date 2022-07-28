@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
