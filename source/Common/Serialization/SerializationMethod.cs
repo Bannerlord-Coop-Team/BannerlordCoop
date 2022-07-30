@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace Common.Serialization
 {
-    public enum DefaultProtocol
+    public enum SerializationMethod : byte
     {
+        Invalid,
         BinaryFormatter,
         ProtoBuf,
-        Invalid
     }
 }

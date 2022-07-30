@@ -23,7 +23,7 @@ namespace Common.Serialization
                     {
                         if (typeof(ISerializer).IsAssignableFrom(type) && type.IsClass)
                         {
-                            RegisterSerializer(Activator.CreateInstance(type) as ISerializer);
+                            TryRegisterSerializer(Activator.CreateInstance(type) as ISerializer);
                         }
                     }
                 }
@@ -48,7 +48,7 @@ namespace Common.Serialization
 
         public static byte[] Serialize(object obj)
         {
-            return Serialize(obj, DefaultProtocol.BinaryFormatter);
+            return Serialize(obj, SerializationMethod.BinaryFormatter);
         }
         public static byte[] Serialize(object obj, Enum protocol)
         {
@@ -57,7 +57,7 @@ namespace Common.Serialization
             return serializers[protocol].Serialize(obj);
         }
 
-        private static bool RegisterSerializer(ISerializer serializer)
+        private static bool TryRegisterSerializer(ISerializer serializer)
         {
             if (serializer == null) return false;
             if (serializers.ContainsKey(serializer.Protocol)) return false;
@@ -66,15 +66,28 @@ namespace Common.Serialization
 
             protocolToId.Add(serializer.Protocol, idToProtocol.Length);
             idToProtocol = idToProtocol.Append(serializer.Protocol).ToArray();
-            
 
             return true;
         }
 
         private static object DeserializeBytes(byte[] bytes, Enum protocol = null)
         {
-            if(protocol == null) protocol = DefaultProtocol.BinaryFormatter;
-            if(!serializers.ContainsKey(protocol)) return null;
+            if (bytes == null)
+            {
+                throw new ArgumentNullException(nameof(bytes));
+            };
+
+            if (bytes.Length <= 0)
+            {
+                return null;
+            }
+
+            if (protocol == null) protocol = SerializationMethod.BinaryFormatter;
+
+            if (!serializers.ContainsKey(protocol))
+            {
+                throw new InvalidOperationException($"{protocol} does not have a register serializer.");
+            }
 
             return serializers[protocol].Deserialize(bytes);
         }

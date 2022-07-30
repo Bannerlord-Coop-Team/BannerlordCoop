@@ -14,7 +14,7 @@ namespace Common.Serialization
     {
         static readonly BinaryFormatter formatter = new BinaryFormatter();
 
-        public Enum Protocol => DefaultProtocol.BinaryFormatter;
+        public Enum Protocol => SerializationMethod.BinaryFormatter;
 
         public byte[] Serialize(object obj)
         {

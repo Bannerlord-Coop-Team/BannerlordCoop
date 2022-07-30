@@ -277,10 +277,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Mod\Config\DefaultNetworkConfig.cs" />
     <Compile Include="Mod\Config\RequiredSyncTypes.cs" />
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Mod\Mission\CoopMission.cs" />
+    <Compile Include="Mod\Mission\CoopMissionBehavior.cs" />
     <Compile Include="Mod\Mission\Messages\BattleNetworkMessages.cs" />
     <Compile Include="Mod\Mission\MissionClient.cs" />
     <Compile Include="Mod\Mission\IMissionPlayerNetwork.cs" />
@@ -289,8 +289,8 @@
     <Compile Include="Mod\Mission\Network\INetworkObject.cs" />
     <Compile Include="Mod\Mission\Messages\MissionEventInfos.cs" />
     <Compile Include="Mod\Mission\Messages\MissionMessages.cs" />
-    <Compile Include="Mod\Mission\Network\LiteNetPackager.cs" />
     <Compile Include="Mod\Mission\Network\MessageBroker.cs" />
+    <Compile Include="Mod\Mission\Network\EventPacket.cs" />
     <Compile Include="Mod\Mission\Network\NetworkLooseWeapon.cs" />
     <Compile Include="Mod\Mission\Network\NetworkSiegeEngine.cs" />
     <Compile Include="Mod\Mission\Network\NetworkMount.cs" />
@@ -481,7 +481,8 @@
     <Compile Include="Mod\UI\LoadGameUI\CoopLoadUI.cs" />
     <Compile Include="NetImpl\LiteNet\DiscoveryThread.cs" />
     <Compile Include="NetImpl\LiteNet\Extensions.cs" />
-    <Compile Include="NetImpl\LiteNet\INetworkConfig.cs" />
+    <Compile Include="NetImpl\LiteNet\IPacket.cs" />
+    <Compile Include="NetImpl\LiteNet\IPacketHandler.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerServer.cs" />

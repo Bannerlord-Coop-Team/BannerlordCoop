@@ -15,51 +15,62 @@ using System.Threading.Tasks;
 
 namespace Coop.Mod.Mission.Network
 {
-    public class MessageBroker : IMessageBroker
+    public class MessageBroker : IMessageBroker, IPacketHandler
     {
-        private HashSet<Type> serializableTypesSet = new HashSet<Type>();
+        private readonly Dictionary<Type, List<Delegate>> m_Subscribers;
+        private readonly LiteNetP2PClient m_Client;
 
-
-        private readonly Dictionary<Type, List<Delegate>> _subscribers;
-        private readonly LiteNetP2PClient _client;
+        public PacketType PacketType => PacketType.Event;
 
         public MessageBroker(LiteNetP2PClient client)
         {
-            _client = client;
-            _subscribers = new Dictionary<Type, List<Delegate>>();
+            m_Client = client;
+            m_Subscribers = new Dictionary<Type, List<Delegate>>();
 
-            _client.DataRecieved += OnRecieve;
+            m_Client.AddHandler(this);
         }
 
         public void Publish<T>(object source, T message)
         {
             if (message == null || source == null)
                 return;
-            
-            if (!serializableTypesSet.Contains(source.GetType()) &&
-                !source.GetType().IsSerializable &&
-                !source.GetType().GetCustomAttributes(false).Contains(typeof(ProtoContractAttribute)))
-            {
-                string msg = $"{source.GetType()} is not marked as serializable or is not a proto contract.";
-                throw new InvalidOperationException(msg);
-            }
-            else
-            {
-                serializableTypesSet.Add(source.GetType());
-            }
 
             var payload = new MessagePayload<T>(message, source.ToString());
 
+            EventPacket messagePacket = new EventPacket(payload);
 
-            NetDataWriter writer = LiteNetPackager.Pack(payload);
-
-
-            _client.SendAll(writer, DeliveryMethod.ReliableOrdered);
+            m_Client.SendAll(messagePacket);
         }
 
-        public void OnRecieve(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
+        public void Subscribe<T>(Action<MessagePayload<T>> subscription)
         {
-            object payload = LiteNetPackager.Unpack(reader);
+            var delegates = m_Subscribers.ContainsKey(typeof(T)) ?
+                            m_Subscribers[typeof(T)] : new List<Delegate>();
+            if (!delegates.Contains(subscription))
+            {
+                delegates.Add(subscription);
+            }
+            m_Subscribers[typeof(T)] = delegates;
+        }
+
+        public void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
+        {
+            if (!m_Subscribers.ContainsKey(typeof(T))) return;
+            var delegates = m_Subscribers[typeof(T)];
+            if (delegates.Contains(subscription))
+                delegates.Remove(subscription);
+            if (delegates.Count == 0)
+                m_Subscribers.Remove(typeof(T));
+        }
+
+        public void Dispose()
+        {
+            m_Subscribers?.Clear();
+        }
+
+        public void HandlePacket(NetPeer peer, IPacket packet)
+        {
+            object payload = CommonSerializer.Deserialize(packet.Data, SerializationMethod.ProtoBuf);
 
             Type type = payload.GetType();
             if (type.GetGenericTypeDefinition() != typeof(MessagePayload<>))
@@ -69,44 +80,18 @@ namespace Coop.Mod.Mission.Network
 
             Type T = type.GetProperty("What").PropertyType;
 
-            if (!_subscribers.ContainsKey(T))
+            if (!m_Subscribers.ContainsKey(T))
             {
                 return;
             }
 
-            var delegates = _subscribers[T];
+            var delegates = m_Subscribers[T];
             if (delegates == null || delegates.Count == 0) return;
 
             foreach (var handler in delegates)
             {
                 Task.Factory.StartNew(() => handler.Method.Invoke(handler.Target, new object[] { payload }));
             }
-        }
-
-        public void Subscribe<T>(Action<MessagePayload<T>> subscription)
-        {
-            var delegates = _subscribers.ContainsKey(typeof(T)) ?
-                            _subscribers[typeof(T)] : new List<Delegate>();
-            if (!delegates.Contains(subscription))
-            {
-                delegates.Add(subscription);
-            }
-            _subscribers[typeof(T)] = delegates;
-        }
-
-        public void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
-        {
-            if (!_subscribers.ContainsKey(typeof(T))) return;
-            var delegates = _subscribers[typeof(T)];
-            if (delegates.Contains(subscription))
-                delegates.Remove(subscription);
-            if (delegates.Count == 0)
-                _subscribers.Remove(typeof(T));
-        }
-
-        public void Dispose()
-        {
-            _subscribers?.Clear();
         }
     }
 }

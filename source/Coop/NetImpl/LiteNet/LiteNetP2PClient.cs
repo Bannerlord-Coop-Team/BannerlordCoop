@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Serialization;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Network.Infrastructure;
@@ -17,12 +18,13 @@ namespace Coop.NetImpl.LiteNet
     public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable
     {
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;
-        public event EventBasedNetListener.OnNetworkReceive DataRecieved;
 
         NetManager netManager;
         string instance;
         public NetPeer peerServer { get; private set; }
         public int Priority => 2;
+
+        static readonly Dictionary<PacketType, List<IPacketHandler>> m_PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
 
         NetworkConfiguration networkConfig;
         public LiteNetP2PClient(NetworkConfiguration configuration)
@@ -43,6 +45,18 @@ namespace Coop.NetImpl.LiteNet
         ~LiteNetP2PClient()
         {
             Stop();
+        }
+
+        public void AddHandler(IPacketHandler handler)
+        {
+            if (m_PacketHandlers.ContainsKey(handler.PacketType))
+            {
+                m_PacketHandlers[handler.PacketType].Add(handler);
+            }
+            else
+            {
+                m_PacketHandlers.Add(handler.PacketType, new List<IPacketHandler> { handler });
+            }
         }
 
         public void Update(TimeSpan frameTime)
@@ -96,9 +110,11 @@ namespace Coop.NetImpl.LiteNet
             netManager.Stop();
         }
 
-        public void SendAll(NetDataWriter writer, DeliveryMethod deliveryMethod)
+        public void SendAll(IPacket packet)
         {
-            netManager.SendToAll(writer, deliveryMethod);
+            NetDataWriter writer = new NetDataWriter();
+            writer.PutBytesWithLength(CommonSerializer.Serialize(packet, SerializationMethod.ProtoBuf));
+            netManager.SendToAll(writer, packet.DeliveryMethod);
         }
 
         public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -137,7 +153,16 @@ namespace Coop.NetImpl.LiteNet
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
-            DataRecieved?.Invoke(peer, reader, deliveryMethod);
+            IPacket packet = CommonSerializer.Deserialize<IPacket>(reader.GetBytesWithLength(), SerializationMethod.ProtoBuf);
+            if (packet.Data == null) throw new NullReferenceException($"{packet.GetType()} is missing data, likely missing a ProtoMember attribute.");
+            if(m_PacketHandlers.TryGetValue(packet.PacketType, out var handlers))
+            {
+                foreach(var handler in handlers)
+                {
+                    handler.HandlePacket(peer, packet);
+                    //Task.Factory.StartNew(() => { handler.HandlePacket(peer, packet); });
+                }
+            }
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)

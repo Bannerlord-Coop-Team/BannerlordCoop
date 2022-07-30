@@ -25,7 +25,7 @@ namespace Common.Serialization
 
     internal class ProtoBufSerializer : ISerializer
     {
-        public Enum Protocol => DefaultProtocol.ProtoBuf;
+        public Enum Protocol => SerializationMethod.ProtoBuf;
 
         public object Deserialize(byte[] data)
         {
@@ -39,16 +39,14 @@ namespace Common.Serialization
             }
         }
 
-        private static MemoryStream WrapperStream = new MemoryStream();
-        private static MemoryStream InternalStream = new MemoryStream();
         public byte[] Serialize(object obj)
         {
-            using (WrapperStream)
+            using (MemoryStream WrapperStream = new MemoryStream())
             {
                 Serializer.Serialize(WrapperStream, obj);
                 ProtoMessageWrapper wrapper = new ProtoMessageWrapper(obj.GetType(), WrapperStream.ToArray());
 
-                using (InternalStream)
+                using (MemoryStream InternalStream = new MemoryStream())
                 {
                     Serializer.Serialize(InternalStream, wrapper);
                     return InternalStream.ToArray();
