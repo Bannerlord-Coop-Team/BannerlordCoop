@@ -16,8 +16,6 @@ namespace Coop.Mod.Mission
 
         public DeliveryMethod DeliveryMethod => throw new NotImplementedException();
 
-        public PacketType PacketType => throw new NotImplementedException();
-
         public byte[] Data => throw new NotImplementedException();
 
         public void HandlePacket(NetPeer peer, IPacket packet)

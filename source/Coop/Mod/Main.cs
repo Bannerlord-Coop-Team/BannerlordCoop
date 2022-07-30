@@ -31,6 +31,11 @@ using TaleWorlds.ScreenSystem;
 using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
+using Coop.Mod.Mission;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Load;
+using SandBox;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Mod
 {
@@ -116,6 +121,12 @@ namespace Coop.Mod
             DebugLogging.Initialize();
         }
 
+        public override void OnBeforeMissionBehaviorInitialize(TaleWorlds.MountAndBlade.Mission mission)
+        {
+            // add the network behavior
+            mission.AddMissionBehavior(new MissionNetworkBehavior());
+        }
+
         public override void NoHarmonyLoad()
         {
             AddBehavior<InitServerBehaviour>();
@@ -150,8 +161,6 @@ namespace Coop.Mod
 
 
 #if DEBUG
-
-
             if (args.Contains("/server"))
             {
                 AddBehavior<PartySyncDebugBehavior>();
@@ -162,6 +171,15 @@ namespace Coop.Mod
             else if (args.Contains("/client"))
             {
                 isServer = false;
+            }
+
+            if (args.Contains("/battles") ||
+                args.Contains("/battle"))
+            {
+                StateEvents.OnMainMenuReady += () =>
+                {
+                    StartFirstSaveAndMission();
+                };
             }
 
 #else
@@ -223,6 +241,22 @@ namespace Coop.Mod
 
             //Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
             #endregion
+        }
+
+        private static void StartFirstSaveAndMission()
+        {
+            //Get all the save sames
+            SaveGameFileInfo[] games = MBSaveLoad.GetSaveFiles();
+
+
+            // just load the first one. 
+            LoadResult result = SaveManager.Load(games[0].Name, new AsyncFileSaveDriver(), true);
+
+            // Create our own game manager. This will help us override the OnLoaded callback and load the town
+            MissionTestGameManager manager = new MissionTestGameManager(result);
+
+            //start it
+            MBGameManager.StartNewGame(manager);
         }
 
         protected override void OnSubModuleUnloaded()

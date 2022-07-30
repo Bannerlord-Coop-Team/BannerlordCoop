@@ -286,10 +286,11 @@
     <Compile Include="Mod\Mission\IMissionPlayerNetwork.cs" />
     <Compile Include="Mod\Mission\IMission.cs" />
     <Compile Include="Mod\Mission\MissionShard.cs" />
+    <Compile Include="Mod\Mission\Test\MissionTestGameManager.cs" />
     <Compile Include="Mod\Mission\Network\INetworkObject.cs" />
     <Compile Include="Mod\Mission\Messages\MissionEventInfos.cs" />
     <Compile Include="Mod\Mission\Messages\MissionMessages.cs" />
-    <Compile Include="Mod\Mission\Network\MessageBroker.cs" />
+    <Compile Include="Mod\Mission\Network\NetworkMessageBroker.cs" />
     <Compile Include="Mod\Mission\Network\EventPacket.cs" />
     <Compile Include="Mod\Mission\Network\NetworkLooseWeapon.cs" />
     <Compile Include="Mod\Mission\Network\NetworkSiegeEngine.cs" />
@@ -317,7 +318,7 @@
     <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
-    <Compile Include="Mod\Mission\MissionManager.cs" />
+    <Compile Include="Mod\Mission\MissionNetworkBehavior.cs" />
     <Compile Include="Mod\Mission\PlayerId.cs" />
     <Compile Include="Mod\ObjectManagerAdapter.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />

@@ -40,8 +40,8 @@ namespace Coop.Tests.Mission
 
             TimeSpan updateTime = TimeSpan.FromSeconds(1);
 
-            IMessageBroker broker = new MessageBroker(client1);
-            IMessageBroker broker2 = new MessageBroker(client2);
+            IMessageBroker broker = new NetworkMessageBroker(client1);
+            IMessageBroker broker2 = new NetworkMessageBroker(client2);
 
             int Client1Calls = 0;
             int Client2Calls = 0;
@@ -90,8 +90,8 @@ namespace Coop.Tests.Mission
 
             TimeSpan updateTime = TimeSpan.FromSeconds(1);
 
-            IMessageBroker broker = new MessageBroker(client1);
-            IMessageBroker broker2 = new MessageBroker(client2);
+            IMessageBroker broker = new NetworkMessageBroker(client1);
+            IMessageBroker broker2 = new NetworkMessageBroker(client2);
 
             int Client1Calls = 0;
             int Client2Calls = 0;
@@ -143,8 +143,8 @@ namespace Coop.Tests.Mission
 
             TimeSpan updateTime = TimeSpan.FromSeconds(1);
 
-            IMessageBroker broker = new MessageBroker(client1);
-            IMessageBroker broker2 = new MessageBroker(client2);
+            IMessageBroker broker = new NetworkMessageBroker(client1);
+            IMessageBroker broker2 = new NetworkMessageBroker(client2);
 
             int Client1Calls = 0;
             int Client2Calls = 0;

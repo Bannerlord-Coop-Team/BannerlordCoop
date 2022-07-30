@@ -15,14 +15,14 @@ using System.Threading.Tasks;
 
 namespace Coop.Mod.Mission.Network
 {
-    public class MessageBroker : IMessageBroker, IPacketHandler
+    public class NetworkMessageBroker : IMessageBroker, IPacketHandler
     {
         private readonly Dictionary<Type, List<Delegate>> m_Subscribers;
         private readonly LiteNetP2PClient m_Client;
 
         public PacketType PacketType => PacketType.Event;
 
-        public MessageBroker(LiteNetP2PClient client)
+        public NetworkMessageBroker(LiteNetP2PClient client)
         {
             m_Client = client;
             m_Subscribers = new Dictionary<Type, List<Delegate>>();
