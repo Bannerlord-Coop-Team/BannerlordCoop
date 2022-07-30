@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using LiteNetLib;
@@ -7,15 +9,21 @@ using NLog;
 
 namespace Coop.NetImpl.LiteNet
 {
-    public class LiteNetListenerServer : INetEventListener
+    public class LiteNetListenerServer : INetEventListener, INatPunchListener
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly Server m_Server;
 
-        public LiteNetListenerServer(Server server)
+        private readonly Dictionary<string, List<P2PPeer>> m_instancePeers = new Dictionary<string, List<P2PPeer>>();
+
+        public readonly NetManager NetManager;
+
+        public LiteNetListenerServer(Server server, NetworkConfiguration config)
         {
             m_Server = server;
+            NetManager = NetManagerFactory.Create(this, config);
+            NetManager.NatPunchModule.Init(this);
         }
 
         public void OnConnectionRequest(ConnectionRequest request)
@@ -80,6 +88,45 @@ namespace Coop.NetImpl.LiteNet
                 remoteEndPoint.ToFriendlyString(),
                 reader,
                 messageType);
+        }
+
+        public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
+        {
+            var newPeer = new P2PPeer(localEndPoint, remoteEndPoint);
+            if (m_instancePeers.TryGetValue(token, out var peers))
+            {
+                if (peers.Contains(newPeer))
+                {
+                    newPeer.Refresh();
+                    return;
+                }
+
+                foreach (var existingPeer in peers)
+                {
+                    Trace.WriteLine($"Connecting {localEndPoint} to {existingPeer.InternalAddr}");
+                    NetManager.NatPunchModule.NatIntroduce(
+                        existingPeer.InternalAddr, // host internal
+                        existingPeer.ExternalAddr, // host external
+                        localEndPoint, // client internal
+                        remoteEndPoint, // client external
+                        token // request token
+                    );
+                }
+
+                m_instancePeers[token].Add(newPeer);
+            }
+            else
+            {
+                m_instancePeers[token] = new List<P2PPeer>
+                {
+                    newPeer
+                };
+            }
+        }
+
+        public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
+        {
+            // Ignore on server
         }
     }
 }

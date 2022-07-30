@@ -4,9 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.Mission.Network
+namespace Common.Serialization
 {
-    public interface INetworkInterface
+    public enum SerializationMethod : byte
     {
+        Invalid,
+        BinaryFormatter,
+        ProtoBuf,
     }
 }

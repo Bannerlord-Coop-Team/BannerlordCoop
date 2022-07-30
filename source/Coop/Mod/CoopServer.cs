@@ -37,6 +37,7 @@ using Coop.Mod.GameSync;
 using Coop.Mod.GameSync.Party;
 using RailgunNet.Connection.Server;
 using TaleWorlds.CampaignSystem.Party;
+using Common.Serialization;
 
 namespace Coop.Mod
 {

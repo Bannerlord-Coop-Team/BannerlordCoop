@@ -31,6 +31,11 @@ namespace Coop.Mod.Serializers.Custom
             return partiesList;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             if (partiesList == null)

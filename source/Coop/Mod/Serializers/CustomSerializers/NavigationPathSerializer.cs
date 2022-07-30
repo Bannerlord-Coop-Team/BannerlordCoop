@@ -29,6 +29,11 @@ namespace Coop.Mod.Serializers.Custom
             return newNavigationPath;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             // No references

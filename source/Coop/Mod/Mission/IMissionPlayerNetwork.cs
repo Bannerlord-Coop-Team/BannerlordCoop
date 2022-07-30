@@ -10,7 +10,6 @@ namespace Coop.Mod.Mission
 {
     public interface IMissionPlayerNetwork
     {
-
         void DetectTimeout();
 
         void Disconnect();
@@ -28,8 +27,5 @@ namespace Coop.Mod.Mission
         void ClaimControl();
 
         void RecieveControlClaim(MessagePayload<ClaimControlMessage> message);
-
-
-
     }
 }

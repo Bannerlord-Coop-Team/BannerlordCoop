@@ -52,7 +52,12 @@ namespace Coop.Mod.Serializers.Custom
                 .SetValue(newRoster, items.ToArray());
 
             return newRoster;
-            }
+        }
+
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
 
         public void ResolveReferenceGuids()
         {

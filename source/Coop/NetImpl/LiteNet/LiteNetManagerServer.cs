@@ -36,12 +36,14 @@ namespace Coop.NetImpl.LiteNet
             m_Server = server;
             if (m_Config.NetworkConfiguration.WanAddress != null)
             {
-                m_wanManager = CreateNetManager();
+                LiteNetListenerServer listener = new LiteNetListenerServer(m_Server, m_Config.NetworkConfiguration);
+                m_wanManager = listener.NetManager;
             }
 
             if (m_Config.NetworkConfiguration.LanAddress != null)
             {
-                m_lanManager = CreateNetManager();
+                LiteNetListenerServer listener = new LiteNetListenerServer(m_Server, m_Config.NetworkConfiguration);
+                m_lanManager = listener.NetManager;
             }
 
             m_SinceLastDiscovery = TimeSpan.Zero;
@@ -54,7 +56,9 @@ namespace Coop.NetImpl.LiteNet
             m_SinceLastKeepAlive += frameTime;
 
             m_lanManager?.PollEvents();
+            m_lanManager?.NatPunchModule?.PollEvents();
             m_wanManager?.PollEvents();
+            m_wanManager?.NatPunchModule?.PollEvents();
 
             if (m_lanManager != null && m_SinceLastDiscovery > m_Config.NetworkConfiguration.LanDiscoveryInterval)
             {
@@ -70,13 +74,6 @@ namespace Coop.NetImpl.LiteNet
             }
         }
         public int Priority { get; } = UpdatePriority.ServerThread.PollNetwork;
-
-        private NetManager CreateNetManager()
-        {
-            return NetManagerFactory.Create(
-                new LiteNetListenerServer(m_Server),
-                m_Config.NetworkConfiguration);
-        }
 
         public void StartListening()
         {

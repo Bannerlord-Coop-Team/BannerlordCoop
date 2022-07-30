@@ -29,6 +29,11 @@ namespace Coop.Mod.Serializers.Custom
             return newVillageMarketData;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             Village village = (Village)CoopObjectManager.GetObject(this.village);

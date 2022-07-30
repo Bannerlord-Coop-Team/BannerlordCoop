@@ -35,6 +35,11 @@ namespace Coop.Mod.Serializers.Custom
             return new MBGUID(id);
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             throw new NotImplementedException();

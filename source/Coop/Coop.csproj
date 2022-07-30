@@ -30,6 +30,7 @@
     <StartWorkingDirectory>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client</StartWorkingDirectory>
     <StartProgram>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
     <StartArguments>/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_</StartArguments>
+    <NoWarn>67</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
@@ -65,6 +66,12 @@
     </Reference>
     <Reference Include="PropertyChanged, Version=3.2.8.0, Culture=neutral, PublicKeyToken=ee3ee20bcf148ddd, processorArchitecture=MSIL">
       <HintPath>..\packages\PropertyChanged.Fody.3.2.8\lib\net40\PropertyChanged.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.3.0.101\lib\net461\protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.Core.3.0.101\lib\net461\protobuf-net.Core.dll</HintPath>
     </Reference>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
@@ -102,9 +109,25 @@
       <HintPath>..\..\mb2\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Collections.Immutable, Version=1.2.5.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Collections.Immutable.1.7.1\lib\net461\System.Collections.Immutable.dll</HintPath>
+    </Reference>
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Memory.4.5.4\lib\net461\System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.4.5.3\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
     <Reference Include="System.Runtime.InteropServices.RuntimeInformation" />
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ServiceModel" />
@@ -257,14 +280,17 @@
     <Compile Include="Mod\Config\RequiredSyncTypes.cs" />
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Mod\Mission\CoopMission.cs" />
+    <Compile Include="Mod\Mission\CoopMissionBehavior.cs" />
     <Compile Include="Mod\Mission\Messages\BattleNetworkMessages.cs" />
-    <Compile Include="Mod\Mission\MissionPlayer.cs" />
+    <Compile Include="Mod\Mission\MissionClient.cs" />
     <Compile Include="Mod\Mission\IMissionPlayerNetwork.cs" />
     <Compile Include="Mod\Mission\IMission.cs" />
-    <Compile Include="Mod\Mission\Network\INetworkInterface.cs" />
+    <Compile Include="Mod\Mission\MissionShard.cs" />
     <Compile Include="Mod\Mission\Network\INetworkObject.cs" />
     <Compile Include="Mod\Mission\Messages\MissionEventInfos.cs" />
     <Compile Include="Mod\Mission\Messages\MissionMessages.cs" />
+    <Compile Include="Mod\Mission\Network\MessageBroker.cs" />
+    <Compile Include="Mod\Mission\Network\EventPacket.cs" />
     <Compile Include="Mod\Mission\Network\NetworkLooseWeapon.cs" />
     <Compile Include="Mod\Mission\Network\NetworkSiegeEngine.cs" />
     <Compile Include="Mod\Mission\Network\NetworkMount.cs" />
@@ -291,7 +317,7 @@
     <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
-    <Compile Include="Mod\MissionManager.cs" />
+    <Compile Include="Mod\Mission\MissionManager.cs" />
     <Compile Include="Mod\Mission\PlayerId.cs" />
     <Compile Include="Mod\ObjectManagerAdapter.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />
@@ -428,6 +454,7 @@
     <Compile Include="Mod\Serializers\CustomSerializers\WorkshopSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializers\WorkshopTypeSerializer.cs" />
     <Compile Include="Mod\Serializers\CustomSerializerWithGuid.cs" />
+    <Compile Include="Mod\Serializers\ISerializationManager.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerCharacterObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerClanSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerCultureObjectSerializer.cs" />
@@ -439,6 +466,7 @@
     <Compile Include="Mod\Serializers\NewPlayer\PlayerHeroSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerPartyBaseSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerSettlementSerializer.cs" />
+    <Compile Include="Mod\Serializers\SerializationManager.cs" />
     <Compile Include="Mod\Serializers\TextObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\PartyComponentSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializer.cs" />
@@ -453,15 +481,17 @@
     <Compile Include="Mod\UI\LoadGameUI\CoopLoadUI.cs" />
     <Compile Include="NetImpl\LiteNet\DiscoveryThread.cs" />
     <Compile Include="NetImpl\LiteNet\Extensions.cs" />
+    <Compile Include="NetImpl\LiteNet\IPacket.cs" />
+    <Compile Include="NetImpl\LiteNet\IPacketHandler.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerClient.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetManagerServer.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetConnection.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetListenerServer.cs" />
     <Compile Include="NetImpl\LiteNet\LiteNetP2PClient.cs" />
-    <Compile Include="NetImpl\LiteNet\LiteNetP2PServer.cs" />
     <Compile Include="NetImpl\LiteNet\NetManagerFactory.cs" />
     <Compile Include="NetImpl\LiteNet\RailNetPeerWrapper.cs" />
+    <Compile Include="NetImpl\LiteNet\P2PPeer.cs" />
     <Compile Include="NetImpl\PlatformAPI.cs" />
     <Compile Include="NetImpl\Steam\NetworkSteam.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

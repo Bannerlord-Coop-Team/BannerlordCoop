@@ -103,5 +103,7 @@ namespace Coop.Mod.Serializers.Custom
                 field.SetValue(workshopType, CoopObjectManager.GetObject(id));
             }
         }
+
+        
     }
 }

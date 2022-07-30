@@ -105,6 +105,11 @@ namespace Coop.Mod.Serializers
             return textObject;
         }
 
+        public T Deserialize<T>()
+        {
+            return (T)Deserialize();
+        }
+
         public void ResolveReferenceGuids()
         {
             // Do nothing no references exist
