@@ -13,11 +13,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 
 namespace Coop.Mod.Missions
 {
-    public class MissionClient
+    public class MissionClient : IDisposable
     {
         private readonly Logger m_Logger = LogManager.GetCurrentClassLogger();
 
@@ -29,51 +30,71 @@ namespace Coop.Mod.Missions
 
         private readonly LiteNetP2PClient m_Client;
 
+        private readonly Guid m_PlayerId;
+
         public MissionClient(LiteNetP2PClient client)
         {
             m_Client = client;
+            m_PlayerId = Guid.NewGuid();
             MessageBroker = new NetworkMessageBroker(m_Client);
             MovementHandler = new MovementHandler(m_Client);
 
             serializedCharacterObject = new SerializableCharacterObject(CharacterObject.PlayerCharacter, Guid.NewGuid());
 
+            
+
             MessageBroker.Subscribe<MissionJoinRequest>(Handle_JoinRequest);
             MessageBroker.Subscribe<MissionJoinResponse>(Handle_JoinResponse);
         }
 
+        public void Dispose()
+        {
+            MovementHandler.Dispose();
+            MessageBroker.Dispose();
+        }
+
         public void SendJoinRequest()
         {
-            m_Logger.Info("Sending join request");
-            Guid playerId = MovementHandler.ControlledAgents.Where(kvp => kvp.Value == Agent.Main).Single().Key;
-            MissionJoinRequest request = new MissionJoinRequest(playerId, Agent.Main.Position);
-            MessageBroker.Publish(request);
+            try
+            {
+                m_Logger.Info("Sending join request");
+                MovementHandler.ControlledAgents.Add(m_PlayerId, Agent.Main);
+                MissionJoinRequest request = new MissionJoinRequest(m_PlayerId, Agent.Main.Position);
+                MessageBroker.Publish(request);
+            }
+            catch (Exception ex)
+            {
+                m_Logger.Error(ex.Message);
+            }
         }
 
         private void Handle_JoinRequest(MessagePayload<MissionJoinRequest> payload)
         {
             m_Logger.Info("Receive join request");
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
+            Guid newAgentId = payload.What.PlayerId;
 
             // TODO remove test code
-            Agent newAgent = MissionTestGameManager.AddPlayerToArena(false);
-            m_Logger.Info($"Creating new agent at {payload.What.OriginalPosition}");
-            newAgent.TeleportToPosition(payload.What.OriginalPosition);
-            MovementHandler.RegisterAgent(payload.What.PlayerId, newAgent);
+            Agent newAgent = MissionTestGameManager.SpawnTavernAgent();
+            
+            MovementHandler.RegisterAgent(netPeer, newAgentId, newAgent);
 
-            Guid playerId = MovementHandler.ControlledAgents.Where(kvp => kvp.Value == Agent.Main).Single().Key;
-
-            MissionJoinResponse response = new MissionJoinResponse(playerId, Agent.Main.Position);
+            MissionJoinResponse response = new MissionJoinResponse(m_PlayerId, Agent.Main.Position);
             MessageBroker.Publish(response, netPeer);
         }
 
         private void Handle_JoinResponse(MessagePayload<MissionJoinResponse> payload)
         {
             m_Logger.Info("Receive join response");
+            NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
 
             // TODO remove test code
-            Agent newAgent = MissionTestGameManager.AddPlayerToArena(false);
+            Agent newAgent = MissionTestGameManager.SpawnTavernAgent();
             m_Logger.Info($"Creating new agent at {payload.What.OriginalPosition}");
-            MovementHandler.RegisterAgent(payload.What.PlayerId, newAgent);
+            MovementHandler.RegisterAgent(netPeer, payload.What.PlayerId, newAgent);
+
+            // We no longer need to listen for responses
+            MessageBroker.Unsubscribe<MissionJoinResponse>(Handle_JoinResponse);
         }
     }
 }

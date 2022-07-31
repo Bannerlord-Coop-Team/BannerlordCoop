@@ -40,12 +40,12 @@ namespace Coop.Mod.Missions.Packets.Agents
         }
     }
 
-    public class MovementHandler : IPacketHandler
+    public class MovementHandler : IPacketHandler, IDisposable
     {
         private readonly NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
 
         public Dictionary<Guid, Agent> ControlledAgents = new Dictionary<Guid, Agent>();
-        public readonly Dictionary<Guid, Agent> OtherAgents = new Dictionary<Guid, Agent>();
+        public readonly Dictionary<NetPeer, AgentGroupController> OtherAgents = new Dictionary<NetPeer, AgentGroupController>();
 
 
         private readonly CancellationTokenSource m_AgentPollingCancelToken = new CancellationTokenSource();
@@ -65,6 +65,11 @@ namespace Coop.Mod.Missions.Packets.Agents
 
         ~MovementHandler()
         {
+            Dispose();
+        }
+
+        public void Dispose()
+        {
             m_AgentPollingCancelToken.Cancel();
             m_AgentPollingTask.Wait();
         }
@@ -80,30 +85,51 @@ namespace Coop.Mod.Missions.Packets.Agents
         {
             while (m_AgentPollingCancelToken.IsCancellationRequested == false)
             {
-                if(Mission.Current.IsLoadingFinished)
-                foreach(Guid guid in ControlledAgents.Keys)
+                bool? isLoadingFinished = Mission.Current?.IsLoadingFinished;
+                if (isLoadingFinished.HasValue == false)
                 {
-                    Agent agent = ControlledAgents[guid];
-                    m_Client.SendAll(new MovementPacket(guid, agent));
+                    m_AgentPollingCancelToken.Cancel(false);
+                }
+                else if (isLoadingFinished.Value)
+                {
+                    foreach (Guid guid in ControlledAgents.Keys)
+                    {
+                        Agent agent = ControlledAgents[guid];
+                        m_Client.SendAll(new MovementPacket(guid, agent));
+                    }
                 }
 
                 await Task.Delay(10);
             }
         }
 
-        public void RegisterAgent(Guid guid, Agent agent)
+        public void RegisterAgent(NetPeer peer, Guid guid, Agent agent)
         {
-            OtherAgents.Add(guid, agent);
+            if(OtherAgents.TryGetValue(peer, out AgentGroupController agentGroup))
+            {
+                agentGroup.AddAgent(guid, agent);
+            }
+            else
+            {
+                AgentGroupController agentGroupController = new AgentGroupController();
+                agentGroupController.AddAgent(guid, agent);
+                OtherAgents.Add(peer, agentGroupController);
+            }
         }
 
         public void HandlePacket(NetPeer peer, IPacket packet)
         {
-            MovementPacket movement = (MovementPacket)packet;
-
-            if(OtherAgents.TryGetValue(movement.AgentId, out Agent agent))
+            if(OtherAgents.TryGetValue(peer, out AgentGroupController agentGroupController))
             {
-                movement.Apply(agent);
+                MovementPacket movement = (MovementPacket)packet;
+                agentGroupController.ApplyMovement(movement);
             }
         }
+
+        public void HandlePeerDisconnect(NetPeer peer, DisconnectInfo reason)
+        {
+            OtherAgents.Remove(peer);
+        }
+
     }
 }

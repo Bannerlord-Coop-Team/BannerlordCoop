@@ -1,4 +1,5 @@
-﻿using SandBox;
+﻿using NLog;
+using SandBox;
 using SandBox.Conversation.MissionLogics;
 using SandBox.Missions.AgentBehaviors;
 using SandBox.Missions.MissionLogics;
@@ -29,6 +30,8 @@ namespace Coop.Mod.Missions
 {
     internal class MissionTestGameManager : SandBoxGameManager
     {
+        private static readonly NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
+
         delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
 
 
@@ -43,7 +46,6 @@ namespace Coop.Mod.Missions
             //get the settlement first
             Settlement settlement = Settlement.Find("town_S1");
 
-
             // get its arena
             Location locationWithId = settlement.LocationComplex.GetLocationWithId("arena");
 
@@ -56,32 +58,32 @@ namespace Coop.Mod.Missions
             //Set our encounter to the created encounter
             PlayerEncounter.LocationEncounter = locationEncounter;
 
-            PlayerEncounter.EnterSettlement();
+            //PlayerEncounter.EnterSettlement();
 
-            Location center = settlement.LocationComplex.GetLocationWithId("center");
+            //Location center = settlement.LocationComplex.GetLocationWithId("center");
 
             //return arena scenae name of current town
-            int upgradeLevel = settlement.IsTown ? settlement.Town.GetWallLevel() : 1;
+   //         int upgradeLevel = settlement.IsTown ? settlement.Town.GetWallLevel() : 1;
 
-            //Open a new arena mission with the scene; commented out because we are not doing Arena testing right now
-			string civilianUpgradeLevelTag = Campaign.Current.Models.LocationModel.GetCivilianUpgradeLevelTag(upgradeLevel);
-            Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(locationWithId.GetSceneName(upgradeLevel), "", false), (Mission mission) => new MissionBehavior[]
-               {
-                                new MissionOptionsComponent(),
-                                //new ArenaDuelMissionController(CharacterObject.PlayerCharacter, false, false, null, 1), //this was the default controller that spawned the player and 1 opponent. Not very useful
-                                new MissionFacialAnimationHandler(),
-                                new MissionDebugHandler(),
-                                new MissionAgentPanicHandler(),
-                                new AgentCommonAILogic(),
-                                new AgentHumanAILogic(),
-                                new ArenaAgentStateDeciderLogic(),
-                                new VisualTrackerMissionBehavior(),
-                                new CampaignMissionComponent(),
-                                new MissionNetworkComponent(),
-                                new EquipmentControllerLeaveLogic(),
-                                new MissionAgentHandler(locationWithId, null),
-                                new MissionNetworkBehavior(),
-               }, true, true);
+   //         //Open a new arena mission with the scene; commented out because we are not doing Arena testing right now
+			//string civilianUpgradeLevelTag = Campaign.Current.Models.LocationModel.GetCivilianUpgradeLevelTag(upgradeLevel);
+   //         Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(locationWithId.GetSceneName(upgradeLevel), "", false), (Mission mission) => new MissionBehavior[]
+   //            {
+   //                             new MissionOptionsComponent(),
+   //                             //new ArenaDuelMissionController(CharacterObject.PlayerCharacter, false, false, null, 1), //this was the default controller that spawned the player and 1 opponent. Not very useful
+   //                             new MissionFacialAnimationHandler(),
+   //                             new MissionDebugHandler(),
+   //                             new MissionAgentPanicHandler(),
+   //                             new AgentCommonAILogic(),
+   //                             new AgentHumanAILogic(),
+   //                             new ArenaAgentStateDeciderLogic(),
+   //                             new VisualTrackerMissionBehavior(),
+   //                             new CampaignMissionComponent(),
+   //                             new MissionNetworkComponent(),
+   //                             new EquipmentControllerLeaveLogic(),
+   //                             new MissionAgentHandler(locationWithId, null),
+   //                             new MissionNetworkBehavior(),
+   //            }, true, true);
 
             //MouseManager.ShowCursor(false);
 
@@ -191,6 +193,43 @@ namespace Coop.Mod.Missions
             //// spawn an instance of the player (controlled by default)
             SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement, true);
 
+        }
+
+        [CommandLineFunctionality.CommandLineArgumentFunction("spawn_tavern_agent", "test")]
+        public static Agent SpawnTavernAgent()
+        {
+            MatrixFrame frame = Mission.Current.Scene.FindEntitiesWithTag("sp_player_conversation").Single().GetGlobalFrame();
+
+            Vec2 vec = frame.rotation.f.AsVec2;
+            vec = vec.Normalized();
+
+            CharacterObject character = Hero.MainHero.CharacterObject;
+            AgentBuildData agentBuildData = new AgentBuildData(character);
+            agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
+            agentBuildData.InitialPosition(frame.origin);
+            agentBuildData.Team(Mission.Current.PlayerAllyTeam);
+            agentBuildData.InitialDirection(vec);
+            agentBuildData.NoHorses(true);
+            agentBuildData.Equipment(character.FirstCivilianEquipment);
+            agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor)));
+            agentBuildData.Controller(Agent.ControllerType.None);
+
+            m_Logger.Info("Spawning Agent");
+            Agent agent = default(Agent);
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                agent = Mission.Current.SpawnAgent(agentBuildData);
+                agent.FadeIn();
+            });
+
+            return agent;
+        }
+
+        public static string[] GetAllSpawnPoints(Scene scene)
+        {
+            List<GameEntity> entities = new List<GameEntity>();
+            scene.GetEntities(ref entities);
+            return entities.Where(entity => entity.Tags.Any(tag => tag.StartsWith("sp_"))).Select(entity => entity.Name).ToArray();
         }
     }
 }

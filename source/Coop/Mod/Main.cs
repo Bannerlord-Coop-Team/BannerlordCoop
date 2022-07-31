@@ -129,7 +129,6 @@ namespace Coop.Mod
 
         public override void OnBeforeMissionBehaviorInitialize(TaleWorlds.MountAndBlade.Mission mission)
         {
-            // add the network behavior
             mission.AddMissionBehavior(new MissionNetworkBehavior());
         }
 
@@ -178,8 +177,7 @@ namespace Coop.Mod
             }
 
             if ((args.Contains("/battles") ||
-                args.Contains("/battle")) &&
-                args.Contains("/server"))
+                args.Contains("/battle")))
             {
                 StateEvents.OnMainMenuReady += () =>
                 {
@@ -215,15 +213,12 @@ namespace Coop.Mod
                             }
                             else if (argument.ToLower() == "/client")
                             {
-                                // TODO remove this line later, battles debug
-                                StartFirstSaveAndMission();
-                                //TODO uncomment
-                                //ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
-                                //ServerConfiguration defaultConfiguration =
-                                //    new ServerConfiguration();
-                                //CoopClient.Instance.Connect(
-                                //    defaultConfiguration.NetworkConfiguration.LanAddress,
-                                //    defaultConfiguration.NetworkConfiguration.LanPort);
+                                ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
+                                ServerConfiguration defaultConfiguration =
+                                    new ServerConfiguration();
+                                CoopClient.Instance.Connect(
+                                    defaultConfiguration.NetworkConfiguration.LanAddress,
+                                    defaultConfiguration.NetworkConfiguration.LanPort);
                             }
                         }
 #else

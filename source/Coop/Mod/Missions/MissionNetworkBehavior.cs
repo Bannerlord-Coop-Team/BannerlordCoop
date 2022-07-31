@@ -22,33 +22,36 @@ namespace Coop.Mod.Missions
         private readonly LiteNetP2PClient m_Client;
         private MissionClient missionClient;
 
-        private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
+        private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(5);
 
         public MissionNetworkBehavior()
         {
             m_Client = new LiteNetP2PClient(new NetworkConfiguration());
 
             Main.Instance.Updateables.Add(m_Client);
-        }
-
-        public override void OnAfterMissionCreated()
-        {
-            
-            base.OnAfterMissionCreated();
 
             // TODO find callback for loading mission
             Task.Factory.StartNew(async () =>
             {
-                while (Mission == null || Mission.IsLoadingFinished == false) { await Task.Delay(100); }
+                while (Mission == null || Mission.IsLoadingFinished == false)
+                {
+                    await Task.Delay(100);
+                }
                 m_Client.ConnectToP2PServer(Mission.SceneName);
-
-                // TODO remove test code
-                MissionTestGameManager.StartArenaFight();
 
                 missionClient = new MissionClient(m_Client);
                 await Task.Delay(WaitForConnectionsTime);
                 missionClient.SendJoinRequest();
             });
+        }
+
+        public override void OnRemoveBehavior()
+        {
+            base.OnRemoveBehavior();
+
+            missionClient.Dispose();
+            m_Client.Dispose();
+            Main.Instance.Updateables.Remove(m_Client);
         }
     }
 }

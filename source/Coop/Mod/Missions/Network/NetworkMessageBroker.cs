@@ -114,5 +114,10 @@ namespace Coop.Mod.Missions.Network
             m_Logger.Info($"Publishing {message}");
             Publish(message, null);
         }
+
+        public void HandlePeerDisconnect(NetPeer peer, DisconnectInfo reason)
+        {
+
+        }
     }
 }

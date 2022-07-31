@@ -280,6 +280,7 @@
     <Compile Include="Mod\Config\RequiredSyncTypes.cs" />
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Mod\Events\MissionEvents.cs" />
+    <Compile Include="Mod\Missions\Packets\Agents\AgentGroupController.cs" />
     <Compile Include="Mod\Missions\CoopMission.cs" />
     <Compile Include="Mod\Missions\Messages\BattleNetworkMessages.cs" />
     <Compile Include="Mod\Missions\Messages\MissionJoinRequest.cs" />

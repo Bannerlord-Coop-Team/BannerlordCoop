@@ -16,10 +16,11 @@ using System.Threading.Tasks;
 
 namespace Coop.NetImpl.LiteNet
 {
-    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable
+    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable
     {
         private static Logger m_Logger = LogManager.GetCurrentClassLogger();
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;
+        public event Action<NetPeer, DisconnectInfo> OnClientDisconnected;
 
         NetManager netManager;
         string instance;
@@ -45,6 +46,11 @@ namespace Coop.NetImpl.LiteNet
         }
 
         ~LiteNetP2PClient()
+        {
+            Dispose();
+        }
+
+        public void Dispose()
         {
             Stop();
         }
@@ -155,7 +161,13 @@ namespace Coop.NetImpl.LiteNet
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            
+            foreach (var handlers in m_PacketHandlers.Values)
+            {
+                foreach (var handler in handlers)
+                {
+                    handler.HandlePeerDisconnect(peer, disconnectInfo);
+                }
+            }
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
