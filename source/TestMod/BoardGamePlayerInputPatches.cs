@@ -44,7 +44,7 @@ namespace CoopTestMod
                     ToIndex = boardGameLogic.Board.Tiles.IndexOf(__result.GoalTile)
                 };
 
-                broker.Publish(__instance, boardGameMoveEvent);
+                broker.Publish(boardGameMoveEvent);
             }
         }
 
@@ -68,7 +68,7 @@ namespace CoopTestMod
                             FromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(hoveredPawnIfAny)
                         };
 
-                        broker.Publish(boardGameLogic.Board, pawnCapturedEvent);
+                        broker.Publish(pawnCapturedEvent);
                     }
                 }
             }
@@ -101,7 +101,7 @@ namespace CoopTestMod
                     FromIndex = boardGameLogic.Board.PlayerTwoUnits.IndexOf(pawn)
                 };
 
-                broker.Publish(boardGameLogic.Board, pawnCapturedEvent);
+                broker.Publish(pawnCapturedEvent);
 
                 forceRemove = false;
             }

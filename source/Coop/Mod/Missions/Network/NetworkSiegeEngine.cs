@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.Mission
+namespace Coop.Mod.Missions
 {
-    public class NetworkMount
+    public class NetworkSiegeEngine
     {
         public Guid networkId;
 

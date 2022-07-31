@@ -488,7 +488,7 @@ namespace CoopTestMod
                     OtherAgentId = otherAgentId
                 };
 
-                broker.Publish(__instance, boardGameForfeitRequest);
+                broker.Publish(boardGameForfeitRequest);
             }
         }
 
@@ -531,7 +531,7 @@ namespace CoopTestMod
                     weaponIndex = shooterAgent.WieldedWeapon.CurrentUsageIndex
                 };
 
-                broker.Publish<MissileFireRequest>(Mission.Current, missileFireEvent);
+                broker.Publish(missileFireEvent);
                 
             }
         }

@@ -4,6 +4,7 @@ using Common.Serialization;
 using Coop.NetImpl.LiteNet;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using NLog;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -13,10 +14,12 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.Mission.Network
+namespace Coop.Mod.Missions.Network
 {
     public class NetworkMessageBroker : IMessageBroker, IPacketHandler
     {
+        private static Logger m_Logger = LogManager.GetCurrentClassLogger();
+
         private readonly Dictionary<Type, List<Delegate>> m_Subscribers;
         private readonly LiteNetP2PClient m_Client;
 
@@ -30,16 +33,23 @@ namespace Coop.Mod.Mission.Network
             m_Client.AddHandler(this);
         }
 
-        public void Publish<T>(object source, T message)
+        public void Publish<T>(T message, NetPeer peer = null)
         {
-            if (message == null || source == null)
+            if (message == null)
                 return;
 
-            var payload = new MessagePayload<T>(message, source.ToString());
+            var payload = new MessagePayload<T>(message, string.Empty);
 
             EventPacket messagePacket = new EventPacket(payload);
 
-            m_Client.SendAll(messagePacket);
+            if(peer != null)
+            {
+                m_Client.Send(messagePacket, peer);
+            }
+            else
+            {
+                m_Client.SendAll(messagePacket);
+            }
         }
 
         public void Subscribe<T>(Action<MessagePayload<T>> subscription)
@@ -70,6 +80,7 @@ namespace Coop.Mod.Mission.Network
 
         public void HandlePacket(NetPeer peer, IPacket packet)
         {
+            m_Logger.Debug($"Received message {packet} from {peer.EndPoint}");
             object payload = CommonSerializer.Deserialize(packet.Data, SerializationMethod.ProtoBuf);
 
             Type type = payload.GetType();
@@ -77,6 +88,8 @@ namespace Coop.Mod.Mission.Network
             {
                 throw new InvalidCastException($"{payload.GetType()} is not of type {typeof(MessagePayload<>)}");
             }
+
+            type.GetProperty("Who").SetValue(payload, peer);
 
             Type T = type.GetProperty("What").PropertyType;
 
@@ -88,10 +101,18 @@ namespace Coop.Mod.Mission.Network
             var delegates = m_Subscribers[T];
             if (delegates == null || delegates.Count == 0) return;
 
+            m_Logger.Info($"Recieved {payload}");
+
             foreach (var handler in delegates)
             {
                 Task.Factory.StartNew(() => handler.Method.Invoke(handler.Target, new object[] { payload }));
             }
+        }
+
+        public void Publish<T>(T message)
+        {
+            m_Logger.Info($"Publishing {message}");
+            Publish(message, null);
         }
     }
 }

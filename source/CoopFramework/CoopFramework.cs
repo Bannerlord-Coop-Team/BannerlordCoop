@@ -44,10 +44,14 @@ namespace CoopFramework
             BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
             foreach (Assembly assembly in loadedAssemblies)
             {
-                foreach (Type type in assembly.GetTypes().Where(t => t.GetMethods(Flags).Any(m => m.GetCustomAttributes<LoadInitializationCallback>().Any())))
+                try
                 {
-                    LoadInitializationCallbacks.Add(type, type.GetMethods(Flags).Where(m => m.GetCustomAttributes<LoadInitializationCallback>().Any()).First());
+                    foreach (Type type in assembly.GetTypes().Where(t => t.GetMethods(Flags).Any(m => m.GetCustomAttributes<LoadInitializationCallback>().Any())))
+                    {
+                        LoadInitializationCallbacks.Add(type, type.GetMethods(Flags).Where(m => m.GetCustomAttributes<LoadInitializationCallback>().Any()).First());
+                    }
                 }
+                catch(ReflectionTypeLoadException) { }
             }
             AppDomain.CurrentDomain.AssemblyLoad += (sender, args) => PatchAssembly(args.LoadedAssembly);
             foreach (var assembly in loadedAssemblies) PatchAssembly(assembly);
@@ -66,20 +70,24 @@ namespace CoopFramework
         {
             lock (m_AssemblyPatchLock)
             {
-                foreach (var type in assembly.GetTypes()
+                try
+                {
+                    foreach (var type in assembly.GetTypes()
                     .Where(t => !t.IsGenericType || !t.ContainsGenericParameters)
-                ) // Cannot call methods on (partially) undefined generic types.
-                foreach (var method in type.GetMethods(BindingFlags.Static |
-                                                       BindingFlags.Public |
-                                                       BindingFlags.NonPublic |
-                                                       BindingFlags.FlattenHierarchy))
-                    if (method.IsDefined(typeof(PatchInitializerAttribute)) &&
-                        !method.GetCustomAttribute<PatchInitializerAttribute>().IsInitialized)
-                    {
-                        Logger.Info("Init patch {}.{}", method.DeclaringType, method.Name);
-                        method.Invoke(null, null);
-                        method.GetCustomAttribute<PatchInitializerAttribute>().IsInitialized = true;
-                    }
+                    ) // Cannot call methods on (partially) undefined generic types.
+                    foreach (var method in type.GetMethods(BindingFlags.Static |
+                                                            BindingFlags.Public |
+                                                            BindingFlags.NonPublic |
+                                                            BindingFlags.FlattenHierarchy))
+                        if (method.IsDefined(typeof(PatchInitializerAttribute)) &&
+                            !method.GetCustomAttribute<PatchInitializerAttribute>().IsInitialized)
+                        {
+                            Logger.Info("Init patch {}.{}", method.DeclaringType, method.Name);
+                            method.Invoke(null, null);
+                            method.GetCustomAttribute<PatchInitializerAttribute>().IsInitialized = true;
+                        }
+                }
+                catch(ReflectionTypeLoadException) { }
             }
         }
 

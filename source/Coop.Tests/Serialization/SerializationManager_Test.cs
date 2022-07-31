@@ -1,4 +1,8 @@
-﻿using Coop.Mod.Serializers;
+﻿using Common;
+using Coop.Mod.Missions;
+using Coop.Mod.Missions.Messages;
+using Coop.Mod.Serializers;
+using Coop.Mod.Serializers.Surrogates;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -7,6 +11,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace Coop.Tests.Serialization
@@ -167,29 +172,26 @@ namespace Coop.Tests.Serialization
         [Fact]
         public void ProtoSerialize_Test()
         {
-            DummyProtoClass<Type> dummyObj = new DummyProtoClass<Type>();
 
-            dummyObj.RanObj = typeof(int);
-
-            string d = (Base64FormattingOptions.None as Enum).ToString();
+            SurrogateCollector.CollectSurrogates();
+            Vec2 vec = Vec2.One;
 
             byte[] data;
-
-            using(MemoryStream stream = new MemoryStream())
+            using (var ms = new MemoryStream())
             {
-                Serializer.Serialize(stream, dummyObj);
-                data = stream.ToArray();
+                Serializer.Serialize(ms, vec);
+                data = ms.ToArray();
             }
 
-            DummyProtoClass<Type> dummyObj2;
-
-            using (MemoryStream stream = new MemoryStream(data))
+            Vec2 newVec;
+            using (var ms = new MemoryStream(data))
             {
-                dummyObj2 = Serializer.Deserialize<DummyProtoClass<Type>>(stream);
+                newVec = Serializer.Deserialize<Vec2>(ms);
             }
 
-            Assert.False(ReferenceEquals(dummyObj, dummyObj2));
-            Assert.Equal(dummyObj.RanVal, dummyObj2.RanVal);
+            Assert.Equal(vec, newVec);
+
+
         }
     }
 }

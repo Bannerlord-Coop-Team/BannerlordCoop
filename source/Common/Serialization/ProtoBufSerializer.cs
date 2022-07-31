@@ -52,6 +52,7 @@ namespace Common.Serialization
                     return InternalStream.ToArray();
                 }
             }
+
         }
     }
 }

@@ -9,7 +9,7 @@ namespace Common.Messaging
 {
     public interface IMessageBroker : IDisposable
     {
-        void Publish<T>(object source, T message);
+        void Publish<T>(T message);
 
         void Subscribe<T>(Action<MessagePayload<T>> subcription);
 

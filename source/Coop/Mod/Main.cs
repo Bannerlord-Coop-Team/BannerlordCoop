@@ -31,11 +31,14 @@ using TaleWorlds.ScreenSystem;
 using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
-using Coop.Mod.Mission;
+using Coop.Mod.Missions;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using SandBox;
 using TaleWorlds.CampaignSystem.Settlements;
+using Coop.NetImpl.LiteNet;
+using System.Threading.Tasks;
+using Coop.Mod.Serializers.Surrogates;
 
 namespace Coop.Mod
 {
@@ -51,6 +54,8 @@ namespace Coop.Mod
         private bool m_IsFirstTick = true;
 
         private bool _isDebugToggled = false;
+
+        private static bool m_IsServer = false;
 
         #region MainMenuButtons
         public static InitialStateOption CoopCampaign =
@@ -119,6 +124,7 @@ namespace Coop.Mod
         public override void NoHarmonyInit()
         {
             DebugLogging.Initialize();
+            SurrogateCollector.CollectSurrogates();
         }
 
         public override void OnBeforeMissionBehaviorInitialize(TaleWorlds.MountAndBlade.Mission mission)
@@ -155,8 +161,6 @@ namespace Coop.Mod
             // Apply all patches via harmony
             harmony.PatchAll();
 
-            var isServer = false;
-
             var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
 
 
@@ -164,17 +168,18 @@ namespace Coop.Mod
             if (args.Contains("/server"))
             {
                 AddBehavior<PartySyncDebugBehavior>();
-                isServer = true;
+                m_IsServer = true;
                 //TODO add name to args
                 
             }
             else if (args.Contains("/client"))
             {
-                isServer = false;
+                m_IsServer = false;
             }
 
-            if (args.Contains("/battles") ||
-                args.Contains("/battle"))
+            if ((args.Contains("/battles") ||
+                args.Contains("/battle")) &&
+                args.Contains("/server"))
             {
                 StateEvents.OnMainMenuReady += () =>
                 {
@@ -191,7 +196,7 @@ namespace Coop.Mod
             CoopCampaign =
                 new InitialStateOption(
                     "CoOp Campaign",
-                    new TextObject(isServer ? "Host Co-op Campaign" : "Join Co-op Campaign"),
+                    new TextObject(m_IsServer ? "Host Co-op Campaign" : "Join Co-op Campaign"),
                     9990,
                     () =>
                     {
@@ -210,12 +215,15 @@ namespace Coop.Mod
                             }
                             else if (argument.ToLower() == "/client")
                             {
-                                ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
-                                ServerConfiguration defaultConfiguration =
-                                    new ServerConfiguration();
-                                CoopClient.Instance.Connect(
-                                    defaultConfiguration.NetworkConfiguration.LanAddress,
-                                    defaultConfiguration.NetworkConfiguration.LanPort);
+                                // TODO remove this line later, battles debug
+                                StartFirstSaveAndMission();
+                                //TODO uncomment
+                                //ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
+                                //ServerConfiguration defaultConfiguration =
+                                //    new ServerConfiguration();
+                                //CoopClient.Instance.Connect(
+                                //    defaultConfiguration.NetworkConfiguration.LanAddress,
+                                //    defaultConfiguration.NetworkConfiguration.LanPort);
                             }
                         }
 #else
@@ -243,8 +251,30 @@ namespace Coop.Mod
             #endregion
         }
 
+        private static LiteNetListenerServer test_server;
         private static void StartFirstSaveAndMission()
         {
+            if (m_IsServer)
+            {
+                NetworkConfiguration Config = new NetworkConfiguration();
+                Server serverSM = new Server(Server.EType.Direct);
+                test_server = new LiteNetListenerServer(serverSM, Config);
+
+                serverSM.Start(new ServerConfiguration());
+
+                test_server.NetManager.Start(Config.LanPort);
+
+                Task.Factory.StartNew(async () =>
+                {
+                    while (true)
+                    {
+                        test_server.NetManager.PollEvents();
+                        test_server.NetManager.NatPunchModule.PollEvents();
+                        await Task.Delay(10);
+                    }
+                });
+            }
+
             //Get all the save sames
             SaveGameFileInfo[] games = MBSaveLoad.GetSaveFiles();
 

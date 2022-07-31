@@ -10,19 +10,18 @@ using TaleWorlds.PlayerServices;
 namespace Common
 {
     [Serializable]
-    [ProtoContract]
-    public readonly struct MessagePayload<T>
+    [ProtoContract(SkipConstructor = true)]
+    public struct MessagePayload<T>
     {
+        public object Who { get; set; }
         [ProtoMember(1)]
-        public string Who { get; }
-        [ProtoMember(2)]
         public T What { get; }
-        [ProtoMember(3)]
+        [ProtoMember(2)]
         public DateTime When { get; }
 
         public MessagePayload(T payload, object source)
         {
-            Who = source.ToString(); What = payload; When = DateTime.UtcNow;
+            Who = source; What = payload; When = DateTime.UtcNow;
         }
     }
 }

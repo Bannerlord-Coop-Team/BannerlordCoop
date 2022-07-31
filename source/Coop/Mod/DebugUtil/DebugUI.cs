@@ -805,7 +805,7 @@ namespace Coop.Mod.DebugUtil
                 if (clientRoom != null)
                 {
                     Guid guid = CoopObjectManager.GetGuid(party);
-                    MobilePartyEntityClient partyEntity = clientRoom.Entities.Values
+                    MobilePartyEntityClient partyEntity = clientRoom.Entities
                         .OfType<MobilePartyEntityClient>()
                         .FirstOrDefault(e => e.State.PartyId == guid);
 

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.Mission.Messages
+namespace Coop.Mod.Missions.Messages
 {
     public struct StartNewResponse
     {

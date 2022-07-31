@@ -279,23 +279,29 @@
   <ItemGroup>
     <Compile Include="Mod\Config\RequiredSyncTypes.cs" />
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
-    <Compile Include="Mod\Mission\CoopMission.cs" />
-    <Compile Include="Mod\Mission\CoopMissionBehavior.cs" />
-    <Compile Include="Mod\Mission\Messages\BattleNetworkMessages.cs" />
-    <Compile Include="Mod\Mission\MissionClient.cs" />
-    <Compile Include="Mod\Mission\IMissionPlayerNetwork.cs" />
-    <Compile Include="Mod\Mission\IMission.cs" />
-    <Compile Include="Mod\Mission\MissionShard.cs" />
-    <Compile Include="Mod\Mission\Test\MissionTestGameManager.cs" />
-    <Compile Include="Mod\Mission\Network\INetworkObject.cs" />
-    <Compile Include="Mod\Mission\Messages\MissionEventInfos.cs" />
-    <Compile Include="Mod\Mission\Messages\MissionMessages.cs" />
-    <Compile Include="Mod\Mission\Network\NetworkMessageBroker.cs" />
-    <Compile Include="Mod\Mission\Network\EventPacket.cs" />
-    <Compile Include="Mod\Mission\Network\NetworkLooseWeapon.cs" />
-    <Compile Include="Mod\Mission\Network\NetworkSiegeEngine.cs" />
-    <Compile Include="Mod\Mission\Network\NetworkMount.cs" />
-    <Compile Include="Mod\Mission\Network\NetworkAgent.cs" />
+    <Compile Include="Mod\Events\MissionEvents.cs" />
+    <Compile Include="Mod\Missions\CoopMission.cs" />
+    <Compile Include="Mod\Missions\Messages\BattleNetworkMessages.cs" />
+    <Compile Include="Mod\Missions\Messages\MissionJoinRequest.cs" />
+    <Compile Include="Mod\Missions\MissionClient.cs" />
+    <Compile Include="Mod\Missions\IMissionPlayerNetwork.cs" />
+    <Compile Include="Mod\Missions\IMission.cs" />
+    <Compile Include="Mod\Missions\MissionShard.cs" />
+    <Compile Include="Mod\Missions\Packets\Agents\AgentActionData.cs" />
+    <Compile Include="Mod\Missions\Packets\Agents\AgentData.cs" />
+    <Compile Include="Mod\Missions\Packets\Agents\AgentEquipmentData.cs" />
+    <Compile Include="Mod\Missions\Packets\Agents\AgentMountData.cs" />
+    <Compile Include="Mod\Missions\Packets\Agents\MovementHandler.cs" />
+    <Compile Include="Mod\Missions\Test\MissionTestGameManager.cs" />
+    <Compile Include="Mod\Missions\Network\INetworkObject.cs" />
+    <Compile Include="Mod\Missions\Messages\MissionEventInfos.cs" />
+    <Compile Include="Mod\Missions\Messages\MissionMessages.cs" />
+    <Compile Include="Mod\Missions\Network\NetworkMessageBroker.cs" />
+    <Compile Include="Mod\Missions\Network\EventPacket.cs" />
+    <Compile Include="Mod\Missions\Network\NetworkLooseWeapon.cs" />
+    <Compile Include="Mod\Missions\Network\NetworkSiegeEngine.cs" />
+    <Compile Include="Mod\Missions\Network\NetworkMount.cs" />
+    <Compile Include="Mod\Missions\Network\NetworkAgent.cs" />
     <Compile Include="Mod\CoopClientSM.cs" />
     <Compile Include="Mod\CoopConditions.cs" />
     <Compile Include="Mod\Config\ManagedTypesConfig.cs" />
@@ -318,8 +324,8 @@
     <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerCampaignBehaviorSync.cs" />
     <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
-    <Compile Include="Mod\Mission\MissionNetworkBehavior.cs" />
-    <Compile Include="Mod\Mission\PlayerId.cs" />
+    <Compile Include="Mod\Missions\MissionNetworkBehavior.cs" />
+    <Compile Include="Mod\Missions\PlayerId.cs" />
     <Compile Include="Mod\ObjectManagerAdapter.cs" />
     <Compile Include="Mod\CoopServerSM.cs" />
     <Compile Include="Mod\DebugUtil\CLICommands.cs" />
@@ -468,6 +474,9 @@
     <Compile Include="Mod\Serializers\NewPlayer\PlayerPartyBaseSerializer.cs" />
     <Compile Include="Mod\Serializers\NewPlayer\PlayerSettlementSerializer.cs" />
     <Compile Include="Mod\Serializers\SerializationManager.cs" />
+    <Compile Include="Mod\Serializers\Surrogates\SurrogateCollector.cs" />
+    <Compile Include="Mod\Serializers\Surrogates\Vec2Surrogate.cs" />
+    <Compile Include="Mod\Serializers\Surrogates\Vec3Surrogate.cs" />
     <Compile Include="Mod\Serializers\TextObjectSerializer.cs" />
     <Compile Include="Mod\Serializers\PartyComponentSerializer.cs" />
     <Compile Include="Mod\Serializers\PropertyOwnerSerializer.cs" />
@@ -552,6 +561,6 @@
     <PostBuildEvent>powershell -ExecutionPolicy Unrestricted ^
             -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\" ^
             -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\\" ^
-            -Libs Coop.dll,CoopFramework.dll,Common.dll,Network.dll,Sync.dll,RemoteAction.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll</PostBuildEvent>
+            -Libs Coop.dll,CoopFramework.dll,Common.dll,Network.dll,Sync.dll,RemoteAction.dll,0harmony.dll,LiteNetLib.dll,Stateless.dll,RailgunNet.dll,NLog.dll,Mono.Reflection.dll,Extensions.Data.xxHash.dll,DistributedLock.dll,BannerlordSystemTestingFramework.dll,SimpleTCP.dll,protobuf-net.dll,protobuf-net.Core.dll,System.Memory.dll,System.Buffers.dll,System.Collections.Immutable.dll,System.Runtime.CompilerServices.Unsafe.dll</PostBuildEvent>
   </PropertyGroup>
 </Project>

@@ -1,7 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Coop.Mod.Config;
-using Coop.Mod.Mission.Network;
+using Coop.Mod.Missions.Network;
 using Coop.NetImpl.LiteNet;
 using Coop.Tests.Mission.Dummy;
 using Coop.Tests.Mission.P2PUtils;
@@ -64,8 +64,8 @@ namespace Coop.Tests.Mission
             broker.Subscribe(rxEvent1);
             broker2.Subscribe(rxEvent2);
 
-            broker.Publish("c1", value1);
-            broker2.Publish("c2", value2);
+            broker.Publish(value1);
+            broker2.Publish(value2);
 
             group.UpdateForXTime(updateTime, (_) => { return Client1Calls == 1 && Client2Calls == 1; });
 
@@ -124,8 +124,8 @@ namespace Coop.Tests.Mission
                 MyInt = value2
             };
 
-            broker.Publish("c1", obj1);
-            broker2.Publish("c2", obj2);
+            broker.Publish(obj1);
+            broker2.Publish(obj2);
 
             group.UpdateForXTime(updateTime, (_) => { return Client1Calls == 1 && Client2Calls == 1; });
 
@@ -168,7 +168,7 @@ namespace Coop.Tests.Mission
             broker2.Subscribe(rxEvent2);
 
             // Publish invalid message
-            Assert.Throws<InvalidOperationException>(() => { broker.Publish("c1", broker); });
+            Assert.Throws<InvalidOperationException>(() => { broker.Publish(broker); });
         }
     }
 }

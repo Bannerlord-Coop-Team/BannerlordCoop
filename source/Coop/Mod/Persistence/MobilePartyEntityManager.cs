@@ -136,13 +136,13 @@ namespace Coop.Mod.Persistence
                     return null;
                 },
                 GetScopeRange);
-                controller.Scope.OnBeforeScopeEnter += BeforeScopeEnter;
-                controller.Scope.OnBeforeScopeLeave += BeforeScopeLeave;
+                //controller.Scope.OnBeforeScopeEnter += BeforeScopeEnter;
+                //controller.Scope.OnBeforeScopeLeave += BeforeScopeLeave;
             };
             room.ClientLeft += controller =>
             {
-                controller.Scope.OnBeforeScopeEnter -= BeforeScopeEnter;
-                controller.Scope.OnBeforeScopeLeave -= BeforeScopeLeave;
+                //controller.Scope.OnBeforeScopeEnter -= BeforeScopeEnter;
+                //controller.Scope. -= BeforeScopeLeave;
             };
             WorldEntityServer = room.AddNewEntity<WorldEntityServer>();
         }
@@ -318,7 +318,7 @@ namespace Coop.Mod.Persistence
             lock (m_Lock)
             {
                 foreach (RailEntityServer controlledEntity in m_Room
-                                                              .Entities.Values.Where(
+                                                              .Entities.Where(
                                                                   e => e.Controller == peer)
                                                               .Select(e => e as RailEntityServer))
                 {

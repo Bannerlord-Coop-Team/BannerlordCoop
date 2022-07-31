@@ -78,18 +78,18 @@ namespace Coop.Mod.Persistence.RemoteAction
                     .Where(call =>
                 {
                     // We want to keep calls in the cleanup list that have not yet been executed on all clients.
-                    foreach (RailPeer client in call.Room.Clients)
-                    {
-                        // Check the event ID of the events we sent against the last event processed by that peer.
-                        if (call.BroadcastEvents.TryGetValue(client, out SequenceId eventId))
-                        {
-                            if (client.LastAckEventId < eventId)
-                            {
-                                // That client has not yet processed the event => keep the call for future cleanup
-                                return true;
-                            }
-                        }
-                    }
+                    //foreach (RailPeer client in call.Room.Clients)
+                    //{
+                    //    // Check the event ID of the events we sent against the last event processed by that peer.
+                    //    if (call.BroadcastEvents.TryGetValue(client, out SequenceId eventId))
+                    //    {
+                    //        if (client.LastAckEventId < eventId)
+                    //        {
+                    //            // That client has not yet processed the event => keep the call for future cleanup
+                    //            return true;
+                    //        }
+                    //    }
+                    //}
 
                     // All clients have received and processed this call. The arguments are no longer needed.
                     foreach (ObjectId id in call.ObjectsNeededForCall)
@@ -230,7 +230,6 @@ namespace Coop.Mod.Persistence.RemoteAction
             public EventActionBase RPC { get; }
             [NotNull] public List<ObjectId> WaitingForObjects { get; }
             [NotNull] public List<ObjectId> ObjectsNeededForCall { get; }
-            [NotNull] public Dictionary<RailPeer, SequenceId> BroadcastEvents { get; private set; } = new Dictionary<RailPeer, SequenceId>();
 
             public DateTime CreatedAt { get; }
 
@@ -246,15 +245,11 @@ namespace Coop.Mod.Persistence.RemoteAction
 
             public bool TryBroadcast()
             {
-                if(BroadcastEvents.Count != 0)
-                {
-                    throw new Exception($"Cannot broadcast the same call twice {this}.");
-                }
                 if (!IsReadyToBeSent())
                 { 
                     return false;
                 }
-                BroadcastEvents = Room.BroadcastEvent(RPC).ToDictionary(p => p.Item1, p => p.Item2);
+                Room.BroadcastEvent(RPC);
                 return true;
             }
         }

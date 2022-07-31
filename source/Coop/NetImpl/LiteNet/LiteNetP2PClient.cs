@@ -3,6 +3,7 @@ using Common.Serialization;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Network.Infrastructure;
+using NLog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -17,6 +18,7 @@ namespace Coop.NetImpl.LiteNet
 {
     public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable
     {
+        private static Logger m_Logger = LogManager.GetCurrentClassLogger();
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;
 
         NetManager netManager;
@@ -110,8 +112,17 @@ namespace Coop.NetImpl.LiteNet
             netManager.Stop();
         }
 
+        public void Send(IPacket packet, NetPeer client)
+        {
+            //if (netManager.ConnectedPeersCount < 1) return;
+            NetDataWriter writer = new NetDataWriter();
+            writer.PutBytesWithLength(CommonSerializer.Serialize(packet, SerializationMethod.ProtoBuf));
+            client.Send(writer, packet.DeliveryMethod);
+        }
+
         public void SendAll(IPacket packet)
         {
+            //if (netManager.ConnectedPeersCount < 1) return;
             NetDataWriter writer = new NetDataWriter();
             writer.PutBytesWithLength(CommonSerializer.Serialize(packet, SerializationMethod.ProtoBuf));
             netManager.SendToAll(writer, packet.DeliveryMethod);
@@ -132,13 +143,14 @@ namespace Coop.NetImpl.LiteNet
         {
             if (type == natAddressTypeMap[networkConfig.NATType])
             {
+                m_Logger.Info($"Connecting P2P: {targetEndPoint}");
                 netManager.Connect(targetEndPoint, token);
             }
         }
 
         public void OnPeerConnected(NetPeer peer)
         {
-            Trace.WriteLine($"{this.netManager.LocalPort} recieved connection from {peer.EndPoint}");
+            m_Logger.Info($"{this.netManager.LocalPort} recieved connection from {peer.EndPoint}");
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)

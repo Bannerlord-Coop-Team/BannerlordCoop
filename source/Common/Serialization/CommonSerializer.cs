@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Common.Serialization
@@ -54,7 +55,15 @@ namespace Common.Serialization
         {
             if (!serializers.ContainsKey(protocol)) throw new InvalidOperationException($"Serializer for {protocol} was not registered.");
 
-            return serializers[protocol].Serialize(obj);
+            try
+            {
+                return serializers[protocol].Serialize(obj);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+            
         }
 
         private static bool TryRegisterSerializer(ISerializer serializer)
@@ -89,8 +98,14 @@ namespace Common.Serialization
                 throw new InvalidOperationException($"{protocol} does not have a register serializer.");
             }
 
-            return serializers[protocol].Deserialize(bytes);
-        }
+            try
+            {
+                return serializers[protocol].Deserialize(bytes);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }        }
 
         public static T Deserialize<T>(ArraySegment<byte> bytes, Enum protocol = null)
         {

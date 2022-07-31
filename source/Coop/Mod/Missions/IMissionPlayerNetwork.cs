@@ -1,12 +1,12 @@
 ﻿using Common;
-using Coop.Mod.Mission.Messages;
+using Coop.Mod.Missions.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.Mission
+namespace Coop.Mod.Missions
 {
     public interface IMissionPlayerNetwork
     {

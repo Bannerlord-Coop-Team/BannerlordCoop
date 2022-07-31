@@ -63,7 +63,7 @@ namespace Coop.Tests.Persistence.RPC
                     .Skip();
                 ApplyStaticPatches();
             }
-            public ManagedFoo([NotNull] Foo instance) : base(instance)
+            public ManagedFoo(Foo instance) : base(instance)
             {
             }
 

@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 
-namespace Coop.Mod.Mission.Messages
+namespace Coop.Mod.Missions.Messages
 {
     public struct MissionInfo
     {
