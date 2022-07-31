@@ -280,6 +280,9 @@
     <Compile Include="Mod\Config\RequiredSyncTypes.cs" />
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Mod\Events\MissionEvents.cs" />
+    <Compile Include="Mod\Missions\BoardGameManager.cs" />
+    <Compile Include="Mod\Missions\Messages\BoardGames\BoardGameChallengeResponse.cs" />
+    <Compile Include="Mod\Missions\Messages\BoardGames\BoardGameChallengeRequest.cs" />
     <Compile Include="Mod\Missions\Packets\Agents\AgentGroupController.cs" />
     <Compile Include="Mod\Missions\CoopMission.cs" />
     <Compile Include="Mod\Missions\Messages\BattleNetworkMessages.cs" />
@@ -347,6 +350,8 @@
     <Compile Include="Mod\MbLogTarget.cs" />
     <Compile Include="Mod\GameSync\Party\CampaignMapMovement.cs" />
     <Compile Include="Mod\GameSync\Party\CampaignMapPositions.cs" />
+    <Compile Include="Mod\Patch\Agents\AgentInteractionPatch.cs" />
+    <Compile Include="Mod\Patch\BoardGames\BoardGamePatches.cs" />
     <Compile Include="Mod\Patch\CampaignPatches\CompanionsCampaignBehaviorPatches.cs" />
     <Compile Include="Mod\Patch\Hero\HeroPatches.cs" />
     <Compile Include="Mod\Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />

@@ -22,6 +22,8 @@ namespace Coop.Mod.Missions
     {
         private readonly Logger m_Logger = LogManager.GetCurrentClassLogger();
 
+        public BoardGameManager BoardGameManager { get; private set; }
+
         public MovementHandler MovementHandler { get; private set; }
 
         public NetworkMessageBroker MessageBroker { get; private set; }
@@ -32,11 +34,14 @@ namespace Coop.Mod.Missions
 
         private readonly Guid m_PlayerId;
 
+        public static readonly Dictionary<Agent, Guid> AgentToId = new Dictionary<Agent, Guid>();
+
         public MissionClient(LiteNetP2PClient client)
         {
             m_Client = client;
             m_PlayerId = Guid.NewGuid();
             MessageBroker = new NetworkMessageBroker(m_Client);
+            BoardGameManager = new BoardGameManager(MessageBroker);
             MovementHandler = new MovementHandler(m_Client);
 
             serializedCharacterObject = new SerializableCharacterObject(CharacterObject.PlayerCharacter, Guid.NewGuid());
@@ -59,6 +64,7 @@ namespace Coop.Mod.Missions
             {
                 m_Logger.Info("Sending join request");
                 MovementHandler.ControlledAgents.Add(m_PlayerId, Agent.Main);
+                MissionClient.AgentToId.Add(Agent.Main, m_PlayerId);
                 MissionJoinRequest request = new MissionJoinRequest(m_PlayerId, Agent.Main.Position);
                 MessageBroker.Publish(request);
             }

@@ -25,6 +25,8 @@ namespace Coop.Mod.Missions.Network
 
         public PacketType PacketType => PacketType.Event;
 
+        public static NetworkMessageBroker Instance { get; internal set; }
+
         public NetworkMessageBroker(LiteNetP2PClient client)
         {
             m_Client = client;

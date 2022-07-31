@@ -105,6 +105,7 @@ namespace Coop.Mod.Missions.Packets.Agents
 
         public void RegisterAgent(NetPeer peer, Guid guid, Agent agent)
         {
+            MissionClient.AgentToId.Add(agent, guid);
             if(OtherAgents.TryGetValue(peer, out AgentGroupController agentGroup))
             {
                 agentGroup.AddAgent(guid, agent);
