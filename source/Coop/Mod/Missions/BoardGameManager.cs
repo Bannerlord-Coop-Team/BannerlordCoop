@@ -1,6 +1,7 @@
 ﻿using Common;
 using Coop.Mod.Missions.Messages.BoardGames;
 using Coop.Mod.Missions.Network;
+using Coop.Mod.Missions.Packets.Agents;
 using Coop.Mod.Patch.Agents;
 using Coop.Mod.Patch.BoardGames;
 using Coop.NetImpl.LiteNet;
@@ -91,7 +92,11 @@ namespace Coop.Mod.Missions
             MessageBroker.Publish(response, netPeer);
 
             //Has to do same thing as if (accepted) in Handle_ChallengeResponse
-            StartGame(false, gameId);
+            if (NetworkAgentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
+                group.ControlledAgents.TryGetValue(other, out Agent opponent))
+            {
+                StartGame(false, gameId, opponent);
+            }
         }
 
         private void DenyGameRequest(Guid sender, Guid other, NetPeer netPeer)
@@ -104,16 +109,23 @@ namespace Coop.Mod.Missions
         {
             bool accepted = payload.What.Accepted;
             Guid gameId = payload.What.GameId;
+            Guid opponentId = payload.What.RequestingPlayer;
+
             if (accepted)
             {
-                StartGame(true, gameId);
+                NetPeer netPeer = payload.Who as NetPeer;
+                if (NetworkAgentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) && 
+                    group.ControlledAgents.TryGetValue(opponentId, out Agent opponent))
+                {
+                    StartGame(true, gameId, opponent);
+                }
             }
         }
 
-        private void StartGame(bool startFirst, Guid gameId)
+        private void StartGame(bool startFirst, Guid gameId, Agent opposingAgent)
         {
             BoardGameLogic = new BoardGameLogic(MessageBroker, gameId);
-            BoardGameLogic.StartGame(startFirst);
+            BoardGameLogic.StartGame(startFirst, opposingAgent);
         }
     }
 }

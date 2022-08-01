@@ -12,6 +12,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -63,13 +64,14 @@ namespace Coop.Mod.Missions
             PreplaceUnitsPatch.OnPreplaceUnits -= PreplaceUnits;
         }
 
-        public void StartGame(bool startFirst)
+        public void StartGame(bool startFirst, Agent opposingAgent)
         {
             IsPlayingOtherPlayer = true;
             MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
             boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
             boardGameLogic.SetStartingPlayer(startFirst);
             boardGameLogic.StartBoardGame();
+            OpposingAgentPropertyInfo.SetValue(boardGameLogic, opposingAgent);
         }
 
         private static readonly FieldInfo GameEndedFieldInfo = typeof(MissionBoardGameLogic).GetField("GameEnded", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -224,14 +226,17 @@ namespace Coop.Mod.Missions
         {
             ForfeitGameMessage forfeitMessage = new ForfeitGameMessage(GameId);
             m_MessageBroker.Publish(forfeitMessage);
+            InformationManager.DisplayMessage(new InformationMessage("OnForfeitGame"));
         }
 
         private void Handle_ForfeitGameMessage(MessagePayload<ForfeitGameMessage> payload)
         {
             if(payload.What.GameId == GameId)
             {
+                InformationManager.DisplayMessage(new InformationMessage("HandleForfeitGame"));
                 MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
                 boardGameLogic.AIForfeitGame();
+                
             }
         }
     }

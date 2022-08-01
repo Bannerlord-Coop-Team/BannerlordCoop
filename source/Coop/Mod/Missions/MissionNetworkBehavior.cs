@@ -22,7 +22,7 @@ namespace Coop.Mod.Missions
         private LiteNetP2PClient m_Client;
         private MissionClient missionClient;
 
-        private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(5);
+        private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
 
         public MissionNetworkBehavior()
         {

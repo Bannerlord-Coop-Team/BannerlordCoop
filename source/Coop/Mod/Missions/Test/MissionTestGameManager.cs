@@ -44,7 +44,7 @@ namespace Coop.Mod.Missions
         {
             base.OnLoadFinished();
             //get the settlement first
-            Settlement settlement = Settlement.Find("town_S1");
+            Settlement settlement = Settlement.Find("town_ES3");
 
             // get its arena
             Location locationWithId = settlement.LocationComplex.GetLocationWithId("arena");
