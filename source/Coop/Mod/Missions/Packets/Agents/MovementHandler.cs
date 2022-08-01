@@ -1,4 +1,5 @@
-﻿using Coop.NetImpl.LiteNet;
+﻿using Coop.Mod.Missions.Network;
+using Coop.NetImpl.LiteNet;
 using LiteNetLib;
 using NLog;
 using ProtoBuf;
@@ -44,10 +45,6 @@ namespace Coop.Mod.Missions.Packets.Agents
     {
         private readonly NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
 
-        public Dictionary<Guid, Agent> ControlledAgents = new Dictionary<Guid, Agent>();
-        public readonly Dictionary<NetPeer, AgentGroupController> OtherAgents = new Dictionary<NetPeer, AgentGroupController>();
-
-
         private readonly CancellationTokenSource m_AgentPollingCancelToken = new CancellationTokenSource();
         private readonly Task m_AgentPollingTask;
 
@@ -57,8 +54,6 @@ namespace Coop.Mod.Missions.Packets.Agents
             m_Client = client;
 
             m_Client.AddHandler(this);
-
-            RegisterAllAgentsAsControl();
 
             m_AgentPollingTask = Task.Run(PollAgents);
         }
@@ -76,11 +71,6 @@ namespace Coop.Mod.Missions.Packets.Agents
 
         public PacketType PacketType => PacketType.Movement;
 
-        private void RegisterAllAgentsAsControl()
-        {
-            ControlledAgents = Mission.Current.AllAgents.ToDictionary((agent) => Guid.NewGuid());
-        }
-
         private async void PollAgents()
         {
             while (m_AgentPollingCancelToken.IsCancellationRequested == false)
@@ -92,9 +82,9 @@ namespace Coop.Mod.Missions.Packets.Agents
                 }
                 else if (isLoadingFinished.Value)
                 {
-                    foreach (Guid guid in ControlledAgents.Keys)
+                    foreach (Guid guid in NetworkAgentRegistry.ControlledAgents.Keys)
                     {
-                        Agent agent = ControlledAgents[guid];
+                        Agent agent = NetworkAgentRegistry.ControlledAgents[guid];
                         m_Client.SendAll(new MovementPacket(guid, agent));
                     }
                 }
@@ -103,24 +93,9 @@ namespace Coop.Mod.Missions.Packets.Agents
             }
         }
 
-        public void RegisterAgent(NetPeer peer, Guid guid, Agent agent)
-        {
-            MissionClient.AgentToId.Add(agent, guid);
-            if(OtherAgents.TryGetValue(peer, out AgentGroupController agentGroup))
-            {
-                agentGroup.AddAgent(guid, agent);
-            }
-            else
-            {
-                AgentGroupController agentGroupController = new AgentGroupController();
-                agentGroupController.AddAgent(guid, agent);
-                OtherAgents.Add(peer, agentGroupController);
-            }
-        }
-
         public void HandlePacket(NetPeer peer, IPacket packet)
         {
-            if(OtherAgents.TryGetValue(peer, out AgentGroupController agentGroupController))
+            if(NetworkAgentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController agentGroupController))
             {
                 MovementPacket movement = (MovementPacket)packet;
                 agentGroupController.ApplyMovement(movement);
@@ -129,7 +104,7 @@ namespace Coop.Mod.Missions.Packets.Agents
 
         public void HandlePeerDisconnect(NetPeer peer, DisconnectInfo reason)
         {
-            OtherAgents.Remove(peer);
+            NetworkAgentRegistry.RemovePeer(peer);
         }
 
     }

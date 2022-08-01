@@ -195,6 +195,30 @@ namespace Coop.Mod.Missions
 
         }
 
+        public static Agent SpawnAgent(Vec3 startingPos)
+        {
+            CharacterObject character = Hero.MainHero.CharacterObject;
+            AgentBuildData agentBuildData = new AgentBuildData(character);
+            agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
+            agentBuildData.InitialPosition(startingPos);
+            agentBuildData.Team(Mission.Current.PlayerAllyTeam);
+            agentBuildData.InitialDirection(Vec2.Forward);
+            agentBuildData.NoHorses(true);
+            agentBuildData.Equipment(character.FirstCivilianEquipment);
+            agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor)));
+            agentBuildData.Controller(Agent.ControllerType.None);
+
+            m_Logger.Info("Spawning Agent");
+            Agent agent = default(Agent);
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                agent = Mission.Current.SpawnAgent(agentBuildData);
+                agent.FadeIn();
+            });
+
+            return agent;
+        }
+
         [CommandLineFunctionality.CommandLineArgumentFunction("spawn_tavern_agent", "test")]
         public static Agent SpawnTavernAgent()
         {

@@ -24,7 +24,7 @@ namespace Coop.Mod.Patch.BoardGames
 
             OnGameOver?.Invoke(__instance);
 
-            return BoardGameManager.IsPlayingOtherPlayer == false;
+            return BoardGameLogic.IsPlayingOtherPlayer == false;
         }
     }
 
@@ -33,7 +33,7 @@ namespace Coop.Mod.Patch.BoardGames
     {
         static bool Prefix()
         {
-            return BoardGameManager.IsPlayingOtherPlayer == false;
+            return BoardGameLogic.IsPlayingOtherPlayer == false;
         }
     }
 
@@ -59,7 +59,7 @@ namespace Coop.Mod.Patch.BoardGames
 
         static bool Postfix(bool result)
         {
-            if (BoardGameManager.IsPlayingOtherPlayer) return false;
+            if (BoardGameLogic.IsPlayingOtherPlayer) return false;
             return result;
         }
     }
@@ -90,7 +90,7 @@ namespace Coop.Mod.Patch.BoardGames
         public static bool ForceRemove = false;
         public static void Postfix()
         {
-            if (BoardGameManager.IsPlayingOtherPlayer)
+            if (BoardGameLogic.IsPlayingOtherPlayer)
             {
                 ForceRemove = true;
             }
@@ -115,9 +115,9 @@ namespace Coop.Mod.Patch.BoardGames
         static bool Prefix()
         {
             
-            if (BoardGameManager.IsPlayingOtherPlayer)
+            if (BoardGameLogic.IsPlayingOtherPlayer)
             {
-                if (BoardGameManager.IsChallenged) { return false; }
+                if (BoardGameLogic.IsChallenged) { return false; }
             }
 
             OnPreplaceUnits?.Invoke();

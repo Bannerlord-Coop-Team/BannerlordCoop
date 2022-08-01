@@ -15,11 +15,11 @@ namespace Coop.Mod.Missions.Messages
         [ProtoMember(1)]
         public readonly Guid PlayerId;
         [ProtoMember(2)]
-        public readonly Vec3 OriginalPosition;
-        public MissionJoinRequest(Guid playerId, Vec3 originalPosition)
+        public readonly Vec3 StartingPosition;
+        public MissionJoinRequest(Guid playerId, Vec3 startingPosition)
         {
             PlayerId = playerId;
-            OriginalPosition = originalPosition;
+            StartingPosition = startingPosition;
         }
     }
 
@@ -29,12 +29,12 @@ namespace Coop.Mod.Missions.Messages
         [ProtoMember(1)]
         public readonly Guid PlayerId;
         [ProtoMember(2)]
-        public readonly Vec3 OriginalPosition;
+        public readonly Vec3 StartingPosition;
 
-        public MissionJoinResponse(Guid playerId, Vec3 originalPosition)
+        public MissionJoinResponse(Guid playerId, Vec3 startingPosition)
         {
             PlayerId = playerId;
-            OriginalPosition = originalPosition;
+            StartingPosition = startingPosition;
         }
     }
 

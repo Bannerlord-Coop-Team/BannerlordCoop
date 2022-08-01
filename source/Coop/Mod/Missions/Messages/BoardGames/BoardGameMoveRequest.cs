@@ -1,0 +1,27 @@
+﻿using ProtoBuf;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Coop.Mod.Missions.Messages.BoardGames
+{
+    [ProtoContract]
+    public readonly struct BoardGameMoveRequest
+    {
+        public BoardGameMoveRequest(Guid gameId, int fromIndex, int toIndex)
+        {
+            GameId = gameId;
+            FromIndex = fromIndex;
+            ToIndex = toIndex;
+        }
+
+        [ProtoMember(1)]
+        public Guid GameId { get; }
+        [ProtoMember(1)]
+        public int FromIndex { get; }
+        [ProtoMember(2)]
+        public int ToIndex { get; }
+    }
+}

@@ -10,11 +10,12 @@ namespace Coop.Mod.Missions.Messages.BoardGames
     [ProtoContract]
     public readonly struct BoardGameChallengeResponse
     {
-        public BoardGameChallengeResponse(Guid requestingPlayer, Guid targetPlayer, bool accepted)
+        public BoardGameChallengeResponse(Guid requestingPlayer, Guid targetPlayer, bool accepted, Guid gameId)
         {
             RequestingPlayer = requestingPlayer;
             TargetPlayer = targetPlayer;
             Accepted = accepted;
+            GameId = gameId;
         }
         [ProtoMember(1)]
         public Guid RequestingPlayer { get; }
@@ -22,5 +23,7 @@ namespace Coop.Mod.Missions.Messages.BoardGames
         public Guid TargetPlayer { get; }
         [ProtoMember(3)]
         public bool Accepted { get; }
+        [ProtoMember(4)]
+        public Guid GameId { get; }
     }
 }
