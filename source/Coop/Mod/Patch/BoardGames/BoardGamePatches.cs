@@ -15,7 +15,7 @@ using TaleWorlds.MountAndBlade;
 namespace Coop.Mod.Patch.BoardGames
 {
 
-    [HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
+    //[HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
     public class SetGameOverPatch
     {
         public static event Action<MissionBoardGameLogic> OnGameOver;
@@ -28,22 +28,15 @@ namespace Coop.Mod.Patch.BoardGames
         }
     }
 
-    [HarmonyPatch(typeof(MissionBoardGameLogic), "StartConversationWithOpponentAfterGameEnd")]
-    public class SetGameOverConversationPatch
-    {
-        static bool Prefix()
-        {
-            return BoardGameLogic.IsPlayingOtherPlayer == false;
-        }
-    }
-
     [HarmonyPatch(typeof(MissionBoardGameLogic), nameof(MissionBoardGameLogic.ForfeitGame))]
     public class ForfeitGamePatch
     {
         public static event Action<MissionBoardGameLogic> OnForfeitGame; 
-        static void Prefix(MissionBoardGameLogic __instance)
+        static bool Prefix(MissionBoardGameLogic __instance)
         {
             OnForfeitGame?.Invoke(__instance);
+
+            return BoardGameLogic.IsPlayingOtherPlayer == false;
         }
     }
 

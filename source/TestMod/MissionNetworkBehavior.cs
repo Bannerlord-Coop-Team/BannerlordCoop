@@ -463,7 +463,7 @@ namespace CoopTestMod
             }
         }
         
-        [HarmonyPatch(typeof(MissionBoardGameLogic), "StartConversationWithOpponentAfterGameEnd")]
+        //[HarmonyPatch(typeof(MissionBoardGameLogic), "StartConversationWithOpponentAfterGameEnd")]
         public class SetGameOverConversationPatch
         {
             static bool Prefix()

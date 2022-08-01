@@ -2,6 +2,7 @@
 using Coop.Mod.Missions.Messages.BoardGames;
 using Coop.Mod.Missions.Network;
 using Coop.Mod.Patch.BoardGames;
+using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;
 using SandBox.BoardGames.Pawns;
@@ -15,6 +16,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using static TaleWorlds.CampaignSystem.CultureObject;
 
 namespace Coop.Mod.Missions
 {
@@ -64,32 +66,27 @@ namespace Coop.Mod.Missions
             PreplaceUnitsPatch.OnPreplaceUnits -= PreplaceUnits;
         }
 
+        private static readonly PropertyInfo OpposingAgentPropertyInfo = typeof(MissionBoardGameLogic).GetProperty("OpposingAgent");
+
         public void StartGame(bool startFirst, Agent opposingAgent)
         {
             IsPlayingOtherPlayer = true;
+
+            // Need for SetGameOver() -> OpposingAgent.GetComponent<CampaignAgentComponent>().AgentNavigator.SpecialTargetTag = this._specialTagOfOpposingHero;
+            opposingAgent.GetComponent<CampaignAgentComponent>().CreateAgentNavigator();
+
             MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-            boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
+            BoardGameType boardGameType = Settlement.CurrentSettlement.Culture.BoardGame;
+            OpposingAgentPropertyInfo.SetValue(boardGameLogic, opposingAgent);
+            boardGameLogic.SetBoardGame(boardGameType);
             boardGameLogic.SetStartingPlayer(startFirst);
             boardGameLogic.StartBoardGame();
-            OpposingAgentPropertyInfo.SetValue(boardGameLogic, opposingAgent);
         }
-
-        private static readonly FieldInfo GameEndedFieldInfo = typeof(MissionBoardGameLogic).GetField("GameEnded", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        private static readonly PropertyInfo OpposingAgentPropertyInfo = typeof(MissionBoardGameLogic).GetProperty("OpposingAgent");
-        private static readonly PropertyInfo IsGameInProgressPropertyInfo = typeof(MissionBoardGameLogic).GetProperty("IsGameInProgress");
+        
         private void OnGameOver(MissionBoardGameLogic boardGameLogic)
         {
             if (IsPlayingOtherPlayer)
             {
-                boardGameLogic.Handler?.Uninstall();
-
-                Action eventGameEnded = GameEndedFieldInfo?.GetValue(boardGameLogic) as Action;
-                eventGameEnded?.Invoke();
-
-                boardGameLogic.Board.Reset();
-                OpposingAgentPropertyInfo.SetValue(boardGameLogic, null);
-                IsGameInProgressPropertyInfo.SetValue(boardGameLogic, false);
                 Dispose();
             }
         }
@@ -131,7 +128,6 @@ namespace Coop.Mod.Missions
         {
             if (payload.What.GameId == GameId)
             {
-                // TODO handle captures
                 MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
                 BoardGameBase boardGame = boardGameLogic.Board;
                 PawnBase unitToCapture;
@@ -192,7 +188,6 @@ namespace Coop.Mod.Missions
         {
             if (payload.What.GameId == GameId)
             {
-                // TODO handle requests
                 MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
                 BoardGameBase boardGame = boardGameLogic.Board;
 
@@ -226,7 +221,8 @@ namespace Coop.Mod.Missions
         {
             ForfeitGameMessage forfeitMessage = new ForfeitGameMessage(GameId);
             m_MessageBroker.Publish(forfeitMessage);
-            InformationManager.DisplayMessage(new InformationMessage("OnForfeitGame"));
+            missionBoardGame.Board.SetGameOverInfo(GameOverEnum.PlayerTwoWon);
+            missionBoardGame.SetGameOver(missionBoardGame.Board.GameOverInfo);
         }
 
         private void Handle_ForfeitGameMessage(MessagePayload<ForfeitGameMessage> payload)
