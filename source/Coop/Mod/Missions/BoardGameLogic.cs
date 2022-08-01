@@ -130,6 +130,26 @@ namespace Coop.Mod.Missions
             if (payload.What.GameId == GameId)
             {
                 // TODO handle captures
+                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                BoardGameBase boardGame = boardGameLogic.Board;
+                PawnBase unitToCapture;
+
+                if (boardGame is BoardGameSeega)
+                {
+                    unitToCapture = boardGame.PlayerOneUnits[payload.What.Index];
+                }
+                else
+                {
+                    unitToCapture = boardGame.PlayerTwoUnits[payload.What.Index];
+                }
+
+                boardGame.SetPawnCaptured(unitToCapture);
+
+                if (!(boardGame is BoardGameSeega))
+                {
+                    boardGame.GetType().GetMethod("EndTurn", BindingFlags.NonPublic | BindingFlags.Instance)?
+                        .Invoke(boardGame, new object[] { });
+                }
             }
         }
 
@@ -171,6 +191,32 @@ namespace Coop.Mod.Missions
             if (payload.What.GameId == GameId)
             {
                 // TODO handle requests
+                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                BoardGameBase boardGame = boardGameLogic.Board;
+
+                var unitToMove = boardGame.PlayerTwoUnits[payload.What.FromIndex];
+                var goalTile = boardGame.Tiles[payload.What.ToIndex];
+
+                if (boardGame is BoardGamePuluc)
+                {
+                    if (payload.What.ToIndex == 11)
+                    {
+                        goalTile = boardGame.Tiles[11];
+                    }
+                    else
+                    {
+                        goalTile = boardGame.Tiles[10 - payload.What.ToIndex];
+                    }
+                }
+
+                var boardType = boardGame.GetType();
+
+                boardType.GetProperty("SelectedUnit", BindingFlags.NonPublic | BindingFlags.Instance)?
+                    .SetValue(boardGame, unitToMove);
+
+                var movePawnToTileMethod = boardType.GetMethod("MovePawnToTile", BindingFlags.NonPublic | BindingFlags.Instance);
+                movePawnToTileMethod?.Invoke(boardGame, new object[] { unitToMove, goalTile, false, true });
+
             }
         }
 
