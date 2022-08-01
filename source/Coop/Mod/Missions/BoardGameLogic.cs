@@ -65,6 +65,7 @@ namespace Coop.Mod.Missions
 
         public void StartGame(bool startFirst)
         {
+            IsPlayingOtherPlayer = true;
             MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
             boardGameLogic.SetBoardGame(Settlement.CurrentSettlement.Culture.BoardGame);
             boardGameLogic.SetStartingPlayer(startFirst);
@@ -128,7 +129,7 @@ namespace Coop.Mod.Missions
         {
             if (payload.What.GameId == GameId)
             {
-
+                // TODO handle captures
             }
         }
 
@@ -169,7 +170,7 @@ namespace Coop.Mod.Missions
         {
             if (payload.What.GameId == GameId)
             {
-
+                // TODO handle requests
             }
         }
 

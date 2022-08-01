@@ -19,9 +19,9 @@ namespace Coop.Mod.Missions.Messages.BoardGames
 
         [ProtoMember(1)]
         public Guid GameId { get; }
-        [ProtoMember(1)]
-        public int FromIndex { get; }
         [ProtoMember(2)]
+        public int FromIndex { get; }
+        [ProtoMember(3)]
         public int ToIndex { get; }
     }
 }

@@ -90,5 +90,12 @@ namespace Coop.Mod.Missions.Network
             }
             return result;
         }
+
+        public static void Clear()
+        {
+            m_AgentToId.Clear();
+            m_OtherAgents.Clear();
+            m_AgentToId.Clear();
+        }
     }
 }

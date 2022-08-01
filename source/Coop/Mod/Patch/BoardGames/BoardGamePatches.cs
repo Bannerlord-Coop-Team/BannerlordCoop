@@ -114,11 +114,8 @@ namespace Coop.Mod.Patch.BoardGames
 
         static bool Prefix()
         {
-            
-            if (BoardGameLogic.IsPlayingOtherPlayer)
-            {
-                if (BoardGameLogic.IsChallenged) { return false; }
-            }
+
+            if (BoardGameLogic.IsPlayingOtherPlayer && BoardGameLogic.IsChallenged) { return false; }
 
             OnPreplaceUnits?.Invoke();
 

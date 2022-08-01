@@ -67,6 +67,14 @@ namespace Coop.NetImpl.LiteNet
             }
         }
 
+        public void RemoveHandler(IPacketHandler handler)
+        {
+            if(m_PacketHandlers.TryGetValue(handler.PacketType, out List<IPacketHandler> list))
+            {
+                list.Remove(handler);
+            }
+        }
+
         public void Update(TimeSpan frameTime)
         {
             netManager.PollEvents();
@@ -115,7 +123,7 @@ namespace Coop.NetImpl.LiteNet
 
         public void Stop()
         {
-            netManager.Stop();
+            netManager.DisconnectAll();
         }
 
         public void Send(IPacket packet, NetPeer client)

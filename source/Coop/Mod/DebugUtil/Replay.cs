@@ -306,7 +306,7 @@ namespace Coop.Mod.DebugUtil
             if (replay != null)
             {
                 if (CoopServer.Instance.Persistence.Room.Entities.FirstOrDefault(
-                    q => q.Id == replay.entityId) is MobilePartyEntityServer entity)
+                    q => q.Key == replay.entityId).Value is MobilePartyEntityServer entity)
                 {
                     entity.State.MapPosition = replay.position;
                 }

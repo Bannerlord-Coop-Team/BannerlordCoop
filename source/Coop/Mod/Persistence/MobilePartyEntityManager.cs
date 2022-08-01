@@ -319,8 +319,8 @@ namespace Coop.Mod.Persistence
             {
                 foreach (RailEntityServer controlledEntity in m_Room
                                                               .Entities.Where(
-                                                                  e => e.Controller == peer)
-                                                              .Select(e => e as RailEntityServer))
+                                                                  e => e.Value.Controller == peer)
+                                                              .Select(e => e.Value as RailEntityServer))
                 {
                     peer.RevokeControl(controlledEntity);
                     OnPlayerControlledEntityOrphaned?.Invoke(peer, controlledEntity);

@@ -6,6 +6,7 @@ using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -65,12 +66,14 @@ namespace Coop.Mod.Missions.Packets.Agents
 
         public void Dispose()
         {
+            m_Client.RemoveHandler(this);
             m_AgentPollingCancelToken.Cancel();
             m_AgentPollingTask.Wait();
         }
 
         public PacketType PacketType => PacketType.Movement;
 
+        [HandleProcessCorruptedStateExceptions]
         private async void PollAgents()
         {
             while (m_AgentPollingCancelToken.IsCancellationRequested == false)
@@ -85,7 +88,20 @@ namespace Coop.Mod.Missions.Packets.Agents
                     foreach (Guid guid in NetworkAgentRegistry.ControlledAgents.Keys)
                     {
                         Agent agent = NetworkAgentRegistry.ControlledAgents[guid];
-                        m_Client.SendAll(new MovementPacket(guid, agent));
+                        if(agent.Mission != null)
+                        {
+                            MovementPacket packet = new MovementPacket(guid, agent);
+                            m_Client.SendAll(packet);
+                        }
+                        else
+                        {
+                            if (NetworkAgentRegistry.AgentToId.TryGetValue(agent, out Guid agentId))
+                            {
+                                agent.MakeDead(false, ActionIndexCache.act_none);
+                                agent.FadeOut(false, true);
+                                NetworkAgentRegistry.RemoveControlledAgent(agentId);
+                            }
+                        }                      
                     }
                 }
 
@@ -104,8 +120,16 @@ namespace Coop.Mod.Missions.Packets.Agents
 
         public void HandlePeerDisconnect(NetPeer peer, DisconnectInfo reason)
         {
-            NetworkAgentRegistry.RemovePeer(peer);
-        }
+            if (NetworkAgentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController controller))
+            {
+                foreach (var agent in controller.ControlledAgents.Values)
+                {
+                    agent.MakeDead(false, ActionIndexCache.act_none);
+                    agent.FadeOut(false, true);
+                }
 
+                NetworkAgentRegistry.RemovePeer(peer);
+            }
+        }
     }
 }

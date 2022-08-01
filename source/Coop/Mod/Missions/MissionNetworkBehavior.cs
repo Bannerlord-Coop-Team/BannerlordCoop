@@ -19,7 +19,7 @@ namespace Coop.Mod.Missions
 
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly LiteNetP2PClient m_Client;
+        private LiteNetP2PClient m_Client;
         private MissionClient missionClient;
 
         private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(5);
@@ -49,9 +49,21 @@ namespace Coop.Mod.Missions
         {
             base.OnRemoveBehavior();
 
-            missionClient.Dispose();
-            m_Client.Dispose();
+            NetworkAgentRegistry.Clear();
+
             Main.Instance.Updateables.Remove(m_Client);
+            m_Client = null;
+            missionClient = null;
+        }
+
+        public override void OnAgentDeleted(Agent affectedAgent)
+        {
+            if(NetworkAgentRegistry.AgentToId.TryGetValue(affectedAgent, out Guid agentId))
+            {
+                NetworkAgentRegistry.RemoveNetworkControlledAgent(agentId);
+            }
+            
+            base.OnAgentDeleted(affectedAgent);
         }
     }
 }

@@ -280,9 +280,14 @@
     <Compile Include="Mod\Config\RequiredSyncTypes.cs" />
     <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Mod\Events\MissionEvents.cs" />
+    <Compile Include="Mod\Missions\BoardGameLogic.cs" />
     <Compile Include="Mod\Missions\BoardGameManager.cs" />
     <Compile Include="Mod\Missions\Messages\BoardGames\BoardGameChallengeResponse.cs" />
     <Compile Include="Mod\Missions\Messages\BoardGames\BoardGameChallengeRequest.cs" />
+    <Compile Include="Mod\Missions\Messages\BoardGames\BoardGameMoveRequest.cs" />
+    <Compile Include="Mod\Missions\Messages\BoardGames\ForfeitGameMessage.cs" />
+    <Compile Include="Mod\Missions\Messages\BoardGames\PawnCapturedMessage.cs" />
+    <Compile Include="Mod\Missions\Network\NetworkAgentRegistry.cs" />
     <Compile Include="Mod\Missions\Packets\Agents\AgentGroupController.cs" />
     <Compile Include="Mod\Missions\CoopMission.cs" />
     <Compile Include="Mod\Missions\Messages\BattleNetworkMessages.cs" />
