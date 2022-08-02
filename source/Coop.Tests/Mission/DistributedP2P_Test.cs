@@ -59,6 +59,11 @@ namespace Coop.Tests.Mission
             {
                 m_Callback.Invoke(packet);
             }
+
+            public void HandlePeerDisconnect(NetPeer peer, DisconnectInfo reason)
+            {
+                throw new NotImplementedException();
+            }
         }
 
         [Fact]

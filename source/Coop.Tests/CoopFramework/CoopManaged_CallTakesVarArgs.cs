@@ -40,7 +40,7 @@ namespace Coop.Tests.CoopFramework
                     .Skip();
             }
 
-            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
+            public CoopManagedFoo(Foo instance) : base(instance)
             {
             }
         }

@@ -84,7 +84,7 @@ namespace Coop.Tests.Persistence
             Assert.Single(serverRoom.Entities);
 
             // Clients representation of the entity is identical to the server
-            RailEntityBase entityProxy = clientRoom.Entities.First();
+            RailEntityBase entityProxy = clientRoom.Entities.First().Value;
             Assert.IsType<RailEntityClient<SomeState>>(entityProxy);
             RailEntityClient<SomeState> entityClientSide =
                 entityProxy as RailEntityClient<SomeState>;

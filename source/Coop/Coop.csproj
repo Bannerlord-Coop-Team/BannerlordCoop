@@ -282,6 +282,7 @@
     <Compile Include="Mod\Events\MissionEvents.cs" />
     <Compile Include="Mod\Missions\BoardGameLogic.cs" />
     <Compile Include="Mod\Missions\BoardGameManager.cs" />
+    <Compile Include="Mod\Missions\Network\INetworkMessageBroker.cs" />
     <Compile Include="Mod\Missions\Messages\BoardGames\BoardGameChallengeResponse.cs" />
     <Compile Include="Mod\Missions\Messages\BoardGames\BoardGameChallengeRequest.cs" />
     <Compile Include="Mod\Missions\Messages\BoardGames\BoardGameMoveRequest.cs" />

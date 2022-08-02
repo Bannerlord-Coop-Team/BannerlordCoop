@@ -25,7 +25,7 @@ namespace Coop.Mod.Missions
 
         public BoardGameManager BoardGameManager { get; private set; }
         public MovementHandler MovementHandler { get; private set; }
-        public NetworkMessageBroker MessageBroker { get; private set; }
+        public INetworkMessageBroker MessageBroker { get; private set; }
 
         private readonly LiteNetP2PClient m_Client;
 

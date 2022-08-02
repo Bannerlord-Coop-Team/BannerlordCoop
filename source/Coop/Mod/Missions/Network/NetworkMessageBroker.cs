@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 
 namespace Coop.Mod.Missions.Network
 {
-    public class NetworkMessageBroker : IMessageBroker, IPacketHandler
+    public class NetworkMessageBroker : INetworkMessageBroker, IPacketHandler
     {
         private static Logger m_Logger = LogManager.GetCurrentClassLogger();
 
@@ -24,8 +24,6 @@ namespace Coop.Mod.Missions.Network
         private readonly LiteNetP2PClient m_Client;
 
         public PacketType PacketType => PacketType.Event;
-
-        public static NetworkMessageBroker Instance { get; internal set; }
 
         public NetworkMessageBroker(LiteNetP2PClient client)
         {
@@ -35,7 +33,7 @@ namespace Coop.Mod.Missions.Network
             m_Client.AddHandler(this);
         }
 
-        public void Publish<T>(T message, NetPeer peer = null)
+        public virtual void Publish<T>(T message, NetPeer peer = null)
         {
             if (message == null)
                 return;
@@ -80,7 +78,7 @@ namespace Coop.Mod.Missions.Network
             m_Subscribers?.Clear();
         }
 
-        public void HandlePacket(NetPeer peer, IPacket packet)
+        public virtual void HandlePacket(NetPeer peer, IPacket packet)
         {
             m_Logger.Debug($"Received message {packet} from {peer.EndPoint}");
             object payload = CommonSerializer.Deserialize(packet.Data, SerializationMethod.ProtoBuf);
@@ -111,13 +109,13 @@ namespace Coop.Mod.Missions.Network
             }
         }
 
-        public void Publish<T>(T message)
+        public virtual void Publish<T>(T message)
         {
             m_Logger.Info($"Publishing {message}");
             Publish(message, null);
         }
 
-        public void HandlePeerDisconnect(NetPeer peer, DisconnectInfo reason)
+        public virtual void HandlePeerDisconnect(NetPeer peer, DisconnectInfo reason)
         {
 
         }

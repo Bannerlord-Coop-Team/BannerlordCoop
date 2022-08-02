@@ -27,11 +27,11 @@ namespace Coop.Mod.Missions
     {
         private readonly NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
 
-        public NetworkMessageBroker MessageBroker { get; private set; }
+        public INetworkMessageBroker MessageBroker { get; private set; }
 
         private BoardGameLogic BoardGameLogic;
 
-        public BoardGameManager(NetworkMessageBroker messageBroker)
+        public BoardGameManager(INetworkMessageBroker messageBroker)
         {
             MessageBroker = messageBroker;
 

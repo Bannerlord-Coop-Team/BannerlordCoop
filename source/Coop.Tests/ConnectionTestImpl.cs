@@ -57,8 +57,8 @@ namespace Coop.Tests
             Server
         }
 
-        [CanBeNull] private readonly ClientTestSM m_ClientSM;
-        [CanBeNull] private readonly ServerTestSM m_ServerSM;
+            private readonly ClientTestSM m_ClientSM;
+            private readonly ServerTestSM m_ServerSM;
 
         public ConnectionTestImpl(
             EType eType,

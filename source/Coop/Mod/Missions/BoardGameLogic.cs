@@ -20,15 +20,15 @@ using static TaleWorlds.CampaignSystem.CultureObject;
 
 namespace Coop.Mod.Missions
 {
-    internal class BoardGameLogic : IDisposable
+    public class BoardGameLogic : IDisposable
     {
         public static bool IsPlayingOtherPlayer { get; private set; }
         public static bool IsChallenged { get; private set; }
         public Guid GameId { get; private set; }
 
-        private readonly NetworkMessageBroker m_MessageBroker;
+        private readonly INetworkMessageBroker m_MessageBroker;
 
-        public BoardGameLogic(NetworkMessageBroker messageBroker, Guid gameId)
+        public BoardGameLogic(INetworkMessageBroker messageBroker, Guid gameId)
         {
             m_MessageBroker = messageBroker;
             GameId = gameId;

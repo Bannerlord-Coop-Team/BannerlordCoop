@@ -8,7 +8,7 @@ namespace Coop.Tests.Sync
 {
     public class TestStores
     {
-        public TestStores([NotNull] TestConnections connections)
+        public TestStores( TestConnections connections)
         {
             Connections = connections;
 
