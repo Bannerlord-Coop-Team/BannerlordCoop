@@ -131,5 +131,26 @@ namespace Coop.Mod.Missions.Packets.Agents
                 NetworkAgentRegistry.RemovePeer(peer);
             }
         }
+
+        public static Vec2 InterpolatePosition(Vec2 controlInput, Vec3 rotation, Vec2 currentPosition, Vec2 newPosition)
+        {
+            Vec2 directionVector = newPosition - currentPosition;
+            double angle = Math.Atan2(rotation.y, rotation.x);
+            directionVector = Rotate(directionVector, angle);
+
+            return directionVector;
+        }
+
+        public static Vec2 Rotate(Vec2 v, double radians)
+        {
+            float sin = MathF.Sin((float)radians);
+            float cos = MathF.Cos((float)radians);
+
+            float tx = v.x;
+            float ty = v.y;
+            v.x = (cos * tx) - (sin * ty);
+            v.y = (sin * tx) + (cos * ty);
+            return v;
+        }
     }
 }

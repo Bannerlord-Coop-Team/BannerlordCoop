@@ -22,6 +22,7 @@ using TaleWorlds.Core;
 using SandBox;
 using Moq;
 using SandBox.BoardGames;
+using Coop.Mod.Missions.Messages.BoardGames;
 
 namespace Coop.Tests.Missions
 {
@@ -41,7 +42,7 @@ namespace Coop.Tests.Missions
         }
 
         [Fact]
-        public void BoardGameTest()
+        public void BoardGameStartTest()
         {
             TestMessageBroker testMessageBroker = new TestMessageBroker();
             CultureObject.BoardGameType gameType = CultureObject.BoardGameType.Seega;
@@ -50,6 +51,14 @@ namespace Coop.Tests.Missions
             output.WriteLine("Test 1 was called");
 
         }
+
+        [Fact]
+        public void SendGameRequestTest()
+        {
+            TestMessageBroker testMessageBroker = new TestMessageBroker();
+            
+        }
+
 
         [Fact]
         public void Test2()
@@ -76,12 +85,25 @@ namespace Coop.Tests.Missions
 
         public void Publish<T>(T message, NetPeer peer = null)
         {
-            
+            Publish<T>(message);
         }
 
         public void Publish<T>(T message)
         {
-            
+            if (message == null)
+                return;
+            if (!m_Subscribers.ContainsKey(typeof(T)))
+            {
+                return;
+            }
+            var delegates = m_Subscribers[typeof(T)];
+            if (delegates == null || delegates.Count == 0) return;
+            var payload = new MessagePayload<T>(message, null);
+            foreach (var handler in delegates.Select
+            (item => item as Action<MessagePayload<T>>))
+            {
+                handler?.Invoke(payload);
+            }
         }
 
         public void Subscribe<T>(Action<MessagePayload<T>> subscription)
