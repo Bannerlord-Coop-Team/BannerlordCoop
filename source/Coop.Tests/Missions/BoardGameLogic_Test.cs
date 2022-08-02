@@ -12,46 +12,41 @@ using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
-using Moq;
 using TaleWorlds.MountAndBlade;
 using SandBox.BoardGames.MissionLogics;
 using TaleWorlds.CampaignSystem.Settlements;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using SandBox;
+using Moq;
+using SandBox.BoardGames;
 
-namespace Coop.Tests.Mission
+namespace Coop.Tests.Missions
 {
     public class BoardGameLogic_Test : IDisposable
     {
         private readonly ITestOutputHelper output;
 
-        private Mock<Settlement> settlementMock = new Mock<Settlement>();
-        private Mock<MobileParty> mobilePartyMock = new Mock<MobileParty>();
-        private Mock<Campaign> campaignMock = new Mock<Campaign>();
-
+        Mock<MissionBoardGameLogic> logicMock;
+        Mock<BoardGameSeega> boardGameMock;
 
         public BoardGameLogic_Test(ITestOutputHelper output)
         {
             this.output = output;
-            output.WriteLine("Setup called");
-
-            typeof(Campaign).GetProperty("Current").SetValue(null, campaignMock.Object);
-
-            typeof(Campaign).GetProperty("MainParty").SetValue(null, mobilePartyMock.Object);
-
-            typeof(MobileParty).GetField("_currentSettlement", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(mobilePartyMock.Object, settlementMock.Object);
-
-            var seettlement = Settlement.CurrentSettlement;
-
+            logicMock = new Mock<MissionBoardGameLogic>();
+            boardGameMock = new Mock<BoardGameSeega>(logicMock.Object, PlayerTurn.PlayerOne);
+            typeof(MissionBoardGameLogic).GetProperty(nameof(MissionBoardGameLogic.Board)).SetValue(logicMock.Object, boardGameMock.Object);
         }
 
         [Fact]
         public void BoardGameTest()
         {
             TestMessageBroker testMessageBroker = new TestMessageBroker();
-            BoardGameLogic boardGameLogic = new BoardGameLogic(testMessageBroker, Guid.NewGuid());
+            CultureObject.BoardGameType gameType = CultureObject.BoardGameType.Seega;
+            BoardGameLogic boardGameLogic = new BoardGameLogic(testMessageBroker, Guid.NewGuid(), logicMock.Object, gameType);
+            boardGameLogic.StartGame(true, null);
             output.WriteLine("Test 1 was called");
 
         }
@@ -72,7 +67,7 @@ namespace Coop.Tests.Mission
 
     public class TestMessageBroker : INetworkMessageBroker
     {
-        private readonly Dictionary<Type, List<Delegate>> m_Subscribers;
+        private readonly Dictionary<Type, List<Delegate>> m_Subscribers = new Dictionary<Type, List<Delegate>>();
 
         public void Dispose()
         {

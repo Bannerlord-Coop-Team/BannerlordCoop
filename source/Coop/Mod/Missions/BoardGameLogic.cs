@@ -2,6 +2,7 @@
 using Coop.Mod.Missions.Messages.BoardGames;
 using Coop.Mod.Missions.Network;
 using Coop.Mod.Patch.BoardGames;
+using NLog;
 using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;
@@ -22,15 +23,20 @@ namespace Coop.Mod.Missions
 {
     public class BoardGameLogic : IDisposable
     {
+        private static NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
         public static bool IsPlayingOtherPlayer { get; private set; }
         public static bool IsChallenged { get; private set; }
         public Guid GameId { get; private set; }
 
         private readonly INetworkMessageBroker m_MessageBroker;
+        private readonly MissionBoardGameLogic m_BoardGameLogic;
+        private readonly BoardGameType m_BoardGameType;
 
-        public BoardGameLogic(INetworkMessageBroker messageBroker, Guid gameId)
+        public BoardGameLogic(INetworkMessageBroker messageBroker, Guid gameId, MissionBoardGameLogic boardGameLogic, BoardGameType gameType)
         {
             m_MessageBroker = messageBroker;
+            m_BoardGameLogic = boardGameLogic;
+            m_BoardGameType = gameType;
             GameId = gameId;
 
             m_MessageBroker.Subscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
@@ -43,6 +49,7 @@ namespace Coop.Mod.Missions
             HandlePreMovementStagePatch.OnHandlePreMovementStage += PreMovementStage;
             SetPawnCapturedSeegaPatch.OnSetPawnCaptured += SeegaPawnCapture;
             PreplaceUnitsPatch.OnPreplaceUnits += PreplaceUnits;
+            
         }
 
         ~BoardGameLogic()
@@ -73,14 +80,12 @@ namespace Coop.Mod.Missions
             IsPlayingOtherPlayer = true;
 
             // Need for SetGameOver() -> OpposingAgent.GetComponent<CampaignAgentComponent>().AgentNavigator.SpecialTargetTag = this._specialTagOfOpposingHero;
-            opposingAgent.GetComponent<CampaignAgentComponent>().CreateAgentNavigator();
+            opposingAgent?.GetComponent<CampaignAgentComponent>().CreateAgentNavigator();
 
-            MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-            BoardGameType boardGameType = Settlement.CurrentSettlement.Culture.BoardGame;
-            OpposingAgentPropertyInfo.SetValue(boardGameLogic, opposingAgent);
-            boardGameLogic.SetBoardGame(boardGameType);
-            boardGameLogic.SetStartingPlayer(startFirst);
-            boardGameLogic.StartBoardGame();
+            OpposingAgentPropertyInfo.SetValue(m_BoardGameLogic, opposingAgent);
+            m_BoardGameLogic.SetBoardGame(m_BoardGameType);
+            m_BoardGameLogic.SetStartingPlayer(startFirst);
+            m_BoardGameLogic.StartBoardGame();
         }
         
         private void OnGameOver(MissionBoardGameLogic boardGameLogic)
@@ -93,9 +98,7 @@ namespace Coop.Mod.Missions
 
         private void PreplaceUnits()
         {
-            var boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-
-            BoardGameSeega seegaBoardGame = (BoardGameSeega)boardGameLogic.Board;
+            BoardGameSeega seegaBoardGame = (BoardGameSeega)m_BoardGameLogic.Board;
 
             var MovePawnToTileDelayedMethod = seegaBoardGame.GetType().GetMethod("MovePawnToTileDelayed", BindingFlags.NonPublic | BindingFlags.Instance);
 
@@ -113,8 +116,7 @@ namespace Coop.Mod.Missions
                 return;
             }
 
-            MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-            int fromIndex = boardGameLogic.Board.PlayerTwoUnits.IndexOf(pawn);
+            int fromIndex = m_BoardGameLogic.Board.PlayerTwoUnits.IndexOf(pawn);
             PawnCapturedMessage pawnCapturedEvent = new PawnCapturedMessage(GameId, fromIndex);
             m_MessageBroker.Publish(pawnCapturedEvent);
 
@@ -128,8 +130,7 @@ namespace Coop.Mod.Missions
         {
             if (payload.What.GameId == GameId)
             {
-                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-                BoardGameBase boardGame = boardGameLogic.Board;
+                BoardGameBase boardGame = m_BoardGameLogic.Board;
                 PawnBase unitToCapture;
 
                 if (boardGame is BoardGameSeega)
@@ -156,13 +157,11 @@ namespace Coop.Mod.Missions
         {
             if (Mission.Current.InputManager.IsHotKeyPressed("BoardGamePawnSelect"))
             {
-                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+                PawnBase hoveredPawnIfAny = (PawnBase)GetHoveredPawnsMethodInfo?.Invoke(m_BoardGameLogic.Board, new object[] { });
 
-                PawnBase hoveredPawnIfAny = (PawnBase)GetHoveredPawnsMethodInfo?.Invoke(boardGameLogic.Board, new object[] { });
-
-                if (hoveredPawnIfAny != null && ((BoardGameKonane)boardGameLogic.Board).RemovablePawns.Contains(hoveredPawnIfAny))
+                if (hoveredPawnIfAny != null && ((BoardGameKonane)m_BoardGameLogic.Board).RemovablePawns.Contains(hoveredPawnIfAny))
                 {
-                    int fromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(hoveredPawnIfAny);
+                    int fromIndex = m_BoardGameLogic.Board.PlayerOneUnits.IndexOf(hoveredPawnIfAny);
                     PawnCapturedMessage pawnCapturedEvent = new PawnCapturedMessage(GameId, fromIndex);
                     m_MessageBroker.Publish(pawnCapturedEvent);
                 }
@@ -176,10 +175,8 @@ namespace Coop.Mod.Missions
                 return;
             }
 
-            MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-
-            int FromIndex = boardGameLogic.Board.PlayerOneUnits.IndexOf(move.Unit);
-            int ToIndex = boardGameLogic.Board.Tiles.IndexOf(move.GoalTile);
+            int FromIndex = m_BoardGameLogic.Board.PlayerOneUnits.IndexOf(move.Unit);
+            int ToIndex = m_BoardGameLogic.Board.Tiles.IndexOf(move.GoalTile);
             BoardGameMoveRequest boardGameMoveEvent = new BoardGameMoveRequest(GameId, FromIndex, ToIndex);
             m_MessageBroker.Publish(boardGameMoveEvent);
         }
@@ -188,8 +185,7 @@ namespace Coop.Mod.Missions
         {
             if (payload.What.GameId == GameId)
             {
-                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-                BoardGameBase boardGame = boardGameLogic.Board;
+                BoardGameBase boardGame = m_BoardGameLogic.Board;
 
                 var unitToMove = boardGame.PlayerTwoUnits[payload.What.FromIndex];
                 var goalTile = boardGame.Tiles[payload.What.ToIndex];
@@ -213,7 +209,6 @@ namespace Coop.Mod.Missions
 
                 var movePawnToTileMethod = boardType.GetMethod("MovePawnToTile", BindingFlags.NonPublic | BindingFlags.Instance);
                 movePawnToTileMethod?.Invoke(boardGame, new object[] { unitToMove, goalTile, false, true });
-
             }
         }
 
@@ -229,10 +224,7 @@ namespace Coop.Mod.Missions
         {
             if(payload.What.GameId == GameId)
             {
-                InformationManager.DisplayMessage(new InformationMessage("HandleForfeitGame"));
-                MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
-                boardGameLogic.AIForfeitGame();
-                
+                m_BoardGameLogic.AIForfeitGame();
             }
         }
     }

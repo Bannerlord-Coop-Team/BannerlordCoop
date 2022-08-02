@@ -16,6 +16,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -124,7 +125,9 @@ namespace Coop.Mod.Missions
 
         private void StartGame(bool startFirst, Guid gameId, Agent opposingAgent)
         {
-            BoardGameLogic = new BoardGameLogic(MessageBroker, gameId);
+            MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
+            CultureObject.BoardGameType gameType = Settlement.CurrentSettlement.Culture.BoardGame;
+            BoardGameLogic = new BoardGameLogic(MessageBroker, gameId, boardGameLogic, gameType);
             BoardGameLogic.StartGame(startFirst, opposingAgent);
         }
     }

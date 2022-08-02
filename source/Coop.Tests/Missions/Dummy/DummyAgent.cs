@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Tests.Mission.Dummy
+namespace Coop.Tests.Missions.Dummy
 {
     public class DummyAgent : IUpdateable
     {

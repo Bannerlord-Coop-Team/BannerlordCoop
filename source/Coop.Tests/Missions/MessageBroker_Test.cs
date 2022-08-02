@@ -3,8 +3,8 @@ using Common.Messaging;
 using Coop.Mod.Config;
 using Coop.Mod.Missions.Network;
 using Coop.NetImpl.LiteNet;
-using Coop.Tests.Mission.Dummy;
-using Coop.Tests.Mission.P2PUtils;
+using Coop.Tests.Missions.Dummy;
+using Coop.Tests.Missions.P2PUtils;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Network.Infrastructure;
@@ -18,12 +18,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Coop.Tests.Mission
+namespace Coop.Tests.Missions
 {
     public class MessageBroker_Test : IDisposable
     {
         P2PGroup group = new P2PGroup(nameof(MessageBroker_Test));
-
 
         public void Dispose()
         {

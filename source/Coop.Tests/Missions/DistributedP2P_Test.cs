@@ -9,17 +9,17 @@ using System.Threading.Tasks;
 using Common.Serialization;
 using Coop.Mod.Config;
 using Coop.NetImpl.LiteNet;
-using Coop.Tests.Mission.Dummy;
-using Coop.Tests.Mission.P2PUtils;
+using Coop.Tests.Missions.Dummy;
+using Coop.Tests.Missions.P2PUtils;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Network.Infrastructure;
 using ProtoBuf;
 using Xunit;
 
-namespace Coop.Tests.Mission
+namespace Coop.Tests.Missions
 {
-    
+
     public class DistributedP2P_Test : IDisposable
     {
         P2PGroup group = new P2PGroup("Test");

@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Coop.Tests.Mission.P2PUtils
+namespace Coop.Tests.Missions.P2PUtils
 {
     public class P2PGroup : IDisposable
     {
@@ -34,10 +34,10 @@ namespace Coop.Tests.Mission.P2PUtils
             LiteNetP2PClient client2 = AddClient();
 
             UpdateForXTime(
-                TimeSpan.FromSeconds(1), 
-                (c) =>  { return c.ConnectedPeersCount > 0; });
+                TimeSpan.FromSeconds(1),
+                (c) => { return c.ConnectedPeersCount > 0; });
 
-            if(client1.ConnectedPeersCount == 0 ||
+            if (client1.ConnectedPeersCount == 0 ||
                client2.ConnectedPeersCount == 0)
             {
                 throw new Exception("Unable to connect clients.");
@@ -61,7 +61,7 @@ namespace Coop.Tests.Mission.P2PUtils
 
         public LiteNetListenerServer AddServer()
         {
-            if(Server == null)
+            if (Server == null)
             {
                 Server serverSM = new Server(global::Network.Infrastructure.Server.EType.Direct);
                 Server = new LiteNetListenerServer(serverSM, Config);
@@ -84,9 +84,10 @@ namespace Coop.Tests.Mission.P2PUtils
         {
             DateTime startTime = DateTime.Now;
             while (DateTime.Now - startTime < amount &&
-                   !Clients.All(c => {
+                   !Clients.All(c =>
+                   {
                        if (untilAll == null) return true;
-                       return untilAll(c); 
+                       return untilAll(c);
                    }))
             {
                 Server.NetManager.PollEvents();
