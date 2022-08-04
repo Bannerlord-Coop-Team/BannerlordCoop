@@ -6,29 +6,21 @@ using Common;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.DebugUtil;
-using Coop.Mod.GameSync;
 using Coop.Mod.GameSync.Hideout;
 using Coop.Mod.GameSync.Party;
 using Coop.Mod.Patch;
-using Coop.Mod.Patch.MobilePartyPatches;
-using Coop.Mod.UI;
 using CoopFramework;
 using HarmonyLib;
 using ModTestingFramework;
-using Network.Infrastructure;
 using NLog;
-using NLog.Layouts;
-using NLog.Targets;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
-using TaleWorlds.Engine.Screens;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Missions;
 using TaleWorlds.ScreenSystem;
-using TaleWorlds.ObjectSystem;
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
 
@@ -101,7 +93,6 @@ namespace Coop.Mod
 
             Instance = this;
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
-            Updateables.Add(CoopClient.Instance);
             Updateables.Add(GameLoopRunner.Instance);
             Updateables.Add(new MobilePartyUpdatable());
         }
@@ -125,7 +116,6 @@ namespace Coop.Mod
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
             bool t = Coop.IsCoopGameSession();
-            CoopFramework.CoopFramework.InitPatches(ObjectManagerAdapter.Instance, Coop.IsCoopGameSession);
 
 
             // Skip startup splash screen
@@ -187,17 +177,10 @@ namespace Coop.Mod
                             if (argument.ToLower() == "/server")
                             {
                                 ClientServerModeMessage = "Started Bannerlord Co-op in server mode";
-                                //TODO add name to args
-                                CoopServer.Instance.StartGame("MP");
                             }
                             else if (argument.ToLower() == "/client")
                             {
                                 ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
-                                ServerConfiguration defaultConfiguration =
-                                    new ServerConfiguration();
-                                CoopClient.Instance.Connect(
-                                    defaultConfiguration.NetworkConfiguration.LanAddress,
-                                    defaultConfiguration.NetworkConfiguration.LanPort);
                             }
                         }
 #else
@@ -246,7 +229,6 @@ namespace Coop.Mod
         public override void OnGameEnd(Game game)
         {
             base.OnGameEnd(game);
-            CoopServer.Instance.ShutDownServer();
             DebugLogging.Shutdown();
         }
 
