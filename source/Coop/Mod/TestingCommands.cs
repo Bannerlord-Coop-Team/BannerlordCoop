@@ -19,12 +19,14 @@ namespace Coop.Mod
 
         public static void SaveGame(string[] saveName)
         {
-            Campaign.Current.SaveHandler.SaveAs(saveName[0]);
+            // TODO send as event
+            //Campaign.Current.SaveHandler.SaveAs(saveName[0]);
         }
 
         public static void LoadGame(string[] saveName)
         {
-            CoopServer.Instance.StartGame(saveName[0]);
+            // TODO send as event
+            //CoopServer.Instance.StartGame(saveName[0]);
         }
     }
 }

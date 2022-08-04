@@ -1,12 +1,10 @@
 ﻿using Common;
 using Coop.Mod.Serializers.Custom;
-using Network;
 using NLog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -17,6 +15,7 @@ using TaleWorlds.SaveSystem.Load;
 
 namespace Coop.Mod.Data
 {
+
     /// <summary>
     /// Package class for game data that is sent to client
     /// </summary>
@@ -75,10 +74,7 @@ namespace Coop.Mod.Data
                 throw new Exception("Saving the game failed. Abort.");
             }
 
-            // Write packet
-            ByteWriter writer = new ByteWriter();
-            save.Serialize(writer);
-            return writer.ToArray();
+            return save.Serialize();
         }
         #endregion
 
@@ -96,16 +92,12 @@ namespace Coop.Mod.Data
 
         private LoadResult UnpackWorldData(byte[] data)
         {
-            ArraySegment<byte> rawData = new ArraySegment<byte>(data);
-            Logger.Debug("Total: {sizeInMemory} bytes.", rawData.Count);
-            InMemDriver stream = DeserializeWorldState(rawData);
-            if (stream == null)
-            {
-                Logger.Error("Error during world state serialization. Abort.");
-                return null;
-            }
+            Logger.Debug("Total: {sizeInMemory} bytes.", data.Length);
+            InMemDriver memStream = new InMemDriver();
+            typeof(InMemDriver).GetField("_data", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(memStream, data);
 
-            LoadResult loadResult = SaveLoad.LoadSaveGameData(stream);
+            LoadResult loadResult = SaveLoad.LoadSaveGameData(memStream);
             if (loadResult == null)
             {
                 Logger.Error("Unable to load world state. Abort.");
@@ -114,26 +106,14 @@ namespace Coop.Mod.Data
 
             if (loadResult.Successful)
             {
-                Logger.Info(loadResult.ToFriendlyString());
+                Logger.Info(loadResult);
             }
             else
             {
-                Logger.Error(loadResult.ToFriendlyString());
+                Logger.Error(loadResult);
             }
 
             return loadResult;
-        }
-
-        private InMemDriver DeserializeWorldState(ArraySegment<byte> rawData)
-        {
-            InMemDriver memStream = new InMemDriver();
-            memStream.SetBuffer(rawData.ToArray());
-            return memStream;
-        }
-
-        public static SaveData Deserialize(ArraySegment<byte> payload)
-        {
-            return (SaveData)CommonSerializer.Deserialize(payload);
         }
 
         /// <summary>
@@ -266,20 +246,6 @@ namespace Coop.Mod.Data
                     GuidAssociations.Remove(mbObject.Id);
                 }
             }
-
-            
-
-#if DEBUG
-            List<Guid> unresolved = new List<Guid>(GuidAssociations.Values);
-            if (GuidAssociations.Count > 0)
-            {
-                CoopClient.Instance.Session.Connection.Send(
-                    new Network.Protocol.Packet(
-                        Network.Protocol.EPacket.BadID,
-                        Common.CommonSerializer.Serialize(unresolved))
-                    );
-            }
-#endif
 
             return GuidAssociations.Count == 0;
         }

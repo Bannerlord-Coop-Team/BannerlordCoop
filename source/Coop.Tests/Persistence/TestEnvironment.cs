@@ -99,12 +99,12 @@ namespace Coop.Tests.Persistence
 
         public EventBroadcastingQueue EventQueue { get; }
 
-        [NotNull] public TestConnectionsRaw ConnectionsRaw { get; private set; }
-        [NotNull] public TestConnections Connections { get; private set; }
+        public TestConnectionsRaw ConnectionsRaw { get; private set; }
+        public TestConnections Connections { get; private set; }
 
-        [NotNull] public TestStores Stores { get; private set; }
+        public TestStores Stores { get; private set; }
 
-        [NotNull] public TestPersistence Persistence { get; private set; }
+        public TestPersistence Persistence { get; private set; }
 
         public List<RemoteStoreClient> StoresClient => Stores.StoresClient;
 

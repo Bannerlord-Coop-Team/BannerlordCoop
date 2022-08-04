@@ -42,5 +42,10 @@ namespace Coop.Mod.Serializers.Custom
         {
             newHeroLastSeenInformation.LastSeenPlace = CoopObjectManager.GetObject<Settlement>(lastSeenPlace);
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

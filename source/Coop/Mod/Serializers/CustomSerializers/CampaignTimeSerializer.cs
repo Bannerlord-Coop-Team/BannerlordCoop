@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using System.Reflection;
+using Coop.Mod.Extentions;
 
 namespace Coop.Mod.Serializers.Custom
 {
@@ -28,7 +29,9 @@ namespace Coop.Mod.Serializers.Custom
             // only create object if it existed on serialize end
             if (numTicksExists)
             {
-                return Extensions.CreateCampaignTime(numTicks);
+                CampaignTime campaignTime = new CampaignTime();
+                campaignTime.SetNumTicks(numTicks);
+                return campaignTime;
             }
             return null;
         }
@@ -36,6 +39,11 @@ namespace Coop.Mod.Serializers.Custom
         public void ResolveReferenceGuids()
         {
             // No references
+        }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
         }
     }
 }

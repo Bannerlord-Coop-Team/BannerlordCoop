@@ -133,5 +133,10 @@ namespace Coop.Mod.Serializers.Custom
                 locationComplexFieldInfo.SetValue(newLocation, CoopObjectManager.GetObject(locationComplex));
             }
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

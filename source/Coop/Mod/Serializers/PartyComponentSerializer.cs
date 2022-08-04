@@ -78,6 +78,11 @@ namespace Coop.Mod.Serializers.Custom
                 .Invoke(component, new object[] { CoopObjectManager.GetObject(party) });
             partyComponentSerializer.ResolveReferenceGuids();
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     [Serializable]
@@ -118,6 +123,11 @@ namespace Coop.Mod.Serializers.Custom
                 .GetProperty(nameof(BanditPartyComponent.Hideout))
                 .GetSetMethod(true)
                 .Invoke(BanditPartyComponent, new object[] { CoopObjectManager.GetObject(hideout) });
+        }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -162,6 +172,11 @@ namespace Coop.Mod.Serializers.Custom
             LordPartyComponent.GetType()
                 .GetField("_leader", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(LordPartyComponent, CoopObjectManager.GetObject(owner));
+        }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -213,6 +228,11 @@ namespace Coop.Mod.Serializers.Custom
                 .GetField("_homeSettlement", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(CustomPartyComponent, CoopObjectManager.GetObject(settlement));
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     [Serializable]
@@ -253,6 +273,11 @@ namespace Coop.Mod.Serializers.Custom
                 .Invoke(CaravanPartyComponent, new object[] { CoopObjectManager.GetObject(settlement) });
             typeof(CaravanPartyComponent).GetProperty("Owner").GetSetMethod(true).Invoke(CaravanPartyComponent, new object[] { CoopObjectManager.GetObject(owner) });
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     [Serializable]
@@ -288,6 +313,11 @@ namespace Coop.Mod.Serializers.Custom
                 .GetProperty(nameof(VillagerPartyComponent.Village))
                 .GetSetMethod(true)
                 .Invoke(VillagerPartyComponent, new object[] { CoopObjectManager.GetObject(village) });
+        }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -341,6 +371,11 @@ namespace Coop.Mod.Serializers.Custom
                     CoopObjectManager.GetObject<Settlement>(settlement)
                 });
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     [Serializable]
@@ -377,6 +412,11 @@ namespace Coop.Mod.Serializers.Custom
                 .GetSetMethod(true)
                 .Invoke(GarrisonPartyComponent, new object[] { CoopObjectManager.GetObject(settlement) });
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     [Serializable]
@@ -407,6 +447,11 @@ namespace Coop.Mod.Serializers.Custom
                 .GetProperty(nameof(MilitiaPartyComponent.Settlement))
                 .GetSetMethod(true)
                 .Invoke(MilitiaPartyComponent, new object[] { CoopObjectManager.GetObject(settlement) });
+        }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
         }
     }
 }

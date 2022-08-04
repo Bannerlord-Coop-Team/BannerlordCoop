@@ -16,7 +16,7 @@ namespace Sync.Patch
         private readonly MethodPatch<TPatch> m_SetterPatch;
 
         public PropertyPatch(
-            [NotNull] Type declaringType)
+            Type declaringType)
         {
             m_Declaring = declaringType;
             m_SetterPatch = new MethodPatch<TPatch>(m_Declaring);

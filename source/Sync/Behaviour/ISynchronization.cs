@@ -1,8 +1,7 @@
 ﻿using JetBrains.Annotations;
-using RailgunNet.Logic;
-using RailgunNet.System.Types;
 using Sync.Call;
 using Sync.Value;
+using System;
 
 namespace Sync.Behaviour
 {
@@ -17,7 +16,7 @@ namespace Sync.Behaviour
         /// <param name="id">Id of the method to call.</param>
         /// <param name="instance">Instance to call the method on. null for a static call.</param>
         /// <param name="args">Method call arguments.</param>
-        void Broadcast(InvokableId id, [CanBeNull] object instance, [NotNull] object[] args);
+        void Broadcast(InvokableId id, object instance, object[] args);
 
         /// <summary>
         ///     Broadcast a method call that is associated with one or more entities. The server will send
@@ -29,12 +28,12 @@ namespace Sync.Behaviour
         /// <param name="id">Id of the method to call.</param>
         /// <param name="instance">Instance to call the method on. null for a static call.</param>
         /// <param name="args">Method call arguments.</param>
-        void Broadcast([CanBeNull] EntityId[] affectedEntities, InvokableId id, [CanBeNull] object instance, [NotNull] object[] args);
+        void Broadcast(Guid[] affectedEntities, InvokableId id, object instance, object[] args);
 
         /// <summary>
         ///     Broadcast a field change buffer to all clients.
         /// </summary>
         /// <param name="buffer">The buffer whose content should be broadcast.</param>
-        void Broadcast([NotNull] FieldChangeBuffer buffer);
+        void Broadcast(FieldChangeBuffer buffer);
     }
 }

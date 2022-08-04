@@ -34,5 +34,10 @@ namespace Coop.Mod.Serializers.Custom
         {
             // No references
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

@@ -11,7 +11,7 @@ namespace Sync.Call
     /// </summary>
     public class Invokable
     {
-        public Invokable([NotNull] MethodBase original, EInvokableFlag flags = EInvokableFlag.None)
+        public Invokable(MethodBase original, EInvokableFlag flags = EInvokableFlag.None)
         {
             if(original == null)
             {
@@ -45,7 +45,7 @@ namespace Sync.Call
         /// <param name="eOrigin">Originator of the call.</param>
         /// <param name="instance">Instance the call is being made on or null for static calls.</param>
         /// <param name="args">Arguments to the call.</param>
-        public virtual void Invoke(EOriginator eOrigin, [CanBeNull] object instance, [CanBeNull] object[] args)
+        public virtual void Invoke(EOriginator eOrigin, object instance, object[] args)
         {
             Original.Invoke(instance, args);
         }

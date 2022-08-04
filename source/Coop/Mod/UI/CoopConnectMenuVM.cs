@@ -1,13 +1,5 @@
-﻿using Network.Infrastructure;
-using System;
-using System.IO;
-using System.Runtime.ExceptionServices;
-using System.Text;
-using TaleWorlds.Core;
-using TaleWorlds.Engine;
-using TaleWorlds.Engine.Screens;
+﻿using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade.View.Missions;
 using TaleWorlds.ScreenSystem;
 
 namespace Coop.Mod.UI
@@ -23,9 +15,9 @@ namespace Coop.Mod.UI
         public string PortText => "Port:";
         public string PasswordText => "Password:";
 
-        public string connectIP = new ServerConfiguration().NetworkConfiguration.LanAddress.ToString();
+        public string connectIP;
 
-        public string connectPort = new ServerConfiguration().NetworkConfiguration.LanPort.ToString();
+        public string connectPort;
 
         public string connectPassword = "";
 
@@ -48,6 +40,7 @@ namespace Coop.Mod.UI
             get => connectPort;
             set
             {
+                // TODO update config
                 if (value == connectPort)
                     return;
                 connectPort = value;
@@ -70,6 +63,8 @@ namespace Coop.Mod.UI
         
         public void ActionConnect()
         {
+            // TODO create config from values
+
             int port;
             System.Net.IPAddress ip;
 
@@ -88,9 +83,7 @@ namespace Coop.Mod.UI
 
             InformationManager.DisplayMessage( new InformationMessage("Trying to connect to "+ ip.ToString() + ":" + port.ToString()));
 
-            CoopClient.Instance.Connect(
-            ip,
-            port);
+            // TODO Send connect message
 
         }
 

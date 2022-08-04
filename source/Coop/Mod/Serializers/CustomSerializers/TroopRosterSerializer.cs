@@ -100,5 +100,10 @@ namespace Coop.Mod.Serializers.Custom
                 .GetField("_troopRosterElements", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(newRoster, new List<TroopRosterElement>(troops));
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

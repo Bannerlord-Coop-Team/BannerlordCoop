@@ -60,7 +60,7 @@ namespace Coop.Mod
                 return loadResult;
             }
 
-            Logger.Error("{loadResult}", loadResult.ToFriendlyString());
+            //Logger.Error("{loadResult}", loadResult.ToFriendlyString());
 
             return null;
         }

@@ -40,7 +40,7 @@ namespace Sync.Call
         /// </summary>
         /// <param name="instance"></param>
         /// <param name="handler"></param>
-        public void SetHandler([NotNull] object instance, [NotNull] InstanceHandlerDelegate handler)
+        public void SetHandler(object instance, InstanceHandlerDelegate handler)
         {
             SetHandler(instance, (eOrigin, args) =>
             {
@@ -60,7 +60,7 @@ namespace Sync.Call
         /// </summary>
         /// <param name="instance"></param>
         /// <param name="handler"></param>
-        public void SetHandler([NotNull] object instance, [NotNull] InstanceHandlerCallerIdDelegate handler)
+        public void SetHandler(object instance, InstanceHandlerCallerIdDelegate handler)
         {
             lock (m_InstanceSpecificHandlers)
             {

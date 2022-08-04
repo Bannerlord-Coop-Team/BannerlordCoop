@@ -28,7 +28,7 @@ namespace Sync.Patch
         private readonly List<PatchedInvokable> m_Access = new List<PatchedInvokable>();
         protected readonly Type m_Declaring;
 
-        public MethodPatch([NotNull] Type declaringClass)
+        public MethodPatch(Type declaringClass)
         {
             m_Declaring = declaringClass;
         }
@@ -220,7 +220,7 @@ namespace Sync.Patch
         /// <returns></returns>
         private static bool DispatchPrefixExecution(
             PatchedInvokable patchedInvokable,
-            [CanBeNull] object instance,
+            object instance,
             params object[] args)
         {
             return patchedInvokable.InvokePrefix(EOriginator.Game, instance, args);
@@ -244,7 +244,7 @@ namespace Sync.Patch
 
         private static void DispatchPostfixExecution(
             PatchedInvokable patchedInvokable,
-            [CanBeNull] object instance,
+            object instance,
             params object[] args)
         {
             patchedInvokable.InvokePostfix(EOriginator.Game, instance, args);

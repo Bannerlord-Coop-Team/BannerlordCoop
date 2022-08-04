@@ -63,7 +63,7 @@ namespace Coop.Tests.Persistence.RPC
                     .Skip();
                 ApplyStaticPatches();
             }
-            public ManagedFoo([NotNull] Foo instance) : base(instance)
+            public ManagedFoo(Foo instance) : base(instance)
             {
             }
 
@@ -75,7 +75,7 @@ namespace Coop.Tests.Persistence.RPC
             Registry.Client,
             Registry.Server);
 
-        [NotNull] private TestPersistence Persistence { get; }
+        private TestPersistence Persistence { get; }
 
         private const int ClientId0 = 0;
         private const int ClientId1 = 1;

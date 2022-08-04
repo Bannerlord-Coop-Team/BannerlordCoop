@@ -100,11 +100,6 @@
     <Compile Include="Patch\MethodPatchFactory.cs" />
     <Compile Include="Patch\Patcher.cs" />
     <Compile Include="Patch\PropertyPatch.cs" />
-    <Compile Include="Store\ISerializableFactory.cs" />
-    <Compile Include="Store\IStore.cs" />
-    <Compile Include="Store\RemoteStoreClient.cs" />
-    <Compile Include="Store\RemoteStoreServer.cs" />
-    <Compile Include="Store\StoreSerializer.cs" />
     <Compile Include="Registry.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Reflection\Extensions.cs" />
@@ -120,20 +115,13 @@
     <Compile Include="Value\FieldId.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="app.config" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
       <Name>Common</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Network\Network.csproj">
-      <Project>{b0ff5e24-4d98-4ec8-bbce-6cdb85cb685d}</Project>
-      <Name>Network</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\RailgunNet\RailgunNet\RailgunNet.csproj">
-      <Project>{d8389325-85ae-4a1d-9b8e-e4742349a531}</Project>
-      <Name>RailgunNet</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

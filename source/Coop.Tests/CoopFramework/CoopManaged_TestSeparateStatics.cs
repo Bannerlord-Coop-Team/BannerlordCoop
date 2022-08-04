@@ -88,7 +88,7 @@ namespace Coop.Tests.CoopFramework
                 AutoWrapAllInstances(instance => new CoopManagedFoo(instance));
             }
 
-            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
+            public CoopManagedFoo(Foo instance) : base(instance)
             {
             }
         }
@@ -105,7 +105,7 @@ namespace Coop.Tests.CoopFramework
                 AutoWrapAllInstances(instance => new CoopManagedFoo2(instance));
             }
 
-            public CoopManagedFoo2([NotNull] Foo2 instance) : base(instance)
+            public CoopManagedFoo2(Foo2 instance) : base(instance)
             {
             }
         }

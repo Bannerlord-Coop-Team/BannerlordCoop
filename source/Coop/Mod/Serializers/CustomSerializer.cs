@@ -9,12 +9,6 @@ using System.Threading.Tasks;
 
 namespace Coop.Mod.Serializers
 {
-    public interface ICustomSerializer
-    {
-        object Deserialize();
-        void ResolveReferenceGuids();
-    }
-
     [Serializable]
     public abstract class CustomSerializer : ICustomSerializer
     {
@@ -148,7 +142,12 @@ namespace Coop.Mod.Serializers
 
         private bool IsSerializable(Type type)
         {
-            return !SerializerConfig.MarkAsNonSerializable.Contains(type) && type.IsSerializable;
+            throw new NotImplementedException();
+        }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
         }
     }
 }

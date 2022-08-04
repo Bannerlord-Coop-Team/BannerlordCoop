@@ -21,7 +21,7 @@ namespace Sync.Call
         /// </summary>
         /// <param name="original">The method that is being patched.</param>
         /// <param name="patcherType">The type info of the class that declared the patch. Used for debugging purposes.</param>
-        public PatchedInvokable([NotNull] MethodBase original, [NotNull] Type patcherType) : base(original)
+        public PatchedInvokable(MethodBase original, Type patcherType) : base(original)
         {
             DeclaringType = patcherType;
             m_StandIn = InvokableFactory.CreateStandIn(this);
@@ -57,7 +57,7 @@ namespace Sync.Call
         /// <param name="eOrigin">Who triggered this call?</param>
         /// <param name="instance"></param>
         /// <param name="args"></param>
-        public override void Invoke(EOriginator eOrigin, [CanBeNull] object instance, [CanBeNull] object[] args)
+        public override void Invoke(EOriginator eOrigin, object instance, object[] args)
         {
             if (!InvokePrefix(eOrigin, instance, args)) return;
             InvokeOriginal(instance, args);
@@ -68,7 +68,7 @@ namespace Sync.Call
         /// </summary>
         /// <param name="instance"></param>
         /// <param name="args"></param>
-        public void InvokeOriginal([CanBeNull] object instance, [CanBeNull] object[] args)
+        public void InvokeOriginal(object instance, object[] args)
         {
             m_Call?.Invoke(instance, args);
             m_CallStatic?.Invoke(args);
@@ -81,7 +81,7 @@ namespace Sync.Call
         /// <param name="instance"></param>
         /// <param name="args"></param>
         /// <returns>true if the invoked prefix wants the original function to be called as well. False otherwise.</returns>
-        public bool InvokePrefix(EOriginator eOrigin, [CanBeNull] object instance, params object[] args)
+        public bool InvokePrefix(EOriginator eOrigin, object instance, params object[] args)
         {
             var handler = Prefix.GetHandler(instance);
             if (handler != null)
@@ -119,8 +119,8 @@ namespace Sync.Call
             }
         }
 
-        [CanBeNull] private readonly Action<object, object[]> m_Call;
-        [CanBeNull] private readonly Action<object[]> m_CallStatic;
+        private readonly Action<object, object[]> m_Call;
+        private readonly Action<object[]> m_CallStatic;
 
         private readonly DynamicMethod m_StandIn;
 

@@ -72,5 +72,10 @@ namespace Coop.Mod.Serializers.Custom
             //    field.SetValue(itemCategory, CoopObjectManager.GetObject(id));
             //}
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

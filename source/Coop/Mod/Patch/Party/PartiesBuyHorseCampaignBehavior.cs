@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Coop.Mod.Extentions;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;

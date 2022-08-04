@@ -5,13 +5,9 @@ using System.Reflection;
 using Common;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
-using Coop.Mod.DebugUtil;
-using Coop.Mod.GameSync.Hideout;
-using Coop.Mod.GameSync.Party;
 using Coop.Mod.Patch;
 using CoopFramework;
 using HarmonyLib;
-using ModTestingFramework;
 using NLog;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
@@ -54,16 +50,11 @@ namespace Coop.Mod
                     {
                         if (argument.ToLower() == "/server")
                         {
-                            //TODO add name to args
-                            CoopServer.Instance.StartGame("MP");
+                            // TODO start network as server using config
                         }
                         else if (argument.ToLower() == "/client")
                         {
-                            ServerConfiguration defaultConfiguration =
-                                new ServerConfiguration();
-                            CoopClient.Instance.Connect(
-                                defaultConfiguration.NetworkConfiguration.LanAddress,
-                                defaultConfiguration.NetworkConfiguration.LanPort);
+                            // TODO start network as client using config
                         }
                     }
 #else
@@ -87,14 +78,11 @@ namespace Coop.Mod
 
         public Main()
         {
-
-            Debug.DebugManager = Debugging.DebugManager;
             MBDebug.DisableLogging = false;
 
             Instance = this;
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             Updateables.Add(GameLoopRunner.Instance);
-            Updateables.Add(new MobilePartyUpdatable());
         }
 
         private static string ClientServerModeMessage = ""; 
@@ -104,19 +92,17 @@ namespace Coop.Mod
 
         public override void NoHarmonyInit()
         {
-            DebugLogging.Initialize();
+            // TODO init DI module
         }
 
         public override void NoHarmonyLoad()
         {
             AddBehavior<InitServerBehaviour>();
             AddBehavior<GameLoadedBehaviour>();
-            AddBehavior<MobilePartyLifetimeBehavior>();
-            AddBehavior<HideoutBehavior>();
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
-            bool t = Coop.IsCoopGameSession();
-
+            // Apply all patches via harmony
+            harmony.PatchAll();
 
             // Skip startup splash screen
 #if DEBUG
@@ -126,27 +112,13 @@ namespace Coop.Mod
                             .SetValue(Module.CurrentModule, true);
 #endif
 
-            if (TESTING_ENABLED)
-            {
-                TestingFramework suite = TestingFramework.Instance;
-            }
-
-            // Apply all patches via harmony
-            harmony.PatchAll();
-
-            var isServer = false;
 
             var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
-
-
 #if DEBUG
-
-
+            bool isServer = false;
             if (args.Contains("/server"))
             {
-                AddBehavior<PartySyncDebugBehavior>();
                 isServer = true;
-                //TODO add name to args
                 
             }
             else if (args.Contains("/client"))
@@ -219,17 +191,16 @@ namespace Coop.Mod
             InformationManager.DisplayMessage(new InformationMessage(ClientServerModeMessage));
         }
 
-        public Action<Game> OnGameInit;
+        //public Action<Game> OnGameInit;
         public override void OnGameInitializationFinished(Game game)
         {
             base.OnGameInitializationFinished(game);
-            OnGameInit?.Invoke(game);
+            //OnGameInit?.Invoke(game);
         }
 
         public override void OnGameEnd(Game game)
         {
             base.OnGameEnd(game);
-            DebugLogging.Shutdown();
         }
 
         protected override void OnApplicationTick(float dt)
@@ -243,7 +214,7 @@ namespace Coop.Mod
             base.OnApplicationTick(dt);
 
             if (Input.IsKeyDown(InputKey.LeftControl) && Input.IsKeyDown(InputKey.Tilde) && this._isDebugToggled == false) {
-                CLICommands.ToggleDebugUI(new List<string>());
+                // TODO add back CLI
                 this._isDebugToggled = true;
             } else if(Input.IsKeyReleased(InputKey.LeftControl) || Input.IsKeyReleased(InputKey.Tilde)) {
                 this._isDebugToggled = false;

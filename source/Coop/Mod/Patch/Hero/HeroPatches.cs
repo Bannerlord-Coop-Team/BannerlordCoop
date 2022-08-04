@@ -18,16 +18,16 @@ namespace Coop.Mod.Patch
         static void Postfix(Hero __instance)
         {
             
-            if(Coop.IsServer)
-            {
-                string stacktrace = Environment.StackTrace;
-                Logger.Info($"Creating new hero, {__instance.Name}");
-            }
-            else if(CoopClient.Instance.ClientPlaying)
-            {
-                string stacktrace = Environment.StackTrace;
-                Logger.Info($"Creating new hero, {__instance.Name}");
-            }
+            //if(Coop.IsServer)
+            //{
+            //    string stacktrace = Environment.StackTrace;
+            //    Logger.Info($"Creating new hero, {__instance.Name}");
+            //}
+            //else if(CoopClient.Instance.ClientPlaying)
+            //{
+            //    string stacktrace = Environment.StackTrace;
+            //    Logger.Info($"Creating new hero, {__instance.Name}");
+            //}
             
         }
     }

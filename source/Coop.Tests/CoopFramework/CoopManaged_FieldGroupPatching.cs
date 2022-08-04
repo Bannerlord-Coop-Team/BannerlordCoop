@@ -99,7 +99,7 @@ namespace Coop.Tests.CoopFramework
                     .Revert();
             }
 
-            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
+            public CoopManagedFoo(Foo instance) : base(instance)
             {
             }
         }

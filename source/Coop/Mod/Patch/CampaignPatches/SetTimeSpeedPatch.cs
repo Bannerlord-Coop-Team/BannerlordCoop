@@ -28,7 +28,7 @@ namespace Coop.Mod.Patch.CampaignPatches
 
             if (ShouldEnableTimeControlMode(__instance.TimeControlMode, speed))
             {
-                TimeControl.CanSyncTimeControlMode = true;
+                //TimeControl.CanSyncTimeControlMode = true;
             }
 
         }

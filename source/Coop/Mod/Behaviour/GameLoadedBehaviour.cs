@@ -23,9 +23,6 @@ namespace Coop.Mod.Behaviour
 
         private static void GameLoaded(CampaignGameStarter gameStarter)
         {
-            CoopClient.Instance.Events.OnGameLoaded.Invoke();
-            CoopClient.Instance.Events.OnBeforePlayerPartySpawned.Invoke(MobileParty.MainParty);
-            LoadPlayers();
         }
 
         private static void LoadPlayers()

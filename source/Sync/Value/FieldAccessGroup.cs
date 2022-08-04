@@ -17,9 +17,9 @@ namespace Sync.Value
     public class FieldAccessGroup<TDeclaring, TValueObject> : FieldAccessGroup
         where TValueObject : class, IEnumerable<object>
     {
-        [NotNull] private readonly FieldAccess[] m_Fields;
+        private readonly FieldAccess[] m_Fields;
 
-        public FieldAccessGroup([NotNull] IEnumerable<FieldAccess> fields) : base(typeof(TDeclaring))
+        public FieldAccessGroup(IEnumerable<FieldAccess> fields) : base(typeof(TDeclaring))
         {
             m_Fields = fields.ToArray();
             VerifyConstructor();
@@ -100,6 +100,6 @@ namespace Sync.Value
         {
         }
 
-        [NotNull] public abstract IEnumerable<FieldAccess> Fields { get; }
+        public abstract IEnumerable<FieldAccess> Fields { get; }
     }
 }

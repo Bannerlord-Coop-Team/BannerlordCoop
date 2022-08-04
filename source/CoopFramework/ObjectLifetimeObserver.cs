@@ -90,8 +90,8 @@ namespace CoopFramework
 
         #region Private
 
-        [CanBeNull] private static ConstructorPatch<ObjectLifetimeObserver<T>> m_ConstructorPatch;
-        [CanBeNull] private static DestructorPatch<ObjectLifetimeObserver<T>> m_DestructorPatch;
+        private static ConstructorPatch<ObjectLifetimeObserver<T>> m_ConstructorPatch;
+        private static DestructorPatch<ObjectLifetimeObserver<T>> m_DestructorPatch;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         #endregion

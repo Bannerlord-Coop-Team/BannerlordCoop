@@ -1,14 +1,14 @@
 ﻿using System;
-using Network;
 using JetBrains.Annotations;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Save;
+using System.IO;
 
 namespace Coop.Mod
 {
     public class SaveGameData
     {
-        public SaveGameData([NotNull] MetaData metaData, [NotNull] SaveOutput saveOutput)
+        public SaveGameData(MetaData metaData, SaveOutput saveOutput)
         {
             MetaData = metaData;
             SaveOutput = saveOutput;
@@ -17,10 +17,13 @@ namespace Coop.Mod
         private MetaData MetaData { get; }
         private SaveOutput SaveOutput { get; }
 
-        public void Serialize(ByteWriter writer)
+        public byte[] Serialize()
         {
-            MetaData.Serialize(writer.Binary.BaseStream);
-            writer.Binary.Write(SaveOutput.Data.GetData());
+            using(var ms = new MemoryStream())
+            {
+                MetaData.Serialize(ms);
+                return ms.ToArray();
+            }
         }
 
         public override string ToString()

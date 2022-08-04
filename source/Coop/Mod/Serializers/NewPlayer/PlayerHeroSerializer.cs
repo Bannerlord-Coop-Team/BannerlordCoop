@@ -1,6 +1,4 @@
-﻿using Coop.NetImpl;
-using SandBox.View.Map;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -9,10 +7,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.Localization;
-using TaleWorlds.ObjectSystem;
-using TaleWorlds.PlayerServices;
 using Debug = System.Diagnostics.Debug;
 
 namespace Coop.Mod.Serializers
@@ -36,8 +31,6 @@ namespace Coop.Mod.Serializers
 
         public PlayerHeroSerializer(Hero hero) : base(hero)
         {
-            PlayerId = new PlatformAPI().GetPlayerID().ToString();
-
             stringId = hero.StringId;
 
             List<string> UnmanagedFields = new List<string>();

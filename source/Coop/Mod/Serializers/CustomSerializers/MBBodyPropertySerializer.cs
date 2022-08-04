@@ -29,6 +29,11 @@ namespace Coop.Mod.Serializers.Custom
         {
             // no refs
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     [Serializable]
@@ -50,6 +55,11 @@ namespace Coop.Mod.Serializers.Custom
         public void ResolveReferenceGuids()
         {
             // No refs
+        }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
         }
     }
 }

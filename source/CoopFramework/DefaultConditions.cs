@@ -20,7 +20,7 @@ namespace CoopFramework
         /// </summary>
         public static Condition RemoteAuthority = IsOriginator(EOriginator.RemoteAuthority);
 
-        public static Condition Not([NotNull] Condition condition)
+        public static Condition Not(Condition condition)
         {
             return new Condition((originator, o) => !condition.Evaluate(originator, o));
         }

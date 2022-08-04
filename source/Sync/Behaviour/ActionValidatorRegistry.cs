@@ -37,7 +37,7 @@ namespace Sync.Behaviour
         /// <param name="id"></param>
         /// <param name="validator"></param>
         /// <exception cref="ArgumentException"></exception>
-        public static void Register(InvokableId id, [NotNull] IActionValidator validator)
+        public static void Register(InvokableId id, IActionValidator validator)
         {
             lock (Lock)
             {
@@ -53,7 +53,7 @@ namespace Sync.Behaviour
         /// <param name="id"></param>
         /// <param name="validator"></param>
         /// <exception cref="ArgumentException"></exception>
-        public static void Register(FieldId id, [NotNull] IActionValidator validator)
+        public static void Register(FieldId id, IActionValidator validator)
         {
             lock (Lock)
             {

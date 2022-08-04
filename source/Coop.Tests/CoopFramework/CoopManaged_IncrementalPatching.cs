@@ -77,7 +77,7 @@ namespace Coop.Tests.CoopFramework
                     });
             }
 
-            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
+            public CoopManagedFoo(Foo instance) : base(instance)
             {
             }
         }
@@ -103,7 +103,7 @@ namespace Coop.Tests.CoopFramework
                     });
             }
 
-            public CoopManagedFoo2([NotNull] Foo instance) : base(instance)
+            public CoopManagedFoo2(Foo instance) : base(instance)
             {
             }
         }

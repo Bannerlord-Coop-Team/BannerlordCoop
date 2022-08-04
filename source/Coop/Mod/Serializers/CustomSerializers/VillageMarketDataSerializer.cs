@@ -40,5 +40,10 @@ namespace Coop.Mod.Serializers.Custom
 
             villageFieldInfo.SetValue(newVillageMarketData, village);
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

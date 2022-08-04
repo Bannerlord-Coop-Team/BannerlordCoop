@@ -36,5 +36,10 @@ namespace Coop.Mod.Serializers.Custom
         {
             serializer.ResolveReferenceGuids();
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

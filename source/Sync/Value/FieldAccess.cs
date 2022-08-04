@@ -35,9 +35,9 @@ namespace Sync.Value
     /// </summary>
     public abstract class FieldAccess : FieldBase
     {
-        [NotNull] public readonly FieldInfo MemberInfo;
+        public readonly FieldInfo MemberInfo;
 
-        protected FieldAccess(Type declaringType, [NotNull] FieldInfo memberInfo) : base(declaringType)
+        protected FieldAccess(Type declaringType, FieldInfo memberInfo) : base(declaringType)
         {
             MemberInfo = memberInfo;
             m_GetterLocal = InvokableFactory.CreateUntypedGetter<object>(memberInfo);
@@ -45,7 +45,7 @@ namespace Sync.Value
         }
 
         /// <inheritdoc />
-        public override object Get([CanBeNull] object target)
+        public override object Get(object target)
         {
             return m_GetterLocal(target);
         }
@@ -65,9 +65,9 @@ namespace Sync.Value
 
         #region Private
 
-        [NotNull] private readonly Func<object, object> m_GetterLocal;
+        private readonly Func<object, object> m_GetterLocal;
 
-        [NotNull] private readonly Action<object, object> m_Setter;
+        private readonly Action<object, object> m_Setter;
 
         #endregion
     }

@@ -182,7 +182,7 @@ namespace Coop.Tests.CoopFramework
                 AutoWrapAllInstances(instance => new CoopManagedFoo(instance));
             }
 
-            public CoopManagedFoo([NotNull] Foo instance) : base(instance)
+            public CoopManagedFoo(Foo instance) : base(instance)
             {
             }
         }
@@ -213,7 +213,7 @@ namespace Coop.Tests.CoopFramework
                 AutoWrapAllInstances(instance => new CoopManagedBaz(instance));
             }
 
-            public CoopManagedBaz([NotNull] Baz instance) : base(instance)
+            public CoopManagedBaz(Baz instance) : base(instance)
             {
                 CreatedInstances[instance] = this;
             }
@@ -245,7 +245,7 @@ namespace Coop.Tests.CoopFramework
                 AutoWrapAllInstances(instance => new CoopManagedParent(instance));
             }
 
-            public CoopManagedParent([NotNull] Parent instance) : base(instance)
+            public CoopManagedParent(Parent instance) : base(instance)
             {
                 CreatedInstances[instance] = this;
             }

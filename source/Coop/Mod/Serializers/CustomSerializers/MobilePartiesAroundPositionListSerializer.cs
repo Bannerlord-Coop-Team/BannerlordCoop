@@ -44,5 +44,10 @@ namespace Coop.Mod.Serializers.Custom
                 .GetField("_partyList", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(partiesList, partiesAroundParty);
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

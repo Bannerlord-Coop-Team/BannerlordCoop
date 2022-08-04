@@ -109,5 +109,10 @@ namespace Coop.Mod.Serializers
         {
             // Do nothing no references exist
         }
+
+        public byte[] Serialize()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

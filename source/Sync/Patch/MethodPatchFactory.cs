@@ -197,7 +197,7 @@ namespace Sync.Patch
 
         private struct SMethodParameter
         {
-            [CanBeNull] public ParameterInfo Info;
+            public ParameterInfo Info;
             public Type ParameterType;
             public string Name;
         }

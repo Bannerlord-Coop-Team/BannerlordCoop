@@ -1,9 +1,6 @@
-﻿using Network;
-using System;
-using System.Collections.Generic;
+﻿using System;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Serializers.Custom
@@ -19,15 +16,12 @@ namespace Coop.Mod.Serializers.Custom
 
         public byte[] Serialize()
         {
-            ByteWriter writer = new ByteWriter();
-            writer.Binary.Write(id);
-            return writer.ToArray();
-        }
-
-        public static MBGUID Deserialize(ByteReader reader)
-        {
-            uint id = reader.Binary.ReadUInt32();
-            return new MBGUID(id);
+            using(var stream = new MemoryStream())
+            {
+                BinaryWriter writer = new BinaryWriter(stream);
+                writer.Write(id);
+                return stream.ToArray();
+            }
         }
 
         public object Deserialize()

@@ -62,7 +62,9 @@ namespace Coop.Mod.UI
 				GameStateManager.Current.CleanStates(0);
 				GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
 			}
-            MBGameManager.StartNewGame(CoopServer.Instance.CreateGameManager(loadResult));
+
+			// TODO Send as event
+            //MBGameManager.StartNewGame(CoopServer.Instance.CreateGameManager(loadResult));
 		}
 
 	}
