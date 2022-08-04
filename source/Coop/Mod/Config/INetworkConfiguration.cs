@@ -2,7 +2,9 @@
 {
     public interface INetworkConfiguration
     {
-        string LanAddress { get; }
-        int LanPort { get; }
+        string Address { get; }
+        int Port { get; }
+        string Token { get; }
+        string P2PToken { get; }
     }
 }

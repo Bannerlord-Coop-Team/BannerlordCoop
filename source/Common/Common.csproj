@@ -85,6 +85,7 @@
     <Compile Include="Globals.cs" />
     <Compile Include="IUpdatable.cs" />
     <Compile Include="MessageBroker\IMessageBroker.cs" />
+    <Compile Include="MessageBroker\MessageBroker.cs" />
     <Compile Include="MovingAverage.cs" />
     <Compile Include="OrderedHashSet.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

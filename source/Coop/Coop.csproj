@@ -57,6 +57,9 @@
       <HintPath>..\packages\LiteNetLib.0.9.4\lib\net35\LiteNetLib.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
     <Reference Include="Mono.Reflection, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756, processorArchitecture=MSIL">
       <HintPath>..\packages\Mono.Reflection.2.0.0\lib\net40\Mono.Reflection.dll</HintPath>
     </Reference>
@@ -65,6 +68,12 @@
     </Reference>
     <Reference Include="PropertyChanged, Version=3.2.8.0, Culture=neutral, PublicKeyToken=ee3ee20bcf148ddd, processorArchitecture=MSIL">
       <HintPath>..\packages\PropertyChanged.Fody.3.2.8\lib\net40\PropertyChanged.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.3.1.17\lib\net461\protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.Core.3.1.17\lib\net461\protobuf-net.Core.dll</HintPath>
     </Reference>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
@@ -77,9 +86,6 @@
     </Reference>
     <Reference Include="SandBox.ViewModelCollection">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
-    </Reference>
-    <Reference Include="Stateless, Version=4.0.0.0, Culture=neutral, PublicKeyToken=93038f0927583c9a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Stateless.5.1.2\lib\net472\Stateless.dll</HintPath>
     </Reference>
     <Reference Include="Steamworks.NET, Version=13.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
@@ -102,12 +108,34 @@
       <HintPath>..\..\mb2\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Collections.Immutable, Version=1.2.5.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Collections.Immutable.1.7.1\lib\net461\System.Collections.Immutable.dll</HintPath>
+    </Reference>
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Diagnostics.DiagnosticSource, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
+    </Reference>
     <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Memory.4.5.4\lib\net461\System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.4.5.3\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
     <Reference Include="System.Runtime.InteropServices.RuntimeInformation" />
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.2\lib\netstandard2.0\System.Threading.Tasks.Extensions.dll</HintPath>
+    </Reference>
     <Reference Include="System.Transactions" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -254,6 +282,29 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Mod\Client\ClientContext.cs" />
+    <Compile Include="Mod\Config\NetworkConfiguration.cs" />
+    <Compile Include="Mod\Messages\Game\GoToMainMenuResponse.cs" />
+    <Compile Include="Mod\Messages\Game\GoToMainMenuRequest.cs" />
+    <Compile Include="Mod\Messages\IMessage.cs" />
+    <Compile Include="Mod\PacketHandlers\IPacketManager.cs" />
+    <Compile Include="Mod\PacketHandlers\PacketManager.cs" />
+    <Compile Include="Mod\Server\ServerContext.cs" />
+    <Compile Include="Mod\States\Client\ClientState.cs" />
+    <Compile Include="Mod\States\Client\CreatingCharacterState.cs" />
+    <Compile Include="Mod\States\Client\IClientContext.cs" />
+    <Compile Include="Mod\States\Client\IClientState.cs" />
+    <Compile Include="Mod\States\Client\InitialClientState.cs" />
+    <Compile Include="Mod\States\Client\LoadingWorldState.cs" />
+    <Compile Include="Mod\States\Client\MapState.cs" />
+    <Compile Include="Mod\States\Client\MissionState.cs" />
+    <Compile Include="Mod\States\IContext.cs" />
+    <Compile Include="Mod\States\IState.cs" />
+    <Compile Include="Mod\States\Server\IServerContext.cs" />
+    <Compile Include="Mod\States\Server\InitialServerState.cs" />
+    <Compile Include="Mod\States\Server\IServerState.cs" />
+    <Compile Include="Mod\States\Server\ServerRunningState.cs" />
+    <Compile Include="Mod\States\Server\ServerState.cs" />
     <Compile Include="Mod\Extentions\CampaignTimeExtensions.cs" />
     <Compile Include="Mod\Extentions\MobilePartyExtensions.cs" />
     <Compile Include="Mod\ICoopNetwork.cs" />
@@ -263,7 +314,6 @@
     <Compile Include="Mod\Data\SaveData.cs" />
     <Compile Include="Mod\EventHandlers\IEventHandler.cs" />
     <Compile Include="Mod\Extentions\CampaignObjectManagerExtentions.cs" />
-    <Compile Include="Mod\Coop.cs" />
     <Compile Include="Mod\GameLoopRunner.cs" />
     <Compile Include="Mod\Config\INetworkConfiguration.cs" />
     <Compile Include="Mod\PacketHandlers\IPacket.cs" />
@@ -288,8 +338,8 @@
     <Compile Include="Mod\Patch\Utils.cs" />
     <Compile Include="Mod\SaveGameData.cs" />
     <Compile Include="Mod\SaveLoad.cs" />
-    <Compile Include="Mod\CoopClient.cs" />
-    <Compile Include="Mod\CoopServer.cs" />
+    <Compile Include="Mod\Client\CoopClient.cs" />
+    <Compile Include="Mod\Server\CoopServer.cs" />
     <Compile Include="Mod\Behaviour\GameLoadedBehaviour.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Mod\Main.cs" />

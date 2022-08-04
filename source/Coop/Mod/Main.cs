@@ -3,9 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common;
+using Common.MessageBroker;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
+using Coop.Mod.Client;
+using Coop.Mod.Config;
+using Coop.Mod.PacketHandlers;
 using Coop.Mod.Patch;
+using Coop.Mod.States.Client;
+using Coop.Mod.States.Server;
 using CoopFramework;
 using HarmonyLib;
 using NLog;
@@ -30,7 +36,11 @@ namespace Coop.Mod
         public static readonly string LOAD_GAME = "MP";
 
         // -------------
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private static readonly ILogger _logger = LogManager.GetCurrentClassLogger();
+        private static IPacketManager packetManager = new PacketManager();
+        private static IMessageBroker messageBroker = new MessageBroker();
+        private static INetworkConfiguration networkConfiguration = new NetworkConfiguration();
+        private static ICoopNetwork _network;
         private bool m_IsFirstTick = true;
 
         private bool _isDebugToggled = false;
@@ -48,15 +58,10 @@ namespace Coop.Mod
 #if DEBUG
                     foreach (string argument in array)
                     {
-                        if (argument.ToLower() == "/server")
-                        {
-                            // TODO start network as server using config
-                        }
-                        else if (argument.ToLower() == "/client")
-                        {
-                            // TODO start network as client using config
-                        }
+                        
                     }
+
+                    _network.Start();
 #else
                     ScreenManager.PushScreen(
                         ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
@@ -80,14 +85,12 @@ namespace Coop.Mod
         {
             MBDebug.DisableLogging = false;
 
-            Instance = this;
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             Updateables.Add(GameLoopRunner.Instance);
         }
 
         private static string ClientServerModeMessage = ""; 
 
-        public static Main Instance { get; private set; }
         public UpdateableList Updateables { get; } = new UpdateableList();
 
         public override void NoHarmonyInit()
@@ -119,7 +122,6 @@ namespace Coop.Mod
             if (args.Contains("/server"))
             {
                 isServer = true;
-                
             }
             else if (args.Contains("/client"))
             {
@@ -139,27 +141,28 @@ namespace Coop.Mod
                     9990,
                     () =>
                     {
+#if DEBUG
                         string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
-
-#if DEBUG
-                        
-                        foreach (string argument in array)
+                        if (isServer)
                         {
-                            if (argument.ToLower() == "/server")
-                            {
-                                ClientServerModeMessage = "Started Bannerlord Co-op in server mode";
-                            }
-                            else if (argument.ToLower() == "/client")
-                            {
-                                ClientServerModeMessage = "Started Bannerlord Co-op in client mode";
-                            }
+                            // TODO start network as server using config
+                            IServerContext context = new ServerContext(_logger, messageBroker, packetManager);
+                            _network = new CoopServer(networkConfiguration, context);
                         }
+                        else
+                        {
+                            // TODO start network as client using config
+                            IClientContext context = new ClientContext(_logger, messageBroker, packetManager);
+                            _network = new CoopClient(networkConfiguration, context);
+                        }
+
 #else
                         ScreenManager.PushScreen(
                             ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
                                 new object[] { }));
 #endif
+                        _network.Start();
                     },
 
                     () => { return (false, new TextObject()); }
@@ -183,6 +186,7 @@ namespace Coop.Mod
         protected override void OnSubModuleUnloaded()
         {
             base.OnSubModuleUnloaded();
+            _network.Stop();
         }
 
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
@@ -227,7 +231,7 @@ namespace Coop.Mod
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             Exception ex = (Exception)e.ExceptionObject;
-            Logger.Fatal(ex, "Unhandled exception");
+            //Logger.Fatal(ex, "Unhandled exception");
         }
 
         internal static bool DisableIntroVideo = true;

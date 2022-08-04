@@ -45,6 +45,6 @@ namespace Common.MessageBroker
     {
         void Subscribe<T>(Action<MessagePayload<T>> subscriber);
         void Unsubscribe<T>(Action<MessagePayload<T>> subscriber);
-        void Publish<T>(MessagePayload<T> payload);
+        void Publish<T>(object sender, T payload);
     }
 }
