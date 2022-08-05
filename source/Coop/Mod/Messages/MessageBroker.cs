@@ -15,7 +15,7 @@ namespace Coop.Mod.Messages
         private static Lazy<MessageBroker> instance = new Lazy<MessageBroker>();
         public static MessageBroker Instance => instance.Value;
 
-        private readonly Dictionary<Type, List<Delegate>> _subscribers;
+        private readonly Dictionary<Type, List<Delegate>> _subscribers = new Dictionary<Type, List<Delegate>>();
 
         private readonly IPacketManager _packetManager;
 
@@ -34,18 +34,24 @@ namespace Coop.Mod.Messages
             }
             else if(scope == MessageScope.External)
             {
-                _packetManager?.se
+                // TODO
             }
         }
 
         public void Subscribe<T>(Action<MessagePayload<T>> subscriber)
         {
-            throw new NotImplementedException();
+            if(_subscribers.TryGetValue(typeof(T), out var subscribers))
+            {
+                subscribers.Add(subscriber);
+            }
         }
 
         public void Unsubscribe<T>(Action<MessagePayload<T>> subscriber)
         {
-            throw new NotImplementedException();
+            if (_subscribers.TryGetValue(typeof(T), out var subscribers))
+            {
+                subscribers.Remove(subscriber);
+            }
         }
     }
 

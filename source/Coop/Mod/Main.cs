@@ -172,14 +172,14 @@ namespace Coop.Mod
                         if (isServer)
                         {
                             // TODO start network as server using config
-                            IServerLogic context = new ServerLogic(_logger, communicator);
-                            _network = new CoopServer(networkConfiguration, context);
+                            IServerLogic logic = new ServerLogic(_logger, communicator);
+                            _network = new CoopServer(networkConfiguration, logic);
                         }
                         else
                         {
                             // TODO start network as client using config
-                            IClientLogic context = new ClientLogic(_logger, communicator);
-                            _network = new CoopClient(networkConfiguration, context);
+                            IClientLogic logic = new ClientLogic(_logger, communicator);
+                            _network = new CoopClient(networkConfiguration, logic);
                         }
 
 #else

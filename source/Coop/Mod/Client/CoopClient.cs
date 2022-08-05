@@ -28,13 +28,13 @@ namespace Coop.Mod
 
         private NetPeer _serverPeer;
 
-        public CoopClient(INetworkConfiguration config, IClientLogic logic, ICommunicator communicator)
+        public CoopClient(INetworkConfiguration config, IClientLogic logic)
         {
             
             _configuration = config;
             _logic = logic;
             _logger = logic.Logger;
-            _packetManager = communicator.PacketManager;
+            _packetManager = logic.Communicator.PacketManager;
 
             _netManager = new NetManager(this);
 

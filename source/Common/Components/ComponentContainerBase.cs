@@ -13,8 +13,6 @@ namespace Common.Components
 
         public bool AddComponent<T>(T component) where T : IComponent
         {
-            Type interfaceType 
-
             if (_components.ContainsKey(component.GetType())) return false;
 
             _components.Add(component.GetType(), component);
