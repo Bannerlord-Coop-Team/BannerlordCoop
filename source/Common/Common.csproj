@@ -37,6 +37,9 @@
     <Reference Include="NLog">
       <HintPath>..\packages\NLog.4.7.2\lib\net45\NLog.dll</HintPath>
     </Reference>
+    <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.3.1.17\lib\net461\protobuf-net.dll</HintPath>
+    </Reference>
     <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
       <HintPath>..\packages\protobuf-net.Core.3.1.17\lib\net461\protobuf-net.Core.dll</HintPath>
     </Reference>
@@ -77,18 +80,21 @@
   <ItemGroup>
     <Compile Include="CommonSerializer.cs" />
     <Compile Include="CompatibilityInfo.cs" />
+    <Compile Include="Components\ComponentContainerBase.cs" />
     <Compile Include="CoopObjectManager.cs" />
     <Compile Include="CoopStateMachine.cs" />
     <Compile Include="DropoutStack.cs" />
     <Compile Include="Extentions.cs" />
     <Compile Include="FrameLimiter.cs" />
     <Compile Include="Globals.cs" />
+    <Compile Include="Components\IComponent.cs" />
+    <Compile Include="Components\IComponentContainer.cs" />
     <Compile Include="IUpdatable.cs" />
     <Compile Include="MessageBroker\IMessageBroker.cs" />
-    <Compile Include="MessageBroker\MessageBroker.cs" />
     <Compile Include="MovingAverage.cs" />
     <Compile Include="OrderedHashSet.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Serialization\ProtoSerializerHelper.cs" />
     <Compile Include="UpdateableList.cs" />
     <Compile Include="UpdatePriority.cs" />
   </ItemGroup>

@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.States
+namespace Coop.Mod.LogicStates.Client
 {
-    public interface IState
+    public interface IClientLogic : ILogic
     {
     }
 }

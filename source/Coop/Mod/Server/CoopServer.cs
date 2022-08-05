@@ -3,35 +3,40 @@ using NLog;
 using LiteNetLib;
 using System.Net;
 using System.Net.Sockets;
-using Coop.Mod.States.Server;
+using Coop.Mod.LogicStates.Server;
 using Common.MessageBroker;
+using Common.Components;
 
 namespace Coop.Mod
 {
-    public interface ICoopServer : ICoopNetwork, INatPunchListener, IDisposable { }
+    public interface ICoopServer : ICoopNetwork, INatPunchListener, IDisposable
+    {
+    }
 
-    public class CoopServer : ICoopServer
+    public class CoopServer : ComponentContainerBase, ICoopServer
     {
         private readonly ILogger _logger;
         private readonly INetworkConfiguration _configuration;
-        private readonly IServerContext _context;
-        private readonly IPacketManager _packetManager;
+        private readonly IServerLogic _logic;
+        private readonly ICommunicator _communicator;
 
         private NetManager m_NetManager;
 
-        public CoopServer(INetworkConfiguration configuration, IServerContext context)
+        public CoopServer(INetworkConfiguration configuration, IServerLogic logic)
         {
             // Dependancy assignment
-            _logger = context.Logger;
+            _logger = logic.Logger;
             _configuration = configuration;
-            _packetManager = context.PacketManager;
-            _context = context;
+            _logic = logic;
+            _communicator = logic.Communicator;
 
             // Netmanager initialization
             m_NetManager = new NetManager(this)
             {
                 NatPunchEnabled = true
             };
+
+            _communicator.PacketManager.Init(m_NetManager);
         }
 
         public int Priority => 0;
@@ -68,7 +73,7 @@ namespace Coop.Mod
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
-            _packetManager.Handle(peer, reader, deliveryMethod);
+            _communicator.PacketManager.Handle(peer, reader, deliveryMethod);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)

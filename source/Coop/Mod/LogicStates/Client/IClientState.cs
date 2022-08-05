@@ -4,9 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.States.Client
+namespace Coop.Mod.LogicStates.Client
 {
-    public interface IClientContext : IContext
+    public interface IClientState : IState
     {
+        void Connect();
     }
 }

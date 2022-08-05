@@ -1,18 +1,17 @@
 ﻿using Common.MessageBroker;
-using NLog;
+using Coop.Mod.GameInterfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.States
+namespace Coop.Mod
 {
-    public interface IContext
+    public interface ICommunicator
     {
-        ILogger Logger { get; }
         IMessageBroker MessageBroker { get; }
-        IState State { get; set; }
         IPacketManager PacketManager { get; }
+        IGameInterface GameInterface { get; }
     }
 }

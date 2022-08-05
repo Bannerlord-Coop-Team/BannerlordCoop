@@ -1,11 +1,11 @@
 ﻿
 using System;
 
-namespace Coop.Mod.States.Server
+namespace Coop.Mod.LogicStates.Server
 {
     public class InitialServerState : ServerState
     {
-        public InitialServerState(IServerContext context) : base(context)
+        public InitialServerState(IServerLogic context) : base(context)
         {
         }
 

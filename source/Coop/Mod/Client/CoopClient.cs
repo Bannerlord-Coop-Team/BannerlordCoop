@@ -4,21 +4,23 @@ using Common;
 using NLog;
 using LiteNetLib;
 using System.Net.Sockets;
-using Coop.Mod.States.Client;
+using Coop.Mod.LogicStates.Client;
 using Common.MessageBroker;
+using Common.Components;
 
 namespace Coop.Mod
 {
-    public interface ICoopClient : ICoopNetwork, IUpdateable, INetEventListener 
+    public interface ICoopClient : ICoopNetwork, IUpdateable, INetEventListener
     {
         bool IsConnected { get; }
     }
 
-    public class CoopClient : ICoopClient
+    public class CoopClient : ComponentContainerBase, ICoopClient
     {
         private readonly INetworkConfiguration _configuration;
         private readonly ILogger _logger;
-        private readonly IClientContext _context;
+        private readonly IClientLogic _logic;
+        private readonly IPacketManager _packetManager;
 
         private readonly NetManager _netManager;
 
@@ -26,13 +28,17 @@ namespace Coop.Mod
 
         private NetPeer _serverPeer;
 
-        public CoopClient(INetworkConfiguration config, IClientContext context)
+        public CoopClient(INetworkConfiguration config, IClientLogic logic, ICommunicator communicator)
         {
-            _logger = _context.Logger;
+            
             _configuration = config;
-            _context = context;
+            _logic = logic;
+            _logger = logic.Logger;
+            _packetManager = communicator.PacketManager;
 
             _netManager = new NetManager(this);
+
+            _packetManager.Init(_netManager);
         }
 
         public int Priority => 0;
@@ -59,7 +65,7 @@ namespace Coop.Mod
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
-            throw new NotImplementedException();
+            _packetManager.Handle(peer, reader, deliveryMethod);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)

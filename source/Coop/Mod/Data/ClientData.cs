@@ -4,10 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.States.Client
+namespace Coop.Mod.Data
 {
-    public interface IClientState : IState
+    internal class ClientData
     {
-        void Connect();
     }
 }

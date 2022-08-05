@@ -1,4 +1,4 @@
-﻿namespace Coop.Mod.States.Server
+﻿namespace Coop.Mod.LogicStates.Server
 {
     public interface IServerState : IState
     {

@@ -5,11 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.States.Client
+namespace Coop.Mod.LogicStates.Client
 {
     public class CreatingCharacterState : ClientState
     {
-        public CreatingCharacterState(IClientContext clientContext) : base(clientContext)
+        public CreatingCharacterState(IClientLogic clientContext) : base(clientContext)
         {
         }
 

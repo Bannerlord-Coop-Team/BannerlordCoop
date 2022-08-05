@@ -5,11 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.States.Client
+namespace Coop.Mod.LogicStates.Client
 {
-    internal class MapState : ClientState
+    public class MissionState : ClientState
     {
-        public MapState(IClientContext clientContext) : base(clientContext)
+        public MissionState(IClientLogic clientContext) : base(clientContext)
         {
         }
 

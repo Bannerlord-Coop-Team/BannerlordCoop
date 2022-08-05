@@ -1,13 +1,13 @@
 ﻿using Common.MessageBroker;
 using System;
 
-namespace Coop.Mod.States.Client
+namespace Coop.Mod.LogicStates.Client
 {
     public abstract class ClientState : IClientState
     {
-        protected IClientContext _clientContext;
+        protected IClientLogic _clientContext;
 
-        public ClientState(IClientContext clientContext)
+        public ClientState(IClientLogic clientContext)
         {
             _clientContext = clientContext;
         }

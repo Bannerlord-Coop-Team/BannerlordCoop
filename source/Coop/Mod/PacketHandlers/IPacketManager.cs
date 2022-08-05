@@ -1,9 +1,41 @@
-﻿using LiteNetLib;
+﻿using Common.Components;
+using Coop.Mod.PacketHandlers;
+using LiteNetLib;
 
 namespace Coop.Mod
 {
-    public interface IPacketManager
+    public interface IPacketManager : IComponent
     {
-        void Handle(NetPeer peer, NetPacketReader writer, DeliveryMethod deliveryMethod);
+        void Init(NetManager netManager);
+
+        void Handle(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod);
+
+        bool RegisterPacketHandler(IPacketHandler handler);
+
+        bool RemovePacketHandler(IPacketHandler handler);
+
+        /// <summary>
+        /// Sends packet to all clients except for the given client.
+        /// </summary>
+        /// <remarks>
+        /// This method is meant to be used for forwarding packets from the server.
+        /// </remarks>
+        /// <param name="netPeer">Peer to omit sending.</param>
+        /// <param name="packet">Packet to send.</param>
+        void SendAllBut(NetPeer netPeer, IPacket packet);
+
+        /// <summary>
+        /// Sends packet to all connected clients.
+        /// </summary>
+        /// <param name="packet">Packet to send.</param>
+        void SendAll(IPacket packet);
+
+        /// <summary>
+        /// Sends a packet to the given client.
+        /// </summary>
+        /// <param name="netPeer">Client to send packet to.</param>
+        /// <param name="packet">Packet to send.</param>
+        void Send(NetPeer netPeer, IPacket packet);
+
     }
 }

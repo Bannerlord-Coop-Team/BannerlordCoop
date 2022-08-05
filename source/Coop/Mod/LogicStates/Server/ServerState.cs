@@ -1,11 +1,11 @@
 ﻿using System;
 
-namespace Coop.Mod.States.Server
+namespace Coop.Mod.LogicStates.Server
 {
     public abstract class ServerState : IServerState
     {
-        protected IServerContext _context;
-        public ServerState(IServerContext context)
+        protected IServerLogic _context;
+        public ServerState(IServerLogic context)
         {
             _context = context;
         }

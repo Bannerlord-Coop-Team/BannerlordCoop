@@ -10,8 +10,8 @@ using Coop.Mod.Client;
 using Coop.Mod.Config;
 using Coop.Mod.PacketHandlers;
 using Coop.Mod.Patch;
-using Coop.Mod.States.Client;
-using Coop.Mod.States.Server;
+using Coop.Mod.LogicStates.Client;
+using Coop.Mod.LogicStates.Server;
 using CoopFramework;
 using HarmonyLib;
 using NLog;
@@ -25,6 +25,9 @@ using TaleWorlds.MountAndBlade.View.Missions;
 using TaleWorlds.ScreenSystem;
 using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
+using Coop.Mod.Messages;
+using Coop.Mod.GameInterfaces;
+using Coop.Mod.GameInterfaces.Helpers;
 
 namespace Coop.Mod
 {
@@ -37,9 +40,8 @@ namespace Coop.Mod
 
         // -------------
         private static readonly ILogger _logger = LogManager.GetCurrentClassLogger();
-        private static IPacketManager packetManager = new PacketManager();
-        private static IMessageBroker messageBroker = new MessageBroker();
         private static INetworkConfiguration networkConfiguration = new NetworkConfiguration();
+        private static ICommunicator communicator;
         private static ICoopNetwork _network;
         private bool m_IsFirstTick = true;
 
@@ -83,10 +85,33 @@ namespace Coop.Mod
 
         public Main()
         {
+            CreateCommunicator();
+
             MBDebug.DisableLogging = false;
 
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             Updateables.Add(GameLoopRunner.Instance);
+        }
+
+        private static ICommunicator CreateCommunicator()
+        {
+            if(communicator == null)
+            {
+                IPacketManager packetManager = new PacketManager();
+                IMessageBroker messageBroker = MessageBroker.Instance;
+
+                IGameInterface gameInterface = CreateGameInterface();
+
+                communicator = new CoopCommunicator(messageBroker, packetManager, gameInterface);
+            }
+            return communicator;
+        }
+
+        private static IGameInterface CreateGameInterface()
+        {
+            IExampleGameHelper exampleGameHelper = new ExampleGameHelper();
+
+            return new GameInterface(exampleGameHelper);
         }
 
         private static string ClientServerModeMessage = ""; 
@@ -147,13 +172,13 @@ namespace Coop.Mod
                         if (isServer)
                         {
                             // TODO start network as server using config
-                            IServerContext context = new ServerContext(_logger, messageBroker, packetManager);
+                            IServerLogic context = new ServerLogic(_logger, communicator);
                             _network = new CoopServer(networkConfiguration, context);
                         }
                         else
                         {
                             // TODO start network as client using config
-                            IClientContext context = new ClientContext(_logger, messageBroker, packetManager);
+                            IClientLogic context = new ClientLogic(_logger, communicator);
                             _network = new CoopClient(networkConfiguration, context);
                         }
 

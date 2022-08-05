@@ -4,11 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.States.Server
+namespace Coop.Mod.LogicStates.Server
 {
     public class ServerRunningState : ServerState
     {
-        public ServerRunningState(IServerContext context) : base(context)
+        public ServerRunningState(IServerLogic context) : base(context)
         {
         }
 
