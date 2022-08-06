@@ -148,7 +148,7 @@ namespace Coop.Mod.Serializers
 
             // TODO manage collections
 
-            Debug.WriteLine($"{hero.Id}");
+            //Debug.WriteLine($"{hero.Id}");
         }
         public override object Deserialize()
         {
@@ -208,7 +208,7 @@ namespace Coop.Mod.Serializers
             PartyBase partyBase = hero.PartyBelongedTo.Party;
             partyBase.Visuals.OnStartup(partyBase);
 
-            Debug.WriteLine($"{hero.Id}");
+            //Debug.WriteLine($"{hero.Id}");
 
             return hero;
         }

@@ -2,32 +2,25 @@
 using Coop.Mod.EventHandlers;
 using Coop.Mod.LogicStates;
 using Coop.Mod.LogicStates.Server;
-using NLog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Coop.Debug.Logger;
 
 namespace Coop.Mod
 {
     public class ServerLogic : IServerLogic
     {
-        public ILogger Logger { get; }
-
         public IState State { get => _state; set => _state = (IServerState)value; }
         private IServerState _state;
 
         public ICommunicator Communicator { get; }
 
-        public ServerLogic(ILogger logger, ICommunicator communicator)
+        public ServerLogic()
         {
-            Logger = logger;
-            Communicator = communicator;
+            /* Communicator = communicator;*/
 
             _state = new InitialServerState(this);
-
-            RegisterHandler<ExampleHandler>();
+            //RegisterHandler<ExampleHandler>();
         }
 
         private readonly List<EventHandlerBase> _eventHandlers = new List<EventHandlerBase>();

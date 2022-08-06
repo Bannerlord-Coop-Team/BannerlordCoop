@@ -15,7 +15,6 @@ namespace Coop.Mod
 
     public class CoopServer : ComponentContainerBase, ICoopServer
     {
-        private readonly ILogger _logger;
         private readonly INetworkConfiguration _configuration;
         private readonly IServerLogic _logic;
         private readonly ICommunicator _communicator;
@@ -25,7 +24,6 @@ namespace Coop.Mod
         public CoopServer(INetworkConfiguration configuration, IServerLogic logic)
         {
             // Dependancy assignment
-            _logger = logic.Logger;
             _configuration = configuration;
             _logic = logic;
             _communicator = logic.Communicator;
@@ -36,7 +34,7 @@ namespace Coop.Mod
                 NatPunchEnabled = true
             };
 
-            _communicator.PacketManager.Init(m_NetManager);
+            //_communicator.PacketManager.Init(m_NetManager);
         }
 
         public int Priority => 0;

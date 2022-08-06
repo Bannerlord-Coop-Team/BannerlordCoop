@@ -18,7 +18,6 @@ namespace Coop.Mod
     public class CoopClient : ComponentContainerBase, ICoopClient
     {
         private readonly INetworkConfiguration _configuration;
-        private readonly ILogger _logger;
         private readonly IClientLogic _logic;
         private readonly IPacketManager _packetManager;
 
@@ -30,10 +29,8 @@ namespace Coop.Mod
 
         public CoopClient(INetworkConfiguration config, IClientLogic logic)
         {
-            
             _configuration = config;
             _logic = logic;
-            _logger = logic.Logger;
             _packetManager = logic.Communicator.PacketManager;
 
             _netManager = new NetManager(this);

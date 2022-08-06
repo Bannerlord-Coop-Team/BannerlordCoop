@@ -11,7 +11,6 @@ namespace Coop.Mod.LogicStates
 {
     public interface ILogic : IComponent
     {
-        ILogger Logger { get; }
         ICommunicator Communicator { get; }
         IState State { get; set; }
     }
