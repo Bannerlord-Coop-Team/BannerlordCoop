@@ -55,14 +55,19 @@ namespace Coop.Tests.Communication
         {
             var container = Bootstrap.Initialize(true);
             using var communicator = container.Resolve<IMessageBroker>();
-            
-            communicator.Subscribe<ExampleIncomingMessage>(payload => { });
+
+            var callCount = 0;
+            var eventData = 0;
+            communicator.Subscribe<ExampleIncomingMessage>(payload => { 
+                callCount++;
+                eventData = payload.What.ExampleData;
+            });
 
             var incomingMessage = new ExampleIncomingMessage(10);
             communicator.Publish(this, incomingMessage, MessageScope.Internal);
             
-            // Find a way to check if the message has been published correctly.
-            Assert.Fail("To implement.");
+            Assert.Equal(1, callCount);
+            Assert.Equal(incomingMessage.ExampleData, eventData);
         }
         
         [Fact]
