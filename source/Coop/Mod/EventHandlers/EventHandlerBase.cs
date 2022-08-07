@@ -1,5 +1,6 @@
 ﻿using Coop.Communication.MessageBroker;
-using Coop.Mod.GameInterfaces;
+
+using GameInterface;
 
 namespace Coop.Mod.EventHandlers
 {
@@ -8,10 +9,10 @@ namespace Coop.Mod.EventHandlers
         protected readonly IMessageBroker _messageBroker;
         protected readonly IGameInterface _gameInterface;
 
-        protected EventHandlerBase(ICommunicator communicator)
+        protected EventHandlerBase(IMessageBroker messageBroker, IGameInterface gameInterface)
         {
-            _messageBroker = communicator.MessageBroker;
-            _gameInterface = communicator.GameInterface;
+            _messageBroker = messageBroker;
+            _gameInterface = gameInterface;
         }
     }
 }

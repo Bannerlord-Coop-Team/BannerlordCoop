@@ -1,13 +1,14 @@
-﻿using Coop.Mod.GameInterfaces.Helpers;
-using ProtoBuf;
+﻿using ProtoBuf;
 using Coop.Communication.MessageBroker;
+using GameInterface.Helpers;
+using GameInterface;
 
 namespace Coop.Mod.EventHandlers
 {
     internal class ExampleHandler : EventHandlerBase
     {
         private IExampleGameHelper _exampleHelper;
-        public ExampleHandler(ICommunicator communicator) : base(communicator)
+        public ExampleHandler(IMessageBroker messageBroker, IGameInterface gameInterface) : base(messageBroker, gameInterface)
         {
             _exampleHelper = _gameInterface.ExampleGameHelper;
 
@@ -24,11 +25,6 @@ namespace Coop.Mod.EventHandlers
 
             // Send internally
             _messageBroker.Publish(this, newMessage);
-
-            // Send externally (server to client if this handler exists in the server)
-            //                 (client to server if this handler exists in the client)
-            // Message is required to be a protocontract on external messages
-            _messageBroker.Publish(this, newMessage, MessageScope.External);
         }
     }
 

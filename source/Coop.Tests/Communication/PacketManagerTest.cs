@@ -9,7 +9,7 @@ namespace Coop.Tests.Communication
         [Fact]
         public void RegisterOnePacketHandler()
         {
-            var container = Bootstrap.Initialize(true);
+            var container = Bootstrap.InitializeAsServer();
             //using var packetManager = container.Resolve<IPacketManager>();
 
             Assert.Fail("To implement.");

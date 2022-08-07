@@ -6,7 +6,7 @@ namespace Coop.Communication.PacketHandlers
     {
         Invalid,
         PacketWrapper,
-        Event,
+        Message,
         Example,
     }
 

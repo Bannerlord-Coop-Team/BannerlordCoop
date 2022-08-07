@@ -5,8 +5,10 @@ using System.Net.Sockets;
 using Common.Components;
 using Coop.Configuration;
 using Coop.Mod.LogicStates.Server;
+using Coop.Communication.MessageBroker;
+using Coop.Mod.Messages.Network;
 
-namespace Coop.Mod
+namespace Coop.Mod.Server
 {
     public interface ICoopServer : ICoopNetwork, INatPunchListener, IDisposable
     {
@@ -14,26 +16,22 @@ namespace Coop.Mod
 
     public class CoopServer : ComponentContainerBase, ICoopServer
     {
-        private readonly INetworkConfiguration _configuration;
-        private readonly IServerLogic _logic;
-        private readonly ICommunicator _communicator;
+        private readonly NetManager netManager;
+        private readonly INetworkConfiguration configuration;
+        private readonly IServerLogic logic;
+        private readonly IMessageBroker messageBroker;
 
-        private NetManager m_NetManager;
-
-        public CoopServer(INetworkConfiguration configuration, IServerLogic logic)
+        public CoopServer(NetManager netManager, INetworkConfiguration configuration, IServerLogic logic, IMessageBroker messageBroker)
         {
             // Dependancy assignment
-            _configuration = configuration;
-            _logic = logic;
-            _communicator = logic.Communicator;
+            this.netManager = netManager;
+            this.configuration = configuration;
+            this.logic = logic;
+            this.messageBroker = messageBroker;
 
             // Netmanager initialization
-            m_NetManager = new NetManager(this)
-            {
-                NatPunchEnabled = true
-            };
-
-            //_communicator.PacketManager.Init(m_NetManager);
+            netManager.NatPunchEnabled = true;
+            netManager.NatPunchModule.Init(this);
         }
 
         public int Priority => 0;
@@ -70,7 +68,8 @@ namespace Coop.Mod
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
-            _communicator.PacketManager.Handle(peer, reader, deliveryMethod);
+            ReceivePacket message = new ReceivePacket(peer, reader, deliveryMethod);
+            messageBroker.Publish(this, message);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -90,18 +89,18 @@ namespace Coop.Mod
 
         public void Start()
         {
-            m_NetManager.Start();
+            netManager.Start();
         }
 
         public void Stop()
         {
-            m_NetManager?.Stop();
+            netManager?.Stop();
         }
 
         public void Update(TimeSpan frameTime)
         {
-            m_NetManager.PollEvents();
-            m_NetManager.NatPunchModule.PollEvents();
+            netManager.PollEvents();
+            netManager.NatPunchModule.PollEvents();
         }
     }
 }

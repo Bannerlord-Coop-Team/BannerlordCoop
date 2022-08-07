@@ -14,12 +14,12 @@ namespace Coop.Tests.Communication
         [Fact]
         public void SubscribeOneEvent()
         {
-            var container = Bootstrap.Initialize(true);
+            var container = Bootstrap.InitializeAsServer();
             using var communicator = container.Resolve<IMessageBroker>();
 
             communicator.Subscribe<ExampleIncomingMessage>(payload => { });
             
-            var subscribers = typeof(CommunicatorMessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
+            var subscribers = typeof(NetworkMessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
                 ?.GetValue(communicator) as Dictionary<Type, List<Delegate>>;
 
             if (subscribers == null)
@@ -31,13 +31,13 @@ namespace Coop.Tests.Communication
         [Fact]
         public void UnsubscribeOneEvent()
         {
-            var container = Bootstrap.Initialize(true);
+            var container = Bootstrap.InitializeAsServer();
             using var communicator = container.Resolve<IMessageBroker>();
 
             void DelegateHandler(MessagePayload<ExampleIncomingMessage> payload) { }
             communicator.Subscribe<ExampleIncomingMessage>(DelegateHandler);
             
-            var subscribers = typeof(CommunicatorMessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
+            var subscribers = typeof(NetworkMessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
                 ?.GetValue(communicator) as Dictionary<Type, List<Delegate>>;
             
             if (subscribers == null)
@@ -51,9 +51,9 @@ namespace Coop.Tests.Communication
         }
 
         [Fact]
-        public void PublishOneEventInternal()
+        public void PublishOneMessage()
         {
-            var container = Bootstrap.Initialize(true);
+            var container = Bootstrap.InitializeAsServer();
             using var communicator = container.Resolve<IMessageBroker>();
 
             var callCount = 0;
@@ -64,25 +64,10 @@ namespace Coop.Tests.Communication
             });
 
             var incomingMessage = new ExampleIncomingMessage(10);
-            communicator.Publish(this, incomingMessage, MessageScope.Internal);
+            communicator.Publish(this, incomingMessage);
             
             Assert.Equal(1, callCount);
             Assert.Equal(incomingMessage.ExampleData, eventData);
-        }
-        
-        [Fact]
-        public void PublishOneEventExternal()
-        {
-            var container = Bootstrap.Initialize(true);
-            using var communicator = container.Resolve<IMessageBroker>();
-            
-            communicator.Subscribe<ExampleIncomingMessage>(payload => { });
-
-            var incomingMessage = new ExampleIncomingMessage(20);
-            communicator.Publish(this, incomingMessage, MessageScope.External);
-            
-            // Find a way to check if the message has been published correctly.
-            Assert.Fail("To implement.");
         }
     }
 }

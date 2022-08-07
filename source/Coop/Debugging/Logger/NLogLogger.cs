@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
-using Coop.Mod;
+using Coop.Mod.Server;
 using NLog;
 using NLog.Config;
 using NLog.Targets;
