@@ -300,8 +300,8 @@
     <Compile Include="Communication\PacketManager.cs" />
     <Compile Include="Configuration\INetworkConfiguration.cs" />
     <Compile Include="Configuration\ServerConfiguration.cs" />
-    <Compile Include="Debug\Logger\ILogger.cs" />
-    <Compile Include="Debug\Logger\NLogLogger.cs" />
+    <Compile Include="Debugging\Logger\ILogger.cs" />
+    <Compile Include="Debugging\Logger\NLogLogger.cs" />
     <Compile Include="Mod\Client\ClientLogic.cs" />
     <Compile Include="Mod\CoopCommunicator.cs" />
     <Compile Include="Mod\Data\ICoopPlayer.cs" />
@@ -474,7 +474,7 @@
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Debug\Commands" />
+    <Folder Include="Debugging\Commands" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />

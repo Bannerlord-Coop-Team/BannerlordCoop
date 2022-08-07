@@ -3,7 +3,7 @@ using Coop.Communication;
 using Coop.Communication.MessageBroker;
 using Coop.Communication.PacketHandlers;
 using Coop.Configuration;
-using Coop.Debug.Logger;
+using Coop.Debugging.Logger;
 using Coop.Mod;
 using Coop.Mod.Client;
 using Coop.Mod.Config;

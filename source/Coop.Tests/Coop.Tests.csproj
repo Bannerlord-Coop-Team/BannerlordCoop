@@ -91,7 +91,7 @@
   <ItemGroup>
     <Compile Include="Communication\CommunicatorMessageBrokerTest.cs" />
     <Compile Include="Communication\PacketManagerTest.cs" />
-    <Compile Include="Debug\LoggerTest.cs" />
+    <Compile Include="Debugging\LoggerTest.cs" />
     <Compile Include="Serialization\ProtobufSerializerTest.cs" />
     <Compile Include="States\StateTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
