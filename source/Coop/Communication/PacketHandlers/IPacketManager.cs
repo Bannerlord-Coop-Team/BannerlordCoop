@@ -1,12 +1,12 @@
-﻿using Common.Components;
-using Coop.Mod.PacketHandlers;
+﻿using System;
+using Common.Components;
 using LiteNetLib;
 
-namespace Coop.Mod
+namespace Coop.Communication.PacketHandlers
 {
-    public interface IPacketManager : IComponent
+    public interface IPacketManager : IComponent, IDisposable
     {
-        void Init(NetManager netManager);
+        void Initialize(NetManager netManager);
 
         void Handle(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod);
 
@@ -36,6 +36,5 @@ namespace Coop.Mod
         /// <param name="netPeer">Client to send packet to.</param>
         /// <param name="packet">Packet to send.</param>
         void Send(NetPeer netPeer, IPacket packet);
-
     }
 }

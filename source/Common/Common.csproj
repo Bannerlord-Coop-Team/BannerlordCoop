@@ -90,7 +90,6 @@
     <Compile Include="Components\IComponent.cs" />
     <Compile Include="Components\IComponentContainer.cs" />
     <Compile Include="IUpdatable.cs" />
-    <Compile Include="MessageBroker\IMessageBroker.cs" />
     <Compile Include="MovingAverage.cs" />
     <Compile Include="OrderedHashSet.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

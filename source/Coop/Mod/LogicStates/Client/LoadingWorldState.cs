@@ -1,6 +1,5 @@
-﻿using Common.MessageBroker;
+﻿using Coop.Communication.MessageBroker;
 using Coop.Mod.Messages.Game;
-using System;
 
 namespace Coop.Mod.LogicStates.Client
 {

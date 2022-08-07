@@ -1,12 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Coop.Mod;
 
-namespace Coop.Mod.Config
+namespace Coop.Configuration
 {
-    public class NetworkConfiguration : INetworkConfiguration
+    public class ServerConfiguration : INetworkConfiguration
     {
         public string Address => throw new NotImplementedException();
 
@@ -15,5 +12,10 @@ namespace Coop.Mod.Config
         public string Token => throw new NotImplementedException();
 
         public string P2PToken => throw new NotImplementedException();
+
+        public void LoadFromFile()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

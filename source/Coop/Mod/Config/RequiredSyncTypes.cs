@@ -8,6 +8,9 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Config
 {
+    /// <summary>
+    ///     Useless for the moment.
+    /// </summary>
     class RequiredSyncTypes
     {
         public static readonly Type[] Types = new Type[]

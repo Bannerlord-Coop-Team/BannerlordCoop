@@ -1,11 +1,6 @@
-﻿using Common.MessageBroker;
-using Coop.Mod.GameInterfaces.Helpers;
+﻿using Coop.Mod.GameInterfaces.Helpers;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Coop.Communication.MessageBroker;
 
 namespace Coop.Mod.EventHandlers
 {

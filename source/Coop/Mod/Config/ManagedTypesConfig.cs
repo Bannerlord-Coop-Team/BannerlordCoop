@@ -7,6 +7,9 @@ using TaleWorlds.ObjectSystem;
 
 namespace Coop.Mod.Config
 {
+    /// <summary>
+    ///     Useless for the moment.
+    /// </summary>
     public class ManagedTypesConfig
     {
         public static readonly Type[] ManagedTypes = new Type[]

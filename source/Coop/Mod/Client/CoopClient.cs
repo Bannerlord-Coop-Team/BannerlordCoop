@@ -1,12 +1,12 @@
 using System;
 using System.Net;
 using Common;
-using NLog;
 using LiteNetLib;
 using System.Net.Sockets;
-using Coop.Mod.LogicStates.Client;
-using Common.MessageBroker;
 using Common.Components;
+using Coop.Communication.PacketHandlers;
+using Coop.Configuration;
+using Coop.Mod.LogicStates.Client;
 
 namespace Coop.Mod
 {
@@ -34,8 +34,7 @@ namespace Coop.Mod
             _packetManager = logic.Communicator.PacketManager;
 
             _netManager = new NetManager(this);
-
-            _packetManager.Init(_netManager);
+            _packetManager.Initialize(_netManager);
         }
 
         public int Priority => 0;

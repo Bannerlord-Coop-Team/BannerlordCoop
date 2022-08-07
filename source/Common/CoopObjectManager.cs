@@ -24,7 +24,8 @@ namespace Common
     /// <summary>
     /// Object manager for identifying objects across the network
     /// </summary>
-    public class CoopObjectManager
+    public class 
+        CoopObjectManager
     {
         public static readonly Dictionary<Guid, WeakReference<object>> Objects = new Dictionary<Guid, WeakReference<object>>();
         private static readonly ConditionalWeakTable<object, GuidWrapper> Guids = new ConditionalWeakTable<object, GuidWrapper>();

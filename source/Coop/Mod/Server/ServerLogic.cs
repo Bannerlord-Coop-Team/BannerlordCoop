@@ -1,10 +1,8 @@
-﻿using Common.MessageBroker;
-using Coop.Mod.EventHandlers;
+﻿using Coop.Mod.EventHandlers;
 using Coop.Mod.LogicStates;
 using Coop.Mod.LogicStates.Server;
 using System;
 using System.Collections.Generic;
-using Coop.Debug.Logger;
 
 namespace Coop.Mod
 {

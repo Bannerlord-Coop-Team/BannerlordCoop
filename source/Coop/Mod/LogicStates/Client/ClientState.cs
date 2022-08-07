@@ -1,7 +1,4 @@
-﻿using Common.MessageBroker;
-using System;
-
-namespace Coop.Mod.LogicStates.Client
+﻿namespace Coop.Mod.LogicStates.Client
 {
     public abstract class ClientState : IClientState
     {

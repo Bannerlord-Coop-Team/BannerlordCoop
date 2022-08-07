@@ -1,4 +1,4 @@
-﻿namespace Coop.Mod
+﻿namespace Coop.Configuration
 {
     public interface INetworkConfiguration
     {

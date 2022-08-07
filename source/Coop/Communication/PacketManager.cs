@@ -1,29 +1,36 @@
-﻿using Common.Serialization;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Common.Serialization;
+using Coop.Communication.PacketHandlers;
+using Coop.Serialization;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Coop.Mod.PacketHandlers
+namespace Coop.Communication
 {
     public class PacketManager : IPacketManager
     {
-
         private readonly Dictionary<PacketType, List<IPacketHandler>> _packetHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
+        
         private NetManager _netManager;
+        private ISerializer _serializer;
 
-        public void Init(NetManager netManager)
+        public PacketManager(ISerializer serializer)
+        {
+            _serializer = serializer;
+        }
+
+        public void Initialize(NetManager netManager)
         {
             _netManager = netManager;
         }
 
         public bool RegisterPacketHandler(IPacketHandler handler)
         {
-            if (_packetHandlers?[handler.PacketType].Contains(handler) == true) return false;
+            if (_packetHandlers?[handler.PacketType].Contains(handler) == true) 
+                return false;
 
             if(_packetHandlers.TryGetValue(handler.PacketType, out List<IPacketHandler> handlers))
             {
@@ -90,12 +97,17 @@ namespace Coop.Mod.PacketHandlers
             NetDataWriter writer = new NetDataWriter();
             writer.Put((int)wrapper.Type);
 
-            // Serialize and put data in writer (with lenght is important on receive end)
-            byte[] data = ProtoSerializerHelper.Serialize(packet);
+            // Serialize and put data in writer (with length is important on receive end)
+            byte[] data = _serializer.Serialize(packet);
             writer.PutBytesWithLength(data);
 
             // Send data
             netPeer.Send(writer.Data, wrapper.DeliveryMethod);
+        }
+
+        public void Dispose()
+        {
+            _packetHandlers.Clear();
         }
     }
 

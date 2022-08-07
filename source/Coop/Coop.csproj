@@ -289,10 +289,20 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Bootstrap.cs" />
+    <Compile Include="Communication\CommunicatorMessageBroker.cs" />
+    <Compile Include="Communication\MessageBroker\IMessageBroker.cs" />
+    <Compile Include="Communication\MessageBroker\MessagePayload.cs" />
+    <Compile Include="Communication\MessageBroker\MessageScope.cs" />
+    <Compile Include="Communication\PacketHandlers\ExamplePacketHandler.cs" />
+    <Compile Include="Communication\PacketHandlers\IPacket.cs" />
+    <Compile Include="Communication\PacketHandlers\IPacketHandler.cs" />
+    <Compile Include="Communication\PacketHandlers\IPacketManager.cs" />
+    <Compile Include="Communication\PacketManager.cs" />
+    <Compile Include="Configuration\INetworkConfiguration.cs" />
+    <Compile Include="Configuration\ServerConfiguration.cs" />
     <Compile Include="Debug\Logger\ILogger.cs" />
     <Compile Include="Debug\Logger\NLogLogger.cs" />
     <Compile Include="Mod\Client\ClientLogic.cs" />
-    <Compile Include="Mod\Config\NetworkConfiguration.cs" />
     <Compile Include="Mod\CoopCommunicator.cs" />
     <Compile Include="Mod\Data\ICoopPlayer.cs" />
     <Compile Include="Mod\EventHandlers\ExampleHandler.cs" />
@@ -305,10 +315,6 @@
     <Compile Include="Mod\Messages\Game\GoToMainMenuResponse.cs" />
     <Compile Include="Mod\Messages\Game\GoToMainMenuRequest.cs" />
     <Compile Include="Mod\Messages\IMessage.cs" />
-    <Compile Include="Mod\Messages\MessageBroker.cs" />
-    <Compile Include="Mod\PacketHandlers\ExamplePacketHandler.cs" />
-    <Compile Include="Mod\PacketHandlers\IPacketManager.cs" />
-    <Compile Include="Mod\PacketHandlers\PacketManager.cs" />
     <Compile Include="Mod\Server\ServerLogic.cs" />
     <Compile Include="Mod\Data\ClientData.cs" />
     <Compile Include="Mod\LogicStates\Client\ClientState.cs" />
@@ -338,9 +344,6 @@
     <Compile Include="Mod\EventHandlers\IEventHandler.cs" />
     <Compile Include="Mod\Extentions\CampaignObjectManagerExtentions.cs" />
     <Compile Include="Mod\GameLoopRunner.cs" />
-    <Compile Include="Mod\Config\INetworkConfiguration.cs" />
-    <Compile Include="Mod\PacketHandlers\IPacket.cs" />
-    <Compile Include="Mod\PacketHandlers\IPacketHandler.cs" />
     <Compile Include="Mod\Patch\CampaignPatches\CompanionsCampaignBehaviorPatches.cs" />
     <Compile Include="Mod\Patch\Hero\HeroPatches.cs" />
     <Compile Include="Mod\Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />

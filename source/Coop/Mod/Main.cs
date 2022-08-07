@@ -1,15 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common;
-using Common.MessageBroker;
+using Coop.Configuration;
 using Coop.Lib.NoHarmony;
 using Coop.Mod.Behaviour;
 using Coop.Mod.Client;
 using Coop.Mod.Config;
-using Coop.Mod.PacketHandlers;
-using Coop.Mod.Patch;
 using Coop.Mod.LogicStates.Client;
 using Coop.Mod.LogicStates.Server;
 using CoopFramework;
@@ -18,16 +15,14 @@ using NLog;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
-using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Missions;
 using TaleWorlds.ScreenSystem;
-using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
-using Coop.Mod.Messages;
 using Coop.Mod.GameInterfaces;
 using Coop.Mod.GameInterfaces.Helpers;
+using JetBrains.Annotations;
 
 namespace Coop.Mod
 {
@@ -40,9 +35,7 @@ namespace Coop.Mod
 
         // -------------
         private static readonly ILogger _logger = LogManager.GetCurrentClassLogger();
-        private static INetworkConfiguration networkConfiguration = new NetworkConfiguration();
-        private static ICommunicator communicator;
-        private static ICoopNetwork _network;
+        private static INetworkConfiguration networkConfiguration = new ServerConfiguration();
         private bool m_IsFirstTick = true;
 
         private bool _isDebugToggled = false;
@@ -63,7 +56,7 @@ namespace Coop.Mod
                         
                     }
 
-                    _network.Start();
+                    //_network.Start();
 #else
                     ScreenManager.PushScreen(
                         ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
@@ -85,7 +78,7 @@ namespace Coop.Mod
 
         public Main()
         {
-            CreateCommunicator();
+            //CreateCommunicator();
 
             MBDebug.DisableLogging = false;
 
@@ -95,16 +88,16 @@ namespace Coop.Mod
 
         private static ICommunicator CreateCommunicator()
         {
+            return null;
+            /*
             if(communicator == null)
             {
                 IPacketManager packetManager = new PacketManager();
-                IMessageBroker messageBroker = MessageBroker.Instance;
-
                 IGameInterface gameInterface = CreateGameInterface();
 
-                communicator = new CoopCommunicator(messageBroker, packetManager, gameInterface);
+                communicator = new CoopCommunicator(packetManager, gameInterface);
             }
-            return communicator;
+            return communicator;*/
         }
 
         private static IGameInterface CreateGameInterface()
@@ -169,6 +162,7 @@ namespace Coop.Mod
 #if DEBUG
                         string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
+                        /*
                         if (isServer)
                         {
                             // TODO start network as server using config
@@ -180,14 +174,14 @@ namespace Coop.Mod
                             // TODO start network as client using config
                             IClientLogic logic = new ClientLogic(_logger, communicator);
                             _network = new CoopClient(networkConfiguration, logic);
-                        }
+                        }*/
 
 #else
                         ScreenManager.PushScreen(
                             ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
                                 new object[] { }));
 #endif
-                        _network.Start();
+                        //_network.Start();
                     },
 
                     () => { return (false, new TextObject()); }
@@ -211,7 +205,7 @@ namespace Coop.Mod
         protected override void OnSubModuleUnloaded()
         {
             base.OnSubModuleUnloaded();
-            _network.Stop();
+            //_network.Stop();
         }
 
         protected override void OnBeforeInitialModuleScreenSetAsRoot()

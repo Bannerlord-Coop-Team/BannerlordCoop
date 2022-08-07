@@ -1,4 +1,8 @@
 ﻿using Autofac;
+using Coop.Communication;
+using Coop.Communication.MessageBroker;
+using Coop.Communication.PacketHandlers;
+using Coop.Configuration;
 using Coop.Debug.Logger;
 using Coop.Mod;
 using Coop.Mod.Client;
@@ -19,11 +23,12 @@ namespace Coop
         public static IContainer Initialize(bool isServer)
         {
             var builder = new ContainerBuilder();
-            builder.RegisterType<ProtobufSerializer>().As<ISerializer>();
             
-            #if DEBUG
+            builder.RegisterType<ProtobufSerializer>().As<ISerializer>();
+            builder.RegisterType<PacketManager>().As<IPacketManager>();
+            builder.RegisterType<CommunicatorMessageBroker>().As<IMessageBroker>();
+            
             builder.RegisterType<NLogLogger>().As<ILogger>();
-            #endif
 
             if (isServer)
                 InitializeServer(builder);
@@ -51,7 +56,7 @@ namespace Coop
         /// <param name="builder">Container Builder</param>
         private static void InitializeServer(ContainerBuilder builder)
         {
-            builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().OwnedByLifetimeScope();
+            builder.RegisterType<ServerConfiguration>().As<INetworkConfiguration>().OwnedByLifetimeScope();
             builder.RegisterType<ServerLogic>().As<IServerLogic>();
             builder.RegisterType<CoopServer>().As<ICoopServer>().As<ICoopNetwork>().SingleInstance();
         }

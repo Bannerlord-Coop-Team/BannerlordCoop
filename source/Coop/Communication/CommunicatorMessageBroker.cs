@@ -1,31 +1,30 @@
-﻿using Common.MessageBroker;
-using Coop.Mod.PacketHandlers;
+﻿using System;
+using System.Collections.Generic;
+using Coop.Communication.MessageBroker;
+using Coop.Communication.PacketHandlers;
 using LiteNetLib;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Coop.Mod.Messages
+namespace Coop.Communication
 {
-    public class MessageBroker : IMessageBroker
+    public class CommunicatorMessageBroker : IMessageBroker
     {
-        private static Lazy<MessageBroker> instance = new Lazy<MessageBroker>();
-        public static MessageBroker Instance => instance.Value;
-
         private readonly Dictionary<Type, List<Delegate>> _subscribers = new Dictionary<Type, List<Delegate>>();
 
         private readonly IPacketManager _packetManager;
 
-        public MessageBroker(IPacketManager packetManager)
+        public CommunicatorMessageBroker(IPacketManager packetManager)
         {
             _packetManager = packetManager;
         }
-
-
-
+        
+        /// <summary>
+        ///     Call an event based on the type of the message.
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="message">Message event</param>
+        /// <param name="scope">Scope of the message</param>
+        /// <typeparam name="T">Type of the message</typeparam>
         public void Publish<T>(object sender, T message, MessageScope scope = MessageScope.Internal)
         {
             if(scope == MessageScope.Internal)
@@ -38,20 +37,34 @@ namespace Coop.Mod.Messages
             }
         }
 
+        /// <summary>
+        ///     Register an delegate based on the type of T so that it get called
+        ///     when we receive an event of T.
+        /// </summary>
+        /// <param name="subscriber">Delegate method</param>
+        /// <typeparam name="T">Type of event subscribing</typeparam>
         public void Subscribe<T>(Action<MessagePayload<T>> subscriber)
         {
-            if(_subscribers.TryGetValue(typeof(T), out var subscribers))
-            {
-                subscribers.Add(subscriber);
-            }
+            if(!_subscribers.ContainsKey(typeof(T)))
+                _subscribers.Add(typeof(T), new List<Delegate>());
+            
+            _subscribers[typeof(T)].Add(subscriber);
         }
 
+        /// <summary>
+        ///     Unregister an event delegate.
+        /// </summary>
+        /// <param name="subscriber"></param>
+        /// <typeparam name="T"></typeparam>
         public void Unsubscribe<T>(Action<MessagePayload<T>> subscriber)
         {
-            if (_subscribers.TryGetValue(typeof(T), out var subscribers))
-            {
+            if (_subscribers.TryGetValue(typeof(T), out var subscribers)) 
                 subscribers.Remove(subscriber);
-            }
+        }
+
+        public void Dispose()
+        {
+            _subscribers.Clear();
         }
     }
 
