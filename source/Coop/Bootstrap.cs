@@ -5,6 +5,7 @@ using Coop.Mod.Client;
 using Coop.Mod.Config;
 using Coop.Mod.LogicStates.Client;
 using Coop.Mod.LogicStates.Server;
+using Coop.Serialization;
 
 namespace Coop
 {
@@ -18,6 +19,7 @@ namespace Coop
         public static IContainer Initialize(bool isServer)
         {
             var builder = new ContainerBuilder();
+            builder.RegisterType<ProtobufSerializer>().As<ISerializer>();
             
             #if DEBUG
             builder.RegisterType<NLogLogger>().As<ILogger>();
@@ -39,7 +41,7 @@ namespace Coop
         private static void InitializeClient(ContainerBuilder builder)
         {
             builder.RegisterType<ClientLogic>().As<IClientLogic>();
-            builder.RegisterType<CoopClient>().As<ICoopClient>().SingleInstance();
+            builder.RegisterType<CoopClient>().As<ICoopClient>().As<ICoopNetwork>().SingleInstance();
         }
 
         /// <summary>
@@ -49,10 +51,9 @@ namespace Coop
         /// <param name="builder">Container Builder</param>
         private static void InitializeServer(ContainerBuilder builder)
         {
-            builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>()
-                .OwnedByLifetimeScope();
+            builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().OwnedByLifetimeScope();
             builder.RegisterType<ServerLogic>().As<IServerLogic>();
-            builder.RegisterType<CoopServer>().As<ICoopServer>();
+            builder.RegisterType<CoopServer>().As<ICoopServer>().As<ICoopNetwork>().SingleInstance();
         }
     }
 }

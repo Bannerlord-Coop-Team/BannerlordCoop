@@ -90,8 +90,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Debug\LoggerTest.cs" />
+    <Compile Include="Serialization\ProtobufSerializerTest.cs" />
     <Compile Include="States\StateTests.cs" />
-    <Compile Include="UnitTest1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

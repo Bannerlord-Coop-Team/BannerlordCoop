@@ -18,8 +18,7 @@ namespace Coop.Mod.Client
         private IClientState _state;
 
         public ICommunicator Communicator { get; }
-
-
+        
         public ClientLogic(ILogger logger, ICommunicator communicator)
         {
             Logger = logger;
