@@ -13,11 +13,11 @@ using Xunit.Abstractions;
 
 namespace GameInterface.Tests
 {
-    public class UnitTest1
+    public class SerializationTests
     {
         private readonly ITestOutputHelper output;
 
-        public UnitTest1(ITestOutputHelper output)
+        public SerializationTests(ITestOutputHelper output)
         {
             this.output = output;
         }
