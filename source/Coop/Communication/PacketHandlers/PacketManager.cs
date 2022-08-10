@@ -6,7 +6,7 @@ using Common.Serialization;
 using Coop.Communication.MessageBroker;
 using Coop.Communication.PacketHandlers;
 using Coop.Mod.Messages.Network;
-using Coop.Serialization;
+using GameInterface.Serialization;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using ProtoBuf;

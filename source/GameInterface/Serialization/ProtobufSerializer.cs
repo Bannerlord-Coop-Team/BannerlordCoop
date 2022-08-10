@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using GameInterface.Serialization;
 using ProtoBuf;
 
 namespace Coop.Serialization

@@ -1,9 +1,9 @@
-﻿namespace Coop.Serialization
+﻿namespace GameInterface.Serialization
 {
     public interface ISerializer
     {
-        byte[] Serialize(object message);
-        
-        T Deserialize<T>(byte[] message);
+        byte[] Serialize(object obj);
+
+        T Deserialize<T>(byte[] data);
     }
 }

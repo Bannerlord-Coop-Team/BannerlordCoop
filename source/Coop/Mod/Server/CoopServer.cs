@@ -7,6 +7,7 @@ using Coop.Configuration;
 using Coop.Mod.LogicStates.Server;
 using Coop.Communication.MessageBroker;
 using Coop.Mod.Messages.Network;
+using Coop.Mod.Server.Connections;
 
 namespace Coop.Mod.Server
 {
@@ -38,12 +39,13 @@ namespace Coop.Mod.Server
 
         public void Dispose()
         {
-            throw new NotImplementedException();
+            netManager.DisconnectAll();
+            netManager.Stop();
         }
 
         public void OnConnectionRequest(ConnectionRequest request)
         {
-            throw new NotImplementedException();
+            request.Accept();
         }
 
         public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -53,7 +55,7 @@ namespace Coop.Mod.Server
 
         public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
         {
-            throw new NotImplementedException();
+            // Not used on server
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
@@ -79,12 +81,14 @@ namespace Coop.Mod.Server
 
         public void OnPeerConnected(NetPeer peer)
         {
-            throw new NotImplementedException();
+            ClientConnectedMessage message = new ClientConnectedMessage(peer);
+            messageBroker.Publish(this, message);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            throw new NotImplementedException();
+            ClientDisconnectedMessage message = new ClientDisconnectedMessage(peer, disconnectInfo);
+            messageBroker.Publish(this, message);
         }
 
         public void Start()

@@ -126,6 +126,12 @@
     <Compile Include="Mod\Client\States\IClientLogic.cs" />
     <Compile Include="Mod\CoopModule.cs" />
     <Compile Include="Mod\Messages\Network\ReceivePacket.cs" />
+    <Compile Include="Mod\Server\Connections\Connection.cs" />
+    <Compile Include="Mod\Server\Connections\ConnectionManager.cs" />
+    <Compile Include="Mod\Server\Connections\IConnection.cs" />
+    <Compile Include="Mod\Server\Connections\IConnectionManager.cs" />
+    <Compile Include="Mod\Server\Connections\IConnectionState.cs" />
+    <Compile Include="Mod\Server\Connections\States\InitialConnectionState.cs" />
     <Compile Include="Mod\Server\States\IServerLogic.cs" />
     <Compile Include="Mod\Messages\Network\BroadcastMessage.cs" />
     <Compile Include="Mod\Server\ServerModule.cs" />

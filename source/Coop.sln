@@ -32,6 +32,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BannerlordSystemTestingFram
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BannerlordSystemTestingLibrary", "BannerlordTestingEssentials\BannerlordSystemTestingLibrary\BannerlordSystemTestingLibrary.csproj", "{510EAA3B-CF7D-46F9-87AA-5CB89A4E3A01}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameInterface.Tests", "GameInterface.Tests\GameInterface.Tests.csproj", "{CDEE7E89-93A5-4856-9401-B2A2B3D4ACB9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -127,6 +129,14 @@ Global
 		{510EAA3B-CF7D-46F9-87AA-5CB89A4E3A01}.Release|Any CPU.Build.0 = Release|Any CPU
 		{510EAA3B-CF7D-46F9-87AA-5CB89A4E3A01}.Release|x64.ActiveCfg = Release|Any CPU
 		{510EAA3B-CF7D-46F9-87AA-5CB89A4E3A01}.Release|x64.Build.0 = Release|Any CPU
+		{CDEE7E89-93A5-4856-9401-B2A2B3D4ACB9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CDEE7E89-93A5-4856-9401-B2A2B3D4ACB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CDEE7E89-93A5-4856-9401-B2A2B3D4ACB9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CDEE7E89-93A5-4856-9401-B2A2B3D4ACB9}.Debug|x64.Build.0 = Debug|Any CPU
+		{CDEE7E89-93A5-4856-9401-B2A2B3D4ACB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CDEE7E89-93A5-4856-9401-B2A2B3D4ACB9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CDEE7E89-93A5-4856-9401-B2A2B3D4ACB9}.Release|x64.ActiveCfg = Release|Any CPU
+		{CDEE7E89-93A5-4856-9401-B2A2B3D4ACB9}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
