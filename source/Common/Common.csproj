@@ -92,6 +92,7 @@
     <Compile Include="IUpdatable.cs" />
     <Compile Include="LogicStates\ILogic.cs" />
     <Compile Include="LogicStates\IState.cs" />
+    <Compile Include="Messages\IResponse.cs" />
     <Compile Include="MovingAverage.cs" />
     <Compile Include="OrderedHashSet.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

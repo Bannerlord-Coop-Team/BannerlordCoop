@@ -4,9 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.Messages.Game
+namespace GameInterface.Data
 {
-    public readonly struct GoToMainMenuRequest : IMessage
+    public interface IGameSaveData
     {
+        byte[] Data { get; }
     }
 }

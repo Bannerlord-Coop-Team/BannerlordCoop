@@ -4,13 +4,13 @@ namespace Coop.Mod.LogicStates.Client
 {
     public abstract class ClientState : IClientState
     {
-        protected IClientLogic _logic;
-        protected IMessageBroker _messageBroker;
+        protected IClientLogic Logic;
+        protected IMessageBroker MessageBroker;
 
         public ClientState(IMessageBroker messageBroker, IClientLogic logic)
         {
-            _messageBroker = messageBroker;
-            _logic = logic;
+            MessageBroker = messageBroker;
+            Logic = logic;
         }
 
         public abstract void Connect();

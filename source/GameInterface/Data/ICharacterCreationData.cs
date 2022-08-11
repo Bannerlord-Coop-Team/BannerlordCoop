@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Mod.Messages
+namespace GameInterface.Data
 {
-    public interface IMessage
+    public interface ICharacterCreationData
     {
     }
 }

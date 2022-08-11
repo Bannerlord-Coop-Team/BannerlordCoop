@@ -243,6 +243,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Behaviour\InitServerBehaviour.cs" />
+    <Compile Include="Data\GameSaveData.cs" />
+    <Compile Include="Data\ICharacterCreationData.cs" />
+    <Compile Include="Data\IGameSaveData.cs" />
     <Compile Include="Extentions\CampaignObjectManagerExtentions.cs" />
     <Compile Include="Extentions\CampaignTimeExtensions.cs" />
     <Compile Include="Extentions\MobilePartyExtensions.cs" />
@@ -253,6 +256,9 @@
     <Compile Include="Helpers\SaveGameData.cs" />
     <Compile Include="IGameInterface.cs" />
     <Compile Include="Helpers\ISaveLoadHelper.cs" />
+    <Compile Include="Messages\Commands\GameStateCommands.cs" />
+    <Compile Include="Messages\Events\GameStateEvents.cs" />
+    <Compile Include="Messages\Queries\SaveGameQueries.cs" />
     <Compile Include="Patch\CampaignPatches\CompanionsCampaignBehaviorPatches.cs" />
     <Compile Include="Patch\CampaignPatches\SetTimeSpeedPatch.cs" />
     <Compile Include="Patch\CampaignPatches\TimeControlModePatch.cs" />
@@ -359,10 +365,6 @@
       <Name>Common</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Messages\Commands\" />
-    <Folder Include="Messages\Events\" />
-    <Folder Include="Messages\Queries\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -56,9 +56,6 @@
     <Reference Include="DistributedLock, Version=1.5.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\DistributedLock.1.5.0\lib\net45\DistributedLock.dll</HintPath>
     </Reference>
-    <Reference Include="GalaxyCSharp">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\GalaxyCSharp.dll</HintPath>
-    </Reference>
     <Reference Include="LiteNetLib, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
       <HintPath>..\packages\LiteNetLib.0.9.4\lib\net35\LiteNetLib.dll</HintPath>
       <Private>True</Private>
@@ -80,10 +77,6 @@
     </Reference>
     <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
       <HintPath>..\packages\protobuf-net.Core.3.1.17\lib\net461\protobuf-net.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="Steamworks.NET, Version=13.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\Steamworks.NET.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -133,7 +126,7 @@
     <Compile Include="Mod\Server\Connections\IConnectionState.cs" />
     <Compile Include="Mod\Server\Connections\States\InitialConnectionState.cs" />
     <Compile Include="Mod\Server\States\IServerLogic.cs" />
-    <Compile Include="Mod\Messages\Network\BroadcastMessage.cs" />
+    <Compile Include="Mod\Messages\Network\SendPacketMessages.cs" />
     <Compile Include="Mod\Server\ServerModule.cs" />
     <Compile Include="Mod\Client\ClientModule.cs" />
     <Compile Include="Communication\NetworkMessageBroker.cs" />
@@ -155,19 +148,12 @@
     <Compile Include="Mod\Data\ICoopPlayer.cs" />
     <Compile Include="Mod\EventHandlers\ExampleHandler.cs" />
     <Compile Include="Mod\EventHandlers\EventHandlerBase.cs" />
-    <Compile Include="Mod\Messages\Game\GoToMainMenuResponse.cs" />
-    <Compile Include="Mod\Messages\Game\GoToMainMenuRequest.cs" />
-    <Compile Include="Mod\Messages\IMessage.cs" />
     <Compile Include="Mod\Server\Config\ServerConfig.cs" />
     <Compile Include="Mod\Server\States\ServerLogic.cs" />
     <Compile Include="Mod\Client\Data\ClientData.cs" />
     <Compile Include="Mod\Client\States\ClientState.cs" />
-    <Compile Include="Mod\Client\States\CreatingCharacterState.cs" />
     <Compile Include="Mod\Client\States\IClientState.cs" />
     <Compile Include="Mod\Client\States\InitialClientState.cs" />
-    <Compile Include="Mod\Client\States\LoadingWorldState.cs" />
-    <Compile Include="Mod\Client\States\MapState.cs" />
-    <Compile Include="Mod\Client\States\MissionState.cs" />
     <Compile Include="Mod\Data\CoopPlayer.cs" />
     <Compile Include="Mod\Server\States\InitialServerState.cs" />
     <Compile Include="Mod\Server\States\IServerState.cs" />
