@@ -36,7 +36,7 @@ namespace CoopFramework
         /// </summary>
         /// <param name="instance">Instance that should be synchronized.</param>
         /// <exception cref="ArgumentOutOfRangeException">When the instance is null.</exception>
-        protected CoopManaged([NotNull] TExtended instance)
+        protected CoopManaged(TExtended instance)
         {
             if (instance == null) 
             {
@@ -58,7 +58,7 @@ namespace CoopFramework
         ///     that is being created.
         /// </summary>
         /// <param name="factoryMethod">Factory method that creates an instance of the concrete inheriting class."/></param>
-        protected static void AutoWrapAllInstances([NotNull] Func<TExtended, TSelf> factoryMethod)
+        protected static void AutoWrapAllInstances(Func<TExtended, TSelf> factoryMethod)
         {
             HookIntoObjectLifetime(factoryMethod);
         }
@@ -220,7 +220,6 @@ namespace CoopFramework
         /// <summary>
         ///     Returns the instance that is being managed by this <see cref="TSelf" />.
         /// </summary>
-        [NotNull]
         private WeakReference<TExtended> ManagedInstance { get; set; }
 
         /// <summary>
@@ -246,7 +245,7 @@ namespace CoopFramework
         /// <param name="args">Arguments to the method call.</param>
         /// <returns></returns>
         private static ECallPropagation Dispatch(
-            [CanBeNull] CoopManaged<TSelf, TExtended> self,
+            CoopManaged<TSelf, TExtended> self,
             EOriginator eOriginator,
             InvokableId invokableId,
             List<CallBehaviourBuilder> behaviours,
@@ -281,7 +280,7 @@ namespace CoopFramework
         ///     Called when an auto wrapped instance is being unregistered.
         /// </summary>
         /// <param name="instance"></param>
-        private void OnAutoRemoved([NotNull] TExtended instance)
+        private void OnAutoRemoved(TExtended instance)
         {
             foreach (var behaviour in m_DefinedBehaviours)
             {
@@ -325,11 +324,11 @@ namespace CoopFramework
         /// </summary>
         private class PendingMethodCall : IPendingMethodCall
         {
-            [CanBeNull] private readonly Func<ISynchronization> m_SyncFactory;
+            private readonly Func<ISynchronization> m_SyncFactory;
 
-            public PendingMethodCall(InvokableId invokable, [CanBeNull] Func<ISynchronization> syncFactory,
-                [CanBeNull] object instance,
-                [NotNull] object[] args)
+            public PendingMethodCall(InvokableId invokable, Func<ISynchronization> syncFactory,
+                object instance,
+                object[] args)
             {
                 Id = invokable;
                 m_SyncFactory = syncFactory;
@@ -413,7 +412,7 @@ namespace CoopFramework
         ///     Setup handlers for the statically configured patches.
         /// </summary>
         /// <param name="self">Instance to setup the handlers for or null for static handlers.</param>
-        private static void SetupHandlers([CanBeNull] CoopManaged<TSelf, TExtended> self)
+        private static void SetupHandlers(CoopManaged<TSelf, TExtended> self)
         {
             foreach (var patchedMethod in Util.SortByMethod(m_DefinedBehaviours))
             {
@@ -436,9 +435,9 @@ namespace CoopFramework
         /// <param name="patchedInvokable"></param>
         /// <param name="relevantBehaviours"></param>
         private static void SetupMethodHandlers(
-            [CanBeNull] CoopManaged<TSelf, TExtended> self,
-            [NotNull] PatchedInvokable patchedInvokable,
-            [NotNull] List<CallBehaviourBuilder> relevantBehaviours)
+            CoopManaged<TSelf, TExtended> self,
+            PatchedInvokable patchedInvokable,
+            List<CallBehaviourBuilder> relevantBehaviours)
         {
             TExtended instanceResolved = null; // stays null for static calls
             if (self != null && !self.TryGetInstance(out instanceResolved)) return;
@@ -469,9 +468,9 @@ namespace CoopFramework
         /// <param name="id"></param>
         /// <param name="relevantBehaviours"></param>
         private static void SetupFieldHandlers(
-            [CanBeNull] CoopManaged<TSelf, TExtended> self,
+            CoopManaged<TSelf, TExtended> self,
             FieldId id,
-            [NotNull] List<FieldAccessBehaviourBuilder> relevantBehaviours)
+            List<FieldAccessBehaviourBuilder> relevantBehaviours)
         {
             TExtended instanceResolved = null; // stays null for static calls
             if (self != null && !self.TryGetInstance(out instanceResolved)) return;
@@ -553,7 +552,7 @@ namespace CoopFramework
         /// <param name="eOriginator">The originator of the action.</param>
         /// <param name="behaviours">Behaviours that apply to this field.</param>
         private static void DispatchPostfix(
-            [CanBeNull] CoopManaged<TSelf, TExtended> self,
+            CoopManaged<TSelf, TExtended> self,
             EOriginator eOriginator,
             FieldBehaviourBuilder[] behaviours)
         {
@@ -582,7 +581,7 @@ namespace CoopFramework
         /// <param name="behaviours">Behaviours that apply to this field.</param>
         /// <param name="field">Access to the value.</param>
         private static ECallPropagation DispatchPrefix(
-            [CanBeNull] CoopManaged<TSelf, TExtended> self,
+            CoopManaged<TSelf, TExtended> self,
             EOriginator eOriginator,
             IEnumerable<FieldBehaviourBuilder> behaviours,
             FieldBase field)
@@ -610,10 +609,10 @@ namespace CoopFramework
             return $"CoopManaged: {ManagedInstance}";
         }
 
-        [CanBeNull] private static ObjectLifetimeObserver<TExtended> m_LifetimeObserver;
-        [CanBeNull] private static Task GCTask;
-        [CanBeNull] private static CancellationToken GCTaskCancellationToken = new CancellationToken();
-        [NotNull] private static readonly FieldChangeStack FieldStack = new FieldChangeStack();
+        private static ObjectLifetimeObserver<TExtended> m_LifetimeObserver;
+        private static Task GCTask;
+        private static CancellationToken GCTaskCancellationToken = new CancellationToken();
+        private static readonly FieldChangeStack FieldStack = new FieldChangeStack();
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 

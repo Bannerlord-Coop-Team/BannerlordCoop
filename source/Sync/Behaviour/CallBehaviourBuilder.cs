@@ -24,7 +24,7 @@ namespace Sync.Behaviour
         public ECallPropagation CallPropagationBehaviour { get; private set; } = ECallPropagation.CallOriginal;
         public bool DoBroadcast { get; private set; }
         public Func<ISynchronization> SynchronizationFactory { get; private set; }
-        [CanBeNull] public Func<IPendingMethodCall, ECallPropagation> MethodCallHandler { get; private set; }
+        public Func<IPendingMethodCall, ECallPropagation> MethodCallHandler { get; private set; }
 
         [CanBeNull]
         public Func<object, IPendingMethodCall, ECallPropagation> MethodCallHandlerInstance { get; private set; }
@@ -73,7 +73,7 @@ namespace Sync.Behaviour
         ///     The local call will be broadcast to all clients as an authoritative call. All clients will receive the
         ///     call on the same campaign tick. The originator of the call will receive the authoritative call as well.
         /// </summary>
-        public CallBehaviourBuilder Broadcast([NotNull] Func<ISynchronization> syncFactory,
+        public CallBehaviourBuilder Broadcast(Func<ISynchronization> syncFactory,
             IActionValidator validator = null)
         {
             SynchronizationFactory = syncFactory;

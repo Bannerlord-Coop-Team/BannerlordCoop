@@ -31,6 +31,9 @@
     <StartProgram>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
     <StartArguments>/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_</StartArguments>
   </PropertyGroup>
+  <PropertyGroup>
+    <RuntimeIdentifiers>win10-arm;win10-arm-aot;win10-arm64-aot;win10-x86;win10-x86-aot;win10-x64;win10-x64-aot</RuntimeIdentifiers>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
@@ -47,67 +50,63 @@
       <HintPath>..\packages\Lib.Harmony.2.0.4\lib\net472\0Harmony.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Autofac, Version=6.4.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autofac.6.4.0\lib\netstandard2.0\Autofac.dll</HintPath>
+    </Reference>
     <Reference Include="DistributedLock, Version=1.5.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\DistributedLock.1.5.0\lib\net45\DistributedLock.dll</HintPath>
-    </Reference>
-    <Reference Include="GalaxyCSharp">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\GalaxyCSharp.dll</HintPath>
     </Reference>
     <Reference Include="LiteNetLib, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
       <HintPath>..\packages\LiteNetLib.0.9.4\lib\net35\LiteNetLib.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
     <Reference Include="Mono.Reflection, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756, processorArchitecture=MSIL">
       <HintPath>..\packages\Mono.Reflection.2.0.0\lib\net40\Mono.Reflection.dll</HintPath>
     </Reference>
-    <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
-      <HintPath>..\packages\NLog.4.7.2\lib\net45\NLog.dll</HintPath>
+    <Reference Include="NLog, Version=5.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
+      <HintPath>..\packages\NLog.5.0.1\lib\net46\NLog.dll</HintPath>
     </Reference>
     <Reference Include="PropertyChanged, Version=3.2.8.0, Culture=neutral, PublicKeyToken=ee3ee20bcf148ddd, processorArchitecture=MSIL">
       <HintPath>..\packages\PropertyChanged.Fody.3.2.8\lib\net40\PropertyChanged.dll</HintPath>
     </Reference>
-    <Reference Include="SandBox">
-      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
+    <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.3.1.17\lib\net461\protobuf-net.dll</HintPath>
     </Reference>
-    <Reference Include="SandBox.GauntletUI">
-      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
-    </Reference>
-    <Reference Include="SandBox.View">
-      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
-    </Reference>
-    <Reference Include="SandBox.ViewModelCollection">
-      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
-    </Reference>
-    <Reference Include="Stateless, Version=4.0.0.0, Culture=neutral, PublicKeyToken=93038f0927583c9a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Stateless.5.1.2\lib\net472\Stateless.dll</HintPath>
-    </Reference>
-    <Reference Include="Steamworks.NET, Version=13.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\Steamworks.NET.dll</HintPath>
-    </Reference>
-    <Reference Include="StoryMode, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.dll</HintPath>
-    </Reference>
-    <Reference Include="StoryMode.GauntletUI, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.GauntletUI.dll</HintPath>
-    </Reference>
-    <Reference Include="StoryMode.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.View.dll</HintPath>
-    </Reference>
-    <Reference Include="StoryMode.ViewModelCollection, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.ViewModelCollection.dll</HintPath>
+    <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.Core.3.1.17\lib\net461\protobuf-net.Core.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Collections.Immutable, Version=1.2.5.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Collections.Immutable.1.7.1\lib\net461\System.Collections.Immutable.dll</HintPath>
+    </Reference>
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Diagnostics.DiagnosticSource, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
+    </Reference>
     <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Memory.4.5.4\lib\net461\System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.4.5.3\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
     <Reference Include="System.Runtime.InteropServices.RuntimeInformation" />
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.2\lib\netstandard2.0\System.Threading.Tasks.Extensions.dll</HintPath>
+    </Reference>
     <Reference Include="System.Transactions" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -115,337 +114,58 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
-    <Reference Include="TaleWorlds.BattlEye.Client">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.BattlEye.Client.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.CampaignSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Core">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Core.ViewModelCollection">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.ViewModelCollection.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Diamond">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Diamond.AccessProvider.Epic">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Epic.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Diamond.AccessProvider.Steam">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Steam.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Diamond.AccessProvider.Test">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Test.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.DotNet">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.DotNet.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.DotNet.AutoGenerated">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.DotNet.AutoGenerated.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Engine">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Engine.AutoGenerated">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.AutoGenerated.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Engine.GauntletUI">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.GauntletUI">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.GauntletUI.Data">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.Data.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.GauntletUI.ExtraWidgets">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.ExtraWidgets.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.GauntletUI.PrefabSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.PrefabSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.GauntletUI.TooltipExtensions">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.TooltipExtensions.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.InputSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Library">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Localization">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.ModuleManager">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ModuleManager.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.MountAndBlade">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.MountAndBlade.AutoGenerated">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.AutoGenerated.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.MountAndBlade.Diamond">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Diamond.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.MountAndBlade.GauntletUI, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.MountAndBlade.Helpers">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Helpers.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.NavigationSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.NavigationSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Network">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Network.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.ObjectSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.PlatformService">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.PlatformService.Epic">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Epic.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.PlatformService.Steam">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Steam.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.PlayerServices">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlayerServices.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.PSAI">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PSAI.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.SaveSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.ScreenSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Starter.DotNetCore">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Starter.DotNetCore.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Starter.Library">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Starter.Library.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.TwoDimension">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.TwoDimension.Standalone">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.Standalone.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Mod\Config\RequiredSyncTypes.cs" />
-    <Compile Include="Mod\Behaviour\InitServerBehaviour.cs" />
-    <Compile Include="Mod\Config\ManagedTypesConfig.cs" />
-    <Compile Include="Mod\CoopClientSM.cs" />
-    <Compile Include="Mod\CoopConditions.cs" />
-    <Compile Include="Mod\Data\SaveData.cs" />
-    <Compile Include="Mod\DebugUtil\PartySyncDebugBehavior.cs" />
-    <Compile Include="Mod\Extentions\CampaignObjectManagerExtentions.cs" />
-    <Compile Include="Mod\GameSync\Bandit\BanditPartyComponentSync.cs" />
-    <Compile Include="Mod\GameSync\Bandit\BanditCampaignBehaviorSync.cs" />
-    <Compile Include="Mod\GameSync\Caravan\CaravansCampaignBehaviorSync.cs" />
-    <Compile Include="Mod\GameSync\Fief\FiefCommands.cs" />
-    <Compile Include="Mod\GameSync\Hideout\HideoutBehavior.cs" />
-    <Compile Include="Mod\GameSync\Hideout\HideoutSync.cs" />
-    <Compile Include="Mod\GameSync\Roster\CharacterObjectSync.cs" />
-    <Compile Include="Mod\GameSync\Initializer.cs" />
-    <Compile Include="Mod\GameSync\Party\MapMovementPatches.cs" />
-    <Compile Include="Mod\GameSync\Party\MobilePartyLifetimeBehavior.cs" />
-    <Compile Include="Mod\GameSync\Party\MobilePartyManaged.cs" />
-    <Compile Include="Mod\GameSync\Roster\TroopRosterSync.cs" />
-    <Compile Include="Mod\GameSync\Villager\VillagerCampaignBehaviorSync.cs" />
-    <Compile Include="Mod\GameSync\Villager\VillagerPartyComponentSync.cs" />
-    <Compile Include="Mod\CoopServerSM.cs" />
-    <Compile Include="Mod\DebugUtil\CLICommands.cs" />
-    <Compile Include="Mod\DebugUtil\DebugConsole.cs" />
-    <Compile Include="Mod\DebugUtil\DebugManager.cs" />
-    <Compile Include="Mod\Coop.cs" />
-    <Compile Include="Mod\DebugUtil\DebugUI.cs" />
-    <Compile Include="Mod\DebugUtil\PartySpawnHelper.cs" />
-    <Compile Include="Mod\DebugUtil\Replay.cs" />
-    <Compile Include="Mod\DebugUtil\ReplayEvent.cs" />
-    <Compile Include="Mod\Exceptions.cs" />
-    <Compile Include="Mod\GameEnvironmentClient.cs" />
+    <Compile Include="Mod\Client\States\IClientLogic.cs" />
+    <Compile Include="Mod\CoopModule.cs" />
+    <Compile Include="Mod\Messages\Network\ReceivePacket.cs" />
+    <Compile Include="Mod\Server\Connections\Connection.cs" />
+    <Compile Include="Mod\Server\Connections\ConnectionManager.cs" />
+    <Compile Include="Mod\Server\Connections\IConnection.cs" />
+    <Compile Include="Mod\Server\Connections\IConnectionManager.cs" />
+    <Compile Include="Mod\Server\Connections\IConnectionState.cs" />
+    <Compile Include="Mod\Server\Connections\States\InitialConnectionState.cs" />
+    <Compile Include="Mod\Server\States\IServerLogic.cs" />
+    <Compile Include="Mod\Messages\Network\SendPacketMessages.cs" />
+    <Compile Include="Mod\Server\ServerModule.cs" />
+    <Compile Include="Mod\Client\ClientModule.cs" />
+    <Compile Include="Communication\NetworkMessageBroker.cs" />
+    <Compile Include="Communication\MessageBroker\IMessageBroker.cs" />
+    <Compile Include="Communication\MessageBroker\MessagePayload.cs" />
+    <Compile Include="Communication\MessageBroker\MessageScope.cs" />
+    <Compile Include="Communication\PacketHandlers\ExamplePacketHandler.cs" />
+    <Compile Include="Communication\PacketHandlers\IPacket.cs" />
+    <Compile Include="Communication\PacketHandlers\IPacketHandler.cs" />
+    <Compile Include="Communication\PacketHandlers\IPacketManager.cs" />
+    <Compile Include="Communication\PacketHandlers\PacketManager.cs" />
+    <Compile Include="Configuration\INetworkConfiguration.cs" />
+    <Compile Include="Configuration\NetworkConfiguration.cs" />
+    <Compile Include="CoopartiveMultiplayerExperience.cs" />
+    <Compile Include="Debugging\Logger\ILogger.cs" />
+    <Compile Include="Debugging\Logger\NLogLogger.cs" />
+    <Compile Include="Mod\Client\ClientLogic.cs" />
+    <Compile Include="Mod\Client\Config\ClientConfig.cs" />
+    <Compile Include="Mod\Data\ICoopPlayer.cs" />
+    <Compile Include="Mod\EventHandlers\ExampleHandler.cs" />
+    <Compile Include="Mod\EventHandlers\EventHandlerBase.cs" />
+    <Compile Include="Mod\Server\Config\ServerConfig.cs" />
+    <Compile Include="Mod\Server\States\ServerLogic.cs" />
+    <Compile Include="Mod\Client\Data\ClientData.cs" />
+    <Compile Include="Mod\Client\States\ClientState.cs" />
+    <Compile Include="Mod\Client\States\IClientState.cs" />
+    <Compile Include="Mod\Client\States\InitialClientState.cs" />
+    <Compile Include="Mod\Data\CoopPlayer.cs" />
+    <Compile Include="Mod\Server\States\InitialServerState.cs" />
+    <Compile Include="Mod\Server\States\IServerState.cs" />
+    <Compile Include="Mod\Server\Data\ServerData.cs" />
+    <Compile Include="Mod\Server\States\ServerRunningState.cs" />
+    <Compile Include="Mod\Server\States\ServerState.cs" />
+    <Compile Include="Mod\ICoopNetwork.cs" />
+    <Compile Include="Mod\EventHandlers\IEventHandler.cs" />
     <Compile Include="Mod\GameLoopRunner.cs" />
-    <Compile Include="Mod\DebugUtil\DebugLogging.cs" />
-    <Compile Include="Mod\Managers\ClientCharacterCreatorManager.cs" />
-    <Compile Include="Mod\Managers\ClientManager.cs" />
-    <Compile Include="Mod\Managers\ServerManager.cs" />
-    <Compile Include="Mod\MbLogTarget.cs" />
-    <Compile Include="Mod\GameSync\Party\CampaignMapMovement.cs" />
-    <Compile Include="Mod\GameSync\Party\CampaignMapPositions.cs" />
-    <Compile Include="Mod\Patch\CampaignPatches\CompanionsCampaignBehaviorPatches.cs" />
-    <Compile Include="Mod\Patch\Hero\HeroPatches.cs" />
-    <Compile Include="Mod\Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />
-    <Compile Include="Mod\GameSync\Party\MobilePartyUpdatable.cs" />
-    <Compile Include="Mod\Patch\Party\GarrisonTroopsCampaignBehavior.cs" />
-    <Compile Include="Mod\Patch\Party\PartiesBuyFoodCampaignBehavior.cs" />
-    <Compile Include="Mod\Patch\Party\PartiesBuyHorseCampaignBehavior.cs" />
-    <Compile Include="Mod\Patch\Party\PartiesSellLootCampaignBehavior.cs" />
-    <Compile Include="Mod\Patch\Party\PartiesSellPrisonerCampaignBehavior.cs" />
-    <Compile Include="Mod\Patch\Party\RecruitmentCampaignBehavior.cs" />
-    <Compile Include="Mod\Patch\Quest\BannerInvestigationQuestPatch.cs" />
-    <Compile Include="Mod\Patch\TemporaryTypesPatch.cs" />
-    <Compile Include="Mod\Patch\World\SaveManager.cs" />
-    <Compile Include="Mod\GameSync\Caravan\CaravanPartyComponentSync.cs" />
-    <Compile Include="Mod\GameSync\Fief\FiefSync.cs" />
-    <Compile Include="Mod\GameSync\HeroSync.cs" />
-    <Compile Include="Mod\GameSync\SettlementSync.cs" />
-    <Compile Include="Mod\Patch\World\TimeCommands.cs" />
-    <Compile Include="Mod\Patch\World\TimeSynchronization.cs" />
-    <Compile Include="Mod\Patch\CampaignPatches\SetTimeSpeedPatch.cs" />
-    <Compile Include="Mod\Patch\CampaignPatches\TimeControlModePatch.cs" />
-    <Compile Include="Mod\Patch\MobilePartyPatches\ComputeIsWaitingPatch.cs" />
-    <Compile Include="Mod\Patch\Debugging.cs" />
-    <Compile Include="Mod\Patch\Exceptions.cs" />
-    <Compile Include="Mod\Patch\World\TimeControl.cs" />
-    <Compile Include="Mod\Patch\Utils.cs" />
-    <Compile Include="Mod\GameSync\TownSync.cs" />
-    <Compile Include="Mod\GameSync\VillageSync.cs" />
-    <Compile Include="Mod\Persistence\Compare.cs" />
-    <Compile Include="Mod\Persistence\Compression.cs" />
-    <Compile Include="Mod\Persistence\IEnvironmentClient.cs" />
-    <Compile Include="Mod\Persistence\IEnvironmentServer.cs" />
-    <Compile Include="Mod\Persistence\Party\IMovementHandler.cs" />
-    <Compile Include="Mod\Persistence\Party\MobilePartyMovementSync.cs" />
-    <Compile Include="Mod\Persistence\RemoteAction\CoopSyncServer.cs" />
-    <Compile Include="Mod\Persistence\RemoteAction\EventFieldChange.cs" />
-    <Compile Include="Mod\Persistence\RemoteAction\EventActionBase.cs" />
-    <Compile Include="Mod\Persistence\RemoteAction\CoopSyncClient.cs" />
-    <Compile Include="Mod\Persistence\Party\EventPartyMoveTo.cs" />
-    <Compile Include="Mod\Persistence\Party\MobilePartyEntityClient.cs" />
-    <Compile Include="Mod\Persistence\Party\MobilePartyEntityServer.cs" />
-    <Compile Include="Mod\Persistence\Party\MobilePartyState.cs" />
-    <Compile Include="Mod\Persistence\Party\MovementData.cs" />
-    <Compile Include="Mod\Persistence\PersistenceClient.cs" />
-    <Compile Include="Mod\Persistence\MobilePartyEntityManager.cs" />
-    <Compile Include="Mod\Persistence\Registry.cs" />
-    <Compile Include="Mod\Persistence\RemoteAction\EventBroadcastingQueue.cs" />
-    <Compile Include="Mod\Persistence\RemoteAction\EventMethodCall.cs" />
-    <Compile Include="Mod\Persistence\RemoteAction\IClientAccess.cs" />
-    <Compile Include="Mod\Persistence\RemoteAction\IServerAccess.cs" />
-    <Compile Include="Mod\Persistence\World\WorldEntityClient.cs" />
-    <Compile Include="Mod\Persistence\World\WorldEntityServer.cs" />
-    <Compile Include="Mod\Persistence\World\WorldState.cs" />
-    <Compile Include="Mod\CoopServerRail.cs" />
-    <Compile Include="Mod\SaveGameData.cs" />
-    <Compile Include="Mod\SaveLoad.cs" />
-    <Compile Include="Mod\CoopEvents.cs" />
-    <Compile Include="Mod\CoopClient.cs" />
-    <Compile Include="Mod\CoopServer.cs" />
-    <Compile Include="Mod\Extensions.cs" />
-    <Compile Include="Mod\Behaviour\GameLoadedBehaviour.cs" />
-    <Compile Include="Mod\GameEnvironmentServer.cs" />
-    <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
-    <Compile Include="Mod\Main.cs" />
-    <Compile Include="Mod\Scope\CoopRailScopeEvaluator.cs" />
-    <Compile Include="Mod\Scope\MobilePartyScopeHelper.cs" />
-    <Compile Include="Mod\Serializers\CommonAreaSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\BannerSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\BuildingsSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\CampaignTimeSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\CharacterObjectSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\ClanSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\MBGUIDSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\DefaultPartyTemplateSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\CultureObjectSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\DeterministicRandomSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\EquipmentElementSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\EquipmentSerialzer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\FactionSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\HeroDeveloperSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\HeroLastSeenInformationSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\HeroSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\HideoutSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\ItemCategorySerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\ItemDataSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\ItemObjectSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\ItemRosterSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\KingdomDecisionSerialzer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\KingdomSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\LocationComplexSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\LocationSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\MBBodyPropertySerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\MBCharacterSkillsSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\MobilePartiesAroundPositionListSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\MobilePartySerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\NavigationPathSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\PartyBaseSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\PathFaceRecordSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\ProductionSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\SellLogSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\SiegeLaneSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\TownMarketDataSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\TownSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\TroopRosterElementSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\VillageMarketDataSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\VillageSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\SettlementSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\TraitObjectSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\TroopRosterSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\VillageTypeSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\WorkshopSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializers\WorkshopTypeSerializer.cs" />
-    <Compile Include="Mod\Serializers\CustomSerializerWithGuid.cs" />
-    <Compile Include="Mod\Serializers\NewPlayer\PlayerCharacterObjectSerializer.cs" />
-    <Compile Include="Mod\Serializers\NewPlayer\PlayerClanSerializer.cs" />
-    <Compile Include="Mod\Serializers\NewPlayer\PlayerCultureObjectSerializer.cs" />
-    <Compile Include="Mod\Serializers\NewPlayer\PlayerHeroDeveloperSerializer.cs" />
-    <Compile Include="Mod\Serializers\NewPlayer\PlayerHeroLastSeenInformationSerializer.cs" />
-    <Compile Include="Mod\Serializers\NewPlayer\PlayerLordPartyComponentSerializer.cs" />
-    <Compile Include="Mod\Serializers\NewPlayer\PlayerMobilePartiesAroundPositionListSerializer.cs" />
-    <Compile Include="Mod\Serializers\NewPlayer\PlayerMobilePartySerializer.cs" />
-    <Compile Include="Mod\Serializers\NewPlayer\PlayerHeroSerializer.cs" />
-    <Compile Include="Mod\Serializers\NewPlayer\PlayerPartyBaseSerializer.cs" />
-    <Compile Include="Mod\Serializers\NewPlayer\PlayerSettlementSerializer.cs" />
-    <Compile Include="Mod\Serializers\TextObjectSerializer.cs" />
-    <Compile Include="Mod\Serializers\PartyComponentSerializer.cs" />
-    <Compile Include="Mod\Serializers\PropertyOwnerSerializer.cs" />
-    <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterPerksSerializer.cs" />
-    <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterSkillsSerializer.cs" />
-    <Compile Include="Mod\Serializers\PropertyOwnerSerializers\CharacterTraitsSerializer.cs" />
-    <Compile Include="Mod\Serializers\SerializableFactory.cs" />
-    <Compile Include="Mod\Serializers\SerializerConfig.cs" />
-    <Compile Include="Mod\UI\CharacterCreationUI\CharacterCreationUI.cs" />
-    <Compile Include="Mod\UI\CoopConnectMenuVM.cs" />
-    <Compile Include="Mod\UI\CoopConnectionUI.cs" />
-    <Compile Include="Mod\UI\LoadGameUI\CoopLoadUI.cs" />
-    <Compile Include="NetImpl\LiteNet\DiscoveryThread.cs" />
-    <Compile Include="NetImpl\LiteNet\Extensions.cs" />
-    <Compile Include="NetImpl\LiteNet\LiteNetManagerClient.cs" />
-    <Compile Include="NetImpl\LiteNet\LiteNetListenerClient.cs" />
-    <Compile Include="NetImpl\LiteNet\LiteNetManagerServer.cs" />
-    <Compile Include="NetImpl\LiteNet\LiteNetConnection.cs" />
-    <Compile Include="NetImpl\LiteNet\LiteNetListenerServer.cs" />
-    <Compile Include="NetImpl\LiteNet\NetManagerFactory.cs" />
-    <Compile Include="NetImpl\LiteNet\RailNetPeerWrapper.cs" />
-    <Compile Include="NetImpl\PlatformAPI.cs" />
-    <Compile Include="NetImpl\Steam\NetworkSteam.cs" />
-    <Compile Include="ObjectManagerAdapter.cs" />
+    <Compile Include="Mod\Client\CoopClient.cs" />
+    <Compile Include="Mod\Server\CoopServer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Mod\TestingCommands.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.editorconfig">
@@ -455,39 +175,21 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BannerlordTestingEssentials\BannerlordSystemTestingFramework\BannerlordSystemTestingFramework.csproj">
-      <Project>{68cefb0c-37f7-4f86-8e8d-1d3baf1e7277}</Project>
-      <Name>BannerlordSystemTestingFramework</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
       <Name>Common</Name>
     </ProjectReference>
-    <ProjectReference Include="..\CoopFramework\CoopFramework.csproj">
-      <Project>{55b13456-9f7f-4724-9cf5-ae12aa3ce81b}</Project>
-      <Name>CoopFramework</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Network\Network.csproj">
-      <Project>{b0ff5e24-4d98-4ec8-bbce-6cdb85cb685d}</Project>
-      <Name>Network</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\RailgunNet\RailgunNet\RailgunNet.csproj">
-      <Project>{d8389325-85ae-4a1d-9b8e-e4742349a531}</Project>
-      <Name>RailgunNet</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\RemoteAction\RemoteAction.csproj">
-      <Project>{d6e8252c-8ede-4e01-9a61-6fb92b50fb6f}</Project>
-      <Name>RemoteAction</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Sync\Sync.csproj">
-      <Project>{79b189c9-b667-4997-a361-ab9c7c014184}</Project>
-      <Name>Sync</Name>
+    <ProjectReference Include="..\GameInterface\GameInterface.csproj">
+      <Project>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</Project>
+      <Name>GameInterface</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Debugging\Commands\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

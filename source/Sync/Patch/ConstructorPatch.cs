@@ -10,7 +10,7 @@ namespace Sync.Patch
     /// </summary>
     public class ConstructorPatch<TPatch> : MethodPatch<TPatch>
     {
-        public ConstructorPatch([NotNull] Type declaringClass) : base(declaringClass)
+        public ConstructorPatch(Type declaringClass) : base(declaringClass)
         {
         }
 

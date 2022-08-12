@@ -16,6 +16,8 @@ namespace Coop.Mod
         private readonly object m_QueueLock = new object();
         private int m_GameLoopThreadId;
 
+        public bool IsInitialized => m_GameLoopThreadId != 0;
+
         private GameLoopRunner()
         {
         }

@@ -1,6 +1,4 @@
-﻿using JetBrains.Annotations;
-
-namespace Sync.Behaviour
+﻿namespace Sync.Behaviour
 {
     /// <summary>
     ///     Describes a behaviour that only applies when a condition is met.
@@ -13,7 +11,7 @@ namespace Sync.Behaviour
         ///     Constructs a new conditional behaviour.
         /// </summary>
         /// <param name="condition"></param>
-        public ConditionalBehaviour([CanBeNull] Condition condition)
+        public ConditionalBehaviour(Condition condition)
         {
             Condition = condition;
         }

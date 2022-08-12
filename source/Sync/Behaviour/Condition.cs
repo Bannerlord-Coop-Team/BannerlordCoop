@@ -12,7 +12,7 @@ namespace Sync.Behaviour
         ///     Creates a new condition.
         /// </summary>
         /// <param name="func">Function to evaluate the condition.</param>
-        public Condition([NotNull] Func<EOriginator, object, bool> func)
+        public Condition(Func<EOriginator, object, bool> func)
         {
             m_Func = func;
         }
@@ -54,7 +54,7 @@ namespace Sync.Behaviour
         /// <param name="lhs"></param>
         /// <param name="rhs"></param>
         /// <returns></returns>
-        public static Condition operator &([NotNull] Condition lhs, [NotNull] Condition rhs)
+        public static Condition operator &(Condition lhs, Condition rhs)
         {
             return new Condition((eOrigin, instance) => lhs.m_Func(eOrigin, instance) && rhs.m_Func(eOrigin, instance));
         }
@@ -65,12 +65,12 @@ namespace Sync.Behaviour
         /// <param name="lhs"></param>
         /// <param name="rhs"></param>
         /// <returns></returns>
-        public static Condition operator |([NotNull] Condition lhs, [NotNull] Condition rhs)
+        public static Condition operator |(Condition lhs, Condition rhs)
         {
             return new Condition((eOrigin, instance) => lhs.m_Func(eOrigin, instance) || rhs.m_Func(eOrigin, instance));
         }
 
-        public static Condition operator !([NotNull] Condition c)
+        public static Condition operator !(Condition c)
         {
             return new Condition((eOrigin, instance) => !c.Evaluate(eOrigin, instance));
         }

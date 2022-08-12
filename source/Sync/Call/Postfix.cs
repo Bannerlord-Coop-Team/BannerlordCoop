@@ -31,7 +31,7 @@ namespace Sync.Call
         /// </summary>
         /// <param name="instance"></param>
         /// <param name="handler"></param>
-        public void SetHandler([NotNull] object instance, [NotNull] InstanceHandlerDelegate handler)
+        public void SetHandler(object instance, InstanceHandlerDelegate handler)
         {
             if (m_InstanceSpecificHandlers.Any(pair => pair.Key.TryGetTarget(out var o) && o == instance))
                 throw new ArgumentException($"Cannot have multiple sync handlers for {this}.");

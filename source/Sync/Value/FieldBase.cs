@@ -8,7 +8,7 @@ namespace Sync.Value
     /// </summary>
     public abstract class FieldBase
     {
-        [NotNull] public readonly Type DeclaringType;
+        public readonly Type DeclaringType;
         public readonly FieldId Id;
 
         public FieldBase(Type declaringType)

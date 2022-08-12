@@ -21,7 +21,7 @@ namespace CoopFramework
         /// <summary>
         ///     Adapter for the games object manager.
         /// </summary>
-        [CanBeNull] public static IObjectManager ObjectManager { get; private set; }
+        public static IObjectManager ObjectManager { get; private set; }
 
         internal static readonly Dictionary<Type, MethodInfo> LoadInitializationCallbacks = new Dictionary<Type, MethodInfo>();
 
@@ -31,7 +31,7 @@ namespace CoopFramework
         /// </summary>
         /// <param name="objectManager">Instance of the adapter to the games object manager.</param>
         /// <param name="isCoopEnabled">Function to evaluate whether the coop patches should be active or not.</param>
-        public static void InitPatches([CanBeNull] IObjectManager objectManager, Func<bool> isCoopEnabled)
+        public static void InitPatches(IObjectManager objectManager, Func<bool> isCoopEnabled)
         {
             ObjectManager = objectManager;
             m_IsCoopEnabled = isCoopEnabled;

@@ -4,7 +4,7 @@ namespace Sync.Value
 {
     public class FieldData
     {
-        public FieldData([NotNull] FieldBase field, object target, object value)
+        public FieldData(FieldBase field, object target, object value)
         {
             FieldBase = field;
             Target = target;

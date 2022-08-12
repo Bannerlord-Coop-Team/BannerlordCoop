@@ -39,8 +39,8 @@ namespace Sync.Behaviour
         ///     receive the changed value on the same campaign tick. The originator of the call will receive the
         ///     authoritative change as well.
         /// </summary>
-        public FieldBehaviourBuilder Broadcast([NotNull] Func<ISynchronization> syncFactory,
-            [NotNull] IActionValidator validator = null)
+        public FieldBehaviourBuilder Broadcast(Func<ISynchronization> syncFactory,
+            IActionValidator validator = null)
         {
             SynchronizationFactory = syncFactory;
             DoBroadcast = true;

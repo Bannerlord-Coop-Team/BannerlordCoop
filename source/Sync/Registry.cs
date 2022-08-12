@@ -32,7 +32,7 @@ namespace Sync
         /// <param name="invokable"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        public static InvokableId Register([NotNull] Invokable invokable)
+        public static InvokableId Register(Invokable invokable)
         {
             lock (Lock)
             {
@@ -51,7 +51,7 @@ namespace Sync
         /// <param name="field"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        public static FieldId Register([NotNull] FieldBase field)
+        public static FieldId Register(FieldBase field)
         {
             lock (Lock)
             {

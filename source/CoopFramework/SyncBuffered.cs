@@ -1,9 +1,5 @@
 ﻿using System;
 using Common;
-using JetBrains.Annotations;
-using RailgunNet.Logic;
-using RailgunNet.System.Types;
-using RemoteAction;
 using Sync.Behaviour;
 using Sync.Call;
 using Sync.Value;
@@ -22,26 +18,16 @@ namespace CoopFramework
             SyncBufferManager.Register(this);
         }
 
-        #region Debug
-
-        /// <summary>
-        ///     Returns the call history of this synchronization instance.
-        /// </summary>
-        [NotNull]
-        public CallStatistics BroadcastHistory { get; } = new CallStatistics(128);
-
-        #endregion
-
-        [NotNull] private FieldChangeBuffer m_Buffer { get; } = new FieldChangeBuffer();
+        private FieldChangeBuffer m_Buffer { get; } = new FieldChangeBuffer();
 
         /// <inheritdoc cref="ISynchronization.Broadcast(InvokableId, object, object[])" />
-        public void Broadcast(InvokableId id, [CanBeNull] object instance, [NotNull] object[] args)
+        public void Broadcast(InvokableId id, object instance, object[] args)
         {
             Broadcast(null, id, instance, args);
         }
 
         /// <inheritdoc cref="ISynchronization.Broadcast(EntityId[] affectedEntities, InvokableId, object, object[])" />
-        public abstract void Broadcast([CanBeNull] EntityId[] affectedEntities, InvokableId id, [CanBeNull] object instance, [NotNull] object[] args);
+        public abstract void Broadcast(Guid[] affectedEntities, InvokableId id, object instance, object[] args);
 
         /// <inheritdoc cref="ISynchronization.Broadcast(FieldChangeBuffer)" />
         public virtual void Broadcast(FieldChangeBuffer buffer)

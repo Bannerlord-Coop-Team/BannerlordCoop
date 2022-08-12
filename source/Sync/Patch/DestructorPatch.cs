@@ -6,7 +6,7 @@ namespace Sync.Patch
 {
     public class DestructorPatch<TPatch> : MethodPatch<TPatch>
     {
-        public DestructorPatch([NotNull] Type declaringClass) : base(declaringClass)
+        public DestructorPatch(Type declaringClass) : base(declaringClass)
         {
         }
 
