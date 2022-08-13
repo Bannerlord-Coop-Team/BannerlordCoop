@@ -5,7 +5,7 @@ namespace Coop.Mod.LogicStates.Client
 {
     internal class InitialClientState : ClientState
     {
-        public InitialClientState(IMessageBroker messageBroker, IClientLogic logic) : base(messageBroker, logic) { }
+        public InitialClientState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker) { }
 
         public override void Connect()
         {

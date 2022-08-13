@@ -7,10 +7,10 @@ namespace Coop.Mod.LogicStates.Client
         protected IClientLogic Logic;
         protected IMessageBroker MessageBroker;
 
-        public ClientState(IMessageBroker messageBroker, IClientLogic logic)
+        public ClientState(IClientLogic logic, IMessageBroker messageBroker)
         {
-            MessageBroker = messageBroker;
             Logic = logic;
+            MessageBroker = messageBroker;
         }
 
         public abstract void Connect();
