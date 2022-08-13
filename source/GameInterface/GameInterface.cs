@@ -1,4 +1,6 @@
-﻿using GameInterface.Helpers;
+﻿using Autofac;
+using GameInterface.Helpers;
+using GameInterface.Serialization.DynamicModel;
 
 namespace GameInterface
 {
@@ -8,12 +10,17 @@ namespace GameInterface
 
         public ISaveLoadHelper SaveLoadHelper { get; }
 
-        public GameInterface(
-            IExampleGameHelper exampleGameHelper,
-            ISaveLoadHelper saveLoadHelper)
+        internal IDynamicModelService DynamicModelService { get; }
+
+        private readonly IContainer Container;
+
+        public GameInterface()
         {
-            ExampleGameHelper = exampleGameHelper;
-            SaveLoadHelper = saveLoadHelper;
+            ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterModule<GameInterfaceModule>();
+            Container = builder.Build();
+
+            DynamicModelService = Container.Resolve<IDynamicModelService>();
         }
     }
 }
