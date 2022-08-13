@@ -2,18 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Coop.Communication.MessageBroker;
-using Coop.Communication.PacketHandlers;
-using Coop.Mod.Messages.Network;
-using LiteNetLib;
-using ProtoBuf;
 
-namespace Coop.Communication
+namespace Common.Messages
 {
-    public class NetworkMessageBroker : IMessageBroker
+    public class MessageBroker : IMessageBroker
     {
         private readonly Dictionary<Type, List<Delegate>> _subscribers = new Dictionary<Type, List<Delegate>>();
-        
+
         /// <summary>
         ///     Call an event based on the type of the message.
         /// </summary>
@@ -21,7 +16,7 @@ namespace Coop.Communication
         /// <param name="message">Message event</param>
         /// <param name="scope">Scope of the message</param>
         /// <typeparam name="T">Type of the message</typeparam>
-        public void Publish<T>(object source, T message)
+        public virtual void Publish<T>(object source, T message)
         {
             if (message == null || source == null)
                 return;
@@ -45,11 +40,11 @@ namespace Coop.Communication
         /// </summary>
         /// <param name="subscriber">Delegate method</param>
         /// <typeparam name="T">Type of event subscribing</typeparam>
-        public void Subscribe<T>(Action<MessagePayload<T>> subscriber)
+        public virtual void Subscribe<T>(Action<MessagePayload<T>> subscriber)
         {
-            if(!_subscribers.ContainsKey(typeof(T)))
+            if (!_subscribers.ContainsKey(typeof(T)))
                 _subscribers.Add(typeof(T), new List<Delegate>());
-            
+
             _subscribers[typeof(T)].Add(subscriber);
         }
 
@@ -58,31 +53,15 @@ namespace Coop.Communication
         /// </summary>
         /// <param name="subscriber"></param>
         /// <typeparam name="T"></typeparam>
-        public void Unsubscribe<T>(Action<MessagePayload<T>> subscriber)
+        public virtual void Unsubscribe<T>(Action<MessagePayload<T>> subscriber)
         {
-            if (_subscribers.TryGetValue(typeof(T), out var subscribers)) 
+            if (_subscribers.TryGetValue(typeof(T), out var subscribers))
                 subscribers.Remove(subscriber);
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             _subscribers.Clear();
-        }
-    }
-
-    [ProtoContract(SkipConstructor = true)]
-    public readonly struct MessagePacket<T> : IPacket
-    {
-        public PacketType Type => PacketType.Message;
-
-        public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableSequenced;
-
-        [ProtoMember(1)]
-        public T Payload { get; }
-
-        public MessagePacket(T payload)
-        {
-            Payload = payload;
         }
     }
 }

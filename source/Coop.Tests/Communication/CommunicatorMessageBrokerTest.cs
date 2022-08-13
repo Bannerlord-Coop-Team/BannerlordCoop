@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using Autofac;
-using Coop.Communication;
-using Coop.Communication.MessageBroker;
+using Common.Messages;
 using Coop.Mod.EventHandlers;
 using Xunit;
 
@@ -19,7 +19,7 @@ namespace Coop.Tests.Communication
 
             communicator.Subscribe<ExampleIncomingMessage>(payload => { });
             
-            var subscribers = typeof(NetworkMessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
+            var subscribers = typeof(MessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
                 ?.GetValue(communicator) as Dictionary<Type, List<Delegate>>;
 
             if (subscribers == null)
@@ -37,7 +37,7 @@ namespace Coop.Tests.Communication
             void DelegateHandler(MessagePayload<ExampleIncomingMessage> payload) { }
             communicator.Subscribe<ExampleIncomingMessage>(DelegateHandler);
             
-            var subscribers = typeof(NetworkMessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
+            var subscribers = typeof(MessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
                 ?.GetValue(communicator) as Dictionary<Type, List<Delegate>>;
             
             if (subscribers == null)
@@ -65,6 +65,8 @@ namespace Coop.Tests.Communication
 
             var incomingMessage = new ExampleIncomingMessage(10);
             communicator.Publish(this, incomingMessage);
+
+            Thread.Sleep(10);
             
             Assert.Equal(1, callCount);
             Assert.Equal(incomingMessage.ExampleData, eventData);

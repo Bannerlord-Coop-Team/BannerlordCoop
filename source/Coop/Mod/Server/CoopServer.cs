@@ -5,9 +5,9 @@ using System.Net.Sockets;
 using Common.Components;
 using Coop.Configuration;
 using Coop.Mod.LogicStates.Server;
-using Coop.Communication.MessageBroker;
 using Coop.Mod.Messages.Network;
 using Coop.Mod.Server.Connections;
+using Common.Messages;
 
 namespace Coop.Mod.Server
 {
