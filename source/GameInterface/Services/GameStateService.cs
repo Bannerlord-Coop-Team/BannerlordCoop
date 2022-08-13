@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace GameInterface.Services
 {
-    internal class GameStateService
+    internal class GameStateService : IGameStateService
     {
     }
 }

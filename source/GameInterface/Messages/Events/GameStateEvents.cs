@@ -17,17 +17,7 @@ namespace GameInterface.Messages.Events
         Mission,
     }
 
-    public readonly struct GameStateChangedEvent
-    {
-        public EGameState PreviousState { get; }
-        public EGameState NewState { get; }
-
-        public GameStateChangedEvent(EGameState previousState, EGameState newState)
-        {
-            PreviousState = previousState;
-            NewState = newState;
-        }
-    }
+    public readonly struct MainMenuEvent { }
 
     public readonly struct CharacterCreationFinishedEvent
     {
