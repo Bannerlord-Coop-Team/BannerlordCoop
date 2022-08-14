@@ -18,17 +18,7 @@ namespace GameInterface.Serialization.DynamicModel
         /// <param name="exclude">Excluded fields by type</param>
         public void CreateDynamicSerializer<T>(IEnumerable<Type> exclude = null)
         {
-            FieldInfo[] fields = typeof(T).GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-            if (exclude != null)
-            {
-                HashSet<Type> excludesSet = exclude.ToHashSet();
-
-                fields = fields.Where(f => excludesSet.Contains(f.FieldType) == false).ToArray();
-            }
-
-            string[] fieldNames = fields.Select(f => f.Name).ToArray();
-            RuntimeTypeModel.Default.Add(typeof(T), true).Add(fieldNames);
+            CreateDynamicSerializer<T>(exclude as IEnumerable<object>);
         }
 
         /// <summary>
@@ -38,11 +28,21 @@ namespace GameInterface.Serialization.DynamicModel
         /// <param name="exclude">Excluded fields by name</param>
         public void CreateDynamicSerializer<T>(IEnumerable<string> exclude = null)
         {
+            CreateDynamicSerializer<T>(exclude as IEnumerable<object>);
+        }
+
+        private void CreateDynamicSerializer<T>(IEnumerable<object> exclude = null)
+        {
+            if (RuntimeTypeModel.Default.CanSerialize(typeof(T)))
+            {
+                return;
+            }
+
             FieldInfo[] fields = typeof(T).GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
             if (exclude != null)
             {
-                HashSet<string> excludesSet = exclude.ToHashSet();
+                HashSet<object> excludesSet = exclude.ToHashSet();
 
                 fields = fields.Where(f => excludesSet.Contains(f.Name) == false).ToArray();
             }
