@@ -1,18 +1,13 @@
-﻿using Coop.Communication.MessageBroker;
+﻿using Coop.Mod.LogicStates.Client;
+using System.Threading.Tasks;
 
-namespace Coop.Mod.LogicStates.Client
+namespace Coop.Mod.Client.States
 {
-    public abstract class ClientState : IClientState
+    public class ClientState : IClientStateBase
     {
-        protected IClientLogic Logic;
-        protected IMessageBroker MessageBroker;
-
-        public ClientState(IClientLogic logic, IMessageBroker messageBroker)
+        public Task<bool> Connect()
         {
-            Logic = logic;
-            MessageBroker = messageBroker;
+            throw new System.NotImplementedException();
         }
-
-        public abstract void Connect();
     }
 }

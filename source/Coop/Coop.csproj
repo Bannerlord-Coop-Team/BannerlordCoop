@@ -116,9 +116,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Mod\Client\States\ClientState.cs" />
+    <Compile Include="Mod\Messages\Commands\ConnectToServerCommand.cs" />
     <Compile Include="Mod\Client\States\IClientLogic.cs" />
     <Compile Include="Mod\CoopModule.cs" />
     <Compile Include="Mod\Messages\Network\ReceivePacket.cs" />
+    <Compile Include="Mod\Messages\Queries\IQuery.cs" />
+    <Compile Include="Mod\Messages\Queries\IQueryDispatcher.cs" />
+    <Compile Include="Mod\Messages\Queries\IQueryProcessor.cs" />
     <Compile Include="Mod\Server\Connections\Connection.cs" />
     <Compile Include="Mod\Server\Connections\ConnectionManager.cs" />
     <Compile Include="Mod\Server\Connections\IConnection.cs" />
@@ -151,8 +156,8 @@
     <Compile Include="Mod\Server\Config\ServerConfig.cs" />
     <Compile Include="Mod\Server\States\ServerLogic.cs" />
     <Compile Include="Mod\Client\Data\ClientData.cs" />
-    <Compile Include="Mod\Client\States\ClientState.cs" />
-    <Compile Include="Mod\Client\States\IClientState.cs" />
+    <Compile Include="Mod\Client\States\ClientStateBase.cs" />
+    <Compile Include="Mod\Client\States\IClientStateBase.cs" />
     <Compile Include="Mod\Client\States\InitialClientState.cs" />
     <Compile Include="Mod\Data\CoopPlayer.cs" />
     <Compile Include="Mod\Server\States\InitialServerState.cs" />
@@ -189,6 +194,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Debugging\Commands\" />
+    <Folder Include="Mod\Messages\Events\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Fody.6.1.1\build\Fody.targets" Condition="Exists('..\packages\Fody.6.1.1\build\Fody.targets')" />

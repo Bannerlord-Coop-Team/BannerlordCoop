@@ -1,15 +1,23 @@
 ﻿using Coop.Communication.MessageBroker;
-using System;
+using Coop.Mod.Messages.Commands;
+using Coop.Mod.Messages.Queries;
+using GameInterface.Messages.Queries;
+using System.Threading.Tasks;
 
 namespace Coop.Mod.LogicStates.Client
 {
-    internal class InitialClientState : ClientState
+    internal class InitialClientState : ClientStateBase
     {
-        public InitialClientState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker) { }
-
-        public override void Connect()
+        public InitialClientState(IClientLogic logic, IMessageBroker messageBroker, IQueryDispatcher queryDispatcher) : base(logic, messageBroker, queryDispatcher)
         {
-            throw new NotImplementedException();
+        }
+
+        public override Task<bool> Connect()
+        {
+            var query = new GetPlatformById { Id = "" };
+            var platform = QueryDispatcher.Dispatch(query);
+
+            return Task.FromResult(true);
         }
     }
 }

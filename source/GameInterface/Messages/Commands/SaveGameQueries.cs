@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GameInterface.Messages.Queries
+namespace GameInterface.Messages.Commands
 {
     public readonly struct GameSaveDataQuery { }
 
