@@ -7,6 +7,6 @@ namespace GameInterface.Serialization.DynamicModel
     {
         void AssignSurrogate<TClass, TSurrogate>();
         void Compile();
-        void CreateDynamicSerializer<T>(IEnumerable<Type> exclude = null);
+        void CreateDynamicSerializer<T>(IEnumerable<string> exclude = null);
     }
 }

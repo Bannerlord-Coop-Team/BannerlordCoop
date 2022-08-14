@@ -26,11 +26,11 @@ namespace GameInterface.Tests
         [Fact]
         public void AddTypeDynamicallyToProtobuf()
         {
-            Type[] excluded = new Type[]
+            string[] excluded = new string[]
             {
-                typeof(ItemCategory),
-                typeof(BasicCultureObject),
-                typeof(WeaponDesign),
+                "<ItemCategory>k__BackingField",
+                "<Culture>k__BackingField",
+                "<WeaponDesign>k__BackingField",
             };
 
             IDynamicModelGenerator generator = new DynamicModelGenerator();

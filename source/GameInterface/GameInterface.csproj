@@ -298,6 +298,7 @@
     <Compile Include="Serialization\ISerializer.cs" />
     <Compile Include="Serialization\Models\EquipmentElementSurrogate.cs" />
     <Compile Include="Serialization\Models\EquipmentSurrogate.cs" />
+    <Compile Include="Serialization\Models\ItemComponentDynamicSerializer.cs" />
     <Compile Include="Serialization\Models\ItemDynamicSerializer.cs" />
     <Compile Include="Serialization\Models\ItemModifierSurrogate.cs" />
     <Compile Include="Serialization\Models\MBObjectSurrogate.cs" />

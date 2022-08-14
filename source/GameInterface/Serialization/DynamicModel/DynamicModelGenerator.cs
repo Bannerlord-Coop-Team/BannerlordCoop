@@ -10,28 +10,12 @@ namespace GameInterface.Serialization.DynamicModel
 {
     public class DynamicModelGenerator : IDynamicModelGenerator
     {
-
-        /// <summary>
-        /// Creates a dynamic serialization model for protobuf of the provided type
-        /// </summary>
-        /// <typeparam name="T">Type to create model</typeparam>
-        /// <param name="exclude">Excluded fields by type</param>
-        public void CreateDynamicSerializer<T>(IEnumerable<Type> exclude = null)
-        {
-            CreateDynamicSerializer<T>(exclude as IEnumerable<object>);
-        }
-
         /// <summary>
         /// Creates a dynamic serialization model for protobuf of the provided type
         /// </summary>
         /// <typeparam name="T">Type to create model</typeparam>
         /// <param name="exclude">Excluded fields by name</param>
         public void CreateDynamicSerializer<T>(IEnumerable<string> exclude = null)
-        {
-            CreateDynamicSerializer<T>(exclude as IEnumerable<object>);
-        }
-
-        private void CreateDynamicSerializer<T>(IEnumerable<object> exclude = null)
         {
             if (RuntimeTypeModel.Default.CanSerialize(typeof(T)))
             {
@@ -42,7 +26,7 @@ namespace GameInterface.Serialization.DynamicModel
 
             if (exclude != null)
             {
-                HashSet<object> excludesSet = exclude.ToHashSet();
+                HashSet<string> excludesSet = exclude.ToHashSet();
 
                 fields = fields.Where(f => excludesSet.Contains(f.Name) == false).ToArray();
             }
