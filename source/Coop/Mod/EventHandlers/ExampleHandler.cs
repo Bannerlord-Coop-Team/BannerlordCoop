@@ -1,7 +1,7 @@
 ﻿using ProtoBuf;
-using Coop.Communication.MessageBroker;
 using GameInterface.Helpers;
 using GameInterface;
+using Common.Messages;
 
 namespace Coop.Mod.EventHandlers
 {

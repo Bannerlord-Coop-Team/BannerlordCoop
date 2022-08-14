@@ -129,10 +129,6 @@
     <Compile Include="Mod\Messages\Network\SendPacketMessages.cs" />
     <Compile Include="Mod\Server\ServerModule.cs" />
     <Compile Include="Mod\Client\ClientModule.cs" />
-    <Compile Include="Communication\NetworkMessageBroker.cs" />
-    <Compile Include="Communication\MessageBroker\IMessageBroker.cs" />
-    <Compile Include="Communication\MessageBroker\MessagePayload.cs" />
-    <Compile Include="Communication\MessageBroker\MessageScope.cs" />
     <Compile Include="Communication\PacketHandlers\ExamplePacketHandler.cs" />
     <Compile Include="Communication\PacketHandlers\IPacket.cs" />
     <Compile Include="Communication\PacketHandlers\IPacketHandler.cs" />
@@ -188,6 +184,7 @@
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Communication\MessageBroker\" />
     <Folder Include="Debugging\Commands\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

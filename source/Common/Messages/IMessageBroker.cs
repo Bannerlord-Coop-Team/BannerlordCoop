@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Coop.Communication.MessageBroker
+namespace Common.Messages
 {
     public interface IMessageBroker : IDisposable
     {

@@ -1,5 +1,4 @@
-﻿using Coop.Communication.MessageBroker;
-
+﻿using Common.Messages;
 using GameInterface;
 
 namespace Coop.Mod.EventHandlers
