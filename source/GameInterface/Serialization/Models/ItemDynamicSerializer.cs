@@ -13,9 +13,6 @@ namespace GameInterface.Serialization.Models
         public ItemDynamicSerializer(IDynamicModelGenerator modelGenerator)
         {
             modelGenerator.CreateDynamicSerializer<ItemObject>();
-            modelGenerator.CreateDynamicSerializer<ItemComponent>();
-
-            modelGenerator.Compile();
         }
     }
 }
