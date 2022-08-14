@@ -1,4 +1,4 @@
-﻿using Coop.Communication.MessageBroker;
+﻿using Common.Messages;
 using System;
 
 namespace Coop.Mod.LogicStates.Client

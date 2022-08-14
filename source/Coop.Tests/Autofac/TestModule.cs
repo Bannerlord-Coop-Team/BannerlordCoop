@@ -1,5 +1,5 @@
 ﻿using Autofac;
-using Coop.Communication.MessageBroker;
+using Common.Messages;
 using Coop.Tests.Stubs;
 
 namespace Coop.Tests.Autofac
@@ -8,7 +8,7 @@ namespace Coop.Tests.Autofac
     {
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterType<MessageBrokerStub>().As<IMessageBroker>().SingleInstance();
+            builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
 
             base.Load(builder);
         }

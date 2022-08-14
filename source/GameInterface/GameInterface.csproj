@@ -277,6 +277,7 @@
     <Compile Include="Patch\CampaignPatches\TimeControlModePatch.cs" />
     <Compile Include="Patch\Debugging.cs" />
     <Compile Include="Patch\Exceptions.cs" />
+    <Compile Include="Patch\GameStates\MainMenuPatch.cs" />
     <Compile Include="Patch\Hero\HeroPatches.cs" />
     <Compile Include="Patch\MobilePartyPatches\ComputeIsWaitingPatch.cs" />
     <Compile Include="Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />
@@ -370,6 +371,8 @@
     <Compile Include="Serializers\PropertyOwnerSerializers\CharacterSkillsSerializer.cs" />
     <Compile Include="Serializers\PropertyOwnerSerializers\CharacterTraitsSerializer.cs" />
     <Compile Include="Serializers\TextObjectSerializer.cs" />
+    <Compile Include="Services\GameStateService.cs" />
+    <Compile Include="Services\IGameStateService.cs" />
     <Compile Include="Utils\ReflectionUtils.cs" />
   </ItemGroup>
   <ItemGroup>
