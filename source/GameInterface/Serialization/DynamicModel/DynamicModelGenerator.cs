@@ -6,15 +6,15 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GameInterface.Serialization
+namespace GameInterface.Serialization.DynamicModel
 {
-    public class DynamicModelGenerator
+    public class DynamicModelGenerator : IDynamicModelGenerator
     {
-        public static void CreateDynamicSerializer<T>(IEnumerable<Type> exclude = null)
+        public void CreateDynamicSerializer<T>(IEnumerable<Type> exclude = null)
         {
             FieldInfo[] fields = typeof(T).GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
-            if(exclude != null)
+            if (exclude != null)
             {
                 HashSet<Type> excludesSet = exclude.ToHashSet();
 
@@ -25,12 +25,12 @@ namespace GameInterface.Serialization
             RuntimeTypeModel.Default.Add(typeof(T), true).Add(fieldNames);
         }
 
-        public static void AssignSurrogate<T1, T2>()
+        public void AssignSurrogate<TClass, TSurrogate>()
         {
-            RuntimeTypeModel.Default.Add(typeof(T1), false).SetSurrogate(typeof(T2));
+            RuntimeTypeModel.Default.Add(typeof(TClass), false).SetSurrogate(typeof(TSurrogate));
         }
 
-        public static void Compile()
+        public void Compile()
         {
             RuntimeTypeModel.Default.CompileInPlace();
         }

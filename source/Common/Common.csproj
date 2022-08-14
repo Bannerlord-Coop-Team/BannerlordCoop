@@ -82,7 +82,6 @@
     <Compile Include="CompatibilityInfo.cs" />
     <Compile Include="Components\ComponentContainerBase.cs" />
     <Compile Include="CoopObjectManager.cs" />
-    <Compile Include="CoopStateMachine.cs" />
     <Compile Include="DropoutStack.cs" />
     <Compile Include="Extentions.cs" />
     <Compile Include="FrameLimiter.cs" />
