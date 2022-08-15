@@ -10,7 +10,7 @@ using TaleWorlds.Localization;
 
 namespace GameInterface.Serialization.Models
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public class TextObjectSurrogate
     {
         [ProtoMember(1)]
@@ -32,11 +32,13 @@ namespace GameInterface.Serialization.Models
 
         public static implicit operator TextObjectSurrogate(TextObject obj)
         {
+            if(obj == null) return null;
             return new TextObjectSurrogate(obj);
         }
 
         public static implicit operator TextObject(TextObjectSurrogate surrogate)
         {
+            if(surrogate == null) return null;
             return surrogate.Deserialize();
         }
     }

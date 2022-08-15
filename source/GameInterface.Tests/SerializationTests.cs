@@ -1,12 +1,14 @@
 using Coop.Serialization;
 using GameInterface.Serialization.DynamicModel;
 using GameInterface.Serialization.Models;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
-using TaleWorlds.ObjectSystem;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -81,6 +83,67 @@ namespace GameInterface.Tests
             var deserializedSettlement = serializer.Deserialize<Settlement>(data);
             
             Assert.Equal(settlement, deserializedSettlement);
+        }
+
+        [Fact]
+        public void SerializeHero()
+        {
+            /*
+            var harmony = new Harmony("GameInterface.Tests");
+            harmony.PatchAll();
+            
+            var hero = new Hero();
+
+            var heroExcludedFields = new string[]
+            {
+                "_father",
+                "_mother",
+                "<Issue>k__BackingField",
+                "_cachedLastSeenInformation",
+                "_lastSeenInformationKnownToPlayer",
+                "SpecialItems",
+                "<BannerItem>k__BackingField",
+                "<PartyBelongedToAsPrisoner>k__BackingField",
+                "_heroDeveloper",
+                "_governorOf"
+            };
+
+            var clanExcludedFields = new string[]
+            {
+                "_defaultPartyTemplate",
+                "_banner",
+                "OnPartiesAndLordsCacheUpdated"
+            };
+            
+            IDynamicModelGenerator generator = new DynamicModelGenerator();
+            generator.CreateDynamicSerializer<Hero>(heroExcludedFields);
+            generator.CreateDynamicSerializer<CharacterObject>();
+            generator.CreateDynamicSerializer<Equipment>();
+            generator.CreateDynamicSerializer<CharacterTraits>();
+            generator.CreateDynamicSerializer<CharacterPerks>();
+            generator.CreateDynamicSerializer<CharacterSkills>();
+            generator.CreateDynamicSerializer<CharacterAttributes>();
+            generator.CreateDynamicSerializer<Clan>(clanExcludedFields);
+            generator.CreateDynamicSerializer<MBCharacterSkills>();
+            generator.CreateDynamicSerializer<TraitObject>();
+            generator.CreateDynamicSerializer<ItemCategory>();
+            generator.CreateDynamicSerializer<Vec2>();
+            
+            generator.AssignSurrogate<TextObject, TextObjectSurrogate>();
+            generator.AssignSurrogate<CampaignTime, CampaignTimeSurrogate>();
+            generator.AssignSurrogate<CultureObject, CultureSurrogate>();
+            generator.AssignSurrogate<Settlement, SettlementSurrogate>();
+            generator.AssignSurrogate<MobileParty, MobilePartySurrogate>();
+            generator.AssignSurrogate<Kingdom, KingdomSurrogate>();
+
+            generator.Compile();
+
+            ProtobufSerializer serializer = new ProtobufSerializer();
+            byte[] data = serializer.Serialize(hero);
+            var deserializedHero = serializer.Deserialize<Hero>(data);
+            
+            Assert.Equal(hero, deserializedHero);
+            harmony.UnpatchAll();*/
         }
     }
 }

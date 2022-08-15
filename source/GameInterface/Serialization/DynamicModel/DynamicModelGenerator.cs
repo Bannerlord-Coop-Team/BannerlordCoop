@@ -5,6 +5,11 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.Core;
 
 namespace GameInterface.Serialization.DynamicModel
 {
@@ -27,8 +32,13 @@ namespace GameInterface.Serialization.DynamicModel
             if (exclude != null)
             {
                 HashSet<string> excludesSet = exclude.ToHashSet();
-
                 fields = fields.Where(f => excludesSet.Contains(f.Name) == false).ToArray();
+            }
+
+            var objectsFields = fields.Where(f => f.FieldType == typeof(Workshop));
+            if (objectsFields.Any())
+            {
+                throw new Exception("ici");
             }
 
             string[] fieldNames = fields.Select(f => f.Name).ToArray();

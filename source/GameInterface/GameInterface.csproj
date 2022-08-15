@@ -299,14 +299,17 @@
     <Compile Include="Serialization\Models\CampaignTimeSurrogate.cs" />
     <Compile Include="Serialization\Models\CharacterPerksSurrogate.cs" />
     <Compile Include="Serialization\Models\CharacterSkillsSurrogate.cs" />
+    <Compile Include="Serialization\Models\CultureSurrogate.cs" />
     <Compile Include="Serialization\Models\EquipmentElementSurrogate.cs" />
     <Compile Include="Serialization\Models\EquipmentSurrogate.cs" />
     <Compile Include="Serialization\Models\HeroDynamicSerializer.cs" />
     <Compile Include="Serialization\Models\ItemComponentDynamicSerializer.cs" />
     <Compile Include="Serialization\Models\ItemDynamicSerializer.cs" />
     <Compile Include="Serialization\Models\ItemModifierSurrogate.cs" />
+    <Compile Include="Serialization\Models\KingdomSurrogate.cs" />
     <Compile Include="Serialization\Models\MBObjectSurrogate.cs" />
     <Compile Include="Serialization\DynamicModel\DynamicModelGenerator.cs" />
+    <Compile Include="Serialization\Models\MobilePartySurrogate.cs" />
     <Compile Include="Serialization\Models\SettlementSurrogate.cs" />
     <Compile Include="Serialization\Models\TextObjectSurrogate.cs" />
     <Compile Include="Serialization\ProtobufSerializer.cs" />
