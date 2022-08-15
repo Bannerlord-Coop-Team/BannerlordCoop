@@ -3,7 +3,7 @@ using System.Linq;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Serialization.Models
+namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract]
     public class MobilePartySurrogate

@@ -1,7 +1,7 @@
-﻿namespace GameInterface.Serialization.Models
+﻿namespace GameInterface.Serialization.Surrogates
 {
     public class CharacterSkillsSurrogate
     {
-        
+
     }
 }

@@ -2,7 +2,7 @@
 using ProtoBuf;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Serialization.Models
+namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract]
     public class SettlementSurrogate

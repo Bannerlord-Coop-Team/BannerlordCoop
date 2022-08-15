@@ -1,13 +1,8 @@
 using Coop.Serialization;
-using GameInterface.Serialization.DynamicModel;
-using GameInterface.Serialization.Models;
-using HarmonyLib;
+using GameInterface.Serialization.Surrogates;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using GameInterface.Serialization.Dynamic;
-using GameInterface.Serialization.Surrogates;
 using ProtoBuf.Meta;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -50,27 +45,32 @@ namespace GameInterface.Tests.Serialization
             Assert.True(testModel.CanSerialize(typeof(ItemObject)));
 
             ItemObject itemObject = new ItemObject();
-            typeof(ItemObject).GetProperty("Name")?.SetValue(itemObject, new TextObject("Serialized Name"));
-            typeof(ItemObject).GetProperty("Weight")?.SetValue(itemObject, 64);
-            typeof(ItemObject).GetProperty("Difficulty")?.SetValue(itemObject, 12);
-            typeof(ItemObject).GetProperty("IsFood")?.SetValue(itemObject, false);
-            
-            ProtobufSerializer ser = new ProtobufSerializer();
+            typeof(ItemObject).GetProperty("Name").SetValue(itemObject, new TextObject("Serialized Name"));
+            typeof(ItemObject).GetProperty("Weight").SetValue(itemObject, 64);
+            typeof(ItemObject).GetProperty("Difficulty").SetValue(itemObject, 12);
+            typeof(ItemObject).GetProperty("IsFood").SetValue(itemObject, false);
+
+            TestProtobufSerializer ser = new TestProtobufSerializer(testModel);
             byte[] data = ser.Serialize(itemObject);
             ItemObject deserializedItemObject = ser.Deserialize<ItemObject>(data);
 
-            Assert.Equal(itemObject, deserializedItemObject);
+            Assert.Equal(itemObject.Name.ToString(), deserializedItemObject.Name.ToString());
+            Assert.Equal(itemObject.Weight, deserializedItemObject.Weight);
+            Assert.Equal(itemObject.Difficulty, deserializedItemObject.Difficulty);
+            Assert.Equal(itemObject.IsFood, deserializedItemObject.IsFood);
         }
 
         [Fact]
         public void SerializeCampaignTime()
         {
             var campaignTime = CampaignTime.Days(5988410);
-            
-            IDynamicModelGenerator generator = new DynamicModelGenerator();
+
+            RuntimeTypeModel testModel = RuntimeTypeModel.Create();
+
+            IDynamicModelGenerator generator = new DynamicModelGenerator(testModel);
             generator.AssignSurrogate<CampaignTime, CampaignTimeSurrogate>();
-            
-            ProtobufSerializer serializer = new ProtobufSerializer();
+
+            TestProtobufSerializer serializer = new TestProtobufSerializer(testModel);
             byte[] data = serializer.Serialize(campaignTime);
             CampaignTime deserializedCampaignTime = serializer.Deserialize<CampaignTime>(data);
             
@@ -81,11 +81,13 @@ namespace GameInterface.Tests.Serialization
         public void SerializeSettlement()
         { 
             var settlement = new Settlement();
-            
-            IDynamicModelGenerator generator = new DynamicModelGenerator();
+
+            RuntimeTypeModel testModel = RuntimeTypeModel.Create();
+
+            IDynamicModelGenerator generator = new DynamicModelGenerator(testModel);
             generator.AssignSurrogate<Settlement, SettlementSurrogate>();
             
-            ProtobufSerializer serializer = new ProtobufSerializer();
+            TestProtobufSerializer serializer = new TestProtobufSerializer(testModel);
             byte[] data = serializer.Serialize(settlement);
             var deserializedSettlement = serializer.Deserialize<Settlement>(data);
             
@@ -122,7 +124,9 @@ namespace GameInterface.Tests.Serialization
                 "OnPartiesAndLordsCacheUpdated"
             };
             
-            IDynamicModelGenerator generator = new DynamicModelGenerator();
+            RuntimeTypeModel testModel = RuntimeTypeModel.Create();
+
+            IDynamicModelGenerator generator = new DynamicModelGenerator(testModel);
             generator.CreateDynamicSerializer<Hero>(heroExcludedFields);
             generator.CreateDynamicSerializer<CharacterObject>();
             generator.CreateDynamicSerializer<Equipment>();
@@ -145,7 +149,7 @@ namespace GameInterface.Tests.Serialization
 
             generator.Compile();
 
-            ProtobufSerializer serializer = new ProtobufSerializer();
+            TestProtobufSerializer serializer = new TestProtobufSerializer(testModel);
             byte[] data = serializer.Serialize(hero);
             var deserializedHero = serializer.Deserialize<Hero>(data);
             

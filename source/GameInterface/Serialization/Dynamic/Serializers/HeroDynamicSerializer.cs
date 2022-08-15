@@ -1,7 +1,6 @@
-﻿using GameInterface.Serialization.DynamicModel;
-using TaleWorlds.CampaignSystem;
+﻿using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Serialization.Models
+namespace GameInterface.Serialization.Dynamic.Serializers
 {
     public class HeroDynamicSerializer : IDynamicSerializer
     {
@@ -12,7 +11,7 @@ namespace GameInterface.Serialization.Models
                 "_mother",
                 "_father"
             };
-            
+
             modelGenerator.CreateDynamicSerializer<Hero>(excluded);
         }
     }

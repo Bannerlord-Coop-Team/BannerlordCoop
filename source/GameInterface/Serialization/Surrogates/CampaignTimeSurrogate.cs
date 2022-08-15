@@ -4,14 +4,14 @@ using Coop.Mod.Extentions;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Serialization.Models
+namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract]
     public class CampaignTimeSurrogate
     {
-        [ProtoMember(1)] 
+        [ProtoMember(1)]
         readonly long _numTicks;
-        
+
         private CampaignTimeSurrogate(long numTicks)
         {
             _numTicks = numTicks;
@@ -37,10 +37,10 @@ namespace GameInterface.Serialization.Models
             var campaignTimeConstructor = typeof(CampaignTime).GetTypeInfo()
                 .GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance)
                 .First();
-            
+
             var campaignTime = campaignTimeConstructor.Invoke(new object[] { campaignTimeSurrogate._numTicks });
-                
-            return (CampaignTime) campaignTime;
+
+            return (CampaignTime)campaignTime;
         }
     }
 }

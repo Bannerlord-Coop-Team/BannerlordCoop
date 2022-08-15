@@ -1,6 +1,5 @@
-﻿using GameInterface.Serialization.Models;
-﻿using GameInterface.Serialization.Dynamic.Serializers;
-using System;
+﻿﻿using GameInterface.Serialization.Dynamic.Serializers;
+using System.Collections.Generic;
 
 namespace GameInterface.Serialization.Dynamic
 {

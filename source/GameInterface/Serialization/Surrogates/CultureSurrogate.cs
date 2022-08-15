@@ -3,15 +3,15 @@ using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Serialization.Models
+namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract]
     public class CultureSurrogate
     {
-        [ProtoMember(1)] 
-        public readonly String NetworkIdentifier;
+        [ProtoMember(1)]
+        public readonly string NetworkIdentifier;
 
-        public CultureSurrogate(String networkIdentifier)
+        public CultureSurrogate(string networkIdentifier)
         {
             NetworkIdentifier = networkIdentifier;
         }
@@ -25,7 +25,7 @@ namespace GameInterface.Serialization.Models
         {
             return new CultureSurrogate(culture.StringId);
         }
-        
+
         /// <summary>
         ///     Retrieve the CultureObject sent through the network on the client.
         /// </summary>
