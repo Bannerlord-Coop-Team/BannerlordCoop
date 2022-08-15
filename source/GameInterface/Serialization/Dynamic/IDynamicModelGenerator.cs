@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace GameInterface.Serialization.DynamicModel
+namespace GameInterface.Serialization.Dynamic
 {
     public interface IDynamicModelGenerator
     {

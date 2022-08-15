@@ -6,13 +6,16 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using GameInterface.Serialization.Dynamic;
+using GameInterface.Serialization.Surrogates;
+using ProtoBuf.Meta;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace GameInterface.Tests
+namespace GameInterface.Tests.Serialization
 {
     public class DynamicModelGeneratorTests
     {
@@ -33,7 +36,9 @@ namespace GameInterface.Tests
                 "<WeaponDesign>k__BackingField",
             };
 
-            IDynamicModelGenerator generator = new DynamicModelGenerator();
+            RuntimeTypeModel testModel = RuntimeTypeModel.Create();
+
+            IDynamicModelGenerator generator = new DynamicModelGenerator(testModel);
 
             generator.CreateDynamicSerializer<ItemObject>(excluded);
             generator.CreateDynamicSerializer<ItemComponent>();
@@ -41,6 +46,8 @@ namespace GameInterface.Tests
 
             generator.AssignSurrogate<TextObject, TextObjectSurrogate>();
             generator.Compile();
+
+            Assert.True(testModel.CanSerialize(typeof(ItemObject)));
 
             ItemObject itemObject = new ItemObject();
             typeof(ItemObject).GetProperty("Name")?.SetValue(itemObject, new TextObject("Serialized Name"));

@@ -122,7 +122,10 @@
     <Compile Include="Patches\HeroPatches.cs" />
     <Compile Include="Patches\RandomPatches.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SerializationTests.cs" />
+    <Compile Include="Serialization\Dynamic\ItemObjectSerializationTests.cs" />
+    <Compile Include="Serialization\SerializationTests.cs" />
+    <Compile Include="Serialization\Surrogates\TextObjectSurrogateTests.cs" />
+    <Compile Include="Serialization\TestProtobufSerializer.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
@@ -138,6 +141,7 @@
       <Name>GameInterface</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

@@ -1,16 +1,17 @@
 ﻿using GameInterface.Serialization.Models;
-using System.Collections.Generic;
+﻿using GameInterface.Serialization.Dynamic.Serializers;
+using System;
 
-namespace GameInterface.Serialization.DynamicModel
+namespace GameInterface.Serialization.Dynamic
 {
     internal class DynamicModelService : IDynamicModelService
     {
         public readonly IEnumerable<IDynamicSerializer> DynamicSerializers;
         public DynamicModelService(IDynamicModelGenerator modelGenerator)
         {
-            DynamicSerializers = new List<IDynamicSerializer>
+            DynamicSerializers = new IDynamicSerializer[]
             {
-                new ItemDynamicSerializer(modelGenerator),
+                new ItemObjectDynamicSerializer(modelGenerator),
                 new ItemComponentDynamicSerializer(modelGenerator),
                 new HeroDynamicSerializer(modelGenerator)
             };

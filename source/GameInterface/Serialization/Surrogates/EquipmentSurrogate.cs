@@ -7,9 +7,9 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.Core;
 
-namespace GameInterface.Serialization.Models
+namespace GameInterface.Serialization.Surrogates
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public class EquipmentSurrogate
     {
         [ProtoMember(1)]
@@ -53,11 +53,13 @@ namespace GameInterface.Serialization.Models
 
         public static implicit operator EquipmentSurrogate(Equipment obj)
         {
+            if(obj == null) return null;
             return new EquipmentSurrogate(obj);
         }
 
         public static implicit operator Equipment(EquipmentSurrogate surrogate)
         {
+            if(surrogate == null) return null;
             return surrogate.Deserialize();
         }
     }

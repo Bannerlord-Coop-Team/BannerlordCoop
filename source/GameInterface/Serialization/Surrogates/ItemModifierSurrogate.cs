@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
-namespace GameInterface.Serialization.Models
+namespace GameInterface.Serialization.Surrogates
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public class ItemModifierSurrogate
     {
         #region Fields
@@ -91,11 +91,13 @@ namespace GameInterface.Serialization.Models
 
         public static implicit operator ItemModifierSurrogate(ItemModifier obj)
         {
+            if(obj == null) return null;
             return new ItemModifierSurrogate(obj);
         }
 
         public static implicit operator ItemModifier(ItemModifierSurrogate surrogate)
         {
+            if(surrogate == null) return null;
             return surrogate.Deserialize();
         }
     }

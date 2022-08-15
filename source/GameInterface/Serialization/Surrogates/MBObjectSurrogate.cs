@@ -11,11 +11,13 @@ namespace Coop.Serialization.Models
     {
         public static implicit operator MBObjectSurrogate(MBObjectBase mbObjectBase)
         {
+            if(mbObjectBase == null) return null;
             throw new NotImplementedException();
         }
 
         public static implicit operator MBObjectBase(MBObjectSurrogate mbObjectSurrogate)
         {
+            if( mbObjectSurrogate == null) return null;
             throw new NotImplementedException();
         }
     }

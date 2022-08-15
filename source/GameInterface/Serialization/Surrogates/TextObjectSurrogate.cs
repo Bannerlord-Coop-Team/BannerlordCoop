@@ -1,14 +1,11 @@
 ﻿using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using TaleWorlds.Localization;
 
-namespace GameInterface.Serialization.Models
+namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract(SkipConstructor = true)]
     public class TextObjectSurrogate

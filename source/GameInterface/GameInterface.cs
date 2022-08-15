@@ -1,7 +1,7 @@
 ﻿using Autofac;
 using Common.Messages;
 using GameInterface.Helpers;
-using GameInterface.Serialization.DynamicModel;
+using GameInterface.Serialization.Dynamic;
 
 namespace GameInterface
 {

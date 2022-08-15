@@ -1,5 +1,4 @@
 ﻿using ProtoBuf.Meta;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -11,10 +10,22 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Core;
 
-namespace GameInterface.Serialization.DynamicModel
+namespace GameInterface.Serialization.Dynamic
 {
     public class DynamicModelGenerator : IDynamicModelGenerator
     {
+        private readonly RuntimeTypeModel _typeModel;
+
+        internal DynamicModelGenerator()
+        {
+            _typeModel = RuntimeTypeModel.Default;
+        }
+
+        public DynamicModelGenerator(RuntimeTypeModel typeModel)
+        {
+            _typeModel = typeModel;
+        }
+
         /// <summary>
         /// Creates a dynamic serialization model for protobuf of the provided type
         /// </summary>
@@ -42,17 +53,17 @@ namespace GameInterface.Serialization.DynamicModel
             }
 
             string[] fieldNames = fields.Select(f => f.Name).ToArray();
-            RuntimeTypeModel.Default.Add(typeof(T), true).Add(fieldNames);
+            _typeModel.Add(typeof(T), true).Add(fieldNames);
         }
 
         public void AssignSurrogate<TClass, TSurrogate>()
         {
-            RuntimeTypeModel.Default.Add(typeof(TClass), false).SetSurrogate(typeof(TSurrogate));
+            _typeModel.Add(typeof(TClass), false).SetSurrogate(typeof(TSurrogate));
         }
 
         public void Compile()
         {
-            RuntimeTypeModel.Default.CompileInPlace();
+            _typeModel.CompileInPlace();
         }
     }
 }
