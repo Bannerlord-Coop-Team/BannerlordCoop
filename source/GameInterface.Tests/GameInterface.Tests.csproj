@@ -96,6 +96,12 @@
     <Reference Include="TaleWorlds.Localization">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.ObjectSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
+    </Reference>
     <Reference Include="xunit.abstractions, Version=2.0.0.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
       <HintPath>..\packages\xunit.abstractions.2.0.3\lib\net35\xunit.abstractions.dll</HintPath>
     </Reference>
@@ -112,6 +118,7 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SerializationTests.cs" />
+    <Compile Include="Stubs\GameManagerStub.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

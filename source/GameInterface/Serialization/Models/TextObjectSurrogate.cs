@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using JetBrains.Annotations;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Serialization.Models
@@ -19,7 +20,7 @@ namespace GameInterface.Serialization.Models
 
         private static readonly FieldInfo info_Value = typeof(TextObject).GetField("Value", BindingFlags.NonPublic | BindingFlags.Instance);
 
-        private TextObjectSurrogate(TextObject obj)
+        private TextObjectSurrogate([NotNull] TextObject obj)
         {
             Value = (string)info_Value.GetValue(obj);
         }

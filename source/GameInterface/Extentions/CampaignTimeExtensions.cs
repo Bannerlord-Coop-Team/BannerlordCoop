@@ -18,7 +18,7 @@ namespace Coop.Mod.Extentions
 
         public static void SetNumTicks(this CampaignTime campaignTime, long ticks)
         {
-            _ticksField.SetValue(campaignTime, ticks);
+            _ticksField.SetValueDirect(__makeref(campaignTime), ticks);
         }
     }
 }
