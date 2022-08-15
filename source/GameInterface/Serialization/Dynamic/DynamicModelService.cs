@@ -1,4 +1,4 @@
-﻿﻿using GameInterface.Serialization.Dynamic.Serializers;
+﻿using GameInterface.Serialization.Dynamic.Serializers;
 using System.Collections.Generic;
 
 namespace GameInterface.Serialization.Dynamic

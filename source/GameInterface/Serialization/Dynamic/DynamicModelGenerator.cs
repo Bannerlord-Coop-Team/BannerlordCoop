@@ -28,33 +28,27 @@ namespace GameInterface.Serialization.Dynamic
         }
 
         /// <summary>
-        /// Creates a dynamic serialization model for protobuf of the provided type
+        ///     Creates a dynamic serialization model for protobuf of the provided type
         /// </summary>
         /// <typeparam name="T">Type to create model</typeparam>
         /// <param name="exclude">Excluded fields by name</param>
-        public void CreateDynamicSerializer<T>(IEnumerable<string> exclude = null)
+        public void CreateDynamicSerializer<T>(string[] exclude = null)
         {
             if (RuntimeTypeModel.Default.CanSerialize(typeof(T)))
-            {
                 return;
-            }
 
             FieldInfo[] fields = typeof(T).GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
+            var selectedFieldNames = fields.Select(f => f.Name).ToArray();
+            
             if (exclude != null)
             {
-                HashSet<string> excludesSet = exclude.ToHashSet();
-                fields = fields.Where(f => excludesSet.Contains(f.Name) == false).ToArray();
+                selectedFieldNames = selectedFieldNames.Except(exclude).ToArray();
+                
+                if (fields.Length - exclude.Length != selectedFieldNames.Length)
+                    throw new Exception($"Some fields are not being used: {String.Join(",", exclude.Except(selectedFieldNames))}");
             }
-
-            var objectsFields = fields.Where(f => f.FieldType == typeof(Workshop));
-            if (objectsFields.Any())
-            {
-                throw new Exception("ici");
-            }
-
-            string[] fieldNames = fields.Select(f => f.Name).ToArray();
-            _typeModel.Add(typeof(T), true).Add(fieldNames);
+            
+            _typeModel.Add(typeof(T), true).Add(selectedFieldNames);
         }
 
         public void AssignSurrogate<TClass, TSurrogate>()
