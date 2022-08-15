@@ -1,6 +1,7 @@
 ﻿using System;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Surrogates
 {
@@ -8,11 +9,11 @@ namespace GameInterface.Serialization.Surrogates
     public class SettlementSurrogate
     {
         [ProtoMember(1)] 
-        public readonly String NetworkIdentifier;
+        public readonly string StringId;
 
-        public SettlementSurrogate(String networkIdentifier)
+        public SettlementSurrogate(string stringId)
         {
-            NetworkIdentifier = networkIdentifier;
+            StringId = stringId;
         }
         
         /// <summary>
@@ -32,7 +33,7 @@ namespace GameInterface.Serialization.Surrogates
         /// <returns></returns>
         public static implicit operator Settlement(SettlementSurrogate settlementSurrogate)
         {
-            return Settlement.FindFirst(s => s.StringId == settlementSurrogate.NetworkIdentifier);
+            return MBObjectManager.Instance.GetObject<Settlement>(settlementSurrogate.StringId);
         }
     }
 }

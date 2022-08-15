@@ -9,6 +9,10 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit;
 using Xunit.Abstractions;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem.Party;
+using System;
+using TaleWorlds.CampaignSystem.Settlements.Locations;
 
 namespace GameInterface.Tests.Serialization
 {
@@ -75,23 +79,6 @@ namespace GameInterface.Tests.Serialization
             CampaignTime deserializedCampaignTime = serializer.Deserialize<CampaignTime>(data);
             
             Assert.Equal(campaignTime, deserializedCampaignTime);
-        }
-        
-        [Fact]
-        public void SerializeSettlement()
-        { 
-            var settlement = new Settlement();
-
-            RuntimeTypeModel testModel = RuntimeTypeModel.Create();
-
-            IDynamicModelGenerator generator = new DynamicModelGenerator(testModel);
-            generator.AssignSurrogate<Settlement, SettlementSurrogate>();
-            
-            TestProtobufSerializer serializer = new TestProtobufSerializer(testModel);
-            byte[] data = serializer.Serialize(settlement);
-            var deserializedSettlement = serializer.Deserialize<Settlement>(data);
-            
-            Assert.Equal(settlement, deserializedSettlement);
         }
 
         [Fact]
