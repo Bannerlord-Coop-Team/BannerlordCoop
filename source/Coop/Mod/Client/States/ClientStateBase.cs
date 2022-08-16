@@ -1,20 +1,17 @@
-﻿using Coop.Communication.MessageBroker;
+using Common.Messages;
 using GameInterface;
-using System.Threading.Tasks;
 
 namespace Coop.Mod.LogicStates.Client
 {
-    public abstract class ClientStateBase : IClientStateBase
+    public abstract class ClientStateBase : IClientState
     {
         protected readonly IClientLogic Logic;
         protected readonly IMessageBroker MessageBroker;
-        protected readonly IGameInterface GameInterface;
 
-        public ClientStateBase(IClientLogic logic, IMessageBroker messageBroker, IGameInterface gameInterface)
+        public ClientStateBase(IClientLogic logic, IMessageBroker messageBroker)
         {
             Logic = logic;
             MessageBroker = messageBroker;
-            GameInterface = gameInterface;
         }
     }
 }

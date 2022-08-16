@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 
 namespace Coop.Mod.Client
 {
-    public class ClientLogic : IClientLogic, IClientStateBase
+    public class ClientLogic : IClientLogic, IClientState
     {
         public ILogger Logger { get; }
         public IMessageBroker MessageBroker { get; }
-        public IState State { get => _state; set => _state = (IClientStateBase)value; }
-        private IClientStateBase _state;
+        public IState State { get => _state; set => _state = (IClientState)value; }
+        private IClientState _state;
         
         public ClientLogic(ILogger logger, IMessageBroker messageBroker)
         {
@@ -21,9 +21,9 @@ namespace Coop.Mod.Client
             State = new InitialClientState(this, messageBroker);
         }
 
-        public async Task<bool> Connect()
+        public void GoToMainMenu()
         {
-            return await _state.Connect();
+            throw new System.NotImplementedException();
         }
     }
 }

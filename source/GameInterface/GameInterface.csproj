@@ -270,8 +270,8 @@
     <Compile Include="IGameInterface.cs" />
     <Compile Include="Helpers\ISaveLoadHelper.cs" />
     <Compile Include="Messages\Commands\GameStateCommands.cs" />
+    <Compile Include="Messages\Commands\SaveGameQueries.cs" />
     <Compile Include="Messages\Events\GameStateEvents.cs" />
-    <Compile Include="Messages\Queries\SaveGameQueries.cs" />
     <Compile Include="Patch\CampaignPatches\CompanionsCampaignBehaviorPatches.cs" />
     <Compile Include="Patch\CampaignPatches\SetTimeSpeedPatch.cs" />
     <Compile Include="Patch\CampaignPatches\TimeControlModePatch.cs" />
@@ -385,6 +385,8 @@
       <Name>Common</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Messages\Queries\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

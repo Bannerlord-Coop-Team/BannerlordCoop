@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Coop.Mod.LogicStates.Client
 {
-    public interface IClientStateBase : IState
+    public interface IClientState : IState
     {
     }
 }

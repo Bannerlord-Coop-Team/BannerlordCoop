@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Coop.Mod.Client.States
 {
-    public class ClientState : IClientStateBase
+    public class ClientState : IClientState
     {
         public Task<bool> Connect()
         {
