@@ -1,5 +1,6 @@
+using Autofac;
 using Coop.Serialization;
-using GameInterface.Serialization;
+using GameInterface.Serialization.DynamicModel;
 using GameInterface.Serialization.Models;
 using ProtoBuf.Meta;
 using System;
@@ -13,11 +14,11 @@ using Xunit.Abstractions;
 
 namespace GameInterface.Tests
 {
-    public class SerializationTests
+    public class DynamicModelGeneratorTests
     {
         private readonly ITestOutputHelper output;
 
-        public SerializationTests(ITestOutputHelper output)
+        public DynamicModelGeneratorTests(ITestOutputHelper output)
         {
             this.output = output;
         }
@@ -32,13 +33,15 @@ namespace GameInterface.Tests
                 typeof(WeaponDesign),
             };
 
-            DynamicModelGenerator.CreateDynamicSerializer<ItemObject>(excluded);
-            DynamicModelGenerator.CreateDynamicSerializer<ItemComponent>();
-            DynamicModelGenerator.CreateDynamicSerializer<Vec3>();
+            IDynamicModelGenerator generator = new DynamicModelGenerator();
 
-            DynamicModelGenerator.AssignSurrogate<TextObject, TextObjectSurrogate>();
+            generator.CreateDynamicSerializer<ItemObject>(excluded);
+            generator.CreateDynamicSerializer<ItemComponent>();
+            generator.CreateDynamicSerializer<Vec3>();
 
-            DynamicModelGenerator.Compile();
+            generator.AssignSurrogate<TextObject, TextObjectSurrogate>();
+
+            generator.Compile();
 
             ItemObject itemObject = new ItemObject();
 

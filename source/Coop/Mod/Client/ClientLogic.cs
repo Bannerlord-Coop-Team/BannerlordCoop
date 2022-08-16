@@ -1,5 +1,5 @@
 ﻿using Common.LogicStates;
-using Coop.Communication.MessageBroker;
+using Common.Messages;
 using Coop.Mod.LogicStates;
 using Coop.Mod.LogicStates.Client;
 using NLog;

@@ -1,7 +1,7 @@
 ﻿using Autofac;
 using Autofac.Builder;
+using Common.Messages;
 using Coop.Communication;
-using Coop.Communication.MessageBroker;
 using Coop.Communication.PacketHandlers;
 using Coop.Configuration;
 using Coop.Debugging.Logger;
@@ -28,7 +28,7 @@ namespace Coop
             #region Communication
             builder.RegisterType<ProtobufSerializer>().As<ISerializer>().SingleInstance();
             builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
-            builder.RegisterType<NetworkMessageBroker>().As<IMessageBroker>().SingleInstance();
+            builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
             builder.RegisterType<Connection>().As<IConnection>();
             #endregion
 

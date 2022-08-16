@@ -1,4 +1,4 @@
-﻿using Coop.Communication.MessageBroker;
+﻿using Common.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;

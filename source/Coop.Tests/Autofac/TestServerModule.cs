@@ -1,10 +1,8 @@
 ﻿using Autofac;
-using Coop.Communication.MessageBroker;
-using Coop.Tests.Stubs;
 
 namespace Coop.Tests.Autofac
 {
-    internal class TestServerModule : Module
+    internal class TestServerModule : TestModule
     {
         protected override void Load(ContainerBuilder builder)
         {

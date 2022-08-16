@@ -1,6 +1,6 @@
 ﻿using System;
 using Common.Components;
-using Coop.Communication.MessageBroker;
+using Common.Messages;
 using Coop.Mod.Messages.Network;
 
 namespace Coop.Communication.PacketHandlers

@@ -1,19 +1,31 @@
-﻿using GameInterface.Helpers;
+﻿using Autofac;
+using Common.Messages;
+using GameInterface.Helpers;
+using GameInterface.Serialization.DynamicModel;
 
 namespace GameInterface
 {
     public class GameInterface : IGameInterface
     {
+        public static IMessageBroker MessageBroker { get; private set; }
+
         public IExampleGameHelper ExampleGameHelper { get; }
 
         public ISaveLoadHelper SaveLoadHelper { get; }
 
-        public GameInterface(
-            IExampleGameHelper exampleGameHelper,
-            ISaveLoadHelper saveLoadHelper)
+        internal IDynamicModelService DynamicModelService { get; }
+
+        private readonly IContainer Container;
+
+        public GameInterface(IMessageBroker messageBroker)
         {
-            ExampleGameHelper = exampleGameHelper;
-            SaveLoadHelper = saveLoadHelper;
+            MessageBroker = messageBroker;
+
+            ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterModule<GameInterfaceModule>();
+            Container = builder.Build();
+
+            DynamicModelService = Container.Resolve<IDynamicModelService>();
         }
     }
 }

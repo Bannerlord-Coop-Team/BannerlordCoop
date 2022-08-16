@@ -34,6 +34,12 @@
     <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Lib.Harmony.2.2.2\lib\net472\0Harmony.dll</HintPath>
     </Reference>
+    <Reference Include="Autofac, Version=6.4.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autofac.6.4.0\lib\netstandard2.0\Autofac.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
     <Reference Include="NLog, Version=5.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
       <HintPath>..\packages\NLog.5.0.1\lib\net46\NLog.dll</HintPath>
     </Reference>
@@ -67,6 +73,9 @@
     </Reference>
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Diagnostics.DiagnosticSource, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
+    </Reference>
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Memory.4.5.4\lib\net461\System.Memory.dll</HintPath>
@@ -77,6 +86,9 @@
     </Reference>
     <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.4.5.3\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.2\lib\netstandard2.0\System.Threading.Tasks.Extensions.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -251,6 +263,7 @@
     <Compile Include="Extentions\MobilePartyExtensions.cs" />
     <Compile Include="GameInterface.cs" />
     <Compile Include="Behaviour\GameLoadedBehaviour.cs" />
+    <Compile Include="GameInterfaceModule.cs" />
     <Compile Include="Helpers\ExampleGameHelper.cs" />
     <Compile Include="Helpers\IExampleGameHelper.cs" />
     <Compile Include="Helpers\SaveGameData.cs" />
@@ -258,13 +271,13 @@
     <Compile Include="Helpers\ISaveLoadHelper.cs" />
     <Compile Include="Messages\Commands\GameStateCommands.cs" />
     <Compile Include="Messages\Events\GameStateEvents.cs" />
-    <Compile Include="Messages\Queries\GetPlatformById.cs" />
     <Compile Include="Messages\Queries\SaveGameQueries.cs" />
     <Compile Include="Patch\CampaignPatches\CompanionsCampaignBehaviorPatches.cs" />
     <Compile Include="Patch\CampaignPatches\SetTimeSpeedPatch.cs" />
     <Compile Include="Patch\CampaignPatches\TimeControlModePatch.cs" />
     <Compile Include="Patch\Debugging.cs" />
     <Compile Include="Patch\Exceptions.cs" />
+    <Compile Include="Patch\GameStates\MainMenuPatch.cs" />
     <Compile Include="Patch\Hero\HeroPatches.cs" />
     <Compile Include="Patch\MobilePartyPatches\ComputeIsWaitingPatch.cs" />
     <Compile Include="Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />
@@ -278,13 +291,17 @@
     <Compile Include="Patch\World\SaveManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Helpers\SaveLoadHelper.cs" />
-    <Compile Include="Serialization\DynamicModelManager.cs" />
+    <Compile Include="Serialization\DynamicModel\DynamicModelService.cs" />
+    <Compile Include="Serialization\DynamicModel\IDynamicModelGenerator.cs" />
+    <Compile Include="Serialization\DynamicModel\IDynamicModelService.cs" />
+    <Compile Include="Serialization\DynamicModel\IDynamicSerializer.cs" />
     <Compile Include="Serialization\ISerializer.cs" />
     <Compile Include="Serialization\Models\EquipmentElementSurrogate.cs" />
     <Compile Include="Serialization\Models\EquipmentSurrogate.cs" />
+    <Compile Include="Serialization\Models\ItemDynamicSerializer.cs" />
     <Compile Include="Serialization\Models\ItemModifierSurrogate.cs" />
     <Compile Include="Serialization\Models\MBObjectSurrogate.cs" />
-    <Compile Include="Serialization\DynamicModelGenerator.cs" />
+    <Compile Include="Serialization\DynamicModel\DynamicModelGenerator.cs" />
     <Compile Include="Serialization\Models\TextObjectSurrogate.cs" />
     <Compile Include="Serialization\ProtobufSerializer.cs" />
     <Compile Include="Serialization\SerializationHelper.cs" />
@@ -354,6 +371,8 @@
     <Compile Include="Serializers\PropertyOwnerSerializers\CharacterSkillsSerializer.cs" />
     <Compile Include="Serializers\PropertyOwnerSerializers\CharacterTraitsSerializer.cs" />
     <Compile Include="Serializers\TextObjectSerializer.cs" />
+    <Compile Include="Services\GameStateService.cs" />
+    <Compile Include="Services\IGameStateService.cs" />
     <Compile Include="Utils\ReflectionUtils.cs" />
   </ItemGroup>
   <ItemGroup>

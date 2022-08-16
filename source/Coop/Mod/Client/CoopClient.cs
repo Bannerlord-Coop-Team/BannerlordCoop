@@ -8,7 +8,7 @@ using Coop.Communication.PacketHandlers;
 using Coop.Configuration;
 using Coop.Mod.LogicStates.Client;
 using Coop.Mod.Messages.Network;
-using Coop.Communication.MessageBroker;
+using Common.Messages;
 
 namespace Coop.Mod
 {

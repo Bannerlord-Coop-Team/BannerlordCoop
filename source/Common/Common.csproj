@@ -82,7 +82,6 @@
     <Compile Include="CompatibilityInfo.cs" />
     <Compile Include="Components\ComponentContainerBase.cs" />
     <Compile Include="CoopObjectManager.cs" />
-    <Compile Include="CoopStateMachine.cs" />
     <Compile Include="DropoutStack.cs" />
     <Compile Include="Extentions.cs" />
     <Compile Include="FrameLimiter.cs" />
@@ -92,7 +91,10 @@
     <Compile Include="IUpdatable.cs" />
     <Compile Include="LogicStates\ILogic.cs" />
     <Compile Include="LogicStates\IState.cs" />
+    <Compile Include="Messages\IMessageBroker.cs" />
     <Compile Include="Messages\IResponse.cs" />
+    <Compile Include="Messages\MessageBroker.cs" />
+    <Compile Include="Messages\MessagePayload.cs" />
     <Compile Include="MovingAverage.cs" />
     <Compile Include="OrderedHashSet.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -104,6 +106,5 @@
     <None Include="app.config" />
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
