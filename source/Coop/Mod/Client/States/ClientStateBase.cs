@@ -1,6 +1,5 @@
 ﻿using Coop.Communication.MessageBroker;
-using Coop.Mod.Messages.Queries;
-using GameInterface.Messages.Queries;
+using GameInterface;
 using System.Threading.Tasks;
 
 namespace Coop.Mod.LogicStates.Client
@@ -9,16 +8,13 @@ namespace Coop.Mod.LogicStates.Client
     {
         protected readonly IClientLogic Logic;
         protected readonly IMessageBroker MessageBroker;
-        protected readonly IQueryDispatcher QueryDispatcher;
+        protected readonly IGameInterface GameInterface;
 
-        public ClientStateBase(IClientLogic logic, IMessageBroker messageBroker, IQueryDispatcher queryDispatcher)
+        public ClientStateBase(IClientLogic logic, IMessageBroker messageBroker, IGameInterface gameInterface)
         {
             Logic = logic;
             MessageBroker = messageBroker;
-            QueryDispatcher = queryDispatcher;
+            GameInterface = gameInterface;
         }
-
-
-        public abstract Task<bool> Connect();
     }
 }
