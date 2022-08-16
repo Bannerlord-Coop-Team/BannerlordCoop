@@ -4,5 +4,6 @@ namespace Coop.Mod.LogicStates.Client
 {
     public interface IClientLogic : ILogic
     {
+        void GoToMainMenu();
     }
 }

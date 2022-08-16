@@ -9,5 +9,10 @@ namespace Coop.Mod.Client.States
         {
             throw new System.NotImplementedException();
         }
+
+        public void GoToMainMenu()
+        {
+
+        }
     }
 }
