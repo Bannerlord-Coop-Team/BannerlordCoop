@@ -16,11 +16,11 @@ using TaleWorlds.CampaignSystem.Settlements.Locations;
 
 namespace GameInterface.Tests.Serialization
 {
-    public class DynamicModelGeneratorTests
+    public partial class SerializationTests
     {
         private readonly ITestOutputHelper output;
 
-        public DynamicModelGeneratorTests(ITestOutputHelper output)
+        public SerializationTests(ITestOutputHelper output)
         {
             this.output = output;
         }
