@@ -1,22 +1,31 @@
 ﻿using Common.Messages;
 using GameInterface.Data;
+using System;
 
 namespace GameInterface.Messages.Commands
 {
     /// <summary>
     /// Goes to the main menu from any game state.
     /// </summary>
-    public readonly struct GoToMainMenuCommand
+    public readonly struct EnterMainMenuCommand
     {
+        public EnterMainMenuCommand(Guid id, TimeSpan timeOut)
+        {
+            Id = id;
+            TimeOut = timeOut;
+        }
+
+        public Guid Id { get; }
+        public TimeSpan TimeOut { get; }
     }
 
     /// <summary>
-    /// Reply to <seealso cref="GoToMainMenuCommand"/>.
+    /// Reply to <seealso cref="EnterMainMenuCommand"/>.
     /// </summary>
-    public readonly struct GoToMainMenuResponse : IResponse
+    public readonly struct EnteredMainMenuResponse : IResponse
     {
         public bool Success { get; }
-        public GoToMainMenuResponse(bool success)
+        public EnteredMainMenuResponse(bool success)
         {
             Success = success;
         }
