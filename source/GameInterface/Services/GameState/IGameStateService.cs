@@ -1,4 +1,4 @@
-﻿namespace GameInterface.Services
+﻿namespace GameInterface.Services.GameState
 {
     internal interface IGameStateService
     {

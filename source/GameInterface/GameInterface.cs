@@ -1,5 +1,5 @@
 ﻿using Autofac;
-using Common.Messages;
+using Common.Messaging;
 using GameInterface.Helpers;
 using GameInterface.Serialization.DynamicModel;
 

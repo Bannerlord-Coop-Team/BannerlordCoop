@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GameInterface.Services
+namespace GameInterface.Services.GameState.Handlers
 {
-    internal class GameStateService : IGameStateService
+    internal interface IStartCharacterCreationHandler
     {
     }
 }

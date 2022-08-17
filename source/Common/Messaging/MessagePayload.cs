@@ -1,7 +1,7 @@
 ﻿using System;
 using ProtoBuf;
 
-namespace Common.Messages
+namespace Common.Messaging
 {
     public readonly struct MessagePayload<T>
     {
