@@ -308,8 +308,8 @@
     <Compile Include="Serialization\Dynamic\Serializers\HeroDynamicSerializer.cs" />
     <Compile Include="Serialization\Surrogates\ItemObjectSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\KingdomSurrogate.cs" />
-    <Compile Include="Serialization\Surrogates\MobilePartySurrogate - Copy.cs" />
     <Compile Include="Serialization\Surrogates\MobilePartySurrogate.cs" />
+    <Compile Include="Serialization\Surrogates\PartyBaseSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\SettlementSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\EquipmentElementSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\EquipmentSurrogate.cs" />
