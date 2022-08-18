@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using TaleWorlds.Engine.Screens;
 using TaleWorlds.Localization;
-using TaleWorlds.MountAndBlade.View.Screen;
 using TaleWorlds.Core.ViewModelCollection;
 using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterCreation;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
 using SandBox.GauntletUI.CharacterCreation;
+using TaleWorlds.MountAndBlade.View.Screens;
 
 namespace Mod.UI.CharacterCreationUI
 {

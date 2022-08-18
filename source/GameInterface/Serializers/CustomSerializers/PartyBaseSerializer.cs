@@ -53,10 +53,6 @@ namespace Coop.Mod.Serializers.Custom
                         // ItemRoster
                         SNNSO.Add(fieldInfo, new ItemRosterSerializer((ItemRoster)value));
                         break;
-                    case "Random":
-                        // DeterministicRandom
-                        SNNSO.Add(fieldInfo, new DeterministicRandomSerializer((DeterministicRandom)value));
-                        break;
                     case "_lastEatingTime":
                         //CampaignTime
                         SNNSO.Add(fieldInfo, new Custom.CampaignTimeSerializer((CampaignTime)value));

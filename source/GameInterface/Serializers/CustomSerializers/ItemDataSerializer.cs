@@ -1,8 +1,8 @@
 ﻿using System;
-using TaleWorlds.CampaignSystem;
+using Coop.Mod.Serializers;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace Coop.Mod.Serializers.Custom
+namespace GameInterface.Serializers.CustomSerializers
 {
     [Serializable]
     public class ItemDataSerializer : CustomSerializer

@@ -1,8 +1,7 @@
 ﻿using Autofac;
-using Common.Messaging;
+using Common.Messages;
 using GameInterface.Helpers;
-using GameInterface.Serialization.DynamicModel;
-using GameInterface.Services.GameState;
+using GameInterface.Serialization.Dynamic;
 
 namespace GameInterface
 {
@@ -24,7 +23,6 @@ namespace GameInterface
 
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<GameInterfaceModule>();
-            builder.RegisterModule<GameStateModule>();
             Container = builder.Build();
 
             DynamicModelService = Container.Resolve<IDynamicModelService>();

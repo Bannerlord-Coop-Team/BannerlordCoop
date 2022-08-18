@@ -11,8 +11,8 @@ namespace Common.Tests
 
         static TestModuleProvider()
         {
-            var gameVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 2, 3, 4, ApplicationVersionGameType.Multiplayer);
-            var modVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 0, 1, 23, ApplicationVersionGameType.Multiplayer);
+            var gameVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 2, 3, 4);
+            var modVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 0, 1, 23);
 
             GameModule = new ModuleInfo("TestModule1", true, gameVersion);
             ModModule = new ModuleInfo("TestModule2", false, modVersion);
@@ -35,8 +35,8 @@ namespace Common.Tests
 
         static TestModuleProvider2()
         {
-            var gameVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 2, 4, 4, ApplicationVersionGameType.Multiplayer);
-            var modVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 0, 2, 23, ApplicationVersionGameType.Multiplayer);
+            var gameVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 2, 4, 4);
+            var modVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 0, 2, 23);
 
             GameModule = new ModuleInfo("TestModule1", true, gameVersion);
             ModModule = new ModuleInfo("TestModule2", false, modVersion);
