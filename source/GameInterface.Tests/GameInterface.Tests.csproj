@@ -123,6 +123,7 @@
     <Compile Include="Patches\RandomPatches.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\DynamicModelGeneratorTests.cs" />
+    <Compile Include="Serialization\Dynamic\HeroObjectSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\ItemObjectSerializationTests.cs" />
     <Compile Include="Serialization\SerializationTests.cs" />
     <Compile Include="Serialization\Surrogates\TextObjectSurrogateTests.cs" />
