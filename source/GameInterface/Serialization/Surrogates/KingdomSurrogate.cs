@@ -2,18 +2,20 @@
 using System.Linq;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Surrogates
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public class KingdomSurrogate
     {
         [ProtoMember(1)] 
-        public readonly String NetworkIdentifier;
+        public readonly string StringId;
 
-        public KingdomSurrogate(String networkIdentifier)
+        public KingdomSurrogate(Kingdom obj)
         {
-            NetworkIdentifier = networkIdentifier;
+            StringId = obj.StringId;
         }
 
         /// <summary>
@@ -21,19 +23,21 @@ namespace GameInterface.Serialization.Surrogates
         /// </summary>
         /// <param name="kingdom">Kingdom Object</param>
         /// <returns>Kingdom Surrogate</returns>
-        public static implicit operator KingdomSurrogate(Kingdom kingdom)
+        public static implicit operator KingdomSurrogate(Kingdom obj)
         {
-            return new KingdomSurrogate(kingdom.StringId);
+            if (obj == null) return null;
+            return new KingdomSurrogate(obj);
         }
 
         /// <summary>
-        ///     Retrieve the mobile party sent through the network on the client.
+        ///     Retrieve the mobile party sent through the game's object manager.
         /// </summary>
         /// <param name="kingdomSurrogate">Kingdom Surrogate</param>
         /// <returns>Kingdom object</returns>
-        public static implicit operator Kingdom(KingdomSurrogate kingdomSurrogate)
+        public static implicit operator Kingdom(KingdomSurrogate surrogate)
         {
-            return Kingdom.All.First(k => k.StringId == kingdomSurrogate.NetworkIdentifier);
+            if (surrogate == null) return null;
+            return MBObjectManager.Instance?.GetObject<Kingdom>(surrogate.StringId);
         }
     }
 }

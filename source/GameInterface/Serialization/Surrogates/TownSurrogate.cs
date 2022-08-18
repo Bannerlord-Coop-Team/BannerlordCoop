@@ -1,31 +1,34 @@
-﻿using System;
-using ProtoBuf;
-using TaleWorlds.CampaignSystem;
+﻿using ProtoBuf;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract(SkipConstructor = true)]
-    public class SettlementSurrogate
+    public class TownSurrogate
     {
-        [ProtoMember(1)] 
+        [ProtoMember(1)]
         public readonly string StringId;
 
-        public SettlementSurrogate(Settlement obj)
+        public TownSurrogate(Town obj)
         {
             StringId = obj.StringId;
         }
-        
+
         /// <summary>
         ///     Prepare the message data to be serialized.
         /// </summary>
         /// <param name="settlement"></param>
         /// <returns></returns>
-        public static implicit operator SettlementSurrogate(Settlement obj)
+        public static implicit operator TownSurrogate(Town obj)
         {
-            if(obj == null) return null;
-            return new SettlementSurrogate(obj);
+            if (obj == null) return null;
+            return new TownSurrogate(obj);
         }
 
         /// <summary>
@@ -33,10 +36,10 @@ namespace GameInterface.Serialization.Surrogates
         /// </summary>
         /// <param name="settlementSurrogate"></param>
         /// <returns></returns>
-        public static implicit operator Settlement(SettlementSurrogate surrogate)
+        public static implicit operator Town(TownSurrogate surrogate)
         {
             if (surrogate == null) return null;
-            return MBObjectManager.Instance?.GetObject<Settlement>(surrogate.StringId);
+            return MBObjectManager.Instance?.GetObject<Town>(surrogate.StringId);
         }
     }
 }

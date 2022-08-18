@@ -2,38 +2,27 @@
 using System.Linq;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Serialization.Surrogates
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public class MobilePartySurrogate
     {
-        [ProtoMember(1)] 
-        public readonly String NetworkIdentifier;
-
-        public MobilePartySurrogate(String networkIdentifier)
+        public static implicit operator MobilePartySurrogate(MobileParty obj)
         {
-            NetworkIdentifier = networkIdentifier;
+            if (obj == null) return null;
+
+            // TODO implement
+            return null;
         }
 
-        /// <summary>
-        ///     Prepare the message data to be serialized.
-        /// </summary>
-        /// <param name="mobileParty">MobileParty object</param>
-        /// <returns>MobileParty Surrogate</returns>
-        public static implicit operator MobilePartySurrogate(MobileParty mobileParty)
+        public static implicit operator MobileParty(MobilePartySurrogate surrogate)
         {
-            return new MobilePartySurrogate(mobileParty.StringId);
-        }
+            if (surrogate == null) return null;
 
-        /// <summary>
-        ///     Retrieve the mobile party sent through the network on the client.
-        /// </summary>
-        /// <param name="mobilePartySurrogate">MobileParty Surrogate</param>
-        /// <returns>MobileParty object</returns>
-        public static implicit operator MobileParty(MobilePartySurrogate mobilePartySurrogate)
-        {
-            return MobileParty.All.First(m => m.StringId == mobilePartySurrogate.NetworkIdentifier);
+            // TODO implement
+            return default;
         }
     }
 }

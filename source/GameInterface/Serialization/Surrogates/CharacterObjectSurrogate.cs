@@ -1,12 +1,12 @@
 ﻿using ProtoBuf;
-using TaleWorlds.Core;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract(SkipConstructor = true)]
-    public class CharacterSkillsSurrogate
+    public class CharacterObjectSurrogate
     {
-        public static implicit operator CharacterSkillsSurrogate(CharacterSkills obj)
+        public static implicit operator CharacterObjectSurrogate(CharacterObject obj)
         {
             if (obj == null) return null;
 
@@ -14,7 +14,7 @@ namespace GameInterface.Serialization.Surrogates
             return null;
         }
 
-        public static implicit operator CharacterSkills(CharacterSkillsSurrogate surrogate)
+        public static implicit operator CharacterObject(CharacterObjectSurrogate surrogate)
         {
             if (surrogate == null) return null;
 

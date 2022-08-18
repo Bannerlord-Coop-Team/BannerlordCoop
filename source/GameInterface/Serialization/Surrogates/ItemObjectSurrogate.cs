@@ -4,9 +4,9 @@ using TaleWorlds.Core;
 namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract(SkipConstructor = true)]
-    public class CharacterSkillsSurrogate
+    public class ItemObjectSurrogate
     {
-        public static implicit operator CharacterSkillsSurrogate(CharacterSkills obj)
+        public static implicit operator ItemObjectSurrogate(ItemObject obj)
         {
             if (obj == null) return null;
 
@@ -14,7 +14,7 @@ namespace GameInterface.Serialization.Surrogates
             return null;
         }
 
-        public static implicit operator CharacterSkills(CharacterSkillsSurrogate surrogate)
+        public static implicit operator ItemObject(ItemObjectSurrogate surrogate)
         {
             if (surrogate == null) return null;
 

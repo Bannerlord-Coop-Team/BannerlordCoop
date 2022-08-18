@@ -1,7 +1,5 @@
 ﻿using ProtoBuf;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using JetBrains.Annotations;
 using TaleWorlds.Localization;
 

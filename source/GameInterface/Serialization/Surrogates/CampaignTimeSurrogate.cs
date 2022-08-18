@@ -6,15 +6,26 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Serialization.Surrogates
 {
-    [ProtoContract]
-    public class CampaignTimeSurrogate
+    [ProtoContract(SkipConstructor = true)]
+    public readonly struct CampaignTimeSurrogate
     {
         [ProtoMember(1)]
         readonly long _numTicks;
 
-        private CampaignTimeSurrogate(long numTicks)
+        private CampaignTimeSurrogate(CampaignTime campaignTime)
         {
-            _numTicks = numTicks;
+            _numTicks = campaignTime.GetNumTicks();
+        }
+
+        private CampaignTime Deserialize()
+        {
+            var campaignTimeConstructor = typeof(CampaignTime).GetTypeInfo()
+                .GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance)
+                .First();
+
+            var campaignTime = campaignTimeConstructor.Invoke(new object[] { _numTicks });
+
+            return (CampaignTime)campaignTime;
         }
 
         /// <summary>
@@ -24,7 +35,7 @@ namespace GameInterface.Serialization.Surrogates
         /// <returns></returns>
         public static implicit operator CampaignTimeSurrogate(CampaignTime campaignTime)
         {
-            return new CampaignTimeSurrogate(campaignTime.GetNumTicks());
+            return new CampaignTimeSurrogate(campaignTime);
         }
 
         /// <summary>
@@ -32,15 +43,9 @@ namespace GameInterface.Serialization.Surrogates
         /// </summary>
         /// <param name="campaignTimeSurrogate">Surrogate object.</param>
         /// <returns>CampaignTime object.</returns>
-        public static implicit operator CampaignTime(CampaignTimeSurrogate campaignTimeSurrogate)
+        public static implicit operator CampaignTime(CampaignTimeSurrogate surrogate)
         {
-            var campaignTimeConstructor = typeof(CampaignTime).GetTypeInfo()
-                .GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance)
-                .First();
-
-            var campaignTime = campaignTimeConstructor.Invoke(new object[] { campaignTimeSurrogate._numTicks });
-
-            return (CampaignTime)campaignTime;
+            return surrogate.Deserialize();
         }
     }
 }
