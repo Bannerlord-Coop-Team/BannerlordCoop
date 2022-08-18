@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
-namespace GameInterface.Serialization.Models
+namespace GameInterface.Serialization.Surrogates
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public class ItemModifierSurrogate
     {
         #region Fields
@@ -67,7 +67,8 @@ namespace GameInterface.Serialization.Models
             SerializationHelper.AssignAsObjectType(ref _missleSpeed,    info_missleSpeed, obj);
             SerializationHelper.AssignAsObjectType(ref _mountHitPoints, info_mountHitPoints, obj);
             SerializationHelper.AssignAsObjectType(ref _mountSpeed,     info_mountSpeed, obj);
-            SerializationHelper.AssignAsObjectType(ref _stackCount,     info_speed, obj);
+            SerializationHelper.AssignAsObjectType(ref _speed,          info_speed, obj);
+            SerializationHelper.AssignAsObjectType(ref _stackCount,     info_stackCount, obj);
 
         }
 
@@ -84,6 +85,7 @@ namespace GameInterface.Serialization.Models
             info_missleSpeed.SetValue(modifier, _missleSpeed);
             info_mountHitPoints.SetValue(modifier, _mountHitPoints);
             info_mountSpeed.SetValue(modifier, _mountSpeed);
+            info_speed.SetValue(modifier, _speed);
             info_stackCount.SetValue(modifier, _stackCount);
 
             return modifier;
@@ -91,11 +93,13 @@ namespace GameInterface.Serialization.Models
 
         public static implicit operator ItemModifierSurrogate(ItemModifier obj)
         {
+            if(obj == null) return null;
             return new ItemModifierSurrogate(obj);
         }
 
         public static implicit operator ItemModifier(ItemModifierSurrogate surrogate)
         {
+            if(surrogate == null) return null;
             return surrogate.Deserialize();
         }
     }

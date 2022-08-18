@@ -7,9 +7,9 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.Core;
 
-namespace GameInterface.Serialization.Models
+namespace GameInterface.Serialization.Surrogates
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public class EquipmentElementSurrogate
     {
         [ProtoMember(1)]
@@ -22,9 +22,9 @@ namespace GameInterface.Serialization.Models
         ItemObject CosmeticItem;
 
         #region Reflection
-        private static readonly PropertyInfo info_IsQuestItem = typeof(EquipmentElement).GetProperty(nameof(EquipmentElement.IsQuestItem), BindingFlags.Instance | BindingFlags.NonPublic);
-        private static readonly PropertyInfo info_Item = typeof(EquipmentElement).GetProperty(nameof(EquipmentElement.Item), BindingFlags.Instance | BindingFlags.NonPublic);
-        private static readonly PropertyInfo info_ItemModifier = typeof(EquipmentElement).GetProperty(nameof(EquipmentElement.ItemModifier), BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly PropertyInfo info_IsQuestItem = typeof(EquipmentElement).GetProperty(nameof(EquipmentElement.IsQuestItem));
+        private static readonly PropertyInfo info_Item = typeof(EquipmentElement).GetProperty(nameof(EquipmentElement.Item));
+        private static readonly PropertyInfo info_ItemModifier = typeof(EquipmentElement).GetProperty(nameof(EquipmentElement.ItemModifier));
         #endregion
 
         private EquipmentElementSurrogate(EquipmentElement obj)

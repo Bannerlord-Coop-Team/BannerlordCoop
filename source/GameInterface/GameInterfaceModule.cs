@@ -1,5 +1,6 @@
 ﻿using Autofac;
-using GameInterface.Serialization.DynamicModel;
+using GameInterface.Serialization.Dynamic;
+using GameInterface.Serialization.Dynamic;
 using System;
 using System.Collections.Generic;
 using System.Linq;

@@ -9,9 +9,10 @@ using NLog;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.MountAndBlade.View.Missions;
+using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.ScreenSystem;
 using Module = TaleWorlds.MountAndBlade.Module;
 
