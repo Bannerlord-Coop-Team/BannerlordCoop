@@ -92,11 +92,13 @@
     <Compile Include="LogicStates\ILogic.cs" />
     <Compile Include="LogicStates\IState.cs" />
     <Compile Include="Messaging\IEvent.cs" />
+    <Compile Include="Messaging\IHandler.cs" />
     <Compile Include="Messaging\IMessage.cs" />
     <Compile Include="Messaging\IMessageBroker.cs" />
     <Compile Include="Messaging\ICommand.cs" />
     <Compile Include="Messaging\MessageBroker.cs" />
     <Compile Include="Messaging\MessagePayload.cs" />
+    <Compile Include="Messaging\Queries\IQuery.cs" />
     <Compile Include="MovingAverage.cs" />
     <Compile Include="OrderedHashSet.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

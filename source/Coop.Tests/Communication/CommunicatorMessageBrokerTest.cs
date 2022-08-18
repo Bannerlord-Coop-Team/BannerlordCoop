@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using Autofac;
-using Common.Messages;
+using Common.Messaging;
 using Coop.Mod.EventHandlers;
 using Xunit;
 
