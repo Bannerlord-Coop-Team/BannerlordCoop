@@ -314,7 +314,6 @@
     <Compile Include="Serializers\CustomSerializers\ClanSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\CultureObjectSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\DefaultPartyTemplateSerializer.cs" />
-    <Compile Include="Serializers\CustomSerializers\DeterministicRandomSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\EquipmentElementSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\EquipmentSerialzer.cs" />
     <Compile Include="Serializers\CustomSerializers\FactionSerializer.cs" />
