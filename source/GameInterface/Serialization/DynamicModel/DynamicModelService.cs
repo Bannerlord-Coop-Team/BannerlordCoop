@@ -1,4 +1,4 @@
-﻿using GameInterface.Serialization.Models;
+﻿using GameInterface.Serialization.Surrogates;
 using System;
 using System.Collections.Generic;
 using System.Linq;
