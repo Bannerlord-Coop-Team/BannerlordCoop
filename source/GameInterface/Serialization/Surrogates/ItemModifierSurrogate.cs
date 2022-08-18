@@ -67,7 +67,8 @@ namespace GameInterface.Serialization.Surrogates
             SerializationHelper.AssignAsObjectType(ref _missleSpeed,    info_missleSpeed, obj);
             SerializationHelper.AssignAsObjectType(ref _mountHitPoints, info_mountHitPoints, obj);
             SerializationHelper.AssignAsObjectType(ref _mountSpeed,     info_mountSpeed, obj);
-            SerializationHelper.AssignAsObjectType(ref _stackCount,     info_speed, obj);
+            SerializationHelper.AssignAsObjectType(ref _speed,          info_speed, obj);
+            SerializationHelper.AssignAsObjectType(ref _stackCount,     info_stackCount, obj);
 
         }
 
@@ -84,6 +85,7 @@ namespace GameInterface.Serialization.Surrogates
             info_missleSpeed.SetValue(modifier, _missleSpeed);
             info_mountHitPoints.SetValue(modifier, _mountHitPoints);
             info_mountSpeed.SetValue(modifier, _mountSpeed);
+            info_speed.SetValue(modifier, _speed);
             info_stackCount.SetValue(modifier, _stackCount);
 
             return modifier;
