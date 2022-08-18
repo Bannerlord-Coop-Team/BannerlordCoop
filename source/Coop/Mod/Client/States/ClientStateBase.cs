@@ -1,5 +1,4 @@
-using Common.Messages;
-using GameInterface;
+using Common.Messaging;
 
 namespace Coop.Mod.LogicStates.Client
 {
@@ -13,5 +12,12 @@ namespace Coop.Mod.LogicStates.Client
             Logic = logic;
             MessageBroker = messageBroker;
         }
+
+        public abstract void Connect();
+        public abstract void Disconnect();
+        public abstract void StartCharacterCreation();
+        public abstract void LoadSavedData();
+        public abstract void ExitGame();
+        public abstract void EnterMainMenu();
     }
 }

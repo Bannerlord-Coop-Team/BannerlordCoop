@@ -14,10 +14,10 @@ namespace GameInterface.Services.GameState.Handlers
             this.gameStateInterface = gameStateInterface;
             this.messageBroker = messageBroker;
 
-            messageBroker.Subscribe<EnterMainMenuCommand>(Handle);
+            messageBroker.Subscribe<EnterMainMenu>(Handle);
         }
 
-        private void Handle(MessagePayload<EnterMainMenuCommand> payload)
+        private void Handle(MessagePayload<EnterMainMenu> payload)
         {
             gameStateInterface.EnterMainMenu();
 

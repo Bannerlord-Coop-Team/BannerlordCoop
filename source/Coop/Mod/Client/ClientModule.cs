@@ -12,7 +12,7 @@ namespace Coop.Mod.Client
         {
             builder.RegisterType<ClientLogic>().As<IClientLogic>();
             builder.RegisterType<CoopClient>().As<ICoopClient>().As<ICoopNetwork>().As<INetEventListener>().SingleInstance();
-            builder.RegisterType<InitialClientState>().As<IState>();
+            builder.RegisterType<MainMenuState>().As<IState>();
             base.Load(builder);
         }
     }

@@ -1,5 +1,5 @@
 ﻿using Common.LogicStates;
-using Common.Messages;
+using Common.Messaging;
 using Coop.Mod.LogicStates.Server;
 
 namespace Coop.Mod.Server.States

@@ -1,10 +1,6 @@
-﻿using Common.Messages;
+﻿using Common.Messaging;
 using Coop.Mod.LogicStates.Client;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Coop.Mod.Client.States
 {
@@ -12,6 +8,36 @@ namespace Coop.Mod.Client.States
     {
         public CampaignState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
+        }
+
+        public override void Connect()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void Disconnect()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void EnterMainMenu()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void ExitGame()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void LoadSavedData()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void StartCharacterCreation()
+        {
+            throw new NotImplementedException();
         }
     }
 }

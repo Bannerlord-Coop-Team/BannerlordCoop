@@ -4,9 +4,9 @@ using System;
 
 namespace Coop.Mod.Client.States
 {
-    public class LoadingState : ClientStateBase
+    internal class ReceivingSavedDataState : ClientStateBase
     {
-        public LoadingState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        public ReceivingSavedDataState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
         }
 

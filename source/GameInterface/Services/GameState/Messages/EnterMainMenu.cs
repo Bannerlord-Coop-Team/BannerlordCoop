@@ -1,21 +1,16 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace GameInterface.Services.GameState.Messages
 {
     /// <summary>
     /// Goes to the main menu from any game state.
     /// </summary>
-    public readonly struct EnterMainMenuCommand : ICommand
+    public readonly struct EnterMainMenu : ICommand
     {
     }
 
     /// <summary>
-    /// Reply to <seealso cref="EnterMainMenuCommand"/>.
+    /// Reply to <seealso cref="EnterMainMenu"/>.
     /// </summary>
     public readonly struct MainMenuEntered : ICommand
     {

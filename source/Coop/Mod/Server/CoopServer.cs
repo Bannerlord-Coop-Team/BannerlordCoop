@@ -7,7 +7,7 @@ using Coop.Configuration;
 using Coop.Mod.LogicStates.Server;
 using Coop.Mod.Messages.Network;
 using Coop.Mod.Server.Connections;
-using Common.Messages;
+using Common.Messaging;
 
 namespace Coop.Mod.Server
 {

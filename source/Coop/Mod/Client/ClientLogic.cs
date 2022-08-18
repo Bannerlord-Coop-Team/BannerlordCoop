@@ -1,9 +1,9 @@
 ﻿using Common.LogicStates;
-using Common.Messages;
-using Coop.Mod.LogicStates;
+using Common.Messaging;
+using Coop.Mod.Client.States;
 using Coop.Mod.LogicStates.Client;
+using GameInterface.Services.GameState.Messages;
 using NLog;
-using System.Threading.Tasks;
 
 namespace Coop.Mod.Client
 {
@@ -18,10 +18,41 @@ namespace Coop.Mod.Client
         {
             Logger = logger;
             MessageBroker = messageBroker;
-            State = new InitialClientState(this, messageBroker);
+            State = new MainMenuState(this, messageBroker);
         }
 
         public void GoToMainMenu()
+        {
+            State = new MainMenuState(this, MessageBroker);
+        }
+
+        public void Connect()
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public void Disconnect()
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public void StartCharacterCreation()
+        {
+            MessageBroker.Publish(this, new StartCreateCharacter());
+            State = new CharacterCreationState(this, MessageBroker);
+        }
+
+        public void LoadSavedData()
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public void ExitGame()
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public void EnterMainMenu()
         {
             throw new System.NotImplementedException();
         }

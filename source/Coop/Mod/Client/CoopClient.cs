@@ -4,11 +4,10 @@ using Common;
 using LiteNetLib;
 using System.Net.Sockets;
 using Common.Components;
-using Coop.Communication.PacketHandlers;
 using Coop.Configuration;
 using Coop.Mod.LogicStates.Client;
 using Coop.Mod.Messages.Network;
-using Common.Messages;
+using Common.Messaging;
 
 namespace Coop.Mod
 {

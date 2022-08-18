@@ -2,8 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Common.Messages;
-using Common.Serialization;
+using Common.Messaging;
 using Coop.Communication.PacketHandlers;
 using Coop.Mod.Messages.Network;
 using GameInterface.Serialization;

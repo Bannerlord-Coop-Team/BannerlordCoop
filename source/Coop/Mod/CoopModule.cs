@@ -1,6 +1,6 @@
 ﻿using Autofac;
 using Autofac.Builder;
-using Common.Messages;
+using Common.Messaging;
 using Coop.Communication;
 using Coop.Communication.PacketHandlers;
 using Coop.Configuration;

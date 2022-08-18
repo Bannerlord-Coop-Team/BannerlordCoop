@@ -1,4 +1,5 @@
 ﻿using GameInterface.Messages.Events;
+using GameInterface.Services.GameState.Messages;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -22,7 +23,7 @@ namespace GameInterface.Patch.GameStates
                 if (!MainMenuReady && MBMusicManager.Current != null)
                 {
                     MainMenuReady = true;
-                    GameInterface.MessageBroker?.Publish(__instance, new MainMenuEvent());
+                    GameInterface.MessageBroker?.Publish(__instance, new EnterMainMenu());
                 }
             }
         }

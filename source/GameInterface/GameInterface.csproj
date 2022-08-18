@@ -77,6 +77,11 @@
       <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
     <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Linq, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Linq.4.3.0\lib\net463\System.Linq.dll</HintPath>
+      <Private>True</Private>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Memory.4.5.4\lib\net461\System.Memory.dll</HintPath>
     </Reference>
@@ -311,7 +316,6 @@
     <Compile Include="Serializers\CustomSerializers\ClanSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\CultureObjectSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\DefaultPartyTemplateSerializer.cs" />
-    <Compile Include="Serializers\CustomSerializers\DeterministicRandomSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\EquipmentElementSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\EquipmentSerialzer.cs" />
     <Compile Include="Serializers\CustomSerializers\FactionSerializer.cs" />
@@ -373,7 +377,7 @@
     <Compile Include="Services\Example\Interfaces\IExampleInterface.cs" />
     <Compile Include="Services\Example\Messages\ExampleCommand.cs" />
     <Compile Include="Services\GameState\Handlers\EnterMainMenuHandler.cs" />
-    <Compile Include="Services\GameState\GameStateService.cs" />
+    <Compile Include="Services\GameState\GameStateModule.cs" />
     <Compile Include="Services\GameState\Handlers\IEnterMainMenuHandler.cs" />
     <Compile Include="Services\GameState\Handlers\IPackageGameSaveDataHandler.cs" />
     <Compile Include="Services\GameState\Handlers\IStartCharacterCreationHandler.cs" />
