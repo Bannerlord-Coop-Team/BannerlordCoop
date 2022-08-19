@@ -116,10 +116,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Mod\Client\ClientConnectedState.cs" />
     <Compile Include="Mod\Client\States\CampaignState.cs" />
     <Compile Include="Mod\Client\States\CharacterCreationState.cs" />
-    <Compile Include="Mod\Client\States\CharacterSetupState.cs" />
     <Compile Include="Mod\Client\States\ClientStateBase.cs" />
     <Compile Include="Mod\Client\States\ConnectingState.cs" />
     <Compile Include="Mod\Client\States\IClientLogic.cs" />
@@ -160,7 +158,6 @@
     <Compile Include="Mod\Server\Config\ServerConfig.cs" />
     <Compile Include="Mod\Server\States\ServerLogic.cs" />
     <Compile Include="Mod\Client\Data\ClientData.cs" />
-    <Compile Include="Mod\Client\States\ClientState.cs" />
     <Compile Include="Mod\Data\CoopPlayer.cs" />
     <Compile Include="Mod\Server\States\InitialServerState.cs" />
     <Compile Include="Mod\Server\States\IServerState.cs" />

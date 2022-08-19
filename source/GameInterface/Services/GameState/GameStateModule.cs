@@ -11,12 +11,14 @@ namespace GameInterface.Services.GameState
             var assembly = GetType().Assembly;
             var @namespace = GetType().Namespace;
             var types = assembly.GetTypes()
-                .Where(t => t.GetInterface(nameof(IHandler)) != null 
-                && t.GetType().Namespace.StartsWith(@namespace));
+                .Where(t => t.GetInterface(nameof(IHandler)) != null && 
+                            t.GetType().Namespace.StartsWith(@namespace));
+
             foreach (var type in types)
             {
                 builder.RegisterType(type).As<IHandler>().SingleInstance();
             }
+
             base.Load(builder);
         }
     }
