@@ -265,11 +265,13 @@
     <Compile Include="Extentions\CampaignTimeExtensions.cs" />
     <Compile Include="Extentions\MobilePartyExtensions.cs" />
     <Compile Include="Behaviour\GameLoadedBehaviour.cs" />
+    <Compile Include="GameInterface.cs" />
     <Compile Include="GameInterfaceModule.cs" />
     <Compile Include="Helpers\ExampleGameHelper.cs" />
     <Compile Include="Helpers\IExampleGameHelper.cs" />
     <Compile Include="Helpers\SaveGameData.cs" />
     <Compile Include="Helpers\ISaveLoadHelper.cs" />
+    <Compile Include="IGameInterface.cs" />
     <Compile Include="Patch\CampaignPatches\CompanionsCampaignBehaviorPatches.cs" />
     <Compile Include="Patch\CampaignPatches\SetTimeSpeedPatch.cs" />
     <Compile Include="Patch\CampaignPatches\TimeControlModePatch.cs" />
@@ -397,10 +399,10 @@
     <Compile Include="Services\GameDebug\Interfaces\IGameDebugInterface.cs" />
     <Compile Include="Services\GameDebug\Messages\StartDebugGame.cs" />
     <Compile Include="Services\GameState\Handlers\EnterMainMenuHandler.cs" />
-    <Compile Include="Services\GameStateModule.cs" />
+    <Compile Include="Services\IServiceModule.cs" />
+    <Compile Include="Services\ServiceModule.cs" />
     <Compile Include="Services\GameState\Interfaces\GameStateInterface.cs" />
     <Compile Include="Services\GameState\Interfaces\IGameStateInterface.cs" />
-    <Compile Include="Services\IGameStateService.cs" />
     <Compile Include="Services\GameState\Messages\EnterMainMenu.cs" />
     <Compile Include="Services\GameState\Messages\GameLoaded.cs" />
     <Compile Include="Services\GameState\Messages\LoadGameSave.cs" />

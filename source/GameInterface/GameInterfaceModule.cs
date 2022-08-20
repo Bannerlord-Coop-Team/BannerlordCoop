@@ -16,10 +16,10 @@ namespace GameInterface
         protected override void Load(ContainerBuilder builder)
         {
             base.Load(builder);
-            builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
+            builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance();
             builder.RegisterType<DynamicModelGenerator>().As<IDynamicModelGenerator>().SingleInstance();
             builder.RegisterType<DynamicModelService>().As<IDynamicModelService>().SingleInstance();
-            builder.RegisterModule<GameStateModule>();
+            builder.RegisterModule<ServiceModule>();
         }
     }
 }

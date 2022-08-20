@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.States;
+using GameInterface;
 
 namespace Coop.Core.Server
 {
@@ -17,14 +18,16 @@ namespace Coop.Core.Server
         private IServerState _state;
 
         private readonly ICoopServer networkServer;
+        private readonly IGameInterface gameInterface;
 
         public IMessageBroker MessageBroker { get; }
 
-        public ServerLogic(IMessageBroker messageBroker, ICoopServer networkServer)
+        public ServerLogic(IMessageBroker messageBroker, ICoopServer networkServer, IGameInterface gameInterface)
         {
             State = new InitialServerState(this, messageBroker);
             MessageBroker = messageBroker;
             this.networkServer = networkServer;
+            this.gameInterface = gameInterface;
         }
 
         public void Start()
