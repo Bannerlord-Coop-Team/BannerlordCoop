@@ -33,6 +33,9 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Lib.Harmony.2.2.2\lib\net472\0Harmony.dll</HintPath>
@@ -266,4 +269,9 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted ^
+            -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\" ^
+            -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\\"</PostBuildEvent>
+  </PropertyGroup>
 </Project>
