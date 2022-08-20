@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.GameState.Messages;
+﻿using Common.Messaging;
+using GameInterface.Services.GameState.Messages;
 using HarmonyLib;
 using TaleWorlds.MountAndBlade;
 
@@ -16,7 +17,7 @@ namespace GameInterface.Patch.GameStates
                 if (!MainMenuReady && MBMusicManager.Current != null)
                 {
                     MainMenuReady = true;
-                    GameInterface.MessageBroker?.Publish(__instance, new EnterMainMenu());
+                    MessageBroker.Instance.Publish(__instance, new EnterMainMenu());
                 }
             }
         }

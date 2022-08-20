@@ -1,6 +1,6 @@
 ﻿using System.IO;
 using Autofac;
-using Coop.Debugging.Logger;
+using Coop.Core.Debugging.Logger;
 using Xunit;
 
 namespace Coop.Tests.Debugging

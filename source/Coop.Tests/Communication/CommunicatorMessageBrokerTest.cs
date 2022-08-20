@@ -4,7 +4,6 @@ using System.Reflection;
 using System.Threading;
 using Autofac;
 using Common.Messaging;
-using Coop.Mod.EventHandlers;
 using Xunit;
 
 namespace Coop.Tests.Communication
@@ -70,6 +69,16 @@ namespace Coop.Tests.Communication
             
             Assert.Equal(1, callCount);
             Assert.Equal(incomingMessage.ExampleData, eventData);
+        }
+    }
+
+    internal readonly struct ExampleIncomingMessage
+    {
+        public int ExampleData { get; }
+
+        public ExampleIncomingMessage(int ExampleData)
+        {
+            this.ExampleData = ExampleData;
         }
     }
 }

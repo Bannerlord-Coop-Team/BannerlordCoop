@@ -4,7 +4,7 @@ using GameInterface.Services.GameState.Messages;
 
 namespace GameInterface.Services.GameState.Handlers
 {
-    internal class EnterMainMenuHandler : IEnterMainMenuHandler
+    internal class EnterMainMenuHandler : IHandler
     {
         private readonly IGameStateInterface gameStateInterface;
         private readonly IMessageBroker messageBroker;

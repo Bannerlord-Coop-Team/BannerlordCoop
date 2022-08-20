@@ -2,8 +2,9 @@
 
 namespace Common.LogicStates
 {
-    public interface ILogic : IComponent
+    public interface ILogic
     {
-        IState State { get; set; }
+        void Start();
+        void Stop();
     }
 }

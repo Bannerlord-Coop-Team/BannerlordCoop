@@ -7,7 +7,15 @@ namespace Common.Messaging
 {
     public class MessageBroker : IMessageBroker
     {
-        private readonly Dictionary<Type, List<Delegate>> _subscribers = new Dictionary<Type, List<Delegate>>();
+        public static MessageBroker Instance;
+        protected readonly Dictionary<Type, List<Delegate>> _subscribers = new Dictionary<Type, List<Delegate>>();
+        public MessageBroker()
+        {
+            if(Instance == null)
+            {
+                Instance = this;
+            }
+        }
 
         /// <summary>
         ///     Call an event based on the type of the message.
