@@ -1,6 +1,6 @@
 ﻿namespace GameInterface.Services.GameDebug.Interfaces
 {
-    internal interface IGameDebugInterface
+    internal interface IGameDebugInterface : IGameAbstraction
     {
         void LoadDebugGame();
     }

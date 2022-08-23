@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace GameInterface.Services.GameState.Interfaces
 {
-    internal interface IGameStateInterface
+    internal interface IGameStateInterface : IGameAbstraction
     {
         void EnterMainMenu();
         void StartCharacterCreation();

@@ -27,7 +27,7 @@ namespace Coop.Core
             #region Communication
             builder.RegisterType<ProtobufSerializer>().As<ISerializer>().SingleInstance();
             builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
-            builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
+            builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance();
             builder.RegisterType<Connection>().As<IConnection>();
             #endregion
 
