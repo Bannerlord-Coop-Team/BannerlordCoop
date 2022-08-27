@@ -4,6 +4,8 @@ using Common.LogicStates;
 using Coop.Core.Client;
 using Coop.Core.Communication.PacketHandlers;
 using Coop.Core.Server;
+using System;
+using System.Xml.Serialization;
 
 namespace Coop.Core
 {
@@ -15,7 +17,13 @@ namespace Coop.Core
 
         public static void Initialize()
         {
+            GameLoopRunner.Instance.SetGameLoopThread();
             Updateables.Add(GameLoopRunner.Instance);
+        }
+
+        public static void Update(TimeSpan deltaTime)
+        {
+            Updateables.UpdateAll(deltaTime);
         }
 
         public static void StartAsServer()

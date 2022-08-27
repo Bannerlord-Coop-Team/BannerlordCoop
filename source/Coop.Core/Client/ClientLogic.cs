@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.States;
-using NLog;
+using Coop.Core.Configuration;
+using Coop.Core.Debugging.Logger;
+using System.Configuration;
 
 namespace Coop.Core.Client
 {
@@ -8,6 +10,7 @@ namespace Coop.Core.Client
     {
         public ILogger Logger { get; }
         public IMessageBroker MessageBroker { get; }
+        public ICoopClient NetworkClient { get; }
         public IClientState State 
         {
             get { return _state; }
@@ -17,11 +20,16 @@ namespace Coop.Core.Client
                 _state = value;
             } 
         }
+
         private IClientState _state;
 
-        public ClientLogic(ILogger logger, IMessageBroker messageBroker)
+        public ClientLogic(
+            ILogger logger,
+            ICoopClient networkClient, 
+            IMessageBroker messageBroker)
         {
             Logger = logger;
+            NetworkClient = networkClient;
             MessageBroker = messageBroker;
             State = new MainMenuState(this, messageBroker);
         }
@@ -43,6 +51,7 @@ namespace Coop.Core.Client
 
         public void Connect()
         {
+
             State.Connect();
         }
 
@@ -70,7 +79,5 @@ namespace Coop.Core.Client
         {
             State.EnterMainMenu();
         }
-
-
     }
 }

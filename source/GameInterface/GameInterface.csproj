@@ -195,6 +195,9 @@
     <Reference Include="TaleWorlds.MountAndBlade.Diamond">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Diamond.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.GauntletUI">
+      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll</HintPath>
     </Reference>
@@ -277,6 +280,7 @@
     <Compile Include="Patch\CampaignPatches\TimeControlModePatch.cs" />
     <Compile Include="Patch\Debugging.cs" />
     <Compile Include="Patch\Exceptions.cs" />
+    <Compile Include="Patch\GameStates\CharacterCreationPatch.cs" />
     <Compile Include="Patch\GameStates\GameLoadedPatch.cs" />
     <Compile Include="Patch\GameStates\MainMenuPatch.cs" />
     <Compile Include="Patch\Hero\HeroPatches.cs" />
@@ -395,11 +399,19 @@
     <Compile Include="Services\Example\Interfaces\IExampleInterface.cs" />
     <Compile Include="Services\Example\Messages\ExampleCommand.cs" />
     <Compile Include="Services\GameDebug\Handlers\LoadDebugGameHandler.cs" />
+    <Compile Include="Services\GameDebug\Handlers\SkipCharacterCreationHandler.cs" />
+    <Compile Include="Services\GameDebug\Interfaces\CharacterCreationInterface.cs" />
     <Compile Include="Services\GameDebug\Interfaces\GameDebugInterface.cs" />
+    <Compile Include="Services\GameDebug\Interfaces\ICharacterCreationInterface.cs" />
     <Compile Include="Services\GameDebug\Interfaces\IGameDebugInterface.cs" />
+    <Compile Include="Services\GameDebug\Messages\CharacterCreationStarted.cs" />
     <Compile Include="Services\GameDebug\Messages\StartDebugGame.cs" />
     <Compile Include="Services\GameState\Handlers\EnterMainMenuHandler.cs" />
+    <Compile Include="Services\MobileParties\Handlers\RemoveMainPartyHandler.cs" />
     <Compile Include="Services\GameState\Handlers\StartCharacterCreationHandler.cs" />
+    <Compile Include="Services\MobileParties\Interfaces\IMainPartyInterface.cs" />
+    <Compile Include="Services\MobileParties\Interfaces\MainPartyInterface.cs" />
+    <Compile Include="Services\MobileParties\Messages\RemoveMainParty.cs" />
     <Compile Include="Services\IGameAbstraction.cs" />
     <Compile Include="Services\IServiceModule.cs" />
     <Compile Include="Services\ServiceModule.cs" />
@@ -422,6 +434,10 @@
       <Name>Common</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Services\Heros\Handlers\" />
+    <Folder Include="Services\Heros\Interfaces\" />
+    <Folder Include="Services\Heros\Messages\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

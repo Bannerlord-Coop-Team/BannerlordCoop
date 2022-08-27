@@ -1,4 +1,6 @@
 using Common.Messaging;
+using Coop.Core.Client.Messages;
+using System;
 
 namespace Coop.Core.Client.States
 {
@@ -6,16 +8,22 @@ namespace Coop.Core.Client.States
     {
         public MainMenuState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
+            MessageBroker.Subscribe<NetworkConnected>(Handle);
         }
 
         public override void Dispose()
         {
-            throw new System.NotImplementedException();
+            MessageBroker.Unsubscribe<NetworkConnected>(Handle);
         }
 
         public override void Connect()
         {
-            //TODO: connect
+            Logic.NetworkClient.Start();
+        }
+
+        private void Handle(MessagePayload<NetworkConnected> obj)
+        {
+
         }
 
         #region unused

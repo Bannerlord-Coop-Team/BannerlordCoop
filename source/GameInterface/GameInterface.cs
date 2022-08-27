@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using GameInterface.Services;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,6 +14,9 @@ namespace GameInterface
         public IContainer Container { get; }
         public GameInterface()
         {
+            Harmony harmony = new Harmony("com.Coop.GameInterface");
+            harmony.PatchAll();
+
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<GameInterfaceModule>();
             IContainer container = builder.Build();

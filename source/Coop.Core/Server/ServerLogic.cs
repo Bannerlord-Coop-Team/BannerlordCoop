@@ -17,29 +17,29 @@ namespace Coop.Core.Server
         }
         private IServerState _state;
 
-        private readonly ICoopServer networkServer;
         private readonly IGameInterface gameInterface;
 
         public IMessageBroker MessageBroker { get; }
+
+        public ICoopServer NetworkServer { get; }
 
         public ServerLogic(IMessageBroker messageBroker, ICoopServer networkServer, IGameInterface gameInterface)
         {
             State = new InitialServerState(this, messageBroker);
             MessageBroker = messageBroker;
-            this.networkServer = networkServer;
+            NetworkServer = networkServer;
             this.gameInterface = gameInterface;
         }
 
         public void Start()
         {
-            networkServer.Start();
-
             State.Start();
         }
 
         public void Stop()
         {
-            networkServer.Stop();
+            State.Stop();
+            NetworkServer.Stop();
         }
 
         public void Dispose()

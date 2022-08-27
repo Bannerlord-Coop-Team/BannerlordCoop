@@ -8,7 +8,6 @@ namespace Coop.Core.Server.States
         public ServerRunningState(IServerLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
             MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<ClientRequestJoin>(Handle);
         }
 
         public override void Dispose()
@@ -22,6 +21,10 @@ namespace Coop.Core.Server.States
 
         public override void Stop()
         {
+            // Stop server
+            Logic.NetworkServer.Stop();
+
+            // Go to main menu
             MessageBroker.Publish(this, new EnterMainMenu());
         }
 

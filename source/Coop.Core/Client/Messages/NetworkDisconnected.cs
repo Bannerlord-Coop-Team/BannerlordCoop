@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GameInterface.Services.GameState.Messages
+namespace Coop.Core.Client.Messages
 {
-    public readonly struct GameLoaded
+    public readonly struct NetworkDisconnected
     {
     }
 }

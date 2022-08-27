@@ -32,7 +32,7 @@ namespace GameInterface.Services.GameDebug.Handlers
 
         private void Handle(MessagePayload<GameLoaded> payload)
         {
-            messageBroker.Publish(this, new MainMenuEntered());
+            messageBroker.Publish(this, new DebugGameStarted());
         }
     }
 }

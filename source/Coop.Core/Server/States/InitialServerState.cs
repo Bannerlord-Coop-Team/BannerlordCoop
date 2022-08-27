@@ -1,6 +1,8 @@
 ﻿
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Messages;
+using System.Runtime.Remoting.Contexts;
 
 namespace Coop.Core.Server.States
 {
@@ -8,16 +10,23 @@ namespace Coop.Core.Server.States
     {
         public InitialServerState(IServerLogic context, IMessageBroker messageBroker) : base(context, messageBroker)
         {
-            MessageBroker.Subscribe<DebugGameStarted>(Handle);
+            MessageBroker.Subscribe<GameLoaded>(Handle);
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<DebugGameStarted>(Handle);
+            MessageBroker.Unsubscribe<GameLoaded>(Handle);
         }
 
-        private void Handle(MessagePayload<DebugGameStarted> payload)
+        private void Handle(MessagePayload<GameLoaded> payload)
         {
+            // Start server when game is fully loaded
+            Logic.NetworkServer.Start();
+
+            // Remove server party
+            MessageBroker.Publish(this, new RemoveMainParty());
+
+            // Change to server running state
             Logic.State = new ServerRunningState(Logic, MessageBroker);
         }
 
@@ -29,7 +38,6 @@ namespace Coop.Core.Server.States
 
         public override void Stop()
         {
-
         }
     }
 }

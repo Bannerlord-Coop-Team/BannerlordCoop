@@ -107,6 +107,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Client\Messages\NetworkDisconnected.cs" />
+    <Compile Include="Client\Messages\NetworkConnected.cs" />
     <Compile Include="Client\States\CampaignState.cs" />
     <Compile Include="Client\States\CharacterCreationState.cs" />
     <Compile Include="Client\States\ClientStateBase.cs" />

@@ -185,26 +185,14 @@ namespace Coop
             base.OnGameEnd(game);
         }
 
-        //protected override void OnApplicationTick(float dt)
-        //{
-        //    if (m_IsFirstTick)
-        //    {
-        //        GameLoopRunner.Instance.SetGameLoopThread();
-        //        m_IsFirstTick = false;
-        //    }
+        private bool m_IsFirstTick;
+        protected override void OnApplicationTick(float dt)
+        {
+            
 
-        //    base.OnApplicationTick(dt);
-
-        //    if (Input.IsKeyDown(InputKey.LeftControl) && Input.IsKeyDown(InputKey.Tilde) && this._isDebugToggled == false) {
-        //        // TODO add back CLI
-        //        this._isDebugToggled = true;
-        //    } else if(Input.IsKeyReleased(InputKey.LeftControl) || Input.IsKeyReleased(InputKey.Tilde)) {
-        //        this._isDebugToggled = false;
-        //    }
-
-        //    TimeSpan frameTime = TimeSpan.FromSeconds(dt);
-        //    Updateables.MakeUnion(SyncBufferManager.ProcessBufferedChanges).UpdateAll(frameTime);
-        //}
+            TimeSpan frameTime = TimeSpan.FromSeconds(dt);
+            CoopartiveMultiplayerExperience.Update(frameTime);
+        }
 
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {

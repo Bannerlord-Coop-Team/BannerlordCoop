@@ -9,6 +9,5 @@ namespace Coop.Core.Server.Messages.Events
 {
     public readonly struct ClientJoinRequested
     {
-        NetPeer peer
     }
 }
