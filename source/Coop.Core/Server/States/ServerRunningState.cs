@@ -8,6 +8,7 @@ namespace Coop.Core.Server.States
         public ServerRunningState(IServerLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
             MessageBroker.Subscribe<MainMenuEntered>(Handle);
+            MessageBroker.Subscribe<ClientRequestJoin>(Handle);
         }
 
         public override void Dispose()

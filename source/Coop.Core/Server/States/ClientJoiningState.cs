@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GameInterface.Services.GameState.Messages
+namespace Coop.Core.Server.States
 {
-    internal readonly struct GameLoaded
+    internal class ClientJoiningState
     {
     }
 }

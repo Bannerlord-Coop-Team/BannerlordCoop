@@ -399,6 +399,7 @@
     <Compile Include="Services\GameDebug\Interfaces\IGameDebugInterface.cs" />
     <Compile Include="Services\GameDebug\Messages\StartDebugGame.cs" />
     <Compile Include="Services\GameState\Handlers\EnterMainMenuHandler.cs" />
+    <Compile Include="Services\GameState\Handlers\StartCharacterCreationHandler.cs" />
     <Compile Include="Services\IGameAbstraction.cs" />
     <Compile Include="Services\IServiceModule.cs" />
     <Compile Include="Services\ServiceModule.cs" />
