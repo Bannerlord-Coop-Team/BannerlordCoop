@@ -64,8 +64,6 @@ namespace Coop
 
         public Main()
         {
-            CoopartiveMultiplayerExperience.Initialize();
-
             MBDebug.DisableLogging = false;
 
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
@@ -185,11 +183,14 @@ namespace Coop
             base.OnGameEnd(game);
         }
 
-        private bool m_IsFirstTick;
+        private bool m_IsFirstTick = true;
         protected override void OnApplicationTick(float dt)
         {
-            
-
+            if(m_IsFirstTick)
+            {
+                CoopartiveMultiplayerExperience.Initialize();
+                m_IsFirstTick = false;
+            }    
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
             CoopartiveMultiplayerExperience.Update(frameTime);
         }
