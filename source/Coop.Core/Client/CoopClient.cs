@@ -32,8 +32,6 @@ namespace Coop.Core.Client
             IClientLogic logic, 
             IMessageBroker messageBroker)
         {
-            CoopartiveMultiplayerExperience.Updateables.Add(this);
-
             configuration = config;
             this.logic = logic;
             this.messageBroker = messageBroker;

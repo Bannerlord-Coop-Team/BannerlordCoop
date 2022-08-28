@@ -283,6 +283,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Coop.Core\Coop.Core.csproj">
       <Project>{442B73F2-B103-4EF6-8B4B-A2F36F169515}</Project>
       <Name>Coop.Core</Name>

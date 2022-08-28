@@ -20,8 +20,6 @@ namespace Coop.Core.Server
 
         public CoopServer(INetworkConfiguration configuration, IMessageBroker messageBroker)
         {
-            CoopartiveMultiplayerExperience.Updateables.Add(this);
-
             // Dependancy assignment
             this.netManager = new NetManager(this);
             this.configuration = configuration;

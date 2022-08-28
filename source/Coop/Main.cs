@@ -1,10 +1,11 @@
-﻿using System;
-using System.Linq;
-using System.Reflection;
+﻿using Common;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
 using Coop.UI;
 using HarmonyLib;
+using System;
+using System.Linq;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -12,7 +13,6 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.ScreenSystem;
-using IContainer = Autofac.IContainer;
 using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop
@@ -21,9 +21,9 @@ namespace Coop
     {
         // Test Symbols
         public static readonly bool TESTING_ENABLED = true;
+        public static UpdateableList Updateables { get; } = new UpdateableList();
 
-
-
+        public static CoopartiveMultiplayerExperience Coop = new CoopartiveMultiplayerExperience();
         // -------------
 
         #region MainMenuButtons
@@ -81,6 +81,9 @@ namespace Coop
 
         public override void NoHarmonyLoad()
         {
+            Updateables.Add(GameLoopRunner.Instance);
+            Updateables.Add(Coop);
+
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
             // Apply all patches via harmony
             harmony.PatchAll();
@@ -124,11 +127,11 @@ namespace Coop
 
                         if (args.Contains("/server"))
                         {
-                            CoopartiveMultiplayerExperience.StartAsServer();
+                            Coop.StartAsServer();
                         }
                         else if (args.Contains("/client"))
                         {
-                            CoopartiveMultiplayerExperience.StartAsClient();
+                            Coop.StartAsClient();
                         }
 
 
@@ -188,11 +191,12 @@ namespace Coop
         {
             if(m_IsFirstTick)
             {
-                CoopartiveMultiplayerExperience.Initialize();
+                GameLoopRunner.Instance.SetGameLoopThread();
+                
                 m_IsFirstTick = false;
             }    
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
-            CoopartiveMultiplayerExperience.Update(frameTime);
+            Updateables.UpdateAll(frameTime);
         }
 
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
