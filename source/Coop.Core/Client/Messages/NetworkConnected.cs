@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Coop.Core.Client.Messages
+﻿namespace Coop.Core.Client.Messages
 {
     public readonly struct NetworkConnected
     {
+        public NetworkConnected(bool clientPartyExists)
+        {
+            ClientPartyExists = clientPartyExists;
+        }
+
+        public bool ClientPartyExists { get; }
     }
 }

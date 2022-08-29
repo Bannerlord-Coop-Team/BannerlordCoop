@@ -1,6 +1,6 @@
 using Common.Messaging;
 using Coop.Core.Client.Messages;
-using System;
+using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {
@@ -23,7 +23,7 @@ namespace Coop.Core.Client.States
 
         private void Handle(MessagePayload<NetworkConnected> obj)
         {
-            if (true) //check obj for character existence
+            if (obj.What.ClientPartyExists)
             {
                 Logic.State = new ReceivingSavedDataState(Logic, MessageBroker);
                 MessageBroker.Publish(this, new LoadGameSave());

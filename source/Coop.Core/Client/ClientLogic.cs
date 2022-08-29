@@ -9,7 +9,6 @@ namespace Coop.Core.Client
     public class ClientLogic : IClientLogic
     {
         public ILogger Logger { get; }
-        public IMessageBroker MessageBroker { get; }
         public ICoopClient NetworkClient { get; }
         public IClientState State 
         {
@@ -30,7 +29,6 @@ namespace Coop.Core.Client
         {
             Logger = logger;
             NetworkClient = networkClient;
-            MessageBroker = messageBroker;
             State = new MainMenuState(this, messageBroker);
         }
 
