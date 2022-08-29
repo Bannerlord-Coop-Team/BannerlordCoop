@@ -99,6 +99,7 @@
     <Compile Include="Autofac\TestClientModule.cs" />
     <Compile Include="Bootstrap.cs" />
     <Compile Include="Client\States\InitialClientStateTests.cs" />
+    <Compile Include="Client\States\MainMenuStateTests.cs" />
     <Compile Include="Communication\CommunicatorMessageBrokerTest.cs" />
     <Compile Include="Communication\PacketManagerTest.cs" />
     <Compile Include="CoopTest.cs" />

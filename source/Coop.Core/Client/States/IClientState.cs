@@ -10,6 +10,8 @@ namespace Coop.Core.Client.States
         void StartCharacterCreation();
         void LoadSavedData();
         void ExitGame();
-        void EnterMainMenu();
+        void EnterMainMenu(); 
+        void EnterCampaignState();
+        void EnterMissionState();
     }
 }

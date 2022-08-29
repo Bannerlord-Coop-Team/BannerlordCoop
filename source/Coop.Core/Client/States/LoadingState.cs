@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using System;
+using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {
@@ -7,41 +7,62 @@ namespace Coop.Core.Client.States
     {
         public LoadingState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
+            MessageBroker.Subscribe<MainMenuEntered>(Handle);
+            MessageBroker.Subscribe<NetworkGuidsResolved>(Handle);
         }
 
-        public override void Dispose()
+        private void Handle(MessagePayload<MainMenuEntered> obj)
         {
-            throw new NotImplementedException();
+            Logic.State = new MainMenuState(Logic, MessageBroker);
         }
 
-        public override void Connect()
+        private void Handle(MessagePayload<NetworkGuidsResolved> obj)
         {
-            throw new NotImplementedException();
-        }
-
-        public override void Disconnect()
-        {
-            throw new NotImplementedException();
+            Logic.State = new ResolveNetworkGuidsState(Logic, MessageBroker);
         }
 
         public override void EnterMainMenu()
         {
-            throw new NotImplementedException();
+            MessageBroker.Publish(this, new EnterMainMenu());
+        }
+
+        public override void ResolveNetworkGuids()
+        {
+            MessageBroker.Publish(this, new ResolveNetworkGuids());
+        }
+
+        public override void Dispose()
+        {
+            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            MessageBroker.Unsubscribe<NetworkGuidsResolved>(Handle);
+        }
+
+        public override void Connect()
+        {
+        }
+
+        public override void Disconnect()
+        {
         }
 
         public override void ExitGame()
         {
-            throw new NotImplementedException();
         }
 
         public override void LoadSavedData()
         {
-            throw new NotImplementedException();
         }
 
         public override void StartCharacterCreation()
         {
-            throw new NotImplementedException();
+        }
+
+        public override void EnterCampaignState()
+        {
+        }
+
+        public override void EnterMissionState()
+        {
         }
     }
 }

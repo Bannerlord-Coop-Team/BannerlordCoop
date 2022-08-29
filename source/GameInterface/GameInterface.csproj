@@ -398,7 +398,14 @@
     <Compile Include="Services\GameDebug\Interfaces\GameDebugInterface.cs" />
     <Compile Include="Services\GameDebug\Interfaces\IGameDebugInterface.cs" />
     <Compile Include="Services\GameDebug\Messages\StartDebugGame.cs" />
+    <Compile Include="Services\GameState\Handlers\EnterCampaignHandler.cs" />
     <Compile Include="Services\GameState\Handlers\EnterMainMenuHandler.cs" />
+    <Compile Include="Services\GameState\Handlers\EnterMissionHandler.cs" />
+    <Compile Include="Services\GameState\Messages\Connect.cs" />
+    <Compile Include="Services\GameState\Messages\EnterCampaignState.cs" />
+    <Compile Include="Services\GameState\Messages\EnterMissionState.cs" />
+    <Compile Include="Services\GameState\Messages\ResolveNetworkGuids.cs" />
+    <Compile Include="Services\GameState\Messages\ValidateModule.cs" />
     <Compile Include="Services\IServiceModule.cs" />
     <Compile Include="Services\ServiceModule.cs" />
     <Compile Include="Services\GameState\Interfaces\GameStateInterface.cs" />

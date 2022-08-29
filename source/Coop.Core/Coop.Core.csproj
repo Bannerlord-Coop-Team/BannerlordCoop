@@ -117,7 +117,7 @@
     <Compile Include="Client\States\MainMenuState.cs" />
     <Compile Include="Client\States\MissionState.cs" />
     <Compile Include="Client\States\ReceivingSavedDataState.cs" />
-    <Compile Include="Client\States\ResolveNetworkGuidsStart.cs" />
+    <Compile Include="Client\States\ResolveNetworkGuidsState.cs" />
     <Compile Include="Client\States\ValidateModuleState.cs" />
     <Compile Include="CoopModule.cs" />
     <Compile Include="Messages\Network\ReceivePacket.cs" />

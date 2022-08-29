@@ -1,15 +1,13 @@
-﻿using Coop.Tests.Stubs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Common.Messaging;
+using Coop.Tests.Stubs;
+using Moq;
 using Xunit.Abstractions;
 
 namespace Coop.Tests
 {
     public class CoopTest
     {
+        public readonly Mock<IMessageBroker> mockMessageBroker;
         public readonly MessageBrokerStub messageBroker;
         public readonly ITestOutputHelper output;
 
@@ -17,6 +15,7 @@ namespace Coop.Tests
         {
             this.output = output;
             messageBroker = new MessageBrokerStub();
+            mockMessageBroker = new Mock<IMessageBroker>();
         }
     }
 }

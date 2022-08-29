@@ -3,12 +3,12 @@ using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {
-    public class MissionState : ClientStateBase
+    public class ResolveNetworkGuidsState : ClientStateBase
     {
-        public MissionState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        public ResolveNetworkGuidsState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
-            MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<CampaignStateEntered>(Handle);
+            messageBroker.Subscribe<MainMenuEntered>(Handle);
+            messageBroker.Subscribe<CampaignStateEntered>(Handle);
         }
 
         private void Handle(MessagePayload<MainMenuEntered> obj)
@@ -21,12 +21,6 @@ namespace Coop.Core.Client.States
             Logic.State = new CampaignState(Logic, MessageBroker);
         }
 
-        public override void Dispose()
-        {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<CampaignStateEntered>(Handle);
-        }
-
         public override void EnterCampaignState()
         {
             MessageBroker.Publish(this, new EnterCampaignState());
@@ -35,6 +29,12 @@ namespace Coop.Core.Client.States
         public override void EnterMainMenu()
         {
             MessageBroker.Publish(this, new EnterMainMenu());
+        }
+
+        public override void Dispose()
+        {
+            MessageBroker.Subscribe<MainMenuEntered>(Handle);
+            MessageBroker.Subscribe<CampaignStateEntered>(Handle);
         }
 
         public override void Connect()
@@ -63,7 +63,6 @@ namespace Coop.Core.Client.States
 
         public override void ResolveNetworkGuids()
         {
-            throw new System.NotImplementedException();
         }
     }
 }

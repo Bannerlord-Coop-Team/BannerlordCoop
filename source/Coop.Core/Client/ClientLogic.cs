@@ -71,6 +71,16 @@ namespace Coop.Core.Client
             State.EnterMainMenu();
         }
 
+        public void EnterCampaignState()
+        {
+            State.ExitGame();
+        }
+
+        public void EnterMissionState()
+        {
+            State.EnterMainMenu();
+        }
+
 
     }
 }

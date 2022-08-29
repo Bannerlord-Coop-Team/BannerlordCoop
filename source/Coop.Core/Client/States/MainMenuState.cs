@@ -1,24 +1,39 @@
 using Common.Messaging;
+using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {
-    internal class MainMenuState : ClientStateBase
+    public class MainMenuState : ClientStateBase
     {
         public MainMenuState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
+            MessageBroker.Subscribe<Connected>(Handle);
         }
 
-        public override void Dispose()
+        private void Handle(MessagePayload<Connected> obj)
         {
-            throw new System.NotImplementedException();
+            if (obj.What.ClientPartyExists)
+            {
+                Logic.State = new ReceivingSavedDataState(Logic, MessageBroker);
+                MessageBroker.Publish(this, new LoadGameSave());
+            }
+            else
+            {
+                Logic.State = new CharacterCreationState(Logic, MessageBroker);
+                MessageBroker.Publish(this, new StartCreateCharacter());
+            }
         }
 
         public override void Connect()
         {
-            //TODO: connect
+            MessageBroker.Publish(this, new Connect());
         }
 
-        #region unused
+        public override void Dispose()
+        {
+            MessageBroker.Unsubscribe<Connected>(Handle);
+        }
+
         public override void Disconnect()
         {
         }
@@ -38,6 +53,17 @@ namespace Coop.Core.Client.States
         public override void StartCharacterCreation()
         {
         }
-        #endregion
+
+        public override void EnterCampaignState()
+        {
+        }
+
+        public override void EnterMissionState()
+        {
+        }
+
+        public override void ResolveNetworkGuids()
+        {
+        }
     }
 }

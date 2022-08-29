@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using Coop.Communication.PacketHandlers;
 using Xunit;
 
 namespace Coop.Tests.Communication
