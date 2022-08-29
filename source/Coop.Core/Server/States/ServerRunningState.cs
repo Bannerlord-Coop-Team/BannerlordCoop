@@ -21,6 +21,10 @@ namespace Coop.Core.Server.States
 
         public override void Stop()
         {
+            // Stop server
+            Logic.NetworkServer.Stop();
+
+            // Go to main menu
             MessageBroker.Publish(this, new EnterMainMenu());
         }
 

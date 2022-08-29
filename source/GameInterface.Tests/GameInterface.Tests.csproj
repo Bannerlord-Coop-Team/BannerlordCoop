@@ -119,7 +119,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="asdfasdf.cs" />
+    <Compile Include="ModuleBuild_UnitTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\DynamicModelGeneratorTests.cs" />
     <Compile Include="Serialization\Dynamic\HeroObjectSerializationTests.cs" />

@@ -6,18 +6,17 @@ using System.Net.Sockets;
 using Common.Components;
 using Common.Messaging;
 using Coop.Core;
-using Coop.Core.Messages.Network;
 using Coop.Core.Configuration;
 using Coop.Core.Client.States;
+using Coop.Core.Client.Messages;
 
 namespace Coop.Core.Client
 {
     public interface ICoopClient : ICoopNetwork, IUpdateable, INetEventListener
     {
-        bool IsConnected { get; }
     }
 
-    public class CoopClient : ComponentContainerBase, ICoopClient
+    public class CoopClient : ICoopClient
     {
         private readonly INetworkConfiguration configuration;
         private readonly IClientLogic logic;
@@ -25,11 +24,13 @@ namespace Coop.Core.Client
 
         private readonly NetManager netManager;
 
-        public bool IsConnected { get; private set; }
-
+        private bool isConnected = false;
         private NetPeer serverPeer;
 
-        public CoopClient(INetworkConfiguration config, IClientLogic logic, IMessageBroker messageBroker)
+        public CoopClient(
+            INetworkConfiguration config, 
+            IClientLogic logic, 
+            IMessageBroker messageBroker)
         {
             configuration = config;
             this.logic = logic;
@@ -61,8 +62,6 @@ namespace Coop.Core.Client
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
-            ReceivePacket message = new ReceivePacket(peer, reader, deliveryMethod);
-            messageBroker.Publish(this, message);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -72,32 +71,41 @@ namespace Coop.Core.Client
 
         public void OnPeerConnected(NetPeer peer)
         {
-            IsConnected = true;
+            if(isConnected == false)
+            {
+                isConnected = true;
+                messageBroker.Publish(this, new NetworkConnected());
+            }
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            IsConnected = false;
+            if (isConnected == true)
+            {
+                isConnected = false;
+                messageBroker.Publish(this, new NetworkDisconnected());
+            }
         }
 
         public void Start()
         {
-            if (IsConnected)
+            if (isConnected)
             {
                 Stop();
             }
+
             netManager.Start();
             serverPeer = netManager.Connect(configuration.Address, configuration.Port, configuration.Token);
         }
 
         public void Stop()
         {
-            netManager.Stop();
+            logic.Stop();
         }
 
         public void Update(TimeSpan frameTime)
         {
-            throw new NotImplementedException();
+            netManager.PollEvents();
         }
     }
 }

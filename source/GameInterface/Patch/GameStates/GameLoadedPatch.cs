@@ -1,22 +1,19 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
 using HarmonyLib;
+using SandBox;
 using TaleWorlds.Core;
 
 namespace GameInterface.Patch.GameStates
 {
-    [HarmonyPatch(typeof(GameManagerBase))]
+    [HarmonyPatch(typeof(SandBoxGameManager))]
     internal class GameLoadedPatch
     {
-        
-        class GameManagerPatch
+        [HarmonyPostfix]
+        [HarmonyPatch("OnLoadFinished")]
+        static void OnGameLoaded(ref GameManagerBase __instance)
         {
-            [HarmonyPrefix]
-            [HarmonyPatch("OnLoadFinished")]
-            static void OnGameLoaded(ref GameManagerBase __instance)
-            {
-                MessageBroker.Instance.Publish(__instance, new GameLoaded());
-            }
+            MessageBroker.Instance.Publish(__instance, new GameLoaded());
         }
     }
 }

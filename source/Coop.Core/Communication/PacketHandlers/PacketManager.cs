@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Common.Messaging;
-using Coop.Core.Messages.Network;
 using GameInterface.Serialization;
 using LiteNetLib;
 using LiteNetLib.Utils;
@@ -43,30 +42,6 @@ namespace Coop.Core.Communication.PacketHandlers
             this.netManager = netManager;
             this.serializer = serializer;
             this.messageBroker = messageBroker;
-
-            messageBroker.Subscribe<BroadcastPacket>(HandleBroadcast);
-            messageBroker.Subscribe<ForwardPacket>(HandleForward);
-            messageBroker.Subscribe<SendPacket>(HandleSend);
-        }
-
-        public void HandleBroadcast(MessagePayload<BroadcastPacket> payload)
-        {
-            IPacket packet = payload.What.Packet;
-            SendAll(packet);
-        }
-
-        public void HandleForward(MessagePayload<ForwardPacket> payload)
-        {
-            NetPeer sendingClient = payload.What.SendingClient;
-            IPacket packet = payload.What.Packet;
-            SendAllBut(sendingClient, packet);
-        }
-
-        public void HandleSend(MessagePayload<SendPacket> payload)
-        {
-            NetPeer receivingClient = payload.What.ClientToSend;
-            IPacket packet = payload.What.Packet;
-            Send(receivingClient, packet);
         }
 
         private void SendAllBut(NetPeer netPeer, IPacket packet)
@@ -99,25 +74,6 @@ namespace Coop.Core.Communication.PacketHandlers
 
             // Send data
             netPeer.Send(writer.Data, wrapper.DeliveryMethod);
-        }
-
-        public void HandleReceive(MessagePayload<ReceivePacket> payload)
-        {
-            NetPeer peer = payload.What.Peer;
-            NetPacketReader reader = payload.What.Writer;
-
-            PacketWrapper wrapper = serializer.Deserialize<PacketWrapper>(reader.GetBytesWithLength());
-
-            PacketType packetType = wrapper.Packet.Type;
-            IPacket packet = wrapper.Packet;
-
-            if (packetHandlers.TryGetValue(packetType, out var handlers))
-            {
-                foreach (var handler in handlers)
-                {
-                    Task.Factory.StartNew(() => { handler.HandlePacket(peer, packet); });
-                }
-            }
         }
     }
 

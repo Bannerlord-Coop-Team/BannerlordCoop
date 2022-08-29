@@ -15,10 +15,5 @@ namespace GameInterface.Data
         {
             Data = data;
         }
-
-        public LoadResult LoadData()
-        {
-            throw new NotImplementedException();
-        }
     }
 }

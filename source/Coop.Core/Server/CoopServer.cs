@@ -4,7 +4,6 @@ using System.Net;
 using System.Net.Sockets;
 using Common.Messaging;
 using Coop.Core.Server.Connections;
-using Coop.Core.Messages.Network;
 using Coop.Core.Configuration;
 
 namespace Coop.Core.Server
@@ -66,8 +65,6 @@ namespace Coop.Core.Server
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
-            ReceivePacket message = new ReceivePacket(peer, reader, deliveryMethod);
-            messageBroker.Publish(this, message);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)

@@ -5,7 +5,7 @@ using System.Threading;
 
 namespace Coop.Core
 {
-    internal class GameLoopRunner : IUpdateable
+    public class GameLoopRunner : IUpdateable
     {
         private static readonly Lazy<GameLoopRunner> m_Instance =
             new Lazy<GameLoopRunner>(() => new GameLoopRunner());

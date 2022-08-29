@@ -107,6 +107,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Client\Messages\NetworkDisconnected.cs" />
+    <Compile Include="Client\Messages\NetworkConnected.cs" />
     <Compile Include="Client\States\CampaignState.cs" />
     <Compile Include="Client\States\CharacterCreationState.cs" />
     <Compile Include="Client\States\ClientStateBase.cs" />
@@ -120,15 +122,15 @@
     <Compile Include="Client\States\ResolveNetworkGuidsState.cs" />
     <Compile Include="Client\States\ValidateModuleState.cs" />
     <Compile Include="CoopModule.cs" />
-    <Compile Include="Messages\Network\ReceivePacket.cs" />
     <Compile Include="Server\Connections\Connection.cs" />
     <Compile Include="Server\Connections\ConnectionManager.cs" />
     <Compile Include="Server\Connections\IConnection.cs" />
     <Compile Include="Server\Connections\IConnectionManager.cs" />
     <Compile Include="Server\Connections\IConnectionState.cs" />
     <Compile Include="Server\Connections\States\InitialConnectionState.cs" />
+    <Compile Include="Server\Messages\Events\ClientJoinRequested.cs" />
+    <Compile Include="Server\States\ClientJoiningState.cs" />
     <Compile Include="Server\States\IServerLogic.cs" />
-    <Compile Include="Messages\Network\SendPacketMessages.cs" />
     <Compile Include="Server\ServerModule.cs" />
     <Compile Include="Client\ClientModule.cs" />
     <Compile Include="Communication\PacketHandlers\ExamplePacketHandler.cs" />
@@ -182,6 +184,8 @@
   <ItemGroup>
     <Folder Include="Communication\MessageBroker\" />
     <Folder Include="Debugging\Commands\" />
+    <Folder Include="Messages\Commands\" />
+    <Folder Include="Messages\Events\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

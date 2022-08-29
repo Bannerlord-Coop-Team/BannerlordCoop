@@ -1,5 +1,6 @@
 using Common.Messaging;
-using GameInterface.Services.GameState.Messages;
+using Coop.Core.Client.Messages;
+using System;
 
 namespace Coop.Core.Client.States
 {
@@ -7,12 +8,22 @@ namespace Coop.Core.Client.States
     {
         public MainMenuState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
-            MessageBroker.Subscribe<Connected>(Handle);
+            MessageBroker.Subscribe<NetworkConnected>(Handle);
         }
 
-        private void Handle(MessagePayload<Connected> obj)
+        public override void Dispose()
         {
-            if (obj.What.ClientPartyExists)
+            MessageBroker.Unsubscribe<NetworkConnected>(Handle);
+        }
+
+        public override void Connect()
+        {
+            Logic.NetworkClient.Start();
+        }
+
+        private void Handle(MessagePayload<NetworkConnected> obj)
+        {
+            if (true) //check obj for character existence
             {
                 Logic.State = new ReceivingSavedDataState(Logic, MessageBroker);
                 MessageBroker.Publish(this, new LoadGameSave());
@@ -22,16 +33,6 @@ namespace Coop.Core.Client.States
                 Logic.State = new CharacterCreationState(Logic, MessageBroker);
                 MessageBroker.Publish(this, new StartCreateCharacter());
             }
-        }
-
-        public override void Connect()
-        {
-            MessageBroker.Publish(this, new Connect());
-        }
-
-        public override void Dispose()
-        {
-            MessageBroker.Unsubscribe<Connected>(Handle);
         }
 
         public override void Disconnect()
