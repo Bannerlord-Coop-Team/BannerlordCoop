@@ -1,14 +1,12 @@
 # arguments
 param([string]$SolutionDir,
-      [string]$TargetDir,
-      [string[]] $Libs);
+      [string]$TargetDir);
 
 $Libs = $Libs -split ','
 
 Write-Output "*** deploy.ps1 ***"
 Write-Output "SolutionDir:   ${SolutionDir}"
 Write-Output "TargetDir:     ${TargetDir}"
-Write-Output "3rdPartyLibs:  ${Libs}"
 
 # path to required files
 $BaseDir        = "${SolutionDir}..\"
@@ -38,11 +36,7 @@ $subModuleContent | Out-File -Encoding utf8 -FilePath $DeployDir\SubModule.xml
 
 
 # copy mod dll
-$filesToCopy = ${Libs}
-foreach ($file in $filesToCopy) 
-{
-    Copy-item -Force ${TargetDir}${file} -Destination $DeployBinDir
-}
+Copy-item -Force *.dll -Destination $DeployBinDir
 
 # copy to games mod folder
 if(Test-Path (${BaseDir} + $config.modsDir))

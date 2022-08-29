@@ -1,9 +1,9 @@
-﻿using MissionTestMod.Server;
-using Missions.Config;
+﻿using Missions.Config;
 using System;
 using System.Threading.Tasks;
+using TestServer.Server;
 
-namespace MissionTestMod
+namespace TestServer
 {
     internal class Program
     {
@@ -16,7 +16,15 @@ namespace MissionTestMod
             NetworkConfiguration config = new NetworkConfiguration();
             testServer = new MissionTestServer(config);
 
-            Console.WriteLine($"Server started on: {config.WanAddress}, Port: {config.WanPort}");
+            if(config.NATType == NATType.Internal)
+            {
+                Console.WriteLine($"Server started on: {config.LanAddress}, Port: {config.LanPort}");
+            }
+            else
+            {
+                Console.WriteLine($"Server started on: {config.WanAddress}, Port: {config.WanPort}");
+            }
+
             Console.WriteLine($"Type STOP to stop the server.");
 
 
@@ -29,12 +37,12 @@ namespace MissionTestMod
 
         static async void WaitForStop()
         {
-            while(Console.ReadLine().ToLower() != "stop") { await Task.Delay(100); }
+            while (Console.ReadLine().ToLower() != "stop") { await Task.Delay(100); }
         }
 
         static async void PollServer()
         {
-            while(stopTask.Status == TaskStatus.Running)
+            while (stopTask.Status == TaskStatus.Running)
             {
                 testServer.Update();
                 await Task.Delay(1000 / TicksPerSecond);

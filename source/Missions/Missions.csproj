@@ -160,7 +160,6 @@
     <Compile Include="Network\NetworkMessageBroker.cs" />
     <Compile Include="Network\NetworkMount.cs" />
     <Compile Include="Network\NetworkSiegeEngine.cs" />
-    <Compile Include="Network\P2PPeer.cs" />
     <Compile Include="Network\Player.cs" />
     <Compile Include="Packets\Agents\AgentActionData.cs" />
     <Compile Include="Packets\Agents\AgentData.cs" />
@@ -172,6 +171,8 @@
     <Compile Include="Patch\BoardGames\BoardGamePatches.cs" />
     <Compile Include="PlayerId.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Serialization\Surrogates\Vec2Surrogate.cs" />
+    <Compile Include="Serialization\Surrogates\Vec3Surrogate.cs" />
     <Compile Include="Test\MissionTestGameManager.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -184,5 +185,6 @@
       <Name>Common</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

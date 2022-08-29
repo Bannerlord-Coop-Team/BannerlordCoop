@@ -38,7 +38,7 @@ namespace Missions
             if (Mission.Current.HasMissionBehavior<MissionBoardGameLogic>() &&
                Agent.Main == sender)
             {
-                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Challenge", "Pussy out",
+                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Challenge", "Cancle",
                 new Action(() => { SendGameRequest(sender, other); }), new Action(() => { })));
             }
 
@@ -67,7 +67,7 @@ namespace Missions
 
             if (BoardGameLogic.IsPlayingOtherPlayer == false)
             {
-                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Accept", "Pussy out",
+                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Accept", "Decline",
                 new Action(() => { AcceptGameRequest(sender, other, netPeer); }), new Action(() => { DenyGameRequest(sender, other, netPeer); })));
             }
             else

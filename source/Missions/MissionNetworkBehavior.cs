@@ -1,9 +1,11 @@
 ﻿using Common.Messaging;
+using Coop.Mod;
 using Coop.Mod.Missions;
 using Missions.Config;
 using Missions.Network;
 using System;
 using System.Threading.Tasks;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions
@@ -32,11 +34,20 @@ namespace Missions
                 {
                     await Task.Delay(100);
                 }
-                m_Client.ConnectToP2PServer(Mission.SceneName);
 
-                missionClient = new MissionClient(m_Client);
-                await Task.Delay(WaitForConnectionsTime);
-                missionClient.SendJoinRequest();
+                string sceneName = Mission.SceneName;
+                if(m_Client.ConnectToP2PServer(sceneName))
+                {
+                    m_Client.NatPunch(sceneName);
+
+                    missionClient = new MissionClient(m_Client);
+                    await Task.Delay(WaitForConnectionsTime);
+                    missionClient.SendJoinRequest();
+                }
+                else
+                {
+                    OnEndMission();
+                }
             });
         }
 
@@ -59,6 +70,20 @@ namespace Missions
             }
 
             base.OnAgentDeleted(affectedAgent);
+        }
+
+        protected override void OnEndMission()
+        {
+            m_Client.Dispose();
+            MBGameManager.EndGame();
+            base.OnEndMission();
+        }
+
+        public override void OnMissionTick(float dt)
+        {
+            TimeSpan frameTime = TimeSpan.FromSeconds(dt);
+            m_Client.Update(frameTime);
+            base.OnMissionTick(dt);
         }
     }
 }

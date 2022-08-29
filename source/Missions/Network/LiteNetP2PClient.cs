@@ -19,6 +19,8 @@ namespace Missions.Network
     public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable
     {
         private static Logger m_Logger = LogManager.GetCurrentClassLogger();
+
+        private readonly Guid id = Guid.NewGuid();
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;
         public event Action<NetPeer, DisconnectInfo> OnClientDisconnected;
 
@@ -36,7 +38,6 @@ namespace Missions.Network
 
             netManager = new NetManager(this)
             {
-                IPv6Enabled = IPv6Mode.DualMode,
                 NatPunchEnabled = true,
             };
 
@@ -77,6 +78,7 @@ namespace Missions.Network
 
         public void Update(TimeSpan frameTime)
         {
+            int t = peerServer.TimeSinceLastPacket;
             netManager.PollEvents();
             netManager.NatPunchModule.PollEvents();
         }
@@ -84,8 +86,6 @@ namespace Missions.Network
         public bool ConnectToP2PServer(string instance)
         {
             this.instance = instance;
-
-            TryPunch(instance);
 
             string connectionAddress;
             int port;
@@ -103,20 +103,26 @@ namespace Missions.Network
 
             peerServer = netManager.Connect(connectionAddress,
                                             port,
-                                            networkConfig.P2PToken);
+                                            $"{networkConfig.P2PToken}%{id}");
 
             return peerServer != null;
         }
 
+        public void NatPunch(string instance)
+        {
+            TryPunch(instance);
+        }
+
         private void TryPunch(string instance)
         {
+            string token = $"{instance}%{id}";
             if (networkConfig.NATType == NATType.Internal)
             {
-                netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.LanAddress.ToString(), networkConfig.LanPort, instance);
+                netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.LanAddress.ToString(), networkConfig.LanPort, token);
             }
             else if (networkConfig.NATType == NATType.External)
             {
-                netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.WanAddress.ToString(), networkConfig.WanPort, instance);
+                netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.WanAddress.ToString(), networkConfig.WanPort, token);
             }
         }
 
@@ -209,7 +215,20 @@ namespace Missions.Network
 
         public void OnConnectionRequest(ConnectionRequest request)
         {
-            request.AcceptIfKey(instance);
+            string[] data = request.Data.GetString().Split('%');
+
+            if (data.Length != 2) return;
+
+            string instance = data[0];
+
+            if(this.instance == instance)
+            {
+                request.Accept();
+            }
+            else
+            {
+                request.Reject();
+            }
         }
     }
 }

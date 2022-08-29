@@ -1,4 +1,5 @@
-﻿using System;
+﻿using LiteNetLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -12,6 +13,7 @@ namespace Missions.Network
         public IPEndPoint InternalAddr { get; }
         public IPEndPoint ExternalAddr { get; }
         public DateTime RefreshTime { get; private set; }
+        public NetPeer NetPeer { get; }
 
         public void Refresh()
         {
@@ -34,8 +36,9 @@ namespace Missions.Network
             return hashCode;
         }
 
-        public P2PPeer(IPEndPoint internalAddr, IPEndPoint externalAddr)
+        public P2PPeer(NetPeer peer, IPEndPoint internalAddr, IPEndPoint externalAddr)
         {
+            NetPeer = peer;
             Refresh();
             InternalAddr = internalAddr;
             ExternalAddr = externalAddr;

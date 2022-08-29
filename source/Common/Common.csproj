@@ -85,7 +85,6 @@
     <Compile Include="Serialization\CommonSerializer.cs" />
     <Compile Include="CompatibilityInfo.cs" />
     <Compile Include="CoopObjectManager.cs" />
-    <Compile Include="CoopStateMachine.cs" />
     <Compile Include="DropoutStack.cs" />
     <Compile Include="Entity\IController.cs" />
     <Compile Include="Entity\IEntity.cs" />

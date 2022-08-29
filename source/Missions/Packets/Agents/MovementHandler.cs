@@ -1,4 +1,5 @@
-﻿using LiteNetLib;
+﻿using Coop.Mod;
+using LiteNetLib;
 using Missions.Network;
 using NLog;
 using ProtoBuf;
@@ -68,34 +69,42 @@ namespace Missions.Packets.Agents
 
         public PacketType PacketType => PacketType.Movement;
 
-        [HandleProcessCorruptedStateExceptions]
+        Mission CurrentMission { 
+            get
+            {
+                Mission current = null;
+                GameLoopRunner.RunOnMainThread(() =>
+                {
+                    current = Mission.Current;
+                });
+                return current;
+            }
+        }
+
         private async void PollAgents()
         {
-            while (m_AgentPollingCancelToken.IsCancellationRequested == false)
+            while (m_AgentPollingCancelToken.IsCancellationRequested == false &&
+                   CurrentMission != null)
             {
-                bool? isLoadingFinished = Mission.Current?.IsLoadingFinished;
-                if (isLoadingFinished.HasValue == false)
+                foreach (Guid guid in NetworkAgentRegistry.ControlledAgents.Keys)
                 {
-                    m_AgentPollingCancelToken.Cancel(false);
-                }
-                else if (isLoadingFinished.Value)
-                {
-                    foreach (Guid guid in NetworkAgentRegistry.ControlledAgents.Keys)
+                    Agent agent = NetworkAgentRegistry.ControlledAgents[guid];
+                    if (agent.Mission != null)
                     {
-                        Agent agent = NetworkAgentRegistry.ControlledAgents[guid];
-                        if (agent.Mission != null)
+                        MovementPacket packet = new MovementPacket(guid, agent);
+                        m_Client.SendAll(packet);
+                    }
+                    else
+                    {
+                        if (NetworkAgentRegistry.AgentToId.TryGetValue(agent, out Guid agentId))
                         {
-                            MovementPacket packet = new MovementPacket(guid, agent);
-                            m_Client.SendAll(packet);
-                        }
-                        else
-                        {
-                            if (NetworkAgentRegistry.AgentToId.TryGetValue(agent, out Guid agentId))
+                            GameLoopRunner.RunOnMainThread(() =>
                             {
                                 agent.MakeDead(false, ActionIndexCache.act_none);
                                 agent.FadeOut(false, true);
-                                NetworkAgentRegistry.RemoveControlledAgent(agentId);
-                            }
+                            });
+
+                            NetworkAgentRegistry.RemoveControlledAgent(agentId);
                         }
                     }
                 }

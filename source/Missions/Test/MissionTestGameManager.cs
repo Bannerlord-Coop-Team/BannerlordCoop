@@ -1,4 +1,7 @@
-﻿using NLog;
+﻿using Missions;
+using Missions.Serialization.Surrogates;
+using NLog;
+using ProtoBuf.Meta;
 using SandBox;
 using SandBox.Conversation.MissionLogics;
 using SandBox.Missions.AgentBehaviors;
@@ -28,13 +31,15 @@ using TaleWorlds.SaveSystem.Load;
 
 namespace Coop.Mod.Missions
 {
-    internal class MissionTestGameManager : SandBoxGameManager
+    public class MissionTestGameManager : SandBoxGameManager
     {
+        static MissionTestGameManager()
+        {
+            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
+        }
+
         private static readonly NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
-
-        delegate void PositionRefDelegate(UIntPtr agentPtr, ref Vec3 position);
-
-
 
         public MissionTestGameManager(LoadResult loadedGameResult) : base(loadedGameResult)
         {
@@ -46,9 +51,6 @@ namespace Coop.Mod.Missions
             //get the settlement first
             Settlement settlement = Settlement.Find("town_ES3");
 
-            // get its arena
-            Location locationWithId = settlement.LocationComplex.GetLocationWithId("arena");
-
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
             LocationEncounter locationEncounter = new TownEncounter(settlement);
 
@@ -58,32 +60,38 @@ namespace Coop.Mod.Missions
             //Set our encounter to the created encounter
             PlayerEncounter.LocationEncounter = locationEncounter;
 
+            int upgradeLevel = settlement.Town?.GetWallLevel() ?? 1;
+            Location tavern = LocationComplex.Current.GetLocationWithId("tavern");
+            string scene = tavern.GetSceneName(upgradeLevel);
+            Mission mission = SandBoxMissions.OpenIndoorMission(scene, tavern);
+            mission.AddMissionBehavior(new MissionNetworkBehavior());
+
             //PlayerEncounter.EnterSettlement();
 
             //Location center = settlement.LocationComplex.GetLocationWithId("center");
 
             //return arena scenae name of current town
-   //         int upgradeLevel = settlement.IsTown ? settlement.Town.GetWallLevel() : 1;
+            //         int upgradeLevel = settlement.IsTown ? settlement.Town.GetWallLevel() : 1;
 
-   //         //Open a new arena mission with the scene; commented out because we are not doing Arena testing right now
-			//string civilianUpgradeLevelTag = Campaign.Current.Models.LocationModel.GetCivilianUpgradeLevelTag(upgradeLevel);
-   //         Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(locationWithId.GetSceneName(upgradeLevel), "", false), (Mission mission) => new MissionBehavior[]
-   //            {
-   //                             new MissionOptionsComponent(),
-   //                             //new ArenaDuelMissionController(CharacterObject.PlayerCharacter, false, false, null, 1), //this was the default controller that spawned the player and 1 opponent. Not very useful
-   //                             new MissionFacialAnimationHandler(),
-   //                             new MissionDebugHandler(),
-   //                             new MissionAgentPanicHandler(),
-   //                             new AgentCommonAILogic(),
-   //                             new AgentHumanAILogic(),
-   //                             new ArenaAgentStateDeciderLogic(),
-   //                             new VisualTrackerMissionBehavior(),
-   //                             new CampaignMissionComponent(),
-   //                             new MissionNetworkComponent(),
-   //                             new EquipmentControllerLeaveLogic(),
-   //                             new MissionAgentHandler(locationWithId, null),
-   //                             new MissionNetworkBehavior(),
-   //            }, true, true);
+            //         //Open a new arena mission with the scene; commented out because we are not doing Arena testing right now
+            //string civilianUpgradeLevelTag = Campaign.Current.Models.LocationModel.GetCivilianUpgradeLevelTag(upgradeLevel);
+            //         Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(locationWithId.GetSceneName(upgradeLevel), "", false), (Mission mission) => new MissionBehavior[]
+            //            {
+            //                             new MissionOptionsComponent(),
+            //                             //new ArenaDuelMissionController(CharacterObject.PlayerCharacter, false, false, null, 1), //this was the default controller that spawned the player and 1 opponent. Not very useful
+            //                             new MissionFacialAnimationHandler(),
+            //                             new MissionDebugHandler(),
+            //                             new MissionAgentPanicHandler(),
+            //                             new AgentCommonAILogic(),
+            //                             new AgentHumanAILogic(),
+            //                             new ArenaAgentStateDeciderLogic(),
+            //                             new VisualTrackerMissionBehavior(),
+            //                             new CampaignMissionComponent(),
+            //                             new MissionNetworkComponent(),
+            //                             new EquipmentControllerLeaveLogic(),
+            //                             new MissionAgentHandler(locationWithId, null),
+            //                             new MissionNetworkBehavior(),
+            //            }, true, true);
 
             //MouseManager.ShowCursor(false);
 
