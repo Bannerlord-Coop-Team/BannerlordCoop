@@ -1,13 +1,10 @@
 ﻿using Common;
 using Coop.Mod;
 using Coop.Mod.Missions;
+using HarmonyLib;
 using SandBox;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Localization;
@@ -21,8 +18,11 @@ namespace MissionTestMod
     {
         public static UpdateableList Updateables { get; } = new UpdateableList();
         private static InitialStateOption JoinTavern;
+        private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
         protected override void OnSubModuleLoad()
         {
+            harmony.PatchAll();
+
             Updateables.Add(GameLoopRunner.Instance);
 
             JoinTavern = new InitialStateOption(

@@ -34,6 +34,9 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Lib.Harmony.2.2.2\lib\net472\0Harmony.dll</HintPath>
+    </Reference>
     <Reference Include="SandBox, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
@@ -56,7 +59,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
     </Reference>
-    <Reference Include="TaleWorlds.DotNet, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
+    <Reference Include="TaleWorlds.DotNet">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.DotNet.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.Engine, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
@@ -68,7 +73,9 @@
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>
-    <Reference Include="TaleWorlds.SaveSystem, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
+    <Reference Include="TaleWorlds.SaveSystem, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="TestMod.cs" />
@@ -76,6 +83,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
