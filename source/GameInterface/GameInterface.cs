@@ -1,31 +1,28 @@
 ﻿using Autofac;
-using Common.Messages;
-using GameInterface.Helpers;
-using GameInterface.Serialization.Dynamic;
+using GameInterface.Services;
+using HarmonyLib;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace GameInterface
 {
     public class GameInterface : IGameInterface
     {
-        public static IMessageBroker MessageBroker { get; private set; }
-
-        public IExampleGameHelper ExampleGameHelper { get; }
-
-        public ISaveLoadHelper SaveLoadHelper { get; }
-
-        internal IDynamicModelService DynamicModelService { get; }
-
-        private readonly IContainer Container;
-
-        public GameInterface(IMessageBroker messageBroker)
+        public IContainer Container { get; }
+        public GameInterface()
         {
-            MessageBroker = messageBroker;
+            Harmony harmony = new Harmony("com.Coop.GameInterface");
+            harmony.PatchAll();
 
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<GameInterfaceModule>();
-            Container = builder.Build();
+            IContainer container = builder.Build();
 
-            DynamicModelService = Container.Resolve<IDynamicModelService>();
+            IServiceModule serviceModule = container.Resolve<IServiceModule>();
+            serviceModule.InstantiateServices(container);
         }
     }
 }

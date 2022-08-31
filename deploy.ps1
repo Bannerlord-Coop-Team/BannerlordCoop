@@ -1,14 +1,10 @@
 # arguments
 param([string]$SolutionDir,
-      [string]$TargetDir,
-      [string[]] $Libs);
-
-$Libs = $Libs -split ','
+      [string]$TargetDir);
 
 Write-Output "*** deploy.ps1 ***"
 Write-Output "SolutionDir:   ${SolutionDir}"
 Write-Output "TargetDir:     ${TargetDir}"
-Write-Output "3rdPartyLibs:  ${Libs}"
 
 # path to required files
 $BaseDir        = "${SolutionDir}..\"
@@ -37,12 +33,8 @@ $subModuleContent = $subModuleContent.replace('${game_version}', $config.game_ve
 $subModuleContent | Out-File -Encoding utf8 -FilePath $DeployDir\SubModule.xml
 
 
-# copy mod dll
-$filesToCopy = ${Libs}
-foreach ($file in $filesToCopy) 
-{
-    Copy-item -Force ${TargetDir}${file} -Destination $DeployBinDir
-}
+# copy mod dlls
+Copy-item -Force *.dll -Destination $DeployBinDir
 
 # copy to games mod folder
 if(Test-Path (${BaseDir} + $config.modsDir))
@@ -51,7 +43,6 @@ if(Test-Path (${BaseDir} + $config.modsDir))
     Remove-Item ${ModDir} -Recurse -ErrorAction Ignore
     New-Item -Force -ItemType Directory -Path ${ModDir} | Out-Null
     Copy-item -Force -Recurse $DeployDir\* -Destination $ModDir\
-    
 }
 
 # write Movie Prefabs

@@ -78,6 +78,11 @@
       <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
     <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Linq, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Linq.4.3.0\lib\net463\System.Linq.dll</HintPath>
+      <Private>True</Private>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Memory.4.5.4\lib\net461\System.Memory.dll</HintPath>
     </Reference>
@@ -190,6 +195,9 @@
     <Reference Include="TaleWorlds.MountAndBlade.Diamond">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Diamond.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.GauntletUI">
+      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll</HintPath>
     </Reference>
@@ -259,22 +267,21 @@
     <Compile Include="Extentions\CampaignObjectManagerExtentions.cs" />
     <Compile Include="Extentions\CampaignTimeExtensions.cs" />
     <Compile Include="Extentions\MobilePartyExtensions.cs" />
-    <Compile Include="GameInterface.cs" />
     <Compile Include="Behaviour\GameLoadedBehaviour.cs" />
+    <Compile Include="GameInterface.cs" />
     <Compile Include="GameInterfaceModule.cs" />
     <Compile Include="Helpers\ExampleGameHelper.cs" />
     <Compile Include="Helpers\IExampleGameHelper.cs" />
     <Compile Include="Helpers\SaveGameData.cs" />
-    <Compile Include="IGameInterface.cs" />
     <Compile Include="Helpers\ISaveLoadHelper.cs" />
-    <Compile Include="Messages\Commands\GameStateCommands.cs" />
-    <Compile Include="Messages\Events\GameStateEvents.cs" />
-    <Compile Include="Messages\Queries\SaveGameQueries.cs" />
+    <Compile Include="IGameInterface.cs" />
     <Compile Include="Patch\CampaignPatches\CompanionsCampaignBehaviorPatches.cs" />
     <Compile Include="Patch\CampaignPatches\SetTimeSpeedPatch.cs" />
     <Compile Include="Patch\CampaignPatches\TimeControlModePatch.cs" />
     <Compile Include="Patch\Debugging.cs" />
     <Compile Include="Patch\Exceptions.cs" />
+    <Compile Include="Patch\GameStates\CharacterCreationPatch.cs" />
+    <Compile Include="Patch\GameStates\GameLoadedPatch.cs" />
     <Compile Include="Patch\GameStates\MainMenuPatch.cs" />
     <Compile Include="Patch\Hero\HeroPatches.cs" />
     <Compile Include="Patch\MobilePartyPatches\ComputeIsWaitingPatch.cs" />
@@ -387,8 +394,41 @@
     <Compile Include="Serializers\PropertyOwnerSerializers\CharacterSkillsSerializer.cs" />
     <Compile Include="Serializers\PropertyOwnerSerializers\CharacterTraitsSerializer.cs" />
     <Compile Include="Serializers\TextObjectSerializer.cs" />
-    <Compile Include="Services\GameStateService.cs" />
-    <Compile Include="Services\IGameStateService.cs" />
+    <Compile Include="Services\Example\Handlers\IExampleHandler.cs" />
+    <Compile Include="Services\Example\IExampleService.cs" />
+    <Compile Include="Services\Example\Interfaces\IExampleInterface.cs" />
+    <Compile Include="Services\Example\Messages\ExampleCommand.cs" />
+    <Compile Include="Services\GameDebug\Handlers\LoadDebugGameHandler.cs" />
+    <Compile Include="Services\GameDebug\Handlers\SkipCharacterCreationHandler.cs" />
+    <Compile Include="Services\GameDebug\Interfaces\CharacterCreationInterface.cs" />
+    <Compile Include="Services\GameDebug\Interfaces\GameDebugInterface.cs" />
+    <Compile Include="Services\GameDebug\Interfaces\ICharacterCreationInterface.cs" />
+    <Compile Include="Services\GameDebug\Interfaces\IGameDebugInterface.cs" />
+    <Compile Include="Services\GameDebug\Messages\CharacterCreationStarted.cs" />
+    <Compile Include="Services\GameDebug\Messages\StartDebugGame.cs" />
+    <Compile Include="Services\GameState\Handlers\EnterCampaignHandler.cs" />
+    <Compile Include="Services\GameState\Handlers\EnterMainMenuHandler.cs" />
+    <Compile Include="Services\MobileParties\Handlers\RemoveMainPartyHandler.cs" />
+    <Compile Include="Services\GameState\Handlers\StartCharacterCreationHandler.cs" />
+    <Compile Include="Services\MobileParties\Interfaces\IMainPartyInterface.cs" />
+    <Compile Include="Services\MobileParties\Interfaces\MainPartyInterface.cs" />
+    <Compile Include="Services\MobileParties\Messages\RemoveMainParty.cs" />
+    <Compile Include="Services\IGameAbstraction.cs" />
+    <Compile Include="Services\GameState\Handlers\EnterMissionHandler.cs" />
+    <Compile Include="Services\GameState\Messages\Connect.cs" />
+    <Compile Include="Services\GameState\Messages\EnterCampaignState.cs" />
+    <Compile Include="Services\GameState\Messages\EnterMissionState.cs" />
+    <Compile Include="Services\GameState\Messages\ResolveNetworkGuids.cs" />
+    <Compile Include="Services\GameState\Messages\ValidateModule.cs" />
+    <Compile Include="Services\IServiceModule.cs" />
+    <Compile Include="Services\ServiceModule.cs" />
+    <Compile Include="Services\GameState\Interfaces\GameStateInterface.cs" />
+    <Compile Include="Services\GameState\Interfaces\IGameStateInterface.cs" />
+    <Compile Include="Services\GameState\Messages\EnterMainMenu.cs" />
+    <Compile Include="Services\GameState\Messages\GameLoaded.cs" />
+    <Compile Include="Services\GameState\Messages\LoadGameSave.cs" />
+    <Compile Include="Services\GameState\Messages\PackageGameSaveData.cs" />
+    <Compile Include="Services\GameState\Messages\StartCharacterCreation.cs" />
     <Compile Include="Utils\ReflectionUtils.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -401,6 +441,10 @@
       <Name>Common</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Services\Heros\Handlers\" />
+    <Folder Include="Services\Heros\Interfaces\" />
+    <Folder Include="Services\Heros\Messages\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

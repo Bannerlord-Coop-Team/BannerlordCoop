@@ -1,6 +1,5 @@
 ﻿using Autofac;
-using Common.Messages;
-using Coop.Tests.Stubs;
+using Common.Messaging;
 
 namespace Coop.Tests.Autofac
 {
