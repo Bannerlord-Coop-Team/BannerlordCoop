@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Net;
 
-namespace Missions.Config
+namespace TestServer.Config
 {
     public enum NATType
     {

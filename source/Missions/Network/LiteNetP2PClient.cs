@@ -23,6 +23,7 @@ namespace Missions.Network
         private readonly Guid id = Guid.NewGuid();
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;
         public event Action<NetPeer, DisconnectInfo> OnClientDisconnected;
+        public event Action<NetPeer> OnClientConnected;
 
         NetManager netManager;
         string instance;
@@ -83,10 +84,8 @@ namespace Missions.Network
             netManager.NatPunchModule.PollEvents();
         }
 
-        public bool ConnectToP2PServer(string instance)
+        public bool ConnectToP2PServer()
         {
-            this.instance = instance;
-
             string connectionAddress;
             int port;
             if (networkConfig.NATType == NATType.Internal)
@@ -100,7 +99,6 @@ namespace Missions.Network
                 port = networkConfig.WanPort;
             }
 
-
             peerServer = netManager.Connect(connectionAddress,
                                             port,
                                             $"{networkConfig.P2PToken}%{id}");
@@ -110,6 +108,7 @@ namespace Missions.Network
 
         public void NatPunch(string instance)
         {
+            this.instance = instance;
             TryPunch(instance);
         }
 
@@ -130,6 +129,7 @@ namespace Missions.Network
         public void Stop()
         {
             netManager.DisconnectAll();
+            netManager.Stop();
         }
 
         public void Send(IPacket packet, NetPeer client)
@@ -170,6 +170,10 @@ namespace Missions.Network
 
         public void OnPeerConnected(NetPeer peer)
         {
+            if(peerServer != null && peer != peerServer)
+            {
+                OnClientConnected?.Invoke(peer);
+            }
             m_Logger.Info($"{netManager.LocalPort} recieved connection from {peer.EndPoint}");
         }
 

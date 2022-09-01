@@ -20,10 +20,10 @@ namespace Missions.Network
             RefreshTime = DateTime.UtcNow;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj == null) return false;
-            if (!(obj is P2PPeer other)) return false;
+            if (obj is not P2PPeer other) return false;
 
             return InternalAddr.Equals(other.InternalAddr) && ExternalAddr.Equals(other.ExternalAddr);
         }

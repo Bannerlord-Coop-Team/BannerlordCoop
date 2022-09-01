@@ -1,7 +1,6 @@
 ﻿using Common;
 using Coop.Mod;
 using Coop.Mod.Missions;
-using HarmonyLib;
 using SandBox;
 using System;
 using System.Linq;
@@ -18,11 +17,9 @@ namespace MissionTestMod
     {
         public static UpdateableList Updateables { get; } = new UpdateableList();
         private static InitialStateOption JoinTavern;
-        private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
+        
         protected override void OnSubModuleLoad()
         {
-            harmony.PatchAll();
-
             Updateables.Add(GameLoopRunner.Instance);
 
             JoinTavern = new InitialStateOption(
@@ -66,9 +63,8 @@ namespace MissionTestMod
 
         private static void StartGame(LoadResult loadResult)
         {
-            MBGameManager manager = new MissionTestGameManager(loadResult);
-            MBGameManager.StartNewGame(manager);
-            MouseManager.ShowCursor(false);
+            MissionTestGameManager manager = new MissionTestGameManager(loadResult);
+            manager.StartGameInTavern();
         }
     }
 }

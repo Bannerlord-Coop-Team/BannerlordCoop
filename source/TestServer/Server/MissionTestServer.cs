@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Missions.Network;
 using NLog;
 using LiteNetLib;
-using Missions.Config;
+using TestServer.Config;
 
 namespace TestServer.Server
 {
@@ -128,7 +128,7 @@ namespace TestServer.Server
 
             if(peer != null)
             {
-                P2PPeer p2PPeer = new P2PPeer(peer, localEndPoint, remoteEndPoint);
+                var p2PPeer = new P2PPeer(peer, localEndPoint, remoteEndPoint);
                 peerRegistry.RegisterPeer(instance, p2PPeer);
             }
             

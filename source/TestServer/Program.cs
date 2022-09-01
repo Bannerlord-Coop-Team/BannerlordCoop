@@ -1,52 +1,40 @@
-﻿using Missions.Config;
-using System;
-using System.Threading.Tasks;
+﻿using TestServer.Config;
 using TestServer.Server;
 
-namespace TestServer
+internal class Program
 {
-    internal class Program
+    static int TicksPerSecond = 120;
+    static MissionTestServer? testServer;
+    static Task? pollTask;
+
+    private static void Main(string[] args)
     {
-        static int TicksPerSecond = 120;
-        static MissionTestServer testServer;
-        static Task stopTask;
-        static Task pollTask;
-        static void Main(string[] args)
+        var config = new NetworkConfiguration();
+        //config.NATType = NATType.External;
+        testServer = new MissionTestServer(config);
+
+        if (config.NATType == NATType.Internal)
         {
-            NetworkConfiguration config = new NetworkConfiguration();
-            testServer = new MissionTestServer(config);
-
-            if(config.NATType == NATType.Internal)
-            {
-                Console.WriteLine($"Server started on: {config.LanAddress}, Port: {config.LanPort}");
-            }
-            else
-            {
-                Console.WriteLine($"Server started on: {config.WanAddress}, Port: {config.WanPort}");
-            }
-
-            Console.WriteLine($"Type STOP to stop the server.");
-
-
-            stopTask = Task.Factory.StartNew(WaitForStop);
-            pollTask = Task.Factory.StartNew(PollServer);
-
-            stopTask.Wait();
-            pollTask.Wait();
+            Console.WriteLine($"Server started on port: {config.LanPort}");
+        }
+        else
+        {
+            Console.WriteLine($"Server started on port: {config.WanPort}");
         }
 
-        static async void WaitForStop()
-        {
-            while (Console.ReadLine().ToLower() != "stop") { await Task.Delay(100); }
-        }
+        Console.WriteLine($"Type STOP to stop the server.");
 
-        static async void PollServer()
+        pollTask = Task.Factory.StartNew(PollServer);
+
+        while (true) { Thread.Sleep(1000); };
+    }
+
+    static async void PollServer()
+    {
+        while (true)
         {
-            while (stopTask.Status == TaskStatus.Running)
-            {
-                testServer.Update();
-                await Task.Delay(1000 / TicksPerSecond);
-            }
+            testServer?.Update();
+            await Task.Delay(1000 / TicksPerSecond);
         }
     }
 }

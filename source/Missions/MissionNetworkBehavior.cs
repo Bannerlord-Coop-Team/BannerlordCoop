@@ -21,11 +21,9 @@ namespace Missions
 
         private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
 
-        public MissionNetworkBehavior()
+        public MissionNetworkBehavior(LiteNetP2PClient client)
         {
-            m_Client = new LiteNetP2PClient(new NetworkConfiguration());
-
-            // TODO add to updateables
+            m_Client = client;
 
             // TODO find callback for loading mission
             Task.Factory.StartNew(async () =>
@@ -36,18 +34,10 @@ namespace Missions
                 }
 
                 string sceneName = Mission.SceneName;
-                if(m_Client.ConnectToP2PServer(sceneName))
-                {
-                    m_Client.NatPunch(sceneName);
+                m_Client.NatPunch(sceneName);
 
-                    missionClient = new MissionClient(m_Client);
-                    await Task.Delay(WaitForConnectionsTime);
-                    missionClient.SendJoinRequest();
-                }
-                else
-                {
-                    OnEndMission();
-                }
+                missionClient = new MissionClient(m_Client);
+                await Task.Delay(WaitForConnectionsTime);
             });
         }
 
@@ -57,7 +47,8 @@ namespace Missions
 
             NetworkAgentRegistry.Clear();
 
-            // TODO remove from updateables
+            missionClient.Dispose();
+            m_Client.Stop();
             m_Client = null;
             missionClient = null;
         }

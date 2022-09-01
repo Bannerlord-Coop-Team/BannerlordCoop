@@ -1,4 +1,8 @@
-﻿using Missions;
+﻿using HarmonyLib;
+using LiteNetLib;
+using Missions;
+using Missions.Config;
+using Missions.Network;
 using Missions.Serialization.Surrogates;
 using NLog;
 using ProtoBuf.Meta;
@@ -22,6 +26,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.CampaignSystem.TournamentGames;
 using TaleWorlds.Core;
+using TaleWorlds.DotNet;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -40,9 +45,29 @@ namespace Coop.Mod.Missions
         }
 
         private static readonly NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
+        private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
+        private LiteNetP2PClient m_Client;
 
         public MissionTestGameManager(LoadResult loadedGameResult) : base(loadedGameResult)
         {
+            harmony.PatchAll();
+        }
+
+        ~MissionTestGameManager()
+        {
+        }
+
+        public void StartGameInTavern()
+        {
+            NetworkConfiguration config = new NetworkConfiguration();
+            config.NATType = NATType.External;
+
+            m_Client = new LiteNetP2PClient(config);
+
+            if (m_Client.ConnectToP2PServer())
+            {
+                StartNewGame(this);
+            }
         }
 
         public override void OnLoadFinished()
@@ -64,7 +89,7 @@ namespace Coop.Mod.Missions
             Location tavern = LocationComplex.Current.GetLocationWithId("tavern");
             string scene = tavern.GetSceneName(upgradeLevel);
             Mission mission = SandBoxMissions.OpenIndoorMission(scene, tavern);
-            mission.AddMissionBehavior(new MissionNetworkBehavior());
+            mission.AddMissionBehavior(new MissionNetworkBehavior(m_Client));
 
             //PlayerEncounter.EnterSettlement();
 
@@ -262,6 +287,12 @@ namespace Coop.Mod.Missions
             List<GameEntity> entities = new List<GameEntity>();
             scene.GetEntities(ref entities);
             return entities.Where(entity => entity.Tags.Any(tag => tag.StartsWith("sp_"))).Select(entity => entity.Name).ToArray();
+        }
+
+        public override void OnGameEnd(Game game)
+        {
+            harmony.UnpatchAll();
+            base.OnGameEnd(game);
         }
     }
 }

@@ -31,32 +31,33 @@ namespace Coop.Mod.Missions
             BoardGameManager = new BoardGameManager(MessageBroker);
             MovementHandler = new MovementHandler(m_Client);
 
-            MessageBroker.Subscribe<MissionJoinRequest>(Handle_JoinRequest);
-            MessageBroker.Subscribe<MissionJoinResponse>(Handle_JoinResponse);
+            m_Client.OnClientConnected += SendJoinInfo;
+
+            MessageBroker.Subscribe<MissionJoinInfo>(Handle_JoinInfo);
+        }
+
+        ~MissionClient()
+        {
+            Dispose();
         }
 
         public void Dispose()
         {
+            m_Client.OnClientConnected -= SendJoinInfo;
+            MessageBroker.Unsubscribe<MissionJoinInfo>(Handle_JoinInfo);
+
             MovementHandler.Dispose();
             MessageBroker.Dispose();
         }
 
-        public void SendJoinRequest()
+        public void SendJoinInfo(NetPeer peer)
         {
             try
             {
                 m_Logger.Info("Sending join request");
                 NetworkAgentRegistry.RegisterControlledAgent(m_PlayerId, Agent.Main);
-                MissionJoinRequest request = new MissionJoinRequest(m_PlayerId, Agent.Main.Position);
-                MessageBroker.Publish(request);
-
-                // If first client remove response handling
-                // When this doesn't happen after the 3rd client joins
-                // There will be a double add on the 1st client
-                if(m_Client.ConnectedPeersCount < 1)
-                {
-                    MessageBroker.Unsubscribe<MissionJoinResponse>(Handle_JoinResponse);
-                }
+                MissionJoinInfo request = new MissionJoinInfo(m_PlayerId, Agent.Main.Position);
+                MessageBroker.Publish(request, peer);
             }
             catch (Exception ex)
             {
@@ -64,7 +65,7 @@ namespace Coop.Mod.Missions
             }
         }
 
-        private void Handle_JoinRequest(MessagePayload<MissionJoinRequest> payload)
+        private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)
         {
             m_Logger.Info("Receive join request");
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
@@ -73,28 +74,8 @@ namespace Coop.Mod.Missions
 
             // TODO remove test code
             Agent newAgent = MissionTestGameManager.SpawnAgent(startingPos);
-            
+
             NetworkAgentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
-
-            MissionJoinResponse response = new MissionJoinResponse(m_PlayerId, Agent.Main.Position);
-            MessageBroker.Publish(response, netPeer);
-        }
-
-        private void Handle_JoinResponse(MessagePayload<MissionJoinResponse> payload)
-        {
-            m_Logger.Info("Receive join response");
-            NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
-
-            Guid playerId = payload.What.PlayerId;
-            Vec3 startingPos = payload.What.StartingPosition;
-
-            // TODO remove test code
-            Agent newAgent = MissionTestGameManager.SpawnAgent(startingPos);
-            m_Logger.Info($"Creating new agent at {startingPos}");
-            NetworkAgentRegistry.RegisterNetworkControlledAgent(netPeer, playerId, newAgent);
-
-            // We no longer need to listen for responses
-            MessageBroker.Unsubscribe<MissionJoinResponse>(Handle_JoinResponse);
         }
     }
 }

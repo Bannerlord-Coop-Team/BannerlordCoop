@@ -6,28 +6,13 @@ using TaleWorlds.Library;
 namespace Missions.Messages
 {
     [ProtoContract]
-    public readonly struct MissionJoinRequest
+    public readonly struct MissionJoinInfo
     {
         [ProtoMember(1)]
         public readonly Guid PlayerId;
         [ProtoMember(2)]
         public readonly Vec3 StartingPosition;
-        public MissionJoinRequest(Guid playerId, Vec3 startingPosition)
-        {
-            PlayerId = playerId;
-            StartingPosition = startingPosition;
-        }
-    }
-
-    [ProtoContract]
-    public readonly struct MissionJoinResponse
-    {
-        [ProtoMember(1)]
-        public readonly Guid PlayerId;
-        [ProtoMember(2)]
-        public readonly Vec3 StartingPosition;
-
-        public MissionJoinResponse(Guid playerId, Vec3 startingPosition)
+        public MissionJoinInfo(Guid playerId, Vec3 startingPosition)
         {
             PlayerId = playerId;
             StartingPosition = startingPosition;
