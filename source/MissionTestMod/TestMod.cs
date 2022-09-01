@@ -3,9 +3,11 @@ using Coop.Mod;
 using Coop.Mod.Missions;
 using SandBox;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
@@ -51,14 +53,32 @@ namespace MissionTestMod
         {
 
             SaveGameFileInfo[] saveFiles = MBSaveLoad.GetSaveFiles(null);
-            SaveGameFileInfo save = saveFiles.FirstOrDefault();
+            SaveGameFileInfo save = saveFiles.FirstOrDefault(s => ValidateModules(s.MetaData));
 
             if(save == null)
             {
-                throw new InvalidOperationException("No saves available to load");
+                InformationManager.DisplayMessage(new InformationMessage("Unable to find a save without Mods. Create a fresh game and try again."));
             }
+            else
+            {
+                SandBoxSaveHelper.TryLoadSave(save, StartGame, null);
+            }
+        }
 
-            SandBoxSaveHelper.TryLoadSave(save, StartGame, null);
+        private static readonly HashSet<string> allowedModules = new HashSet<string>()
+        {
+            "Native",
+            "Sandbox",
+            "SandBox Core",
+            "StoryMode",
+            "MissionTestMod"
+        };
+        private static bool ValidateModules(MetaData metaData)
+        {
+            if(metaData == null) return false;
+
+            var moduleNames = metaData.GetModules();
+            return moduleNames.All(name => allowedModules.Contains(name));
         }
 
         private static void StartGame(LoadResult loadResult)
