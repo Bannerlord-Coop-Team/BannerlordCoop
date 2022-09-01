@@ -541,5 +541,5 @@ mb2/**
 source/.editorconfig
 # Rider IDE
 source/.idea
-!*/ClientDebug.csproj.user
-!*/MissionTestMod.csproj
+!*ClientDebug.csproj.user
+!*MissionTestMod.csproj
