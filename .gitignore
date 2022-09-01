@@ -542,4 +542,4 @@ source/.editorconfig
 # Rider IDE
 source/.idea
 !*ClientDebug.csproj.user
-!*MissionTestMod.csproj
+!*MissionTestMod.csproj.user
