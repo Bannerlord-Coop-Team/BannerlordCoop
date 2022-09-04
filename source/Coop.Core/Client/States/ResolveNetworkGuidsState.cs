@@ -33,8 +33,8 @@ namespace Coop.Core.Client.States
 
         public override void Dispose()
         {
-            MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<CampaignStateEntered>(Handle);
+            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            MessageBroker.Unsubscribe<CampaignStateEntered>(Handle);
         }
 
         public override void Connect()

@@ -1,8 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.States;
-using Coop.Core.Configuration;
 using Coop.Core.Debugging.Logger;
-using System.Configuration;
 
 namespace Coop.Core.Client
 {
@@ -68,6 +66,11 @@ namespace Coop.Core.Client
             State.LoadSavedData();
         }
 
+        public void ResolveNetworkGuids()
+        {
+            State.ResolveNetworkGuids();
+        }
+
         public void ExitGame()
         {
             State.ExitGame();
@@ -80,14 +83,12 @@ namespace Coop.Core.Client
 
         public void EnterCampaignState()
         {
-            State.ExitGame();
+            State.EnterCampaignState();
         }
 
         public void EnterMissionState()
         {
-            State.EnterMainMenu();
+            State.EnterMissionState();
         }
-
-
     }
 }

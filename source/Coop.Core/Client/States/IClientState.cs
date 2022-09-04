@@ -9,6 +9,7 @@ namespace Coop.Core.Client.States
         void Disconnect();
         void StartCharacterCreation();
         void LoadSavedData();
+        void ResolveNetworkGuids();
         void ExitGame();
         void EnterMainMenu(); 
         void EnterCampaignState();
