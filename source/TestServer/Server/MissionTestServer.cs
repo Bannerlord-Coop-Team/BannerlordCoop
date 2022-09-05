@@ -20,6 +20,7 @@ namespace TestServer.Server
         public readonly NetManager NetManager;
 
         private readonly NetworkConfiguration config;
+        private readonly int MaxAllowedPeers = 200;
 
         private readonly PeerRegistry peerRegistry = new PeerRegistry();
 
@@ -52,7 +53,7 @@ namespace TestServer.Server
         {
             string[] data = request.Data.GetString().Split('%');
             string key = data[0];
-            if(key == config.P2PToken)
+            if(key == config.P2PToken && NetManager.ConnectedPeersCount <= MaxAllowedPeers)
             {
                 Guid id = new Guid(data[1]);
                 peerRegistry.RegisterPeer(id, request.Accept());
