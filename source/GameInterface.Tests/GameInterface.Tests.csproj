@@ -122,9 +122,11 @@
     <Compile Include="ModuleBuild_UnitTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\DynamicModelGeneratorTests.cs" />
+    <Compile Include="Serialization\Dynamic\CharacterObjectSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\HeroObjectSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\ItemObjectSerializationTests.cs" />
     <Compile Include="Serialization\SerializationTests.cs" />
+    <Compile Include="Serialization\SurrogateStub.cs" />
     <Compile Include="Serialization\Surrogates\TextObjectSurrogateTests.cs" />
     <Compile Include="Serialization\TestProtobufSerializer.cs" />
   </ItemGroup>
