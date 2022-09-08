@@ -3,6 +3,9 @@ using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {
+    /// <summary>
+    /// State Logic Controller for the Loading Client State
+    /// </summary>
     public class LoadingState : ClientStateBase
     {
         public LoadingState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)

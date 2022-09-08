@@ -3,6 +3,9 @@ using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {
+    /// <summary>
+    /// State Logic Controller for the Resolve Network Guids State
+    /// </summary>
     public class ResolveNetworkGuidsState : ClientStateBase
     {
         public ResolveNetworkGuidsState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)

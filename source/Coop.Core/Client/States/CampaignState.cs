@@ -3,6 +3,9 @@ using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {
+    /// <summary>
+    /// State controller for campaign client state
+    /// </summary>
     public class CampaignState : ClientStateBase
     {
         public CampaignState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)

@@ -3,6 +3,9 @@ using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {
+    /// <summary>
+    /// State controller for the character creation client state
+    /// </summary>
     public class CharacterCreationState : ClientStateBase
     {
         public CharacterCreationState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)

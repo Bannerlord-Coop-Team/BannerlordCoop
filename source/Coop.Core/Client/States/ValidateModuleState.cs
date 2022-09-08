@@ -3,6 +3,9 @@ using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {
+    /// <summary>
+    /// State Logic Controller for the Validate Module Client State
+    /// </summary>
     public class ValidateModuleState : ClientStateBase
     {
         public ValidateModuleState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)

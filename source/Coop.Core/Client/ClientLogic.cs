@@ -4,6 +4,9 @@ using Coop.Core.Debugging.Logger;
 
 namespace Coop.Core.Client
 {
+    /// <summary>
+    /// Top level client-side state machine logic orchestrator
+    /// </summary>
     public class ClientLogic : IClientLogic
     {
         public ILogger Logger { get; }
