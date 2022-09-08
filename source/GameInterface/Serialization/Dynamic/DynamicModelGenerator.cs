@@ -32,10 +32,10 @@ namespace GameInterface.Serialization.Dynamic
         /// </summary>
         /// <typeparam name="T">Type to create model</typeparam>
         /// <param name="exclude">Excluded fields by name</param>
-        public void CreateDynamicSerializer<T>(string[] exclude = null)
+        public IMetaTypeContainer CreateDynamicSerializer<T>(string[] exclude = null)
         {
             if (RuntimeTypeModel.Default.CanSerialize(typeof(T)))
-                return;
+                return null;
 
             FieldInfo[] fields = typeof(T).GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             var selectedFieldNames = fields.Select(f => f.Name).ToArray();
@@ -45,10 +45,12 @@ namespace GameInterface.Serialization.Dynamic
                 selectedFieldNames = selectedFieldNames.Except(exclude).ToArray();
                 
                 if (fields.Length - exclude.Length != selectedFieldNames.Length)
-                    throw new Exception($"Some fields are not being used: {String.Join(",", exclude.Except(selectedFieldNames))}");
+                    throw new Exception($"Some fields are not being used: {string.Join(",", exclude.Except(selectedFieldNames))}");
             }
-            
-            _typeModel.Add(typeof(T), true).Add(selectedFieldNames);
+
+            var metaType = _typeModel.Add(typeof(T), true).Add(selectedFieldNames);
+
+            return new MetaTypeContainer(metaType);
         }
 
         public void AssignSurrogate<TClass, TSurrogate>()

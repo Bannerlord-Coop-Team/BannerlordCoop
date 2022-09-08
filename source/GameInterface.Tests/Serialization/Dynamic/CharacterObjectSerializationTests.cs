@@ -14,17 +14,13 @@ namespace GameInterface.Tests.Serialization.Dynamic
     public class CharacterObjectSerializationTests : IDisposable
     {
         private readonly ITestOutputHelper output;
-        private readonly Harmony harmony;
         public CharacterObjectSerializationTests(ITestOutputHelper output)
         {
-            harmony = new Harmony($"testing.{GetType()}");
-            harmony.PatchAll();
             this.output = output;
         }
 
         public void Dispose()
         {
-            harmony.UnpatchAll();
         }
 
         [Fact]
@@ -65,6 +61,7 @@ namespace GameInterface.Tests.Serialization.Dynamic
             IDynamicModelGenerator generator = new DynamicModelGenerator(testModel);
 
             generator.CreateDynamicSerializer<CharacterObject>(excluded);
+            generator.CreateDynamicSerializer<BasicCharacterObject>(excluded).AddDerivedType<CharacterObject>();
 
             // Make interface serializable
             generator.CreateDynamicSerializer<IHeroDeveloper>();
@@ -75,6 +72,11 @@ namespace GameInterface.Tests.Serialization.Dynamic
             generator.AssignSurrogate<ItemCategory, SurrogateStub<ItemCategory>>();
             generator.AssignSurrogate<TextObject, SurrogateStub<TextObject>>();
             generator.AssignSurrogate<MBCharacterSkills, SurrogateStub<MBCharacterSkills>>();
+
+            // BasicCharacterObject fields
+            generator.AssignSurrogate<MBBodyProperty, SurrogateStub<MBBodyProperty>>();
+            generator.AssignSurrogate<MBEquipmentRoster, SurrogateStub<MBEquipmentRoster>>();
+            generator.AssignSurrogate<BasicCultureObject, SurrogateStub<BasicCultureObject>>();
 
             generator.Compile();
 

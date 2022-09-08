@@ -4,18 +4,19 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Serialization.Dynamic.Serializers
 {
-    internal class CharacterObjectDynamicSerializer : IDynamicSerializer
+    public class CharacterTraitsDynamicSerializer : IDynamicSerializer
     {
-        public CharacterObjectDynamicSerializer(IDynamicModelGenerator modelGenerator)
+        public CharacterTraitsDynamicSerializer(IDynamicModelGenerator modelGenerator)
         {
             var excluded = new string[]
             {
             };
 
-            modelGenerator.CreateDynamicSerializer<CharacterObject>(excluded);
+            modelGenerator.CreateDynamicSerializer<CharacterTraits>(excluded);
         }
     }
 }

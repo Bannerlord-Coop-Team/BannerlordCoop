@@ -300,7 +300,10 @@
     <Compile Include="Serialization\Dynamic\IDynamicModelGenerator.cs" />
     <Compile Include="Serialization\Dynamic\IDynamicModelService.cs" />
     <Compile Include="Serialization\Dynamic\IDynamicSerializer.cs" />
+    <Compile Include="Serialization\Dynamic\IMetaTypeContainer.cs" />
+    <Compile Include="Serialization\Dynamic\MetaTypeContainer.cs" />
     <Compile Include="Serialization\Dynamic\Serializers\CharacterObjectDynamicSerializer.cs" />
+    <Compile Include="Serialization\Dynamic\Serializers\CharacterTraitsDynamicSerializer.cs" />
     <Compile Include="Serialization\ISerializer.cs" />
     <Compile Include="Serialization\Surrogates\CampaignTimeSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\ClanSurrogate.cs" />
@@ -311,7 +314,6 @@
     <Compile Include="Serialization\Surrogates\CharacterTraitsSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\CharacterPerksSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\CharacterSkillsSurrogate.cs" />
-    <Compile Include="Serialization\Surrogates\CultureObjectSurrogate.cs" />
     <Compile Include="Serialization\Dynamic\Serializers\HeroDynamicSerializer.cs" />
     <Compile Include="Serialization\Surrogates\ItemCategorySurrogate.cs" />
     <Compile Include="Serialization\Surrogates\ItemObjectSurrogate.cs" />
@@ -319,7 +321,6 @@
     <Compile Include="Serialization\Surrogates\MBCharacterSkillsSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\MobilePartySurrogate.cs" />
     <Compile Include="Serialization\Surrogates\PartyBaseSurrogate.cs" />
-    <Compile Include="Serialization\Surrogates\SettlementSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\EquipmentElementSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\EquipmentSurrogate.cs" />
     <Compile Include="Serialization\Dynamic\Serializers\ItemComponentDynamicSerializer.cs" />
@@ -327,11 +328,10 @@
     <Compile Include="Serialization\Surrogates\ItemModifierSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\MBObjectBaseSurrogate.cs" />
     <Compile Include="Serialization\Dynamic\DynamicModelGenerator.cs" />
+    <Compile Include="Serialization\Surrogates\StringIdSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\TextObjectSurrogate.cs" />
     <Compile Include="Serialization\ProtobufSerializer.cs" />
     <Compile Include="Serialization\SerializationHelper.cs" />
-    <Compile Include="Serialization\Surrogates\TownSurrogate.cs" />
-    <Compile Include="Serialization\Surrogates\TraitObjectSurrogate.cs" />
     <Compile Include="Serializers\CommonAreaSerializer.cs" />
     <Compile Include="Serializers\CustomSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\BannerSerializer.cs" />

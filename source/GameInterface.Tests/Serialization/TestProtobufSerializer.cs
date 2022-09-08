@@ -25,12 +25,18 @@ namespace GameInterface.Tests.Serialization
         /// <returns>Byte array representing the message</returns>
         public byte[] Serialize(object message)
         {
-            if (message == null) return new byte[0];
+            if (message == null) return new byte[1] { byte.MinValue };
 
             var memoryStream = new MemoryStream();
+
+            // IsNull bit
+            memoryStream.WriteByte(byte.MaxValue);
+
             _typeModel.Serialize(memoryStream, message);
 
-            return memoryStream.ToArray();
+            var dataArray = memoryStream.ToArray();
+
+            return dataArray;
         }
 
         /// <summary>
@@ -40,9 +46,12 @@ namespace GameInterface.Tests.Serialization
         /// <returns>The object deserialized</returns>
         public T Deserialize<T>(byte[] message)
         {
-            if (message.Length == 0) return default(T);
-
             var memoryStream = new MemoryStream(message);
+
+            var isNullByte = memoryStream.ReadByte();
+
+            if (isNullByte == byte.MinValue) return default;
+
             return _typeModel.Deserialize<T>(memoryStream);
         }
     }
