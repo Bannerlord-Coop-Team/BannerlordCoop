@@ -15,20 +15,16 @@ using Xunit.Abstractions;
 #if false
 namespace GameInterface.Tests.Serialization.Dynamic
 {
-    public class TemplateObjectSerializationTests : IDisposable
+    public class TemplateSerializationTests : IDisposable
     {
         private readonly ITestOutputHelper output;
-        private readonly Harmony harmony;
-        public TemplateObjectSerializationTests(ITestOutputHelper output)
+        public TemplateSerializationTests(ITestOutputHelper output)
         {
-            harmony = new Harmony($"testing.{GetType()}");
-            harmony.PatchAll();
             this.output = output;
         }
 
         public void Dispose()
         {
-            harmony.UnpatchAll();
         }
 
         [Fact]

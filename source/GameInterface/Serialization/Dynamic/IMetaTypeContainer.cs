@@ -3,5 +3,6 @@
     public interface IMetaTypeContainer
     {
         IMetaTypeContainer AddDerivedType<T>();
+        IMetaTypeContainer UseConstuctor();
     }
 }

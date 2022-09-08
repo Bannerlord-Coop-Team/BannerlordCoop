@@ -23,5 +23,11 @@ namespace GameInterface.Serialization.Dynamic
             metaType.AddSubType(numFields++, typeof(T));
             return this;
         }
+
+        public IMetaTypeContainer UseConstuctor()
+        {
+            metaType.UseConstructor = true;
+            return this;
+        }
     }
 }

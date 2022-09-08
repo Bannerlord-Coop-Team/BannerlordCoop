@@ -50,6 +50,8 @@ namespace GameInterface.Serialization.Dynamic
 
             var metaType = _typeModel.Add(typeof(T), true).Add(selectedFieldNames);
 
+            metaType.UseConstructor = false;
+
             return new MetaTypeContainer(metaType);
         }
 
