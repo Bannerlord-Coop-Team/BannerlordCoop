@@ -129,6 +129,7 @@
     <Compile Include="Serialization\Dynamic\EquipmentSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\ItemComponentSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\ItemModifierGroupSerializationTests.cs" />
+    <Compile Include="Serialization\Dynamic\ItemModifierSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\ItemObjectSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\MBBodyPropertySerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\MBEquipmentRosterSerializationTests.cs" />
