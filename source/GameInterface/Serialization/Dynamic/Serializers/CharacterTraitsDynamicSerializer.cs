@@ -12,11 +12,9 @@ namespace GameInterface.Serialization.Dynamic.Serializers
     {
         public CharacterTraitsDynamicSerializer(IDynamicModelGenerator modelGenerator)
         {
-            var excluded = new string[]
-            {
-            };
+            modelGenerator.CreateDynamicSerializer<CharacterTraits>();
 
-            modelGenerator.CreateDynamicSerializer<CharacterTraits>(excluded);
+            // NOTE: CharacterTrait is serialized via string id
         }
     }
 }

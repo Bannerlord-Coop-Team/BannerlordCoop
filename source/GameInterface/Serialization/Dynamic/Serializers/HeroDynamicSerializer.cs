@@ -1,4 +1,5 @@
 ﻿using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Serialization.Dynamic.Serializers
 {
@@ -13,6 +14,7 @@ namespace GameInterface.Serialization.Dynamic.Serializers
             };
 
             modelGenerator.CreateDynamicSerializer<Hero>(excluded);
+            modelGenerator.CreateDynamicSerializer<IHeroDeveloper>();
         }
     }
 }

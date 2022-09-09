@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 
 namespace GameInterface.Serialization.Dynamic.Serializers
 {
@@ -11,11 +12,8 @@ namespace GameInterface.Serialization.Dynamic.Serializers
     {
         public CharacterObjectDynamicSerializer(IDynamicModelGenerator modelGenerator)
         {
-            var excluded = new string[]
-            {
-            };
-
-            modelGenerator.CreateDynamicSerializer<CharacterObject>(excluded);
+            modelGenerator.CreateDynamicSerializer<CharacterObject>();
+            modelGenerator.CreateDynamicSerializer<BasicCharacterObject>().AddDerivedType<CharacterObject>();
         }
     }
 }
