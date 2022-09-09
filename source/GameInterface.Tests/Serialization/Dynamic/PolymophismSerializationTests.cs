@@ -46,8 +46,8 @@ namespace GameInterface.Tests.Serialization.Dynamic
 
             IDynamicModelGenerator generator = new DynamicModelGenerator(testModel);
 
-            generator.CreateDynamicSerializer<TestBaseClass>().AddDerivedType<TestClass>();
             generator.CreateDynamicSerializer<TestClass>();
+            generator.CreateDynamicSerializer<TestBaseClass>().AddDerivedType<TestClass>();
 
             generator.Compile();
 
