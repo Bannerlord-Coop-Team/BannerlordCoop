@@ -7,6 +7,12 @@ using System.Threading.Tasks;
 
 namespace GameInterface.Serialization.Dynamic
 {
+    public interface IMetaTypeContainer
+    {
+        IMetaTypeContainer AddDerivedType<T>();
+        IMetaTypeContainer UseConstuctor();
+    }
+
     public class MetaTypeContainer : IMetaTypeContainer
     {
         readonly MetaType metaType;

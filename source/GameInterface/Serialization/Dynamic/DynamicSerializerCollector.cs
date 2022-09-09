@@ -6,10 +6,14 @@ using System.Reflection;
 
 namespace GameInterface.Serialization.Dynamic
 {
-    internal class DynamicModelService : IDynamicModelService
+    public interface IDynamicSerializerCollector
+    {
+    }
+
+    public class DynamicSerializerCollector : IDynamicSerializerCollector
     {
         public readonly IEnumerable<IDynamicSerializer> DynamicSerializers;
-        public DynamicModelService(IDynamicModelGenerator modelGenerator)
+        public DynamicSerializerCollector(IDynamicModelGenerator modelGenerator)
         {
             Assembly asm = GetType().Assembly;
             string Namespace = GetType().Namespace;

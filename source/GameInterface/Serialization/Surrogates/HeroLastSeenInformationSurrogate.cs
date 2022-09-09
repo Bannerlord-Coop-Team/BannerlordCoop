@@ -12,7 +12,7 @@ using static TaleWorlds.CampaignSystem.Hero;
 namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct HeroLastSeenInformationSurrogate
+    public readonly struct HeroLastSeenInformationSurrogate : ISurrogate
     {
         [ProtoMember(1)]
         Settlement LastSeenPlace { get; }

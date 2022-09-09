@@ -126,6 +126,7 @@
     <Compile Include="Serialization\Dynamic\CharacterObjectSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\CharacterSkillsSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\CharacterTraitsSerializationTests.cs" />
+    <Compile Include="Serialization\Dynamic\EquipmentElementSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\EquipmentSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\ItemComponentSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\ItemModifierGroupSerializationTests.cs" />
@@ -138,9 +139,16 @@
     <Compile Include="Serialization\Dynamic\SkeletonScaleSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\TemplateSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\HeroObjectSerializationTests.cs" />
+    <Compile Include="Serialization\Dynamic\WeaponDesignSerializationTests.cs" />
+    <Compile Include="Serialization\SerializationServiceTests.cs" />
     <Compile Include="Serialization\SerializationTests.cs" />
     <Compile Include="Serialization\SurrogateStub.cs" />
+    <Compile Include="Serialization\Surrogates\CraftingTemplateSurrogateTests.cs" />
     <Compile Include="Serialization\Surrogates\TextObjectSurrogateTests.cs" />
+    <Compile Include="Serialization\Surrogates\Mat3SurrogateTests.cs" />
+    <Compile Include="Serialization\Surrogates\MatrixFrameSurrogateTests.cs" />
+    <Compile Include="Serialization\Surrogates\Vec2SurrogateTests.cs" />
+    <Compile Include="Serialization\Surrogates\Vec3SurrogateTests.cs" />
     <Compile Include="Serialization\TestProtobufSerializer.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -1,6 +1,6 @@
 ﻿namespace GameInterface.Serialization.Dynamic
 {
-    internal interface IDynamicSerializer
+    public interface IDynamicSerializer
     {
     }
 }

@@ -1,4 +1,5 @@
-﻿using ProtoBuf.Meta;
+﻿using ProtoBuf;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,6 +14,13 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Serialization.Dynamic
 {
+    public interface IDynamicModelGenerator
+    {
+        void AssignSurrogate<TClass, TSurrogate>();
+        void Compile();
+        IMetaTypeContainer CreateDynamicSerializer<T>(string[] exclude = null);
+    }
+
     public class DynamicModelGenerator : IDynamicModelGenerator
     {
         private readonly RuntimeTypeModel _typeModel;
@@ -57,7 +65,36 @@ namespace GameInterface.Serialization.Dynamic
 
         public void AssignSurrogate<TClass, TSurrogate>()
         {
+            ValidateSurrogate<TClass, TSurrogate>();
+
             _typeModel.Add(typeof(TClass), false).SetSurrogate(typeof(TSurrogate));
+        }
+
+        private void ValidateSurrogate<TClass, TSurrogate>()
+        {
+            var implicitMethods = typeof(TSurrogate).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Where(m => m.Name == "op_Implicit")
+                .Where(m =>
+                {
+                    return (m.ReturnParameter.ParameterType == typeof(TClass) &&
+                            m.GetParameters().Length == 1 &&
+                            m.GetParameters().First().ParameterType == typeof(TSurrogate)) ||
+                            (m.ReturnParameter.ParameterType == typeof(TSurrogate) &&
+                            m.GetParameters().Length == 1 &&
+                            m.GetParameters().First().ParameterType == typeof(TClass));
+                });
+
+
+
+            if (implicitMethods.Count() != 2)
+            {
+                throw new InvalidOperationException($"{typeof(TSurrogate).Name} is not a valid surrogate for {typeof(TClass).Name}");
+            }
+
+            if (typeof(TSurrogate).GetCustomAttribute<ProtoContractAttribute>() == null)
+            {
+                throw new InvalidOperationException($"{typeof(TSurrogate).Name} does not have the {nameof(ProtoContractAttribute)}");
+            }
         }
 
         public void Compile()

@@ -6,7 +6,7 @@ using TaleWorlds.Localization;
 namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract(SkipConstructor = true)]
-    public class TextObjectSurrogate
+    public class TextObjectSurrogate : ISurrogate
     {
         [ProtoMember(1)]
         string Value { get; }

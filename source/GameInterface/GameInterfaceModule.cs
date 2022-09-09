@@ -17,7 +17,8 @@ namespace GameInterface
             base.Load(builder);
             builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance();
             builder.RegisterType<DynamicModelGenerator>().As<IDynamicModelGenerator>().SingleInstance();
-            builder.RegisterType<DynamicModelService>().As<IDynamicModelService>().SingleInstance();
+            builder.RegisterType<DynamicSerializerCollector>().As<IDynamicSerializerCollector>().SingleInstance();
+            builder.RegisterType<GameInterface>().As<IGameInterface>().SingleInstance();
             builder.RegisterType<GameInterface>().As<IGameInterface>().SingleInstance();
             builder.RegisterModule<ServiceModule>();
         }
