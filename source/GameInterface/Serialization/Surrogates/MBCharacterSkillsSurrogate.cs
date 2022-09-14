@@ -5,7 +5,7 @@ using TaleWorlds.Core;
 namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract]
-    public class MBCharacterSkillsSurrogate : ISurrogate
+    public class MBCharacterSkillsSurrogate
     {
         #region Reflection
         private static readonly PropertyInfo p_skills = typeof(MBCharacterSkills).GetProperty(nameof(MBCharacterSkills.Skills));

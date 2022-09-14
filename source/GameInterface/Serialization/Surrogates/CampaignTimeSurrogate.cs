@@ -7,7 +7,7 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Serialization.Surrogates
 {
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct CampaignTimeSurrogate : ISurrogate
+    public readonly struct CampaignTimeSurrogate
     {
         [ProtoMember(1)]
         readonly long _numTicks;
