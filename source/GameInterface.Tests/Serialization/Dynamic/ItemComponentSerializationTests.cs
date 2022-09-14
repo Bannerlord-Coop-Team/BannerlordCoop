@@ -14,7 +14,7 @@ using static TaleWorlds.Core.HorseComponent;
 
 namespace GameInterface.Tests.Serialization.Dynamic
 {
-    public class ItemComponentSerializationTests : IDisposable
+    public class ItemComponentSerializationTests
     {
         private readonly ITestOutputHelper output;
         public ItemComponentSerializationTests(ITestOutputHelper output)
@@ -22,42 +22,28 @@ namespace GameInterface.Tests.Serialization.Dynamic
             this.output = output;
         }
 
-        public void Dispose()
+        public static IEnumerable<object[]> ItemComponents => new List<object[]>
         {
-        }
+            new[] { new HorseComponent() },
+            new[] { new SaddleComponent(null) },
+            new[] { new ArmorComponent(new ItemObject()) },
+            new[] { new TradeItemComponent() },
+            new[] { new WeaponComponent(new ItemObject()) },
+        };
 
         [Theory]
-        [InlineData(typeof(ArmorComponent))]
-        [InlineData(typeof(HorseComponent))]
-        [InlineData(typeof(SaddleComponent))]
-        [InlineData(typeof(TradeItemComponent))]
-        [InlineData(typeof(WeaponComponent))]
-        public void NominalItemComponentObjectSerialization(Type componentType)
+        [MemberData(nameof(ItemComponents))]
+        public void NominalItemComponentObjectSerialization(object component)
         {
             var testModel = MakeItemComponentSerializable();
 
-            ItemObject item = new ItemObject();
-            ItemComponent itemComponent = CreateComponent(componentType);
-
-
             TestProtobufSerializer ser = new TestProtobufSerializer(testModel);
 
-            byte[] data = ser.Serialize(itemComponent);
+            byte[] data = ser.Serialize(component);
 
             ItemComponent newItemComponent = ser.Deserialize<ItemComponent>(data);
 
             Assert.NotNull(newItemComponent);
-        }
-
-        private ItemComponent CreateComponent(Type type)
-        {
-            if (type == typeof(HorseComponent)) return new HorseComponent();
-            if (type == typeof(SaddleComponent)) return new SaddleComponent(null);
-            if (type == typeof(ArmorComponent)) return new ArmorComponent(new ItemObject());
-            if (type == typeof(TradeItemComponent)) return new TradeItemComponent();
-            if (type == typeof(WeaponComponent)) return new WeaponComponent(new ItemObject());
-
-            throw new Exception($"{type.Name} is not an ItemComponent");
         }
 
         [Fact]

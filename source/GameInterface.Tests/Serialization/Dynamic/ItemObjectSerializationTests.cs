@@ -15,16 +15,12 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Tests.Serialization.Dynamic
 {
-    public class ItemObjectSerializationTests : IDisposable
+    public class ItemObjectSerializationTests
     {
         private readonly ITestOutputHelper output;
         public ItemObjectSerializationTests(ITestOutputHelper output)
         {
             this.output = output;
-        }
-
-        public void Dispose()
-        {
         }
 
         [Fact]

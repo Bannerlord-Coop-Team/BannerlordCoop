@@ -18,7 +18,7 @@ namespace GameInterface.Serialization.Dynamic
     {
         void AssignSurrogate<TClass, TSurrogate>();
         void Compile();
-        IMetaTypeContainer CreateDynamicSerializer<T>(string[] exclude = null);
+        IMetaTypeContainer CreateDynamicSerializer<T>(string[] excluded = null);
     }
 
     public class DynamicModelGenerator : IDynamicModelGenerator
@@ -39,8 +39,8 @@ namespace GameInterface.Serialization.Dynamic
         ///     Creates a dynamic serialization model for protobuf of the provided type
         /// </summary>
         /// <typeparam name="T">Type to create model</typeparam>
-        /// <param name="exclude">Excluded fields by name</param>
-        public IMetaTypeContainer CreateDynamicSerializer<T>(string[] exclude = null)
+        /// <param name="excluded">Excluded fields by name</param>
+        public IMetaTypeContainer CreateDynamicSerializer<T>(string[] excluded = null)
         {
             if (RuntimeTypeModel.Default.CanSerialize(typeof(T)))
                 return null;
@@ -48,12 +48,12 @@ namespace GameInterface.Serialization.Dynamic
             FieldInfo[] fields = typeof(T).GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             var selectedFieldNames = fields.Select(f => f.Name).ToArray();
             
-            if (exclude != null)
+            if (excluded != null)
             {
-                selectedFieldNames = selectedFieldNames.Except(exclude).ToArray();
+                selectedFieldNames = selectedFieldNames.Except(excluded).ToArray();
                 
-                if (fields.Length - exclude.Length != selectedFieldNames.Length)
-                    throw new Exception($"Some fields are not being used: {string.Join(",", exclude.Except(selectedFieldNames))}");
+                if (fields.Length - excluded.Length != selectedFieldNames.Length)
+                    throw new Exception($"Some fields are not being used: {string.Join(",", excluded.Except(selectedFieldNames))}");
             }
 
             var metaType = _typeModel.Add(typeof(T), true).Add(selectedFieldNames);

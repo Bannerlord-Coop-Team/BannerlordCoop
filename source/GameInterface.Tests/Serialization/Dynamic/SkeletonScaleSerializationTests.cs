@@ -12,16 +12,12 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Tests.Serialization.Dynamic
 {
-    public class SkeletonScaleSerializationTests : IDisposable
+    public class SkeletonScaleSerializationTests
     {
         private readonly ITestOutputHelper output;
         public SkeletonScaleSerializationTests(ITestOutputHelper output)
         {
             this.output = output;
-        }
-
-        public void Dispose()
-        {
         }
 
         [Fact]

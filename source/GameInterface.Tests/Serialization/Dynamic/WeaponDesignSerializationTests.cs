@@ -16,7 +16,7 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Tests.Serialization.Dynamic
 {
-    public class WeaponDesignSerializationTests : IDisposable
+    public class WeaponDesignSerializationTests
     {
         private readonly ITestOutputHelper output;
         private readonly Harmony harmony;
@@ -25,11 +25,6 @@ namespace GameInterface.Tests.Serialization.Dynamic
             harmony = new Harmony($"testing.{GetType()}");
             harmony.PatchAll();
             this.output = output;
-        }
-
-        public void Dispose()
-        {
-            harmony.UnpatchAll();
         }
 
         [Fact]

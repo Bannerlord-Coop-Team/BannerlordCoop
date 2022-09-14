@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Services;
 using HarmonyLib;
 using System;
@@ -12,8 +13,11 @@ namespace GameInterface
     public class GameInterface : IGameInterface
     {
         public IContainer Container { get; }
-        public GameInterface()
+        private readonly ISerializationService _service;
+        public GameInterface(ISerializationService serializationService)
         {
+            _service = serializationService;
+
             Harmony harmony = new Harmony("com.Coop.GameInterface");
             harmony.PatchAll();
 

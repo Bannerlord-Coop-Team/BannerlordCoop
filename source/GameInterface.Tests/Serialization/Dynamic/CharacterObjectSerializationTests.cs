@@ -11,7 +11,7 @@ using Xunit.Abstractions;
 
 namespace GameInterface.Tests.Serialization.Dynamic
 {
-    public class CharacterObjectSerializationTests : IDisposable
+    public class CharacterObjectSerializationTests
     {
         private readonly ITestOutputHelper output;
         public CharacterObjectSerializationTests(ITestOutputHelper output)
@@ -19,14 +19,12 @@ namespace GameInterface.Tests.Serialization.Dynamic
             this.output = output;
         }
 
-        public void Dispose()
-        {
-        }
-
         [Fact]
         public void NominalCharacterObjectSerialization()
         {
             var testModel = MakeCharacterObjectSerializable();
+
+            Assert.True(testModel.CanSerialize(typeof(CharacterObject)));
 
             CharacterObject characterObject = new CharacterObject();
 
@@ -79,9 +77,6 @@ namespace GameInterface.Tests.Serialization.Dynamic
             generator.AssignSurrogate<BasicCultureObject, SurrogateStub<BasicCultureObject>>();
 
             generator.Compile();
-
-            // Verify the type ItemObject can be serialized
-            Assert.True(testModel.CanSerialize(typeof(CharacterObject)));
 
             return testModel;
         }

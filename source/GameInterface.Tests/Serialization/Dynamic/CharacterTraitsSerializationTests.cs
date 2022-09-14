@@ -14,16 +14,12 @@ using GameInterface.Serialization.Surrogates;
 
 namespace GameInterface.Tests.Serialization.Dynamic
 {
-    public class CharacterTraitsObjectSerializationTests : IDisposable
+    public class CharacterTraitsObjectSerializationTests
     {
         private readonly ITestOutputHelper output;
         public CharacterTraitsObjectSerializationTests(ITestOutputHelper output)
         {
             this.output = output;
-        }
-
-        public void Dispose()
-        {
         }
 
         [Fact]

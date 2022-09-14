@@ -12,16 +12,12 @@ using TaleWorlds.Localization;
 
 namespace GameInterface.Tests.Serialization.Dynamic
 {
-    public class ItemModifierGroupSerializationTests : IDisposable
+    public class ItemModifierGroupSerializationTests
     {
         private readonly ITestOutputHelper output;
         public ItemModifierGroupSerializationTests(ITestOutputHelper output)
         {
             this.output = output;
-        }
-
-        public void Dispose()
-        {
         }
 
         [Fact]

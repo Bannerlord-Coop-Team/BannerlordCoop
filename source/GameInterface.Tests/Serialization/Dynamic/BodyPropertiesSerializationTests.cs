@@ -8,16 +8,12 @@ using Xunit.Abstractions;
 
 namespace GameInterface.Tests.Serialization.Dynamic
 {
-    public class BodyPropertiesObjectSerializationTests : IDisposable
+    public class BodyPropertiesObjectSerializationTests
     {
         private readonly ITestOutputHelper output;
         public BodyPropertiesObjectSerializationTests(ITestOutputHelper output)
         {
             this.output = output;
-        }
-
-        public void Dispose()
-        {
         }
 
         [Fact]

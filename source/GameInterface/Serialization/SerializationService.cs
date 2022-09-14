@@ -39,8 +39,8 @@ namespace GameInterface.Serialization
             modelGenerator.CreateDynamicSerializer<CharacterTraits>();
             modelGenerator.CreateDynamicSerializer<Hero>(new string[]
             {
-                            "_mother",
-                            "_father"
+                "_mother",
+                "_father"
             });
             modelGenerator.CreateDynamicSerializer<IHeroDeveloper>();
 
@@ -98,10 +98,10 @@ namespace GameInterface.Serialization
             modelGenerator.AssignSurrogate<BasicCultureObject, StringIdSurrogate<BasicCultureObject>>();
             modelGenerator.AssignSurrogate<Town, StringIdSurrogate<Town>>();
             modelGenerator.AssignSurrogate<Settlement, StringIdSurrogate<Settlement>>();
-            modelGenerator.AssignSurrogate<TraitObject, StringIdSurrogate<TraitObject>>();
             modelGenerator.AssignSurrogate<ItemCategory, StringIdSurrogate<ItemCategory>>();
             modelGenerator.AssignSurrogate<CraftingTemplate, StringIdSurrogate<CraftingTemplate>>();
 
+            modelGenerator.AssignSurrogate<TraitObject, StringIdSurrogate<TraitObject>>();
             modelGenerator.AssignSurrogate<SkillObject, StringIdSurrogate<SkillObject>>();
             modelGenerator.AssignSurrogate<PerkObject, StringIdSurrogate<PerkObject>>();
             modelGenerator.AssignSurrogate<CharacterAttribute, StringIdSurrogate<CharacterAttribute>>();

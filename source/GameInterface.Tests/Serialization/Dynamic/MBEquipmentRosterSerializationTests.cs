@@ -13,16 +13,12 @@ using TaleWorlds.Localization;
 
 namespace GameInterface.Tests.Serialization.Dynamic
 {
-    public class MBEquipmentRosterSerializationTests : IDisposable
+    public class MBEquipmentRosterSerializationTests
     {
         private readonly ITestOutputHelper output;
         public MBEquipmentRosterSerializationTests(ITestOutputHelper output)
         {
             this.output = output;
-        }
-
-        public void Dispose()
-        {
         }
 
         [Fact]

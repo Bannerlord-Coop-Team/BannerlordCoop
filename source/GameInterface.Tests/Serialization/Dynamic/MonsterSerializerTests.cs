@@ -13,16 +13,12 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Tests.Serialization.Dynamic
 {
-    public class MonsterSerializationTests : IDisposable
+    public class MonsterSerializationTests
     {
         private readonly ITestOutputHelper output;
         public MonsterSerializationTests(ITestOutputHelper output)
         {
             this.output = output;
-        }
-
-        public void Dispose()
-        {
         }
 
         [Fact]
