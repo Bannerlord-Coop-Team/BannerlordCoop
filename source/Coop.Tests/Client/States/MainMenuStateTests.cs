@@ -5,6 +5,7 @@ using Moq;
 using Coop.Core.Debugging.Logger;
 using Xunit;
 using Xunit.Abstractions;
+using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Tests.Client.States
 {
@@ -38,6 +39,20 @@ namespace Coop.Tests.Client.States
             messageBroker.Publish(this, new NetworkConnected(true));
 
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
+        }
+
+        [Fact]
+        public void Disconnect_Publishes_ExitGame()
+        {
+            var isEventPublished = false;
+            messageBroker.Subscribe<ExitGame>((payload) =>
+            {
+                isEventPublished = true;
+            });
+
+            clientLogic.Disconnect();
+
+            Assert.True(isEventPublished);
         }
 
         [Fact]
