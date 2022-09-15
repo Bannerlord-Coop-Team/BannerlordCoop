@@ -408,7 +408,6 @@
     <Compile Include="Services\GameDebug\Messages\StartDebugGame.cs" />
     <Compile Include="Services\GameState\Handlers\EnterCampaignHandler.cs" />
     <Compile Include="Services\GameState\Handlers\EnterMainMenuHandler.cs" />
-    <Compile Include="Services\GameState\Messages\ExitGame.cs" />
     <Compile Include="Services\MobileParties\Handlers\RemoveMainPartyHandler.cs" />
     <Compile Include="Services\GameState\Handlers\StartCharacterCreationHandler.cs" />
     <Compile Include="Services\MobileParties\Interfaces\IMainPartyInterface.cs" />

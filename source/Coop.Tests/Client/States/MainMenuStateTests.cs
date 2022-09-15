@@ -42,10 +42,10 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void Disconnect_Publishes_ExitGame()
+        public void Disconnect_Publishes_EnterMainMenu()
         {
             var isEventPublished = false;
-            messageBroker.Subscribe<ExitGame>((payload) =>
+            messageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
