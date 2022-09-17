@@ -1,4 +1,6 @@
-﻿using System;
+﻿using GameInterface.Serialization;
+using Moq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,7 +14,7 @@ namespace GameInterface.Tests
         [Fact]
         public void BuildGameInterfaceModule()
         {
-            GameInterface gameInterface = new GameInterface();
+            GameInterface gameInterface = new GameInterface(new Mock<ISerializationService>().Object);
         }
     }
 }

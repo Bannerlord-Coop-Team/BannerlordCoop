@@ -1,28 +1,36 @@
-﻿using System;
+﻿using ProtoBuf;
+using System;
+using System.Collections.Generic;
 using System.Linq;
-using ProtoBuf;
+using System.Text;
+using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
 
 namespace GameInterface.Serialization.Surrogates
 {
-    [ProtoContract(SkipConstructor = true)]
-    public class MobilePartySurrogate
+    // TODO implement correctly
+    [ProtoContract]
+    internal class MobilePartySurrogate
     {
         public static implicit operator MobilePartySurrogate(MobileParty obj)
         {
-            if (obj == null) return null;
-
-            // TODO implement
-            return null;
+            return new MobilePartySurrogate();
         }
 
         public static implicit operator MobileParty(MobilePartySurrogate surrogate)
         {
-            if (surrogate == null) return null;
+            return null;
+        }
 
-            // TODO implement
-            return default;
+        public static implicit operator MobilePartySurrogate(PartyBase obj)
+        {
+            return new MobilePartySurrogate();
+        }
+
+        public static implicit operator PartyBase(MobilePartySurrogate surrogate)
+        {
+            return null;
         }
     }
 }
