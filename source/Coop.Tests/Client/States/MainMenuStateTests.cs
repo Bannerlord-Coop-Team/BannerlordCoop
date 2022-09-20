@@ -5,22 +5,22 @@ using Moq;
 using Coop.Core.Debugging.Logger;
 using Xunit;
 using Xunit.Abstractions;
+using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Tests.Client.States
 {
     public class MainMenuStateTests : CoopTest
     {
+        private readonly IClientLogic clientLogic;
         public MainMenuStateTests(ITestOutputHelper output) : base(output)
         {
+            var mockCoopClient = new Mock<ICoopClient>();
+            clientLogic = new ClientLogic(new Mock<ILogger>().Object, mockCoopClient.Object, messageBroker);
         }
 
         [Fact]
-        public void Ctor_SubscribesNetworkConnect()
+        public void Ctor_SubscribesNetworkConnected()
         {
-            var mockCoopClient = new Mock<ICoopClient>();
-            var clientLogic = new ClientLogic(new Mock<ILogger>().Object, mockCoopClient.Object, messageBroker);
-            _ = new MainMenuState(clientLogic, messageBroker);
-
             var subscriberCount = messageBroker.GetTotalSubscribers();
             Assert.Equal(1, subscriberCount);
         }
@@ -28,14 +28,6 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void Connect_CharacterNotCreated_EnterCharacterCreation()
         {
-            var mockCoopClient = new Mock<ICoopClient>();
-            mockCoopClient.Setup(s => s.Start());
-
-            var clientLogic = new ClientLogic(new Mock<ILogger>().Object, mockCoopClient.Object, messageBroker);
-            var currentState = new MainMenuState(clientLogic, messageBroker);
-
-            clientLogic.Start();
-
             messageBroker.Publish(this, new NetworkConnected(false));
 
             Assert.IsType<CharacterCreationState>(clientLogic.State);
@@ -44,32 +36,57 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void Connect_CharacterCreated_ReceivingSavedDataState()
         {
-            var mockCoopClient = new Mock<ICoopClient>();
-            mockCoopClient.Setup(s => s.Start());
-
-            var clientLogic = new ClientLogic(new Mock<ILogger>().Object, mockCoopClient.Object, messageBroker);
-            var currentState = new MainMenuState(clientLogic, messageBroker);
-
-            clientLogic.Start();
-
             messageBroker.Publish(this, new NetworkConnected(true));
 
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
         [Fact]
+        public void Disconnect_Publishes_EnterMainMenu()
+        {
+            var isEventPublished = false;
+            messageBroker.Subscribe<EnterMainMenu>((payload) =>
+            {
+                isEventPublished = true;
+            });
+
+            clientLogic.Disconnect();
+
+            Assert.True(isEventPublished);
+        }
+
+        [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            var mockCoopClient = new Mock<ICoopClient>();
-            mockCoopClient.Setup(s => s.Start());
-
-            var clientLogic = new ClientLogic(new Mock<ILogger>().Object, mockCoopClient.Object, messageBroker);
-            var currentState = new MainMenuState(clientLogic, messageBroker);
-
-            currentState.Dispose();
+            clientLogic.Dispose();
 
             var subscriberCount = messageBroker.GetTotalSubscribers();
             Assert.Equal(0, subscriberCount);
+        }
+
+        [Fact]
+        public void OtherStateMethods_DoNotAlterState()
+        {
+            clientLogic.Disconnect();
+            Assert.IsType<MainMenuState>(clientLogic.State);
+
+            clientLogic.EnterMainMenu();
+            Assert.IsType<MainMenuState>(clientLogic.State);
+
+            clientLogic.ExitGame();
+            Assert.IsType<MainMenuState>(clientLogic.State);
+
+            clientLogic.LoadSavedData();
+            Assert.IsType<MainMenuState>(clientLogic.State);
+
+            clientLogic.StartCharacterCreation();
+            Assert.IsType<MainMenuState>(clientLogic.State);
+
+            clientLogic.EnterCampaignState();
+            Assert.IsType<MainMenuState>(clientLogic.State);
+
+            clientLogic.EnterMissionState();
+            Assert.IsType<MainMenuState>(clientLogic.State);
         }
     }
 }

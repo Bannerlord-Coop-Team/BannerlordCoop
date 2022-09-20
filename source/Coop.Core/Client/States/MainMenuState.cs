@@ -4,6 +4,9 @@ using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {
+    /// <summary>
+    /// State Logic Controller for the Main Menu Client State
+    /// </summary>
     public class MainMenuState : ClientStateBase
     {
         public MainMenuState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
@@ -37,6 +40,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
+            MessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void EnterMainMenu()

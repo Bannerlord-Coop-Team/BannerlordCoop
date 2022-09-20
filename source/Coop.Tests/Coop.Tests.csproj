@@ -99,8 +99,14 @@
     <Compile Include="Autofac\TestServerModule.cs" />
     <Compile Include="Autofac\TestClientModule.cs" />
     <Compile Include="Bootstrap.cs" />
-    <Compile Include="Client\States\InitialClientStateTests.cs" />
+    <Compile Include="Client\States\CampaignStateTests.cs" />
+    <Compile Include="Client\States\CharacterCreationStateTests.cs" />
+    <Compile Include="Client\States\LoadingStateTests.cs" />
     <Compile Include="Client\States\MainMenuStateTests.cs" />
+    <Compile Include="Client\States\MissionStateTests.cs" />
+    <Compile Include="Client\States\ReceivingSavedDataStateTests.cs" />
+    <Compile Include="Client\States\ResolveNetworkGuidsStateTests.cs" />
+    <Compile Include="Client\States\ValidateModuleStateTests.cs" />
     <Compile Include="Communication\CommunicatorMessageBrokerTest.cs" />
     <Compile Include="Communication\PacketManagerTest.cs" />
     <Compile Include="CoopTest.cs" />

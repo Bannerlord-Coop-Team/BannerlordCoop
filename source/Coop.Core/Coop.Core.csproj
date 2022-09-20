@@ -112,8 +112,7 @@
     <Compile Include="Client\States\CampaignState.cs" />
     <Compile Include="Client\States\CharacterCreationState.cs" />
     <Compile Include="Client\States\ClientStateBase.cs" />
-    <Compile Include="Client\States\ConnectingState.cs" />
-    <Compile Include="Client\States\IClientLogic.cs" />
+    <Compile Include="Client\IClientLogic.cs" />
     <Compile Include="Client\States\IClientState.cs" />
     <Compile Include="Client\States\LoadingState.cs" />
     <Compile Include="Client\States\MainMenuState.cs" />

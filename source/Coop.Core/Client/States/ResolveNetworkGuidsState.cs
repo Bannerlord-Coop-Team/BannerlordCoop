@@ -3,6 +3,9 @@ using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {
+    /// <summary>
+    /// State Logic Controller for the Resolve Network Guids State
+    /// </summary>
     public class ResolveNetworkGuidsState : ClientStateBase
     {
         public ResolveNetworkGuidsState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
@@ -33,8 +36,8 @@ namespace Coop.Core.Client.States
 
         public override void Dispose()
         {
-            MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<CampaignStateEntered>(Handle);
+            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            MessageBroker.Unsubscribe<CampaignStateEntered>(Handle);
         }
 
         public override void Connect()
@@ -43,6 +46,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
+            MessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void EnterMissionState()
