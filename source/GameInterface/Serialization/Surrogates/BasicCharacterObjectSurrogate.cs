@@ -21,8 +21,6 @@ namespace GameInterface.Serialization.Surrogates
         // ...
 
         #region Reflection
-        private static readonly BindingFlags PrivateFlags = BindingFlags.NonPublic | BindingFlags.Instance;
-
         private static readonly Dictionary<string, FieldInfo> Fields = new Dictionary<string, FieldInfo>
         {
             {nameof(_basicName), AccessTools.Field(typeof(BasicCharacterObject), nameof(_basicName)) },
