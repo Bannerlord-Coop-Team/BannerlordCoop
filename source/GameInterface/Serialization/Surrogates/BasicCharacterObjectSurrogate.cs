@@ -1,4 +1,5 @@
-﻿using ProtoBuf;
+﻿using HarmonyLib;
+using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,7 +25,7 @@ namespace GameInterface.Serialization.Surrogates
 
         private static readonly Dictionary<string, FieldInfo> Fields = new Dictionary<string, FieldInfo>
         {
-            {nameof(_basicName), typeof(BasicCharacterObject).GetField(nameof(_basicName), PrivateFlags) },
+            {nameof(_basicName), AccessTools.Field(typeof(BasicCharacterObject), nameof(_basicName)) },
             //...
         };
 
