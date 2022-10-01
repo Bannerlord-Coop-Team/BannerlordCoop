@@ -304,6 +304,7 @@
     <Compile Include="Serialization\SerializationService.cs" />
     <Compile Include="Serialization\Surrogates\CampaignTimeSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\HeroLastSeenInformationSurrogate.cs" />
+    <Compile Include="Serialization\Surrogates\HeroSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\IssueBaseSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\Mat3Surrogate.cs" />
     <Compile Include="Serialization\Surrogates\MatrixFrameSurrogate.cs" />

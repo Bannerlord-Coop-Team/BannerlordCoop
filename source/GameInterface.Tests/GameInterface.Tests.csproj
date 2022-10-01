@@ -147,7 +147,7 @@
     <Compile Include="Serialization\Dynamic\PolymophismSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\SkeletonScaleSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\TemplateSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\HeroObjectSerializationTests.cs" />
+    <Compile Include="Serialization\Surrogates\HeroSerializationTests.cs" />
     <Compile Include="Serialization\Dynamic\WeaponDesignSerializationTests.cs" />
     <Compile Include="Serialization\SerializationServiceTests.cs" />
     <Compile Include="Serialization\SerializationTests.cs" />
