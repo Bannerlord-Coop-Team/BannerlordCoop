@@ -1,4 +1,5 @@
 ﻿using GameInterface.Serialization.Dynamic;
+using GameInterface.Serialization.Helper;
 using GameInterface.Serialization.Surrogates;
 using HarmonyLib;
 using ProtoBuf.Meta;
@@ -47,47 +48,6 @@ namespace GameInterface.Tests.Serialization.Surrogates
             Hero newHero = ser.Deserialize<Hero>(data);
 
             Assert.NotNull(newHero);
-
-            BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
-
-            int ctr = 47;
-            //foreach (var field in typeof(Hero).GetFields(All))
-            //{
-            //    if (field.Name.Contains("BackingField") == false)
-            //    {
-            //        //output.WriteLine($"[ProtoMember({ctr++})]");
-            //        //output.WriteLine($"{field.FieldType.Name} {field.Name} {{ get; }}");
-            //        //output.WriteLine("");
-
-            //        //output.WriteLine($"{{ nameof({field.Name}), AccessTools.Field(typeof({field.FieldType.Name}), nameof({field.Name})) }},");
-
-            //        //output.WriteLine($"{field.Name} = ({field.FieldType.Name})Fields[nameof({field.Name})].GetValue(hero);");
-
-            //        //output.WriteLine($"Fields[nameof({field.Name})].SetValue(newHero, {field.Name});");
-            //    }
-            //}
-
-            HashSet<string> propertyNames = new HashSet<string>();
-
-            foreach (var field in typeof(Hero).GetFields(All).Where(f => f.Name.Contains("BackingField")))
-            {
-                string propName = Regex.Match(field.Name, "<([A-Za-z1-9]+)>").Groups[1].Value;
-
-                propertyNames.Add(propName);
-            }
-
-            foreach (var property in typeof(Hero).GetProperties(All).Where(p => propertyNames.Contains(p.Name)))
-            {
-                //output.WriteLine($"[ProtoMember({ctr++})]");
-                //output.WriteLine($"{property.PropertyType.Name} {property.Name} {{ get; }}");
-                //output.WriteLine("");
-
-                //output.WriteLine($"{{ nameof({property.Name}), AccessTools.Property(typeof(Hero), nameof({property.Name})) }},");
-
-                //output.WriteLine($"{property.Name} = ({property.PropertyType.Name})Fields[nameof({property.Name})].GetValue(hero);");
-
-                output.WriteLine($"Properties[nameof({property.Name})].SetValue(newHero, {property.Name});");
-            }
         }
 
         [Fact]
@@ -100,6 +60,8 @@ namespace GameInterface.Tests.Serialization.Surrogates
             Hero newHero = ser.Deserialize<Hero>(data);
 
             Assert.Null(newHero);
+
+            output.WriteLine(SurrogateClassGenerator.GenerateClass(typeof(CharacterObject)));
         }
 
         private RuntimeTypeModel MakeHeroSerializable()

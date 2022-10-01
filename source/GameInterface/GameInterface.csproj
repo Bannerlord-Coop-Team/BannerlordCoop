@@ -300,9 +300,11 @@
     <Compile Include="Serialization\Collections\ICollectionSerializer.cs" />
     <Compile Include="Serialization\Collections\ListSerializer.cs" />
     <Compile Include="Serialization\Dynamic\MetaTypeContainer.cs" />
+    <Compile Include="Serialization\Helper\SurrogateClassGenerator.cs" />
     <Compile Include="Serialization\ISerializer.cs" />
     <Compile Include="Serialization\SerializationService.cs" />
     <Compile Include="Serialization\Surrogates\CampaignTimeSurrogate.cs" />
+    <Compile Include="Serialization\Surrogates\Class1.cs" />
     <Compile Include="Serialization\Surrogates\HeroLastSeenInformationSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\HeroSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\IssueBaseSurrogate.cs" />
