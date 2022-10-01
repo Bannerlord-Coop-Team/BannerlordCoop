@@ -50,7 +50,6 @@ namespace Coop.Core.Client
 
         public void Connect()
         {
-
             State.Connect();
         }
 

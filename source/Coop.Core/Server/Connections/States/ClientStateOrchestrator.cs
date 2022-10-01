@@ -1,32 +1,67 @@
 ﻿using Common.Messaging;
-using System;
+using Coop.Core.Server.Connections.Messages;
+using System.Collections.Generic;
 
 namespace Coop.Core.Server.Connections.States
 {
-    internal class ClientStateOrchestrator : ClientConnectionBase
+    public interface IClientStateOrchestrator
     {
-        public ClientStateOrchestrator(IClientConnectionLogic clientConnectionLogic, IMessageBroker messageBroker) : base(clientConnectionLogic, messageBroker)
+    }
+
+    public class ClientStateOrchestrator : IClientStateOrchestrator
+    {
+        public IPlayerConnectionStates PlayerConnectionStates { get; private set; }
+
+        private readonly IMessageBroker _messageBroker;
+
+        public ClientStateOrchestrator(IMessageBroker messageBroker, IPlayerConnectionStates playerConnectionStates)
         {
+            _messageBroker = messageBroker;
+            PlayerConnectionStates = playerConnectionStates;
+
+            _messageBroker.Subscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
+            _messageBroker.Subscribe<PlayerJoining>(PlayerJoiningHandler);
+            _messageBroker.Subscribe<PlayerJoined>(PlayerJoinedHandler);
+            _messageBroker.Subscribe<PlayerLoaded>(PlayerLoadedHandler);
+            _messageBroker.Subscribe<PlayerTransitionCampaign>(PlayerTransitionsCampaignHandler);
+            _messageBroker.Subscribe<PlayerTransitionMission>(PlayerTransitionsMissionHandler);
         }
 
-        public override void EnterCampaign()
+        private void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)
         {
-            throw new NotImplementedException();
+            var playerId = obj.What.PlayerId;
+            PlayerConnectionStates.RemovePlayer(playerId);
         }
 
-        public override void EnterMission()
+        private void PlayerJoiningHandler(MessagePayload<PlayerJoining> obj)
         {
-            throw new NotImplementedException();
+            var playerId = obj.What.PlayerId;
+            PlayerConnectionStates.AddNewPlayer(playerId);
         }
 
-        public override void Join()
+        private void PlayerJoinedHandler(MessagePayload<PlayerJoined> obj)
         {
-            throw new NotImplementedException();
+            var playerId = obj.What.PlayerId;
+            PlayerConnectionStates.PlayerJoined(playerId);
+            _messageBroker.Publish(this, new PlayerLoading(playerId));
         }
 
-        public override void Loading()
+        private void PlayerLoadedHandler(MessagePayload<PlayerLoaded> obj)
         {
-            throw new NotImplementedException();
+            var playerId = obj.What.PlayerId;
+            PlayerConnectionStates.PlayerLoaded(playerId);
+        }
+
+        private void PlayerTransitionsCampaignHandler(MessagePayload<PlayerTransitionCampaign> obj)
+        {
+            var playerId = obj.What.PlayerId;
+            PlayerConnectionStates.EnterCampaign(playerId);
+        }
+
+        private void PlayerTransitionsMissionHandler(MessagePayload<PlayerTransitionMission> obj)
+        {
+            var playerId = obj.What.PlayerId;
+            PlayerConnectionStates.EnterMission(playerId);
         }
     }
 }

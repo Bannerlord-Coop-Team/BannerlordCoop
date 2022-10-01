@@ -111,6 +111,13 @@
     <Compile Include="Communication\PacketManagerTest.cs" />
     <Compile Include="CoopTest.cs" />
     <Compile Include="Debugging\LoggerTest.cs" />
+    <Compile Include="Server\Connections\States\CampaignStateTests.cs" />
+    <Compile Include="Server\Connections\States\ClientStateOrchestratorTests.cs" />
+    <Compile Include="Server\Connections\States\InitialConnectionStateTests.cs" />
+    <Compile Include="Server\Connections\States\JoiningStateTests.cs" />
+    <Compile Include="Server\Connections\States\LoadingStateTests.cs" />
+    <Compile Include="Server\Connections\States\MissionStateTests.cs" />
+    <Compile Include="Server\Connections\States\PlayerConnectionStateTests.cs" />
     <Compile Include="Server\States\InitialStateTests.cs" />
     <Compile Include="Server\States\RunningStateTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

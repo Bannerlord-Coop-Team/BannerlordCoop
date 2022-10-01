@@ -1,32 +1,29 @@
 ﻿using Common.Messaging;
-using System;
 
 namespace Coop.Core.Server.Connections.States
 {
-    internal class CampaignState : ClientConnectionBase
+    public class CampaignState : ConnectionStateBase
     {
-        public CampaignState(IClientConnectionLogic clientConnectionLogic, IMessageBroker messageBroker) : base(clientConnectionLogic, messageBroker)
+        public CampaignState(IConnectionLogic connectionLogic, IMessageBroker messageBroker) : base(connectionLogic, messageBroker)
+        {
+
+        }
+
+        public override void Join()
+        {
+        }
+
+        public override void Load()
         {
         }
 
         public override void EnterCampaign()
         {
-            throw new NotImplementedException();
         }
 
         public override void EnterMission()
         {
-            throw new NotImplementedException();
-        }
-
-        public override void Join()
-        {
-            throw new NotImplementedException();
-        }
-
-        public override void Loading()
-        {
-            throw new NotImplementedException();
+            ConnectionLogic.State = new MissionState(ConnectionLogic, MessageBroker);
         }
     }
 }

@@ -15,7 +15,7 @@ namespace Coop.Core.Server.Connections
         public Connection(NetPeer peer)
         {
             Peer = peer;
-            State = new InitialConnectionState(this);
+            //State = new InitialConnectionState(this);
         }
 
         public void Dispose()

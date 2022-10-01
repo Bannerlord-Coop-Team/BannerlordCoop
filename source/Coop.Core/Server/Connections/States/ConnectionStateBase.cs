@@ -2,19 +2,19 @@
 
 namespace Coop.Core.Server.Connections.States
 {
-    public abstract class ClientConnectionBase
+    public abstract class ConnectionStateBase : IConnectionState
     {
         public IMessageBroker MessageBroker;
-        public IClientConnectionLogic ClientConnectionLogic;
+        public IConnectionLogic ConnectionLogic;
 
-        public ClientConnectionBase(IClientConnectionLogic clientConnectionLogic, IMessageBroker messageBroker)
+        public ConnectionStateBase(IConnectionLogic connectionLogic, IMessageBroker messageBroker)
         {
-            ClientConnectionLogic = clientConnectionLogic;
+            ConnectionLogic = connectionLogic;
             MessageBroker = messageBroker;
         }
 
         public abstract void Join();
-        public abstract void Loading();
+        public abstract void Load();
         public abstract void EnterCampaign();
         public abstract void EnterMission();
     }
