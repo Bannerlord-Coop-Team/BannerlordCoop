@@ -27,7 +27,7 @@ namespace Coop.Serialization
                 return memoryStream.ToArray();
             }
         }
-        
+
         /// <summary>
         ///     Deserializes the message into the represented object.
         /// </summary>
