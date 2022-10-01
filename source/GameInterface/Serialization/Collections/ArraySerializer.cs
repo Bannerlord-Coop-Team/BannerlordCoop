@@ -7,6 +7,10 @@ using System.Threading.Tasks;
 
 namespace GameInterface.Serialization.Collections
 {
+    /// <summary>
+    /// Custom array serializer for protobuf-net support
+    /// </summary>
+    /// <typeparam name="T">Array's underlying type</typeparam>
     [ProtoContract]
     public class ArraySerializer<T> : ICollectionSerializer<T[]>
     {

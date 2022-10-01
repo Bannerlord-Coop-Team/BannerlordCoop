@@ -7,6 +7,10 @@ using System.Threading.Tasks;
 
 namespace GameInterface.Serialization.Collections
 {
+    /// <summary>
+    /// Custom list serializer for protobuf-net support
+    /// </summary>
+    /// <typeparam name="T">List's underlying type</typeparam>
     [ProtoContract]
     public class ListSerializer<T> : ICollectionSerializer<List<T>>
     {
