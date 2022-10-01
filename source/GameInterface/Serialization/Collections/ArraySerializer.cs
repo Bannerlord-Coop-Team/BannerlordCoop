@@ -1,4 +1,5 @@
-﻿using ProtoBuf;
+﻿using GameInterface.Utils;
+using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,19 +16,25 @@ namespace GameInterface.Serialization.Collections
     public class ArraySerializer<T> : ICollectionSerializer<T[]>
     {
         [ProtoMember(1)]
-        protected Queue<T> Values { get; }
+        Queue<T> Values { get; }
 
         [ProtoMember(2)]
-        protected List<bool> NullElements { get; }
+        List<bool> NullElements { get; }
+
+        [ProtoMember(3)]
+        bool IsNull;
 
         public ArraySerializer()
         {
             Values = new Queue<T>();
             NullElements = new List<bool>();
+            IsNull = true;
         }
 
         public void Pack(T[] values)
         {
+            if (values == null) return;
+
             foreach (var value in values)
             {
                 if (value == null)
@@ -40,10 +47,14 @@ namespace GameInterface.Serialization.Collections
                     NullElements.Add(false);
                 }
             }
+
+            IsNull = false;
         }
 
         public T[] Unpack()
         {
+            if (IsNull) return null;
+
             List<T> newList = new List<T>();
 
             foreach (var isNull in NullElements)

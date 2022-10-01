@@ -15,19 +15,25 @@ namespace GameInterface.Serialization.Collections
     public class ListSerializer<T> : ICollectionSerializer<List<T>>
     {
         [ProtoMember(1)]
-        protected Queue<T> Values { get; }
+        Queue<T> Values { get; }
+
+        [ProtoMember(2)]
+        List<bool> NullElements { get; }
 
         [ProtoMember(3)]
-        protected List<bool> NullElements { get; }
+        bool IsNull;
 
         public ListSerializer()
         {
             Values = new Queue<T>();
             NullElements = new List<bool>();
+            IsNull = true;
         }
 
         public void Pack(List<T> values)
         {
+            if (values == null) return;
+
             foreach (var value in values)
             {
                 if (value == null)
@@ -40,10 +46,14 @@ namespace GameInterface.Serialization.Collections
                     NullElements.Add(false);
                 }
             }
+
+            IsNull = false;
         }
 
         public List<T> Unpack()
         {
+            if (IsNull) return null;
+
             List<T> newList = new List<T>();
 
             foreach (var isNull in NullElements)
