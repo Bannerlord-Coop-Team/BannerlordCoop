@@ -304,7 +304,6 @@
     <Compile Include="Serialization\ISerializer.cs" />
     <Compile Include="Serialization\SerializationService.cs" />
     <Compile Include="Serialization\Surrogates\CampaignTimeSurrogate.cs" />
-    <Compile Include="Serialization\Surrogates\Class1.cs" />
     <Compile Include="Serialization\Surrogates\HeroLastSeenInformationSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\HeroSurrogate.cs" />
     <Compile Include="Serialization\Surrogates\IssueBaseSurrogate.cs" />

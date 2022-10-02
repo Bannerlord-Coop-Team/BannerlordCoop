@@ -1,18 +1,10 @@
-﻿using GameInterface.Serialization.Collections;
-using GameInterface.Serialization.Surrogates;
-using HarmonyLib;
-using System;
-using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Engine;
 
 namespace GameInterface.Serialization.Helper
 {
@@ -33,7 +25,8 @@ namespace GameInterface.Serialization.Helper
         private static List<PropertyInfo> Properties;
         private static HashSet<string> Collections;
         private static string ClassName;
-        private static string SurrogateType;
+        private static string SurrogateTypeName;
+        private static Type SurrogateType;
 
         public static string GenerateClass(Type type)
         {
@@ -42,13 +35,29 @@ namespace GameInterface.Serialization.Helper
             StringBuilder = new StringBuilder();
             Collections = new HashSet<string>();
             ClassName = $"{type.Name}Surrogate";
-            SurrogateType = type.Name;
+            SurrogateTypeName = type.Name;
+            SurrogateType = type;
 
             GetFields(type);
             GetProperties(type);
 
             AppendLine($"[ProtoContract(SkipConstructor = true)]", tabs);
-            AppendLine($"public readonly struct {ClassName}", tabs);
+
+            string generatedClassType;
+            if(type.IsClass)
+            {
+                generatedClassType = "class";
+            }
+            else if(type.IsValueType && !type.IsEnum)
+            {
+                generatedClassType = "readonly struct";
+            }
+            else
+            {
+                throw new InvalidOperationException("Expected a type of struct or class, but got something else");
+            }
+
+            AppendLine($"public {generatedClassType} {ClassName}", tabs);
             AppendLine("{", tabs);
 
             GenerateClassProperties(tabs + 1);
@@ -102,7 +111,7 @@ namespace GameInterface.Serialization.Helper
 
             foreach(var field in Fields)
             {
-                AppendLine($"{{ nameof({field.Name}), AccessTools.Field(typeof({SurrogateType}), nameof({field.Name})) }},", tabs + 1);
+                AppendLine($"{{ nameof({field.Name}), AccessTools.Field(typeof({SurrogateTypeName}), nameof({field.Name})) }},", tabs + 1);
             }
             AppendLine("};", tabs);
             StringBuilder.AppendLine("");
@@ -111,7 +120,7 @@ namespace GameInterface.Serialization.Helper
             AppendLine("{", tabs);
             foreach (var property in Properties)
             {
-                AppendLine($"{{ nameof({property.Name}),AccessTools.Property(typeof({SurrogateType}), nameof({property.Name})) }},", tabs + 1);
+                AppendLine($"{{ nameof({property.Name}),AccessTools.Property(typeof({SurrogateTypeName}), nameof({property.Name})) }},", tabs + 1);
             }
             AppendLine("};", tabs);
             AppendLine($"#endregion", tabs);
@@ -121,7 +130,7 @@ namespace GameInterface.Serialization.Helper
 
         private static void GenerateClassConstructor(int tabs)
         {
-            AppendLine($"private {ClassName}({SurrogateType} obj)", tabs);
+            AppendLine($"private {ClassName}({SurrogateTypeName} obj)", tabs);
             AppendLine("{", tabs);
 
             //AppendLine("if (obj == null) return;", tabs + 1);
@@ -189,15 +198,15 @@ namespace GameInterface.Serialization.Helper
 
         private static void GenerateClassDeserialize(int tabs)
         {
-            AppendLine($"private {SurrogateType} Deserialize()", tabs);
+            AppendLine($"private {SurrogateTypeName} Deserialize()", tabs);
             AppendLine("{", tabs);
-            AppendLine($"{SurrogateType} new{SurrogateType} = new {SurrogateType}();", tabs + 1);
+            AppendLine($"{SurrogateTypeName} new{SurrogateTypeName} = new {SurrogateTypeName}();", tabs + 1);
 
             foreach (var field in Fields)
             {
                 if (Collections.Contains(field.Name) == false)
                 {
-                    AppendLine($"Fields[nameof({field.Name})].SetValue(new{SurrogateType}, {field.Name});", tabs + 1);
+                    AppendLine($"Fields[nameof({field.Name})].SetValue(new{SurrogateTypeName}, {field.Name});", tabs + 1);
                 }
             }
 
@@ -205,7 +214,7 @@ namespace GameInterface.Serialization.Helper
             {
                 if (Collections.Contains(property.Name) == false)
                 {
-                    AppendLine($"Properties[nameof({property.Name})].SetValue(new{SurrogateType}, {property.Name});", tabs + 1);
+                    AppendLine($"Properties[nameof({property.Name})].SetValue(new{SurrogateTypeName}, {property.Name});", tabs + 1);
                 }
             }
 
@@ -213,7 +222,7 @@ namespace GameInterface.Serialization.Helper
             {
                 if (Collections.Contains(field.Name))
                 {
-                    AppendLine($"Fields[nameof({field.Name})].SetValue(new{SurrogateType}, {field.Name}.Unpack());", tabs + 1);
+                    AppendLine($"Fields[nameof({field.Name})].SetValue(new{SurrogateTypeName}, {field.Name}.Unpack());", tabs + 1);
                 }
             }
 
@@ -223,11 +232,11 @@ namespace GameInterface.Serialization.Helper
             {
                 if (Collections.Contains(property.Name))
                 {
-                    AppendLine($"Properties[nameof({property.Name})].SetValue(new{SurrogateType}, {property.Name}.Unpack());", tabs + 1);
+                    AppendLine($"Properties[nameof({property.Name})].SetValue(new{SurrogateTypeName}, {property.Name}.Unpack());", tabs + 1);
                 }
             }
 
-            AppendLine($"return new{SurrogateType};", tabs);
+            AppendLine($"return new{SurrogateTypeName};", tabs);
             AppendLine("}", tabs);
             StringBuilder.AppendLine();
         }
@@ -235,22 +244,30 @@ namespace GameInterface.Serialization.Helper
         private static void GenerateClassImplicits(int tabs)
         {
             AppendLine($"/// <summary>", tabs);
-            AppendLine($"///     Prepare the serialization of the {SurrogateType} object from the game.", tabs);
+            AppendLine($"///     Prepare the serialization of the {SurrogateTypeName} object from the game.", tabs);
             AppendLine($"/// </summary>", tabs);
             AppendLine($"/// <param name=\"{ClassName}\"></param>", tabs);
             AppendLine($"/// <returns></returns>", tabs);
-            AppendLine($"public static implicit operator {ClassName}({SurrogateType} obj)", tabs);
+            AppendLine($"public static implicit operator {ClassName}({SurrogateTypeName} obj)", tabs);
             AppendLine("{", tabs);
+            if(SurrogateType.IsClass)
+            {
+                AppendLine($"if (obj == null) return null;", tabs + 1);
+            }
             AppendLine($"return new {ClassName}(obj);", tabs + 1);
             AppendLine("}", tabs);
 
             AppendLine($"/// <summary>", tabs);
-            AppendLine($"///     Retrieve the {SurrogateType} object from the surrogate.", tabs);
+            AppendLine($"///     Retrieve the {SurrogateTypeName} object from the surrogate.", tabs);
             AppendLine($"/// </summary>", tabs);
             AppendLine($"/// <param name=\"{ClassName}\">Surrogate object.</param>", tabs);
-            AppendLine($"/// <returns>{SurrogateType} object.</returns>", tabs);
-            AppendLine($"public static implicit operator {SurrogateType}({ClassName} surrogate)", tabs);
+            AppendLine($"/// <returns>{SurrogateTypeName} object.</returns>", tabs);
+            AppendLine($"public static implicit operator {SurrogateTypeName}({ClassName} surrogate)", tabs);
             AppendLine("{", tabs);
+            if (SurrogateType.IsClass)
+            {
+                AppendLine($"if (surrogate == null) return null;", tabs + 1);
+            }
             AppendLine("return surrogate.Deserialize();", tabs + 1);
             AppendLine("}", tabs);
         }
@@ -323,7 +340,5 @@ namespace GameInterface.Serialization.Helper
 
             return $"ListSerializer<{genericArg.Name}>";
         }
-
-        
     }
 }
