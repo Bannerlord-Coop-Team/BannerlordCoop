@@ -296,6 +296,9 @@
     <Compile Include="Patch\World\SaveManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Helpers\SaveLoadHelper.cs" />
+    <Compile Include="Serialization\Collections\ArraySerializer.cs" />
+    <Compile Include="Serialization\Collections\ICollectionSerializer.cs" />
+    <Compile Include="Serialization\Collections\ListSerializer.cs" />
     <Compile Include="Serialization\Dynamic\MetaTypeContainer.cs" />
     <Compile Include="Serialization\ISerializer.cs" />
     <Compile Include="Serialization\SerializationService.cs" />
