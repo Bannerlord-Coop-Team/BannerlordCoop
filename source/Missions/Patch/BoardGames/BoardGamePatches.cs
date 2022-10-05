@@ -4,6 +4,8 @@ using SandBox.BoardGames;
 using SandBox.BoardGames.AI;
 using SandBox.BoardGames.MissionLogics;
 using SandBox.BoardGames.Pawns;
+using SandBox.Conversation.MissionLogics;
+using SandBox.Source.Missions.AgentBehaviors;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,12 +17,37 @@ using TaleWorlds.MountAndBlade;
 namespace Coop.Mod.Patch.BoardGames
 {
 
+    [HarmonyPatch(typeof(BoardGameAgentBehavior), "RemoveBoardGameBehaviorOfAgent")]
+    public class RemoveBoardGameBehaviorOfAgentPatch
+    {
+        static bool Prefix(Agent ownerAgent)
+        {
+
+            //Somewhat ugly way to not break forfeit/win, might be issues with opposingAgent have not checked
+            return BoardGameLogic.IsPlayingOtherPlayer == false;
+        }
+    }
+
+    [HarmonyPatch(typeof(MissionConversationLogic), "StartConversation")]
+    public class StartConversationPatch
+    {
+        static bool Prefix(Agent agent, bool setActionsInstantly, bool isInitialization = false)
+        {
+            if (agent == null)
+            {
+
+            }
+
+            return BoardGameLogic.IsPlayingOtherPlayer == false;
+        }
+    }
+
     //[HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
     public class SetGameOverPatch
     {
         public static event Action<MissionBoardGameLogic> OnGameOver;
         static bool Prefix(MissionBoardGameLogic __instance, GameOverEnum gameOverInfo)
-        {          
+        {
 
             OnGameOver?.Invoke(__instance);
 
