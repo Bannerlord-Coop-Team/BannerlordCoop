@@ -24,7 +24,7 @@ namespace Coop.Mod.Missions
     public class BoardGameLogic : IDisposable
     {
         private static NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
-        public static bool IsPlayingOtherPlayer { get; private set; }
+        public static bool IsPlayingOtherPlayer { get; set; }
         public static bool IsChallenged { get; private set; }
         public Guid GameId { get; private set; }
 

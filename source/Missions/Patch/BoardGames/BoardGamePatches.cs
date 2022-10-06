@@ -1,5 +1,6 @@
 ﻿using Coop.Mod.Missions;
 using HarmonyLib;
+using Missions.Network;
 using SandBox.BoardGames;
 using SandBox.BoardGames.AI;
 using SandBox.BoardGames.MissionLogics;
@@ -22,6 +23,7 @@ namespace Coop.Mod.Patch.BoardGames
     {
         static bool Prefix(Agent ownerAgent)
         {
+            
 
             //Somewhat ugly way to not break forfeit/win, might be issues with opposingAgent have not checked
             return BoardGameLogic.IsPlayingOtherPlayer == false;
@@ -31,16 +33,46 @@ namespace Coop.Mod.Patch.BoardGames
     [HarmonyPatch(typeof(MissionConversationLogic), "StartConversation")]
     public class StartConversationPatch
     {
+
         static bool Prefix(Agent agent, bool setActionsInstantly, bool isInitialization = false)
         {
-            if (agent == null)
+            if (NetworkAgentRegistry.AgentToId.ContainsKey(agent))
             {
-
+                return BoardGameLogic.IsPlayingOtherPlayer == false;
             }
-
-            return BoardGameLogic.IsPlayingOtherPlayer == false;
+            else
+            {
+                return true;
+            }
+        }
+        static void Postfix(Agent agent, bool setActionsInstantly, bool isInitialization = false)
+        {
+            if (NetworkAgentRegistry.AgentToId.ContainsKey(agent))
+            {
+                BoardGameLogic.IsPlayingOtherPlayer = false;
+            }
         }
     }
+
+    //[HarmonyPatch(typeof(MissionBoardGameLogic), "StartConversationWithOpponentAfterGameEnd")]
+    //public class StartConversationAfterGamePatch
+    //{
+    //    public static event Action<MissionBoardGameLogic> OnGameOver;
+    //    static bool Prefix(MissionBoardGameLogic __instance, Agent agent)
+    //    {
+    //        if (NetworkAgentRegistry.AgentToId.ContainsKey(agent))
+    //        {
+    //            OnGameOver?.Invoke(__instance);
+
+    //            return false;
+    //        }
+
+    //        else
+    //        {
+    //            return true;
+    //        }
+    //    }
+    //}
 
     //[HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
     public class SetGameOverPatch
