@@ -17,6 +17,8 @@ assignees: ''
 # Intended Design
 <!-- Provide any relevant design documents, create any if complexity requires. -->
 
+# Additional information
+<!-- Add all information that might be useful while working on this issue here. (e.g. places in the code to look at) -->
 
 # Definition of Done
 - [ ] Class level comments exist for all new classes.
