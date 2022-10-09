@@ -43,7 +43,7 @@ namespace Coop.Mod.Missions
             m_MessageBroker.Subscribe<PawnCapturedMessage>(Handle_PawnCapture);
             m_MessageBroker.Subscribe<BoardGameMoveRequest>(Handle_MoveRequest);
 
-            SetGameOverPatch.OnGameOver += OnGameOver;
+            StartConversationAfterGamePatch.OnGameOver += OnGameOver;
             ForfeitGamePatch.OnForfeitGame += OnForfeitGame;
             HandlePlayerInputPatch.OnHandlePlayerInput += OnPlayerInput;
             HandlePreMovementStagePatch.OnHandlePreMovementStage += PreMovementStage;
@@ -65,7 +65,7 @@ namespace Coop.Mod.Missions
             m_MessageBroker.Subscribe<PawnCapturedMessage>(Handle_PawnCapture);
             m_MessageBroker.Subscribe<BoardGameMoveRequest>(Handle_MoveRequest);
 
-            SetGameOverPatch.OnGameOver -= OnGameOver;
+            StartConversationAfterGamePatch.OnGameOver -= OnGameOver;
             ForfeitGamePatch.OnForfeitGame -= OnForfeitGame;
             HandlePlayerInputPatch.OnHandlePlayerInput -= OnPlayerInput;
             HandlePreMovementStagePatch.OnHandlePreMovementStage -= PreMovementStage;

@@ -30,62 +30,62 @@ namespace Coop.Mod.Patch.BoardGames
         }
     }
 
-    [HarmonyPatch(typeof(MissionConversationLogic), "StartConversation")]
-    public class StartConversationPatch
-    {
-
-        static bool Prefix(Agent agent, bool setActionsInstantly, bool isInitialization = false)
-        {
-            if (NetworkAgentRegistry.AgentToId.ContainsKey(agent))
-            {
-                return BoardGameLogic.IsPlayingOtherPlayer == false;
-            }
-            else
-            {
-                return true;
-            }
-        }
-        static void Postfix(Agent agent, bool setActionsInstantly, bool isInitialization = false)
-        {
-            if (NetworkAgentRegistry.AgentToId.ContainsKey(agent))
-            {
-                BoardGameLogic.IsPlayingOtherPlayer = false;
-            }
-        }
-    }
-
-    //[HarmonyPatch(typeof(MissionBoardGameLogic), "StartConversationWithOpponentAfterGameEnd")]
-    //public class StartConversationAfterGamePatch
+    //[HarmonyPatch(typeof(MissionConversationLogic), "StartConversation")]
+    //public class StartConversationPatch
     //{
-    //    public static event Action<MissionBoardGameLogic> OnGameOver;
-    //    static bool Prefix(MissionBoardGameLogic __instance, Agent agent)
+
+    //    static bool Prefix(Agent agent, bool setActionsInstantly, bool isInitialization = false)
     //    {
     //        if (NetworkAgentRegistry.AgentToId.ContainsKey(agent))
     //        {
-    //            OnGameOver?.Invoke(__instance);
-
-    //            return false;
+    //            return BoardGameLogic.IsPlayingOtherPlayer == false;
     //        }
-
     //        else
     //        {
     //            return true;
     //        }
     //    }
+    //    static void Postfix(Agent agent, bool setActionsInstantly, bool isInitialization = false)
+    //    {
+    //        if (NetworkAgentRegistry.AgentToId.ContainsKey(agent))
+    //        {
+    //            BoardGameLogic.IsPlayingOtherPlayer = false;
+    //        }
+    //    }
     //}
 
-    //[HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
-    public class SetGameOverPatch
+    [HarmonyPatch(typeof(MissionBoardGameLogic), "StartConversationWithOpponentAfterGameEnd")]
+    public class StartConversationAfterGamePatch
     {
         public static event Action<MissionBoardGameLogic> OnGameOver;
-        static bool Prefix(MissionBoardGameLogic __instance, GameOverEnum gameOverInfo)
+        static bool Prefix(MissionBoardGameLogic __instance, Agent conversationAgent)
         {
+            if (NetworkAgentRegistry.AgentToId.ContainsKey(conversationAgent))
+            {
+                OnGameOver?.Invoke(__instance);
 
-            OnGameOver?.Invoke(__instance);
+                return false;
+            }
 
-            return BoardGameLogic.IsPlayingOtherPlayer == false;
+            else
+            {
+                return true;
+            }
         }
     }
+
+    //[HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
+    //public class SetGameOverPatch
+    //{
+    //    public static event Action<MissionBoardGameLogic> OnGameOver;
+    //    static bool Prefix(MissionBoardGameLogic __instance, GameOverEnum gameOverInfo)
+    //    {
+
+    //        OnGameOver?.Invoke(__instance);
+
+    //        return BoardGameLogic.IsPlayingOtherPlayer == false;
+    //    }
+    //}
 
     [HarmonyPatch(typeof(MissionBoardGameLogic), nameof(MissionBoardGameLogic.ForfeitGame))]
     public class ForfeitGamePatch
