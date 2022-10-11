@@ -12,6 +12,9 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.Core;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Missions
 {
@@ -38,8 +41,28 @@ namespace Missions
             if (Mission.Current.HasMissionBehavior<MissionBoardGameLogic>() &&
                Agent.Main == sender)
             {
-                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Challenge", "Cancle",
-                new Action(() => { SendGameRequest(sender, other); }), new Action(() => { })));
+                //Free board game selection, for bug testing etc
+                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Player Interaction", "Interacting with " + other.Name,
+                    new List<InquiryElement>()
+                        {
+                            new InquiryElement(1, "Play a board game", new ImageIdentifier(ImageIdentifierType.Null))
+                        },
+                    true, 1, "Confirm", "Cancel",
+
+                    new Action<List<InquiryElement>>((List<InquiryElement> elements) =>
+                    {
+                        int selectedElement = (int)elements.First().Identifier;
+
+                        switch(selectedElement)
+                        {
+                            case 1:
+                                SendGameRequest(sender, other);
+                                break;
+
+                        }
+                    }), 
+
+                    new Action<List<InquiryElement>>((List<InquiryElement> elements) => {  })));
             }
 
         }
@@ -67,7 +90,7 @@ namespace Missions
 
             if (BoardGameLogic.IsPlayingOtherPlayer == false)
             {
-                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", string.Empty, true, true, "Accept", "Decline",
+                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", NetworkAgentRegistry.ControlledAgents[sender].Name + " has challenged you to a board game", true, true, "Accept", "Decline",
                 new Action(() => { AcceptGameRequest(sender, other, netPeer); }), new Action(() => { DenyGameRequest(sender, other, netPeer); })));
             }
             else

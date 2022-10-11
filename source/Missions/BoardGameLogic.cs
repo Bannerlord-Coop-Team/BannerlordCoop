@@ -212,6 +212,8 @@ namespace Coop.Mod.Missions
             }
         }
 
+
+        //OnGameOver has to be called on Forfeit somewhere
         private void OnForfeitGame(MissionBoardGameLogic missionBoardGame)
         {
             ForfeitGameMessage forfeitMessage = new ForfeitGameMessage(GameId);
