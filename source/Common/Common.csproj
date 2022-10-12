@@ -82,6 +82,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Extensions\StringBuilderExtensions.cs" />
     <Compile Include="Serialization\CommonSerializer.cs" />
     <Compile Include="CompatibilityInfo.cs" />
     <Compile Include="CoopObjectManager.cs" />
