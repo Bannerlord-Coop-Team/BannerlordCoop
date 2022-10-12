@@ -4,6 +4,7 @@ using System.Collections.Generic;
 
 namespace Coop.Core.Server.Connections
 {
+
     public readonly struct ClientConnectedMessage
     {
         public NetPeer Peer { get; }
@@ -26,6 +27,11 @@ namespace Coop.Core.Server.Connections
             DisconnectInfo = disconnectInfo;
         }
     }
+
+    internal interface IConnectionManager
+    {
+    }
+
     internal class ConnectionManager : IConnectionManager
     {
         private readonly IMessageBroker _messageBroker;

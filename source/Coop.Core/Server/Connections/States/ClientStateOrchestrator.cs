@@ -10,11 +10,11 @@ namespace Coop.Core.Server.Connections.States
 
     public class ClientStateOrchestrator : IClientStateOrchestrator
     {
-        public IPlayerConnectionStates PlayerConnectionStates { get; private set; }
+        public IPlayerConnectionStatesManager PlayerConnectionStates { get; private set; }
 
         private readonly IMessageBroker _messageBroker;
 
-        public ClientStateOrchestrator(IMessageBroker messageBroker, IPlayerConnectionStates playerConnectionStates)
+        public ClientStateOrchestrator(IMessageBroker messageBroker, IPlayerConnectionStatesManager playerConnectionStates)
         {
             _messageBroker = messageBroker;
             PlayerConnectionStates = playerConnectionStates;

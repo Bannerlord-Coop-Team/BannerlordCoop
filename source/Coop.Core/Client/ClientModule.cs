@@ -11,7 +11,7 @@ namespace Coop.Core.Client
     {
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterType<ClientLogic>().As<IClientLogic>();
+            builder.RegisterType<ClientLogic>().As<IClientLogic>().SingleInstance();
             builder.RegisterType<CoopClient>().As<ICoopClient>().As<ICoopNetwork>().As<INetEventListener>().SingleInstance();
             base.Load(builder);
         }

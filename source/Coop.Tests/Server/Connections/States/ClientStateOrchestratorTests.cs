@@ -13,7 +13,7 @@ namespace Coop.Tests.Server.Connections.States
         private readonly string _playerId = Guid.NewGuid().ToString();
         public ClientStateOrchestratorTests(ITestOutputHelper output) : base(output)
         {
-            var playerConnectionStates = new PlayerConnectionStates(messageBroker);
+            var playerConnectionStates = new PlayerConnectionStatesManager(messageBroker);
             clientStateOrchestrator = new ClientStateOrchestrator(messageBroker, playerConnectionStates);
         }
 

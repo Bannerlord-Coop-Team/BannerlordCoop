@@ -3,7 +3,10 @@ using System.Collections.Generic;
 
 namespace Coop.Core.Server.Connections.States
 {
-    public interface IPlayerConnectionStates
+    /// <summary>
+    /// Manage the state of a player's connection state
+    /// </summary>
+    public interface IPlayerConnectionStatesManager
     {
         /// <summary>
         /// Maps playerIds to their corresponding connection state to the primary BL2 Coop server
@@ -47,11 +50,11 @@ namespace Coop.Core.Server.Connections.States
         void EnterMission(string playerId);
     }
 
-    public class PlayerConnectionStates : IPlayerConnectionStates
+    public class PlayerConnectionStatesManager : IPlayerConnectionStatesManager
     {
         private readonly IMessageBroker _messageBroker;
 
-        public PlayerConnectionStates(IMessageBroker messageBroker)
+        public PlayerConnectionStatesManager(IMessageBroker messageBroker)
         {
             _messageBroker = messageBroker;
         }

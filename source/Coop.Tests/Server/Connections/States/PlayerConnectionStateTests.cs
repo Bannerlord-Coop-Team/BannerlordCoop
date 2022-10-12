@@ -8,12 +8,12 @@ namespace Coop.Tests.Server.Connections.States
 {
     public class PlayerConnectionStateTests : CoopTest
     {
-        private readonly IPlayerConnectionStates _playerConnectionStates;
+        private readonly IPlayerConnectionStatesManager _playerConnectionStates;
         private readonly string _playerId = Guid.NewGuid().ToString();
 
         public PlayerConnectionStateTests(ITestOutputHelper output) : base(output)
         {
-            _playerConnectionStates = new PlayerConnectionStates(messageBroker);
+            _playerConnectionStates = new PlayerConnectionStatesManager(messageBroker);
         }
 
         [Fact]

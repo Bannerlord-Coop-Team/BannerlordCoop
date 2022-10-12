@@ -124,7 +124,6 @@
     <Compile Include="Server\Connections\Connection.cs" />
     <Compile Include="Server\Connections\ConnectionManager.cs" />
     <Compile Include="Server\Connections\IConnection.cs" />
-    <Compile Include="Server\Connections\IConnectionManager.cs" />
     <Compile Include="Server\Connections\IConnectionState.cs" />
     <Compile Include="Server\Connections\Messages\PlayerConnectedCampaign.cs" />
     <Compile Include="Server\Connections\Messages\PlayerConnectedMission.cs" />
@@ -135,6 +134,7 @@
     <Compile Include="Server\Connections\Messages\PlayerLoading.cs" />
     <Compile Include="Server\Connections\Messages\PlayerTransitionCampaign.cs" />
     <Compile Include="Server\Connections\Messages\PlayerTransitionMission.cs" />
+    <Compile Include="Server\Connections\ServerConnectionStateModule.cs" />
     <Compile Include="Server\Connections\States\CampaignState.cs" />
     <Compile Include="Server\Connections\States\ConnectionStateBase.cs" />
     <Compile Include="Server\Connections\States\ConnectionLogic.cs" />
@@ -143,7 +143,7 @@
     <Compile Include="Server\Connections\States\JoiningState.cs" />
     <Compile Include="Server\Connections\States\LoadingState.cs" />
     <Compile Include="Server\Connections\States\MissionState.cs" />
-    <Compile Include="Server\Connections\States\PlayerConnectionStates.cs" />
+    <Compile Include="Server\Connections\States\PlayerConnectionStatesManager.cs" />
     <Compile Include="Server\Messages\Events\ClientJoinRequested.cs" />
     <Compile Include="Server\States\IServerLogic.cs" />
     <Compile Include="Server\ServerModule.cs" />
