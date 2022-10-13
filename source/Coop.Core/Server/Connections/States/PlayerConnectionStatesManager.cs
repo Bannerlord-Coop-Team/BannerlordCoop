@@ -65,7 +65,7 @@ namespace Coop.Core.Server.Connections.States
         {
             var connectionLogic = new ConnectionLogic(_messageBroker);
             ConnectionStates.Add(playerId, connectionLogic);
-            connectionLogic.Join();
+            connectionLogic.ResolveCharacter();
         }
 
         public void RemovePlayer(string playerId)

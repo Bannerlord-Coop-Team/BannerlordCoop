@@ -2,9 +2,9 @@
 
 namespace Coop.Core.Server.Connections.Messages
 {
-    public readonly struct PlayerJoining : ICommand
+    public readonly struct ResolveCharacter : ICommand
     {
-        public PlayerJoining(string playerId)
+        public ResolveCharacter(string playerId)
         {
             PlayerId = playerId;
         }

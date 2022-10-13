@@ -8,7 +8,7 @@ namespace Coop.Core.Server.Connections.States
         {
         }
 
-        public override void Join()
+        public override void ResolveCharacter()
         {
         }
 

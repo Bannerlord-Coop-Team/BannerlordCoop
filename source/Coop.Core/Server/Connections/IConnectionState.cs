@@ -5,17 +5,17 @@ namespace Coop.Core.Server.Connections
     public interface IConnectionState : IState
     {
         /// <summary>
-        /// Player joins the server instance
+        /// Player joins server and is determine the existence of their given character
         /// </summary>
-        void Join();
+        void ResolveCharacter();
 
         /// <summary>
-        /// Player loading server data
+        /// Player loading server data as a whole
         /// </summary>
         void Load();
 
         /// <summary>
-        /// Player entering in enter campaign
+        /// Player entering into campaign map
         /// </summary>
         void EnterCampaign();
 

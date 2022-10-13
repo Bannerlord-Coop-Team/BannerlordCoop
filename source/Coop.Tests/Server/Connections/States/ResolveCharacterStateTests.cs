@@ -5,11 +5,11 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Connections.States
 {
-    public class JoiningStateTests : CoopTest
+    public class ResolveCharacterStateTests : CoopTest
     {
         private readonly IConnectionLogic _connectionLogic;
 
-        public JoiningStateTests(ITestOutputHelper output) : base(output)
+        public ResolveCharacterStateTests(ITestOutputHelper output) : base(output)
         {
             _connectionLogic = new ConnectionLogic(messageBroker);
         }
@@ -17,7 +17,7 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void LoadMethod_TransitionState_LoadingState()
         {
-            _connectionLogic.State = new JoiningState(_connectionLogic, messageBroker);
+            _connectionLogic.State = new ResolveCharacterState(_connectionLogic, messageBroker);
 
             _connectionLogic.Load();
 
@@ -27,13 +27,13 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            _connectionLogic.State = new JoiningState(_connectionLogic, messageBroker);
+            _connectionLogic.State = new ResolveCharacterState(_connectionLogic, messageBroker);
 
-            _connectionLogic.Join();
+            _connectionLogic.ResolveCharacter();
             _connectionLogic.EnterCampaign();
             _connectionLogic.EnterMission();
 
-            Assert.IsType<JoiningState>(_connectionLogic.State);
+            Assert.IsType<ResolveCharacterState>(_connectionLogic.State);
         }
     }
 }

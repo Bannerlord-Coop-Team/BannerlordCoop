@@ -9,9 +9,9 @@ namespace Coop.Core.Server.Connections.States
         {
         }
 
-        public override void Join()
+        public override void ResolveCharacter()
         {
-            ConnectionLogic.State = new JoiningState(ConnectionLogic, MessageBroker);
+            ConnectionLogic.State = new ResolveCharacterState(ConnectionLogic, MessageBroker);
         }
 
         public override void Load()

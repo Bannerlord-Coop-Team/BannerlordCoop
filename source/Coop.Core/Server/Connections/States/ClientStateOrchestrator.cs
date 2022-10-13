@@ -1,9 +1,11 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Connections.Messages;
-using System.Collections.Generic;
 
 namespace Coop.Core.Server.Connections.States
 {
+    /// <summary>
+    /// Handle Client connection state as it pertains to loading in a given player
+    /// </summary>
     public interface IClientStateOrchestrator
     {
     }
@@ -20,8 +22,8 @@ namespace Coop.Core.Server.Connections.States
             PlayerConnectionStates = playerConnectionStates;
 
             _messageBroker.Subscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
-            _messageBroker.Subscribe<PlayerJoining>(PlayerJoiningHandler);
-            _messageBroker.Subscribe<PlayerJoined>(PlayerJoinedHandler);
+            _messageBroker.Subscribe<ResolveCharacter>(PlayerJoiningHandler);
+            _messageBroker.Subscribe<ResolvedCharacter>(PlayerJoinedHandler);
             _messageBroker.Subscribe<PlayerLoaded>(PlayerLoadedHandler);
             _messageBroker.Subscribe<PlayerTransitionCampaign>(PlayerTransitionsCampaignHandler);
             _messageBroker.Subscribe<PlayerTransitionMission>(PlayerTransitionsMissionHandler);
@@ -33,13 +35,13 @@ namespace Coop.Core.Server.Connections.States
             PlayerConnectionStates.RemovePlayer(playerId);
         }
 
-        private void PlayerJoiningHandler(MessagePayload<PlayerJoining> obj)
+        private void PlayerJoiningHandler(MessagePayload<ResolveCharacter> obj)
         {
             var playerId = obj.What.PlayerId;
             PlayerConnectionStates.AddNewPlayer(playerId);
         }
 
-        private void PlayerJoinedHandler(MessagePayload<PlayerJoined> obj)
+        private void PlayerJoinedHandler(MessagePayload<ResolvedCharacter> obj)
         {
             var playerId = obj.What.PlayerId;
             PlayerConnectionStates.PlayerJoined(playerId);

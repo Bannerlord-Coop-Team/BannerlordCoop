@@ -25,7 +25,7 @@ namespace Coop.Tests.Server.Connections.States
 
             Assert.Single(_playerConnectionStates.ConnectionStates);
             Assert.Equal(_playerId, connectionStateKeyPairValue.Key);
-            Assert.IsType<JoiningState>(connectionStateKeyPairValue.Value.State);
+            Assert.IsType<ResolveCharacterState>(connectionStateKeyPairValue.Value.State);
         }
 
         [Fact]
@@ -49,11 +49,11 @@ namespace Coop.Tests.Server.Connections.States
 
             Assert.Single(_playerConnectionStates.ConnectionStates);
             Assert.Equal(_playerId, connectionStateKeyPairValue.Key);
-            Assert.IsType<JoiningState>(connectionStateKeyPairValue.Value.State);
+            Assert.IsType<ResolveCharacterState>(connectionStateKeyPairValue.Value.State);
         }
 
         [Fact]
-        public void PlayerJoined_ChangesPlayerConnectionState_PlayerLoading()
+        public void PlayerResolvedCharacter_ChangesPlayerConnectionState_PlayerLoading()
         {
              _playerConnectionStates.AddNewPlayer(_playerId);
             _playerConnectionStates.PlayerJoined(_playerId);
@@ -64,7 +64,7 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void PlayerJoined_NoMatchingPlayerId_ShortCircuits()
+        public void PlayerResolvedCharacter_NoMatchingPlayerId_ShortCircuits()
         {
             var nonExistantId = "nonExistantId";
             _playerConnectionStates.AddNewPlayer(_playerId);
@@ -72,7 +72,7 @@ namespace Coop.Tests.Server.Connections.States
 
             var connectionStateKeyPairValue = _playerConnectionStates.ConnectionStates.Single();
 
-            Assert.IsType<JoiningState>(connectionStateKeyPairValue.Value.State);
+            Assert.IsType<ResolveCharacterState>(connectionStateKeyPairValue.Value.State);
         }
 
         [Fact]

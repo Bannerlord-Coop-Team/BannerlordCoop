@@ -2,14 +2,14 @@
 
 namespace Coop.Core.Server.Connections.States
 {
-    public class JoiningState : ConnectionStateBase
+    public class ResolveCharacterState : ConnectionStateBase
     {
-        public JoiningState(IConnectionLogic connectionLogic, IMessageBroker messageBroker) 
+        public ResolveCharacterState(IConnectionLogic connectionLogic, IMessageBroker messageBroker) 
             : base(connectionLogic, messageBroker)
         {
         }
 
-        public override void Join()
+        public override void ResolveCharacter()
         {
         }
 

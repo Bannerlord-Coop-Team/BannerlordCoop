@@ -28,7 +28,7 @@ namespace Coop.Tests.Server.Connections.States
         {
             _connectionLogic.State = new CampaignState(_connectionLogic, messageBroker);
 
-            _connectionLogic.Join();
+            _connectionLogic.ResolveCharacter();
             _connectionLogic.Load();
             _connectionLogic.EnterCampaign();
 

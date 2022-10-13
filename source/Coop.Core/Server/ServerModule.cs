@@ -6,6 +6,9 @@ using LiteNetLib;
 
 namespace Coop.Core.Server
 {
+    /// <summary>
+    /// Server dependencies
+    /// </summary>
     internal class ServerModule : Module
     {
         protected override void Load(ContainerBuilder builder)

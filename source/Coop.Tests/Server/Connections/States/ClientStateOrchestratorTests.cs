@@ -20,26 +20,26 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerDisconnected_RemovePlayer()
         {
-            messageBroker.Publish(this, new PlayerJoining(_playerId));
+            messageBroker.Publish(this, new ResolveCharacter(_playerId));
             messageBroker.Publish(this, new PlayerDisconnected(_playerId));
 
             Assert.Empty(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates);
         }
 
         [Fact]
-        public void PlayerJoining_AddsNewPlayer()
+        public void PlayerResolveCharacter_AddsNewPlayer()
         {
-            messageBroker.Publish(this, new PlayerJoining(_playerId));
+            messageBroker.Publish(this, new ResolveCharacter(_playerId));
 
             Assert.Single(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates);
-            Assert.IsType<JoiningState>(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates.Single().Value.State);
+            Assert.IsType<ResolveCharacterState>(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates.Single().Value.State);
         }
 
         [Fact]
-        public void PlayerJoined_UpdatesPlayerState_LoadingState()
+        public void PlayerResolvedCharacter_UpdatesPlayerState_LoadingState()
         {
-            messageBroker.Publish(this, new PlayerJoining(_playerId));
-            messageBroker.Publish(this, new PlayerJoined(_playerId));
+            messageBroker.Publish(this, new ResolveCharacter(_playerId));
+            messageBroker.Publish(this, new ResolvedCharacter(_playerId));
 
             Assert.IsType<LoadingState>(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates.Single().Value.State);
         }
@@ -53,8 +53,8 @@ namespace Coop.Tests.Server.Connections.States
                 messagePublished = true;
             });
 
-            messageBroker.Publish(this, new PlayerJoining(_playerId));
-            messageBroker.Publish(this, new PlayerJoined(_playerId));
+            messageBroker.Publish(this, new ResolveCharacter(_playerId));
+            messageBroker.Publish(this, new ResolvedCharacter(_playerId));
 
             Assert.True(messagePublished);
         }
@@ -62,8 +62,8 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerLoaded_EntersCampaignState()
         {
-            messageBroker.Publish(this, new PlayerJoining(_playerId));
-            messageBroker.Publish(this, new PlayerJoined(_playerId));
+            messageBroker.Publish(this, new ResolveCharacter(_playerId));
+            messageBroker.Publish(this, new ResolvedCharacter(_playerId));
             messageBroker.Publish(this, new PlayerLoaded(_playerId));
 
             Assert.IsType<CampaignState>(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates.Single().Value.State);
@@ -72,8 +72,8 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerEntersMissionState()
         {
-            messageBroker.Publish(this, new PlayerJoining(_playerId));
-            messageBroker.Publish(this, new PlayerJoined(_playerId));
+            messageBroker.Publish(this, new ResolveCharacter(_playerId));
+            messageBroker.Publish(this, new ResolvedCharacter(_playerId));
             messageBroker.Publish(this, new PlayerLoaded(_playerId));
             messageBroker.Publish(this, new PlayerTransitionMission(_playerId));
 
@@ -84,8 +84,8 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerMissionState_TransitionsCampaignState()
         {
-            messageBroker.Publish(this, new PlayerJoining(_playerId));
-            messageBroker.Publish(this, new PlayerJoined(_playerId));
+            messageBroker.Publish(this, new ResolveCharacter(_playerId));
+            messageBroker.Publish(this, new ResolvedCharacter(_playerId));
             messageBroker.Publish(this, new PlayerLoaded(_playerId));
             messageBroker.Publish(this, new PlayerTransitionMission(_playerId));
             messageBroker.Publish(this, new PlayerTransitionCampaign(_playerId));

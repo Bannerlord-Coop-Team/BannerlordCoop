@@ -14,13 +14,13 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void JoinMethod_TransitionState_JoiningState()
+        public void ResolveCharacterMethod_TransitionState_JoiningState()
         {
             _connectionLogic.State = new InitialConnectionState(_connectionLogic, messageBroker);
 
-            _connectionLogic.Join();
+            _connectionLogic.ResolveCharacter();
 
-            Assert.IsType<JoiningState>(_connectionLogic.State);
+            Assert.IsType<ResolveCharacterState>(_connectionLogic.State);
         }
 
         [Fact]

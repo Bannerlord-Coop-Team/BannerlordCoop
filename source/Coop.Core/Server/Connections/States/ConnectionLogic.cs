@@ -21,9 +21,9 @@ namespace Coop.Core.Server.Connections.States
             State = new InitialConnectionState(this, messageBroker);
         }
 
-        public void Join()
+        public void ResolveCharacter()
         {
-            State.Join();
+            State.ResolveCharacter();
         }
 
         public void Load()
