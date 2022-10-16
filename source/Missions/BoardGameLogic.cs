@@ -229,7 +229,7 @@ namespace Coop.Mod.Missions
         {
             if(payload.What.GameId == GameId)
             {
-                m_BoardGameLogic.Board.SetGameOverInfo(GameOverEnum.PlayerOneWon);
+                m_BoardGameLogic.SetGameOver(GameOverEnum.PlayerOneWon);
             }
         }
     }

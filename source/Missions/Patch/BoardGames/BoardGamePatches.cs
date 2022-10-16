@@ -97,7 +97,10 @@ namespace Coop.Mod.Patch.BoardGames
         public static event Action<MissionBoardGameLogic> OnForfeitGame; 
         static bool Prefix(MissionBoardGameLogic __instance)
         {
-             OnForfeitGame?.Invoke(__instance);
+            if (BoardGameLogic.IsPlayingOtherPlayer)
+            {
+                OnForfeitGame?.Invoke(__instance);
+            }
 
              return true;
 
