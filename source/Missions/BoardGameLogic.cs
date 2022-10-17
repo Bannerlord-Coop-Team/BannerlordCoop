@@ -220,7 +220,7 @@ namespace Coop.Mod.Missions
         {
             ForfeitGameMessage forfeitMessage = new ForfeitGameMessage(GameId);
             m_MessageBroker.Publish(forfeitMessage);
-            //Dispose();
+            Dispose();
             //missionBoardGame.Board.SetGameOverInfo(GameOverEnum.PlayerTwoWon);
             //missionBoardGame.SetGameOver(missionBoardGame.Board.GameOverInfo);
         }
@@ -230,6 +230,7 @@ namespace Coop.Mod.Missions
             if(payload.What.GameId == GameId)
             {
                 m_BoardGameLogic.SetGameOver(GameOverEnum.PlayerOneWon);
+                Dispose();
             }
         }
     }
