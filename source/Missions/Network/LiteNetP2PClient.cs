@@ -40,6 +40,7 @@ namespace Missions.Network
             netManager = new NetManager(this)
             {
                 NatPunchEnabled = true,
+                DisconnectTimeout = int.MaxValue,
             };
 
             netManager.NatPunchModule.Init(this);
