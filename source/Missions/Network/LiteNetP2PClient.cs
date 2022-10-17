@@ -40,7 +40,11 @@ namespace Missions.Network
             netManager = new NetManager(this)
             {
                 NatPunchEnabled = true,
+// TODO remove after bug is found
+#if DEBUG
                 DisconnectTimeout = int.MaxValue,
+                MaxConnectAttempts = int.MaxValue,
+#endif
             };
 
             netManager.NatPunchModule.Init(this);
