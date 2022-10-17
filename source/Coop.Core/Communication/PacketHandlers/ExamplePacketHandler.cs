@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Coop.Core.Communication.PacketHandlers
 {
-    public class ExamplePacketHandler : IPacketHandler
+    public class ExamplePacketHandler : IPacketHandler<ExamplePacket>
     {
 
         /// <summary>
@@ -16,11 +16,9 @@ namespace Coop.Core.Communication.PacketHandlers
         /// </summary>
         public PacketType PacketType => PacketType.Example;
 
-        public void HandlePacket(NetPeer peer, IPacket packet)
+        public void HandlePacket(ExamplePacket packet)
         {
-            ExamplePacket convertedPacket = (ExamplePacket)packet;
-
-            if (convertedPacket.Data != null)
+            if (packet.Data != null)
             {
                 // Do something with data
             }

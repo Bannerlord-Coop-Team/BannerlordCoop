@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using Common.Messaging;
 using Coop.Core.Server.Connections;
 using Coop.Core.Configuration;
+using Coop.Core.Communication.PacketHandlers;
 
 namespace Coop.Core.Server
 {
@@ -17,13 +18,15 @@ namespace Coop.Core.Server
         private readonly NetManager netManager;
         private readonly INetworkConfiguration configuration;
         private readonly IMessageBroker messageBroker;
+        private readonly IPacketProcessor packetProcessor;
 
-        public CoopServer(INetworkConfiguration configuration, IMessageBroker messageBroker)
+        public CoopServer(INetworkConfiguration configuration, IMessageBroker messageBroker, IPacketProcessor packetProcessor)
         {
             // Dependancy assignment
             this.netManager = new NetManager(this);
             this.configuration = configuration;
             this.messageBroker = messageBroker;
+            this.packetProcessor = packetProcessor;
 
             // Netmanager initialization
             netManager.NatPunchEnabled = true;

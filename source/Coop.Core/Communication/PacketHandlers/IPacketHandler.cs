@@ -2,10 +2,10 @@
 
 namespace Coop.Core.Communication.PacketHandlers
 {
-    public interface IPacketHandler
+    public interface IPacketHandler<in T>
     {
         PacketType PacketType { get; }
 
-        void HandlePacket(NetPeer peer, IPacket packet);
+        void HandlePacket(T packet);
     }
 }

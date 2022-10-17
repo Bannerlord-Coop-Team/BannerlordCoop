@@ -22,21 +22,6 @@ namespace Coop.Core.Communication.PacketHandlers
         private readonly ISerializer serializer;
         private readonly IMessageBroker messageBroker;
 
-        private static readonly Dictionary<PacketType, List<IPacketHandler>> packetHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
-
-        public static void RegisterPacketHandler(IPacketHandler handler)
-        {
-            if (packetHandlers.TryGetValue(handler.PacketType, out var handlers))
-            {
-                if (handlers.Contains(handler)) throw new InvalidOperationException($"{handler.GetType()} is already registered.");
-                handlers.Add(handler);
-            }
-            else
-            {
-                packetHandlers.Add(handler.PacketType, new List<IPacketHandler> { handler });
-            }
-        }
-
         public PacketManager(NetManager netManager, ISerializer serializer, IMessageBroker messageBroker)
         {
             this.netManager = netManager;
