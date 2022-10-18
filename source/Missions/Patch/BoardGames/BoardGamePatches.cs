@@ -13,6 +13,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Coop.Mod.Patch.BoardGames
@@ -23,10 +24,14 @@ namespace Coop.Mod.Patch.BoardGames
     {
         static bool Prefix(Agent ownerAgent)
         {
-            
 
             //Somewhat ugly way to not break forfeit/win, might be issues with opposingAgent have not checked
             return BoardGameLogic.IsPlayingOtherPlayer == false;
+        }
+
+        static void Postfix(Agent ownerAgent)
+        {
+            BoardGameLogic.IsPlayingOtherPlayer = false;
         }
     }
 
@@ -77,13 +82,12 @@ namespace Coop.Mod.Patch.BoardGames
     //[HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
     //public class SetGameOverPatch
     //{
-    //    public static event Action<MissionBoardGameLogic> OnGameOver;
-    //    static bool Prefix(MissionBoardGameLogic __instance, GameOverEnum gameOverInfo)
+    //    static void Postfix(MissionBoardGameLogic __instance, GameOverEnum gameOverInfo)
     //    {
-
-    //        OnGameOver?.Invoke(__instance);
-
-    //        return BoardGameLogic.IsPlayingOtherPlayer == false;
+    //        if (BoardGameLogic.IsPlayingOtherPlayer)
+    //        {
+    //            BoardGameLogic.IsPlayingOtherPlayer = false;
+    //        }
     //    }
     //}
 
@@ -93,9 +97,13 @@ namespace Coop.Mod.Patch.BoardGames
         public static event Action<MissionBoardGameLogic> OnForfeitGame; 
         static bool Prefix(MissionBoardGameLogic __instance)
         {
-            OnForfeitGame?.Invoke(__instance);
+            if (BoardGameLogic.IsPlayingOtherPlayer)
+            {
+                OnForfeitGame?.Invoke(__instance);
+            }
 
-            return BoardGameLogic.IsPlayingOtherPlayer == false;
+             return true;
+
         }
     }
 

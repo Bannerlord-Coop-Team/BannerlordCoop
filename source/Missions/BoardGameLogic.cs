@@ -7,6 +7,7 @@ using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;
 using SandBox.BoardGames.Pawns;
+using SandBox.GauntletUI.Missions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,11 +60,11 @@ namespace Coop.Mod.Missions
 
         public void Dispose()
         {
-            IsPlayingOtherPlayer = false;
+            //IsPlayingOtherPlayer = false;
 
-            m_MessageBroker.Subscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
-            m_MessageBroker.Subscribe<PawnCapturedMessage>(Handle_PawnCapture);
-            m_MessageBroker.Subscribe<BoardGameMoveRequest>(Handle_MoveRequest);
+            m_MessageBroker.Unsubscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
+            m_MessageBroker.Unsubscribe<PawnCapturedMessage>(Handle_PawnCapture);
+            m_MessageBroker.Unsubscribe<BoardGameMoveRequest>(Handle_MoveRequest);
 
             StartConversationAfterGamePatch.OnGameOver -= OnGameOver;
             ForfeitGamePatch.OnForfeitGame -= OnForfeitGame;
@@ -92,7 +93,8 @@ namespace Coop.Mod.Missions
         {
             if (IsPlayingOtherPlayer)
             {
-                Dispose();
+                //Dispose();
+                IsPlayingOtherPlayer = false;
             }
         }
 
@@ -218,16 +220,20 @@ namespace Coop.Mod.Missions
         {
             ForfeitGameMessage forfeitMessage = new ForfeitGameMessage(GameId);
             m_MessageBroker.Publish(forfeitMessage);
-            missionBoardGame.Board.SetGameOverInfo(GameOverEnum.PlayerTwoWon);
-            missionBoardGame.SetGameOver(missionBoardGame.Board.GameOverInfo);
+            Dispose();
+            //missionBoardGame.Board.SetGameOverInfo(GameOverEnum.PlayerTwoWon);
+            //missionBoardGame.SetGameOver(missionBoardGame.Board.GameOverInfo);
         }
 
         private void Handle_ForfeitGameMessage(MessagePayload<ForfeitGameMessage> payload)
         {
             if(payload.What.GameId == GameId)
             {
-                m_BoardGameLogic.AIForfeitGame();
+                m_BoardGameLogic.SetGameOver(GameOverEnum.PlayerOneWon);
+                Dispose();
             }
         }
     }
 }
+//m_BoardGameLogic.AIForfeitGame();
+//Dispose();
