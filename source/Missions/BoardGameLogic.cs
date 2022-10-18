@@ -93,9 +93,9 @@ namespace Coop.Mod.Missions
         {
             if (IsPlayingOtherPlayer)
             {
-                //Dispose();
                 IsPlayingOtherPlayer = false;
             }
+            Dispose();
         }
 
         private void PreplaceUnits()
