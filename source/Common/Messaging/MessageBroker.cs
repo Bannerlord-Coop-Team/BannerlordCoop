@@ -5,17 +5,26 @@ using System.Threading.Tasks;
 
 namespace Common.Messaging
 {
+    public interface IMessageBroker : IDisposable
+    {
+        void Subscribe<T>(Action<MessagePayload<T>> subscriber);
+        void SubscribeToNetwork<T>(Action<MessagePayload<T>> subscriber) where T : INetworkMessage;
+        void Unsubscribe<T>(Action<MessagePayload<T>> subscriber);
+        void Publish<T>(object sender, T message);
+        void PublishToNetwork<T>(object source, T message) where T : INetworkMessage;
+    }
+
     public class MessageBroker : IMessageBroker
     {
         public static MessageBroker Instance = new MessageBroker();
         protected readonly Dictionary<Type, List<Delegate>> _subscribers = new Dictionary<Type, List<Delegate>>();
+        protected readonly Dictionary<Type, List<Delegate>> _networkSubscribers = new Dictionary<Type, List<Delegate>>();
 
         /// <summary>
         ///     Call an event based on the type of the message.
         /// </summary>
-        /// <param name="sender">Sender</param>
+        /// <param name="source">Sender</param>
         /// <param name="message">Message event</param>
-        /// <param name="scope">Scope of the message</param>
         /// <typeparam name="T">Type of the message</typeparam>
         public virtual void Publish<T>(object source, T message)
         {
@@ -47,6 +56,14 @@ namespace Common.Messaging
                 _subscribers.Add(typeof(T), new List<Delegate>());
 
             _subscribers[typeof(T)].Add(subscriber);
+        }
+
+        public void PublishToNetwork<T>(object source, T message) where T : INetworkMessage
+        {
+        }
+
+        public void SubscribeToNetwork<T>(Action<MessagePayload<T>> subscriber) where T : INetworkMessage
+        {
         }
 
         /// <summary>

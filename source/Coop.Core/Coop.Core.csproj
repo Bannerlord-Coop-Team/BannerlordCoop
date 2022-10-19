@@ -120,6 +120,8 @@
     <Compile Include="Client\States\ReceivingSavedDataState.cs" />
     <Compile Include="Client\States\ResolveNetworkGuidsState.cs" />
     <Compile Include="Client\States\ValidateModuleState.cs" />
+    <Compile Include="Communication\PacketHandlers\PacketHandlerRepository.cs" />
+    <Compile Include="Communication\PacketHandlers\PacketProcessor.cs" />
     <Compile Include="CoopModule.cs" />
     <Compile Include="Server\Connections\Connection.cs" />
     <Compile Include="Server\Connections\ConnectionManager.cs" />

@@ -6,6 +6,7 @@ using Common.Messaging;
 using Coop.Core.Server.Connections;
 using Coop.Core.Configuration;
 using Coop.Core.Communication.PacketHandlers;
+using Coop.Core.Server.Messages;
 
 namespace Coop.Core.Server
 {
@@ -31,6 +32,24 @@ namespace Coop.Core.Server
             // Netmanager initialization
             netManager.NatPunchEnabled = true;
             netManager.NatPunchModule.Init(this);
+
+            messageBroker.Subscribe<INetworkMessage>(HandleOutBound);
+        }
+
+        private void HandleOutBound(MessagePayload<INetworkMessage> obj)
+        {
+            var what = obj.What;
+            var netPeerObject = what.GetType().GetProperty("NetPeer").GetValue(what);
+
+            if (netPeerObject != null)
+            {
+                var netPeer = (NetPeer)netPeerObject;
+                netPeer.Send(new byte[1], DeliveryMethod.ReliableSequenced);
+            }
+            else
+            {
+                netManager.SendToAll(new byte[1], DeliveryMethod.ReliableSequenced);
+            }
         }
 
         public int Priority => 0;
