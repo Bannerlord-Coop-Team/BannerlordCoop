@@ -66,6 +66,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="app.config" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
@@ -73,9 +74,13 @@
     <Analyzer Include="..\packages\xunit.analyzers.1.0.0\analyzers\dotnet\cs\xunit.analyzers.fixes.dll" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\IntroducationServer\IntroducationServer.csproj">
-      <Project>{8C62048A-7438-4B30-A61E-69D2AF634254}</Project>
-      <Name>IntroducationServer</Name>
+    <ProjectReference Include="..\Missions\Missions.csproj">
+      <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
+      <Name>Missions</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\SharedData\SharedData.csproj">
+      <Project>{0D23DC04-68A2-49E0-B92A-383B5BB08457}</Project>
+      <Name>SharedData</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />

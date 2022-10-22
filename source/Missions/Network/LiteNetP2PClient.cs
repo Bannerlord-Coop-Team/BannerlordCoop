@@ -1,9 +1,11 @@
 ﻿using Common;
 using Common.Serialization;
+using Coop.Mod.Missions;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Missions.Config;
 using NLog;
+using SharedData;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -79,7 +81,6 @@ namespace Missions.Network
 
         public void Update(TimeSpan frameTime)
         {
-            int t = peerServer.TimeSinceLastPacket;
             netManager.PollEvents();
             netManager.NatPunchModule.PollEvents();
         }
@@ -99,9 +100,13 @@ namespace Missions.Network
                 port = networkConfig.WanPort;
             }
 
+            ClientInfo clientInfo = new ClientInfo(
+                id,
+                typeof(MissionClient).Assembly.GetName().Version);
+
             peerServer = netManager.Connect(connectionAddress,
                                             port,
-                                            $"{networkConfig.P2PToken}%{id}");
+                                            clientInfo.ToString());
 
             return peerServer != null;
         }

@@ -65,7 +65,7 @@ namespace Missions.Config
         /// <summary>
         ///     P2P NAT Type
         /// </summary>
-        public NATType NATType { get; set; } = NATType.Internal;
+        public NATType NATType { get; set; } = NATType.External;
         #endregion
     }
 }

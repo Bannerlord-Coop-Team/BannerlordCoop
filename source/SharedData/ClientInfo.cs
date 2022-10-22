@@ -1,29 +1,29 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
-using Common.Extensions;
+using ProtoBuf;
+using SharedData.Extensions;
 
-namespace IntroducationServer.Data
+namespace SharedData
 {
+    [ProtoContract]
     public class ClientInfo
     {
-        public ClientInfo(Guid clientId, Version version, string instanceName)
+        public ClientInfo(Guid clientId, Version version)
         {
             if (clientId == Guid.Empty) throw new ArgumentNullException($"{nameof(clientId)} is invalid, use Guid.NewGuid().");
             if (version == null) throw new ArgumentNullException($"{nameof(version)} cannot be null.");
-            if (instanceName == string.Empty) throw new ArgumentNullException($"{nameof(instanceName)} cannot be empty.");
-            if (instanceName == null) throw new ArgumentNullException($"{nameof(instanceName)} cannot be null.");
 
             ClientId = clientId;
             ModVersion = version;
-            InstanceName = instanceName;
         }
 
         private readonly static char Delimiter = '%';
 
+        [ProtoMember(1)]
         public Guid ClientId { get; }
+        [ProtoMember(2)]
         public Version ModVersion { get; }
-        public string InstanceName { get; }
 
         public override string ToString()
         {
@@ -33,7 +33,6 @@ namespace IntroducationServer.Data
             {
                 ClientId.ToString(),
                 ModVersion.ToString(),
-                InstanceName.ToString(),
             };
 
             ValidateItems(items);
@@ -61,18 +60,15 @@ namespace IntroducationServer.Data
 
                 string[] values = token.Split(Delimiter);
 
-                if (values.Length != 3) return false;
+                if (values.Length != 2) return false;
 
                 Guid guid = new Guid(values[0]);
                 Version modVersion = Version.Parse(values[1]);
-                string instanceName = values[2];
 
                 if (guid == Guid.Empty) return false;
                 if (modVersion == null) return false;
-                if (instanceName == null) return false;
-                if (instanceName == string.Empty) return false;
 
-                clientInfo = new ClientInfo(guid, modVersion, instanceName);
+                clientInfo = new ClientInfo(guid, modVersion);
                 return true;
             }
             catch

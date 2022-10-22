@@ -15,7 +15,6 @@ namespace IntroducationServer
         private static void Main(string[] args)
         {
             var config = new NetworkConfiguration();
-            config.NATType = NATType.External;
             testServer = new MissionTestServer(config);
 
             if (config.NATType == NATType.Internal)

@@ -1,8 +1,7 @@
 ﻿using IntroducationServer.Config;
-using IntroducationServer.Data;
 using LiteNetLib;
-using MissionTestMod;
 using NLog;
+using SharedData;
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -55,7 +54,7 @@ namespace IntroducationServer.Server
                     return;
                 }
 
-                if (clientInfo.ModVersion != typeof(TestMod).Assembly.GetName().Version)
+                if (clientInfo.ModVersion != typeof(MissionTestServer).Assembly.GetName().Version)
                 {
                     request.Reject();
                     return;
@@ -105,35 +104,43 @@ namespace IntroducationServer.Server
 
         public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
         {
-            ClientInfo clientInfo;
-            if (ClientInfo.TryParse(token, out clientInfo) == false) return;
-
-            string instance = clientInfo.InstanceName;
-            Guid id = clientInfo.ClientId;
-
-            if (peerRegistry.ContainsP2PPeer(instance, id))
+            try
             {
-                return;
+                string[] data = token.Split('%');
+
+                if (data.Length != 2) return;
+
+                string instance = data[0];
+                if (Guid.TryParse(data[1], out Guid id) == false) return;
+
+                if (peerRegistry.ContainsP2PPeer(instance, id))
+                {
+                    return;
+                }
+
+                foreach (var existingPeer in peerRegistry.GetPeersInInstance(instance))
+                {
+                    Console.WriteLine($"Connecting {localEndPoint} to {existingPeer.InternalAddr}");
+                    NetManager.NatPunchModule.NatIntroduce(
+                        existingPeer.InternalAddr, // host internal
+                        existingPeer.ExternalAddr, // host external
+                        localEndPoint, // client internal
+                        remoteEndPoint, // client external
+                        token // request token
+                    );
+                }
+
+                NetPeer peer = peerRegistry.GetPeer(id);
+
+                if (peer != null)
+                {
+                    var p2PPeer = new P2PPeer(peer, localEndPoint, remoteEndPoint);
+                    peerRegistry.RegisterPeer(instance, p2PPeer);
+                }
             }
-
-            foreach (var existingPeer in peerRegistry.GetPeersInInstance(instance))
+            catch (Exception e)
             {
-                Console.WriteLine($"Connecting {localEndPoint} to {existingPeer.InternalAddr}");
-                NetManager.NatPunchModule.NatIntroduce(
-                    existingPeer.InternalAddr, // host internal
-                    existingPeer.ExternalAddr, // host external
-                    localEndPoint, // client internal
-                    remoteEndPoint, // client external
-                    token // request token
-                );
-            }
-
-            NetPeer peer = peerRegistry.GetPeer(id);
-
-            if (peer != null)
-            {
-                var p2PPeer = new P2PPeer(peer, localEndPoint, remoteEndPoint);
-                peerRegistry.RegisterPeer(instance, p2PPeer);
+                Console.WriteLine(e.Message);
             }
 
         }

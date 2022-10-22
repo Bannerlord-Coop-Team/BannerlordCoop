@@ -60,7 +60,6 @@ namespace Coop.Mod.Missions
         public void StartGameInTavern()
         {
             NetworkConfiguration config = new NetworkConfiguration();
-            config.NATType = NATType.External;
 
             m_Client = new LiteNetP2PClient(config);
 
