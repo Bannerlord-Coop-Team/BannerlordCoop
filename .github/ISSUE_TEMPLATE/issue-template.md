@@ -8,8 +8,7 @@ assignees: ''
 ---
 
 # For New Contributors
-[How to contribute]()
-[How to setup your environment]()
+[How to contribute](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki/Getting-Started-as-a-Contributor)
 
 # Purpose
 <!-- Describe why this issue is needed. -->
