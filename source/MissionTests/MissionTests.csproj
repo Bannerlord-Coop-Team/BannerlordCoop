@@ -82,10 +82,6 @@
       <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
       <Name>Missions</Name>
     </ProjectReference>
-    <ProjectReference Include="..\SharedData\SharedData.csproj">
-      <Project>{0D23DC04-68A2-49E0-B92A-383B5BB08457}</Project>
-      <Name>SharedData</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
