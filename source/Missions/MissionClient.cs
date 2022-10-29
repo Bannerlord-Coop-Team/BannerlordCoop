@@ -56,6 +56,7 @@ namespace Coop.Mod.Missions
             {
                 m_Logger.Info("Sending join request");
                 NetworkAgentRegistry.RegisterControlledAgent(m_PlayerId, Agent.Main);
+
                 MissionJoinInfo request = new MissionJoinInfo(m_PlayerId, Agent.Main.Position);
                 MessageBroker.Publish(request, peer);
             }

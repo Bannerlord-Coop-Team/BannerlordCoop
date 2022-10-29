@@ -1,8 +1,11 @@
 ﻿using Common;
 using Common.Serialization;
+using Coop.Mod.Missions;
+using IntroServer.Config;
+using IntroServer.Data;
+using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
-using Missions.Config;
 using NLog;
 using System;
 using System.Collections.Generic;
@@ -18,21 +21,20 @@ namespace Missions.Network
 {
     public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable
     {
-        private static Logger m_Logger = LogManager.GetCurrentClassLogger();
+        private static readonly Logger m_Logger = LogManager.GetCurrentClassLogger();
 
         private readonly Guid id = Guid.NewGuid();
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;
         public event Action<NetPeer, DisconnectInfo> OnClientDisconnected;
         public event Action<NetPeer> OnClientConnected;
 
-        NetManager netManager;
+        readonly NetManager netManager;
         string instance;
-        public NetPeer peerServer { get; private set; }
+        public NetPeer PeerServer { get; private set; }
         public int Priority => 2;
 
         static readonly Dictionary<PacketType, List<IPacketHandler>> m_PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
-
-        NetworkConfiguration networkConfig;
+        readonly NetworkConfiguration networkConfig;
         public LiteNetP2PClient(NetworkConfiguration configuration)
         {
             networkConfig = configuration;
@@ -79,7 +81,6 @@ namespace Missions.Network
 
         public void Update(TimeSpan frameTime)
         {
-            int t = peerServer.TimeSinceLastPacket;
             netManager.PollEvents();
             netManager.NatPunchModule.PollEvents();
         }
@@ -99,11 +100,15 @@ namespace Missions.Network
                 port = networkConfig.WanPort;
             }
 
-            peerServer = netManager.Connect(connectionAddress,
-                                            port,
-                                            $"{networkConfig.P2PToken}%{id}");
+            ClientInfo clientInfo = new ClientInfo(
+                id,
+                typeof(MissionTestServer).Assembly.GetName().Version);
 
-            return peerServer != null;
+            PeerServer = netManager.Connect(connectionAddress,
+                                            port,
+                                            clientInfo.ToString());
+
+            return PeerServer != null;
         }
 
         public void NatPunch(string instance)
@@ -153,7 +158,7 @@ namespace Missions.Network
             // No requests on client
         }
 
-        static Dictionary<NATType, NatAddressType> natAddressTypeMap = new Dictionary<NATType, NatAddressType>()
+        static readonly Dictionary<NATType, NatAddressType> natAddressTypeMap = new Dictionary<NATType, NatAddressType>()
         {
             { NATType.External, NatAddressType.External },
             { NATType.Internal, NatAddressType.Internal },
@@ -170,7 +175,7 @@ namespace Missions.Network
 
         public void OnPeerConnected(NetPeer peer)
         {
-            if(peerServer != null && peer != peerServer)
+            if(PeerServer != null && peer != PeerServer)
             {
                 OnClientConnected?.Invoke(peer);
             }
