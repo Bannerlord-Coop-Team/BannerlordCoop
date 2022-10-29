@@ -1,37 +1,23 @@
 ﻿using HarmonyLib;
-using LiteNetLib;
+using IntroServer.Config;
 using Missions;
-using Missions.Config;
 using Missions.Network;
 using Missions.Serialization.Surrogates;
 using NLog;
 using ProtoBuf.Meta;
 using SandBox;
-using SandBox.Conversation.MissionLogics;
-using SandBox.Missions.AgentBehaviors;
-using SandBox.Missions.MissionLogics;
-using SandBox.Missions.MissionLogics.Arena;
-using SandBox.Missions.MissionLogics.Towns;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
-using TaleWorlds.CampaignSystem.TournamentGames;
 using TaleWorlds.Core;
-using TaleWorlds.DotNet;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.MountAndBlade.Source.Missions;
-using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
 using TaleWorlds.SaveSystem.Load;
 
 namespace Coop.Mod.Missions
@@ -60,7 +46,6 @@ namespace Coop.Mod.Missions
         public void StartGameInTavern()
         {
             NetworkConfiguration config = new NetworkConfiguration();
-            config.NATType = NATType.External;
 
             m_Client = new LiteNetP2PClient(config);
 
