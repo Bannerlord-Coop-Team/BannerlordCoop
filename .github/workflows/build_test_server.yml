@@ -25,10 +25,10 @@ jobs:
 
       # Run Nuget restore to ensure we have all the packages for the test server
     - name: Nuget Restore
-      run: nuget restore source\TestServer\IntroServer.csproj
+      run: nuget restore source\IntroServer\IntroServer.csproj
 
       # Build the test server with high Verboristy
     - name: build Test Server
-      run: msbuild source\TestServer\IntroServer.csproj -verbosity:diag
+      run: msbuild source\IntroServer\IntroServer.csproj -verbosity:diag
 
       # Once some one gives me what tests to run we can try to incorporate them here. Currently the build just completes, and goes nowhere
