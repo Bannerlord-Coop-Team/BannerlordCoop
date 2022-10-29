@@ -1,12 +1,13 @@
-﻿using IntroducationServer.Config;
+﻿using IntroServer.Server;
+using IntroServer.Config;
+using IntroServer.Data;
 using LiteNetLib;
 using NLog;
-using SharedData;
 using System;
 using System.Net;
 using System.Net.Sockets;
 
-namespace IntroducationServer.Server
+namespace IntroServer.Server
 {
     public class MissionTestServer : INetEventListener, INatPunchListener
     {

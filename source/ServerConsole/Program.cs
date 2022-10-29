@@ -1,6 +1,7 @@
-﻿using IntroducationServer.Config;
-using IntroducationServer.Server;
+﻿using IntroServer.Config;
+using IntroServer.Server;
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,8 +10,8 @@ namespace IntroducationServer
     internal class Program
     {
         static int TicksPerSecond = 120;
-        static MissionTestServer testServer;
-        static Task pollTask;
+        static MissionTestServer? testServer;
+        static Task? pollTask;
 
         private static void Main(string[] args)
         {

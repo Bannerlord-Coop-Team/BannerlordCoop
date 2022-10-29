@@ -1,4 +1,4 @@
-﻿using SharedData;
+﻿using IntroServer.Data;
 using System;
 using Xunit;
 
@@ -13,8 +13,7 @@ namespace MissionTests
 
             string strClientInfo = clientInfo.ToString();
 
-            ClientInfo deserializedClientInfo;
-            bool isDeserialized = ClientInfo.TryParse(strClientInfo, out deserializedClientInfo);
+            bool isDeserialized = ClientInfo.TryParse(strClientInfo, out ClientInfo deserializedClientInfo);
 
             Assert.True(isDeserialized);
             Assert.Equal(clientInfo.ClientId, deserializedClientInfo.ClientId);

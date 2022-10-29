@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Net;
 
-namespace IntroducationServer.Config
+namespace IntroServer.Config
 {
     public enum NATType
     {
@@ -65,7 +65,7 @@ namespace IntroducationServer.Config
         /// <summary>
         ///     P2P NAT Type
         /// </summary>
-        #if DEBUG
+#if DEBUG
         public NATType NATType { get; set; } = NATType.Internal;
 #else
         public NATType NATType { get; set; } = NATType.External;

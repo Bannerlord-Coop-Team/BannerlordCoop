@@ -6,7 +6,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IntroducationServer.Server
+namespace IntroServer.Server
 {
     public class P2PPeer
     {

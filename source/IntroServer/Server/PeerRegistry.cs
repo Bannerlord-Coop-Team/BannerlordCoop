@@ -1,4 +1,5 @@
-﻿using LiteNetLib;
+﻿using IntroServer.Server;
+using LiteNetLib;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -7,7 +8,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IntroducationServer.Server
+namespace IntroServer.Server
 {
     internal class PeerRegistry
     {

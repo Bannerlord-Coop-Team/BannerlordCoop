@@ -1,11 +1,12 @@
 ﻿using Common;
 using Common.Serialization;
 using Coop.Mod.Missions;
+using IntroServer.Data;
+using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Missions.Config;
 using NLog;
-using SharedData;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -102,7 +103,7 @@ namespace Missions.Network
 
             ClientInfo clientInfo = new ClientInfo(
                 id,
-                typeof(MissionClient).Assembly.GetName().Version);
+                typeof(MissionTestServer).Assembly.GetName().Version);
 
             peerServer = netManager.Connect(connectionAddress,
                                             port,

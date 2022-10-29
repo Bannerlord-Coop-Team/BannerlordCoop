@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
+using IntroServer.Extensions;
 using ProtoBuf;
-using SharedData.Extensions;
 
-namespace SharedData
+namespace IntroServer.Data
 {
     [ProtoContract]
     public class ClientInfo
