@@ -146,6 +146,7 @@
     <Compile Include="Server\Connections\States\MissionState.cs" />
     <Compile Include="Server\Connections\States\PlayerConnectionStatesManager.cs" />
     <Compile Include="Server\Messages\Events\ClientJoinRequested.cs" />
+    <Compile Include="Server\Messages\TestOutboundMessage.cs" />
     <Compile Include="Server\States\IServerLogic.cs" />
     <Compile Include="Server\ServerModule.cs" />
     <Compile Include="Client\ClientModule.cs" />

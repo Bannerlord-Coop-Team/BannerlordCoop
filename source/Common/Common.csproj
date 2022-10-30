@@ -34,6 +34,9 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="LiteNetLib">
+      <HintPath>..\Coop.Tests\bin\Debug\LiteNetLib.dll</HintPath>
+    </Reference>
     <Reference Include="NLog">
       <HintPath>..\packages\NLog.4.7.2\lib\net45\NLog.dll</HintPath>
     </Reference>
@@ -94,10 +97,13 @@
     <Compile Include="Messaging\IEvent.cs" />
     <Compile Include="Messaging\IHandler.cs" />
     <Compile Include="Messaging\IMessage.cs" />
-    <Compile Include="Messaging\IMessageBroker.cs" />
     <Compile Include="Messaging\ICommand.cs" />
+    <Compile Include="Messaging\INetworkMessage.cs" />
+    <Compile Include="Messaging\INetworkPeerMessage.cs" />
+    <Compile Include="Messaging\INetworkSendToAllMessage.cs" />
     <Compile Include="Messaging\MessageBroker.cs" />
     <Compile Include="Messaging\MessagePayload.cs" />
+    <Compile Include="Messaging\NetworkMessageBroker.cs" />
     <Compile Include="Messaging\Queries\IQuery.cs" />
     <Compile Include="MovingAverage.cs" />
     <Compile Include="OrderedHashSet.cs" />
