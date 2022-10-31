@@ -32,6 +32,18 @@ namespace Coop.Core.Server.Connections.States
         void PlayerJoined(string playerId);
 
         /// <summary>
+        /// Start the character creation process
+        /// </summary>
+        /// <param name="playerId"></param>
+        void CreateCharacter(string playerId);
+
+        /// <summary>
+        /// Transfer the character from creator to server
+        /// </summary>
+        /// <param name="playerId"></param>
+        void TransferCharacter(string playerId);
+
+        /// <summary>
         /// Player has completed loading game data, bring player into campaign
         /// </summary>
         /// <param name="playerId"></param>
@@ -82,6 +94,22 @@ namespace Coop.Core.Server.Connections.States
                 return;
 
             connectionLogic.Load();
+        }
+
+        public void CreateCharacter(string playerId)
+        {
+            if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
+                return;
+
+            connectionLogic.CreateCharacter();
+        }
+
+        public void TransferCharacter(string playerId)
+        {
+            if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
+                return;
+
+            connectionLogic.TransferCharacter();
         }
 
         public void PlayerLoaded(string playerId)

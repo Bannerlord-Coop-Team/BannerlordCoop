@@ -13,6 +13,15 @@ namespace Coop.Core.Server.Connections.States
         {
         }
 
+        public override void CreateCharacter()
+        {
+            ConnectionLogic.State = new CreateCharacterState(ConnectionLogic, MessageBroker);
+        }
+
+        public override void TransferCharacter()
+        {
+        }
+
         public override void Load()
         {
             ConnectionLogic.State = new LoadingState(ConnectionLogic, MessageBroker);

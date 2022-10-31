@@ -1,19 +1,16 @@
 ﻿using Common.Messaging;
-using Coop.Core.Client;
 using Coop.Core.Debugging.Logger;
 
 namespace Coop.Core.Server.Connections.States
 {
     public interface IConnectionLogic : IConnectionState
     {
-        ICoopClient NetworkClient { get; }
         IConnectionState State { get; set; }
     }
 
     public class ConnectionLogic : IConnectionLogic
     {
         public ILogger Logger { get; }
-        public ICoopClient NetworkClient { get; }
         public IConnectionState State { get; set; }
 
         public ConnectionLogic(IMessageBroker messageBroker)
@@ -24,6 +21,16 @@ namespace Coop.Core.Server.Connections.States
         public void ResolveCharacter()
         {
             State.ResolveCharacter();
+        }
+
+        public void CreateCharacter()
+        {
+            State.CreateCharacter();
+        }
+
+        public void TransferCharacter()
+        {
+            State.TransferCharacter();
         }
 
         public void Load()

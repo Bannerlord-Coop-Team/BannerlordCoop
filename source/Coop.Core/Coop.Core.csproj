@@ -127,7 +127,9 @@
     <Compile Include="Server\Connections\IConnectionState.cs" />
     <Compile Include="Server\Connections\Messages\PlayerConnectedCampaign.cs" />
     <Compile Include="Server\Connections\Messages\PlayerConnectedMission.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerCreatingCharacter.cs" />
     <Compile Include="Server\Connections\Messages\PlayerDisconnected.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerTransferCharacter.cs" />
     <Compile Include="Server\Connections\Messages\ResolvedCharacter.cs" />
     <Compile Include="Server\Connections\Messages\ResolveCharacter.cs" />
     <Compile Include="Server\Connections\Messages\PlayerLoaded.cs" />
@@ -138,11 +140,13 @@
     <Compile Include="Server\Connections\States\ConnectionStateBase.cs" />
     <Compile Include="Server\Connections\States\ConnectionLogic.cs" />
     <Compile Include="Server\Connections\States\ClientStateOrchestrator.cs" />
+    <Compile Include="Server\Connections\States\CreateCharacterState.cs" />
     <Compile Include="Server\Connections\States\InitialConnectionState.cs" />
     <Compile Include="Server\Connections\States\ResolveCharacterState.cs" />
     <Compile Include="Server\Connections\States\LoadingState.cs" />
     <Compile Include="Server\Connections\States\MissionState.cs" />
     <Compile Include="Server\Connections\States\PlayerConnectionStatesManager.cs" />
+    <Compile Include="Server\Connections\States\TransferCharacterState.cs" />
     <Compile Include="Server\Messages\Events\ClientJoinRequested.cs" />
     <Compile Include="Server\States\IServerLogic.cs" />
     <Compile Include="Server\ServerModule.cs" />

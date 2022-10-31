@@ -10,6 +10,16 @@ namespace Coop.Core.Server.Connections
         void ResolveCharacter();
 
         /// <summary>
+        /// Player is in the process of creating a character
+        /// </summary>
+        void CreateCharacter();
+
+        /// <summary>
+        /// New character info is being transferred to server
+        /// </summary>
+        void TransferCharacter();
+
+        /// <summary>
         /// Player loading server data as a whole
         /// </summary>
         void Load();

@@ -5,22 +5,22 @@ using System.Collections.Generic;
 namespace Coop.Core.Server.Connections
 {
 
-    public readonly struct ClientConnectedMessage
+    public readonly struct ClientConnected
     {
         public NetPeer Peer { get; }
 
-        public ClientConnectedMessage(NetPeer peer)
+        public ClientConnected(NetPeer peer)
         {
             Peer = peer;
         }
     }
 
-    public readonly struct ClientDisconnectedMessage
+    public readonly struct ClientDisconnected
     {
         public NetPeer Peer { get; }
         public DisconnectInfo DisconnectInfo { get; }
 
-        public ClientDisconnectedMessage(NetPeer peer, DisconnectInfo disconnectInfo)
+        public ClientDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
 
             Peer = peer;
@@ -42,17 +42,17 @@ namespace Coop.Core.Server.Connections
         {
             _messageBroker = messageBroker;
 
-            _messageBroker.Subscribe<ClientConnectedMessage>(Handle_Connect);
-            _messageBroker.Subscribe<ClientDisconnectedMessage>(Handle_Disconnect);
+            _messageBroker.Subscribe<ClientConnected>(Handle_Connect);
+            _messageBroker.Subscribe<ClientDisconnected>(Handle_Disconnect);
         }
 
-        private void Handle_Connect(MessagePayload<ClientConnectedMessage> payload)
+        private void Handle_Connect(MessagePayload<ClientConnected> payload)
         {
             NetPeer peer = payload.What.Peer;
             _connections.Add(new Connection(peer));
         }
 
-        private void Handle_Disconnect(MessagePayload<ClientDisconnectedMessage> payload)
+        private void Handle_Disconnect(MessagePayload<ClientDisconnected> payload)
         {
             NetPeer peer = payload.What.Peer;
             IConnection connection = _connections.Find(con => con.Peer == peer);

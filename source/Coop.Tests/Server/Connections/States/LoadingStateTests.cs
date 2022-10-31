@@ -26,9 +26,11 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic, messageBroker);
+            _connectionLogic.State = new LoadingState(_connectionLogic, messageBroker);
 
             _connectionLogic.ResolveCharacter();
+            _connectionLogic.CreateCharacter();
+            _connectionLogic.TransferCharacter();
             _connectionLogic.Load();
             _connectionLogic.EnterMission();
 

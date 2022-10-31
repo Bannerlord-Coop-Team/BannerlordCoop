@@ -1,15 +1,14 @@
-﻿using Common.Messaging;
-using Coop.Core.Server.Connections.States;
+﻿using Coop.Core.Server.Connections.States;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Connections.States
 {
-    public class ResolveCharacterStateTests : CoopTest
+    public class TransferCharacterStateTests : CoopTest
     {
         private readonly IConnectionLogic _connectionLogic;
 
-        public ResolveCharacterStateTests(ITestOutputHelper output) : base(output)
+        public TransferCharacterStateTests(ITestOutputHelper output) : base(output)
         {
             _connectionLogic = new ConnectionLogic(messageBroker);
         }
@@ -17,7 +16,7 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void LoadMethod_TransitionState_LoadingState()
         {
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic, messageBroker);
+            _connectionLogic.State = new TransferCharacterState(_connectionLogic, messageBroker);
 
             _connectionLogic.Load();
 
@@ -27,14 +26,15 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic, messageBroker);
+            _connectionLogic.State = new TransferCharacterState(_connectionLogic, messageBroker);
 
             _connectionLogic.ResolveCharacter();
+            _connectionLogic.CreateCharacter();
             _connectionLogic.TransferCharacter();
             _connectionLogic.EnterCampaign();
             _connectionLogic.EnterMission();
 
-            Assert.IsType<ResolveCharacterState>(_connectionLogic.State);
+            Assert.IsType<TransferCharacterState>(_connectionLogic.State);
         }
     }
 }

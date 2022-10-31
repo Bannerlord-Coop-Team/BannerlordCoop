@@ -24,6 +24,8 @@ namespace Coop.Core.Server.Connections.States
             _messageBroker.Subscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
             _messageBroker.Subscribe<ResolveCharacter>(PlayerJoiningHandler);
             _messageBroker.Subscribe<ResolvedCharacter>(PlayerJoinedHandler);
+            _messageBroker.Subscribe<PlayerCreatingCharacter>(PlayerCreatingCharacterHandler);
+            _messageBroker.Subscribe<PlayerTransferCharacter>(PlayerTransferCharacterHandler);
             _messageBroker.Subscribe<PlayerLoaded>(PlayerLoadedHandler);
             _messageBroker.Subscribe<PlayerTransitionCampaign>(PlayerTransitionsCampaignHandler);
             _messageBroker.Subscribe<PlayerTransitionMission>(PlayerTransitionsMissionHandler);
@@ -46,6 +48,20 @@ namespace Coop.Core.Server.Connections.States
             var playerId = obj.What.PlayerId;
             PlayerConnectionStates.PlayerJoined(playerId);
             _messageBroker.Publish(this, new PlayerLoading(playerId));
+        }
+
+        private void PlayerCreatingCharacterHandler(MessagePayload<PlayerCreatingCharacter> obj)
+        {
+            var playerId = obj.What.PlayerId;
+            PlayerConnectionStates.CreateCharacter(playerId);
+            _messageBroker.Publish(this, new PlayerCreatingCharacter(playerId));
+        }
+
+        private void PlayerTransferCharacterHandler(MessagePayload<PlayerTransferCharacter> obj)
+        {
+            var playerId = obj.What.PlayerId;
+            PlayerConnectionStates.TransferCharacter(playerId);
+            _messageBroker.Publish(this, new PlayerTransferCharacter(playerId));
         }
 
         private void PlayerLoadedHandler(MessagePayload<PlayerLoaded> obj)

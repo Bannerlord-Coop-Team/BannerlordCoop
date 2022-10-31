@@ -17,6 +17,8 @@ namespace Coop.Core.Server.Connections.States
         }
 
         public abstract void ResolveCharacter();
+        public abstract void CreateCharacter();
+        public abstract void TransferCharacter();
         public abstract void Load();
         public abstract void EnterCampaign();
         public abstract void EnterMission();

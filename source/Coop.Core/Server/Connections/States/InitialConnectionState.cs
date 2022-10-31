@@ -2,7 +2,7 @@
 
 namespace Coop.Core.Server.Connections.States
 {
-    public class InitialConnectionState : ConnectionStateBase, IConnectionState
+    public class InitialConnectionState : ConnectionStateBase
     {
         public InitialConnectionState(IConnectionLogic connectionLogic, IMessageBroker messageBroker) 
             : base(connectionLogic, messageBroker)
@@ -12,6 +12,14 @@ namespace Coop.Core.Server.Connections.States
         public override void ResolveCharacter()
         {
             ConnectionLogic.State = new ResolveCharacterState(ConnectionLogic, MessageBroker);
+        }
+
+        public override void CreateCharacter()
+        {
+        }
+
+        public override void TransferCharacter()
+        {
         }
 
         public override void Load()

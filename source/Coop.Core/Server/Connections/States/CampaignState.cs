@@ -13,6 +13,14 @@ namespace Coop.Core.Server.Connections.States
         {
         }
 
+        public override void CreateCharacter()
+        {
+        }
+
+        public override void TransferCharacter()
+        {
+        }
+
         public override void Load()
         {
         }

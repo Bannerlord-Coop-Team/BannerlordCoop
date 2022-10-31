@@ -74,13 +74,13 @@ namespace Coop.Core.Server
 
         public void OnPeerConnected(NetPeer peer)
         {
-            ClientConnectedMessage message = new ClientConnectedMessage(peer);
+            ClientConnected message = new ClientConnected(peer);
             messageBroker.Publish(this, message);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            ClientDisconnectedMessage message = new ClientDisconnectedMessage(peer, disconnectInfo);
+            ClientDisconnected message = new ClientDisconnected(peer, disconnectInfo);
             messageBroker.Publish(this, message);
         }
 

@@ -114,6 +114,8 @@
     <Compile Include="Server\Connections\States\CampaignStateTests.cs" />
     <Compile Include="Server\Connections\States\ClientStateOrchestratorTests.cs" />
     <Compile Include="Server\Connections\States\InitialConnectionStateTests.cs" />
+    <Compile Include="Server\Connections\States\TransferCharacterStateTests.cs" />
+    <Compile Include="Server\Connections\States\CreateCharacterStateTests.cs" />
     <Compile Include="Server\Connections\States\ResolveCharacterStateTests.cs" />
     <Compile Include="Server\Connections\States\LoadingStateTests.cs" />
     <Compile Include="Server\Connections\States\MissionStateTests.cs" />
