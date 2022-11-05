@@ -1,4 +1,4 @@
-name: build TestServer
+name: build IntroServer
 
 on:
   # Workflow_dispatch allows for a button press execution of the action file on any branch (The action needs to exist on the primary brnach)
@@ -6,9 +6,8 @@ on:
 
   # These were left in from the original attempt, Which should allow for automated building on pushes/pr's
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master, release ]
+    branches: [ taverns-vertical-slice ]
+
 
 jobs:
   build:
