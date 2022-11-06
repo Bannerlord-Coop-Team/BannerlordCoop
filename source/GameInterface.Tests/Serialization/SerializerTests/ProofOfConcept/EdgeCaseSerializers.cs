@@ -153,12 +153,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 
         public void Pack()
         {
-            if (IsPacked == false)
-            {
-                IsPacked = true;
-                classBPackage = SerializerStore.GetSerializer<ClassBBinaryPackage>(Object.testClassB);
-                classBPackage.Pack();
-            }
+            if (IsPacked == true) return;
+
+            IsPacked = true;
+            classBPackage = SerializerStore.GetSerializer<ClassBBinaryPackage>(Object.testClassB);
+            classBPackage.Pack();
         }
 
         public TestClassA Deserialize()
@@ -171,8 +170,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 
             return Object;
         }
-
-        
     }
 
     [Serializable]
@@ -195,12 +192,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 
         public void Pack()
         {
-            if(IsPacked == false)
-            {
-                IsPacked = true;
-                classAPackage = SerializerStore.GetSerializer<ClassABinaryPackage>(Object.testClassA);
-                classAPackage.Pack();
-            }
+            if (IsPacked == true) return;
+
+            IsPacked = true;
+            classAPackage = SerializerStore.GetSerializer<ClassABinaryPackage>(Object.testClassA);
+            classAPackage.Pack();
         }
 
         public TestClassB Deserialize()
