@@ -4,12 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Common.Serialization
+namespace Common.Messaging
 {
-    public enum SerializationMethod : byte
+    public interface IEvent
     {
-        Invalid,
-        BinaryFormatter,
-        ProtoBuf,
     }
 }

@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using System;

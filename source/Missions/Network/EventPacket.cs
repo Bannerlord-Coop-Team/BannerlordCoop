@@ -16,7 +16,7 @@ namespace Missions.Network
 
         public EventPacket(object payload)
         {
-            m_Data = CommonSerializer.Serialize(payload, SerializationMethod.ProtoBuf);
+            m_Data = ProtoBufSerializer.Serialize(payload);
         }
     }
 }

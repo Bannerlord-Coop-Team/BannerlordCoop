@@ -1,98 +1,90 @@
-﻿﻿using Sync.Store;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
-using Coop.Mod.Serializers.Custom;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
+﻿//using GameInterface.Serializers.CustomSerializers;
+//using ProtoBuf;
+//using System;
+//using System.Collections.Generic;
+//using System.IO;
+//using System.Linq;
+//using System.Reflection;
+//using System.Runtime.Serialization.Formatters.Binary;
+//using System.Text;
+//using System.Threading.Tasks;
+//using TaleWorlds.CampaignSystem;
 
-namespace Coop.Mod.Serializers
-{
-    /// <summary>
-    ///     Factory to create the serialization wrappers for non-serializable game objects.
-    /// </summary>
-    public class SerializableFactory : ISerializableFactory
-    {
-        public object Wrap(object obj)
-        {
-            switch (obj)
-            {
-                case Banner banner:
-                    return new BannerSerializer(banner);
-                case CampaignTime campaignTime:
-                    return new CampaignTimeSerializer(campaignTime);
-                case CharacterObject characterObject:
-                    return new CharacterObjectSerializer(characterObject);
-                case Clan clan:
-                    return new ClanSerializer(clan);
-                case CultureObject cultureObject:
-                    return new CultureObjectSerializer(cultureObject);
-                case DeterministicRandom deterministicRandom:
-                    return new DeterministicRandomSerializer(deterministicRandom);
-                case EquipmentElement equipmentElement:
-                    return new EquipmentElementSerializer(equipmentElement);
-                case Equipment equipment:
-                    return new EquipmentSerializer(equipment);
-                case HeroDeveloper heroDeveloper:
-                    return new HeroDeveloperSerializer(heroDeveloper);
-                case Hero.HeroLastSeenInformation heroLastSeenInfo:
-                    return new HeroLastSeenInformationSerializer(heroLastSeenInfo);
-                case Hero hero:
-                    if(hero.StringId == "main_hero")
-                    {
-                        return new PlayerHeroSerializer(hero);
-                    }
-                    else
-                    {
-                        return new HeroSerializer(hero);
-                    }
-                    
-                case ItemRoster itemRoster:
-                    return new ItemRosterSerializer(itemRoster);
-                case MobilePartiesAroundPositionList partiesAroundPosition:
-                    return new MobilePartiesAroundPositionListSerializer(partiesAroundPosition);
-                case MobileParty mobileParty:
-                    return new MobilePartySerializer(mobileParty);
-                case NavigationPath navPath:
-                    return new NavigationPathSerializer(navPath);
-                case PartyBase partyBase:
-                    return new PartyBaseSerializer(partyBase);
-                case PathFaceRecord pathFaceRecord:
-                    return new PathFaceRecordSerializer(pathFaceRecord);
-                case Settlement settlement:
-                    return new SettlementSerializer(settlement);
-                case TraitObject traitObject:
-                    return new TraitObjectSerializer(traitObject);
-                case TroopRoster troopRoster:
-                    return new TroopRosterSerializer(troopRoster);
-                case CharacterPerks characterPerks:
-                    return new CharacterPerksSerializer(characterPerks);
-                case CharacterSkills characterSkills:
-                    return new CharacterSkillsSerializer(characterSkills);
-                case CharacterTraits characterTraits:
-                    return new CharacterTraitsSerializer(characterTraits);
-                case PartyComponent partyComponent:
-                    return new PartyComponentSerializer(partyComponent);
-                default:
-                    return obj;
-            }
-        }
+//namespace GameInterface.Serializers
+//{
+//    public class SerializableFactory
+//    {
+//        readonly ReferenceRepository referenceRepository;
 
-        public object Unwrap(object obj)
-        {
-            switch (obj)
-            {
-                case ICustomSerializer ser:
-                    object ret = ser.Deserialize();
-                    ser.ResolveReferenceGuids();
-                    return ret;
-                default:
-                    return obj;
-            }
-        }
-    }
-}
+//        readonly Dictionary<Type, CustomSerializerBase> Serializers = new Dictionary<Type, CustomSerializerBase>();
+        
+
+//        private static readonly BinaryFormatter binaryFormatter = new BinaryFormatter();
+
+//        public SerializableFactory(ReferenceRepository referenceRepository)
+//        {
+//            this.referenceRepository = referenceRepository;
+
+//            CollectSerializers();
+//        }
+
+//        public void CollectSerializers()
+//        {
+//            foreach(var type in Assembly.GetExecutingAssembly().GetTypes())
+//            {
+//                if(type.IsAbstract == false &&
+//                   typeof(CustomSerializerBase).IsAssignableFrom(type))
+//                {
+//                    CustomSerializerBase customSerializer = (CustomSerializerBase)Activator
+//                        .CreateInstance(type, new object[] { this, referenceRepository });
+//                    Serializers.Add(customSerializer.CustomType, customSerializer);
+//                }
+//            }
+//        }
+
+//        public CustomSerializerBase GetSerializer(object obj)
+//        {
+//            if (Serializers.TryGetValue(obj.GetType(), out CustomSerializerBase serializer))
+//            {
+//                return serializer;
+//            }
+//            throw new SerializationException($"Serializer for type {obj.GetType()} does not exist");
+//        }
+
+//        public byte[] Serialize(object obj)
+//        {
+//            ICustomSerializer serializer = GetSerializer(obj);
+//            return serializer.Serialize(obj);
+//        }
+
+//        public object Deserialize(byte[] bytes)
+//        {
+//            using (MemoryStream ms = new MemoryStream(bytes))
+//            {
+//                ICustomSerializer serializer = (ICustomSerializer)binaryFormatter.Deserialize(ms);
+//                object newObj = serializer.Deserialize(bytes);
+//                serializer.ResolveReferences(newObj);
+//                return newObj;
+//            }
+//        }
+//    }
+
+//    public class SerializationException : Exception
+//    {
+//        public SerializationException()
+//        {
+//        }
+
+//        public SerializationException(string message) : base(message)
+//        {
+//        }
+
+//        public SerializationException(string message, Exception innerException) : base(message, innerException)
+//        {
+//        }
+
+//        protected SerializationException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) : base(info, context)
+//        {
+//        }
+//    }
+//}

@@ -1,154 +1,95 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
+﻿//using System;
+//using System.Collections;
+//using System.Collections.Generic;
+//using System.Reflection;
+//using System.Runtime.Serialization;
 
-namespace Coop.Mod.Serializers
-{
-    public interface ICustomSerializer
-    {
-        object Deserialize();
-        void ResolveReferenceGuids();
-    }
+//namespace GameInterface.Serializers
+//{
+//    public interface ICustomSerializer<T>
+//    {
+//        ICustomSerializer<T> Pack(T obj);
+//        T Unpack();
+//        void ResolveReferences(object obj);
+//    }
 
-    [Serializable]
-    public abstract class CustomSerializer : ICustomSerializer
-    {
-        public Type ObjectType { get; private set; }
-        public readonly Dictionary<FieldInfo, object> SerializableObjects = new Dictionary<FieldInfo, object>();
-        public readonly Dictionary<FieldInfo, ICollection> Collections = new Dictionary<FieldInfo, ICollection>();
+//    [Serializable]
+//    public abstract class CustomSerializerBase<T> : ICustomSerializer<T>
+//    {
+//        public readonly int ReferenceId;
 
-        [NonSerialized]
-        public readonly List<FieldInfo> NonSerializableObjects = new List<FieldInfo>();
-        [NonSerialized]
-        public readonly List<FieldInfo> NonSerializableCollections = new List<FieldInfo>();
+//        [NonSerialized]
+//        protected readonly SerializableFactory SerializableFactory;
+//        [NonSerialized]
+//        protected readonly ReferenceRepository ReferenceRepo;
 
-        protected CustomSerializer() { }
+//        public readonly Dictionary<FieldInfo, object> SerializableObjects = new Dictionary<FieldInfo, object>();
+//        public readonly Dictionary<FieldInfo, ICollection> Collections = new Dictionary<FieldInfo, ICollection>();
 
-        protected CustomSerializer(object obj)
-        {
-            ObjectType = obj.GetType();
-            FieldInfo[] fields = GetFields();
-            foreach (FieldInfo field in fields)
-            {
-                if(!field.IsLiteral)
-                {
-                    // Is field collection
-                    if(field.FieldType.GetInterface(nameof(ICollection)) != null)
-                    {
-                        // If collection is serializable add to Collections list
-                        if(field.FieldType.IsSerializable &&
-                           IsCollectionSerializableRecursive(field.FieldType))
-                        {
-                            Collections.Add(field, (ICollection)field.GetValue(obj));
-                        }
-                        // otherwise, add to NonSerializableCollections list
-                        else
-                        {
-                            NonSerializableCollections.Add(field);
-                        }
-                        
-                    }
-                    else if (field.FieldType == typeof(Action))
-                    {
-                        NonSerializableObjects.Add(field);
-                    }
-                    else if (IsSerializable(field.FieldType))
-                    {
-                        SerializableObjects.Add(field, field.GetValue(obj));
-                    }
-                    else
-                    {
-                        NonSerializableObjects.Add(field);
-                    }
-                }
-            }
-        }
+//        [NonSerialized]
+//        public readonly List<FieldInfo> NonSerializableObjects = new List<FieldInfo>();
+//        [NonSerialized]
+//        public readonly List<FieldInfo> NonSerializableCollections = new List<FieldInfo>();
 
-        /// <summary>
-        /// Deserialized object
-        /// </summary>
-        /// <returns>New instantiated object</returns>
-        public abstract object Deserialize();
+//        protected CustomSerializerBase(SerializableFactory serializableFactory, ReferenceRepository referenceRepository)
+//        {
+//            SerializableFactory = serializableFactory;
+//            ReferenceRepo = referenceRepository;
 
-        /// <summary>
-        /// Assigns natively serializable fields
-        /// </summary>
-        /// <param name="newObj">Object to assign values</param>
-        /// <returns>Object</returns>
-        protected virtual object Deserialize(object newObj)
-        {
-            foreach (FieldInfo field in SerializableObjects.Keys)
-            {
-                field.SetValue(newObj, SerializableObjects[field]);
-            }
-            return newObj;
-        }
+//            ReferenceId = ReferenceRepo.AddReference(this);
+//        }
 
-        /// <summary>
-        /// Any assigned Guids are replaced with actual object references.
-        /// </summary>
-        public abstract void ResolveReferenceGuids();
 
-        /// <summary>
-        /// Get all fields from type
-        /// </summary>
-        /// <returns>FieldInfo[]</returns>
-        protected FieldInfo[] GetFields()
-        {
-            return GetFields(ObjectType);
-        }
+//        /// <summary>
+//        /// Sorts and stores objects based on their serializability
+//        /// </summary>
+//        /// <param name="obj"></param>
+//        protected virtual void CollectObjects(object obj)
+//        {
+//            FieldInfo[] fields = SerializationHelper.GetFields(typeof(T));
+//            foreach (FieldInfo field in fields)
+//            {
+//                if (!field.IsLiteral)
+//                {
+//                    // Is field collection
+//                    if (field.FieldType.GetInterface(nameof(ICollection)) != null)
+//                    {
+//                        // If collection is serializable add to Collections list
+//                        if (field.FieldType.IsSerializable &&
+//                           SerializationHelper.IsTypeSerializable(field.FieldType))
+//                        {
+//                            Collections.Add(field, (ICollection)field.GetValue(obj));
+//                        }
+//                        // otherwise, add to NonSerializableCollections list
+//                        else
+//                        {
+//                            NonSerializableCollections.Add(field);
+//                        }
 
-        private FieldInfo[] GetFields(Type ObjectType)
-        {
-            List<FieldInfo> fields = new List<FieldInfo>(ObjectType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
-            if (ObjectType.BaseType != null)
-            {
-                fields.AddRange(GetFields(ObjectType.BaseType));
-            }
-            return fields.ToArray();
-        }
+//                    }
+//                    else if (field.FieldType == typeof(Action))
+//                    {
+//                        NonSerializableObjects.Add(field);
+//                    }
+//                    else if (SerializationHelper.IsTypeSerializable(field.FieldType))
+//                    {
+//                        SerializableObjects.Add(field, field.GetValue(obj));
+//                    }
+//                    else
+//                    {
+//                        NonSerializableObjects.Add(field);
+//                    }
+//                }
+//            }
+//        }
 
-        /// <summary>
-        /// Checks if collection has serializable elements
-        /// </summary>
-        /// <param name="type">Type from collection</param>
-        /// <returns>If collection is completely serializable</returns>
-        private bool IsCollectionSerializableRecursive(Type type)
-        {
+//        public abstract ICustomSerializer<T> Pack(T obj);
 
-            List<Type> elementTypes = new List<Type>(type.GetGenericArguments());
-
-            // Native arrays do not have generic arguments
-            if (elementTypes.Count == 0 && type.IsArray)
-            {
-                elementTypes.Add(type.GetElementType());
-            }
-
-            // Return true if list is empty, but never should be empty
-            // TODO add validate to result or change to false
-            bool result = true;
-            foreach(Type elementType in elementTypes)
-            {
-                if (elementType.GetInterface(nameof(ICollection)) != null)
-                {
-                    result &= IsCollectionSerializableRecursive(elementType);
-                }
-                else
-                {
-                    result &= IsSerializable(elementType);
-                }
-            }
-            return result;
-        }
-
-        private bool IsSerializable(Type type)
-        {
-            return !SerializerConfig.MarkAsNonSerializable.Contains(type) && type.IsSerializable;
-        }
-    }
-}
+//        public abstract T Unpack();
+        
+//        /// <summary>
+//        /// Any assigned Guids are replaced with actual object references.
+//        /// </summary>
+//        public abstract void ResolveReferences(object obj);
+//    }
+//}

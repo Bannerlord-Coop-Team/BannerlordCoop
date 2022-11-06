@@ -1,81 +1,93 @@
-﻿using Common;
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
-using TaleWorlds.Core;
+﻿//using Common;
+//using System;
+//using System.Collections.Generic;
+//using System.Reflection;
+//using TaleWorlds.CampaignSystem;
+//using TaleWorlds.CampaignSystem.Settlements.Buildings;
+//using TaleWorlds.Core;
 
-namespace Coop.Mod.Serializers.Custom
-{
-    [Serializable]
-    public class BuildingsSerializer : CustomSerializerWithGuid
-    {
-        [NonSerialized]
-        Building newBuilding;
+//namespace Coop.Mod.Serializers.Custom
+//{
+//    [Serializable]
+//    public class BuildingsSerializer : CustomSerializerWithGuid
+//    {
+//        [NonSerialized]
+//        Building newBuilding;
 
-        readonly Dictionary<FieldInfo, Guid> references = new Dictionary<FieldInfo, Guid>();
+//        readonly Dictionary<FieldInfo, Guid> references = new Dictionary<FieldInfo, Guid>();
 
-        string typeId;
+//        string typeId;
 
-        public BuildingsSerializer(Building building) : base(building)
-        {
-            List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
+//        public override Type CustomType => throw new NotImplementedException();
 
-            foreach (FieldInfo fieldInfo in NonSerializableObjects)
-            {
-                // Get value from fieldInfo
-                object value = fieldInfo.GetValue(building);
+//        public BuildingsSerializer(Building building) : base(building)
+//        {
+//            List<FieldInfo> UnmanagedFields = new List<FieldInfo>();
 
-                // If value is null, no need to serialize
-                if (value == null)
-                {
-                    continue;
-                }
+//            foreach (FieldInfo fieldInfo in NonSerializableObjects)
+//            {
+//                // Get value from fieldInfo
+//                object value = fieldInfo.GetValue(building);
 
-                // Assign serializer to nonserializable objects
-                switch (fieldInfo.Name)
-                {
-                    case "BuildingType":
-                        typeId = ((BuildingType)value).StringId;
-                        break;
-                    // References
-                    case "<Town>k__BackingField":
-                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
-                        break;
-                    default:
-                        UnmanagedFields.Add(fieldInfo);
-                        break;
-                }
-            }
+//                // If value is null, no need to serialize
+//                if (value == null)
+//                {
+//                    continue;
+//                }
 
-            if (!UnmanagedFields.IsEmpty())
-            {
-                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
-            }
-        }
+//                // Assign serializer to nonserializable objects
+//                switch (fieldInfo.Name)
+//                {
+//                    case "BuildingType":
+//                        typeId = ((BuildingType)value).StringId;
+//                        break;
+//                    // References
+//                    case "<Town>k__BackingField":
+//                        references.Add(fieldInfo, CoopObjectManager.GetGuid(value));
+//                        break;
+//                    default:
+//                        UnmanagedFields.Add(fieldInfo);
+//                        break;
+//                }
+//            }
 
-        public override object Deserialize()
-        {
-            BuildingType buildingType = Campaign.Current.ObjectManager.GetObject<BuildingType>(typeId);
-            newBuilding = new Building(buildingType, null);
-            return base.Deserialize(newBuilding);
-        }
+//            if (!UnmanagedFields.IsEmpty())
+//            {
+//                throw new NotImplementedException($"Cannot serialize {UnmanagedFields}");
+//            }
+//        }
 
-        public override void ResolveReferenceGuids()
-        {
-            if (newBuilding == null)
-            {
-                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
-            }
+//        public override object Deserialize()
+//        {
+//            BuildingType buildingType = Campaign.Current.ObjectManager.GetObject<BuildingType>(typeId);
+//            newBuilding = new Building(buildingType, null);
+//            return base.Deserialize(newBuilding);
+//        }
 
-            foreach (KeyValuePair<FieldInfo, Guid> entry in references)
-            {
-                FieldInfo field = entry.Key;
-                Guid id = entry.Value;
+//        public override void ResolveReferences()
+//        {
+//            if (newBuilding == null)
+//            {
+//                throw new NullReferenceException("Deserialize() has not been called before ResolveReferenceGuids().");
+//            }
 
-                field.SetValue(newBuilding, CoopObjectManager.GetObject(id));
-            }
-        }
-    }
-}
+//            foreach (KeyValuePair<FieldInfo, Guid> entry in references)
+//            {
+//                FieldInfo field = entry.Key;
+//                Guid id = entry.Value;
+
+//                field.SetValue(newBuilding, CoopObjectManager.GetObject(id));
+//            }
+//        }
+
+//        public override byte[] Serialize(object obj)
+//        {
+//            throw new NotImplementedException();
+//        }
+
+//        public override void ResolveReferences(object obj)
+//        {
+//            throw new NotImplementedException();
+//        }
+//    }
+//}

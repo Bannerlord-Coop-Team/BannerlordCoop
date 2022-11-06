@@ -23,11 +23,9 @@ namespace Common.Serialization
         }
     }
 
-    internal class ProtoBufSerializer : ISerializer
+    public class ProtoBufSerializer
     {
-        public Enum Protocol => SerializationMethod.ProtoBuf;
-
-        public object Deserialize(byte[] data)
+        public static object Deserialize(byte[] data)
         {
             using(var ms = new MemoryStream(data))
             {
@@ -39,7 +37,7 @@ namespace Common.Serialization
             }
         }
 
-        public byte[] Serialize(object obj)
+        public static byte[] Serialize(object obj)
         {
             using (MemoryStream WrapperStream = new MemoryStream())
             {

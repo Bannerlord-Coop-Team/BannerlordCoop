@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GameInterface.Tests.Serialization.Surrogates
+namespace Common.Messaging
 {
-    internal class CraftingTemplateSurrogateTests
+    public interface IHandler
     {
     }
 }

@@ -13,7 +13,7 @@ namespace GameInterface.Patch.GameStates
         [HarmonyPatch("OnLoadFinished")]
         static void OnGameLoaded(ref GameManagerBase __instance)
         {
-            MessageBroker.Instance.Publish(__instance, new GameLoaded());
+            //MessageBroker.Instance.Publish(__instance, new GameLoaded());
         }
     }
 }

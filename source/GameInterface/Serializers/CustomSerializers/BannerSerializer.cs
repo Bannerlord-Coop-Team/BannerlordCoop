@@ -1,27 +1,68 @@
-﻿using System;
-using TaleWorlds.Core;
+﻿//using Common.Serialization;
+//using GameInterface.Serializers;
+//using System;
+//using System.Reflection;
+//using TaleWorlds.Core;
 
-namespace Coop.Mod.Serializers.Custom
-{
-    [Serializable]
-    internal class BannerSerializer : ICustomSerializer
-    {
-        private string data;
+//namespace GameInterface.Serializers.CustomSerializers
+//{
+    
+//    public class BannerSerializer : CustomSerializerBase<Banner>
+//    {
+        
 
-        public BannerSerializer(Banner value)
-        {
-            data = value.Serialize();
-        }
+//        public BannerSerializer(SerializableFactory serializableFactory, ReferenceRepository referenceRepository) : base(serializableFactory, referenceRepository)
+//        {
+//        }
 
-        public object Deserialize()
-        {
-            Banner newBanner = new Banner(data);
-            return newBanner;
-        }
+//        public byte[] Serialize(Banner obj)
+//        {
+//            return BinaryFormatterSerializer.Serialize(this);
+//        }
 
-        public void ResolveReferenceGuids()
-        {
-            // No references
-        }
-    }
-}
+//        public Banner Deserialize()
+//        {
+//            var package = BinaryFormatterSerializer.Deserialize<BannerBinaryPackage>(bytes);
+
+//            return new Banner(data);
+//        }
+
+//        public override void ResolveReferences(object obj)
+//        {
+//            // No references
+//        }
+
+//        public override ICustomSerializer<Banner> Pack(Banner obj)
+//        {
+//            throw new NotImplementedException();
+//        }
+
+//        public override Banner Unpack()
+//        {
+//            throw new NotImplementedException();
+//        }
+//    }
+
+//    [Serializable]
+//    public class BannerBinaryPackage : IBinaryPackage<Banner>
+//    {
+//        private string data;
+
+//        public IBinaryPackage<Banner> Pack(Banner obj)
+//        {
+//            data = obj.Serialize();
+//            return this;
+//        }
+
+//        public Banner Unpack()
+//        {
+//            return new Banner(data);
+//        }
+//    }
+
+//    public interface IBinaryPackage<T>
+//    {
+//        IBinaryPackage<T> Pack(T obj);
+//        T Unpack();
+//    }
+//}

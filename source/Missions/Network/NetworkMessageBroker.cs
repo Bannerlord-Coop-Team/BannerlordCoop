@@ -73,7 +73,7 @@ namespace Missions.Network
         public virtual void HandlePacket(NetPeer peer, IPacket packet)
         {
             m_Logger.Debug($"Received message {packet} from {peer.EndPoint}");
-            object payload = CommonSerializer.Deserialize(packet.Data, SerializationMethod.ProtoBuf);
+            object payload = ProtoBufSerializer.Deserialize(packet.Data);
 
             Type type = payload.GetType();
             if (type.GetGenericTypeDefinition() != typeof(MessagePayload<>))
@@ -110,6 +110,10 @@ namespace Missions.Network
         public virtual void HandlePeerDisconnect(NetPeer peer, DisconnectInfo reason)
         {
 
+        }
+
+        public void Publish<T>(object source, T message)
+        {
         }
     }
 }

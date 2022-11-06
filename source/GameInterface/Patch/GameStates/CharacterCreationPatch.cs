@@ -17,7 +17,7 @@ namespace GameInterface.Patch.GameStates
         [HarmonyPostfix]
         public static void CharacterCreationStateCtor(ref CharacterCreationState __instance)
         {
-            MessageBroker.Instance.Publish(__instance, new CharacterCreationStarted());
+            //MessageBroker.Instance.Publish(__instance, new CharacterCreationStarted());
         }
     }
 }

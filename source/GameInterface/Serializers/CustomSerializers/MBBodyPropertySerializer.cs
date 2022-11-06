@@ -1,55 +1,56 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
-using TaleWorlds.Core;
+﻿//using GameInterface.Serializers;
+//using System;
+//using System.Collections.Generic;
+//using System.Reflection;
+//using TaleWorlds.Core;
 
-namespace Coop.Mod.Serializers.Custom
-{
-    [Serializable]
-    public class MBBodyPropertySerializer : ICustomSerializer
-    {
-        BodyPropertySerializer bodyPropertyMin;
-        BodyPropertySerializer bodyPropertyMax;
-        public MBBodyPropertySerializer(MBBodyProperty mbBodyProperty)
-        {
-            bodyPropertyMin = new BodyPropertySerializer(mbBodyProperty.BodyPropertyMin);
-            bodyPropertyMax = new BodyPropertySerializer(mbBodyProperty.BodyPropertyMax);
-        }
+//namespace Coop.Mod.Serializers.Custom
+//{
+//    [Serializable]
+//    public class MBBodyPropertySerializer : ICustomSerializer
+//    {
+//        BodyPropertySerializer bodyPropertyMin;
+//        BodyPropertySerializer bodyPropertyMax;
+//        public MBBodyPropertySerializer(MBBodyProperty mbBodyProperty)
+//        {
+//            bodyPropertyMin = new BodyPropertySerializer(mbBodyProperty.BodyPropertyMin);
+//            bodyPropertyMax = new BodyPropertySerializer(mbBodyProperty.BodyPropertyMax);
+//        }
 
-        public object Deserialize()
-        {
-            BodyProperties bodyPropertyMin = (BodyProperties)this.bodyPropertyMin.Deserialize();
-            BodyProperties bodyPropertyMax = (BodyProperties)this.bodyPropertyMax.Deserialize();
-            MBBodyProperty mBBodyProperty = new MBBodyProperty();
-            mBBodyProperty.Init(bodyPropertyMin, bodyPropertyMax);
-            return mBBodyProperty;
-        }
+//        public object Deserialize()
+//        {
+//            BodyProperties bodyPropertyMin = (BodyProperties)this.bodyPropertyMin.Deserialize();
+//            BodyProperties bodyPropertyMax = (BodyProperties)this.bodyPropertyMax.Deserialize();
+//            MBBodyProperty mBBodyProperty = new MBBodyProperty();
+//            mBBodyProperty.Init(bodyPropertyMin, bodyPropertyMax);
+//            return mBBodyProperty;
+//        }
 
-        public void ResolveReferenceGuids()
-        {
-            // no refs
-        }
-    }
+//        public void ResolveReferences()
+//        {
+//            // no refs
+//        }
+//    }
 
-    [Serializable]
-    public class BodyPropertySerializer : ICustomSerializer
-    {
-        string data;
-        public BodyPropertySerializer(BodyProperties bodyProperties)
-        {
-            data = bodyProperties.ToString();
-        }
+//    [Serializable]
+//    public class BodyPropertySerializer : ICustomSerializer
+//    {
+//        string data;
+//        public BodyPropertySerializer(BodyProperties bodyProperties)
+//        {
+//            data = bodyProperties.ToString();
+//        }
 
-        public object Deserialize()
-        {
-            BodyProperties newProp = new BodyProperties();
-            BodyProperties.FromString(data, out newProp);
-            return newProp;
-        }
+//        public object Deserialize()
+//        {
+//            BodyProperties newProp = new BodyProperties();
+//            BodyProperties.FromString(data, out newProp);
+//            return newProp;
+//        }
 
-        public void ResolveReferenceGuids()
-        {
-            // No refs
-        }
-    }
-}
+//        public void ResolveReferences()
+//        {
+//            // No refs
+//        }
+//    }
+//}

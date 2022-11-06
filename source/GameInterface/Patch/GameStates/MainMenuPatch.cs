@@ -17,7 +17,7 @@ namespace GameInterface.Patch.GameStates
                 if (!MainMenuReady && MBMusicManager.Current != null)
                 {
                     MainMenuReady = true;
-                    MessageBroker.Instance.Publish(__instance, new MainMenuEntered());
+                    //MessageBroker.Instance.Publish(__instance, new MainMenuEntered());
                 }
             }
         }
