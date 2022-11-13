@@ -64,7 +64,14 @@ namespace Coop.Mod.Missions
             PlayerEncounter.Start();
             PlayerEncounter.Current.SetupFields(PartyBase.MainParty, MobileParty.AllBanditParties.First().Party);
             PlayerEncounter.StartBattle();
-            Mission mission = SandBoxMissions.OpenBattleMission(PlayerEncounter.GetBattleSceneForMapPatch(Campaign.Current.MapSceneWrapper.GetMapPatchAtPosition(MobileParty.MainParty.Position2D)));
+
+            //Load into open battle
+            //Mission mission = SandBoxMissions.OpenBattleMission(PlayerEncounter.GetBattleSceneForMapPatch(Campaign.Current.MapSceneWrapper.GetMapPatchAtPosition(MobileParty.MainParty.Position2D)));
+            
+            //Load into siege
+            Mission mission = SandBoxMissions.OpenSiegeMissionNoDeployment("khuzait_castle_siege_001");
+
+
             mission.AddMissionBehavior(new MissionNetworkBehavior(m_Client));
 
             // create an encounter of the town with the player
