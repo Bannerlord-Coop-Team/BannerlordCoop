@@ -74,6 +74,7 @@
     </Reference>
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data.Linq" />
     <Reference Include="System.Diagnostics.DiagnosticSource, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
@@ -296,6 +297,8 @@
     <Compile Include="Patch\World\SaveManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Helpers\SaveLoadHelper.cs" />
+    <Compile Include="Serialization\BinaryPackageBase.cs" />
+    <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serializers\CommonAreaSerializer.cs" />
     <Compile Include="Serializers\CustomSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\BannerSerializer.cs" />
@@ -342,7 +345,6 @@
     <Compile Include="Serializers\CustomSerializers\VillageTypeSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\WorkshopSerializer.cs" />
     <Compile Include="Serializers\CustomSerializers\WorkshopTypeSerializer.cs" />
-    <Compile Include="Serializers\SerializableFactory.cs" />
     <Compile Include="Serializers\GuidSerializer.cs" />
     <Compile Include="Serializers\NewPlayer\PlayerCharacterObjectSerializer.cs" />
     <Compile Include="Serializers\NewPlayer\PlayerClanSerializer.cs" />

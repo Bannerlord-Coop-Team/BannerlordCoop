@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using GameInterface.Serialization;
 using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
@@ -14,7 +10,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
         {
             TestClassA testClassA = new TestClassA();
 
-            ClassABinaryPackage package = SerializerStore.GetSerializer<ClassABinaryPackage>(testClassA);
+            BinaryPackageFactory factory = new BinaryPackageFactory();
+
+            ClassABinaryPackage package = factory.GetBinaryPackage<ClassABinaryPackage>(testClassA);
 
             package.Pack();
 
@@ -24,7 +22,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 
             ClassABinaryPackage deserialized = BinaryFormatterSerializer.Deserialize<ClassABinaryPackage>(bytes);
 
-            TestClassA classA = deserialized.Deserialize();
+            TestClassA classA = deserialized.Unpack();
 
             Assert.Same(classA, classA.testClassB.testClassA);
         }

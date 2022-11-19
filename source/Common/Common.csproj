@@ -89,6 +89,7 @@
     <Compile Include="Entity\IEntity.cs" />
     <Compile Include="Entity\IWrapper.cs" />
     <Compile Include="Entity\ObjectWrapper.cs" />
+    <Compile Include="Extensions\ReflectionExtensions.cs" />
     <Compile Include="Extentions.cs" />
     <Compile Include="FrameLimiter.cs" />
     <Compile Include="Globals.cs" />
