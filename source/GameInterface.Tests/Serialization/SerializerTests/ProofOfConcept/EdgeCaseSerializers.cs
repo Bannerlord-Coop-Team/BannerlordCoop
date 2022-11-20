@@ -28,19 +28,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
             if (IsPacked == true) return;
 
             IsPacked = true;
-            classBPackage = BinaryPackageFactory.GetBinaryPackage<ClassBBinaryPackage>(_object.testClassB);
+            classBPackage = BinaryPackageFactory.GetBinaryPackage<ClassBBinaryPackage>(Object.testClassB);
             classBPackage.Pack();
         }
 
-        public override TestClassA Unpack()
+        protected override void UnpackInternal()
         {
-            if (_object != null) return _object;
-
-            _object = (TestClassA)FormatterServices.GetUninitializedObject(ObjectType);
-
-            _object.testClassB = (TestClassB)classBPackage.Object;
-
-            return _object;
+            Object.testClassB = classBPackage.Unpack<TestClassB>();
         }
     }
 
@@ -59,19 +53,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
             if (IsPacked == true) return;
 
             IsPacked = true;
-            classAPackage = BinaryPackageFactory.GetBinaryPackage<ClassABinaryPackage>(_object.testClassA);
+            classAPackage = BinaryPackageFactory.GetBinaryPackage<ClassABinaryPackage>(Object.testClassA);
             classAPackage.Pack();
         }
 
-        public override TestClassB Unpack()
+        protected override void UnpackInternal()
         {
-            if (_object != null) return _object;
-
-            _object = (TestClassB)FormatterServices.GetUninitializedObject(ObjectType);
-
-            _object.testClassA = (TestClassA)classAPackage.Object;
-
-            return _object;
+            Object.testClassA = classAPackage.Unpack<TestClassA>();
         }
     }
 }

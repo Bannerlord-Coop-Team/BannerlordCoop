@@ -22,7 +22,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 
             ClassABinaryPackage deserialized = BinaryFormatterSerializer.Deserialize<ClassABinaryPackage>(bytes);
 
-            TestClassA classA = deserialized.Unpack();
+            TestClassA classA = deserialized.Unpack<TestClassA>();
 
             Assert.Same(classA, classA.testClassB.testClassA);
         }
