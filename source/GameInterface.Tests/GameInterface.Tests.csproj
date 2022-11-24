@@ -134,7 +134,7 @@
     <Compile Include="Serialization\SerializerTests\HeroLastSeenInfoSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ClanSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ListSerializerTest.cs" />
-    <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerilizationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest - Copy.cs" />
     <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerSerializationTest.cs" />
