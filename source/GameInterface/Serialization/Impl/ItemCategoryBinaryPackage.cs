@@ -1,12 +1,14 @@
 ﻿using System;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Impl
 {
     [Serializable]
     public class ItemCategoryBinaryPackage : BinaryPackageBase<ItemCategory>
     {
-        string stringId;
+        public string stringId;
+
         public ItemCategoryBinaryPackage(ItemCategory obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
 
@@ -17,7 +19,7 @@ namespace GameInterface.Serialization.Impl
         }
         protected override void UnpackInternal()
         {
-            Object = new ItemCategory(stringId);
+            Object = MBObjectManager.Instance.GetObject<ItemCategory>(stringId);
         }
     }
 }

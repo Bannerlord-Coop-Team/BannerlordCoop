@@ -45,12 +45,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemCategoryBinaryPackage returnedPackage = (ItemCategoryBinaryPackage)obj;
 
-            ItemCategory newItemCategory = returnedPackage.Unpack<ItemCategory>();
-
-            foreach(FieldInfo field in typeof(ItemCategory).GetAllInstanceFields())
-            {
-                Assert.Equal(field.GetValue(testItemCategory), field.GetValue(newItemCategory));
-            }
+            Assert.Equal(returnedPackage.stringId, package.stringId);
         }
     }
 }
