@@ -300,6 +300,7 @@
     <Compile Include="Serialization\BinaryPackageBase.cs" />
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\BladeDataBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\DynamicBodyPropertiesBinaryPackage.cs" />
     <Compile Include="Serialization\Native\DictionaryBinaryPackage.cs" />
     <Compile Include="Serialization\Native\EnumerableBinaryPackage.cs" />
