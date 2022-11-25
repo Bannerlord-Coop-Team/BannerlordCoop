@@ -130,6 +130,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Serialization\SerializerTests\CampaignTimeSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemCategorySerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\DictionarySerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\HeroLastSeenInfoSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ClanSerializationTest.cs" />
