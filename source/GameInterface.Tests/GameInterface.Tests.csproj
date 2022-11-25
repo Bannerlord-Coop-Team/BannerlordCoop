@@ -133,8 +133,9 @@
     <Compile Include="Serialization\SerializerTests\DictionarySerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\HeroLastSeenInfoSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ClanSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ArraySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ListSerializerTest.cs" />
-    <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest - Copy.cs" />
+    <Compile Include="Serialization\SerializerTests\MBReadOnlyListSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterObjectSerializationTest.cs" />
