@@ -6,6 +6,9 @@ using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
+    /// <summary>
+    /// Binary package for BladeData
+    /// </summary>
     public class BladeDataSerializationTest
     {
         [Fact]
