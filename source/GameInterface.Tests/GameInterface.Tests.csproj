@@ -138,7 +138,8 @@
     <Compile Include="Serialization\SerializerTests\ListSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\MBReadOnlyListSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
-    <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest - Copy.cs" />
+    <Compile Include="Serialization\SerializerTests\Vec2SerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\Vec3SerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterObjectSerializationTest.cs" />
