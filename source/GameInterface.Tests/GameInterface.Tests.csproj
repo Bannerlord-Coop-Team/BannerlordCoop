@@ -140,6 +140,7 @@
     <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Vec2SerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Vec3SerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BladeDataSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterObjectSerializationTest.cs" />
