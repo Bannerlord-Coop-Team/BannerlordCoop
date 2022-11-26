@@ -129,6 +129,7 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Serialization\SerializerTests\SaddleComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\TextObjectSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\TradeItemComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CampaignTimeSerializationTest.cs" />
