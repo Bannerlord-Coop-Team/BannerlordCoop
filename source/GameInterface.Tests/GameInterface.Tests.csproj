@@ -141,7 +141,6 @@
     <Compile Include="Serialization\SerializerTests\MBReadOnlyListSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Vec2SerializationTest.cs" />
-    <Compile Include="Serialization\SerializerTests\Mat3SerializationTest - Copy.cs" />
     <Compile Include="Serialization\SerializerTests\Vec3SerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerSerializationTest.cs" />
