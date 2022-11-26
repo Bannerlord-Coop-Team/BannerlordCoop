@@ -129,6 +129,7 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Serialization\SerializerTests\SaddleComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\TextObjectSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\TradeItemComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CampaignTimeSerializationTest.cs" />
@@ -141,6 +142,7 @@
     <Compile Include="Serialization\SerializerTests\MBReadOnlyListSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Vec2SerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\Mat3SerializationTest - Copy.cs" />
     <Compile Include="Serialization\SerializerTests\Vec3SerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerSerializationTest.cs" />
