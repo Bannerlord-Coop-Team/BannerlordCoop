@@ -301,6 +301,7 @@
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BladeDataBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\ItemModifierBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\DynamicBodyPropertiesBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ItemCategoryBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\Vec2BinaryPackage.cs" />
