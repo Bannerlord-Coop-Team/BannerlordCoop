@@ -17,9 +17,14 @@ namespace GameInterface.Serialization.Impl
         {
         }
 
+        static readonly HashSet<string> excludes = new HashSet<string>
+        {
+            "Name"
+        };
+
         public override void Pack()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
+            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
             {
                 object obj = field.GetValue(Object);
                 StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
