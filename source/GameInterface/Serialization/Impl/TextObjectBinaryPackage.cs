@@ -18,9 +18,15 @@ namespace GameInterface.Serialization.Impl
         {
         }
 
+        static readonly HashSet<string> excludes = new HashSet<string>
+        {
+            "cachedTokens",
+            "cachedTextLanguageId"
+        };
+
         public override void Pack()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
+            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
             {
                 object obj = field.GetValue(Object);
                 StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
