@@ -24,7 +24,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         }
 
         [Fact]
-        public void StaticBodyProperties_Full_Serialization()
+        public void TradeItemComponent_Full_Serialization()
         {
             TradeItemComponent tradeItemComponent = new TradeItemComponent();
 
