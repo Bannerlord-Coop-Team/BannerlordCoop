@@ -10,15 +10,15 @@ using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
-    public class SaddleComponentSerializationTest
+    public class ItemObjectSerializationTest
     {
         [Fact]
-        public void SaddleComponent_Serialize()
+        public void ItemObject_Serialize()
         {
+            ItemObject itemObject = (ItemObject)FormatterServices.GetUninitializedObject(typeof(ItemObject));
 
-            SaddleComponent saddleComponent = (SaddleComponent)FormatterServices.GetUninitializedObject(typeof(SaddleComponent));
             BinaryPackageFactory factory = new BinaryPackageFactory();
-            SaddleComponentBinaryPackage package = new SaddleComponentBinaryPackage(saddleComponent, factory);
+            ItemObjectBinaryPackage package = new ItemObjectBinaryPackage(itemObject, factory);
 
             package.Pack();
 
@@ -28,12 +28,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         }
 
         [Fact]
-        public void SaddleComponent_Full_Serialization()
+        public void ItemObject_Full_Serialization()
         {
-            SaddleComponent saddleComponent = (SaddleComponent)FormatterServices.GetUninitializedObject(typeof(SaddleComponent));
+            ItemObject itemObject = (ItemObject)FormatterServices.GetUninitializedObject(typeof(ItemObject));
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
-            SaddleComponentBinaryPackage package = new SaddleComponentBinaryPackage(saddleComponent, factory);
+            ItemObjectBinaryPackage package = new ItemObjectBinaryPackage(itemObject, factory);
 
             package.Pack();
 
@@ -43,9 +43,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             object obj = BinaryFormatterSerializer.Deserialize(bytes);
 
-            Assert.IsType<SaddleComponentBinaryPackage>(obj);
+            Assert.IsType<ItemObjectBinaryPackage>(obj);
 
-            SaddleComponentBinaryPackage returnedPackage = (SaddleComponentBinaryPackage)obj;
+            ItemObjectBinaryPackage returnedPackage = (ItemObjectBinaryPackage)obj;
 
             Assert.Equal(package.stringId, returnedPackage.stringId);
 
