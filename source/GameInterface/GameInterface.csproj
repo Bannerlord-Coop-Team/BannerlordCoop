@@ -302,9 +302,13 @@
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TextObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TradeItemComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\BannerEffectBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\BladeDataBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\DynamicBodyPropertiesBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\BasicCultureObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ItemCategoryBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\Vec2BinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\Mat3BinaryPackage.cs" />
     <Compile Include="Serialization\Impl\Vec3BinaryPackage.cs" />
     <Compile Include="Serialization\Native\DictionaryBinaryPackage.cs" />
     <Compile Include="Serialization\Native\EnumerableBinaryPackage.cs" />
