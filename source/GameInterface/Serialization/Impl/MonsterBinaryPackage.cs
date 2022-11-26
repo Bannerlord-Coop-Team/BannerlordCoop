@@ -13,12 +13,7 @@ namespace GameInterface.Serialization.Impl
     [Serializable]
     public class MonsterBinaryPackage : BinaryPackageBase<Monster>
     {
-
-        public static string[] Excludes = new string[]
-        {
-            "_monsterMissionData",
-        };
-
+        public string StringId;
 
         public MonsterBinaryPackage(Monster obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
@@ -26,20 +21,12 @@ namespace GameInterface.Serialization.Impl
 
         public override void Pack()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(Excludes))
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            StringId = Object.StringId;
         }
 
         protected override void UnpackInternal()
         {
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            Game.Current.ObjectManager.GetObject<Monster>(StringId);
         }
     }
 }
