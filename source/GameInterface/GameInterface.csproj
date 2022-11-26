@@ -304,7 +304,6 @@
     <Compile Include="Serialization\Impl\WeaponDesignElementBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\WeaponComponentDataBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\MatrixFrameBinaryPackage.cs" />
-    <Compile Include="Serialization\Impl\ItemModifierBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ItemObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\SaddleComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TextObjectBinaryPackage.cs" />
