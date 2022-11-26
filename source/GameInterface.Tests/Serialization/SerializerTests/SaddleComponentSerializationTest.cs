@@ -17,9 +17,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
 
             SaddleComponent saddleComponent = (SaddleComponent)FormatterServices.GetUninitializedObject(typeof(SaddleComponent));
-
-            //SaddleComponent saddleComponent = MBObjectManager.Instance.GetObject<SaddleComponent>("Test");
-
             BinaryPackageFactory factory = new BinaryPackageFactory();
             SaddleComponentBinaryPackage package = new SaddleComponentBinaryPackage(saddleComponent, factory);
 
