@@ -300,6 +300,7 @@
     <Compile Include="Serialization\BinaryPackageBase.cs" />
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\SaddleComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TextObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TradeItemComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\DynamicBodyPropertiesBinaryPackage.cs" />
