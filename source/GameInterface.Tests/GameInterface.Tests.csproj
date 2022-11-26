@@ -30,7 +30,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -130,6 +130,10 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Serialization\SerializerTests\CampaignTimeSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemModifierSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CraftingTemplateSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BannerEffectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BasicCultureObjectSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\ItemCategorySerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\DictionarySerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\HeroLastSeenInfoSerializationTest.cs" />
@@ -141,7 +145,9 @@
     <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Vec2SerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\MonsterSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\Mat3SerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Vec3SerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BladeDataSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterObjectSerializationTest.cs" />
