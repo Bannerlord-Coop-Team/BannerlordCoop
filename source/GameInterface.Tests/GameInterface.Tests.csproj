@@ -133,6 +133,7 @@
     <Compile Include="Serialization\SerializerTests\TextObjectSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\TradeItemComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CampaignTimeSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CraftingTemplateSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerEffectSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\BasicCultureObjectSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\ItemCategorySerializerTest.cs" />

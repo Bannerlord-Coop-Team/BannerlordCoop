@@ -303,6 +303,7 @@
     <Compile Include="Serialization\Impl\SaddleComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TextObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TradeItemComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\CraftingTemplateBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BannerEffectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BladeDataBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\DynamicBodyPropertiesBinaryPackage.cs" />
