@@ -1,9 +1,6 @@
-﻿using Common.Extensions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
+﻿using System;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Impl
 {
@@ -26,7 +23,7 @@ namespace GameInterface.Serialization.Impl
 
         protected override void UnpackInternal()
         {
-            Game.Current.ObjectManager.GetObject<Monster>(StringId);
+            MBObjectManager.Instance.GetObject<Monster>(StringId);
         }
     }
 }
