@@ -300,6 +300,13 @@
     <Compile Include="Serialization\BinaryPackageBase.cs" />
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\VillageBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\TownBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\SettlementBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\CharacterTraitsBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\CultureObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\PerkObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\TraitObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CraftingTemplateBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BannerEffectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BladeDataBinaryPackage.cs" />
@@ -307,6 +314,7 @@
     <Compile Include="Serialization\Impl\DynamicBodyPropertiesBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BasicCultureObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ItemCategoryBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\BodyPropertiesBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\Vec2BinaryPackage.cs" />
     <Compile Include="Serialization\Impl\Mat3BinaryPackage.cs" />
     <Compile Include="Serialization\Impl\Vec3BinaryPackage.cs" />
