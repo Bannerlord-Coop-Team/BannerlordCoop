@@ -49,6 +49,10 @@ namespace GameInterface.Serialization.Native
             {
                 return UnpackList();
             }
+            else if (typeof(HashSet<>) == enumerableType.GetGenericTypeDefinition())
+            {
+                return UnpackList();
+            }
 
             throw new Exception($"Type {enumerableType} not handled");
         }

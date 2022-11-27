@@ -139,10 +139,12 @@
     <Compile Include="Serialization\SerializerTests\HeroLastSeenInfoSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ClanSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ArraySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HashSetSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ListSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\MBReadOnlyListSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Vec2SerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MonsterSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Mat3SerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Vec3SerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BladeDataSerializationTest.cs" />
