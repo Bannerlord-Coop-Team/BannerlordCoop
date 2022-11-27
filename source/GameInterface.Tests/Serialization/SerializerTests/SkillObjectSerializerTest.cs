@@ -13,7 +13,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void SkillObject_Serialize()
         {
-            SkillObject testSkillObject = (SkillObject)FormatterServices.GetUninitializedObject(typeof(SkillObject));
+            SkillObject testSkillObject = new SkillObject("Test");
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             SkillObjectBinaryPackage package = new SkillObjectBinaryPackage(testSkillObject, factory);
@@ -28,7 +28,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void SkillObject_Full_Serialization()
         {
-            SkillObject testSkillObject = (SkillObject)FormatterServices.GetUninitializedObject(typeof(SkillObject));
+            SkillObject testSkillObject = new SkillObject("Test");
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             SkillObjectBinaryPackage package = new SkillObjectBinaryPackage(testSkillObject, factory);

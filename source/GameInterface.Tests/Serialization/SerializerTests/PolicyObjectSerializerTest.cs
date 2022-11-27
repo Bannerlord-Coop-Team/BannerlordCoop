@@ -14,7 +14,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void PolicyObject_Serialize()
         {
-            PolicyObject testPolicyObject = (PolicyObject)FormatterServices.GetUninitializedObject(typeof(PolicyObject));
+            PolicyObject testPolicyObject = new PolicyObject("Test");
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             PolicyObjectBinaryPackage package = new PolicyObjectBinaryPackage(testPolicyObject, factory);
@@ -29,7 +29,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void PolicyObject_Full_Serialization()
         {
-            PolicyObject testPolicyObject = (PolicyObject)FormatterServices.GetUninitializedObject(typeof(PolicyObject));
+            PolicyObject testPolicyObject = new PolicyObject("Test");
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             PolicyObjectBinaryPackage package = new PolicyObjectBinaryPackage(testPolicyObject, factory);
