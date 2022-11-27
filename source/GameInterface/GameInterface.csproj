@@ -301,6 +301,7 @@
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CraftingPieceBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\WeaponComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\WeaponDesignElementBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\WeaponComponentDataBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\MatrixFrameBinaryPackage.cs" />

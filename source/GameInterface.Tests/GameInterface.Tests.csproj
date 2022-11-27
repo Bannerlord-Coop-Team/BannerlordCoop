@@ -130,6 +130,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Serialization\SerializerTests\CraftingPieceSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WeaponComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WeaponDesignElementSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WeaponComponentDataSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\MatrixFrameSerializationTest.cs" />

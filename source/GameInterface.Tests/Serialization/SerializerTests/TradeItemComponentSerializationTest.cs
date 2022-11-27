@@ -1,5 +1,6 @@
 ﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
+using System.Diagnostics;
 using System.Linq;
 using TaleWorlds.Core;
 using Xunit;
@@ -27,6 +28,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void TradeItemComponent_Full_Serialization()
         {
             TradeItemComponent tradeItemComponent = new TradeItemComponent();
+            tradeItemComponent.GetType().GetProperty("MoraleBonus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public).SetValue(tradeItemComponent, 5);
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             TradeItemComponentBinaryPackage package = new TradeItemComponentBinaryPackage(tradeItemComponent, factory);
@@ -34,7 +36,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             package.Pack();
 
             byte[] bytes = BinaryFormatterSerializer.Serialize(package);
-
+                
             Assert.NotEmpty(bytes);
 
             object obj = BinaryFormatterSerializer.Deserialize(bytes);

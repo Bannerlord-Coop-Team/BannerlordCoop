@@ -54,6 +54,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.Equal(weaponDesignElement.ScaleFactor, newWeaponDesignElement.ScaleFactor);
             Assert.Equal(weaponDesignElement.ScalePercentage, newWeaponDesignElement.ScalePercentage);
+            Assert.Equal(weaponDesignElement.CraftingPiece, newWeaponDesignElement.CraftingPiece);
 
         }
     }

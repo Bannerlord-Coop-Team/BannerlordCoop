@@ -13,12 +13,12 @@ using TaleWorlds.ObjectSystem;
 namespace GameInterface.Serialization.Impl
 {
     [Serializable]
-    public class SaddleComponentBinaryPackage : BinaryPackageBase<SaddleComponent>
+    public class WeaponComponentBinaryPackage : BinaryPackageBase<WeaponComponent>
     {
 
         public string stringId;
 
-        public SaddleComponentBinaryPackage(SaddleComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public WeaponComponentBinaryPackage(WeaponComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -26,13 +26,19 @@ namespace GameInterface.Serialization.Impl
         {
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
             {
-                stringId = Object.StringId;
+                object obj = field.GetValue(Object);
+                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
             }
         }
 
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<SaddleComponent>(stringId);
+            TypedReference reference = __makeref(Object);
+            foreach (FieldInfo field in StoredFields.Keys)
+            {
+                field.SetValueDirect(reference, StoredFields[field].Unpack());
+            }
         }
     }
+    
 }

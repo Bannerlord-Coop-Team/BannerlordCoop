@@ -31,7 +31,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void SaddleComponent_Full_Serialization()
         {
             SaddleComponent saddleComponent = (SaddleComponent)FormatterServices.GetUninitializedObject(typeof(SaddleComponent));
-
+            saddleComponent.Item = new ItemObject("Test");
             BinaryPackageFactory factory = new BinaryPackageFactory();
             SaddleComponentBinaryPackage package = new SaddleComponentBinaryPackage(saddleComponent, factory);
 
@@ -47,7 +47,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             SaddleComponentBinaryPackage returnedPackage = (SaddleComponentBinaryPackage)obj;
 
+            SaddleComponent newSaddleComponent = returnedPackage.Unpack<SaddleComponent>();
+
             Assert.Equal(package.stringId, returnedPackage.stringId);
+            Assert.Equal(saddleComponent.Item, newSaddleComponent.Item);
 
         }
     }

@@ -1,6 +1,7 @@
 ﻿using Common.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -23,15 +24,30 @@ namespace GameInterface.Serialization.Impl
 
         public override void Pack()
         {
+            stringId = Object.StringId;
+            
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
             {
-                stringId = Object.StringId;
+                object obj = field.GetValue(Object);
+                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
             }
+            
         }
 
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<ItemObject>(stringId);
+            if (stringId != null)
+            {
+                Object = MBObjectManager.Instance.GetObject<ItemObject>(stringId);
+            }
+            else
+            {
+                TypedReference reference = __makeref(Object);
+                foreach (FieldInfo field in StoredFields.Keys)
+                {
+                    field.SetValueDirect(reference, StoredFields[field].Unpack());
+                }
+            }
         }
     }
 }
