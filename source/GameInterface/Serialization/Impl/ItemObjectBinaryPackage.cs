@@ -36,11 +36,9 @@ namespace GameInterface.Serialization.Impl
 
         protected override void UnpackInternal()
         {
-            if (stringId != null)
-            {
-                Object = MBObjectManager.Instance.GetObject<ItemObject>(stringId);
-            }
-            else
+            var newObject = MBObjectManager.Instance?.GetObject<ItemObject>(stringId);
+
+            if (newObject == null)
             {
                 TypedReference reference = __makeref(Object);
                 foreach (FieldInfo field in StoredFields.Keys)

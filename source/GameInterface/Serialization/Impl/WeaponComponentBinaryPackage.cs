@@ -15,9 +15,6 @@ namespace GameInterface.Serialization.Impl
     [Serializable]
     public class WeaponComponentBinaryPackage : BinaryPackageBase<WeaponComponent>
     {
-
-        public string stringId;
-
         public WeaponComponentBinaryPackage(WeaponComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }

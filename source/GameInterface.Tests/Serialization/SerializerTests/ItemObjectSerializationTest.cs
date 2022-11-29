@@ -1,9 +1,11 @@
 ﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
@@ -53,7 +55,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemObjectBinaryPackage returnedPackage = (ItemObjectBinaryPackage)obj;
 
+            ItemObject newItemObject = returnedPackage.Unpack<ItemObject>();
+
             Assert.Equal(package.stringId, returnedPackage.stringId);
+            Assert.Equal(itemObject.Name , newItemObject.Name);
+            Assert.Equal(itemObject.MultiMeshName , newItemObject.MultiMeshName);
+            Assert.Equal(itemObject.Value , newItemObject.Value);
+            Assert.Equal(itemObject.BodyName , newItemObject.BodyName);
 
         }
 
