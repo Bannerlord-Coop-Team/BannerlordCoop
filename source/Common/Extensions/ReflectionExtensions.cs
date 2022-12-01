@@ -40,8 +40,6 @@ namespace Common.Extensions
             return types;
         }
 
-        private readonly static BindingFlags AllInstanceFields = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy;
-
         /// <summary>
         /// Gets all instance fields of a given type
         /// </summary>
@@ -50,13 +48,32 @@ namespace Common.Extensions
         /// <returns>Array of all instance fields</returns>
         public static FieldInfo[] GetAllInstanceFields(this Type type, IEnumerable<string> excluding = null)
         {
-            if(excluding == null) return type.GetFields(AllInstanceFields);
+            if(excluding == null) return GetAllFieldsRecursive(type).ToArray();
 
             HashSet<string> excludes = new HashSet<string>(excluding);
 
-            FieldInfo[] fields = type.GetFields(AllInstanceFields);
+            FieldInfo[] fields = GetAllFieldsRecursive(type).ToArray();
 
             return fields.Where(f => excludes.Contains(f.Name) == false && f.IsLiteral == false).ToArray();
+        }
+
+        private readonly static BindingFlags AllInstanceFields = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy;
+        private static IEnumerable<FieldInfo> GetAllFieldsRecursive(Type type, HashSet<Type> handledTypes = null)
+        {
+            if (handledTypes == null) handledTypes = new HashSet<Type>();
+
+            if (handledTypes.Contains(type)) return new FieldInfo[0];
+
+            handledTypes.Add(type);
+
+            List<FieldInfo> fields = new List<FieldInfo>(type.GetFields(AllInstanceFields));
+
+            if(type.BaseType != null)
+            {
+                fields.AddRange(GetAllFieldsRecursive(type.BaseType));
+            }
+
+            return fields;
         }
 
         /// <summary>
