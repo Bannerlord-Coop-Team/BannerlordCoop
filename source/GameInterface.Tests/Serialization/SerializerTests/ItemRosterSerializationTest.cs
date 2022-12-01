@@ -11,7 +11,7 @@ using GameInterface.Serialization.Impl;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
-    public class ItemRosterSerializerTest
+    public class ItemRosterSerializationTest
     {
         [Fact]
         public void ItemRoster_Serialize()
