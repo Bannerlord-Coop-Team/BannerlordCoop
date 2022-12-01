@@ -46,6 +46,10 @@ namespace GameInterface.Serialization.Impl
                     field.SetValueDirect(reference, StoredFields[field].Unpack());
                 }
             }
+            else
+            {
+                Object = newObject;
+            }
         }
     }
 }

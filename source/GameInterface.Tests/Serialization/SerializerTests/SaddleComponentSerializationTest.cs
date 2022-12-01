@@ -50,8 +50,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             SaddleComponent newSaddleComponent = returnedPackage.Unpack<SaddleComponent>();
 
-            Assert.Equal(saddleComponent.Item, newSaddleComponent.Item);
-            Assert.True(saddleComponent.Equals(newSaddleComponent));
+            Assert.Equal(saddleComponent.Item?.StringId, newSaddleComponent.Item?.StringId);
+            Assert.Equal(saddleComponent.ItemModifierGroup, newSaddleComponent.ItemModifierGroup);
 
         }
     }

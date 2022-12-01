@@ -27,6 +27,7 @@ namespace GameInterface.Serialization.Impl
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
             {
                 object obj = field.GetValue(Object);
+                //IBinaryPackage binaryPackage = 
                 StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
             }
         }
