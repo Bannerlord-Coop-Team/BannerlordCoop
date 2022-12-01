@@ -16,8 +16,6 @@ namespace GameInterface.Serialization.Impl
     public class SaddleComponentBinaryPackage : BinaryPackageBase<SaddleComponent>
     {
 
-        public string stringId;
-
         public SaddleComponentBinaryPackage(SaddleComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
