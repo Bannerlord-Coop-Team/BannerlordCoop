@@ -140,6 +140,7 @@
     <Compile Include="Serialization\SerializerTests\ClanSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ArraySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\HashSetSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemRosterSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\ListSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\MBReadOnlyListSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
