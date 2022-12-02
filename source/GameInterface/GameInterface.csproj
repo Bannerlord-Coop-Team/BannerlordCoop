@@ -301,6 +301,16 @@
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BanditPartyComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\CraftingPieceBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\MBGUIDBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\WeaponComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\WeaponDesignElementBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\WeaponComponentDataBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\MatrixFrameBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\ItemObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\SaddleComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\TextObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\TradeItemComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CraftingTemplateBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BannerEffectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BladeDataBinaryPackage.cs" />
