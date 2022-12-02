@@ -63,7 +63,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Hideout hideout = returnedPackage.Unpack<Hideout>();
 
-            Assert.True(hideout.SceneName == item.SceneName && item.IsSpotted == hideout.IsSpotted && _nextPossibleAttackTime.GetValue(hideout) != null);
+            Assert.True(hideout == item && hideout.SceneName == item.SceneName && item.IsSpotted == hideout.IsSpotted && _nextPossibleAttackTime.GetValue(hideout) != null);
         }
     }
 }

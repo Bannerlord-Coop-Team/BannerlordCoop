@@ -9,6 +9,7 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Serialization.Impl
 {
+    [Serializable]
     public class EquipmentBinaryPackage : BinaryPackageBase<Equipment>
     {
         public EquipmentBinaryPackage(Equipment obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)

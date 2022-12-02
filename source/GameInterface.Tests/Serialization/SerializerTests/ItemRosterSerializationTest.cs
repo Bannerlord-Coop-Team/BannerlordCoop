@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 using Xunit;
 using TaleWorlds.CampaignSystem.Roster;
 using GameInterface.Serialization.Impl;
+using System.Reflection;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -31,8 +34,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void ItemRoster_Full_Serialization()
         {
-            ItemRoster itemRoster = new ItemRoster();
-
+            MBObjectManager.Init();
+            ItemObject itemobj = MBObjectManager.Instance.CreateObject<ItemObject>();
+            ItemRoster itemRoster = new ItemRoster
+            {
+                new ItemRosterElement(new EquipmentElement(itemobj), 1)
+            };
             BinaryPackageFactory factory = new BinaryPackageFactory();
             ItemRosterBinaryPackage package = new ItemRosterBinaryPackage(itemRoster, factory);
 
@@ -50,8 +57,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemRoster newRoster = returnedPackage.Unpack<ItemRoster>();
 
-            //Assert Stuff
-            Assert.Equal(itemRoster, newRoster);
+            Assert.True(itemRoster.Count == newRoster.Count && newRoster[0].Equals(itemRoster[0]));
+            MBObjectManager.Instance.Destroy();
         }
     }
 }
