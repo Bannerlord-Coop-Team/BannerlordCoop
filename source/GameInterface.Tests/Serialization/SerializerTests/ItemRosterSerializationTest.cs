@@ -57,8 +57,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemRoster newRoster = returnedPackage.Unpack<ItemRoster>();
 
-            Assert.True(itemRoster.Count == newRoster.Count && newRoster[0].Equals(itemRoster[0]));
-            MBObjectManager.Instance.Destroy();
+            Assert.Equal(itemRoster.Count, newRoster.Count);
+            Assert.Equal(newRoster.ToString(), itemRoster.ToString());
         }
     }
 }
