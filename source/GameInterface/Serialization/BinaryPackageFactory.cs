@@ -16,7 +16,7 @@ namespace GameInterface.Serialization
 
     public class BinaryPackageFactory : IBinaryPackageFactory
     {
-        readonly Dictionary<object, IBinaryPackage> InstantiatedPackages = new Dictionary<object, IBinaryPackage>();
+        readonly Dictionary<ObjectAndType, IBinaryPackage> InstantiatedPackages = new Dictionary<ObjectAndType, IBinaryPackage>();
         static readonly Dictionary<Type, Type> PackagesTypes = new Dictionary<Type, Type>();
 
         static BinaryPackageFactory()
@@ -70,23 +70,30 @@ namespace GameInterface.Serialization
             Type type = obj.GetType();
 
             if (type.IsFullySerializable()) return new PrimitiveBinaryPackage(obj);
-            //if (obj is IEnumerable) return EnumerableBinaryPackageFactory.GetBinaryPackage(obj);
 
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(KeyValuePair<,>)) return new KeyValuePairBinaryPackage(obj, this);
 
-            if (InstantiatedPackages.TryGetValue(obj, out IBinaryPackage serializer))
+            ObjectAndType wrappedObj = new ObjectAndType(type, obj);
+
+            if (InstantiatedPackages.TryGetValue(wrappedObj, out IBinaryPackage serializer))
             {
                 return serializer;
             }
 
             IBinaryPackage package = CreateBinaryPackage(obj);
             Register(obj, package);
+
+            package.Pack();
+
             return package;
         }
 
         private IBinaryPackage CreateBinaryPackage(object obj)
         {
             Type objectType = obj.GetType();
+
+            objectType = objectType.IsGenericType ? objectType.GetGenericTypeDefinition() : objectType;
+
             if (PackagesTypes.TryGetValue(objectType, out Type packageType) == false) throw new Exception(
                 $"No binary package exists for {objectType}");
 
@@ -95,10 +102,30 @@ namespace GameInterface.Serialization
 
         private void Register(object obj, IBinaryPackage serializer)
         {
-            if (InstantiatedPackages.ContainsKey(obj)) throw new DuplicateKeyException(
+            ObjectAndType wrappedObj = new ObjectAndType(obj);
+
+            if (InstantiatedPackages.ContainsKey(wrappedObj)) throw new DuplicateKeyException(
                 $"{obj} already has a registered serializer.");
 
-            InstantiatedPackages.Add(obj, serializer);
+            InstantiatedPackages.Add(wrappedObj, serializer);
         }
     }
+
+    public class ObjectAndType
+    {
+        public Type Type { get; private set; }
+        public object Object { get; private set; }
+
+        public ObjectAndType(object @object)
+        {
+            Type = @object.GetType();
+            Object = @object;
+        }
+
+        public ObjectAndType(Type type, object @object)
+        {
+            Type = type;
+            Object = @object;
+        }
+    }    
 }
