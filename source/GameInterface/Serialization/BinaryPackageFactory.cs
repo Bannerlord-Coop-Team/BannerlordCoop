@@ -16,7 +16,7 @@ namespace GameInterface.Serialization
 
     public class BinaryPackageFactory : IBinaryPackageFactory
     {
-        readonly Dictionary<object, IBinaryPackage> InstantiatedPackages = new Dictionary<object, IBinaryPackage>();
+        readonly Dictionary<ObjectAndType, IBinaryPackage> InstantiatedPackages = new Dictionary<ObjectAndType, IBinaryPackage>();
         static readonly Dictionary<Type, Type> PackagesTypes = new Dictionary<Type, Type>();
 
         static BinaryPackageFactory()
@@ -73,7 +73,9 @@ namespace GameInterface.Serialization
 
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(KeyValuePair<,>)) return new KeyValuePairBinaryPackage(obj, this);
 
-            if (InstantiatedPackages.TryGetValue(obj, out IBinaryPackage serializer))
+            ObjectAndType wrappedObj = new ObjectAndType(type, obj);
+
+            if (InstantiatedPackages.TryGetValue(wrappedObj, out IBinaryPackage serializer))
             {
                 return serializer;
             }
@@ -100,10 +102,30 @@ namespace GameInterface.Serialization
 
         private void Register(object obj, IBinaryPackage serializer)
         {
-            if (InstantiatedPackages.ContainsKey(obj)) throw new DuplicateKeyException(
+            ObjectAndType wrappedObj = new ObjectAndType(obj);
+
+            if (InstantiatedPackages.ContainsKey(wrappedObj)) throw new DuplicateKeyException(
                 $"{obj} already has a registered serializer.");
 
-            InstantiatedPackages.Add(obj, serializer);
+            InstantiatedPackages.Add(wrappedObj, serializer);
         }
     }
+
+    public class ObjectAndType
+    {
+        public Type Type { get; private set; }
+        public object Object { get; private set; }
+
+        public ObjectAndType(object @object)
+        {
+            Type = @object.GetType();
+            Object = @object;
+        }
+
+        public ObjectAndType(Type type, object @object)
+        {
+            Type = type;
+            Object = @object;
+        }
+    }    
 }
