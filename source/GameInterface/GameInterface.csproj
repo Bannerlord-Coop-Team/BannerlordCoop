@@ -300,6 +300,8 @@
     <Compile Include="Serialization\BinaryPackageBase.cs" />
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\PolicyObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\SkillObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CraftingPieceBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\MBGUIDBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\WeaponComponentBinaryPackage.cs" />
@@ -317,6 +319,7 @@
     <Compile Include="Serialization\Impl\DynamicBodyPropertiesBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BasicCultureObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ItemCategoryBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\CharacterSkillsBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\Vec2BinaryPackage.cs" />
     <Compile Include="Serialization\Impl\MonsterBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\Mat3BinaryPackage.cs" />
