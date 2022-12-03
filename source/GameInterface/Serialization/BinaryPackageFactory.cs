@@ -69,7 +69,7 @@ namespace GameInterface.Serialization
 
             Type type = obj.GetType();
    
-            if (type.IsFullySerializable() && !type.IsArray) return new PrimitiveBinaryPackage(obj);
+            if (type.IsFullySerializable()) return new PrimitiveBinaryPackage(obj);
 
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(KeyValuePair<,>)) return new KeyValuePairBinaryPackage(obj, this);
 
