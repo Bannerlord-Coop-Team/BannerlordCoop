@@ -19,7 +19,7 @@ namespace GameInterface.Serialization.Impl
         }
         protected override void UnpackInternal()
         {
-            MBObjectManager.Instance.GetObject<SkillObject>(StringId);
+            MBObjectManager.Instance?.GetObject<SkillObject>(StringId);
         }
     }
 }
