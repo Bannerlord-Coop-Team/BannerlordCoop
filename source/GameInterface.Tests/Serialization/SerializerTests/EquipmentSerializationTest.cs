@@ -35,7 +35,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Equipment equipment = new Equipment();
             FieldInfo _equipmentType = typeof(Equipment).GetField("_equipmentType", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             _equipmentType.SetValue(equipment,EquipmentType.Battle);
-            //TODO: populate the 12 item slots.
+            for (int i = 0; i < 12; i++)
+            {
+                equipment[i] = new EquipmentElement();
+            }
             BinaryPackageFactory factory = new BinaryPackageFactory();
             EquipmentBinaryPackage package = new EquipmentBinaryPackage(equipment, factory);
 
@@ -53,8 +56,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Equipment newEquipment = returnedPackage.Unpack<Equipment>();
 
-            Assert.True(equipment.IsCivilian == newEquipment.IsCivilian && equipment.IsValid == newEquipment.IsValid && _equipmentType.GetValue(equipment) == _equipmentType.GetValue(newEquipment));
-            //TODO: Assert the 12 item slots.
+            Assert.True(equipment.IsCivilian == newEquipment.IsCivilian && equipment.IsValid == newEquipment.IsValid && (EquipmentType)_equipmentType.GetValue(equipment) == (EquipmentType)_equipmentType.GetValue(newEquipment));
+            for (int i = 0; i < 12; i++)
+            {
+                Assert.True(equipment[i].IsEqualTo(newEquipment[i]));
+            }
         }
     }
 }
