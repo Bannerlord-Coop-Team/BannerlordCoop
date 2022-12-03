@@ -6,6 +6,7 @@ using System.Runtime.Serialization;
 using Common.Extensions;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using System.Collections.Generic;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -14,10 +15,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void CharacterTraits_Serialize()
         {
-            CharacterTraits testCharacterTraits = (CharacterTraits)FormatterServices.GetUninitializedObject(typeof(CharacterTraits));
+            CharacterTraits CharacterTraits = new CharacterTraits();
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
-            CharacterTraitsBinaryPackage package = new CharacterTraitsBinaryPackage(testCharacterTraits, factory);
+            CharacterTraitsBinaryPackage package = new CharacterTraitsBinaryPackage(CharacterTraits, factory);
 
             package.Pack();
 
@@ -26,13 +27,21 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
+        private static readonly FieldInfo _attributes = typeof(PropertyOwner<TraitObject>).GetField("_attributes", BindingFlags.Instance | BindingFlags.NonPublic);
         [Fact]
         public void CharacterTraits_Full_Serialization()
         {
-            CharacterTraits testCharacterTraits = (CharacterTraits)FormatterServices.GetUninitializedObject(typeof(CharacterTraits));
+            CharacterTraits characterTraits = new CharacterTraits();
+
+            Dictionary<TraitObject, int> traits = new Dictionary<TraitObject, int>
+            {
+                { new TraitObject("Trait1"), 3 },
+                { new TraitObject("Trait2"), 7 },
+            };
+            _attributes.SetValue(characterTraits, traits);
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
-            CharacterTraitsBinaryPackage package = new CharacterTraitsBinaryPackage(testCharacterTraits, factory);
+            CharacterTraitsBinaryPackage package = new CharacterTraitsBinaryPackage(characterTraits, factory);
 
             package.Pack();
 
@@ -46,7 +55,15 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CharacterTraitsBinaryPackage returnedPackage = (CharacterTraitsBinaryPackage)obj;
 
-            Assert.Equal(returnedPackage.StringId, package.StringId);
+            CharacterTraits newCharacterTraits = returnedPackage.Unpack<CharacterTraits>();
+
+            Assert.Equal(characterTraits.Id, newCharacterTraits.Id);
+            Assert.Equal(characterTraits.StringId, newCharacterTraits.StringId);
+            Assert.Equal(characterTraits.IsReady, newCharacterTraits.IsReady);
+
+            Dictionary<TraitObject, int> newTraits = (Dictionary<TraitObject, int>)_attributes.GetValue(newCharacterTraits);
+
+            Assert.Equal(traits.ToString(), newTraits.ToString());
         }
     }
 }

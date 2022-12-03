@@ -20,7 +20,7 @@ namespace GameInterface.Serialization.Impl
         }
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<TraitObject>(StringId);
+            MBObjectManager.Instance?.GetObject<TraitObject>(StringId);
         }
     }
 }
