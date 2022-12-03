@@ -12,7 +12,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void CharacterSkills_Serialize()
         {
-            CharacterSkills CharacterSkills = (CharacterSkills)FormatterServices.GetUninitializedObject(typeof(CharacterSkills));
+            CharacterSkills CharacterSkills = new CharacterSkills();
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             CharacterSkillsBinaryPackage package = new CharacterSkillsBinaryPackage(CharacterSkills, factory);
@@ -27,7 +27,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void CharacterSkills_Full_Serialization()
         {
-            CharacterSkills CharacterSkills = (CharacterSkills)FormatterServices.GetUninitializedObject(typeof(CharacterSkills));
+            CharacterSkills CharacterSkills = new CharacterSkills();
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             CharacterSkillsBinaryPackage package = new CharacterSkillsBinaryPackage(CharacterSkills, factory);
@@ -46,7 +46,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CharacterSkills newCharacterSkills = returnedPackage.Unpack<CharacterSkills>();
 
-            Assert.Equal(CharacterSkills.StringId, newCharacterSkills.StringId);
+            Assert.Equal(CharacterSkills, newCharacterSkills);
         }
     }
 }
