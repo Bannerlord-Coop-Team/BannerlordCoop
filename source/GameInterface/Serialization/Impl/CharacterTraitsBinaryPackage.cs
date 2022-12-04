@@ -10,8 +10,6 @@ namespace GameInterface.Serialization.Impl
     [Serializable]
     public class CharacterTraitsBinaryPackage : BinaryPackageBase<CharacterTraits>
     {
-        public string StringId;
-
         public CharacterTraitsBinaryPackage(CharacterTraits obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
 
