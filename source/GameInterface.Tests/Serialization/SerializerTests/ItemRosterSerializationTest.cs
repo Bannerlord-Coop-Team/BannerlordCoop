@@ -14,8 +14,12 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
-    public class ItemRosterSerializationTest
+    public class ItemRosterSerializationTest: IDisposable
     {
+        public ItemRosterSerializationTest() 
+        { 
+            MBObjectManager.Init(); 
+        }
         [Fact]
         public void ItemRoster_Serialize()
         {
@@ -34,7 +38,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void ItemRoster_Full_Serialization()
         {
-            MBObjectManager.Init();
             ItemObject itemobj = MBObjectManager.Instance.CreateObject<ItemObject>();
             ItemRoster itemRoster = new ItemRoster
             {
@@ -59,6 +62,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.Equal(itemRoster.Count, newRoster.Count);
             Assert.Equal(newRoster.ToString(), itemRoster.ToString());
+        }
+
+        public void Dispose()
+        {
+            MBObjectManager.Instance.Destroy();
         }
     }
 }

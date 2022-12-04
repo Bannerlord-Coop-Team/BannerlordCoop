@@ -17,6 +17,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BanditPartyComponentSerializationTest
     {
+
         [Fact]
         public void BanditPartyComponent_Serialize()
         {
@@ -32,17 +33,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
+        private static readonly PropertyInfo Campaign_Current = typeof(Campaign).GetProperty("Current");
+        private static readonly FieldInfo Campaign_hideouts = typeof(Campaign).GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        private static readonly PropertyInfo BanditPartyComponent_Hideout = typeof(BanditPartyComponent).GetProperty(nameof(BanditPartyComponent.Hideout));
+        private static readonly PropertyInfo BanditPartyComponent_IsBossParty = typeof(BanditPartyComponent).GetProperty(nameof(BanditPartyComponent.IsBossParty));
+
         [Fact]
         public void BanditPartyComponent_Full_Serialization()
         {
-            typeof(Campaign).GetProperty("Current").SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
+            Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
             List<Hideout> allhideouts = new List<Hideout>();
             Hideout hideout = new Hideout();
             allhideouts.Add(hideout);
-            typeof(Campaign).GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).SetValue(Campaign.Current, allhideouts);
+            Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
             BanditPartyComponent item = (BanditPartyComponent)FormatterServices.GetUninitializedObject(typeof(BanditPartyComponent));
-            item.GetType().GetProperty(nameof(BanditPartyComponent.Hideout)).SetValue(item, hideout);
-            item.GetType().GetProperty(nameof(BanditPartyComponent.IsBossParty)).SetValue(item, true);
+            BanditPartyComponent_Hideout.SetValue(item, hideout);
+            BanditPartyComponent_IsBossParty.SetValue(item, true);
             BinaryPackageFactory factory = new BinaryPackageFactory();
             BanditPartyComponentBinaryPackage package = new BanditPartyComponentBinaryPackage(item, factory);
 
@@ -60,7 +66,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BanditPartyComponent newBanditPartyComponent = returnedPackage.Unpack<BanditPartyComponent>();
 
-            Assert.True(item.IsBossParty == newBanditPartyComponent.IsBossParty == true && newBanditPartyComponent.Hideout != null);
+            Assert.True(item.IsBossParty == newBanditPartyComponent.IsBossParty == true);
+            Assert.True(newBanditPartyComponent.Hideout != null);
         }
 
     }

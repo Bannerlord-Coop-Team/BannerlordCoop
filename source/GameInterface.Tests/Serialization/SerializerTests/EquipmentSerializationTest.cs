@@ -28,12 +28,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.NotEmpty(bytes);
         }
-
+        private static readonly FieldInfo _equipmentType = typeof(Equipment).GetField("_equipmentType", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         [Fact]
         public void Equipment_Full_Serialization()
         {
             Equipment equipment = new Equipment();
-            FieldInfo _equipmentType = typeof(Equipment).GetField("_equipmentType", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             _equipmentType.SetValue(equipment,EquipmentType.Battle);
             for (int i = 0; i < 12; i++)
             {
@@ -56,7 +55,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Equipment newEquipment = returnedPackage.Unpack<Equipment>();
 
-            Assert.True(equipment.IsCivilian == newEquipment.IsCivilian && equipment.IsValid == newEquipment.IsValid && (EquipmentType)_equipmentType.GetValue(equipment) == (EquipmentType)_equipmentType.GetValue(newEquipment));
+            Assert.True(equipment.IsCivilian == newEquipment.IsCivilian);
+            Assert.True(equipment.IsValid == newEquipment.IsValid);
+            Assert.True((EquipmentType)_equipmentType.GetValue(equipment) == (EquipmentType)_equipmentType.GetValue(newEquipment));
             for (int i = 0; i < 12; i++)
             {
                 Assert.True(equipment[i].IsEqualTo(newEquipment[i]));

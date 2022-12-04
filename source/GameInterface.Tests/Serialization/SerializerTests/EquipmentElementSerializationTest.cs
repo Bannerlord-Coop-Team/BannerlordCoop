@@ -12,8 +12,12 @@ using System.Reflection;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
-    public class EquipmentElementSerializationTest
+    public class EquipmentElementSerializationTest: IDisposable
     {
+        public EquipmentElementSerializationTest() 
+        {
+            MBObjectManager.Init();
+        }
         [Fact]
         public void EquipmentElement_Serialize()
         {
@@ -32,7 +36,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void EquipmentElement_Full_Serialization()
         {
-            MBObjectManager.Init();
             ItemObject itemobj = MBObjectManager.Instance.CreateObject<ItemObject>();
             ItemObject itemobj2 = MBObjectManager.Instance.CreateObject<ItemObject>();
             ItemModifier ItemModifier = MBObjectManager.Instance.CreateObject<ItemModifier>();
@@ -63,6 +66,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 newEquipmentElement.ItemModifier.GetType().GetField("_armor", BindingFlags.Instance | BindingFlags.NonPublic));
             Assert.Equal(equipmentElement.Item.StringId, newEquipmentElement.Item.StringId);
             Assert.Equal(equipmentElement.CosmeticItem.StringId, newEquipmentElement.CosmeticItem.StringId);
+        }
+
+        public void Dispose()
+        {
             MBObjectManager.Instance.Destroy();
         }
     }
