@@ -300,6 +300,13 @@
     <Compile Include="Serialization\BinaryPackageBase.cs" />
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\VillageBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\TownBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\SettlementBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\CharacterTraitsBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\CultureObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\PerkObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\TraitObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BanditPartyComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\PolicyObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\SkillObjectBinaryPackage.cs" />
@@ -323,6 +330,7 @@
     <Compile Include="Serialization\Impl\DynamicBodyPropertiesBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BasicCultureObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ItemCategoryBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\BodyPropertiesBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ItemRosterBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ItemRosterElementBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CharacterSkillsBinaryPackage.cs" />

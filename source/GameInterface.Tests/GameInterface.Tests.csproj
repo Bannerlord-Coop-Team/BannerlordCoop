@@ -129,6 +129,13 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Serialization\SerializerTests\VillageSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TownSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\SettlementSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterTraitsSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CultureObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PerkObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TraitObjectSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\BanditPartyComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PolicyObjectSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\SkillObjectSerializerTest.cs" />
@@ -160,6 +167,7 @@
     <Compile Include="Serialization\SerializerTests\ListSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\MBReadOnlyListSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterSkillsSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Vec2SerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\MonsterSerializationTest.cs" />
