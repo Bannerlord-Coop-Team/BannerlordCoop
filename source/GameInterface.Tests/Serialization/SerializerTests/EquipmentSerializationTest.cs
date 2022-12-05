@@ -55,9 +55,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Equipment newEquipment = returnedPackage.Unpack<Equipment>();
 
-            Assert.True(equipment.IsCivilian == newEquipment.IsCivilian);
-            Assert.True(equipment.IsValid == newEquipment.IsValid);
-            Assert.True((EquipmentType)_equipmentType.GetValue(equipment) == (EquipmentType)_equipmentType.GetValue(newEquipment));
+            Assert.Equal(equipment.IsCivilian, newEquipment.IsCivilian);
+            Assert.Equal(equipment.IsValid, newEquipment.IsValid);
+            Assert.Equal((EquipmentType)_equipmentType.GetValue(equipment), (EquipmentType)_equipmentType.GetValue(newEquipment));
             for (int i = 0; i < 12; i++)
             {
                 Assert.True(equipment[i].IsEqualTo(newEquipment[i]));

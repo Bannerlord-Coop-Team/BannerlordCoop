@@ -16,14 +16,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class HideoutSerializationTest
     {
+        private static readonly PropertyInfo Campaign_Current = typeof(Campaign).GetProperty("Current");
+        private static readonly FieldInfo Campaign_hideouts = typeof(Campaign).GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         [Fact]
         public void Hideout_Serialize()
         {
-            typeof(Campaign).GetProperty("Current").SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
+            Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
             List<Hideout> allhideouts = new List<Hideout>();
             Hideout item = new Hideout();
             allhideouts.Add(item);
-            typeof(Campaign).GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).SetValue(Campaign.Current,allhideouts);
+            Campaign_hideouts.SetValue(Campaign.Current,allhideouts);
             BinaryPackageFactory factory = new BinaryPackageFactory();
             HideoutBinaryPackage package = new HideoutBinaryPackage(item, factory);
 
@@ -33,19 +35,19 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.NotEmpty(bytes);
         }
-
+        private static readonly FieldInfo Hideout_nextPossibleAttackTime = typeof(Hideout).GetField("_nextPossibleAttackTime", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        private static readonly PropertyInfo Hideout_SceneName = typeof(Hideout).GetProperty("SceneName", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         [Fact]
         public void Hideout_Full_Serialization()
         {
-            FieldInfo _nextPossibleAttackTime = typeof(Hideout).GetField("_nextPossibleAttackTime", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            typeof(Campaign).GetProperty("Current").SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
+            Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
             List<Hideout> allhideouts = new List<Hideout>();
             Hideout item = new Hideout();
             item.IsSpotted = true;
-            _nextPossibleAttackTime.SetValue(item, new CampaignTime());
-            item.GetType().GetProperty("SceneName", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).SetValue(item, "something");
+            Hideout_nextPossibleAttackTime.SetValue(item, new CampaignTime());
+            Hideout_SceneName.SetValue(item, "something");
             allhideouts.Add(item);
-            typeof(Campaign).GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).SetValue(Campaign.Current, allhideouts);
+            Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
             BinaryPackageFactory factory = new BinaryPackageFactory();
             HideoutBinaryPackage package = new HideoutBinaryPackage(item, factory);
 
@@ -63,7 +65,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Hideout hideout = returnedPackage.Unpack<Hideout>();
 
-            Assert.True(hideout == item && hideout.SceneName == item.SceneName && item.IsSpotted == hideout.IsSpotted && _nextPossibleAttackTime.GetValue(hideout) != null);
+            Assert.Equal(hideout, item);
+            Assert.Equal(hideout.SceneName, item.SceneName);
+            Assert.Equal(item.IsSpotted, hideout.IsSpotted);
+            Assert.NotNull(Hideout_nextPossibleAttackTime.GetValue(hideout));
         }
     }
 }

@@ -66,8 +66,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BanditPartyComponent newBanditPartyComponent = returnedPackage.Unpack<BanditPartyComponent>();
 
-            Assert.True(item.IsBossParty == newBanditPartyComponent.IsBossParty == true);
-            Assert.True(newBanditPartyComponent.Hideout != null);
+            Assert.Equal(item.IsBossParty, newBanditPartyComponent.IsBossParty);
+            Assert.NotNull(newBanditPartyComponent.Hideout);
         }
 
     }
