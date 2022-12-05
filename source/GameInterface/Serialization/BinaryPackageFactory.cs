@@ -68,7 +68,7 @@ namespace GameInterface.Serialization
             if (obj == null) return new NullBinaryPackage();
 
             Type type = obj.GetType();
-
+   
             if (type.IsFullySerializable()) return new PrimitiveBinaryPackage(obj);
 
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(KeyValuePair<,>)) return new KeyValuePairBinaryPackage(obj, this);
@@ -93,7 +93,7 @@ namespace GameInterface.Serialization
             Type objectType = obj.GetType();
 
             objectType = objectType.IsGenericType ? objectType.GetGenericTypeDefinition() : objectType;
-
+            objectType = objectType.IsArray ? objectType.BaseType : objectType;
             if (PackagesTypes.TryGetValue(objectType, out Type packageType) == false) throw new Exception(
                 $"No binary package exists for {objectType}");
 

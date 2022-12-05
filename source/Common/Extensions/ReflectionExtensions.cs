@@ -93,6 +93,8 @@ namespace Common.Extensions
                 if (result == false) return result;
             }
 
+            if (type.IsArray) result &= IsFullySerializable(type.GetElementType());
+
             return result;
         }
     }

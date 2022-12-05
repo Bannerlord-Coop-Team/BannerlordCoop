@@ -136,6 +136,7 @@
     <Compile Include="Serialization\SerializerTests\CultureObjectSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\PerkObjectSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\TraitObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BanditPartyComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PolicyObjectSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\SkillObjectSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\CraftingPieceSerializationTest.cs" />
@@ -148,6 +149,9 @@
     <Compile Include="Serialization\SerializerTests\TextObjectSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\TradeItemComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CampaignTimeSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\EquipmentElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\EquipmentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HideoutSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ItemModifierSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CraftingTemplateSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerEffectSerializerTest.cs" />
@@ -158,6 +162,8 @@
     <Compile Include="Serialization\SerializerTests\ClanSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ArraySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\HashSetSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemRosterElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemRosterSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ListSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\MBReadOnlyListSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
