@@ -130,6 +130,8 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Serialization\SerializerTests\BanditPartyComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PolicyObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\SkillObjectSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\CraftingPieceSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WeaponComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WeaponDesignElementSerializationTest.cs" />
@@ -158,6 +160,7 @@
     <Compile Include="Serialization\SerializerTests\ListSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\MBReadOnlyListSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterSkillsSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Vec2SerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\MonsterSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\Mat3SerializationTest.cs" />
