@@ -1,10 +1,8 @@
-﻿using Common.Messaging;
-
-namespace Coop.Core.Server.Connections.States
+﻿namespace Coop.Core.Server.Connections.States
 {
     public class LoadingState : ConnectionStateBase
     {
-        public LoadingState(IConnectionLogic connectionLogic, IMessageBroker messageBroker) : base(connectionLogic, messageBroker)
+        public LoadingState(IConnectionLogic connectionLogic) : base(connectionLogic)
         {
         }
 
@@ -26,7 +24,7 @@ namespace Coop.Core.Server.Connections.States
 
         public override void EnterCampaign()
         {
-            ConnectionLogic.State = new CampaignState(ConnectionLogic, MessageBroker);
+            ConnectionLogic.State = new CampaignState(ConnectionLogic);
         }
 
         public override void EnterMission()

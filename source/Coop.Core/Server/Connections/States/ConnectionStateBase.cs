@@ -10,10 +10,9 @@ namespace Coop.Core.Server.Connections.States
         public IMessageBroker MessageBroker;
         public IConnectionLogic ConnectionLogic;
 
-        public ConnectionStateBase(IConnectionLogic connectionLogic, IMessageBroker messageBroker)
+        public ConnectionStateBase(IConnectionLogic connectionLogic)
         {
             ConnectionLogic = connectionLogic;
-            MessageBroker = messageBroker;
         }
 
         public abstract void ResolveCharacter();

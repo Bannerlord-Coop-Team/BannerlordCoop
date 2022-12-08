@@ -13,8 +13,7 @@ namespace Coop.Tests.Server.Connections.States
         private readonly string _playerId = Guid.NewGuid().ToString();
         public ClientStateOrchestratorTests(ITestOutputHelper output) : base(output)
         {
-            var playerConnectionStates = new PlayerConnectionStatesManager(messageBroker);
-            clientStateOrchestrator = new ClientStateOrchestrator(messageBroker, playerConnectionStates);
+            clientStateOrchestrator = new ClientStateOrchestrator(messageBroker);
         }
 
         [Fact]
@@ -23,7 +22,7 @@ namespace Coop.Tests.Server.Connections.States
             messageBroker.Publish(this, new ResolveCharacter(_playerId));
             messageBroker.Publish(this, new PlayerDisconnected(_playerId));
 
-            Assert.Empty(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates);
+            Assert.Empty(clientStateOrchestrator.ConnectionStates);
         }
 
         [Fact]
@@ -31,8 +30,8 @@ namespace Coop.Tests.Server.Connections.States
         {
             messageBroker.Publish(this, new ResolveCharacter(_playerId));
 
-            Assert.Single(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates);
-            Assert.IsType<ResolveCharacterState>(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates.Single().Value.State);
+            Assert.Single(clientStateOrchestrator.ConnectionStates);
+            Assert.IsType<ResolveCharacterState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
         }
 
         [Fact]
@@ -41,7 +40,7 @@ namespace Coop.Tests.Server.Connections.States
             messageBroker.Publish(this, new ResolveCharacter(_playerId));
             messageBroker.Publish(this, new ResolvedCharacter(_playerId));
 
-            Assert.IsType<LoadingState>(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates.Single().Value.State);
+            Assert.IsType<LoadingState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
         }
 
         [Fact]
@@ -66,7 +65,7 @@ namespace Coop.Tests.Server.Connections.States
             messageBroker.Publish(this, new ResolvedCharacter(_playerId));
             messageBroker.Publish(this, new PlayerLoaded(_playerId));
 
-            Assert.IsType<CampaignState>(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates.Single().Value.State);
+            Assert.IsType<CampaignState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
         }
 
         [Fact]
@@ -77,7 +76,7 @@ namespace Coop.Tests.Server.Connections.States
             messageBroker.Publish(this, new PlayerLoaded(_playerId));
             messageBroker.Publish(this, new PlayerTransitionMission(_playerId));
 
-            Assert.IsType<MissionState>(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates.Single().Value.State);
+            Assert.IsType<MissionState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
         }
 
 
@@ -90,7 +89,7 @@ namespace Coop.Tests.Server.Connections.States
             messageBroker.Publish(this, new PlayerTransitionMission(_playerId));
             messageBroker.Publish(this, new PlayerTransitionCampaign(_playerId));
 
-            Assert.IsType<CampaignState>(clientStateOrchestrator.PlayerConnectionStates.ConnectionStates.Single().Value.State);
+            Assert.IsType<CampaignState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
         }
     }
 }

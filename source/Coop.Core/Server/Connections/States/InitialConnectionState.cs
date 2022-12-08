@@ -4,14 +4,14 @@ namespace Coop.Core.Server.Connections.States
 {
     public class InitialConnectionState : ConnectionStateBase
     {
-        public InitialConnectionState(IConnectionLogic connectionLogic, IMessageBroker messageBroker) 
-            : base(connectionLogic, messageBroker)
+        public InitialConnectionState(IConnectionLogic connectionLogic) 
+            : base(connectionLogic)
         {
         }
 
         public override void ResolveCharacter()
         {
-            ConnectionLogic.State = new ResolveCharacterState(ConnectionLogic, MessageBroker);
+            ConnectionLogic.State = new ResolveCharacterState(ConnectionLogic);
         }
 
         public override void CreateCharacter()

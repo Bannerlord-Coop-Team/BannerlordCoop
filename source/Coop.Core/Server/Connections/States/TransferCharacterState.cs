@@ -1,10 +1,9 @@
-﻿using Common.Messaging;
-
-namespace Coop.Core.Server.Connections.States
+﻿namespace Coop.Core.Server.Connections.States
 {
     public class TransferCharacterState : ConnectionStateBase
     {
-        public TransferCharacterState(IConnectionLogic connectionLogic, IMessageBroker messageBroker) : base(connectionLogic, messageBroker)
+        public TransferCharacterState(IConnectionLogic connectionLogic) 
+            : base(connectionLogic)
         {
         }
 
@@ -22,7 +21,7 @@ namespace Coop.Core.Server.Connections.States
 
         public override void Load()
         {
-            ConnectionLogic.State = new LoadingState(ConnectionLogic, MessageBroker);
+            ConnectionLogic.State = new LoadingState(ConnectionLogic);
         }
 
         public override void ResolveCharacter()

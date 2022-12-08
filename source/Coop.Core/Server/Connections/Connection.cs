@@ -1,4 +1,5 @@
-﻿using Coop.Core.Server.Connections.States;
+﻿using Common.Messaging;
+using Coop.Core.Server.Connections.States;
 using LiteNetLib;
 using System;
 
@@ -15,7 +16,7 @@ namespace Coop.Core.Server.Connections
         public Connection(NetPeer peer)
         {
             Peer = peer;
-            //State = new InitialConnectionState(this);
+            State = new InitialConnectionState(new ConnectionLogic());
         }
 
         public void Dispose()

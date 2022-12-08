@@ -10,13 +10,13 @@ namespace Coop.Tests.Server.Connections.States
 
         public CampaignStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic(messageBroker);
+            _connectionLogic = new ConnectionLogic();
         }
 
         [Fact]
         public void EnterMissionMethod_TransitionState_MissionState()
         {
-            _connectionLogic.State = new CampaignState(_connectionLogic, messageBroker);
+            _connectionLogic.State = new CampaignState(_connectionLogic);
 
             _connectionLogic.EnterMission();
 
@@ -26,7 +26,7 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            _connectionLogic.State = new CampaignState(_connectionLogic, messageBroker);
+            _connectionLogic.State = new CampaignState(_connectionLogic);
 
             _connectionLogic.ResolveCharacter();
             _connectionLogic.CreateCharacter();

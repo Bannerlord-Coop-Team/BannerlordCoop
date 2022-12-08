@@ -10,13 +10,13 @@ namespace Coop.Tests.Server.Connections.States
 
         public InitialConnectionStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic(messageBroker);
+            _connectionLogic = new ConnectionLogic();
         }
 
         [Fact]
         public void ResolveCharacterMethod_TransitionState_JoiningState()
         {
-            _connectionLogic.State = new InitialConnectionState(_connectionLogic, messageBroker);
+            _connectionLogic.State = new InitialConnectionState(_connectionLogic);
 
             _connectionLogic.ResolveCharacter();
 
@@ -26,7 +26,7 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            _connectionLogic.State = new InitialConnectionState(_connectionLogic, messageBroker);
+            _connectionLogic.State = new InitialConnectionState(_connectionLogic);
 
             _connectionLogic.Load();
             _connectionLogic.CreateCharacter();

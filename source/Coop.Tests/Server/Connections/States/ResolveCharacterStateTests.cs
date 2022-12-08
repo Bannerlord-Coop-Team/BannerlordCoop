@@ -11,13 +11,23 @@ namespace Coop.Tests.Server.Connections.States
 
         public ResolveCharacterStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic(messageBroker);
+            _connectionLogic = new ConnectionLogic();
+        }
+
+        [Fact]
+        public void CreateCharacter_TransitionState_CreateCharacterState()
+        {
+            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
+
+            _connectionLogic.CreateCharacter();
+
+            Assert.IsType<CreateCharacterState>(_connectionLogic.State);
         }
 
         [Fact]
         public void LoadMethod_TransitionState_LoadingState()
         {
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic, messageBroker);
+            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
 
             _connectionLogic.Load();
 
@@ -27,7 +37,7 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic, messageBroker);
+            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
 
             _connectionLogic.ResolveCharacter();
             _connectionLogic.TransferCharacter();

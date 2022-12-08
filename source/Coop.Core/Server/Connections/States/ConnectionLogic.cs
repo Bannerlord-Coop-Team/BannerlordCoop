@@ -13,9 +13,9 @@ namespace Coop.Core.Server.Connections.States
         public ILogger Logger { get; }
         public IConnectionState State { get; set; }
 
-        public ConnectionLogic(IMessageBroker messageBroker)
+        public ConnectionLogic()
         {
-            State = new InitialConnectionState(this, messageBroker);
+            State = new InitialConnectionState(this);
         }
 
         public void ResolveCharacter()
