@@ -17,21 +17,11 @@ namespace GameInterface.Serialization.Impl
         }
         public override void Pack()
         {
-            //templateId = Object.StringId;
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            templateId = Object.StringId;
         }
         protected override void UnpackInternal()
         {
-            //Object = MBObjectManager.Instance.GetObject<CraftingTemplate>(templateId);
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            Object = MBObjectManager.Instance.GetObject<CraftingTemplate>(templateId);
         }
     }
 }

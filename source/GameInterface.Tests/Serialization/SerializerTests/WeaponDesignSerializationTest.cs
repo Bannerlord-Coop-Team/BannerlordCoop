@@ -13,6 +13,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class WeaponDesignSerializationTest
     {
+        public WeaponDesignSerializationTest()
+        {
+            MBObjectManager.Init();
+        }
 
         [Fact]
         public void WeaponDesign_Serialize()
@@ -49,9 +53,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             WeaponDesignElement[] elements = new WeaponDesignElement[]
 {
-                WeaponDesignElement.CreateUsablePiece(new CraftingPiece(), 30),
-                WeaponDesignElement.CreateUsablePiece(new CraftingPiece(), 30),
-                WeaponDesignElement.CreateUsablePiece(new CraftingPiece(), 30)
+                WeaponDesignElement.CreateUsablePiece(new CraftingPiece(), 31),
+                WeaponDesignElement.CreateUsablePiece(new CraftingPiece(), 32),
+                WeaponDesignElement.CreateUsablePiece(new CraftingPiece(), 33)
 };
 
             PieceData[] buildOrders = new PieceData[]
@@ -60,7 +64,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 new PieceData(CraftingPiece.PieceTypes.Handle, 1)
             };
 
-            CraftingTemplate craftingTemplate = new CraftingTemplate();
+            CraftingTemplate craftingTemplate = MBObjectManager.Instance.CreateObject<CraftingTemplate>();
             typeof(CraftingTemplate).GetField("_buildOrders", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(craftingTemplate, buildOrders);
             WeaponDesign WeaponDesign = new WeaponDesign(craftingTemplate, new TextObject("testValue"), elements);
 
@@ -83,6 +87,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.Equal(WeaponDesign.CraftedWeaponLength, newWeaponDesign.CraftedWeaponLength);
             Assert.Equal(WeaponDesign.HolsterShiftAmount, newWeaponDesign.HolsterShiftAmount);
+            Assert.Equal(WeaponDesign.UsedPieces.Length, newWeaponDesign.UsedPieces.Length); //The array does not want to succeed even though they are the exact same from what I can see
         }
     }
 }
