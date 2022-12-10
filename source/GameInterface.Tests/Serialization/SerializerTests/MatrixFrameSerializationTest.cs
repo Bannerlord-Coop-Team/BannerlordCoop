@@ -52,7 +52,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MatrixFrame newMatrixFrame = returnedPackage.Unpack<MatrixFrame>();
 
-            Assert.True(matrixFrame.Equals(newMatrixFrame));
+            Assert.Equal(matrixFrame, newMatrixFrame);
             Assert.Equal(matrixFrame.origin, newMatrixFrame.origin);
             Assert.Equal(matrixFrame.rotation, newMatrixFrame.rotation);
 

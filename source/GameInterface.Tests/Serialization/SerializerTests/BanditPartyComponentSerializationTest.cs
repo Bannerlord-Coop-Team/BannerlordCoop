@@ -46,9 +46,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hideout hideout = new Hideout();
             allhideouts.Add(hideout);
             Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
+            
             BanditPartyComponent item = (BanditPartyComponent)FormatterServices.GetUninitializedObject(typeof(BanditPartyComponent));
             BanditPartyComponent_Hideout.SetValue(item, hideout);
             BanditPartyComponent_IsBossParty.SetValue(item, true);
+
             BinaryPackageFactory factory = new BinaryPackageFactory();
             BanditPartyComponentBinaryPackage package = new BanditPartyComponentBinaryPackage(item, factory);
 
@@ -69,6 +71,5 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(item.IsBossParty, newBanditPartyComponent.IsBossParty);
             Assert.NotNull(newBanditPartyComponent.Hideout);
         }
-
     }
 }

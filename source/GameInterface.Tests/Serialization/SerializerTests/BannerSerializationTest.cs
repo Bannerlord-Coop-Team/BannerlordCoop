@@ -45,9 +45,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Banner newBanner = returnedPackage.Unpack<Banner>();
 
-            foreach (var data in testBanner.BannerDataList.Zip(newBanner.BannerDataList, (a, b) => new { a, b }))
+            foreach (var data in testBanner.BannerDataList.Zip(newBanner.BannerDataList, (bannerData, newBannerData) => new { bannerData, newBannerData }))
             {
-                Assert.Equal(data.a, data.b);
+                Assert.Equal(data.bannerData, data.newBannerData);
             }
         }
     }

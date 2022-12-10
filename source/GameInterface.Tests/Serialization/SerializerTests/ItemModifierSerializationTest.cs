@@ -1,16 +1,8 @@
 ﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
-using System.Linq;
-using TaleWorlds.Core;
-using Xunit;
-
-using GameInterface.Serialization;
-using GameInterface.Serialization.Impl;
-using System.Linq;
-using TaleWorlds.Core;
-using Xunit;
 using System.Reflection;
-using System;
+using TaleWorlds.Core;
+using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -31,6 +23,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
+        static FieldInfo _damage = typeof(ItemModifier).GetField("_damage", BindingFlags.Instance | BindingFlags.NonPublic);
+        static FieldInfo _armor = typeof(ItemModifier).GetField("_armor", BindingFlags.Instance | BindingFlags.NonPublic);
         [Fact]
         public void ItemModifier_Full_Serialization()
         {
@@ -55,11 +49,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemModifier newItemModifier = returnedPackage.Unpack<ItemModifier>();
 
-            Assert.Equal(ItemModifier.GetType().GetField("_damage", BindingFlags.Instance | BindingFlags.NonPublic), 
-                newItemModifier.GetType().GetField("_damage", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.Equal(_damage.GetValue(ItemModifier),
+                         _damage.GetValue(newItemModifier));
 
-            Assert.Equal(ItemModifier.GetType().GetField("_armor", BindingFlags.Instance | BindingFlags.NonPublic),
-                newItemModifier.GetType().GetField("_armor", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.Equal(_armor.GetValue(ItemModifier),
+                         _armor.GetValue(newItemModifier));
         }
     }
 }

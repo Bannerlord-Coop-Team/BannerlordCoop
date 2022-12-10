@@ -1,4 +1,5 @@
-﻿using TaleWorlds.CampaignSystem;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -14,6 +15,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             CharacterObject characterObject = new CharacterObject();
 
             //BinaryFormatterSerializer.Serialize(new CharacterObjectSerializer(characterObject));
+
+            Assert.Fail("To be completed");
         }
     }
 }
