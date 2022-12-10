@@ -302,6 +302,7 @@
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ItemModifierGroupBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\PieceDataBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\MaterialPropertyBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\WeaponDesignBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\VillageBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TownBinaryPackage.cs" />
