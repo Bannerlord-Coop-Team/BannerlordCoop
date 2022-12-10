@@ -304,6 +304,9 @@
     <Compile Include="Serialization\Impl\CharacterObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TroopRosterElementBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TroopRosterBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\ItemModifierGroupBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\PieceDataBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\WeaponDesignBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\VillageBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TownBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\SettlementBinaryPackage.cs" />
