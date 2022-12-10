@@ -1,16 +1,13 @@
 ﻿using Common.Extensions;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
 using static TaleWorlds.Core.HorseComponent;
 
 namespace GameInterface.Serialization.Impl
 {
+    /// <summary>
+    /// Binary package for MaterialProperty
+    /// </summary>
     [Serializable]
     public class MaterialPropertyBinaryPackage : BinaryPackageBase<MaterialProperty>
     {
