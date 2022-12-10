@@ -32,6 +32,7 @@ namespace GameInterface.Serialization.Impl
             }
         }
 
+        private static MethodInfo BuildHashedCode = typeof(WeaponDesign).GetMethod("BuildHashedCode", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
             TypedReference reference = __makeref(Object);
@@ -39,6 +40,8 @@ namespace GameInterface.Serialization.Impl
             {
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
             }
+
+            BuildHashedCode.Invoke(Object, null);
         }
     }
 }
