@@ -17,15 +17,9 @@ namespace GameInterface.Serialization.Impl
         {
         }
 
-        static readonly HashSet<string> excludes = new HashSet<string>
-        {
-            "_cachedHashedCodeInt",
-            "_hashedCode"
-        };
-
         public override void Pack()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
+            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
             {
                 object obj = field.GetValue(Object);
                 StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
@@ -40,8 +34,6 @@ namespace GameInterface.Serialization.Impl
             {
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
             }
-
-            BuildHashedCode.Invoke(Object, null);
         }
     }
 }
