@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -83,17 +84,26 @@ namespace Common.Extensions
         /// <returns>True if fully serializable otherwise False</returns>
         public static bool IsFullySerializable(this Type type)
         {
+            return IsFullySerializableRecursive(type, new HashSet<Type>());
+        }
+
+        private static bool IsFullySerializableRecursive(Type type, HashSet<Type> handledTypes = null)
+        {
             bool result = true;
+
+            if (handledTypes == null) handledTypes = new HashSet<Type>();
+
+            if (handledTypes.Contains(type)) return result;
 
             result &= type.IsSerializable;
 
-            foreach(Type genericType in type.GetGenericArguments())
+            foreach (Type genericType in type.GetGenericArguments())
             {
-                result &= genericType.IsFullySerializable();
+                result &= IsFullySerializableRecursive(genericType);
                 if (result == false) return result;
             }
 
-            if (type.IsArray) result &= IsFullySerializable(type.GetElementType());
+            if (type.IsArray) result &= IsFullySerializableRecursive(type.GetElementType());
 
             return result;
         }

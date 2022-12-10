@@ -15,7 +15,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void SaddleComponent_Serialize()
         {
-
             SaddleComponent saddleComponent = (SaddleComponent)FormatterServices.GetUninitializedObject(typeof(SaddleComponent));
             BinaryPackageFactory factory = new BinaryPackageFactory();
             SaddleComponentBinaryPackage package = new SaddleComponentBinaryPackage(saddleComponent, factory);
@@ -50,9 +49,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             SaddleComponent newSaddleComponent = returnedPackage.Unpack<SaddleComponent>();
 
-            Assert.Equal(saddleComponent.Item?.StringId, newSaddleComponent.Item?.StringId);
+            Assert.Equal(saddleComponent.Item.StringId, newSaddleComponent.Item.StringId);
             Assert.Equal(saddleComponent.ItemModifierGroup, newSaddleComponent.ItemModifierGroup);
-
         }
     }
 }

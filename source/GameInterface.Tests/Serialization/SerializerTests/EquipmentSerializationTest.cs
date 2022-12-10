@@ -28,12 +28,14 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.NotEmpty(bytes);
         }
+
         private static readonly FieldInfo _equipmentType = typeof(Equipment).GetField("_equipmentType", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         [Fact]
         public void Equipment_Full_Serialization()
         {
             Equipment equipment = new Equipment();
-            _equipmentType.SetValue(equipment,EquipmentType.Battle);
+            _equipmentType.SetValue(equipment, EquipmentType.Battle);
+
             for (int i = 0; i < 12; i++)
             {
                 equipment[i] = new EquipmentElement();
