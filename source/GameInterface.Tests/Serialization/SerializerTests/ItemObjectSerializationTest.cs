@@ -16,6 +16,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ItemObjectSerializationTest
     {
+        public ItemObjectSerializationTest()
+        {
+            MBObjectManager.Init();
+        }
+
         [Fact]
         public void ItemObject_Serialize()
         {
@@ -34,18 +39,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void ItemObject_Full_Serialization()
         {
-            WeaponComponentData weaponComponentData = new WeaponComponentData(new ItemObject());
+            ItemObject itemObject = MBObjectManager.Instance.CreateObject<ItemObject>();
+
+            WeaponComponentData weaponComponentData = new WeaponComponentData(itemObject);
             weaponComponentData.Init("testName", "Cu", "slicy", new DamageTypes(), new DamageTypes(), 9, 57, 45, 34, 12, 54, 23, 78, 34, "testname", 11, 56, new MatrixFrame(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), new WeaponClass(), 70, 71, 72, 73, 75, new Vec3(1, 2, 3), new WeaponTiers(), 4);
 
-            ItemObject itemObject = new ItemObject("testID");
             itemObject.AddWeapon(weaponComponentData, new ItemModifierGroup());
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
-            ItemObjectBinaryPackage package = new ItemObjectBinaryPackage(itemObject, factory);
 
-            package.Pack();
-
-            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
+            byte[] bytes = BinaryFormatterSerializer.Serialize(factory.GetBinaryPackage(itemObject));
 
             Assert.NotEmpty(bytes);
 
@@ -57,12 +60,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemObject newItemObject = returnedPackage.Unpack<ItemObject>();
 
-            Assert.Equal(package.stringId, returnedPackage.stringId);
-            Assert.Equal(itemObject.Name , newItemObject.Name);
-            Assert.Equal(itemObject.MultiMeshName , newItemObject.MultiMeshName);
-            Assert.Equal(itemObject.Value , newItemObject.Value);
-            Assert.Equal(itemObject.BodyName , newItemObject.BodyName);
-
+            Assert.Equal(itemObject.Name, newItemObject.Name);
+            Assert.Equal(itemObject.MultiMeshName, newItemObject.MultiMeshName);
+            Assert.Equal(itemObject.Value, newItemObject.Value);
+            Assert.Equal(itemObject.BodyName, newItemObject.BodyName);
         }
 
         [Fact]
@@ -86,7 +87,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             ItemObjectBinaryPackage returnedPackage = (ItemObjectBinaryPackage)obj;
 
             Assert.Equal(package.stringId, returnedPackage.stringId);
-
         }
     }
 }

@@ -16,6 +16,7 @@ namespace GameInterface.Serialization.Native
                 { typeof(List<>), typeof(EnumerableBinaryPackage) },
 
                 { typeof(Dictionary<,>), typeof(DictionaryBinaryPackage) },
+                { typeof(KeyValuePair<,>), typeof(KeyValuePairBinaryPackage) },
             };
 
             return types;

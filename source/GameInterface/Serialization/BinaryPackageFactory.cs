@@ -71,8 +71,6 @@ namespace GameInterface.Serialization
    
             if (type.IsFullySerializable()) return new PrimitiveBinaryPackage(obj);
 
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(KeyValuePair<,>)) return new KeyValuePairBinaryPackage(obj, this);
-
             ObjectAndType wrappedObj = new ObjectAndType(type, obj);
 
             if (InstantiatedPackages.TryGetValue(wrappedObj, out IBinaryPackage serializer))
@@ -81,7 +79,7 @@ namespace GameInterface.Serialization
             }
 
             IBinaryPackage package = CreateBinaryPackage(obj);
-            Register(obj, package);
+            Register(wrappedObj, package);
 
             package.Pack();
 
@@ -93,19 +91,19 @@ namespace GameInterface.Serialization
             Type objectType = obj.GetType();
 
             objectType = objectType.IsGenericType ? objectType.GetGenericTypeDefinition() : objectType;
-            objectType = objectType.IsArray ? objectType.BaseType : objectType;
-            if (PackagesTypes.TryGetValue(objectType, out Type packageType) == false) throw new Exception(
-                $"No binary package exists for {objectType}");
+            objectType = objectType.IsArray ? typeof(Array) : objectType;
+            if (PackagesTypes.TryGetValue(objectType, out Type packageType) == false)
+            { 
+                throw new Exception($"No binary package exists for {objectType}");
+            }  
 
             return (IBinaryPackage)Activator.CreateInstance(packageType, new object[] { obj, this });
         }
 
-        private void Register(object obj, IBinaryPackage serializer)
+        private void Register(ObjectAndType wrappedObj, IBinaryPackage serializer)
         {
-            ObjectAndType wrappedObj = new ObjectAndType(obj);
-
             if (InstantiatedPackages.ContainsKey(wrappedObj)) throw new DuplicateKeyException(
-                $"{obj} already has a registered serializer.");
+                $"{wrappedObj} already has a registered serializer.");
 
             InstantiatedPackages.Add(wrappedObj, serializer);
         }
@@ -126,6 +124,21 @@ namespace GameInterface.Serialization
         {
             Type = type;
             Object = @object;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is ObjectAndType oat == false) return false;
+
+            if (ReferenceEquals(Object, oat.Object)) return true;
+
+            return Object.Equals(oat.Object) &&
+                   Type == oat.Type;
+        }
+
+        public override int GetHashCode()
+        {
+            return new { Object, Type }.GetHashCode();
         }
     }    
 }

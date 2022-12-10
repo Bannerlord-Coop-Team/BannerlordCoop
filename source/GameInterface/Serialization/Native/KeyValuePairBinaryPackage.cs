@@ -31,8 +31,6 @@ namespace GameInterface.Serialization.Native
 
             if (ObjectType.GetGenericTypeDefinition() != typeof(KeyValuePair<,>)) throw new Exception(
                 $"{ObjectType} is not {typeof(KeyValuePair<,>)}");
-
-            Pack();
         }
 
         public void Pack()
