@@ -130,6 +130,8 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Serialization\DictTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TroopRosterElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TroopRosterSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\VillageSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\TownSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\SettlementSerializerTest.cs" />
