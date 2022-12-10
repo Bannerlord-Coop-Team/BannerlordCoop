@@ -1,8 +1,10 @@
 ﻿using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Security.Policy;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
@@ -17,6 +19,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             MBObjectManager.Init();
             MBObjectManager.Instance.RegisterType<ItemObject>("Item", "Items", 4U, true, false);
+            MBObjectManager.Instance.RegisterType<BannerEffect>("BannerEffect", "BannerEffects", 4U, true, false);
         }
 
         [Fact]
@@ -76,10 +79,20 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BannerComponent newBannerComponent = returnedPackage.Unpack<BannerComponent>();
 
-            foreach (var property in typeof(BannerComponent).GetProperties())
+            HashSet<string> excludes = new HashSet<string>
             {
-                property.SetRandom(BannerComponent);
+                "BannerEffect",
+                "PrimaryWeapon",
+            };
+
+            var properties = typeof(BannerComponent).GetProperties().Where(p => excludes.Contains(p.Name) == false);
+
+            foreach (var property in properties)
+            {
+                Assert.Equal(property.GetValue(BannerComponent), property.GetValue(newBannerComponent));
             }
+
+            Assert.Equal(BannerEffect.GetValue(BannerComponent), BannerEffect.GetValue(newBannerComponent));
         }
     }
 }
