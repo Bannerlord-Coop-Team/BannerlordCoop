@@ -147,5 +147,37 @@ namespace Common.Extensions
 
             return true;
         }
+
+        private static int seed = 9876;
+        private static Random random = new Random(seed);
+        private static Dictionary<Type, Func<object>> RandomTypeMap = new Dictionary<Type, Func<object>>
+        {
+            { typeof(int), () => random.Next() },
+            { typeof(float), () => random.NextDouble() },
+            { typeof(string), () => random.NextDouble().ToString() },
+        };
+
+        public static void SetRandom(this PropertyInfo property, object obj)
+        {
+            if (property.SetMethod == null) return;
+            
+            if (RandomTypeMap.TryGetValue(property.PropertyType, out Func<object> randFn))
+            {
+                property.SetValue(obj, randFn());
+                return;
+            }
+
+            if (property.PropertyType.IsEnum)
+            {
+                property.SetValue(obj, ChooseRandomEnum(property.PropertyType));
+                return;
+            }
+        }
+
+        private static object ChooseRandomEnum(Type type)
+        {
+            Array values = Enum.GetValues(type);
+            return values.GetValue(random.Next(values.Length));
+        }
     }
 }
