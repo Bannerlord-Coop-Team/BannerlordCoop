@@ -1,17 +1,17 @@
 ﻿using Common.Extensions;
 using System;
 using System.Reflection;
-using TaleWorlds.Library;
+using static TaleWorlds.Core.HorseComponent;
 
 namespace GameInterface.Serialization.Impl
 {
     /// <summary>
-    /// Binary package for Mat3
+    /// Binary package for MaterialProperty
     /// </summary>
     [Serializable]
-    public class Mat3BinaryPackage : BinaryPackageBase<Mat3>
+    public class MaterialPropertyBinaryPackage : BinaryPackageBase<MaterialProperty>
     {
-        public Mat3BinaryPackage(Mat3 obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public MaterialPropertyBinaryPackage(MaterialProperty obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

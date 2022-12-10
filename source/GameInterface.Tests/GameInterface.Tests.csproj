@@ -130,6 +130,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Serialization\SerializerTests\ItemModifierGroupSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HorseComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\SkeletonScaleSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PieceDataSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WeaponDesignSerializationTest.cs" />
     <Compile Include="Serialization\DictTest.cs" />
