@@ -5,26 +5,24 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.Impl
 {
+    /// <summary>
+    /// Binary package for TroopRosterElement
+    /// </summary>
     [Serializable]
-    public class ItemModifierBinaryPackage : BinaryPackageBase<ItemModifier>
+    public class TroopRosterElementBinaryPackage : BinaryPackageBase<TroopRosterElement>
     {
-        public ItemModifierBinaryPackage(ItemModifier obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public TroopRosterElementBinaryPackage(TroopRosterElement obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
-        static readonly HashSet<string> excludes = new HashSet<string>
-        {
-            "<Name>k__BackingField"
-        };
-
         public override void Pack()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
+            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
             {
                 object obj = field.GetValue(Object);
                 StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));

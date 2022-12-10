@@ -134,8 +134,11 @@
     <Compile Include="Serialization\SerializerTests\SkeletonScaleSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PieceDataSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WeaponDesignSerializationTest.cs" />
     <Compile Include="Serialization\DictTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TroopRosterElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TroopRosterSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\VillageSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\TownSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\SettlementSerializerTest.cs" />

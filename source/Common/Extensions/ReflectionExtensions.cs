@@ -53,9 +53,30 @@ namespace Common.Extensions
 
             HashSet<string> excludes = new HashSet<string>(excluding);
 
-            FieldInfo[] fields = GetAllFieldsRecursive(type).ToArray();
+            List<FieldInfo> fields = new List<FieldInfo>();
 
-            return fields.Where(f => excludes.Contains(f.Name) == false && f.IsLiteral == false).ToArray();
+            //fields = fields.Where(f => excludes.Contains(f.Name) == false && f.IsLiteral == false).ToArray();
+
+            foreach (var field in GetAllFieldsRecursive(type).ToArray())
+            {
+                if (excludes.Contains(field.Name))
+                {
+                    excludes.Remove(field.Name);
+                }
+                else if(field.IsLiteral == false)
+                {
+                    fields.Add(field);
+                }
+            }
+
+            if (excludes.Count() > 0)
+            {
+                throw new ArgumentException(
+                $"Some excluding values where not present in retrieved fields. " +
+                $"These values where not found {excludes.ValuesToString()}");
+            }
+
+            return fields.ToArray();
         }
 
         private readonly static BindingFlags AllInstanceFields = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy;
@@ -106,6 +127,25 @@ namespace Common.Extensions
             if (type.IsArray) result &= IsFullySerializableRecursive(type.GetElementType());
 
             return result;
+        }
+
+        /// <summary>
+        /// Creates a new delegate with error checking
+        /// </summary>
+        /// <param name="type">Delegate type</param>
+        /// <param name="obj">Instance used to call method</param>
+        /// <param name="method">Method to assign delegate to</param>
+        /// <param name="delegate">Newly created delegate</param>
+        /// <returns>Success status</returns>
+        public static bool TryCreateDelegate(this Type type, object obj, MethodInfo method, out Delegate @delegate)
+        {
+            @delegate = null;
+
+            if (obj == null) return false;
+
+            @delegate = Delegate.CreateDelegate(type, obj, method);
+
+            return true;
         }
     }
 }

@@ -49,6 +49,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.Equal(MaterialProperty.Name, newMaterialProperty.Name);
             Assert.Equal(MaterialProperty.MeshMultiplier, newMaterialProperty.MeshMultiplier);
+            Assert.Equal(MaterialProperty.ToString(), newMaterialProperty.ToString());
         }
     }
 }
