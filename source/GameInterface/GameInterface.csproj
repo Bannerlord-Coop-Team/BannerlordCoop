@@ -300,6 +300,7 @@
     <Compile Include="Serialization\BinaryPackageBase.cs" />
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\BannerComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ArmorComponentSerializationTest.cs" />
     <Compile Include="Serialization\Impl\PartyBaseBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CharacterObjectBinaryPackage.cs" />
