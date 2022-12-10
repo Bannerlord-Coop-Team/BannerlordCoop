@@ -1,7 +1,6 @@
 ﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
-using System.Linq;
-using TaleWorlds.Core;
+using System;
 using Xunit;
 using static TaleWorlds.Core.HorseComponent;
 
@@ -12,7 +11,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void MaterialProperty_Serialize()
         {
-            MaterialProperty MaterialProperty = new MaterialProperty("testValue");
+            MaterialProperty MaterialProperty = new MaterialProperty("mat1");
+            MaterialProperty.MeshMultiplier.Add(new Tuple<uint, float>(1, .5f));
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             MaterialPropertyBinaryPackage package = new MaterialPropertyBinaryPackage(MaterialProperty, factory);
@@ -27,7 +27,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void MaterialProperty_Full_Serialization()
         {
-            MaterialProperty MaterialProperty = new MaterialProperty("testValue");
+            MaterialProperty MaterialProperty = new MaterialProperty("mat1");
+            MaterialProperty.MeshMultiplier.Add(new Tuple<uint, float>(1, .5f));
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             MaterialPropertyBinaryPackage package = new MaterialPropertyBinaryPackage(MaterialProperty, factory);

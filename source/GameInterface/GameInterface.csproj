@@ -301,11 +301,16 @@
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\Mat3BinaryPackage - Copy.cs" />
+    <Compile Include="Serialization\Impl\BannerComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\ArmorComponentSerializationTest.cs" />
     <Compile Include="Serialization\Impl\PartyBaseBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CharacterObjectBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TroopRosterElementBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\TroopRosterBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ItemModifierGroupBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\MaterialPropertyBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\SkeletonScaleBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\HorseComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\PieceDataBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\MaterialPropertyBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\WeaponDesignBinaryPackage.cs" />

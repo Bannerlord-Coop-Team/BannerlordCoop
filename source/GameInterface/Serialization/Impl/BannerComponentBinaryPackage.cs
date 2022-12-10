@@ -1,17 +1,17 @@
 ﻿using Common.Extensions;
 using System;
 using System.Reflection;
-using TaleWorlds.Library;
+using TaleWorlds.Core;
 
 namespace GameInterface.Serialization.Impl
 {
     /// <summary>
-    /// Binary package for Mat3
+    /// Binary package for BannerComponent
     /// </summary>
     [Serializable]
-    public class Mat3BinaryPackage : BinaryPackageBase<Mat3>
+    public class BannerComponentBinaryPackage : BinaryPackageBase<BannerComponent>
     {
-        public Mat3BinaryPackage(Mat3 obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public BannerComponentBinaryPackage(BannerComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
