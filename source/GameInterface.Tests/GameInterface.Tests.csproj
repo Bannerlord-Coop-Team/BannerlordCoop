@@ -131,6 +131,7 @@
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Serialization\SerializerTests\ItemModifierGroupSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PieceDataSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WeaponDesignSerializationTest.cs" />
     <Compile Include="Serialization\DictTest.cs" />
     <Compile Include="Serialization\SerializerTests\TroopRosterElementSerializationTest.cs" />
