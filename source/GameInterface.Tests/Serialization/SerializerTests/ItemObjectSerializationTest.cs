@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
@@ -19,6 +20,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public ItemObjectSerializationTest()
         {
             MBObjectManager.Init();
+            MBObjectManager.Instance.RegisterType<ItemObject>("ItemObject", "ItemObjects", 4U, true, false);
         }
 
         [Fact]
@@ -39,7 +41,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void ItemObject_Full_Serialization()
         {
-            ItemObject itemObject = MBObjectManager.Instance.CreateObject<ItemObject>();
+            ItemObject itemObject = new ItemObject("myItem");
 
             WeaponComponentData weaponComponentData = new WeaponComponentData(itemObject);
             weaponComponentData.Init("testName", "Cu", "slicy", new DamageTypes(), new DamageTypes(), 9, 57, 45, 34, 12, 54, 23, 78, 34, "testname", 11, 56, new MatrixFrame(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), new WeaponClass(), 70, 71, 72, 73, 75, new Vec3(1, 2, 3), new WeaponTiers(), 4);
@@ -69,7 +71,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void ItemObject_Full_Serialization_Def()
         {
-            ItemObject itemObject = new ItemObject();
+            ItemObject itemObject = MBObjectManager.Instance.CreateObject<ItemObject>();
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             ItemObjectBinaryPackage package = new ItemObjectBinaryPackage(itemObject, factory);
@@ -86,7 +88,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemObjectBinaryPackage returnedPackage = (ItemObjectBinaryPackage)obj;
 
-            Assert.Equal(package.stringId, returnedPackage.stringId);
+            ItemObject newItemObject = returnedPackage.Unpack<ItemObject>();
+
+            Assert.Same(itemObject, newItemObject);
         }
     }
 }
