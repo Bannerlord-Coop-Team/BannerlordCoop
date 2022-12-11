@@ -137,6 +137,7 @@
     <Compile Include="Serialization\SerializerTests\BannerComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ArmorComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\HorseComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CaravanPartyComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\SkeletonScaleSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PieceDataSerializationTest.cs" />
