@@ -7,11 +7,17 @@ using Common.Extensions;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using System.Collections.Generic;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CharacterTraitsSerializationTest
     {
+        public CharacterTraitsSerializationTest()
+        {
+            MBObjectManager.Init();
+            MBObjectManager.Instance.RegisterType<PerkObject>("TraitObject", "TraitObjects", 4U, true, false);
+        }
         [Fact]
         public void CharacterTraits_Serialize()
         {
@@ -33,10 +39,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             CharacterTraits characterTraits = new CharacterTraits();
 
+            TraitObject trait1 = new TraitObject("Trait1");
+            TraitObject trait2 = new TraitObject("Trait2");
+
+            MBObjectManager.Instance.RegisterObject(trait1);
+            MBObjectManager.Instance.RegisterObject(trait2);
+
             Dictionary<TraitObject, int> traits = new Dictionary<TraitObject, int>
             {
-                { new TraitObject("Trait1"), 3 },
-                { new TraitObject("Trait2"), 7 },
+                { trait1, 3 },
+                { trait2, 7 },
             };
             _attributes.SetValue(characterTraits, traits);
 

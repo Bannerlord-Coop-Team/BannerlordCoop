@@ -47,9 +47,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             PerkObject perk2 = new PerkObject("MyPerk2");
             PerkObject perk3 = new PerkObject("MyPerk3");
 
-            MBObjectManager.Instance.RegisterObject<PerkObject>(perk1);
-            MBObjectManager.Instance.RegisterObject<PerkObject>(perk2);
-            MBObjectManager.Instance.RegisterObject<PerkObject>(perk3);
+            MBObjectManager.Instance.RegisterObject(perk1);
+            MBObjectManager.Instance.RegisterObject(perk2);
+            MBObjectManager.Instance.RegisterObject(perk3);
 
             Dictionary<PerkObject, int> perks = new Dictionary<PerkObject, int>
             {
