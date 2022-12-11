@@ -5,12 +5,19 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CharacterSkillsSerializationTest
     {
+        public CharacterSkillsSerializationTest()
+        {
+            MBObjectManager.Init();
+            MBObjectManager.Instance.RegisterType<SkillObject>("SkillObject", "SkillObjects", 4U, true, false);
+        }
+
         [Fact]
         public void CharacterSkills_Serialize()
         {
@@ -32,10 +39,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             CharacterSkills CharacterSkills = new CharacterSkills();
 
+            SkillObject skill1 = new SkillObject("MySkill1");
+            SkillObject skill2 = new SkillObject("MySkill2");
+
+            MBObjectManager.Instance.RegisterObject(skill1);
+            MBObjectManager.Instance.RegisterObject(skill2);
+
             Dictionary<SkillObject, int> skills = new Dictionary<SkillObject, int>
             {
-                { new SkillObject("MySkill"), 5 },
-                { new SkillObject("MySkill2"), 6 },
+                { skill1, 5 },
+                { skill2, 6 },
             };
 
             _attributes.SetValue(CharacterSkills, skills);
