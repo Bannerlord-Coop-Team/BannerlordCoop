@@ -25,7 +25,7 @@ namespace GameInterface.Serialization.Impl
 
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<PerkObject>(StringId);
+            MBObjectManager.Instance?.GetObject<PerkObject>(StringId);
         }
     }
 }
