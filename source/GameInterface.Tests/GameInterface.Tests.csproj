@@ -110,6 +110,9 @@
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.Launcher.Library">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Launcher.Library.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.ObjectSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
     </Reference>
@@ -130,6 +133,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Serialization\SerializerTests\ItemModifierGroupSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\LordPartyComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ArmorComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\HorseComponentSerializationTest.cs" />
