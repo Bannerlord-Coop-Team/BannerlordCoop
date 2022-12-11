@@ -13,7 +13,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CharacterPerksSerializationTest
     {
-
+        public CharacterPerksSerializationTest()
+        {
+            MBObjectManager.Init();
+            MBObjectManager.Instance.RegisterType<PerkObject>("PerkObject", "PerkObjects", 4U, true, false);
+        }
         [Fact]
         public void CharacterPerks_Serialize()
         {
@@ -33,18 +37,25 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void CharacterPerks_Full_Serialization()
         {
-            CharacterPerks CharacterPerks = new CharacterPerks();
+            CharacterPerks characterPerks = new CharacterPerks();
+
+            characterPerks.StringId = "myCharacterPerks";
+
+            MBObjectManager.Instance.RegisterObject(characterPerks);
 
             Dictionary<PerkObject, int> perks = new Dictionary<PerkObject, int>
             {
                 { new PerkObject("MyPerk"), 5 },
                 { new PerkObject("MyPerk2"), 6 },
+                { new PerkObject("MyPerk3"), 7 },
+                { new PerkObject("MyPerk4"), 11 }
+
             };
 
-            _attributes.SetValue(CharacterPerks, perks);
+            _attributes.SetValue(characterPerks, perks);
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
-            CharacterPerksBinaryPackage package = new CharacterPerksBinaryPackage(CharacterPerks, factory);
+            CharacterPerksBinaryPackage package = new CharacterPerksBinaryPackage(characterPerks, factory);
 
             package.Pack();
 
@@ -60,9 +71,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CharacterPerks newCharacterPerks = returnedPackage.Unpack<CharacterPerks>();
 
-            Assert.Equal(CharacterPerks.StringId, CharacterPerks.StringId);
-            Assert.Equal(CharacterPerks.Id, CharacterPerks.Id);
-            Assert.Equal(CharacterPerks.IsReady, newCharacterPerks.IsReady);
+            Assert.Equal(characterPerks.StringId, characterPerks.StringId);
+            Assert.Equal(characterPerks.Id, characterPerks.Id);
+            Assert.Equal(characterPerks.IsReady, newCharacterPerks.IsReady);
 
             Dictionary<PerkObject, int> newPerks = (Dictionary<PerkObject, int>)_attributes.GetValue(newCharacterPerks);
 
