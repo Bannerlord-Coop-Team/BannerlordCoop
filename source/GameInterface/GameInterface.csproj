@@ -303,6 +303,7 @@
     <Compile Include="Serialization\Impl\LordPartyComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BannerComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ArmorComponentSerializationTest.cs" />
+    <Compile Include="Serialization\Impl\HeroDeveloperBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\MobilePartyBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\PartyAIBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CaravanPartyComponentBinaryPackage.cs" />
