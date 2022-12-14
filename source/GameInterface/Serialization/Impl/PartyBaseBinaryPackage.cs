@@ -1,5 +1,9 @@
-﻿using System;
+﻿using Common.Extensions;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.Impl
 {
@@ -13,14 +17,35 @@ namespace GameInterface.Serialization.Impl
         {
         }
 
+        private static HashSet<string> excludes = new HashSet<string>
+        {
+            "_lastMemberRosterVersionNo",
+            "_partyMemberSizeLastCheckVersion",
+            "_cachedPartyMemberSizeLimit",
+            "_prisonerSizeLastCheckVersion",
+            "_cachedPrisonerSizeLimit",
+            "_lastNumberOfMenWithHorseVersionNo",
+            "_lastNumberOfMenPerTierVersionNo",
+            "_cachedTotalStrength",
+            "_visual",
+        };
+
         public override void Pack()
         {
-            // TODO implement
+            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
+            {
+                object obj = field.GetValue(Object);
+                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
+            }
         }
 
         protected override void UnpackInternal()
         {
-            // TODO implement
+            TypedReference reference = __makeref(Object);
+            foreach (FieldInfo field in StoredFields.Keys)
+            {
+                field.SetValueDirect(reference, StoredFields[field].Unpack());
+            }
         }
     }
 }
