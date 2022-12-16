@@ -1,12 +1,19 @@
 ﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
+using System.Reflection;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CharacterAttributeSerializationTest
     {
+        public CharacterAttributeSerializationTest()
+        {
+            GameBootStrap.Initialize();
+        }
+
         [Fact]
         public void CharacterAttribute_Serialize()
         {
@@ -25,10 +32,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void CharacterAttribute_Full_Serialization()
         {
-            CharacterAttribute testCharacterAttribute = new CharacterAttribute("test");
+            CharacterAttribute characterAttribute = new CharacterAttribute("test");
+
+            MBObjectManager.Instance.RegisterObject(characterAttribute);
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
-            CharacterAttributeBinaryPackage package = new CharacterAttributeBinaryPackage(testCharacterAttribute, factory);
+            CharacterAttributeBinaryPackage package = new CharacterAttributeBinaryPackage(characterAttribute, factory);
 
             package.Pack();
 
@@ -42,7 +51,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CharacterAttributeBinaryPackage returnedPackage = (CharacterAttributeBinaryPackage)obj;
 
-            Assert.Equal(returnedPackage.StringId, package.StringId);
+            CharacterAttribute newCharacterAttribute = returnedPackage.Unpack<CharacterAttribute>();
+
+            Assert.Same(characterAttribute, newCharacterAttribute);
         }
     }
 }
