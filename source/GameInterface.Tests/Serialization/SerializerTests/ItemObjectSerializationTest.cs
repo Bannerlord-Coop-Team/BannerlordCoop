@@ -19,8 +19,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public ItemObjectSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<ItemObject>("ItemObject", "ItemObjects", 4U, true, false);
+            GameBootStrap.Initialize();
         }
 
         [Fact]

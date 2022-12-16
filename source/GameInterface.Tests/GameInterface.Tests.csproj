@@ -132,6 +132,7 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Serialization\MBObjectManagerBootStrap.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterPerksSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ItemModifierGroupSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\LordPartyComponentSerializationTest.cs" />
@@ -139,6 +140,7 @@
     <Compile Include="Serialization\SerializerTests\ArmorComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\HorseComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterAttributeSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PartyBaseSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WorkshopSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\HeroDeveloperSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PartyAISerializationTest.cs" />

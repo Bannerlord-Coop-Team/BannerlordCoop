@@ -15,7 +15,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public WeaponDesignSerializationTest()
         {
-            MBObjectManager.Init();
+            GameBootStrap.Initialize();
         }
 
         [Fact]

@@ -14,7 +14,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public HorseComponentSerializationTest()
         {
-            MBObjectManager.Init();
+            GameBootStrap.Initialize();
         }
 
         [Fact]

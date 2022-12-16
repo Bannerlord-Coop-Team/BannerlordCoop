@@ -14,8 +14,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public PartyAISerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<MobileParty>("MobileParty", "MobilePartys", 5U, true, false);
+            GameBootStrap.Initialize();
         }
         
         [Fact]

@@ -16,7 +16,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public EquipmentElementSerializationTest()
         {
-            MBObjectManager.Init();
+            GameBootStrap.Initialize();
         }
 
         [Fact]
