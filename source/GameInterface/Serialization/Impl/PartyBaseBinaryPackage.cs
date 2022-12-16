@@ -46,6 +46,8 @@ namespace GameInterface.Serialization.Impl
             {
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
             }
+            
+            Campaign.Current?.VisualCreator?.CreatePartyVisual();
         }
     }
 }
