@@ -42,15 +42,22 @@ namespace GameInterface.Tests.Serialization
             if (MBObjectManager.Instance != null) return;
 
             MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<ItemObject>("Item", "Items", 4U, true, false);
-            MBObjectManager.Instance.RegisterType<Settlement>("Settlement", "Settlements", 4U, true, false);
-            MBObjectManager.Instance.RegisterType<Hero>("Hero", "Heros", 5U, true, false);
-            MBObjectManager.Instance.RegisterType<MobileParty>("MobileParty", "MobilePartys", 5U, true, false);
-            MBObjectManager.Instance.RegisterType<ItemObject>("ItemObject", "ItemObjects", 4U, true, false);
-            MBObjectManager.Instance.RegisterType<TraitObject>("TraitObject", "TraitObjects", 4U, true, false);
-            MBObjectManager.Instance.RegisterType<SkillObject>("SkillObject", "SkillObjects", 4U, true, false);
-            MBObjectManager.Instance.RegisterType<PerkObject>("PerkObject", "PerkObjects", 4U, true, false);
-            MBObjectManager.Instance.RegisterType<BannerEffect>("BannerEffect", "BannerEffects", 4U, true, false);
+            RegisterType<ItemObject>();
+            RegisterType<Settlement>();
+            RegisterType<Hero>();
+            RegisterType<MobileParty>();
+            RegisterType<ItemObject>();
+            RegisterType<TraitObject>();
+            RegisterType<SkillObject>();
+            RegisterType<PerkObject>();
+            RegisterType<BannerEffect>();
+            RegisterType<CharacterAttribute>();
+        }
+
+        private static uint itemCounter = 0;
+        private static void RegisterType<T>() where T : MBObjectBase
+        {
+            MBObjectManager.Instance.RegisterType<T>($"{typeof(T).Name}", $"{typeof(T).Name}s", itemCounter++, true, false);
         }
     }
 }
