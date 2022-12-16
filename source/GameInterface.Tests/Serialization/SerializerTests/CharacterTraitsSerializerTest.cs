@@ -15,8 +15,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public CharacterTraitsSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<TraitObject>("TraitObject", "TraitObjects", 4U, true, false);
+            GameBootStrap.Initialize();
         }
         [Fact]
         public void CharacterTraits_Serialize()

@@ -15,9 +15,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public CharacterPerksSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<PerkObject>("PerkObject", "PerkObjects", 4U, true, false);
+            GameBootStrap.Initialize();
         }
+
         [Fact]
         public void CharacterPerks_Serialize()
         {

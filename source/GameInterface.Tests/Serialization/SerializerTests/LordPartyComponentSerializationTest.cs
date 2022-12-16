@@ -20,8 +20,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public LordPartyComponentSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<Hero>("Hero", "Heros", 4U, true, false);
+            GameBootStrap.Initialize();
         }
 
         [Fact]

@@ -18,8 +18,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public HeroDeveloperSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<Hero>("Hero", "Heros", 5U, true, false);
+            GameBootStrap.Initialize();
         }
 
         private readonly static FieldInfo _totalXp = typeof(HeroDeveloper).GetField("_totalXp", BindingFlags.NonPublic | BindingFlags.Instance);

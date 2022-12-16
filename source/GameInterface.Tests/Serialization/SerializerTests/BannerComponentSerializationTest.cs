@@ -17,9 +17,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public BannerComponentSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<ItemObject>("Item", "Items", 4U, true, false);
-            MBObjectManager.Instance.RegisterType<BannerEffect>("BannerEffect", "BannerEffects", 4U, true, false);
+            GameBootStrap.Initialize();
         }
 
         [Fact]

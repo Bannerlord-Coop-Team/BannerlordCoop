@@ -17,8 +17,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     public class ItemRosterSerializationTest
     {
         public ItemRosterSerializationTest() 
-        { 
-            MBObjectManager.Init(); 
+        {
+            GameBootStrap.Initialize();
         }
 
         [Fact]

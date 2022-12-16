@@ -19,10 +19,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public WorkshopSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<Settlement>("Settlement", "Settlements", 4U, true, false);
-            MBObjectManager.Instance.RegisterType<Hero>("Hero", "Heros", 5U, true, false);
-            MBObjectManager.Instance.RegisterType<MobileParty>("MobileParty", "MobilePartys", 5U, true, false);
+            GameBootStrap.Initialize();
         }
 
         [Fact]

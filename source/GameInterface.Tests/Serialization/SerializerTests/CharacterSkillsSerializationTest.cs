@@ -14,8 +14,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         public CharacterSkillsSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<SkillObject>("SkillObject", "SkillObjects", 4U, true, false);
+            GameBootStrap.Initialize();
         }
 
         [Fact]

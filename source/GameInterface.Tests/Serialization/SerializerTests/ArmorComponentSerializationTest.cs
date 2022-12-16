@@ -14,13 +14,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ArmorComponentSerializationTest
     {
-        private readonly ITestOutputHelper output;
-
-        public ArmorComponentSerializationTest(ITestOutputHelper output)
+        public ArmorComponentSerializationTest()
         {
-            this.output = output;
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<ItemObject>("Item", "Items", 4U, true, false);
+            GameBootStrap.Initialize();
         }
 
         [Fact]
