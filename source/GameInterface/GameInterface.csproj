@@ -301,6 +301,7 @@
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CommonAreaPartyComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\CharacterAttributeBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\LordPartyComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BannerComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ArmorComponentSerializationTest.cs" />
