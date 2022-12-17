@@ -145,6 +145,7 @@
     <Compile Include="Serialization\SerializerTests\CharacterPerksSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CommonAreaSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ItemModifierGroupSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterObjectSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\KingdomSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\LordPartyComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerComponentSerializationTest.cs" />
@@ -215,7 +216,6 @@
     <Compile Include="Serialization\SerializerTests\BladeDataSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BannerSerializationTest.cs" />
-    <Compile Include="Serialization\SerializerTests\CharacterObjectSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\HeroSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ProofOfConcept\EdgeCaseClasses.cs" />
     <Compile Include="Serialization\SerializerTests\ProofOfConcept\EdgeCaseSerializers.cs" />
