@@ -1,17 +1,10 @@
-﻿using Common.Extensions;
-using GameInterface.Serialization;
+﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
-using System.Diagnostics;
-using System.Linq;
+using GameInterface.Tests.Bootstrap;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -37,6 +30,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
+        private static readonly FieldInfo Army_tickEvent = typeof(Army).GetField("_tickEvent", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo Army_hourlyTickEvent = typeof(Army).GetField("_hourlyTickEvent", BindingFlags.NonPublic | BindingFlags.Instance);
         [Fact]
         public void Army_Full_Serialization()
         {
@@ -68,6 +63,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(armyObject.Cohesion, newArmyObject.Cohesion);
             Assert.Equal(armyObject.ArmyOwner.PassedTimeAtHomeSettlement, newArmyObject.ArmyOwner.PassedTimeAtHomeSettlement);
             Assert.Equal(armyObject.Morale, newArmyObject.Morale);
+            Assert.NotNull(Army_tickEvent.GetValue(newArmyObject));
+            Assert.NotNull(Army_hourlyTickEvent.GetValue(newArmyObject));
         }
     }
 }

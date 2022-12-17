@@ -14,6 +14,8 @@ namespace GameInterface.Serialization.Impl
     [Serializable]
     public class ArmyBinaryPackage : BinaryPackageBase<Army>
     {
+
+        private static readonly MethodInfo AddEventHandlers = typeof(Army).GetMethod("AddEventHandlers", BindingFlags.NonPublic | BindingFlags.Instance);
         public ArmyBinaryPackage(Army obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
@@ -39,6 +41,19 @@ namespace GameInterface.Serialization.Impl
             foreach (FieldInfo field in StoredFields.Keys)
             {
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
+            }
+
+            // Resolves _hourlyTickEvent and _tickEvent
+            AddEventHandlers.Invoke(Object, new object[0]);
+
+            // Resolves _armiesCache for Kingdom
+            if (Object.Kingdom != null)
+            {
+                List<Army> kingdomArmies = (List<Army>)KingdomBinaryPackage.Kingdom_Armies.GetValue(Object.Kingdom);
+                if (kingdomArmies.Contains(Object) == false)
+                {
+                    kingdomArmies.Add(Object);
+                }
             }
         }
     }

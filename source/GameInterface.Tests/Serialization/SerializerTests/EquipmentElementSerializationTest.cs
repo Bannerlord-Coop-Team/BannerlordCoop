@@ -9,6 +9,7 @@ using TaleWorlds.Core;
 using Xunit;
 using TaleWorlds.ObjectSystem;
 using System.Reflection;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
