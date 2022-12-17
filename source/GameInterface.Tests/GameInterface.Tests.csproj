@@ -140,6 +140,7 @@
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Bootstrap\GameBootStrap.cs" />
     <Compile Include="Serialization\SerializerTests\ArmySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterAttributesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CommonAreaPartyComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterPerksSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CommonAreaSerializationTest.cs" />
