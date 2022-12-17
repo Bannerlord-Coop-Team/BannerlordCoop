@@ -140,7 +140,10 @@
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Bootstrap\GameBootStrap.cs" />
     <Compile Include="Serialization\SerializerTests\ArmySerializationTest.cs" />
+    <Compile Include="Serialization\MBObjectManagerBootStrap.cs" />
+    <Compile Include="Serialization\SerializerTests\CommonAreaPartyComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterPerksSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CommonAreaSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ItemModifierGroupSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\KingdomSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\LordPartyComponentSerializationTest.cs" />
@@ -150,6 +153,7 @@
     <Compile Include="Serialization\SerializerTests\PathFaceRecordSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\StanceLinkSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\MobilePartySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterAttributeSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PartyBaseSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WorkshopSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\HeroDeveloperSerializationTest.cs" />
