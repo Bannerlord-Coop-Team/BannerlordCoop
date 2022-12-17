@@ -12,6 +12,9 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Impl
 {
+    /// <summary>
+    /// Binary package for Hero
+    /// </summary>
     [Serializable]
     public class HeroBinaryPackage : BinaryPackageBase<Hero>
     {
