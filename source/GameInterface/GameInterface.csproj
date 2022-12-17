@@ -307,6 +307,7 @@
     <Compile Include="Serialization\Impl\ArmorComponentSerializationTest.cs" />
     <Compile Include="Serialization\Impl\CharacterPerksBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\MobilePartyBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\PathFaceRecordBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\StanceLinkBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\WorkshopTypeBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\WorkshopBinaryPackage.cs" />

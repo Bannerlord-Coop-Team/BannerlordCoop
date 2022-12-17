@@ -45,6 +45,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             MobileParty mobilePartyObject = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
 
+            // Assign non default values to mobile party
             mobilePartyObject.SetCustomName(new TextObject("Custom Name"));
             mobilePartyObject.Aggressiveness = 56;
             mobilePartyObject.IsActive = true;
@@ -55,6 +56,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MobilePartyBinaryPackage.MobileParty_Surgeon.SetValue(mobilePartyObject, surgeon);
 
+            // Setup serialization for mobilePartyObject
             BinaryPackageFactory factory = new BinaryPackageFactory();
             MobilePartyBinaryPackage package = new MobilePartyBinaryPackage(mobilePartyObject, factory);
 
@@ -72,6 +74,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MobileParty newMobilePartyObject = returnedPackage.Unpack<MobileParty>();
 
+            // Verify party values
             Assert.True(mobilePartyObject.Name.Equals(newMobilePartyObject.Name));
             Assert.Equal(mobilePartyObject.Aggressiveness, newMobilePartyObject.Aggressiveness);
             Assert.Equal(mobilePartyObject.IsActive, newMobilePartyObject.IsActive);

@@ -11,7 +11,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Serialization.Impl
 {
     /// <summary>
-    /// Binary package for Kingdom
+    /// Binary package for PathFaceRecord
     /// </summary>
     [Serializable]
     public class PathFaceRecordBinaryPackage : BinaryPackageBase<PathFaceRecord>
