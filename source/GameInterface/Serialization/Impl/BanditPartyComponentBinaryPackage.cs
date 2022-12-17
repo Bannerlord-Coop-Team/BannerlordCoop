@@ -1,7 +1,9 @@
 ﻿using Common.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Serialization.Impl
@@ -33,6 +35,17 @@ namespace GameInterface.Serialization.Impl
             foreach (FieldInfo field in StoredFields.Keys)
             {
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
+            }
+
+            // Resolves _warPartyComponentsCache for Kingdom
+            Kingdom kingdom = Object.Clan.Kingdom;
+            if (kingdom != null)
+            {
+                List<WarPartyComponent> kingdomComponents = (List<WarPartyComponent>)KingdomBinaryPackage.Kingdom_WarPartyComponents.GetValue(kingdom);
+                if (kingdomComponents.Contains(Object) == false)
+                {
+                    kingdomComponents.Add(Object);
+                }
             }
         }
     }

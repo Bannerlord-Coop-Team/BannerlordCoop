@@ -36,7 +36,7 @@ namespace GameInterface.Serialization.Impl
 
         protected override void UnpackInternal()
         {
-            var newObject = MBObjectManager.Instance?.GetObject<ItemObject>(stringId);
+            var newObject = MBObjectManager.Instance.GetObject<ItemObject>(stringId);
 
             if (newObject == null)
             {

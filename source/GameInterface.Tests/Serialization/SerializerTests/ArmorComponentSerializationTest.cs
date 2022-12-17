@@ -1,6 +1,7 @@
 ﻿using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
+using GameInterface.Tests.Bootstrap;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
