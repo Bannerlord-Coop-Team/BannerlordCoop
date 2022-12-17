@@ -11,6 +11,7 @@ using GameInterface.Serialization.Impl;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
