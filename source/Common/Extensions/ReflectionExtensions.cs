@@ -153,7 +153,7 @@ namespace Common.Extensions
         private static Dictionary<Type, Func<object>> RandomTypeMap = new Dictionary<Type, Func<object>>
         {
             { typeof(int), () => random.Next() },
-            { typeof(float), () => random.NextDouble() },
+            { typeof(float), () => (float)random.NextDouble() },
             { typeof(string), () => random.NextDouble().ToString() },
         };
 
