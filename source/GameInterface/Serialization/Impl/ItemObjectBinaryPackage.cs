@@ -36,19 +36,20 @@ namespace GameInterface.Serialization.Impl
 
         protected override void UnpackInternal()
         {
-            var newObject = MBObjectManager.Instance.GetObject<ItemObject>(stringId);
-
-            if (newObject == null)
+            if(stringId != null)
             {
-                TypedReference reference = __makeref(Object);
-                foreach (FieldInfo field in StoredFields.Keys)
+                var newObject = MBObjectManager.Instance.GetObject<ItemObject>(stringId);
+                if(newObject != null)
                 {
-                    field.SetValueDirect(reference, StoredFields[field].Unpack());
+                    Object = newObject;
+                    return;
                 }
             }
-            else
+
+            TypedReference reference = __makeref(Object);
+            foreach (FieldInfo field in StoredFields.Keys)
             {
-                Object = newObject;
+                field.SetValueDirect(reference, StoredFields[field].Unpack());
             }
         }
     }

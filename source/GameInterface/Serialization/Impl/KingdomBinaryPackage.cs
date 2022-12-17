@@ -123,7 +123,7 @@ namespace GameInterface.Serialization.Impl
 
             // Ensure all instances are resolved
             if (values.Any(v => v == null))
-                throw new Exception($"Some clans were not resolved in {values}");
+                throw new Exception($"Some values were not resolved in {values}");
 
             return values;
         }

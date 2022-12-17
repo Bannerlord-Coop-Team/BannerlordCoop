@@ -1,28 +1,24 @@
-﻿using GameInterface.Serialization.Impl;
-using GameInterface.Serialization;
-using TaleWorlds.Core;
-using Xunit;
-using System.Linq;
-using TaleWorlds.CampaignSystem;
-using System.Runtime.Serialization;
+﻿using Castle.Components.DictionaryAdapter.Xml;
 using Common.Extensions;
-using TaleWorlds.ObjectSystem;
-using Xunit.Abstractions;
-using static TaleWorlds.CampaignSystem.Hero;
-using System.ComponentModel;
-using System;
+using GameInterface.Serialization;
+using GameInterface.Serialization.Impl;
+using GameInterface.Tests.Bootstrap;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.Serialization;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Localization;
-using System.Reflection;
-using static TaleWorlds.CampaignSystem.Actions.KillCharacterAction;
-using System.Collections.Generic;
-using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.Library;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
-using TaleWorlds.MountAndBlade;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
+using Xunit;
+using Xunit.Abstractions;
+using static TaleWorlds.CampaignSystem.Hero;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -42,7 +38,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             HeroFactory.RandomHeroWithData heroData = HeroFactory.CreateRandomHero();
             Hero hero = heroData.Hero;
 
-            foreach(FieldInfo field in typeof(Hero).GetAllInstanceFields())
+            foreach(FieldInfo field in typeof(Hero).GetAllInstanceFields(HeroBinaryPackage.Excludes))
             {
                 object value = field.GetValue(hero);
                 if(value == null)
@@ -62,12 +58,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
+        
+
         [Fact]
         public void Hero_Full_Serialization()
         {
+            // Create hero with partially-random values
             HeroFactory.RandomHeroWithData heroData = HeroFactory.CreateRandomHero();
             Hero hero = heroData.Hero;
 
+            // Setup serialization
             BinaryPackageFactory factory = new BinaryPackageFactory();
             HeroBinaryPackage package = new HeroBinaryPackage(hero, factory);
 
@@ -85,19 +85,81 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Hero newHero = returnedPackage.Unpack<Hero>();
 
-            
+            // Verify PropertyOwner types
+            CharacterAttributes newAttribues = (CharacterAttributes)HeroFactory.Hero_characterAttributes.GetValue(newHero);
+            AssertPropertyOwnerEqual(heroData.CharacterAttributes, newAttribues);
+            CharacterPerks newPerks = (CharacterPerks)HeroFactory.Hero_heroPerks.GetValue(newHero);
+            AssertPropertyOwnerEqual(heroData.CharacterPerks, newPerks);
+            CharacterSkills newSkills = (CharacterSkills)HeroFactory.Hero_heroSkills.GetValue(newHero);
+            AssertPropertyOwnerEqual(heroData.CharacterSkills, newSkills);
+            CharacterTraits newTraits = (CharacterTraits)HeroFactory.Hero_heroTraits.GetValue(newHero);
+            AssertPropertyOwnerEqual(heroData.CharacterTraits, newTraits);
 
-            // TODO verify values
-            Assert.Fail("Finish test");
+            // Verify StringId resolvable list types
+            AssertValuesSame(heroData.Children, newHero.Children);
+            AssertValuesSame(heroData.ExSpouses, newHero.ExSpouses);
+            AssertValuesSame(heroData.OwnedCaravans.Select(pc => pc.MobileParty), newHero.OwnedCaravans.Select(pc => pc.MobileParty));
+            AssertValuesSame(heroData.OwnedCommonAreas.Select(pc => pc.MobileParty), newHero.OwnedCommonAreas.Select(pc => pc.MobileParty));
+            AssertValuesSame(heroData.OwnedWorkshops, newHero.OwnedWorkshops);
+            AssertValuesSame(heroData.SpecialItems, newHero.SpecialItems);
+
+            // Verify StringId resolvable types
+            Assert.Same(heroData.Clan, newHero.Clan);
+            Assert.Same(heroData.Culture, newHero.Culture);
+            Assert.Same(heroData.Father, newHero.Father);
+            Assert.Same(heroData.GoverningTown, newHero.GovernorOf);
+            Assert.Same(heroData.HeroParty, newHero.PartyBelongedTo);
+            Assert.Same(heroData.CharacterObject, newHero.CharacterObject);
+            Assert.Same(heroData.HomeSettlement, newHero.HomeSettlement);
+            Assert.Same(heroData.LastSeenSettlement, newHero.LastSeenPlace);
+            Assert.Same(heroData.Mother, newHero.Mother);
+            Assert.Same(heroData.Spouse, newHero.Spouse);
+
+            // Verify data types are equal
+            Assert.Equal(heroData.HeroDeveloper.ToString(), newHero.HeroDeveloper.ToString());
+            Assert.Equal(heroData.StaticBodyProperties, newHero.BodyProperties.StaticProperties);
+            Assert.Equal(heroData.PartyBelongedToAsPrisoner.ToString(), newHero.PartyBelongedToAsPrisoner.ToString());
+            AssertValuesEqual(heroData.VolunteerTypes, newHero.VolunteerTypes);
+        }
+
+        private void AssertValuesEqual<T>(IEnumerable<T> values1, IEnumerable<T> values2)
+        {
+            Assert.Equal(values1.Count(), values2.Count());
+
+            foreach (var vals in values1.Zip(values2, (v1, v2) => (v1, v2)))
+            {
+                Assert.Equal(vals.v1, vals.v2);
+            }
+        }
+
+        private void AssertValuesSame<T>(IEnumerable<T> values1, IEnumerable<T> values2)
+        {
+            Assert.Equal(values1.Count(), values2.Count());
+
+            foreach (var vals in values1.Zip(values2, (v1, v2) => (v1, v2)))
+            {
+                Assert.Same(vals.v1, vals.v2);
+            }
+        }
+
+        private void AssertPropertyOwnerEqual<T>(PropertyOwner<T> owner1, PropertyOwner<T> owner2) where T : MBObjectBase
+        {
+            var _attributes = typeof(PropertyOwner<>).MakeGenericType(typeof(T)).GetField("_attributes", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            Dictionary<T, int> values1 = (Dictionary<T, int>)_attributes.GetValue(owner1);
+            Dictionary<T, int> values2 = (Dictionary<T, int>)_attributes.GetValue(owner2);
+
+            Assert.Equal(values1.Count, values2.Count);
+
+            AssertValuesSame(values1.Keys, values2.Keys);
+            AssertValuesEqual(values1.Values, values2.Values);
         }
 
         [Fact]
-        public void Hero_stringId_Serialization()
+        public void Hero_StringId_Serialization()
         {
             HeroFactory.RandomHeroWithData heroData = HeroFactory.CreateRandomHero();
             Hero hero = heroData.Hero;
-
-            hero.StringId = "My Hero";
             MBObjectManager.Instance.RegisterObject(hero);
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
@@ -121,6 +183,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         }
     }
 
+    /// <summary>
+    /// Factory for creating test heros
+    /// </summary>
     internal class HeroFactory
     {
         public MobileParty HeroParty { get; private set; }
@@ -147,10 +212,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         private static readonly FieldInfo Hero_CaptivityStartTime = typeof(Hero).GetField("<CaptivityStartTime>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_PreferredUpgradeFormation = typeof(Hero).GetField("<PreferredUpgradeFormation>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_heroState = typeof(Hero).GetField("_heroState", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_heroTraits = typeof(Hero).GetField("_heroTraits", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_heroPerks = typeof(Hero).GetField("_heroPerks", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_heroSkills = typeof(Hero).GetField("_heroSkills", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_characterAttributes = typeof(Hero).GetField("_characterAttributes", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        public static readonly FieldInfo Hero_heroTraits = typeof(Hero).GetField("_heroTraits", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        public static readonly FieldInfo Hero_heroPerks = typeof(Hero).GetField("_heroPerks", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        public static readonly FieldInfo Hero_heroSkills = typeof(Hero).GetField("_heroSkills", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        public static readonly FieldInfo Hero_characterAttributes = typeof(Hero).GetField("_characterAttributes", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_IsNobleForOldSaves = typeof(Hero).GetField("IsNobleForOldSaves", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_IsMinorFactionHero = typeof(Hero).GetField("<IsMinorFactionHero>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_LastVisitTimeOfHomeSettlement = typeof(Hero).GetField("LastVisitTimeOfHomeSettlement", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -201,6 +266,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             RandomHeroWithData heroData = new RandomHeroWithData();
 
             Hero hero = heroData.Hero;
+            hero.StringId = "My Hero";
 
             #region ValueData
             Hero_StaticBodyProperties.SetValue(hero, heroData.StaticBodyProperties);
@@ -209,7 +275,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hero_LastTimeStampForActivity.SetRandom(hero);
             Hero_VolunteerTypes.SetValue(hero, heroData.VolunteerTypes);
             Hero_passedTimeAtHomeSettlement.SetRandom(hero);
-            Hero_characterObject.SetValue(hero, (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject)));
+            Hero_characterObject.SetValue(hero, heroData.CharacterObject);
             Hero_firstName.SetValue(hero, new TextObject("My First Name"));
             Hero_name.SetValue(hero, new TextObject("My Name"));
             Hero_EncyclopediaText.SetValue(hero, new TextObject("My EEncyclopedia Text"));
@@ -225,12 +291,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hero_heroTraits.SetValue(hero, heroData.CharacterTraits);
             Hero_heroPerks.SetValue(hero, heroData.CharacterPerks);
             Hero_heroSkills.SetValue(hero, heroData.CharacterSkills);
-            //Hero_characterAttributes.SetValue(hero, heroData.CharacterAttributes);
+            Hero_characterAttributes.SetValue(hero, heroData.CharacterAttributes);
             Hero_IsNobleForOldSaves.SetRandom(hero);
             Hero_IsMinorFactionHero.SetRandom(hero);
             Hero_LastVisitTimeOfHomeSettlement.SetRandom(hero);
             Hero_Level.SetRandom(hero);
-            Hero_companionOf.SetValue(hero, (Clan)FormatterServices.GetUninitializedObject(typeof(Clan)));
+            Hero_companionOf.SetValue(hero, heroData.Clan);
             Hero_Occupation.SetRandom(hero);
             Hero_DeathMark.SetRandom(hero);
             Hero_DeathMarkKillerHero.SetValue(hero, (Hero)FormatterServices.GetUninitializedObject(typeof(Hero)));
@@ -246,7 +312,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hero_supporterOf.SetValue(hero, heroData.Clan);
             Hero_governorOf.SetValue(hero, heroData.GoverningTown);
             Hero_ownedWorkshops.SetValue(hero, heroData.OwnedWorkshops);
-            //Hero_OwnedCommonAreas.SetValue(hero, heroData.OwnedCommonAreas);
+            Hero_OwnedCommonAreas.SetValue(hero, heroData.OwnedCommonAreas);
             Hero_Culture.SetValue(hero, heroData.Culture);
             Hero_OwnedCaravans.SetValue(hero, heroData.OwnedCaravans);
             Hero_partyBelongedTo.SetValue(hero, heroData.HeroParty);
@@ -271,11 +337,15 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             return heroData;
         }
 
+        /// <summary>
+        /// Random Hero data used for verification comparison
+        /// </summary>
         public class RandomHeroWithData
         {
             public Hero Hero { get; }
             public StaticBodyProperties StaticBodyProperties { get; private set; } = new StaticBodyProperties(1, 2, 3, 4, 5, 6, 7, 8);
             public MobileParty HeroParty { get; private set; }
+            public CharacterObject CharacterObject { get; private set; }
             public Settlement HomeSettlement { get; private set; }
             public Settlement LastSeenSettlement { get; private set; }
             public HeroLastSeenInformation LastSeenInformation;
@@ -304,6 +374,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 Hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
 
                 CreateParty();
+                CreateCharacterObject();
                 CreateSettlement();
                 CreateLastSeenInfo();
                 CreateVolunteerTypes();
@@ -318,13 +389,23 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             }
 
             #region CreationMethods
+            static readonly PropertyInfo PartyBase_MobileParty = typeof(PartyBase).GetProperty(nameof(PartyBase.MobileParty));
             private void CreateParty()
             {
                 HeroParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
                 HeroParty.StringId = "My Party";
+                HeroParty.SetCustomName(new TextObject("My Party"));
                 MBObjectManager.Instance.RegisterObject(HeroParty);
 
                 PartyBelongedToAsPrisoner = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
+                PartyBase_MobileParty.SetValue(PartyBelongedToAsPrisoner, HeroParty);
+            }
+            private void CreateCharacterObject()
+            {
+                CharacterObject = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
+                CharacterObject.StringId = "My CharacterObject";
+                CharacterObject_basicName.SetValue(CharacterObject, new TextObject("My CharacterObject"));
+                MBObjectManager.Instance.RegisterObject(CharacterObject);
             }
 
             private void CreateSettlement()
@@ -346,6 +427,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 LastSeenInformation.IsNearbySettlement = true;
             }
 
+            static readonly FieldInfo CharacterObject_basicName = typeof(CharacterObject).GetField("_basicName", BindingFlags.NonPublic | BindingFlags.Instance);
             private void CreateVolunteerTypes()
             {
                 VolunteerTypes = new CharacterObject[]
@@ -354,6 +436,14 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                     (CharacterObject) FormatterServices.GetUninitializedObject(typeof(CharacterObject)),
                     (CharacterObject) FormatterServices.GetUninitializedObject(typeof(CharacterObject)),
                 };
+
+                for (int i = 0; i < VolunteerTypes.Length; i++)
+                {
+                    CharacterObject character = VolunteerTypes[i];
+                    character.StringId = $"Character_{i}";
+                    CharacterObject_basicName.SetValue(character, new TextObject($"Character_{i}"));
+                    MBObjectManager.Instance.RegisterObject(character);
+                }
             }
             
             private void CreateClanCultureTown()
@@ -373,8 +463,19 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             private static readonly FieldInfo Workshop_Settlement = typeof(Workshop).GetField("_settlement", BindingFlags.NonPublic | BindingFlags.Instance);
             private static readonly FieldInfo Workshop_tag = typeof(Workshop).GetField("_tag", BindingFlags.NonPublic | BindingFlags.Instance);
+            private static readonly PropertyInfo Town_Workshops = typeof(Town).GetProperty(nameof(Town.Workshops));
             private void CreateOwnedParties()
             {
+                Town town = (Town)FormatterServices.GetUninitializedObject(typeof(Town));
+
+                // Setup town to be referencable by StringId
+                town.StringId = "myTown";
+
+                MBObjectManager.Instance.RegisterObject(town);
+
+                // Set town of workshop settlement
+                HomeSettlement.Town = town;
+
                 OwnedWorkshops = new List<Workshop>
                 {
                     (Workshop)FormatterServices.GetUninitializedObject(typeof(Workshop)),
@@ -383,8 +484,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                     (Workshop)FormatterServices.GetUninitializedObject(typeof(Workshop)),
                 };
 
+                Town_Workshops.SetValue(town, OwnedWorkshops.ToArray());
+
                 // Workshop requires settlement for GetHashCode
-                foreach(var workshop in OwnedWorkshops)
+                foreach (var workshop in OwnedWorkshops)
                 {
                     Workshop_Settlement.SetValue(workshop, HomeSettlement);
                     Workshop_tag.SetValue(workshop, "My Tag");
@@ -410,6 +513,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                     (ItemObject)FormatterServices.GetUninitializedObject(typeof(ItemObject)),
                     (ItemObject)FormatterServices.GetUninitializedObject(typeof(ItemObject)),
                 };
+
+                for(int i = 0; i < SpecialItems.Count; i++)
+                {
+                    ItemObject item = SpecialItems[i];
+                    item.StringId = $"Item_{i}";
+                    MBObjectManager.Instance.RegisterObject(item);
+                }
             }
 
             private void CreateParents()
