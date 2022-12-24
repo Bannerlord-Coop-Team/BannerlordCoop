@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem;
 using System.Runtime.Serialization;
 using Common.Extensions;
 using System.Reflection;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -32,6 +33,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Clan testClan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
 
+            CampaignTime time = (CampaignTime)FormatterServices.GetUninitializedObject(typeof(CampaignTime));
+
+            testClan.LastFactionChangeTime = time;
+            testClan.AutoRecruitmentExpenses = 68;
+
             BinaryPackageFactory factory = new BinaryPackageFactory();
             ClanBinaryPackage package = new ClanBinaryPackage(testClan, factory);
 
@@ -49,10 +55,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Clan newClan = returnedPackage.Unpack<Clan>();
 
-            foreach(FieldInfo field in typeof(Clan).GetAllInstanceFields())
-            {
-                Assert.Equal(field.GetValue(testClan), field.GetValue(newClan));
-            }
+            Assert.Equal(testClan.AutoRecruitmentExpenses, newClan.AutoRecruitmentExpenses);
+            Assert.Equal(testClan.LastFactionChangeTime, newClan.LastFactionChangeTime);
+
         }
     }
 }

@@ -6,6 +6,9 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.Impl
 {
@@ -15,6 +18,25 @@ namespace GameInterface.Serialization.Impl
         public ClanBinaryPackage(Clan obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
+
+        private static HashSet<string> excludes = new HashSet<string>
+        {
+            "_supporterNotablesCache",
+            "_fiefsCache",
+            "_villagesCache",
+            "_settlementsCache",
+            "_lordsCache",
+            "_heroesCache",
+            "_companionsCache",
+            "_warPartyComponentsCache",
+            "_clanMidSettlement",
+            "_stances",
+            "_distanceToClosestNonAllyFortificationCache",
+            "_distanceToClosestNonAllyFortificationCacheDirty",
+            "TotalStrength",
+            "_midPointCalculated",
+        };
+
         public override void Pack()
         {
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
