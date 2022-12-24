@@ -1,28 +1,26 @@
 ﻿using Common.Extensions;
 using System;
-using System.Reflection;
-using TaleWorlds.Core;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
 using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Serialization.Impl
 {
-    /// <summary>
-    /// Binary package for Kingdom
-    /// </summary>
     [Serializable]
-    public class ExplainedNumberBinaryPackage : BinaryPackageBase<ExplainedNumber>
+    public class CommonAreaPartyComponentBinaryPackage : BinaryPackageBase<CommonAreaPartyComponent>
     {
-        public ExplainedNumberBinaryPackage(ExplainedNumber obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CommonAreaPartyComponentBinaryPackage(CommonAreaPartyComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
+        static readonly HashSet<string> excludes = new HashSet<string>
+        {
+            "_cachedName",
+        };
+
         public override void Pack()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
+            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
             {
                 object obj = field.GetValue(Object);
                 StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
