@@ -30,7 +30,7 @@ namespace GameInterface.Serialization.Impl
             "<Faction2>k__BackingField",
         };
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
             {

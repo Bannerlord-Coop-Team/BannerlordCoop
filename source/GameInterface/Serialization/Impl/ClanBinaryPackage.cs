@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Impl
 {
@@ -24,22 +25,17 @@ namespace GameInterface.Serialization.Impl
         private static HashSet<string> excludes = new HashSet<string>
         {
             "_supporterNotablesCache",
-            "_fiefsCache",
-            "_villagesCache",
-            "_settlementsCache",
             "_lordsCache",
             "_heroesCache",
             "_companionsCache",
             "_warPartyComponentsCache",
             "_clanMidSettlement",
-            "_stances",
             "_distanceToClosestNonAllyFortificationCache",
             "_distanceToClosestNonAllyFortificationCacheDirty",
-            "TotalStrength",
             "_midPointCalculated",
         };
 
-        public override void Pack()
+        protected  override void PackInternal()
         {
             stringId = Object.StringId;
 
@@ -50,6 +46,7 @@ namespace GameInterface.Serialization.Impl
             }
         }
 
+        private static readonly MethodInfo Clan_InitMembers = typeof(Clan).GetMethod("InitMembers", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
             // If the stringId already exists in the object manager use that object
@@ -62,6 +59,8 @@ namespace GameInterface.Serialization.Impl
                     return;
                 }
             }
+
+            Clan_InitMembers.Invoke(Object, new object[0]);
 
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)

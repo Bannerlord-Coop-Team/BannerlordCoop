@@ -21,7 +21,7 @@ namespace GameInterface.Serialization.Impl
         {
         }
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             Town town = Object.Settlement.Town;
             townId = town.StringId;

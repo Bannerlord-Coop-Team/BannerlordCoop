@@ -5,6 +5,7 @@ using GameInterface.Tests.Bootstrap;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
@@ -40,9 +41,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Army armyObject = (Army)FormatterServices.GetUninitializedObject(typeof(Army));
             // Assign non default values to armyObject
-            Hero tempHero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Hero hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
 
-            armyObject.ArmyOwner = tempHero;
+            hero.StringId = "myHero";
+
+            MBObjectManager.Instance.RegisterObject(hero);
+
+            armyObject.ArmyOwner = hero;
             Army_Cohesion.SetRandom(armyObject);
             Army_Morale.SetRandom(armyObject);
 

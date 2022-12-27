@@ -12,7 +12,7 @@ namespace GameInterface.Serialization.Impl
         {
         }
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             Index = Hideout.All.FindIndex(hideout => hideout == Object);
         }

@@ -37,7 +37,7 @@ namespace GameInterface.Serialization.Impl
             "<UpgradeTargets>k__BackingField",
         };
 
-        public override void Pack()
+        protected  override void PackInternal()
         {
             // Store the string identifier of the object in a local variable
             stringId = Object.StringId;
@@ -102,35 +102,13 @@ namespace GameInterface.Serialization.Impl
             }
 
             // Resolve Ids for StringId resolvable objects
-            ResolveId(CharacterObject_battleEquipmentTemplate, battleEquipmentTemplateId);
-            ResolveId(CharacterObject_civilianEquipmentTemplate, civilianEquipmentTemplateId);
-            ResolveId(CharacterObject_originCharacter, originCharacterId);
+            CharacterObject_battleEquipmentTemplate.SetValue(Object, ResolveId<CharacterObject>(battleEquipmentTemplateId));
+            CharacterObject_civilianEquipmentTemplate.SetValue(Object, ResolveId<CharacterObject>(civilianEquipmentTemplateId));
+            CharacterObject_originCharacter.SetValue(Object, ResolveId<CharacterObject>(originCharacterId));
 
             CharacterObject_UpgradeTargets.SetValue(Object, ResolveIds<CharacterObject>(UpgradeTargetIds).ToArray());
         }
 
-        private void ResolveId(FieldInfo field, string id)
-        {
-            // Return if id is null
-            if (id == null) return;
-
-            // Get the character object with the specified id
-            CharacterObject character = MBObjectManager.Instance.GetObject<CharacterObject>(id);
-            // Set the value of the field to the character object
-            field.SetValue(Object, character);
-        }
-
-        private IEnumerable<T> ResolveIds<T>(string[] ids) where T : MBObjectBase
-        {
-            // Convert ids to instances using the MBObjectManager
-            IEnumerable<T> values = ids.Select(id => MBObjectManager.Instance.GetObject<T>(id));
-
-            // If any of the instances are null, throw an exception
-            if (values.Any(v => v == null))
-                throw new Exception($"Some values were not resolved in {values}");
-
-            // Return the resolved instances
-            return values;
-        }
+        
     }
 }

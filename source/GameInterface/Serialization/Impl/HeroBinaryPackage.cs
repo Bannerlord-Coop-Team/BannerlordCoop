@@ -47,7 +47,7 @@ namespace GameInterface.Serialization.Impl
             "_children",
         };
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             stringId = Object.StringId;
 

@@ -73,7 +73,7 @@ namespace GameInterface.Serialization.Impl
 
         };
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             if (Object.Army != null) throw new Exception($"{nameof(Army)} is not handled in {nameof(MobilePartyBinaryPackage)}");
             if (Object.BesiegerCamp != null) throw new Exception($"{nameof(BesiegerCamp)} is not handled in {nameof(MobilePartyBinaryPackage)}");

@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization
 {
@@ -40,7 +41,15 @@ namespace GameInterface.Serialization
             BinaryPackageFactory = binaryPackageFactory;
         }
 
-        public abstract void Pack();
+        protected abstract void PackInternal();
+        protected abstract void UnpackInternal();
+
+
+        public void Pack()
+        {
+            PackInternal();
+        }
+        
         public object Unpack()
         {
             if (IsUnpacked) return Object;
@@ -59,11 +68,31 @@ namespace GameInterface.Serialization
             return (CastType)Unpack();
         }
 
-        protected abstract void UnpackInternal();
-
         protected static T CreateObject()
         {
             return (T)FormatterServices.GetUninitializedObject(typeof(T));
+        }
+
+        protected static OutT ResolveId<OutT>(string id) where OutT : MBObjectBase
+        {
+            // Return if id is null
+            if (id == null) return null;
+
+            // Get the character object with the specified id
+            return MBObjectManager.Instance.GetObject<OutT>(id);
+        }
+
+        protected static IEnumerable<OutT> ResolveIds<OutT>(string[] ids) where OutT : MBObjectBase
+        {
+            // Convert ids to instances using the MBObjectManager
+            IEnumerable<OutT> values = ids.Select(id => ResolveId<OutT>(id));
+
+            // If any of the instances are null, throw an exception
+            if (values.Any(v => v == null))
+                throw new Exception($"Some values were not resolved in {values}");
+
+            // Return the resolved instances
+            return values;
         }
     }
 }
