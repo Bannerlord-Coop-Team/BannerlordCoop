@@ -69,7 +69,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         }
 
         [Fact]
-        public void ItemObject_Full_Serialization_Def()
+        public void ItemObject_StringId_Serialization()
         {
             ItemObject itemObject = MBObjectManager.Instance.CreateObject<ItemObject>();
 

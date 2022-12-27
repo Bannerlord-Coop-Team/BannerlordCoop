@@ -130,6 +130,30 @@ namespace Common.Extensions
         }
 
         /// <summary>
+        /// Castable GetValue Extension
+        /// </summary>
+        /// <typeparam name="T">Value to cast to</typeparam>
+        /// <param name="field">Extended type</param>
+        /// <param name="obj">Object to get value from</param>
+        /// <returns></returns>
+        public static T GetValue<T>(this FieldInfo field, object obj)
+        {
+            return (T)field.GetValue(obj);
+        }
+
+        /// <summary>
+        /// Castable GetValue Extension
+        /// </summary>
+        /// <typeparam name="T">Value to cast to</typeparam>
+        /// <param name="property">Extended type</param>
+        /// <param name="obj">Object to get value from</param>
+        /// <returns></returns>
+        public static T GetValue<T>(this PropertyInfo property, object obj)
+        {
+            return (T)property.GetValue(obj);
+        }
+
+        /// <summary>
         /// Creates a new delegate with error checking
         /// </summary>
         /// <param name="type">Delegate type</param>
@@ -154,24 +178,55 @@ namespace Common.Extensions
         {
             { typeof(int), () => random.Next() },
             { typeof(float), () => (float)random.NextDouble() },
+            { typeof(double), () => random.NextDouble() },
             { typeof(string), () => random.NextDouble().ToString() },
+            { typeof(bool), () => random.Next(2) > 0 ? true : false },
         };
 
+        /// <summary>
+        /// Sets the field of an object to a random type if it is handled
+        /// </summary>
+        /// <param name="field">Field to assign</param>
+        /// <param name="obj">Object to assign</param>
+        public static void SetRandom(this FieldInfo field, object obj)
+        {
+            if (TryChooseRandomType(field.FieldType, out object newObj))
+            {
+                field.SetValue(obj, newObj);
+            }
+        }
+
+        /// <summary>
+        /// Sets the property of an object to a random type if it is handled
+        /// </summary>
+        /// <param name="property">Property to assign</param>
+        /// <param name="obj">Object to assign</param>
         public static void SetRandom(this PropertyInfo property, object obj)
         {
             if (property.SetMethod == null) return;
-            
-            if (RandomTypeMap.TryGetValue(property.PropertyType, out Func<object> randFn))
+
+            if(TryChooseRandomType(property.PropertyType, out object newObj))
             {
-                property.SetValue(obj, randFn());
-                return;
+                property.SetValue(obj, newObj);
+            }
+        }
+
+        private static bool TryChooseRandomType(Type type, out object obj)
+        {
+            if (RandomTypeMap.TryGetValue(type, out Func<object> randFn))
+            {
+                obj = randFn();
+                return true;
             }
 
-            if (property.PropertyType.IsEnum)
+            if (type.IsEnum)
             {
-                property.SetValue(obj, ChooseRandomEnum(property.PropertyType));
-                return;
+                obj = ChooseRandomEnum(type);
+                return true;
             }
+
+            obj = null;
+            return false;
         }
 
         private static object ChooseRandomEnum(Type type)

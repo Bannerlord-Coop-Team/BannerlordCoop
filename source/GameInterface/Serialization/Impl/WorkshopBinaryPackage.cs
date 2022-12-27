@@ -1,8 +1,10 @@
 ﻿using Common.Extensions;
 using System;
 using System.Reflection;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Impl
 {
@@ -12,26 +14,27 @@ namespace GameInterface.Serialization.Impl
     [Serializable]
     public class WorkshopBinaryPackage : BinaryPackageBase<Workshop>
     {
+        string townId;
+        int workshopIndex;
+
         public WorkshopBinaryPackage(Workshop obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
         public override void Pack()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            Town town = Object.Settlement.Town;
+            townId = town.StringId;
+            if (townId == null) throw new Exception("Town does not have required StringId");
+
+            workshopIndex = town.Workshops.FindIndex(w => w == Object);
         }
 
         protected override void UnpackInternal()
         {
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            Town town = MBObjectManager.Instance.GetObject<Town>(townId);
+
+            Object = town.Workshops[workshopIndex];
         }
     }
 }

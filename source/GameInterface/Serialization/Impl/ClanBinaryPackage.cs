@@ -15,6 +15,8 @@ namespace GameInterface.Serialization.Impl
     [Serializable]
     public class ClanBinaryPackage : BinaryPackageBase<Clan>
     {
+        string stringId;
+
         public ClanBinaryPackage(Clan obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
@@ -39,6 +41,8 @@ namespace GameInterface.Serialization.Impl
 
         public override void Pack()
         {
+            stringId = Object.StringId;
+
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
             {
                 object obj = field.GetValue(Object);
@@ -48,6 +52,17 @@ namespace GameInterface.Serialization.Impl
 
         protected override void UnpackInternal()
         {
+            // If the stringId already exists in the object manager use that object
+            if (stringId != null)
+            {
+                var newObject = MBObjectManager.Instance.GetObject<Clan>(stringId);
+                if (newObject != null)
+                {
+                    Object = newObject;
+                    return;
+                }
+            }
+
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
