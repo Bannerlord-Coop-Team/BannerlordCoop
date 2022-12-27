@@ -47,7 +47,7 @@ namespace GameInterface.Serialization.Impl
             "_children",
         };
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             stringId = Object.StringId;
 
@@ -62,24 +62,23 @@ namespace GameInterface.Serialization.Impl
             spouseId = Object.Spouse?.StringId;
 
             List<Hero> exSpoueses = (List<Hero>)Hero_ExSpouses.GetValue(Object);
-            exSpousesIds = ConvertHeroToId(exSpoueses);
-            childrenIds = ConvertHeroToId(Object.Children);
+            exSpousesIds = PackIds(exSpoueses);
+            childrenIds = PackIds(Object.Children);
         }
 
-        private string[] ConvertHeroToId<T>(IEnumerable<T> values) where T : MBObjectBase
-        {
-            if (values == null) return new string[0];
-
-            return values.Select(v => v.StringId).ToArray();
-        }
-
+        /// <summary>
+        /// Unpacks the stored fields and relationships for a hero object.
+        /// If the hero object already exists in the object manager, it will be used.
+        /// Otherwise, a new hero object will be created and initialized.
+        /// </summary>
         protected override void UnpackInternal()
         {
             // If the stringId already exists in the object manager use that object
-            if(stringId != null)
+            // Otherwise, create a new object and initialize it
+            if (stringId != null)
             {
                 var newObject = MBObjectManager.Instance.GetObject<Hero>(stringId);
-                if(newObject != null)
+                if (newObject != null)
                 {
                     Object = newObject;
                     return;
@@ -88,43 +87,24 @@ namespace GameInterface.Serialization.Impl
 
             Object.Init();
 
+            // Set the values of all the stored fields on the object
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
             }
 
-            AssignId(Hero_Father, fatherId);
-            AssignId(Hero_Mother, motherId);
-            AssignId(Hero_Spouse, spouseId);
+            // Set the values of the object's father, mother, spouse, ex-spouses, and children
+            Hero_Father.SetValue(Object, ResolveId<Hero>(fatherId));
+            Hero_Mother.SetValue(Object, ResolveId<Hero>(motherId));
+            Hero_Spouse.SetValue(Object, ResolveId<Hero>(spouseId));
 
-            List<Hero> exSpouses = ResolveIds<Hero>(exSpousesIds);
+            List<Hero> exSpouses = ResolveIds<Hero>(exSpousesIds).ToList();
             Hero_ExSpouses.SetValue(Object, exSpouses);
-            Hero_Children.SetValue(Object, ResolveIds<Hero>(childrenIds));
+            Hero_Children.SetValue(Object, ResolveIds<Hero>(childrenIds).ToList());
 
+            // Set the object's ex-spouses list as read-only
             Object.ExSpouses = exSpouses.GetReadOnlyList();
-        }
-
-        private List<T> ResolveIds<T>(string[] ids) where T : MBObjectBase
-        {
-            // Convert ids to instances
-            List<T> values = ids.Select(id => MBObjectManager.Instance.GetObject<T>(id)).ToList();
-
-            // Ensure all instances are resolved
-            if (values.Any(v => v == null))
-                throw new Exception($"Some values were not resolved in {values}");
-
-            return values;
-        }
-
-        private void AssignId(FieldInfo fieldInfo, string id)
-        {
-            if (id == null) return;
-            
-            Hero hero = MBObjectManager.Instance.GetObject<Hero>(id);
-            if (hero == null) throw new Exception($"Hero with id {id} was not found in MBObjectManager");
-
-            fieldInfo.SetValue(Object, hero);
         }
     }
 }

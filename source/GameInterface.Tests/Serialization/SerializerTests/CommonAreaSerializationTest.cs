@@ -67,8 +67,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             
             List<CommonArea> commonAreas = new List<CommonArea>
             {
-                commonArea,
                 commonArea2,
+                commonArea,
             };
 
             CommonAreas.SetValue(settlement, commonAreas);

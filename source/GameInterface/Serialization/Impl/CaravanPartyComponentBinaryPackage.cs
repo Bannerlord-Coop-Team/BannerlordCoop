@@ -21,7 +21,7 @@ namespace GameInterface.Serialization.Impl
             "_cachedName",
         };
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
             {

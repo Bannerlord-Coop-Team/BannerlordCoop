@@ -19,13 +19,13 @@ namespace GameInterface.Serialization.Impl
         {
         }
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             settlementStringId = Object.Settlement.StringId;
 
             // CommonArea is generated once per campaign so we can resolve it by
             // Using the index of that common area in it's settlement
-            Object.Settlement.CommonAreas.FindIndex(i => i == Object);
+            commonAreaIndex = Object.Settlement.CommonAreas.FindIndex(i => i == Object);
         }
 
         protected override void UnpackInternal()

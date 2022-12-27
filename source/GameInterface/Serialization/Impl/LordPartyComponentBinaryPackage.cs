@@ -22,7 +22,7 @@ namespace GameInterface.Serialization.Impl
             "_cachedName",
         };
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
             {
@@ -40,7 +40,7 @@ namespace GameInterface.Serialization.Impl
             }
 
             // Resolves _warPartyComponentsCache for Kingdom
-            Kingdom kingdom = Object.Clan.Kingdom;
+            Kingdom kingdom = Object.Clan?.Kingdom;
             if (kingdom != null)
             {
                 List<WarPartyComponent> kingdomComponents = (List<WarPartyComponent>)KingdomBinaryPackage.Kingdom_WarPartyComponents.GetValue(kingdom);

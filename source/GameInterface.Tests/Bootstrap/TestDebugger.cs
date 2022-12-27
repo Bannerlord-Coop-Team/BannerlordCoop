@@ -17,7 +17,7 @@ namespace GameInterface.Tests.Bootstrap
 
         public void Assert(bool condition, string message, [CallerFilePath] string callerFile = "", [CallerMemberName] string callerMethod = "", [CallerLineNumber] int callerLine = 0)
         {
-            throw new NotImplementedException();
+            
         }
 
         public void BeginTelemetryScopeBaseLevelInternal(TelemetryLevelMask levelMask, string scopeName)

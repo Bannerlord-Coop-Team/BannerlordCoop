@@ -12,12 +12,12 @@ namespace GameInterface.Serialization.Native
     public class DictionaryBinaryPackage : IEnumerableBinaryPackage
     {
         [NonSerialized]
-        IBinaryPackageFactory PackageFactory;
+        readonly IBinaryPackageFactory PackageFactory;
 
         [NonSerialized]
-        IEnumerable enumerable;
+        readonly IEnumerable enumerable;
 
-        Type enumerableType;
+        readonly Type enumerableType;
 
         IBinaryPackage[] packages;
 

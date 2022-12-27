@@ -15,7 +15,7 @@ namespace GameInterface.Serialization.Impl
         {
         }
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
             {

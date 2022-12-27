@@ -23,7 +23,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
         public ClassABinaryPackage(TestClassA classA, BinaryPackageFactory packageFactory) 
             : base(classA, packageFactory) { }
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             if (IsPacked == true) return;
 
@@ -48,7 +48,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
         public ClassBBinaryPackage(TestClassB classB, BinaryPackageFactory packageFactory) 
             : base(classB, packageFactory) { }
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             if (IsPacked == true) return;
 

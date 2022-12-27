@@ -31,7 +31,7 @@ namespace GameInterface.Serialization.Impl
             "_visual",
         };
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
             {
@@ -40,6 +40,7 @@ namespace GameInterface.Serialization.Impl
             }
         }
 
+        private static readonly FieldInfo PartyBase_Visual = typeof(PartyBase).GetField("_visual", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
             TypedReference reference = __makeref(Object);
@@ -47,8 +48,9 @@ namespace GameInterface.Serialization.Impl
             {
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
             }
-            
-            Campaign.Current?.VisualCreator?.CreatePartyVisual();
+
+            IPartyVisual partyVisual = Campaign.Current?.VisualCreator?.CreatePartyVisual();
+            PartyBase_Visual.SetValue(Object, partyVisual);
         }
     }
 }
