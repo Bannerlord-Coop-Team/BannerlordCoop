@@ -1,0 +1,25 @@
+﻿using System;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
+
+namespace GameInterface.Serialization.Impl
+{
+    [Serializable]
+    public class SkillObjectBinaryPackage : BinaryPackageBase<SkillObject>
+    {
+        public string StringId;
+        public SkillObjectBinaryPackage(SkillObject obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        {
+
+        }
+        protected override void PackInternal()
+        {
+            StringId = Object.StringId;
+        }
+        protected override void UnpackInternal()
+        {
+            Object = MBObjectManager.Instance.GetObject<SkillObject>(StringId);
+        }
+    }
+}

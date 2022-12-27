@@ -1,0 +1,256 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\packages\xunit.core.2.4.2\build\xunit.core.props" Condition="Exists('..\packages\xunit.core.2.4.2\build\xunit.core.props')" />
+  <Import Project="..\packages\MSTest.TestAdapter.2.2.7\build\net45\MSTest.TestAdapter.props" Condition="Exists('..\packages\MSTest.TestAdapter.2.2.7\build\net45\MSTest.TestAdapter.props')" />
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{AFD76C22-8732-44C1-834B-059AE2097ED7}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>GameInterface.Tests</RootNamespace>
+    <AssemblyName>GameInterface.Tests</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">15.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+    <ReferencePath>$(ProgramFiles)\Common Files\microsoft shared\VSTT\$(VisualStudioVersion)\UITestExtensionPackages</ReferencePath>
+    <IsCodedUITest>False</IsCodedUITest>
+    <TestProjectType>UnitTest</TestProjectType>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Lib.Harmony.2.2.2\lib\net472\0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="Autofac, Version=6.4.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autofac.6.4.0\lib\netstandard2.0\Autofac.dll</HintPath>
+    </Reference>
+    <Reference Include="Castle.Core, Version=5.0.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
+      <HintPath>..\packages\Castle.Core.5.1.0\lib\net462\Castle.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.VisualStudio.TestPlatform.TestFramework, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\MSTest.TestFramework.2.2.7\lib\net45\Microsoft.VisualStudio.TestPlatform.TestFramework.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.VisualStudio.TestPlatform.TestFramework.Extensions, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\MSTest.TestFramework.2.2.7\lib\net45\Microsoft.VisualStudio.TestPlatform.TestFramework.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="Moq, Version=4.18.0.0, Culture=neutral, PublicKeyToken=69f491c39445e920, processorArchitecture=MSIL">
+      <HintPath>..\packages\Moq.4.18.2\lib\net462\Moq.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.3.1.17\lib\net461\protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.Core.3.1.17\lib\net461\protobuf-net.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="SandBox, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Collections.Immutable, Version=1.2.5.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Collections.Immutable.1.7.1\lib\net461\System.Collections.Immutable.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data.Linq" />
+    <Reference Include="System.Diagnostics.DiagnosticSource, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Memory.4.5.4\lib\net461\System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.4.5.3\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.4\lib\net461\System.Threading.Tasks.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.CampaignSystem, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Core">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Library">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Localization">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.Launcher.Library">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Launcher.Library.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.ObjectSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="xunit.abstractions, Version=2.0.0.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.abstractions.2.0.3\lib\net35\xunit.abstractions.dll</HintPath>
+    </Reference>
+    <Reference Include="xunit.assert, Version=2.4.2.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.assert.2.4.2\lib\netstandard1.1\xunit.assert.dll</HintPath>
+    </Reference>
+    <Reference Include="xunit.core, Version=2.4.2.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.extensibility.core.2.4.2\lib\net452\xunit.core.dll</HintPath>
+    </Reference>
+    <Reference Include="xunit.execution.desktop, Version=2.4.2.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.extensibility.execution.2.4.2\lib\net452\xunit.execution.desktop.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Bootstrap\Patches\GamePatches.cs" />
+    <Compile Include="Bootstrap\TestDebugger.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Bootstrap\GameBootStrap.cs" />
+    <Compile Include="Serialization\SerializerTests\ArmySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterAttributesSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CommonAreaPartyComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterPerksSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CommonAreaSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemModifierGroupSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterObjectSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\KingdomSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\LordPartyComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BannerComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ArmorComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HorseComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PathFaceRecordSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\StanceLinkSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MobilePartySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterAttributeSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PartyBaseSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WorkshopSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HeroDeveloperSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PartyAISerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CaravanPartyComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\SkeletonScaleSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PieceDataSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WorkshopTypeSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WeaponDesignSerializationTest.cs" />
+    <Compile Include="Serialization\DictTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TroopRosterElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TroopRosterSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\VillageSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TownSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\SettlementSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterTraitsSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CultureObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PerkObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TraitObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BanditPartyComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PolicyObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\SkillObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CraftingPieceSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WeaponComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WeaponDesignElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WeaponComponentDataSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MatrixFrameSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemObjectSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\SaddleComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TextObjectSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TradeItemComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CampaignTimeSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\EquipmentElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\EquipmentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HideoutSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemModifierSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CraftingTemplateSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BannerEffectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BasicCultureObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemCategorySerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\DictionarySerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HeroLastSeenInfoSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ClanSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ArraySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HashSetSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemRosterElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemRosterSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ListSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MBReadOnlyListSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BodyPropertiesSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterSkillsSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\Vec2SerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MonsterSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\Mat3SerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\Vec3SerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BladeDataSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BannerSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HeroSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ProofOfConcept\EdgeCaseClasses.cs" />
+    <Compile Include="Serialization\SerializerTests\ProofOfConcept\EdgeCaseSerializers.cs" />
+    <Compile Include="Serialization\SerializerTests\ProofOfConcept\GenericSerializationTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.config" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Analyzer Include="..\packages\xunit.analyzers.1.0.0\analyzers\dotnet\cs\xunit.analyzers.dll" />
+    <Analyzer Include="..\packages\xunit.analyzers.1.0.0\analyzers\dotnet\cs\xunit.analyzers.fixes.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\GameInterface\GameInterface.csproj">
+      <Project>{d22cb8fa-40cc-4f47-986f-1c5a4415980b}</Project>
+      <Name>GameInterface</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\MSTest.TestAdapter.2.2.7\build\net45\MSTest.TestAdapter.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\MSTest.TestAdapter.2.2.7\build\net45\MSTest.TestAdapter.props'))" />
+    <Error Condition="!Exists('..\packages\MSTest.TestAdapter.2.2.7\build\net45\MSTest.TestAdapter.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\MSTest.TestAdapter.2.2.7\build\net45\MSTest.TestAdapter.targets'))" />
+    <Error Condition="!Exists('..\packages\xunit.core.2.4.2\build\xunit.core.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\xunit.core.2.4.2\build\xunit.core.props'))" />
+    <Error Condition="!Exists('..\packages\xunit.core.2.4.2\build\xunit.core.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\xunit.core.2.4.2\build\xunit.core.targets'))" />
+  </Target>
+  <Import Project="..\packages\MSTest.TestAdapter.2.2.7\build\net45\MSTest.TestAdapter.targets" Condition="Exists('..\packages\MSTest.TestAdapter.2.2.7\build\net45\MSTest.TestAdapter.targets')" />
+  <Import Project="..\packages\xunit.core.2.4.2\build\xunit.core.targets" Condition="Exists('..\packages\xunit.core.2.4.2\build\xunit.core.targets')" />
+</Project>

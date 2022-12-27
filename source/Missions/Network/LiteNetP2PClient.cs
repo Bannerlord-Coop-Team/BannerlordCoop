@@ -141,7 +141,7 @@ namespace Missions.Network
         {
             //if (netManager.ConnectedPeersCount < 1) return;
             NetDataWriter writer = new NetDataWriter();
-            writer.PutBytesWithLength(CommonSerializer.Serialize(packet, SerializationMethod.ProtoBuf));
+            writer.PutBytesWithLength(ProtoBufSerializer.Serialize(packet));
             client.Send(writer, packet.DeliveryMethod);
         }
 
@@ -149,7 +149,7 @@ namespace Missions.Network
         {
             //if (netManager.ConnectedPeersCount < 1) return;
             NetDataWriter writer = new NetDataWriter();
-            writer.PutBytesWithLength(CommonSerializer.Serialize(packet, SerializationMethod.ProtoBuf));
+            writer.PutBytesWithLength(ProtoBufSerializer.Serialize(packet));
             netManager.SendToAll(writer, packet.DeliveryMethod);
         }
 
@@ -200,7 +200,7 @@ namespace Missions.Network
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
-            IPacket packet = CommonSerializer.Deserialize<IPacket>(reader.GetBytesWithLength(), SerializationMethod.ProtoBuf);
+            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
             if (packet.Data == null) throw new NullReferenceException($"{packet.GetType()} is missing data, likely missing a ProtoMember attribute.");
             if (m_PacketHandlers.TryGetValue(packet.PacketType, out var handlers))
             {

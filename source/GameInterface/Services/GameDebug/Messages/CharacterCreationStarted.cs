@@ -4,12 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Common.Serialization
+namespace GameInterface.Services.GameDebug.Messages
 {
-    public enum SerializationMethod : byte
+    public readonly struct CharacterCreationStarted
     {
-        Invalid,
-        BinaryFormatter,
-        ProtoBuf,
     }
 }

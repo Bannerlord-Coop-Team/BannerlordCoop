@@ -8,15 +8,11 @@ using System.Threading.Tasks;
 
 namespace Common.Serialization
 {
-
-
-    internal class BinaryFormatterSerializer : ISerializer
+    public class BinaryFormatterSerializer
     {
         static readonly BinaryFormatter formatter = new BinaryFormatter();
 
-        public Enum Protocol => SerializationMethod.BinaryFormatter;
-
-        public byte[] Serialize(object obj)
+        public static byte[] Serialize(object obj)
         {
             using (MemoryStream ms = new MemoryStream())
             {
@@ -25,7 +21,12 @@ namespace Common.Serialization
             }
         }
 
-        public object Deserialize(byte[] data)
+        public static T Deserialize<T>(byte[] data)
+        {
+            return (T)Deserialize(data);
+        }
+
+        public static object Deserialize(byte[] data)
         {
             using (MemoryStream ms = new MemoryStream(data))
             {
