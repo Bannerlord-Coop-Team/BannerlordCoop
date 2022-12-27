@@ -130,6 +130,30 @@ namespace Common.Extensions
         }
 
         /// <summary>
+        /// Castable GetValue Extension
+        /// </summary>
+        /// <typeparam name="T">Value to cast to</typeparam>
+        /// <param name="field">Extended type</param>
+        /// <param name="obj">Object to get value from</param>
+        /// <returns></returns>
+        public static T GetValue<T>(this FieldInfo field, object obj)
+        {
+            return (T)field.GetValue(obj);
+        }
+
+        /// <summary>
+        /// Castable GetValue Extension
+        /// </summary>
+        /// <typeparam name="T">Value to cast to</typeparam>
+        /// <param name="property">Extended type</param>
+        /// <param name="obj">Object to get value from</param>
+        /// <returns></returns>
+        public static T GetValue<T>(this PropertyInfo property, object obj)
+        {
+            return (T)property.GetValue(obj);
+        }
+
+        /// <summary>
         /// Creates a new delegate with error checking
         /// </summary>
         /// <param name="type">Delegate type</param>

@@ -88,11 +88,14 @@ namespace GameInterface.Serialization.Impl
         public static readonly MethodInfo InitializeCachedLists = typeof(Kingdom).GetMethod("InitializeCachedLists", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
-            Kingdom kingdom = MBObjectManager.Instance.GetObject<Kingdom>(stringId);
-            if (kingdom != null)
+            if(stringId != null)
             {
-                Object = kingdom;
-                return;
+                Kingdom kingdom = MBObjectManager.Instance.GetObject<Kingdom>(stringId);
+                if (kingdom != null)
+                {
+                    Object = kingdom;
+                    return;
+                }
             }
 
             TypedReference reference = __makeref(Object);
