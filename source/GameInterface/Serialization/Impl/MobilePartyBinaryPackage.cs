@@ -27,6 +27,7 @@ namespace GameInterface.Serialization.Impl
         private string engineerId;
         private string quartermasterId;
         private string surgeonId;
+
         public MobilePartyBinaryPackage(MobileParty obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
@@ -111,18 +112,10 @@ namespace GameInterface.Serialization.Impl
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
             }
 
-            AssignHero(MobileParty_Scout, scoutId);
-            AssignHero(MobileParty_Engineer, engineerId);
-            AssignHero(MobileParty_Quartermaster, quartermasterId);
-            AssignHero(MobileParty_Surgeon, surgeonId);
-        }
-
-        private void AssignHero(PropertyInfo property, string id)
-        {
-            if (id == null) return;
-
-            Hero hero = MBObjectManager.Instance.GetObject<Hero>(id);
-            property.SetValue(Object, hero);
+            MobileParty_Scout        .SetValue(Object, ResolveId<Hero>(scoutId));
+            MobileParty_Engineer     .SetValue(Object, ResolveId<Hero>(engineerId));
+            MobileParty_Quartermaster.SetValue(Object, ResolveId<Hero>(quartermasterId));
+            MobileParty_Surgeon      .SetValue(Object, ResolveId<Hero>(surgeonId));
         }
     }
 }

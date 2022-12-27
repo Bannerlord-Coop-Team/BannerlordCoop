@@ -78,13 +78,6 @@ namespace GameInterface.Serialization.Impl
             villageIds = PackIds(Object.Villages);
         }
 
-        private string[] PackIds<T>(IEnumerable<T> values) where T : MBObjectBase
-        {
-            if (values == null) return new string[0];
-
-            return values.Select(value => value.StringId).ToArray();
-        }
-
         public static readonly MethodInfo InitializeCachedLists = typeof(Kingdom).GetMethod("InitializeCachedLists", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
@@ -117,18 +110,6 @@ namespace GameInterface.Serialization.Impl
             Kingdom_Lords.SetValue(Object, ResolveIds<Hero>(lordIds));
             Kingdom_Settlements.SetValue(Object, ResolveIds<Settlement>(settlementIds));
             Kingdom_Villages.SetValue(Object, ResolveIds<Village>(villageIds));
-        }
-
-        private List<T> ResolveIds<T>(string[] ids) where T : MBObjectBase
-        {
-            // Convert ids to instances
-            List<T> values = ids.Select(id => MBObjectManager.Instance.GetObject<T>(id)).ToList();
-
-            // Ensure all instances are resolved
-            if (values.Any(v => v == null))
-                throw new Exception($"Some values were not resolved in {values}");
-
-            return values;
         }
     }
 }

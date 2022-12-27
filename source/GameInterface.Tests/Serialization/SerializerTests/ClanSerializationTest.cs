@@ -9,6 +9,7 @@ using Common.Extensions;
 using System.Reflection;
 using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;
+using System.Collections.Generic;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -38,11 +39,30 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void Clan_Full_Serialization()
         {
             Clan testClan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
+            Hero hero1 = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Hero hero2 = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+
+            hero1.StringId = "myHero1";
+            hero2.StringId = "myHero2";
+
+            MBObjectManager.Instance.RegisterObject(hero1);
+            MBObjectManager.Instance.RegisterObject(hero2);
 
             CampaignTime time = (CampaignTime)FormatterServices.GetUninitializedObject(typeof(CampaignTime));
 
             testClan.LastFactionChangeTime = time;
             testClan.AutoRecruitmentExpenses = 68;
+
+            List<Hero> heroes = new List<Hero>
+            {
+                hero1,
+                hero2
+            };
+
+            ClanBinaryPackage.Clan_supporterNotablesCache.SetValue(testClan, heroes);
+            ClanBinaryPackage.Clan_companionsCache.SetValue(testClan, heroes);
+            ClanBinaryPackage.Clan_lordsCache.SetValue(testClan, heroes);
+            ClanBinaryPackage.Clan_supporterNotablesCache.SetValue(testClan, heroes);
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             ClanBinaryPackage package = new ClanBinaryPackage(testClan, factory);
@@ -64,6 +84,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(testClan.AutoRecruitmentExpenses, newClan.AutoRecruitmentExpenses);
             Assert.Equal(testClan.LastFactionChangeTime, newClan.LastFactionChangeTime);
 
+            Assert.Equal(heroes, ClanBinaryPackage.Clan_supporterNotablesCache.GetValue(newClan));
+            Assert.Equal(heroes, ClanBinaryPackage.Clan_companionsCache.GetValue(newClan));
+            Assert.Equal(heroes, ClanBinaryPackage.Clan_lordsCache.GetValue(newClan));
+            Assert.Equal(heroes, ClanBinaryPackage.Clan_supporterNotablesCache.GetValue(newClan));
         }
 
         [Fact]

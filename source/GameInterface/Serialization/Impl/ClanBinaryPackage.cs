@@ -16,7 +16,18 @@ namespace GameInterface.Serialization.Impl
     [Serializable]
     public class ClanBinaryPackage : BinaryPackageBase<Clan>
     {
+        public static readonly FieldInfo Clan_supporterNotablesCache = typeof(Clan).GetField("_supporterNotablesCache", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static readonly FieldInfo Clan_lordsCache = typeof(Clan).GetField("_lordsCache", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static readonly FieldInfo Clan_heroesCache = typeof(Clan).GetField("_heroesCache", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static readonly FieldInfo Clan_companionsCache = typeof(Clan).GetField("_companionsCache", BindingFlags.NonPublic | BindingFlags.Instance);
+
         string stringId;
+
+        string[] supporterNotablesIds;
+        string[] lordsIds;
+        string[] heroesIds;
+        string[] companionsIds;
+
 
         public ClanBinaryPackage(Clan obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
@@ -28,14 +39,9 @@ namespace GameInterface.Serialization.Impl
             "_lordsCache",
             "_heroesCache",
             "_companionsCache",
-            "_warPartyComponentsCache",
-            "_clanMidSettlement",
-            "_distanceToClosestNonAllyFortificationCache",
-            "_distanceToClosestNonAllyFortificationCacheDirty",
-            "_midPointCalculated",
         };
 
-        protected  override void PackInternal()
+        protected override void PackInternal()
         {
             stringId = Object.StringId;
 
@@ -44,6 +50,11 @@ namespace GameInterface.Serialization.Impl
                 object obj = field.GetValue(Object);
                 StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
             }
+
+            supporterNotablesIds = PackIds((List<Hero>)Clan_supporterNotablesCache.GetValue(Object));
+            lordsIds = PackIds((List<Hero>)Clan_lordsCache.GetValue(Object));
+            heroesIds = PackIds((List<Hero>)Clan_heroesCache.GetValue(Object));
+            companionsIds = PackIds((List<Hero>)Clan_companionsCache.GetValue(Object));
         }
 
         private static readonly MethodInfo Clan_InitMembers = typeof(Clan).GetMethod("InitMembers", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -67,6 +78,12 @@ namespace GameInterface.Serialization.Impl
             {
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
             }
+
+            // Unpack special cases
+            Clan_supporterNotablesCache.SetValue(Object, ResolveIds<Hero>(supporterNotablesIds).ToList());
+            Clan_lordsCache.SetValue(Object, ResolveIds<Hero>(lordsIds).ToList());
+            Clan_heroesCache.SetValue(Object, ResolveIds<Hero>(heroesIds).ToList());
+            Clan_companionsCache.SetValue(Object, ResolveIds<Hero>(companionsIds).ToList());
         }
     }
 }

@@ -12,7 +12,6 @@ namespace GameInterface.Serialization.Impl
     {
         public CharacterAttributesBinaryPackage(CharacterAttributes obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
-
         }
         protected override void PackInternal()
         {

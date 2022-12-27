@@ -37,7 +37,7 @@ namespace GameInterface.Serialization.Impl
             "<UpgradeTargets>k__BackingField",
         };
 
-        protected  override void PackInternal()
+        protected override void PackInternal()
         {
             // Store the string identifier of the object in a local variable
             stringId = Object.StringId;
@@ -46,40 +46,25 @@ namespace GameInterface.Serialization.Impl
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields(Excludes))
             {
                 // Get the value of the current field in the object
-                object obj = field.GetValue(Object);
                 // Add a binary package of the field value to the StoredFields collection
+                object obj = field.GetValue(Object);
                 StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
             }
 
             // Get the value of the CharacterObject_battleEquipmentTemplate field in the object
             CharacterObject battleEquipmentTemplate = CharacterObject_battleEquipmentTemplate.GetValue<CharacterObject>(Object);
-            // If the value is not null, store its string identifier in a local variable
             battleEquipmentTemplateId = battleEquipmentTemplate?.StringId;
 
             // Get the value of the CharacterObject_civilianEquipmentTemplate field in the object
             CharacterObject civilianEquipmentTemplate = CharacterObject_civilianEquipmentTemplate.GetValue<CharacterObject>(Object);
-            // If the value is not null, store its string identifier in a local variable
             civilianEquipmentTemplateId = civilianEquipmentTemplate?.StringId;
 
             // Get the value of the CharacterObject_originCharacter field in the object
             CharacterObject originCharacter = CharacterObject_originCharacter.GetValue<CharacterObject>(Object);
-            // If the value is not null, store its string identifier in a local variable
             originCharacterId = originCharacter?.StringId;
 
             // Store the result of calling the PackIds method on the object's UpgradeTargets property in the UpgradeTargetIds variable
             UpgradeTargetIds = PackIds(Object.UpgradeTargets);
-        }
-
-        private string[] PackIds<T>(IEnumerable<T> values) where T : MBObjectBase
-        {
-            // Return an empty array if the values parameter is null
-            if (values == null) return new string[0];
-
-            // Return an empty array if the values parameter is an empty collection
-            if (!values.Any()) return new string[0];
-
-            // Use the Select and ToArray LINQ methods to convert the values collection to an array of strings
-            return values.Select(value => value.StringId).ToArray();
         }
 
         protected override void UnpackInternal()
@@ -108,7 +93,5 @@ namespace GameInterface.Serialization.Impl
 
             CharacterObject_UpgradeTargets.SetValue(Object, ResolveIds<CharacterObject>(UpgradeTargetIds).ToArray());
         }
-
-        
     }
 }
