@@ -37,7 +37,7 @@ namespace GameInterface.Serialization.Impl
             "<UpgradeTargets>k__BackingField",
         };
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             // Store the string identifier of the object in a local variable
             stringId = Object.StringId;
@@ -46,40 +46,25 @@ namespace GameInterface.Serialization.Impl
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields(Excludes))
             {
                 // Get the value of the current field in the object
-                object obj = field.GetValue(Object);
                 // Add a binary package of the field value to the StoredFields collection
+                object obj = field.GetValue(Object);
                 StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
             }
 
             // Get the value of the CharacterObject_battleEquipmentTemplate field in the object
             CharacterObject battleEquipmentTemplate = CharacterObject_battleEquipmentTemplate.GetValue<CharacterObject>(Object);
-            // If the value is not null, store its string identifier in a local variable
             battleEquipmentTemplateId = battleEquipmentTemplate?.StringId;
 
             // Get the value of the CharacterObject_civilianEquipmentTemplate field in the object
             CharacterObject civilianEquipmentTemplate = CharacterObject_civilianEquipmentTemplate.GetValue<CharacterObject>(Object);
-            // If the value is not null, store its string identifier in a local variable
             civilianEquipmentTemplateId = civilianEquipmentTemplate?.StringId;
 
             // Get the value of the CharacterObject_originCharacter field in the object
             CharacterObject originCharacter = CharacterObject_originCharacter.GetValue<CharacterObject>(Object);
-            // If the value is not null, store its string identifier in a local variable
             originCharacterId = originCharacter?.StringId;
 
             // Store the result of calling the PackIds method on the object's UpgradeTargets property in the UpgradeTargetIds variable
             UpgradeTargetIds = PackIds(Object.UpgradeTargets);
-        }
-
-        private string[] PackIds<T>(IEnumerable<T> values) where T : MBObjectBase
-        {
-            // Return an empty array if the values parameter is null
-            if (values == null) return new string[0];
-
-            // Return an empty array if the values parameter is an empty collection
-            if (!values.Any()) return new string[0];
-
-            // Use the Select and ToArray LINQ methods to convert the values collection to an array of strings
-            return values.Select(value => value.StringId).ToArray();
         }
 
         protected override void UnpackInternal()
@@ -102,35 +87,11 @@ namespace GameInterface.Serialization.Impl
             }
 
             // Resolve Ids for StringId resolvable objects
-            ResolveId(CharacterObject_battleEquipmentTemplate, battleEquipmentTemplateId);
-            ResolveId(CharacterObject_civilianEquipmentTemplate, civilianEquipmentTemplateId);
-            ResolveId(CharacterObject_originCharacter, originCharacterId);
+            CharacterObject_battleEquipmentTemplate.SetValue(Object, ResolveId<CharacterObject>(battleEquipmentTemplateId));
+            CharacterObject_civilianEquipmentTemplate.SetValue(Object, ResolveId<CharacterObject>(civilianEquipmentTemplateId));
+            CharacterObject_originCharacter.SetValue(Object, ResolveId<CharacterObject>(originCharacterId));
 
             CharacterObject_UpgradeTargets.SetValue(Object, ResolveIds<CharacterObject>(UpgradeTargetIds).ToArray());
-        }
-
-        private void ResolveId(FieldInfo field, string id)
-        {
-            // Return if id is null
-            if (id == null) return;
-
-            // Get the character object with the specified id
-            CharacterObject character = MBObjectManager.Instance.GetObject<CharacterObject>(id);
-            // Set the value of the field to the character object
-            field.SetValue(Object, character);
-        }
-
-        private IEnumerable<T> ResolveIds<T>(string[] ids) where T : MBObjectBase
-        {
-            // Convert ids to instances using the MBObjectManager
-            IEnumerable<T> values = ids.Select(id => MBObjectManager.Instance.GetObject<T>(id));
-
-            // If any of the instances are null, throw an exception
-            if (values.Any(v => v == null))
-                throw new Exception($"Some values were not resolved in {values}");
-
-            // Return the resolved instances
-            return values;
         }
     }
 }

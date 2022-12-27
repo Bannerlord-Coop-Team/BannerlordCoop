@@ -22,7 +22,7 @@ namespace GameInterface.Serialization.Impl
         {
         }
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             stringId = Object.StringId;
             

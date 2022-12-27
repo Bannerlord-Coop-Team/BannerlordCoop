@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -39,21 +40,37 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        private static readonly FieldInfo _leader = typeof(LordPartyComponent).GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly PropertyInfo Owner = typeof(LordPartyComponent).GetProperty(nameof(LordPartyComponent.Owner));
+        private static readonly FieldInfo LordPartyComponent_leader = typeof(LordPartyComponent).GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly PropertyInfo PartyComponent_MobileParty = typeof(PartyComponent).GetProperty(nameof(PartyComponent.MobileParty));
+        private static readonly PropertyInfo LordPartyComponent_Owner = typeof(LordPartyComponent).GetProperty(nameof(LordPartyComponent.Owner));
+        private static readonly PropertyInfo PartyBase_MobileParty = typeof(PartyBase).GetProperty(nameof(PartyBase.MobileParty));
+        private static readonly FieldInfo MobileParty_actualClan = typeof(MobileParty).GetField("_actualClan", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly PropertyInfo MobileParty_Party = typeof(MobileParty).GetProperty(nameof(MobileParty.Party));
         [Fact]
         public void LordPartyComponent_Full_Serialization()
         {
-            Hero h1 = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Hero hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            MobileParty mobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+            PartyBase party = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
+            Clan clan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
 
-            h1.StringId = "myHero";
+            hero.StringId = "myHero";
+            mobileParty.StringId = "MyMobileParty";
+            clan.StringId = "myClan";
 
-            MBObjectManager.Instance.RegisterObject(h1);
+            PartyBase_MobileParty.SetValue(party, mobileParty);
+            MobileParty_Party.SetValue(mobileParty, party);
+            MobileParty_actualClan.SetValue(mobileParty, clan);
+
+            MBObjectManager.Instance.RegisterObject(hero);
+            MBObjectManager.Instance.RegisterObject(mobileParty);
+            MBObjectManager.Instance.RegisterObject(clan);
 
             LordPartyComponent LordPartyComponent = (LordPartyComponent)FormatterServices.GetUninitializedObject(typeof(LordPartyComponent));
 
-            _leader.SetValue(LordPartyComponent, h1);
-            Owner.SetValue(LordPartyComponent, h1);
+            LordPartyComponent_leader.SetValue(LordPartyComponent, hero);
+            LordPartyComponent_Owner.SetValue(LordPartyComponent, hero);
+            PartyComponent_MobileParty.SetValue(LordPartyComponent, mobileParty);
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             LordPartyComponentBinaryPackage package = new LordPartyComponentBinaryPackage(LordPartyComponent, factory);
@@ -72,7 +89,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             LordPartyComponent newLordPartyComponent = returnedPackage.Unpack<LordPartyComponent>();
 
-            Assert.Equal(_leader.GetValue(LordPartyComponent), _leader.GetValue(newLordPartyComponent));
+            Assert.Equal(LordPartyComponent_leader.GetValue(LordPartyComponent), LordPartyComponent_leader.GetValue(newLordPartyComponent));
             Assert.Equal(LordPartyComponent.Owner, newLordPartyComponent.Owner);
             Assert.Equal(LordPartyComponent.Party, newLordPartyComponent.Party);
         }

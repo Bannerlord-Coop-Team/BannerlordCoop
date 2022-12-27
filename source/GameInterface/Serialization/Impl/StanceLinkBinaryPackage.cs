@@ -30,7 +30,7 @@ namespace GameInterface.Serialization.Impl
             "<Faction2>k__BackingField",
         };
 
-        public override void Pack()
+        protected override void PackInternal()
         {
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
             {
@@ -50,16 +50,8 @@ namespace GameInterface.Serialization.Impl
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
             }
 
-            SetFaction(StanceLink_Faction1, faction1Id);
-            SetFaction(StanceLink_Faction2, faction2Id);
-        }
-
-        private void SetFaction(PropertyInfo property, string id)
-        {
-            if (id == null) return;
-
-            Clan clan = MBObjectManager.Instance.GetObject<Clan>(id);
-            property.SetValue(Object, clan);
+            StanceLink_Faction1.SetValue(Object, ResolveId<Clan>(faction1Id));
+            StanceLink_Faction2.SetValue(Object, ResolveId<Clan>(faction2Id));
         }
     }
 }
