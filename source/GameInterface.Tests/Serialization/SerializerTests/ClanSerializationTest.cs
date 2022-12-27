@@ -7,11 +7,18 @@ using TaleWorlds.CampaignSystem;
 using System.Runtime.Serialization;
 using Common.Extensions;
 using System.Reflection;
+using TaleWorlds.ObjectSystem;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ClanSerializationTest
     {
+        public ClanSerializationTest()
+        {
+            GameBootStrap.Initialize();
+        }
+
         [Fact]
         public void Clan_Serialize()
         {
@@ -49,10 +56,37 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Clan newClan = returnedPackage.Unpack<Clan>();
 
-            foreach(FieldInfo field in typeof(Clan).GetAllInstanceFields())
+            foreach (FieldInfo field in typeof(Clan).GetAllInstanceFields())
             {
                 Assert.Equal(field.GetValue(testClan), field.GetValue(newClan));
             }
+        }
+
+        [Fact]
+        public void Clan_StringId_Serialization()
+        {
+            Clan clan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
+            clan.StringId = "My Clan";
+            MBObjectManager.Instance.RegisterObject(clan);
+
+            BinaryPackageFactory factory = new BinaryPackageFactory();
+            ClanBinaryPackage package = new ClanBinaryPackage(clan, factory);
+
+            package.Pack();
+
+            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
+
+            Assert.NotEmpty(bytes);
+
+            object obj = BinaryFormatterSerializer.Deserialize(bytes);
+
+            Assert.IsType<ClanBinaryPackage>(obj);
+
+            ClanBinaryPackage returnedPackage = (ClanBinaryPackage)obj;
+
+            Clan newHero = returnedPackage.Unpack<Clan>();
+
+            Assert.Same(clan, newHero);
         }
     }
 }
