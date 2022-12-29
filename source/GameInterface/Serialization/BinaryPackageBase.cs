@@ -145,12 +145,8 @@ namespace GameInterface.Serialization
             // Convert ids to instances using the MBObjectManager
             IEnumerable<OutT> values = ids.Select(id => ResolveId<OutT>(id));
 
-            // If any of the instances are null, throw an exception
-            if (values.Any(v => v == null))
-                throw new Exception($"Some values were not resolved in {values}");
-
             // Return the resolved instances
-            return values;
+            return values.Where(v => v != null);
         }
     }
 }
