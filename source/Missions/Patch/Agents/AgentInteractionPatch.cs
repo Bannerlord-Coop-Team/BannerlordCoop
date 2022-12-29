@@ -16,7 +16,8 @@ namespace Coop.Mod.Patch.Agents
                 return true;
             }
 
-            OnAgentInteraction?.Invoke(userAgent, agent);
+            // TODO fix board games
+            //OnAgentInteraction?.Invoke(userAgent, agent);
 
             return false;
 
