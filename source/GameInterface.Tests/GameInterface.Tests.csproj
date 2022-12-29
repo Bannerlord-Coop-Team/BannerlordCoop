@@ -163,7 +163,6 @@
     <Compile Include="Serialization\SerializerTests\SkeletonScaleSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PieceDataSerializationTest.cs" />
-    <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WorkshopTypeSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WeaponDesignSerializationTest.cs" />
     <Compile Include="Serialization\DictTest.cs" />
