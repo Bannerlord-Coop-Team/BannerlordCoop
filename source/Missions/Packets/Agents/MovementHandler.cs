@@ -4,7 +4,6 @@ using Missions.Network;
 using NLog;
 using ProtoBuf;
 using System;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using TaleWorlds.Library;

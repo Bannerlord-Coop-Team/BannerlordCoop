@@ -1,5 +1,4 @@
-﻿using Castle.Components.DictionaryAdapter.Xml;
-using Common.Extensions;
+﻿using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
 using GameInterface.Tests.Bootstrap;

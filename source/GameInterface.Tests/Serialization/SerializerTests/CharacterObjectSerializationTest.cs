@@ -1,18 +1,11 @@
 ﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
 using GameInterface.Tests.Bootstrap;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Extensions;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using Xunit;
-using static TaleWorlds.Core.WeaponComponentData;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

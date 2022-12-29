@@ -1,5 +1,4 @@
-﻿using IntroServer.Server;
-using IntroServer.Config;
+﻿using IntroServer.Config;
 using IntroServer.Data;
 using LiteNetLib;
 using NLog;

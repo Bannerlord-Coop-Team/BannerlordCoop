@@ -1,5 +1,4 @@
-﻿using Autofac.Features.OwnedInstances;
-using GameInterface.Serialization;
+﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -7,8 +6,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 

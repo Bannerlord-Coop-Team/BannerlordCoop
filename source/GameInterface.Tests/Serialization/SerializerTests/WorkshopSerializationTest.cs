@@ -1,16 +1,10 @@
 ﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
 using GameInterface.Tests.Bootstrap;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 

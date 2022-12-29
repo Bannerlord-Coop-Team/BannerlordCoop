@@ -2,8 +2,6 @@
 using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Impl
 {

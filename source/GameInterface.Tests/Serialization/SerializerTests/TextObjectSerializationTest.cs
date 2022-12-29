@@ -1,8 +1,6 @@
 ﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
 using System.Collections.Generic;
-using System.Linq;
-using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit;
 

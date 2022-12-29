@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace GameInterface.Serialization.Native
+﻿namespace GameInterface.Serialization.Native
 {
     public interface IEnumerableBinaryPackage : IBinaryPackage
     {

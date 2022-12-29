@@ -2,9 +2,7 @@
 using GameInterface.Serialization.Impl;
 using GameInterface.Tests.Bootstrap;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;

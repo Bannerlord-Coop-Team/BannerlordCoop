@@ -1,15 +1,9 @@
 ﻿using GameInterface.Serialization.Impl;
 using GameInterface.Serialization;
-using TaleWorlds.Core;
 using Xunit;
 using System.Runtime.Serialization;
-using Common.Extensions;
-using System.Reflection;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.ObjectSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

@@ -1,12 +1,7 @@
 ﻿using Common.Extensions;
 using System;
 using System.Reflection;
-using TaleWorlds.Core;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
-using System.Collections.Generic;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Serialization.Impl
 {

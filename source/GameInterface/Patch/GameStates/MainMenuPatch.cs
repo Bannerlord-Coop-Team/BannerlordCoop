@@ -1,6 +1,4 @@
-﻿using Common.Messaging;
-using GameInterface.Services.GameState.Messages;
-using HarmonyLib;
+﻿using HarmonyLib;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Patch.GameStates

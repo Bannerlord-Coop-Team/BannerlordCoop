@@ -1,9 +1,7 @@
 ﻿using Coop.Mod.Extentions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
 using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests

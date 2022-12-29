@@ -2,10 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Security.Policy;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Impl
 {
