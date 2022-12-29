@@ -134,18 +134,15 @@ namespace Coop.Mod.Missions
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
             Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);                             //this spawns an archer
-            //Agent agent = mission.SpawnAgent(agentBuildData2.InitialDirection(vec).NoHorses(true).Equipment(CharacterObject.Find("conspiracy_guardian").Equipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);    //this spawns a spearman
             agent.FadeIn();
+
             if (isMain)
             {
                 agent.Controller = Agent.ControllerType.Player;
-
             }
             else
             {
-
                 agent.Controller = Agent.ControllerType.AI;
-
             }
 
             return agent;
@@ -213,9 +210,8 @@ namespace Coop.Mod.Missions
 
         }
 
-        public static Agent SpawnAgent(Vec3 startingPos)
+        public static Agent SpawnAgent(Vec3 startingPos, CharacterObject character)
         {
-            CharacterObject character = Hero.MainHero.CharacterObject;
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             agentBuildData.InitialPosition(startingPos);

@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Serialization;
-using Coop.Mod.Missions;
 using IntroServer.Config;
 using IntroServer.Data;
 using IntroServer.Server;
@@ -9,13 +8,8 @@ using LiteNetLib.Utils;
 using NLog;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Missions.Network
 {
@@ -175,7 +169,7 @@ namespace Missions.Network
 
         public void OnPeerConnected(NetPeer peer)
         {
-            if(PeerServer != null && peer != PeerServer)
+            if (PeerServer != null && peer != PeerServer)
             {
                 OnClientConnected?.Invoke(peer);
             }
@@ -230,7 +224,7 @@ namespace Missions.Network
 
             string instance = data[0];
 
-            if(this.instance == instance)
+            if (this.instance == instance)
             {
                 request.Accept();
             }

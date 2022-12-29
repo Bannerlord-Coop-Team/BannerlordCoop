@@ -7,7 +7,7 @@ namespace Missions.Network
     [ProtoContract(SkipConstructor = true)]
     public readonly struct EventPacket : IPacket
     {
-        public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableSequenced;
+        public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
         public PacketType PacketType => PacketType.Event;
         public byte[] Data => m_Data;
         [ProtoMember(1)]

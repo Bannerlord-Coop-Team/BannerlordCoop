@@ -7,8 +7,6 @@ namespace Missions.Network
     [ProtoContract]
     public class NetworkAgent
     {
-
-
         public Agent Agent { get; private set; }
 
         [ProtoMember(1)]

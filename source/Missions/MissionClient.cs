@@ -6,6 +6,7 @@ using Missions.Network;
 using Missions.Packets.Agents;
 using NLog;
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -52,29 +53,26 @@ namespace Coop.Mod.Missions
 
         public void SendJoinInfo(NetPeer peer)
         {
-            try
-            {
-                m_Logger.Info("Sending join request");
-                NetworkAgentRegistry.RegisterControlledAgent(m_PlayerId, Agent.Main);
+            m_Logger.Info("Sending join request");
+            NetworkAgentRegistry.RegisterControlledAgent(m_PlayerId, Agent.Main);
 
-                MissionJoinInfo request = new MissionJoinInfo(m_PlayerId, Agent.Main.Position);
-                MessageBroker.Publish(request, peer);
-            }
-            catch (Exception ex)
-            {
-                m_Logger.Error(ex.Message);
-            }
+            CharacterObject characterObject = CharacterObject.PlayerCharacter;
+            MissionJoinInfo request = new MissionJoinInfo(characterObject, m_PlayerId, Agent.Main.Position);
+            MessageBroker.Publish(request, peer);
         }
 
         private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)
         {
             m_Logger.Info("Receive join request");
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
-            Guid newAgentId = payload.What.PlayerId;
-            Vec3 startingPos = payload.What.StartingPosition;
+
+            MissionJoinInfo joinInfo = payload.What;
+            
+            Guid newAgentId = joinInfo.PlayerId;
+            Vec3 startingPos = joinInfo.StartingPosition;
 
             // TODO remove test code
-            Agent newAgent = MissionTestGameManager.SpawnAgent(startingPos);
+            Agent newAgent = MissionTestGameManager.SpawnAgent(startingPos, joinInfo.CharacterObject);
 
             NetworkAgentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
         }
