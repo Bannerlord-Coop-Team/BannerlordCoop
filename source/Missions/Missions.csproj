@@ -131,6 +131,7 @@
     <Compile Include="BoardGameLogic.cs" />
     <Compile Include="BoardGameManager.cs" />
     <Compile Include="CoopMission.cs" />
+    <Compile Include="Extensions\AgentExtensions.cs" />
     <Compile Include="GameLoopRunner.cs" />
     <Compile Include="IMission.cs" />
     <Compile Include="IMissionPlayerNetwork.cs" />

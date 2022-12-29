@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using Missions.Extensions;
 using SandBox.Conversation.MissionLogics;
 using System;
 using TaleWorlds.MountAndBlade;
@@ -11,7 +12,7 @@ namespace Coop.Mod.Patch.Agents
         public static event Action<Agent, Agent> OnAgentInteraction;
         static bool Prefix(ref Agent userAgent, ref Agent agent)
         {
-            if (!agent.Character.IsPlayerCharacter)
+            if (!agent.IsNetworkAgent())
             {
                 return true;
             }
