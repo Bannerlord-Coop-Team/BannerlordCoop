@@ -424,15 +424,15 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
-      <Name>Common</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <Folder Include="Services\Heros\Handlers\" />
     <Folder Include="Services\Heros\Interfaces\" />
     <Folder Include="Services\Heros\Messages\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{9258BCC2-E74D-4BCF-B016-D95DBF420F2F}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
