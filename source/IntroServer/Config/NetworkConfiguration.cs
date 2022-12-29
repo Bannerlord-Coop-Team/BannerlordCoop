@@ -17,19 +17,19 @@ namespace IntroServer.Config
         /// <summary>
         ///     ip address of the server in LAN.
         /// </summary>
-        public IPAddress LanAddress { get; set; } = IPAddress.Parse("127.0.0.1");
+        public IPAddress LanAddress { get; } = IPAddress.Parse("127.0.0.1");
         /// <summary>
         ///     port of the server in LAN.
         /// </summary>
-        public int LanPort { get; set; } = 4201;
+        public int LanPort { get; } = 4201;
         /// <summary>
         ///     ip address of the server in WAN.
         /// </summary>
-        public IPAddress WanAddress { get; set; } = IPAddress.Parse("144.202.53.18");
+        public IPAddress WanAddress { get; } = IPAddress.Parse("144.202.53.18");
         /// <summary>
         ///     port of the server in WAN.
         /// </summary>
-        public int WanPort { get; set; } = 4200;
+        public int WanPort { get; } = 4200;
         /// <summary>
         ///     Interval in which the server will send out LAN discovery messages.
         /// </summary>
@@ -37,38 +37,38 @@ namespace IntroServer.Config
         /// <summary>
         ///     port the server will broadcast a LAN discovery message.
         /// </summary>
-        public int LanDiscoveryPort { get; set; } = 4202;
+        public int LanDiscoveryPort { get; } = 4202;
         /// <summary>
         ///     Interval in which the server will send out <see cref="EPacket.KeepAlive"/>
         ///     packets.
         /// </summary>
-        public TimeSpan KeepAliveInterval { get; set; } = TimeSpan.FromSeconds(1);
+        public TimeSpan KeepAliveInterval { get; } = TimeSpan.FromSeconds(1);
         /// <summary>
         ///     If a connection is inactive (no requests or response) for longer than this time
         ///     frame, it will be disconnected.
         /// </summary>
-        public TimeSpan DisconnectTimeout { get; set; } = TimeSpan.FromSeconds(60);
+        public TimeSpan DisconnectTimeout { get; } = TimeSpan.FromSeconds(60);
         /// <summary>
         ///     Delay after a failed connection attempt until it is tried again.
         /// </summary>
-        public TimeSpan ReconnectDelay { get; set; } = TimeSpan.FromSeconds(2);
+        public TimeSpan ReconnectDelay { get; } = TimeSpan.FromSeconds(2);
         /// <summary>
         ///     Update cycle time for the network receiver.
         /// </summary>
-        public TimeSpan UpdateTime { get; set; } = TimeSpan.FromMilliseconds(15);
+        public TimeSpan UpdateTime { get; } = TimeSpan.FromMilliseconds(15);
 
         #region P2P
         /// <summary>
         ///     P2P Identifier.
         /// </summary>
-        public string P2PToken { get; set; } = "P2PToken";
+        public string P2PToken { get; } = "P2PToken";
         /// <summary>
         ///     P2P NAT Type
         /// </summary>
 #if DEBUG
-        public NATType NATType { get; set; } = NATType.Internal;
+        public NATType NATType { get; } = NATType.Internal;
 #else
-        public NATType NATType { get; set; } = NATType.External;
+        public NATType NATType { get; } = NATType.External;
 #endif
         #endregion
     }

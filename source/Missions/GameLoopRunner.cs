@@ -38,7 +38,7 @@ namespace Coop.Mod
 
             foreach ((Action, EventWaitHandle) task in toBeRun)
             {
-                task.Item1.Invoke();
+                task.Item1?.Invoke();
                 task.Item2?.Set();
             }
         }

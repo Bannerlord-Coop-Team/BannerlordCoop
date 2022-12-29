@@ -19,7 +19,9 @@ namespace GameInterface.Serialization
     /// <summary>
     /// A base class for creating binary packages for objects.
     /// </summary>
-    /// <typeparam name="T">The type of the object to be packed or unpacked.</typeparam>
+    /// <typeparam name="T">
+    /// The type of the object to be packed or unpacked.
+    /// </typeparam>
     [Serializable]
     public abstract class BinaryPackageBase<T> : IBinaryPackage
     {
@@ -29,8 +31,13 @@ namespace GameInterface.Serialization
         [NonSerialized]
         protected T Object;
 
+        public BinaryPackageFactory BinaryPackageFactory
+        {
+            get { return _binaryPackageFactory; }
+            set { _binaryPackageFactory = value; }
+        }
         [NonSerialized]
-        protected BinaryPackageFactory BinaryPackageFactory;
+        private BinaryPackageFactory _binaryPackageFactory;
 
         protected Type ObjectType => typeof(T);
 
@@ -41,6 +48,8 @@ namespace GameInterface.Serialization
 
         protected BinaryPackageBase(T obj, BinaryPackageFactory binaryPackageFactory)
         {
+            if (obj == null) throw new ArgumentNullException();
+
             Object = obj;
             BinaryPackageFactory = binaryPackageFactory;
         }
@@ -59,7 +68,9 @@ namespace GameInterface.Serialization
         /// <summary>
         /// Unpacks the stored data for an object and returns the resulting object.
         /// </summary>
-        /// <returns>The object created from the stored data.</returns>
+        /// <returns>
+        /// The object created from the stored data.
+        /// </returns>
         public object Unpack()
         {
             if (IsUnpacked) return Object;

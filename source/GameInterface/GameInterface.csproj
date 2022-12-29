@@ -302,6 +302,9 @@
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\ArmyBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CharacterAttributesBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\MBEquipmentRosterBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\MBBodyPropertyBinaryPackage.cs" />
+    <Compile Include="Serialization\Impl\MBCharacterSkillsBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\KingdomBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CommonAreaPartyComponentBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\CharacterAttributeBinaryPackage.cs" />

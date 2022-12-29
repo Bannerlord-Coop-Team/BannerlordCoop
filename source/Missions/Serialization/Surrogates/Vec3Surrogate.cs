@@ -11,7 +11,7 @@ using TaleWorlds.ObjectSystem;
 namespace Missions.Serialization.Surrogates
 {
     [ProtoContract(SkipConstructor = true)]
-    internal readonly struct Vec3Surrogate
+    public readonly struct Vec3Surrogate
     {
         [ProtoMember(1)]
         public float X { get; }
@@ -42,7 +42,6 @@ namespace Missions.Serialization.Surrogates
 
         public static implicit operator Vec3(Vec3Surrogate surrogate)
         {
-
             return surrogate.Deserialize();
         }
     }

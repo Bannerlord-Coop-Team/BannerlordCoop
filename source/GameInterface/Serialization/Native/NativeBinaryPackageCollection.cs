@@ -1,8 +1,10 @@
-﻿using System;
+﻿using GameInterface.Serialization.Generics;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.Native
 {
@@ -17,6 +19,8 @@ namespace GameInterface.Serialization.Native
 
                 { typeof(Dictionary<,>), typeof(DictionaryBinaryPackage) },
                 { typeof(KeyValuePair<,>), typeof(KeyValuePairBinaryPackage) },
+
+                { typeof(MBReadOnlyList<>), typeof(MBReadOnlyListBinaryPackage) },
             };
 
             return types;
