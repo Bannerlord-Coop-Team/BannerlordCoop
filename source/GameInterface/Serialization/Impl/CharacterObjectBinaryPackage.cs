@@ -19,7 +19,6 @@ namespace GameInterface.Serialization.Impl
         public static readonly FieldInfo CharacterObject_originCharacter = typeof(CharacterObject).GetField("_originCharacter", BindingFlags.NonPublic | BindingFlags.Instance);
         public static readonly PropertyInfo CharacterObject_UpgradeTargets = typeof(CharacterObject).GetProperty(nameof(CharacterObject.UpgradeTargets));
 
-        string stringId;
         string battleEquipmentTemplateId;
         string civilianEquipmentTemplateId;
         string originCharacterId;
@@ -39,9 +38,6 @@ namespace GameInterface.Serialization.Impl
 
         protected override void PackInternal()
         {
-            // Store the string identifier of the object in a local variable
-            stringId = Object.StringId;
-
             // Iterate through all of the instance fields of the object's type, excluding any fields that are specified in the Excludes collection
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields(Excludes))
             {
@@ -69,17 +65,6 @@ namespace GameInterface.Serialization.Impl
 
         protected override void UnpackInternal()
         {
-            // Resolve using a StringId when one exists in the MBObjectManager
-            if (stringId != null)
-            {
-                CharacterObject characterObject = MBObjectManager.Instance.GetObject<CharacterObject>(stringId);
-                if (characterObject != null)
-                {
-                    Object = characterObject;
-                    return;
-                }
-            }
-
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
