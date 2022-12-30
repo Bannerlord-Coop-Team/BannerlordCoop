@@ -119,6 +119,10 @@
     <Reference Include="TaleWorlds.Library">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.Localization, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>

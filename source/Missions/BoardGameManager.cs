@@ -41,7 +41,7 @@ namespace Missions
             if (Mission.Current.HasMissionBehavior<MissionBoardGameLogic>() &&
                Agent.Main == sender)
             {
-                //Free board game selection, for bug testing etc
+                //Free board game selection, for bug testing etc (Doesn't work)
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Player Interaction", "Interacting with " + other.Name,
                     new List<InquiryElement>()
                         {

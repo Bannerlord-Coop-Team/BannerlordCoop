@@ -8,8 +8,11 @@ using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;
 using SandBox.BoardGames.Pawns;
 using System;
+using System.IO;
 using System.Reflection;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using static TaleWorlds.CampaignSystem.CultureObject;
 
@@ -163,6 +166,9 @@ namespace Coop.Mod.Missions
             }
         }
 
+        string path = "C:/Users/alexa/Desktop/cooplog.txt";
+
+
         private void OnPlayerInput(Move move)
         {
             if (!move.IsValid)
@@ -170,8 +176,12 @@ namespace Coop.Mod.Missions
                 return;
             }
 
+            
+
             int FromIndex = m_BoardGameLogic.Board.PlayerOneUnits.IndexOf(move.Unit);
             int ToIndex = m_BoardGameLogic.Board.Tiles.IndexOf(move.GoalTile);
+
+            File.AppendAllText(path, "Sent: " + ToIndex + Environment.NewLine);
             BoardGameMoveRequest boardGameMoveEvent = new BoardGameMoveRequest(GameId, FromIndex, ToIndex);
             m_MessageBroker.Publish(boardGameMoveEvent);
         }
@@ -184,6 +194,8 @@ namespace Coop.Mod.Missions
 
                 var unitToMove = boardGame.PlayerTwoUnits[payload.What.FromIndex];
                 var goalTile = boardGame.Tiles[payload.What.ToIndex];
+
+                File.AppendAllText(path, "Recieved: " + payload.What.ToIndex + Environment.NewLine);
 
                 if (boardGame is BoardGamePuluc)
                 {
@@ -222,7 +234,10 @@ namespace Coop.Mod.Missions
         {
             if(payload.What.GameId == GameId)
             {
-                m_BoardGameLogic.SetGameOver(GameOverEnum.PlayerOneWon);
+                m_BoardGameLogic.AIForfeitGame();
+                MBInformationManager.AddQuickInformation(new TextObject("You won! Your opponent has surrendered"));
+
+                //m_BoardGameLogic.SetGameOver(GameOverEnum.PlayerOneWon);
                 Dispose();
             }
         }
