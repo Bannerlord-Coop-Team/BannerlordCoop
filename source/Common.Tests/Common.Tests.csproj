@@ -28,10 +28,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Common\Common.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Reference Include="TaleWorlds.Library, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
     </Reference>
