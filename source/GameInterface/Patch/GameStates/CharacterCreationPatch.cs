@@ -1,11 +1,4 @@
-﻿using Common.Messaging;
-using GameInterface.Services.GameDebug.Messages;
-using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
 
 namespace GameInterface.Patch.GameStates

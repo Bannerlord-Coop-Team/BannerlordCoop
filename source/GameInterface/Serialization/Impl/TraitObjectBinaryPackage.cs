@@ -1,6 +1,5 @@
 ﻿using System;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Impl

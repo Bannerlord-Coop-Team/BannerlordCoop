@@ -5,12 +5,9 @@ using GameInterface.Tests.Bootstrap;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Security.Policy;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

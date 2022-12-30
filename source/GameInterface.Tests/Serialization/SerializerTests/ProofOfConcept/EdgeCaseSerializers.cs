@@ -1,6 +1,5 @@
 ﻿using GameInterface.Serialization;
 using System;
-using System.Runtime.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 {

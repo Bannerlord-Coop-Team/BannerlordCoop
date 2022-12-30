@@ -1,8 +1,6 @@
 ﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
 using System.Collections.Generic;
-using System.Linq;
-using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit;
 
@@ -127,7 +125,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             TextObject newTextObject = returnedPackage.Unpack<TextObject>();
 
             Assert.Equal(textObject.ToString(), newTextObject.ToString());
-            Assert.Equal(newTextObject.ToString(), "Testing with simple nests");
+            Assert.Equal("Testing with simple nests", newTextObject.ToString());
         }
     }
 }

@@ -39,6 +39,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
@@ -163,7 +164,6 @@
     <Compile Include="Serialization\SerializerTests\SkeletonScaleSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PieceDataSerializationTest.cs" />
-    <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WorkshopTypeSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\WeaponDesignSerializationTest.cs" />
     <Compile Include="Serialization\DictTest.cs" />

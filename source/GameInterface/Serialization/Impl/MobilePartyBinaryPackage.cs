@@ -5,7 +5,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Impl

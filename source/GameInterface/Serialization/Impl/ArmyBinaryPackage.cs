@@ -1,9 +1,7 @@
 ﻿using Common.Extensions;
 using System;
 using System.Reflection;
-using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
 using System.Collections.Generic;
 
 namespace GameInterface.Serialization.Impl

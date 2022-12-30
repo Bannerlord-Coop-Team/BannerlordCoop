@@ -1,20 +1,7 @@
-﻿using Autofac.Features.Indexed;
-using Common.Extensions;
-using GameInterface.Serialization;
+﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
-using System.Diagnostics;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.Serialization;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
-using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.Localization;
-using TaleWorlds.ObjectSystem;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

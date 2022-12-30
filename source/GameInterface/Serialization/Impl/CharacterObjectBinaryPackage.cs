@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.Impl
 {

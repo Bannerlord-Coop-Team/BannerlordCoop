@@ -7,7 +7,6 @@ using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;
 using SandBox.BoardGames.Pawns;
-using SandBox.GauntletUI.Missions;
 using System;
 using System.Reflection;
 using TaleWorlds.Library;

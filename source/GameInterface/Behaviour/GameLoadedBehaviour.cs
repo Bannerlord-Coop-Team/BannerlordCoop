@@ -4,9 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Behaviour
 {

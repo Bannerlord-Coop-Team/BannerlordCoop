@@ -1,12 +1,10 @@
 ﻿using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
-using System;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.Library;
 using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests

@@ -1,7 +1,6 @@
 ﻿using Common.Extensions;
 using GameInterface.Serialization.Native;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Data.Linq;
 using System.Linq;

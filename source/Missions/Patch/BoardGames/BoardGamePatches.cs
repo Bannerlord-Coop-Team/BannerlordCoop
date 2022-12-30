@@ -5,15 +5,10 @@ using SandBox.BoardGames;
 using SandBox.BoardGames.AI;
 using SandBox.BoardGames.MissionLogics;
 using SandBox.BoardGames.Pawns;
-using SandBox.Conversation.MissionLogics;
 using SandBox.Source.Missions.AgentBehaviors;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Coop.Mod.Patch.BoardGames

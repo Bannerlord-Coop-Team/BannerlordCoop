@@ -5,7 +5,6 @@ using NLog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ModuleManager;
-using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.SaveSystem.Save;

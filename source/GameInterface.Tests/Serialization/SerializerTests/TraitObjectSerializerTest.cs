@@ -1,10 +1,7 @@
 ﻿using GameInterface.Serialization.Impl;
 using GameInterface.Serialization;
-using TaleWorlds.Core;
 using Xunit;
 using System.Runtime.Serialization;
-using Common.Extensions;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
