@@ -22,10 +22,12 @@ namespace IntroServer.Config
         ///     port of the server in LAN.
         /// </summary>
         public int LanPort { get; } = 4201;
+
+        private string WanAddressText { get; set; }
         /// <summary>
         ///     ip address of the server in WAN.
         /// </summary>
-        public IPAddress WanAddress { get; } = IPAddress.Parse("144.202.53.18");
+        public IPAddress WanAddress => IPAddress.Parse(WanAddressText);
         /// <summary>
         ///     port of the server in WAN.
         /// </summary>
