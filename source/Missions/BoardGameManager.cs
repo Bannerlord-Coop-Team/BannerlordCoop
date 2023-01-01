@@ -41,7 +41,6 @@ namespace Missions
         {
             if (Mission.Current.HasMissionBehavior<MissionBoardGameLogic>() && Agent.Main == sender)
             {
-                Campaign.Current.ConversationManager.EndConversation();
                 SendGameRequest(sender, other);
             }
 

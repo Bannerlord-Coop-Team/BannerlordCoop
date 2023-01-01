@@ -2,7 +2,9 @@
 using Missions.Extensions;
 using SandBox.Conversation.MissionLogics;
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Coop.Mod.Patch.Agents
@@ -17,7 +19,7 @@ namespace Coop.Mod.Patch.Agents
                 ProcessSentencePatch.SetInteractedAgents(null, null);
                 return true;
             }
-
+            
             ProcessSentencePatch.SetInteractedAgents(userAgent, agent);
             return true;
 
@@ -33,8 +35,9 @@ namespace Coop.Mod.Patch.Agents
         public static event Action<Agent, Agent> OnAgentInteraction;
         public static bool Prefix(ConversationSentenceOption conversationSentenceOption)
         {
-            if (conversationSentenceOption.Id == "lord_player_start_game")
+            if (conversationSentenceOption.Id == "lord_player_start_game" && targetAgent.IsNetworkAgent())
             {
+                MissionConversationLogic.Current.ConversationManager.EndConversation();
                 OnAgentInteraction?.Invoke(requesterAgent, targetAgent);
                 return false;
             }
