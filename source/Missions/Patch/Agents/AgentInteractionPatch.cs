@@ -2,6 +2,7 @@
 using Missions.Extensions;
 using SandBox.Conversation.MissionLogics;
 using System;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.MountAndBlade;
 
 namespace Coop.Mod.Patch.Agents
@@ -9,19 +10,40 @@ namespace Coop.Mod.Patch.Agents
     [HarmonyPatch(typeof(MissionConversationLogic), "OnAgentInteraction")]
     public class AgentInteractionPatch
     {
-        public static event Action<Agent, Agent> OnAgentInteraction;
-        static bool Prefix(ref Agent userAgent, ref Agent agent)
+        public static bool Prefix(ref Agent userAgent, ref Agent agent)
         {
             if (!agent.IsNetworkAgent())
             {
+                ProcessSentencePatch.SetInteractedAgents(null, null);
                 return true;
             }
 
-            // TODO fix board games
-            OnAgentInteraction?.Invoke(userAgent, agent);
+            ProcessSentencePatch.SetInteractedAgents(userAgent, agent);
+            return true;
 
-            return false;
+        }
+    }
 
+    [HarmonyPatch(typeof(ConversationManager), "ProcessSentence")]
+    public class ProcessSentencePatch
+    {
+        private static Agent requesterAgent;
+        private static Agent targetAgent;
+
+        public static event Action<Agent, Agent> OnAgentInteraction;
+        public static bool Prefix(ConversationSentenceOption conversationSentenceOption)
+        {
+            if (conversationSentenceOption.Id == "lord_player_start_game")
+            {
+                OnAgentInteraction?.Invoke(requesterAgent, targetAgent);
+                return false;
+            }
+            return true;
+        }
+        public static void SetInteractedAgents(Agent reqAgent, Agent tarAgent)
+        {
+            requesterAgent = reqAgent;
+            targetAgent = tarAgent;
         }
     }
 }
