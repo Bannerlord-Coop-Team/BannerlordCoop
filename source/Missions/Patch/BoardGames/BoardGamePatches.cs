@@ -101,9 +101,7 @@ namespace Coop.Mod.Patch.BoardGames
     {
         public static bool Prefix()
         {
-            if (!BoardGameLogic.IsPlayingOtherPlayer) return true;
-
-            return false;
+            return !BoardGameLogic.IsPlayingOtherPlayer;
         }
     }
 
