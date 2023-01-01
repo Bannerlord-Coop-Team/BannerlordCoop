@@ -5,6 +5,7 @@ using Missions.Network;
 using NLog;
 using SandBox;
 using SandBox.BoardGames;
+using SandBox.BoardGames.AI;
 using SandBox.BoardGames.MissionLogics;
 using SandBox.BoardGames.Pawns;
 using System;
@@ -42,11 +43,11 @@ namespace Coop.Mod.Missions
 
             StartConversationAfterGamePatch.OnGameOver += OnGameOver;
             ForfeitGamePatch.OnForfeitGame += OnForfeitGame;
-            HandlePlayerInputPatch.OnHandlePlayerInput += OnPlayerInput;
             HandlePreMovementStagePatch.OnHandlePreMovementStage += PreMovementStage;
             SetPawnCapturedSeegaPatch.OnSetPawnCaptured += SeegaPawnCapture;
             PreplaceUnitsPatch.OnPreplaceUnits += PreplaceUnits;
-            
+            HandlePlayerInputPatch.OnHandlePlayerInput += OnPlayerInput;
+
         }
 
         ~BoardGameLogic()
@@ -64,10 +65,10 @@ namespace Coop.Mod.Missions
 
             StartConversationAfterGamePatch.OnGameOver -= OnGameOver;
             ForfeitGamePatch.OnForfeitGame -= OnForfeitGame;
-            HandlePlayerInputPatch.OnHandlePlayerInput -= OnPlayerInput;
             HandlePreMovementStagePatch.OnHandlePreMovementStage -= PreMovementStage;
             SetPawnCapturedSeegaPatch.OnSetPawnCaptured -= SeegaPawnCapture;
             PreplaceUnitsPatch.OnPreplaceUnits -= PreplaceUnits;
+            HandlePlayerInputPatch.OnHandlePlayerInput -= OnPlayerInput;
         }
 
         private static readonly PropertyInfo OpposingAgentPropertyInfo = typeof(MissionBoardGameLogic).GetProperty("OpposingAgent");
@@ -166,9 +167,6 @@ namespace Coop.Mod.Missions
             }
         }
 
-        string path = "C:/Users/alexa/Desktop/cooplog.txt";
-
-
         private void OnPlayerInput(Move move)
         {
             if (!move.IsValid)
@@ -176,12 +174,9 @@ namespace Coop.Mod.Missions
                 return;
             }
 
-            
-
             int FromIndex = m_BoardGameLogic.Board.PlayerOneUnits.IndexOf(move.Unit);
             int ToIndex = m_BoardGameLogic.Board.Tiles.IndexOf(move.GoalTile);
 
-            File.AppendAllText(path, "Sent: " + ToIndex + Environment.NewLine);
             BoardGameMoveRequest boardGameMoveEvent = new BoardGameMoveRequest(GameId, FromIndex, ToIndex);
             m_MessageBroker.Publish(boardGameMoveEvent);
         }
@@ -194,8 +189,6 @@ namespace Coop.Mod.Missions
 
                 var unitToMove = boardGame.PlayerTwoUnits[payload.What.FromIndex];
                 var goalTile = boardGame.Tiles[payload.What.ToIndex];
-
-                File.AppendAllText(path, "Recieved: " + payload.What.ToIndex + Environment.NewLine);
 
                 if (boardGame is BoardGamePuluc)
                 {
@@ -211,11 +204,8 @@ namespace Coop.Mod.Missions
 
                 var boardType = boardGame.GetType();
 
-                boardType.GetProperty("SelectedUnit", BindingFlags.NonPublic | BindingFlags.Instance)?
-                    .SetValue(boardGame, unitToMove);
-
                 var movePawnToTileMethod = boardType.GetMethod("MovePawnToTile", BindingFlags.NonPublic | BindingFlags.Instance);
-                movePawnToTileMethod?.Invoke(boardGame, new object[] { unitToMove, goalTile, false, true });
+                movePawnToTileMethod.Invoke(boardGame, new object[] { unitToMove, goalTile, false, true });
             }
         }
 
@@ -226,8 +216,6 @@ namespace Coop.Mod.Missions
             ForfeitGameMessage forfeitMessage = new ForfeitGameMessage(GameId);
             m_MessageBroker.Publish(forfeitMessage);
             Dispose();
-            //missionBoardGame.Board.SetGameOverInfo(GameOverEnum.PlayerTwoWon);
-            //missionBoardGame.SetGameOver(missionBoardGame.Board.GameOverInfo);
         }
 
         private void Handle_ForfeitGameMessage(MessagePayload<ForfeitGameMessage> payload)
@@ -236,12 +224,8 @@ namespace Coop.Mod.Missions
             {
                 m_BoardGameLogic.AIForfeitGame();
                 MBInformationManager.AddQuickInformation(new TextObject("You won! Your opponent has surrendered"));
-
-                //m_BoardGameLogic.SetGameOver(GameOverEnum.PlayerOneWon);
                 Dispose();
             }
         }
     }
 }
-//m_BoardGameLogic.AIForfeitGame();
-//Dispose();
