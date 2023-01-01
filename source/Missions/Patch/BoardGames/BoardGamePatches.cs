@@ -22,8 +22,6 @@ namespace Coop.Mod.Patch.BoardGames
     {
         static bool Prefix(Agent ownerAgent)
         {
-
-            //Somewhat ugly way to not break forfeit/win, might be issues with opposingAgent have not checked
             return BoardGameLogic.IsPlayingOtherPlayer == false;
         }
 
@@ -44,8 +42,7 @@ namespace Coop.Mod.Patch.BoardGames
             {
                 OnGameOver?.Invoke(__instance);
 
-                //Set AgentNavigator to null as this gets set in SetGameOver by default and destroys all future interactions
-                //PropertyInfo prop = conversationAgent.GetComponent<CampaignAgentComponent>().GetType().GetProperty("AgentNavigator", BindingFlags.Public | BindingFlags.Instance);
+                //Set AgentNavigator to null as this gets set in SetGameOver by default and breaks all future interactions
                 AgentNavigatorPropertyInfo.SetValue(conversationAgent.GetComponent<CampaignAgentComponent>(), null);
                 return false;
             }
@@ -156,24 +153,6 @@ namespace Coop.Mod.Patch.BoardGames
             OnPreplaceUnits?.Invoke();
 
             return true;
-
-        }
-    }
-
-    //override SetGameOver
-    [HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
-    public class SetGameOverPatch
-    {
-        public static event Action OnPreplaceUnits;
-
-        public static void Postfix(GameOverEnum gameOverInfo)
-        {
-
-            if (BoardGameLogic.IsPlayingOtherPlayer) return; 
-
-
-            //TODO to circumvent AgentNavigator OR patc GetComponent where T = CampaignAgentComponent
-            //OnPreplaceUnits?.Invoke();
 
         }
     }

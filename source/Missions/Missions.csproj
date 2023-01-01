@@ -173,7 +173,7 @@
     <Compile Include="Packets\Agents\AgentGroupController.cs" />
     <Compile Include="Packets\Agents\AgentMountData.cs" />
     <Compile Include="Packets\Agents\MovementHandler.cs" />
-    <Compile Include="Patch\Agents\AgentInteractionPatch.cs" />
+    <Compile Include="Patch\Agents\AgentInteractionPatches.cs" />
     <Compile Include="Patch\BoardGames\BoardGamePatches.cs" />
     <Compile Include="PlayerId.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
