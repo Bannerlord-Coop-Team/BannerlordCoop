@@ -44,7 +44,7 @@ namespace Coop.Mod.Missions
             StartConversationAfterGamePatch.OnGameOver += OnGameOver;
             ForfeitGamePatch.OnForfeitGame += OnForfeitGame;
             HandlePreMovementStagePatch.OnHandlePreMovementStage += PreMovementStage;
-            SetPawnCapturedSeegaPatch.OnSetPawnCaptured += SeegaPawnCapture;
+            SetPawnCapturedPatch.OnSetPawnCaptured += OnPawnCapture;
             PreplaceUnitsPatch.OnPreplaceUnits += PreplaceUnits;
             HandlePlayerInputPatch.OnHandlePlayerInput += OnPlayerInput;
 
@@ -66,7 +66,7 @@ namespace Coop.Mod.Missions
             StartConversationAfterGamePatch.OnGameOver -= OnGameOver;
             ForfeitGamePatch.OnForfeitGame -= OnForfeitGame;
             HandlePreMovementStagePatch.OnHandlePreMovementStage -= PreMovementStage;
-            SetPawnCapturedSeegaPatch.OnSetPawnCaptured -= SeegaPawnCapture;
+            SetPawnCapturedPatch.OnSetPawnCaptured -= OnPawnCapture;
             PreplaceUnitsPatch.OnPreplaceUnits -= PreplaceUnits;
             HandlePlayerInputPatch.OnHandlePlayerInput -= OnPlayerInput;
         }
@@ -79,7 +79,6 @@ namespace Coop.Mod.Missions
 
             // Need for SetGameOver() -> OpposingAgent.GetComponent<CampaignAgentComponent>().AgentNavigator.SpecialTargetTag = this._specialTagOfOpposingHero;
             opposingAgent?.GetComponent<CampaignAgentComponent>().CreateAgentNavigator();
-
             OpposingAgentPropertyInfo.SetValue(m_BoardGameLogic, opposingAgent);
             m_BoardGameLogic.SetBoardGame(m_BoardGameType);
             m_BoardGameLogic.SetStartingPlayer(startFirst);
@@ -107,22 +106,22 @@ namespace Coop.Mod.Missions
             MovePawnToTileDelayedMethod.Invoke(seegaBoardGame, new object[] { seegaBoardGame.PlayerOneUnits[1], seegaBoardGame.GetTile(2, 4), false, false, 1f });
         }
 
-        private void SeegaPawnCapture(PawnBase pawn)
+        private void OnPawnCapture(PawnBase pawn)
         {
             //Only call SetPawnCaptured when it's a forceful remove as a result of no moves available as otherwise it gets handled locally from the move
-            if (!FocusBlockingPawnsPatch.ForceRemove)
-            {
-                return;
-            }
+            //if (!FocusBlockingPawnsPatch.ForceRemove)
+            //{
+            //    return;
+            //}
 
             int fromIndex = m_BoardGameLogic.Board.PlayerTwoUnits.IndexOf(pawn);
             PawnCapturedMessage pawnCapturedEvent = new PawnCapturedMessage(GameId, fromIndex);
             m_MessageBroker.Publish(pawnCapturedEvent);
 
-            if (IsPlayingOtherPlayer)
-            {
-                FocusBlockingPawnsPatch.ForceRemove = false;
-            }
+            //if (IsPlayingOtherPlayer)
+            //{
+            //    FocusBlockingPawnsPatch.ForceRemove = false;
+            //}
         }
 
         private void Handle_PawnCapture(MessagePayload<PawnCapturedMessage> payload)
@@ -130,17 +129,7 @@ namespace Coop.Mod.Missions
             if (payload.What.GameId == GameId)
             {
                 BoardGameBase boardGame = m_BoardGameLogic.Board;
-                PawnBase unitToCapture;
-
-                if (boardGame is BoardGameSeega)
-                {
-                    unitToCapture = boardGame.PlayerOneUnits[payload.What.Index];
-                }
-                else
-                {
-                    unitToCapture = boardGame.PlayerTwoUnits[payload.What.Index];
-                }
-
+                PawnBase unitToCapture = boardGame.PlayerOneUnits[payload.What.Index];
                 boardGame.SetPawnCaptured(unitToCapture);
 
                 if (!(boardGame is BoardGameSeega))

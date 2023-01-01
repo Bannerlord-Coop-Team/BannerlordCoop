@@ -1,6 +1,7 @@
 ﻿using Coop.Mod.Missions;
 using HarmonyLib;
 using Missions.Network;
+using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.AI;
 using SandBox.BoardGames.MissionLogics;
@@ -35,6 +36,7 @@ namespace Coop.Mod.Patch.BoardGames
     [HarmonyPatch(typeof(MissionBoardGameLogic), "StartConversationWithOpponentAfterGameEnd")]
     public class StartConversationAfterGamePatch
     {
+        private static readonly PropertyInfo AgentNavigatorPropertyInfo = typeof(CampaignAgentComponent).GetProperty("AgentNavigator");
         public static event Action<MissionBoardGameLogic> OnGameOver;
         static bool Prefix(MissionBoardGameLogic __instance, Agent conversationAgent)
         {
@@ -42,6 +44,9 @@ namespace Coop.Mod.Patch.BoardGames
             {
                 OnGameOver?.Invoke(__instance);
 
+                //Set AgentNavigator to null as this gets set in SetGameOver by default and destroys all future interactions
+                //PropertyInfo prop = conversationAgent.GetComponent<CampaignAgentComponent>().GetType().GetProperty("AgentNavigator", BindingFlags.Public | BindingFlags.Instance);
+                AgentNavigatorPropertyInfo.SetValue(conversationAgent.GetComponent<CampaignAgentComponent>(), null);
                 return false;
             }
 
@@ -128,11 +133,11 @@ namespace Coop.Mod.Patch.BoardGames
         }
     }
 
-    [HarmonyPatch(typeof(BoardGameSeega), "SetPawnCaptured")]
-    public class SetPawnCapturedSeegaPatch
+    [HarmonyPatch(typeof(BoardGameBase), "SetPawnCaptured")]
+    public class SetPawnCapturedPatch
     {
         public static event Action<PawnBase> OnSetPawnCaptured;
-        public static void Prefix(PawnBase pawn, bool aiSimulation)
+        public static void Postfix(PawnBase pawn, bool fake)
         {
             OnSetPawnCaptured?.Invoke(pawn);
         }
@@ -151,6 +156,24 @@ namespace Coop.Mod.Patch.BoardGames
             OnPreplaceUnits?.Invoke();
 
             return true;
+
+        }
+    }
+
+    //override SetGameOver
+    [HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
+    public class SetGameOverPatch
+    {
+        public static event Action OnPreplaceUnits;
+
+        public static void Postfix(GameOverEnum gameOverInfo)
+        {
+
+            if (BoardGameLogic.IsPlayingOtherPlayer) return; 
+
+
+            //TODO to circumvent AgentNavigator OR patc GetComponent where T = CampaignAgentComponent
+            //OnPreplaceUnits?.Invoke();
 
         }
     }
