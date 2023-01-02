@@ -25,6 +25,9 @@ namespace IntroServer.Server
             _netManager = new NetManager(this)
             {
                 NatPunchEnabled = true,
+                DisconnectTimeout = config.DisconnectTimeout.Milliseconds,
+                PingInterval = config.PingInterval.Milliseconds,
+                ReconnectDelay = config.ReconnectDelay.Milliseconds,
             };
             _netManager.NatPunchModule.Init(this);
 

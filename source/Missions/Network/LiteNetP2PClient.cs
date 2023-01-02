@@ -35,13 +35,16 @@ namespace Missions.Network
         private static readonly Dictionary<PacketType, List<IPacketHandler>> m_PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
         private readonly NetworkConfiguration networkConfig;
         private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
-        public LiteNetP2PClient(NetworkConfiguration configuration)
+        public LiteNetP2PClient(NetworkConfiguration config)
         {
-            networkConfig = configuration;
+            networkConfig = config;
 
             netManager = new NetManager(this)
             {
                 NatPunchEnabled = true,
+                DisconnectTimeout = config.DisconnectTimeout.Milliseconds,
+                PingInterval = config.PingInterval.Milliseconds,
+                ReconnectDelay = config.ReconnectDelay.Milliseconds,
             };
 
             netManager.NatPunchModule.Init(this);
