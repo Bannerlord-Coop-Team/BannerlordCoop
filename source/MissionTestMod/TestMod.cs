@@ -70,7 +70,8 @@ namespace MissionTestMod
             "Sandbox",
             "SandBox Core",
             "StoryMode",
-            "MissionTestMod"
+            "CustomBattle",
+            "BirthAndDeath",
         };
         private static bool ValidateModules(MetaData metaData)
         {
