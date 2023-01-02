@@ -28,11 +28,11 @@ namespace Missions.Network
         public NetPeer PeerServer { get; private set; }
         public int Priority => 2;
 
+        private static readonly Dictionary<PacketType, List<IPacketHandler>> m_PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
+
         private readonly NetManager netManager;
         private string instance;
-        
 
-        private static readonly Dictionary<PacketType, List<IPacketHandler>> m_PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
         private readonly NetworkConfiguration networkConfig;
         private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
         public LiteNetP2PClient(NetworkConfiguration config)
