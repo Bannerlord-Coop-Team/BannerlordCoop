@@ -116,7 +116,7 @@ namespace Missions.Network
 
         public void NatPunch(string instance)
         {
-            this._instance = instance;
+            _instance = instance;
             TryPunch(instance);
         }
 
@@ -232,7 +232,7 @@ namespace Missions.Network
 
             string instance = data[0];
 
-            if (this._instance == instance)
+            if (_instance == instance)
             {
                 request.Accept();
             }
