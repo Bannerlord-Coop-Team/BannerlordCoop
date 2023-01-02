@@ -70,6 +70,8 @@ namespace Common.Logging
 		public void Dispose()
 		{
 			// Cancel the poller task.
+			if (_cancellation.IsCancellationRequested)
+				return;
 			_cancellation.Cancel();
 			// Wait for the poller task to complete.
 			while (!_poller.IsCompleted)
