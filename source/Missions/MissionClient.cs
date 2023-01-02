@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Messaging;
 using LiteNetLib;
 using Missions;
 using Missions.Messages;
@@ -18,23 +19,23 @@ namespace Coop.Mod.Missions
 
         public BoardGameManager BoardGameManager { get; private set; }
         public MovementHandler MovementHandler { get; private set; }
-        public INetworkMessageBroker MessageBroker { get; private set; }
+        private readonly IMessageBroker _messageBroker;
 
         private readonly LiteNetP2PClient m_Client;
 
         private readonly Guid m_PlayerId;
 
-        public MissionClient(LiteNetP2PClient client)
+        public MissionClient(LiteNetP2PClient client, IMessageBroker messageBroker)
         {
             m_Client = client;
             m_PlayerId = Guid.NewGuid();
-            MessageBroker = new NetworkMessageBroker(m_Client);
-            BoardGameManager = new BoardGameManager(MessageBroker);
+            _messageBroker = messageBroker;
+            BoardGameManager = new BoardGameManager(client, _messageBroker);
             MovementHandler = new MovementHandler(m_Client);
 
             m_Client.OnClientConnected += SendJoinInfo;
 
-            MessageBroker.Subscribe<MissionJoinInfo>(Handle_JoinInfo);
+            _messageBroker.Subscribe<MissionJoinInfo>(Handle_JoinInfo);
         }
 
         ~MissionClient()
@@ -44,11 +45,12 @@ namespace Coop.Mod.Missions
 
         public void Dispose()
         {
+
             m_Client.OnClientConnected -= SendJoinInfo;
-            MessageBroker.Unsubscribe<MissionJoinInfo>(Handle_JoinInfo);
+            _messageBroker.Unsubscribe<MissionJoinInfo>(Handle_JoinInfo);
 
             MovementHandler.Dispose();
-            MessageBroker.Dispose();
+            _messageBroker.Dispose();
         }
 
         public void SendJoinInfo(NetPeer peer)
@@ -58,7 +60,7 @@ namespace Coop.Mod.Missions
 
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
             MissionJoinInfo request = new MissionJoinInfo(characterObject, m_PlayerId, Agent.Main.Position);
-            MessageBroker.Publish(request, peer);
+            _messageBroker.Publish(request, peer);
         }
 
         private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)

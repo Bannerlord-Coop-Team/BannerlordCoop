@@ -6,6 +6,5 @@ namespace Missions.Network
     {
         DeliveryMethod DeliveryMethod { get; }
         PacketType PacketType { get; }
-        byte[] Data { get; }
     }
 }

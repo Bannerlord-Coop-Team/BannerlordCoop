@@ -1,10 +1,11 @@
-﻿using ProtoBuf;
+﻿using Common.Messaging;
+using ProtoBuf;
 using System;
 
 namespace Missions.Messages.BoardGames
 {
     [ProtoContract]
-    public readonly struct PawnCapturedMessage
+    public readonly struct PawnCapturedMessage : INetworkEvent
     {
         public PawnCapturedMessage(Guid gameId, int index)
         {

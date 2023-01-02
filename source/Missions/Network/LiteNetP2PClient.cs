@@ -1,10 +1,13 @@
 ﻿using Common;
+using Common.Messaging;
 using Common.Serialization;
 using IntroServer.Config;
 using IntroServer.Data;
 using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Missions.Messages.Network;
+using Missions.Packets.Events;
 using NLog;
 using System;
 using System.Collections.Generic;
@@ -34,9 +37,11 @@ namespace Missions.Network
         private readonly NetManager _netManager;
         private readonly NetworkConfiguration _networkConfig;
         private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
-        public LiteNetP2PClient(NetworkConfiguration config)
+        private readonly IMessageBroker _messageBroker;
+        public LiteNetP2PClient(NetworkConfiguration configuration, IMessageBroker messageBroker)
         {
-            _networkConfig = config;
+            _networkConfig = configuration;
+            _messageBroker = messageBroker;
 
             _netManager = new NetManager(this)
             {
@@ -139,12 +144,26 @@ namespace Missions.Network
             _netManager.Stop();
         }
 
-        public void Send(IPacket packet, NetPeer client)
+        public void SendEvent(INetworkEvent networkEvent, NetPeer peer)
+        {
+            EventPacket eventPacket = new EventPacket(networkEvent);
+
+            Send(eventPacket, peer);
+        }
+
+        public void SendAllEvent(INetworkEvent networkEvent)
+        {
+            EventPacket eventPacket = new EventPacket(networkEvent);
+
+            SendAll(eventPacket);
+        }
+
+        public void Send(IPacket packet, NetPeer peer)
         {
             //if (netManager.ConnectedPeersCount < 1) return;
             NetDataWriter writer = new NetDataWriter();
             writer.PutBytesWithLength(ProtoBufSerializer.Serialize(packet));
-            client.Send(writer, packet.DeliveryMethod);
+            peer.Send(writer, packet.DeliveryMethod);
         }
 
         public void SendAll(IPacket packet)
@@ -179,6 +198,8 @@ namespace Missions.Network
         {
             if (PeerServer != null && peer != PeerServer)
             {
+                var peerConnectedEvent = new PeerConnected(peer);
+                _messageBroker.Publish(this, peerConnectedEvent);
                 OnClientConnected?.Invoke(peer);
             }
             Logger.Info($"{_netManager.LocalPort} recieved connection from {peer.EndPoint}");
@@ -186,13 +207,8 @@ namespace Missions.Network
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            foreach (var handlers in PacketHandlers.Values)
-            {
-                foreach (var handler in handlers)
-                {
-                    handler.HandlePeerDisconnect(peer, disconnectInfo);
-                }
-            }
+            var peerDisconnectedEvent = new PeerDisconnected(peer, disconnectInfo);
+            _messageBroker.Publish(this, peerDisconnectedEvent);
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
@@ -203,8 +219,7 @@ namespace Missions.Network
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
-            if (packet.Data == null) throw new NullReferenceException($"{packet.GetType()} is missing data, likely missing a ProtoMember attribute.");
-            if (PacketHandlers.TryGetValue(packet.PacketType, out var handlers))
+            if (m_PacketHandlers.TryGetValue(packet.PacketType, out var handlers))
             {
                 _batchLogger.Log(packet.PacketType);
                 foreach (var handler in handlers)

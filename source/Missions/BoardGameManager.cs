@@ -16,6 +16,7 @@ using TaleWorlds.Core;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Conversation;
+using Common.Messaging;
 
 namespace Missions
 {
@@ -23,18 +24,20 @@ namespace Missions
     {
         private readonly NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
 
-        public INetworkMessageBroker MessageBroker { get; private set; }
+        private readonly LiteNetP2PClient _P2PClient;
+        
+        private readonly IMessageBroker _messageBroker;
 
         private BoardGameLogic BoardGameLogic;
 
-        public BoardGameManager(INetworkMessageBroker messageBroker)
+        public BoardGameManager(LiteNetP2PClient P2PClient, IMessageBroker messageBroker)
         {
-            MessageBroker = messageBroker;
+            _P2PClient = P2PClient;
+            _messageBroker = messageBroker;
 
             ProcessSentencePatch.OnAgentInteraction += Handle_OnAgentInteraction;
 
-            MessageBroker.Subscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
-
+            _messageBroker.Subscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
         }
 
         private void Handle_OnAgentInteraction(Agent sender, Agent other)
@@ -52,8 +55,8 @@ namespace Missions
                 NetworkAgentRegistry.AgentToId.TryGetValue(other, out Guid otherGuid))
             {
                 BoardGameChallengeRequest request = new BoardGameChallengeRequest(senderGuid, otherGuid);
-                MessageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
-                MessageBroker.Publish(request);
+                _messageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
+                _messageBroker.Publish(request);
             }
             else
             {
@@ -83,7 +86,7 @@ namespace Missions
             Guid gameId = Guid.NewGuid();
 
             BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, true, gameId);
-            MessageBroker.Publish(response, netPeer);
+            _messageBroker.Publish(response, netPeer);
 
             //Has to do same thing as if (accepted) in Handle_ChallengeResponse
             if (NetworkAgentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
@@ -96,7 +99,7 @@ namespace Missions
         private void DenyGameRequest(Guid sender, Guid other, NetPeer netPeer)
         {
             BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, false, Guid.Empty);
-            MessageBroker.Publish(response, netPeer);
+            _messageBroker.Publish(response, netPeer);
         }
 
         private void Handle_ChallengeResponse(MessagePayload<BoardGameChallengeResponse> payload)
@@ -120,7 +123,7 @@ namespace Missions
         {
             MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
             CultureObject.BoardGameType gameType = Settlement.CurrentSettlement.Culture.BoardGame;
-            BoardGameLogic = new BoardGameLogic(MessageBroker, gameId, boardGameLogic, gameType);
+            BoardGameLogic = new BoardGameLogic(_P2PClient, _messageBroker, gameId, boardGameLogic, gameType);
             BoardGameLogic.StartGame(startFirst, opposingAgent);
         }
     }
