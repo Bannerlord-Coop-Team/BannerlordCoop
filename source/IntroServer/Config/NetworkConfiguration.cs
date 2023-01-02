@@ -39,15 +39,18 @@ namespace IntroServer.Config
         /// </summary>
         public int LanDiscoveryPort { get; } = 4202;
         /// <summary>
-        ///     Interval in which the server will send out <see cref="EPacket.KeepAlive"/>
-        ///     packets.
+        ///     Interval in which the server will send out KeepAlive packets.
         /// </summary>
-        public TimeSpan KeepAliveInterval { get; } = TimeSpan.FromSeconds(1);
+        public TimeSpan PingInterval { get; } = TimeSpan.FromSeconds(1);
         /// <summary>
         ///     If a connection is inactive (no requests or response) for longer than this time
         ///     frame, it will be disconnected.
         /// </summary>
+#if DEBUG
+        public TimeSpan DisconnectTimeout { get; } = TimeSpan.FromMinutes(5);
+#else
         public TimeSpan DisconnectTimeout { get; } = TimeSpan.FromSeconds(60);
+#endif
         /// <summary>
         ///     Delay after a failed connection attempt until it is tried again.
         /// </summary>
@@ -57,7 +60,7 @@ namespace IntroServer.Config
         /// </summary>
         public TimeSpan UpdateTime { get; } = TimeSpan.FromMilliseconds(15);
 
-        #region P2P
+#region P2P
         /// <summary>
         ///     P2P Identifier.
         /// </summary>
@@ -70,6 +73,6 @@ namespace IntroServer.Config
 #else
         public NATType NATType { get; } = NATType.External;
 #endif
-        #endregion
+#endregion
     }
 }
