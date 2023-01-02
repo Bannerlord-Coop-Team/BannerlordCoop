@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using Common.Logging;
 
 namespace Missions.Network
 {
@@ -18,6 +19,7 @@ namespace Missions.Network
         private static readonly Logger m_Logger = LogManager.GetCurrentClassLogger();
 
         private readonly Guid id = Guid.NewGuid();
+        private readonly BatchLogger<PacketType> _batchLogger = new BatchLogger<PacketType>(LogLevel.Trace);
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;
         public event Action<NetPeer, DisconnectInfo> OnClientDisconnected;
         public event Action<NetPeer> OnClientConnected;
@@ -50,6 +52,7 @@ namespace Missions.Network
 
         public void Dispose()
         {
+            _batchLogger.Dispose();
             Stop();
         }
 
@@ -124,7 +127,6 @@ namespace Missions.Network
             }
         }
 
-
         public void Stop()
         {
             netManager.DisconnectAll();
@@ -191,17 +193,17 @@ namespace Missions.Network
         {
 
         }
-
+        
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
             if (packet.Data == null) throw new NullReferenceException($"{packet.GetType()} is missing data, likely missing a ProtoMember attribute.");
             if (m_PacketHandlers.TryGetValue(packet.PacketType, out var handlers))
             {
+                _batchLogger.Log(packet.PacketType);
                 foreach (var handler in handlers)
                 {
                     handler.HandlePacket(peer, packet);
-                    //Task.Factory.StartNew(() => { handler.HandlePacket(peer, packet); });
                 }
             }
         }

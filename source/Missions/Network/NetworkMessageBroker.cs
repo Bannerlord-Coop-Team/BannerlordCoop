@@ -10,7 +10,7 @@ namespace Missions.Network
 {
     public class NetworkMessageBroker : INetworkMessageBroker, IPacketHandler
     {
-        private static Logger m_Logger = LogManager.GetCurrentClassLogger();
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly Dictionary<Type, List<Delegate>> m_Subscribers;
         private readonly LiteNetP2PClient m_Client;
@@ -50,6 +50,7 @@ namespace Missions.Network
                             m_Subscribers[typeof(T)] : new List<Delegate>();
             if (!delegates.Contains(subscription))
             {
+                Logger.Trace("Started listening for {PacketType}", typeof(T).Name);
                 delegates.Add(subscription);
             }
             m_Subscribers[typeof(T)] = delegates;
@@ -58,6 +59,7 @@ namespace Missions.Network
         public void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
         {
             if (!m_Subscribers.ContainsKey(typeof(T))) return;
+            Logger.Trace("Stopped listening for {PacketType}", typeof(T).Name);
             var delegates = m_Subscribers[typeof(T)];
             if (delegates.Contains(subscription))
                 delegates.Remove(subscription);
@@ -72,7 +74,7 @@ namespace Missions.Network
 
         public virtual void HandlePacket(NetPeer peer, IPacket packet)
         {
-            m_Logger.Debug($"Received message {packet} from {peer.EndPoint}");
+            Logger.Trace("Received message {Packet} from {Peer}", packet, peer.EndPoint);
             object payload = ProtoBufSerializer.Deserialize(packet.Data);
 
             Type type = payload.GetType();
@@ -93,7 +95,7 @@ namespace Missions.Network
             var delegates = m_Subscribers[T];
             if (delegates == null || delegates.Count == 0) return;
 
-            m_Logger.Info($"Recieved {payload}");
+            Logger.Debug("Received {PacketType} from {Peer}: {Payload}", type.Name, peer.EndPoint, payload);
 
             foreach (var handler in delegates)
             {
@@ -103,7 +105,7 @@ namespace Missions.Network
 
         public virtual void Publish<T>(T message)
         {
-            m_Logger.Info($"Publishing {message}");
+            Logger.Debug("Publishing {PacketType} : {Payload}", typeof(T).Name, message);
             Publish(message, null);
         }
 
