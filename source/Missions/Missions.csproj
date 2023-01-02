@@ -126,6 +126,10 @@
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.GauntletUI, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.ObjectSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
     </Reference>
@@ -176,6 +180,7 @@
     <Compile Include="Patch\Agents\AgentInteractionPatches.cs" />
     <Compile Include="Packets\Events\EventPacketHandler.cs" />
     <Compile Include="Patch\BoardGames\BoardGamePatches.cs" />
+    <Compile Include="Patch\PausePatch.cs" />
     <Compile Include="PlayerId.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\Surrogates\Vec2Surrogate.cs" />
