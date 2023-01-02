@@ -5,11 +5,15 @@ using Missions.Network;
 using NLog;
 using SandBox;
 using SandBox.BoardGames;
+using SandBox.BoardGames.AI;
 using SandBox.BoardGames.MissionLogics;
 using SandBox.BoardGames.Pawns;
 using System;
+using System.IO;
 using System.Reflection;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using static TaleWorlds.CampaignSystem.CultureObject;
 
@@ -39,11 +43,11 @@ namespace Coop.Mod.Missions
 
             StartConversationAfterGamePatch.OnGameOver += OnGameOver;
             ForfeitGamePatch.OnForfeitGame += OnForfeitGame;
-            HandlePlayerInputPatch.OnHandlePlayerInput += OnPlayerInput;
             HandlePreMovementStagePatch.OnHandlePreMovementStage += PreMovementStage;
-            SetPawnCapturedSeegaPatch.OnSetPawnCaptured += SeegaPawnCapture;
+            SetPawnCapturedPatch.OnSetPawnCaptured += OnPawnCapture;
             PreplaceUnitsPatch.OnPreplaceUnits += PreplaceUnits;
-            
+            HandlePlayerInputPatch.OnHandlePlayerInput += OnPlayerInput;
+
         }
 
         ~BoardGameLogic()
@@ -61,10 +65,10 @@ namespace Coop.Mod.Missions
 
             StartConversationAfterGamePatch.OnGameOver -= OnGameOver;
             ForfeitGamePatch.OnForfeitGame -= OnForfeitGame;
-            HandlePlayerInputPatch.OnHandlePlayerInput -= OnPlayerInput;
             HandlePreMovementStagePatch.OnHandlePreMovementStage -= PreMovementStage;
-            SetPawnCapturedSeegaPatch.OnSetPawnCaptured -= SeegaPawnCapture;
+            SetPawnCapturedPatch.OnSetPawnCaptured -= OnPawnCapture;
             PreplaceUnitsPatch.OnPreplaceUnits -= PreplaceUnits;
+            HandlePlayerInputPatch.OnHandlePlayerInput -= OnPlayerInput;
         }
 
         private static readonly PropertyInfo OpposingAgentPropertyInfo = typeof(MissionBoardGameLogic).GetProperty("OpposingAgent");
@@ -75,7 +79,6 @@ namespace Coop.Mod.Missions
 
             // Need for SetGameOver() -> OpposingAgent.GetComponent<CampaignAgentComponent>().AgentNavigator.SpecialTargetTag = this._specialTagOfOpposingHero;
             opposingAgent?.GetComponent<CampaignAgentComponent>().CreateAgentNavigator();
-
             OpposingAgentPropertyInfo.SetValue(m_BoardGameLogic, opposingAgent);
             m_BoardGameLogic.SetBoardGame(m_BoardGameType);
             m_BoardGameLogic.SetStartingPlayer(startFirst);
@@ -103,22 +106,22 @@ namespace Coop.Mod.Missions
             MovePawnToTileDelayedMethod.Invoke(seegaBoardGame, new object[] { seegaBoardGame.PlayerOneUnits[1], seegaBoardGame.GetTile(2, 4), false, false, 1f });
         }
 
-        private void SeegaPawnCapture(PawnBase pawn)
+        private void OnPawnCapture(PawnBase pawn)
         {
             //Only call SetPawnCaptured when it's a forceful remove as a result of no moves available as otherwise it gets handled locally from the move
-            if (!FocusBlockingPawnsPatch.ForceRemove)
-            {
-                return;
-            }
+            //if (!FocusBlockingPawnsPatch.ForceRemove)
+            //{
+            //    return;
+            //}
 
             int fromIndex = m_BoardGameLogic.Board.PlayerTwoUnits.IndexOf(pawn);
             PawnCapturedMessage pawnCapturedEvent = new PawnCapturedMessage(GameId, fromIndex);
             m_MessageBroker.Publish(pawnCapturedEvent);
 
-            if (IsPlayingOtherPlayer)
-            {
-                FocusBlockingPawnsPatch.ForceRemove = false;
-            }
+            //if (IsPlayingOtherPlayer)
+            //{
+            //    FocusBlockingPawnsPatch.ForceRemove = false;
+            //}
         }
 
         private void Handle_PawnCapture(MessagePayload<PawnCapturedMessage> payload)
@@ -126,17 +129,7 @@ namespace Coop.Mod.Missions
             if (payload.What.GameId == GameId)
             {
                 BoardGameBase boardGame = m_BoardGameLogic.Board;
-                PawnBase unitToCapture;
-
-                if (boardGame is BoardGameSeega)
-                {
-                    unitToCapture = boardGame.PlayerOneUnits[payload.What.Index];
-                }
-                else
-                {
-                    unitToCapture = boardGame.PlayerTwoUnits[payload.What.Index];
-                }
-
+                PawnBase unitToCapture = boardGame.PlayerOneUnits[payload.What.Index];
                 boardGame.SetPawnCaptured(unitToCapture);
 
                 if (!(boardGame is BoardGameSeega))
@@ -172,6 +165,7 @@ namespace Coop.Mod.Missions
 
             int FromIndex = m_BoardGameLogic.Board.PlayerOneUnits.IndexOf(move.Unit);
             int ToIndex = m_BoardGameLogic.Board.Tiles.IndexOf(move.GoalTile);
+
             BoardGameMoveRequest boardGameMoveEvent = new BoardGameMoveRequest(GameId, FromIndex, ToIndex);
             m_MessageBroker.Publish(boardGameMoveEvent);
         }
@@ -199,11 +193,8 @@ namespace Coop.Mod.Missions
 
                 var boardType = boardGame.GetType();
 
-                boardType.GetProperty("SelectedUnit", BindingFlags.NonPublic | BindingFlags.Instance)?
-                    .SetValue(boardGame, unitToMove);
-
                 var movePawnToTileMethod = boardType.GetMethod("MovePawnToTile", BindingFlags.NonPublic | BindingFlags.Instance);
-                movePawnToTileMethod?.Invoke(boardGame, new object[] { unitToMove, goalTile, false, true });
+                movePawnToTileMethod.Invoke(boardGame, new object[] { unitToMove, goalTile, false, true });
             }
         }
 
@@ -214,19 +205,16 @@ namespace Coop.Mod.Missions
             ForfeitGameMessage forfeitMessage = new ForfeitGameMessage(GameId);
             m_MessageBroker.Publish(forfeitMessage);
             Dispose();
-            //missionBoardGame.Board.SetGameOverInfo(GameOverEnum.PlayerTwoWon);
-            //missionBoardGame.SetGameOver(missionBoardGame.Board.GameOverInfo);
         }
 
         private void Handle_ForfeitGameMessage(MessagePayload<ForfeitGameMessage> payload)
         {
             if(payload.What.GameId == GameId)
             {
-                m_BoardGameLogic.SetGameOver(GameOverEnum.PlayerOneWon);
+                m_BoardGameLogic.AIForfeitGame();
+                MBInformationManager.AddQuickInformation(new TextObject("You won! Your opponent has surrendered"));
                 Dispose();
             }
         }
     }
 }
-//m_BoardGameLogic.AIForfeitGame();
-//Dispose();

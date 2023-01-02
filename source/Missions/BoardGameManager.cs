@@ -15,6 +15,7 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.Core;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem.Conversation;
 
 namespace Missions
 {
@@ -30,7 +31,7 @@ namespace Missions
         {
             MessageBroker = messageBroker;
 
-            AgentInteractionPatch.OnAgentInteraction += Handle_OnAgentInteraction;
+            ProcessSentencePatch.OnAgentInteraction += Handle_OnAgentInteraction;
 
             MessageBroker.Subscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
 
@@ -38,31 +39,9 @@ namespace Missions
 
         private void Handle_OnAgentInteraction(Agent sender, Agent other)
         {
-            if (Mission.Current.HasMissionBehavior<MissionBoardGameLogic>() &&
-               Agent.Main == sender)
+            if (Mission.Current.HasMissionBehavior<MissionBoardGameLogic>() && Agent.Main == sender)
             {
-                //Free board game selection, for bug testing etc
-                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Player Interaction", "Interacting with " + other.Name,
-                    new List<InquiryElement>()
-                        {
-                            new InquiryElement(1, "Play a board game", new ImageIdentifier(ImageIdentifierType.Null))
-                        },
-                    true, 1, "Confirm", "Cancel",
-
-                    new Action<List<InquiryElement>>((List<InquiryElement> elements) =>
-                    {
-                        int selectedElement = (int)elements.First().Identifier;
-
-                        switch(selectedElement)
-                        {
-                            case 1:
-                                SendGameRequest(sender, other);
-                                break;
-
-                        }
-                    }), 
-
-                    new Action<List<InquiryElement>>((List<InquiryElement> elements) => {  })));
+                SendGameRequest(sender, other);
             }
 
         }

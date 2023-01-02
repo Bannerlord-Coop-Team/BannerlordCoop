@@ -1,26 +1,27 @@
 ﻿using Coop.Mod.Missions;
 using HarmonyLib;
 using Missions.Network;
+using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.AI;
 using SandBox.BoardGames.MissionLogics;
 using SandBox.BoardGames.Pawns;
+using SandBox.BoardGames.Tiles;
 using SandBox.Source.Missions.AgentBehaviors;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Coop.Mod.Patch.BoardGames
 {
 
-    [HarmonyPatch(typeof(BoardGameAgentBehavior), "RemoveBoardGameBehaviorOfAgent")]
+    [HarmonyPatch(typeof(BoardGameAgentBehavior), nameof(BoardGameAgentBehavior.RemoveBoardGameBehaviorOfAgent))]
     public class RemoveBoardGameBehaviorOfAgentPatch
     {
         static bool Prefix(Agent ownerAgent)
         {
-
-            //Somewhat ugly way to not break forfeit/win, might be issues with opposingAgent have not checked
             return BoardGameLogic.IsPlayingOtherPlayer == false;
         }
 
@@ -30,33 +31,10 @@ namespace Coop.Mod.Patch.BoardGames
         }
     }
 
-    //[HarmonyPatch(typeof(MissionConversationLogic), "StartConversation")]
-    //public class StartConversationPatch
-    //{
-
-    //    static bool Prefix(Agent agent, bool setActionsInstantly, bool isInitialization = false)
-    //    {
-    //        if (NetworkAgentRegistry.AgentToId.ContainsKey(agent))
-    //        {
-    //            return BoardGameLogic.IsPlayingOtherPlayer == false;
-    //        }
-    //        else
-    //        {
-    //            return true;
-    //        }
-    //    }
-    //    static void Postfix(Agent agent, bool setActionsInstantly, bool isInitialization = false)
-    //    {
-    //        if (NetworkAgentRegistry.AgentToId.ContainsKey(agent))
-    //        {
-    //            BoardGameLogic.IsPlayingOtherPlayer = false;
-    //        }
-    //    }
-    //}
-
     [HarmonyPatch(typeof(MissionBoardGameLogic), "StartConversationWithOpponentAfterGameEnd")]
     public class StartConversationAfterGamePatch
     {
+        private static readonly PropertyInfo AgentNavigatorPropertyInfo = typeof(CampaignAgentComponent).GetProperty("AgentNavigator");
         public static event Action<MissionBoardGameLogic> OnGameOver;
         static bool Prefix(MissionBoardGameLogic __instance, Agent conversationAgent)
         {
@@ -64,6 +42,8 @@ namespace Coop.Mod.Patch.BoardGames
             {
                 OnGameOver?.Invoke(__instance);
 
+                //Set AgentNavigator to null as this gets set in SetGameOver by default and breaks all future interactions
+                AgentNavigatorPropertyInfo.SetValue(conversationAgent.GetComponent<CampaignAgentComponent>(), null);
                 return false;
             }
 
@@ -74,17 +54,15 @@ namespace Coop.Mod.Patch.BoardGames
         }
     }
 
-    //[HarmonyPatch(typeof(MissionBoardGameLogic), "SetGameOver")]
-    //public class SetGameOverPatch
-    //{
-    //    static void Postfix(MissionBoardGameLogic __instance, GameOverEnum gameOverInfo)
-    //    {
-    //        if (BoardGameLogic.IsPlayingOtherPlayer)
-    //        {
-    //            BoardGameLogic.IsPlayingOtherPlayer = false;
-    //        }
-    //    }
-    //}
+    [HarmonyPatch(typeof(BoardGameBase), "HandlePlayerInput")]
+    public class HandlePlayerInputPatch
+    {
+        public static event Action<Move> OnHandlePlayerInput;
+        static void Postfix(ref BoardGameBase __instance, ref Move __result)
+        {
+            OnHandlePlayerInput?.Invoke(__result);
+        }
+    }
 
     [HarmonyPatch(typeof(MissionBoardGameLogic), nameof(MissionBoardGameLogic.ForfeitGame))]
     public class ForfeitGamePatch
@@ -107,7 +85,6 @@ namespace Coop.Mod.Patch.BoardGames
     {
         static IEnumerable<MethodBase> TargetMethods()
         {
-            yield return AccessTools.Method(typeof(BoardGameAIBase), nameof(BoardGameAIBase.CanMakeMove));
             yield return AccessTools.Method(typeof(BoardGameAIBase), nameof(BoardGameAIBase.WantsToForfeit));
             yield return AccessTools.Method(typeof(BoardGameAISeega), nameof(BoardGameAIBase.WantsToForfeit));
         }
@@ -119,13 +96,12 @@ namespace Coop.Mod.Patch.BoardGames
         }
     }
 
-    [HarmonyPatch(typeof(BoardGameBase), "HandlePlayerInput")]
-    public class HandlePlayerInputPatch
+    [HarmonyPatch(typeof(BoardGameAIBase), "CalculateMovementStageMoveOnSeparateThread")]
+    public class CalculateMovePatch
     {
-        public static event Action<Move> OnHandlePlayerInput;
-        static void Postfix(ref BoardGameBase __instance, ref Move __result)
+        public static bool Prefix()
         {
-            OnHandlePlayerInput?.Invoke(__result);
+            return !BoardGameLogic.IsPlayingOtherPlayer;
         }
     }
 
@@ -152,11 +128,11 @@ namespace Coop.Mod.Patch.BoardGames
         }
     }
 
-    [HarmonyPatch(typeof(BoardGameSeega), "SetPawnCaptured")]
-    public class SetPawnCapturedSeegaPatch
+    [HarmonyPatch(typeof(BoardGameBase), nameof(BoardGameBase.SetPawnCaptured))]
+    public class SetPawnCapturedPatch
     {
         public static event Action<PawnBase> OnSetPawnCaptured;
-        public static void Prefix(PawnBase pawn, bool aiSimulation)
+        public static void Postfix(PawnBase pawn, bool fake)
         {
             OnSetPawnCaptured?.Invoke(pawn);
         }
