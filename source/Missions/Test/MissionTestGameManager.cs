@@ -3,11 +3,12 @@ using IntroServer.Config;
 using Missions;
 using Missions.Network;
 using Missions.Serialization.Surrogates;
-using NLog;
 using ProtoBuf.Meta;
 using SandBox;
 using System.Collections.Generic;
 using System.Linq;
+using Common.Logging;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -30,7 +31,7 @@ namespace Coop.Mod.Missions
             RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
         }
 
-        private static readonly NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
+        private static readonly ILogger m_Logger = LogManager.GetLogger<MissionTestGameManager>();
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
         private LiteNetP2PClient m_Client;
 
@@ -222,7 +223,7 @@ namespace Coop.Mod.Missions
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor)));
             agentBuildData.Controller(Agent.ControllerType.None);
 
-            m_Logger.Info("Spawning Agent");
+            m_Logger.Information("Spawning Agent");
             Agent agent = default(Agent);
             GameLoopRunner.RunOnMainThread(() =>
             {
@@ -252,7 +253,7 @@ namespace Coop.Mod.Missions
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor)));
             agentBuildData.Controller(Agent.ControllerType.None);
 
-            m_Logger.Info("Spawning Agent");
+            m_Logger.Information("Spawning Agent");
             Agent agent = default(Agent);
             GameLoopRunner.RunOnMainThread(() =>
             {

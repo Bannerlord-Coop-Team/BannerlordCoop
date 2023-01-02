@@ -1,13 +1,11 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
-using NLog;
 
 namespace Coop.Mod.Patch
 {
     [HarmonyPatch(typeof(Hero))]
     internal class HeroPatches
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         [HarmonyPostfix]
         [HarmonyPatch(MethodType.Constructor)]

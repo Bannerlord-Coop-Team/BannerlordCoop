@@ -8,21 +8,22 @@ using LiteNetLib;
 using LiteNetLib.Utils;
 using Missions.Messages.Network;
 using Missions.Packets.Events;
-using NLog;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using Common.Logging;
+using Serilog;
+using Serilog.Events;
 using Version = System.Version;
 
 namespace Missions.Network
 {
     public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private static readonly ILogger m_Logger = LogManager.GetLogger<LiteNetP2PClient>();
         private static readonly Dictionary<PacketType, List<IPacketHandler>> PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
-
+        
         public int ConnectedPeersCount => _netManager.ConnectedPeersCount;
         public event Action<NetPeer, DisconnectInfo> OnClientDisconnected;
         public event Action<NetPeer> OnClientConnected;
@@ -33,7 +34,7 @@ namespace Missions.Network
         private string _instance;
 
         private readonly Guid id = Guid.NewGuid();
-        private readonly BatchLogger<PacketType> _batchLogger = new BatchLogger<PacketType>(LogLevel.Trace);
+        private readonly BatchLogger<PacketType> _batchLogger = new BatchLogger<PacketType>(LogEventLevel.Verbose);
         private readonly NetManager _netManager;
         private readonly NetworkConfiguration _networkConfig;
         private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
@@ -189,7 +190,7 @@ namespace Missions.Network
         {
             if (type == natAddressTypeMap[_networkConfig.NATType])
             {
-                Logger.Info($"Connecting P2P: {targetEndPoint}");
+                m_Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
                 _netManager.Connect(targetEndPoint, token);
             }
         }
@@ -202,7 +203,7 @@ namespace Missions.Network
                 _messageBroker.Publish(this, peerConnectedEvent);
                 OnClientConnected?.Invoke(peer);
             }
-            Logger.Info($"{_netManager.LocalPort} recieved connection from {peer.EndPoint}");
+            m_Logger.Information("{LocalPort} received connection from {peer}", _netManager.LocalPort, peer.EndPoint);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)

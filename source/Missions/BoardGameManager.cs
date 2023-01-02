@@ -5,7 +5,6 @@ using LiteNetLib;
 using Missions.Messages.BoardGames;
 using Missions.Network;
 using Missions.Packets.Agents;
-using NLog;
 using SandBox.BoardGames.MissionLogics;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -15,6 +14,8 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.Core;
 using System.Collections.Generic;
 using System.Linq;
+using Common.Logging;
+using Serilog;
 using TaleWorlds.CampaignSystem.Conversation;
 using Common.Messaging;
 
@@ -22,7 +23,7 @@ namespace Missions
 {
     public class BoardGameManager
     {
-        private readonly NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
+        private readonly ILogger m_Logger = LogManager.GetLogger<BoardGameManager>();
 
         private readonly LiteNetP2PClient _P2PClient;
         
@@ -60,7 +61,7 @@ namespace Missions
             }
             else
             {
-                m_Logger.Warn("SendGameRequest failed to send");
+                m_Logger.Warning("SendGameRequest failed to send");
             }
         }
 
