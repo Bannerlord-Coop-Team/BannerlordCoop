@@ -1,21 +1,18 @@
 ﻿using System.Collections.Generic;
 using System.Reflection;
 using GameInterface.Utils;
-using NLog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ModuleManager;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.SaveSystem.Save;
-using Logger = NLog.Logger;
 using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace GameInterface.Helpers
 {
     public class SaveLoadHelper : ISaveLoadHelper
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private static readonly string LOAD_GAME = "MP";
         public SaveGameData SaveGame(Game game, ISaveDriver driver)

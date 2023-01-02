@@ -1,11 +1,12 @@
 ﻿using Coop.Mod;
 using LiteNetLib;
 using Missions.Network;
-using NLog;
 using ProtoBuf;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Common.Logging;
+using Serilog;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -39,9 +40,7 @@ namespace Missions.Packets.Agents
 
     public class MovementHandler : IPacketHandler, IDisposable
     {
-        private readonly NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
-
-        private readonly CancellationTokenSource m_AgentPollingCancelToken = new CancellationTokenSource();
+	    private readonly CancellationTokenSource m_AgentPollingCancelToken = new CancellationTokenSource();
         private readonly Task m_AgentPollingTask;
 
         private readonly LiteNetP2PClient m_Client;

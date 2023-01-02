@@ -5,33 +5,36 @@ using SandBox;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NLog.Targets;
+using Common.Logging;
+using Serilog;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
-using NLog;
-using Logger = NLog.Logger;
 
 namespace MissionTestMod
 {
     public class TestMod : MBSubModuleBase
-	{
-		private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+    {
+	    private static ILogger Logger;
 		private static UpdateableList Updateables { get; } = new UpdateableList();
         private static InitialStateOption JoinTavern;
         
         protected override void OnSubModuleLoad()
         {
-#if DEBUG
-            var logTarget = new DebuggerTarget()
-            {
-	            Layout = "${date:format=HH\\:MM\\:ss} (${level}) [${logger}] : ${message} ${exception}",
-            };
-            NLog.Config.SimpleConfigurator.ConfigureForTargetLogging(logTarget, LogLevel.Trace);
-#endif
+	        if (System.Diagnostics.Debugger.IsAttached)
+	        {
+		        LogManager.Configuration
+			        .WriteTo.Debug(
+				        outputTemplate:
+				        "[{Timestamp:HH:mm:ss} {Level:u3} ({SourceContext})] {Message:lj}{NewLine}{Exception}")
+			        .MinimumLevel.Verbose();
+	        }
+
+	        Logger = LogManager.GetLogger<TestMod>();
+			Logger.Verbose("Building Network Configuration");
 
 			Updateables.Add(GameLoopRunner.Instance);
 
@@ -44,7 +47,7 @@ namespace MissionTestMod
 
             Module.CurrentModule.AddInitialStateOption(JoinTavern);
             base.OnSubModuleLoad();
-            Logger.Trace("Bannerlord Coop Mod loaded");
+            Logger.Verbose("Bannerlord Coop Mod loaded");
         }
 
         private bool m_IsFirstTick = true;

@@ -1,28 +1,27 @@
 ﻿using IntroServer.Config;
 using IntroServer.Data;
 using LiteNetLib;
-using NLog;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using Microsoft.Extensions.Logging;
 
 namespace IntroServer.Server
 {
     public class MissionTestServer : INetEventListener, INatPunchListener
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+	    private const int MaxAllowedPeers = 200;
 
-        private readonly NetManager _netManager;
-
-        private const int MaxAllowedPeers = 200;
-
-        private readonly PeerRegistry _peerRegistry = new PeerRegistry();
+	    private readonly ILogger _logger;
+		private readonly NetManager _netManager;
+	    private readonly PeerRegistry _peerRegistry = new PeerRegistry();
 
         private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
 
-        public MissionTestServer(NetworkConfiguration config)
+        public MissionTestServer(NetworkConfiguration config, ILogger<MissionTestServer> logger)
         {
-            _netManager = new NetManager(this)
+	        _logger = logger;
+	        _netManager = new NetManager(this)
             {
                 NatPunchEnabled = true,
                 DisconnectTimeout = config.DisconnectTimeout.Milliseconds,
@@ -45,14 +44,14 @@ namespace IntroServer.Server
 
 		public void OnConnectionRequest(ConnectionRequest request)
         {
-            Logger.Trace("Connection request received for {Peer}", request.RemoteEndPoint);
+            _logger.LogTrace("Connection request received for {Peer}", request.RemoteEndPoint);
             string token = request.Data.GetString();
 
             if (ClientInfo.TryParse(token, out ClientInfo clientInfo))
             {
                 if (_netManager.ConnectedPeersCount > MaxAllowedPeers)
                 {
-                    Logger.Warn("Connection Request Rejected from {Peer} because {RejectionReason}", 
+                    _logger.LogWarning("Connection Request Rejected from {Peer} because {RejectionReason}", 
 	                    request.RemoteEndPoint, "Max Peers Reached");
                     request.Reject();
                     return;
@@ -61,18 +60,18 @@ namespace IntroServer.Server
                 if (clientInfo.ModVersion != _version)
                 {
 
-	                Logger.Warn("Connection Request Rejected from {Peer} because {RejectionReason}", 
+	                _logger.LogWarning("Connection Request Rejected from {Peer} because {RejectionReason}", 
 		                request.RemoteEndPoint, $"Incompatible Mod Version (Local Version: {LocalVersion}, Peer Version: {clientInfo.ModVersion})");
 					request.Reject();
                     return;
                 }
 
                 _peerRegistry.RegisterPeer(clientInfo.ClientId, request.Accept());
-                Logger.Info("Connection Request Accepted for {ClientID} on {Peer}", clientInfo.ClientId, request.RemoteEndPoint);
+                _logger.LogInformation("Connection Request Accepted for {ClientID} on {Peer}", clientInfo.ClientId, request.RemoteEndPoint);
             }
             else
             {
-                Logger.Warn("Connection Request Rejected from {Peer} because {RejectionReason}",
+                _logger.LogWarning("Connection Request Rejected from {Peer} because {RejectionReason}",
 	                request.RemoteEndPoint, "Invalid ClientInfo Provided");
                 request.Reject();
             }
@@ -80,19 +79,19 @@ namespace IntroServer.Server
 
         public void OnPeerConnected(NetPeer peer)
         {
-            Logger.Info("Received connection from {Peer}", peer.EndPoint);
+            _logger.LogInformation("Received connection from {Peer}", peer.EndPoint);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            Logger.Info("{Peer} disconnected. Reason: {DisconnectionReason}", peer.EndPoint, disconnectInfo.Reason);
+            _logger.LogInformation("{Peer} disconnected. Reason: {DisconnectionReason}", peer.EndPoint, disconnectInfo.Reason);
             _peerRegistry.RemovePeer(peer);
         }
 
         public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
         {
             if (latency > 0)
-				Logger.Debug("Network latency update of {Latency} for {Peer}", latency, peer.EndPoint);
+				_logger.LogDebug("Network latency update of {Latency} for {Peer}", latency, peer.EndPoint);
         }
 
         public void OnNetworkReceive(
@@ -105,7 +104,7 @@ namespace IntroServer.Server
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
         {
-            Logger.Error("OnNetworkError({endPoint}, {socketError}).", endPoint, socketError);
+            _logger.LogError("OnNetworkError({endPoint}, {socketError}).", endPoint, socketError);
         }
 
         public void OnNetworkReceiveUnconnected(
@@ -113,7 +112,7 @@ namespace IntroServer.Server
             NetPacketReader reader,
             UnconnectedMessageType messageType)
         {
-            Logger.Debug("{Peer} unconnected.", remoteEndPoint);
+            _logger.LogDebug("{Peer} unconnected.", remoteEndPoint);
         }
 
         public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -134,7 +133,7 @@ namespace IntroServer.Server
 
                 foreach (var existingPeer in _peerRegistry.GetPeersInInstance(instance))
                 {
-                    Logger.Info("Connecting {LocalAgent} to {Peer}", localEndPoint, existingPeer.InternalAddr);
+                    _logger.LogInformation("Connecting {LocalAgent} to {Peer}", localEndPoint, existingPeer.InternalAddr);
                     _netManager.NatPunchModule.NatIntroduce(
                         existingPeer.InternalAddr, // host internal
                         existingPeer.ExternalAddr, // host external
@@ -149,18 +148,18 @@ namespace IntroServer.Server
                 if (peer == null) return;
                 var p2PPeer = new P2PPeer(peer, localEndPoint, remoteEndPoint);
                 _peerRegistry.RegisterPeer(instance, p2PPeer);
-                Logger.Debug("Peer {Peer} Registered", p2PPeer.NetPeer.EndPoint);
+                _logger.LogDebug("Peer {Peer} Registered", p2PPeer.NetPeer.EndPoint);
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Error while handling NAT introduction: {ErrorMessage}", ex.Message);
+                _logger.LogError(ex, "Error while handling NAT introduction: {ErrorMessage}", ex.Message);
             }
 
         }
 
         public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
         {
-            Logger.Trace("Nat Introduction succeeded for {Peer}", targetEndPoint);
+            _logger.LogTrace("Nat Introduction succeeded for {Peer}", targetEndPoint);
         }
     }
 }
