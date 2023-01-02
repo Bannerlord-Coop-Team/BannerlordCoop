@@ -17,7 +17,7 @@ using TaleWorlds.MountAndBlade;
 namespace Coop.Mod.Patch.BoardGames
 {
 
-    [HarmonyPatch(typeof(BoardGameAgentBehavior), "RemoveBoardGameBehaviorOfAgent")]
+    [HarmonyPatch(typeof(BoardGameAgentBehavior), nameof(BoardGameAgentBehavior.RemoveBoardGameBehaviorOfAgent))]
     public class RemoveBoardGameBehaviorOfAgentPatch
     {
         static bool Prefix(Agent ownerAgent)
@@ -128,7 +128,7 @@ namespace Coop.Mod.Patch.BoardGames
         }
     }
 
-    [HarmonyPatch(typeof(BoardGameBase), "SetPawnCaptured")]
+    [HarmonyPatch(typeof(BoardGameBase), nameof(BoardGameBase.SetPawnCaptured))]
     public class SetPawnCapturedPatch
     {
         public static event Action<PawnBase> OnSetPawnCaptured;
