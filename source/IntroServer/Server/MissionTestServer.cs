@@ -18,6 +18,8 @@ namespace IntroServer.Server
 
         private readonly PeerRegistry _peerRegistry = new PeerRegistry();
 
+        private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
+
         public MissionTestServer(NetworkConfiguration config)
         {
             _netManager = new NetManager(this)
@@ -53,7 +55,7 @@ namespace IntroServer.Server
                     return;
                 }
 
-                if (clientInfo.ModVersion != LocalVersion)
+                if (clientInfo.ModVersion != _version)
                 {
 
 	                Logger.Warn("Connection Request Rejected from {Peer} because {RejectionReason}", 

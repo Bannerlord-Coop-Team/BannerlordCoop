@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using Common.Logging;
+using Version = System.Version;
 
 namespace Missions.Network
 {
@@ -24,13 +25,16 @@ namespace Missions.Network
         public event Action<NetPeer, DisconnectInfo> OnClientDisconnected;
         public event Action<NetPeer> OnClientConnected;
 
-        readonly NetManager netManager;
-        string instance;
         public NetPeer PeerServer { get; private set; }
         public int Priority => 2;
 
-        static readonly Dictionary<PacketType, List<IPacketHandler>> m_PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
-        readonly NetworkConfiguration networkConfig;
+        private readonly NetManager netManager;
+        private string instance;
+        
+
+        private static readonly Dictionary<PacketType, List<IPacketHandler>> m_PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
+        private readonly NetworkConfiguration networkConfig;
+        private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
         public LiteNetP2PClient(NetworkConfiguration configuration)
         {
             networkConfig = configuration;
@@ -99,7 +103,7 @@ namespace Missions.Network
 
             ClientInfo clientInfo = new ClientInfo(
                 id,
-                typeof(MissionTestServer).Assembly.GetName().Version);
+                _version);
 
             PeerServer = netManager.Connect(connectionAddress,
                                             port,

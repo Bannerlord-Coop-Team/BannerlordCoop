@@ -1,6 +1,3 @@
-[submodule "source/RailgunNet"]
-	path = source/RailgunNet
-	url = https://github.com/araex/RailgunNet.git
 [submodule "source/BannerlordTestingEssentials"]
 	path = source/BannerlordTestingEssentials
 	url = git@github.com:Bannerlord-Coop-Team/BannerlordTestingEssentials.git
