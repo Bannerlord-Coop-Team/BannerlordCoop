@@ -1,16 +1,17 @@
 ﻿using Common;
 using Common.Serialization;
 using LiteNetLib;
-using NLog;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Common.Logging;
+using Serilog;
 
 namespace Missions.Network
 {
     public class NetworkMessageBroker : INetworkMessageBroker, IPacketHandler
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private static readonly ILogger Logger = LogManager.GetLogger<NetworkMessageBroker>();
 
         private readonly Dictionary<Type, List<Delegate>> m_Subscribers;
         private readonly LiteNetP2PClient m_Client;
@@ -50,7 +51,7 @@ namespace Missions.Network
                             m_Subscribers[typeof(T)] : new List<Delegate>();
             if (!delegates.Contains(subscription))
             {
-                Logger.Trace("Started listening for {PacketType}", typeof(T).Name);
+                Logger.Verbose("Started listening for {PacketType}", typeof(T).Name);
                 delegates.Add(subscription);
             }
             m_Subscribers[typeof(T)] = delegates;
@@ -59,7 +60,7 @@ namespace Missions.Network
         public void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
         {
             if (!m_Subscribers.ContainsKey(typeof(T))) return;
-            Logger.Trace("Stopped listening for {PacketType}", typeof(T).Name);
+            Logger.Verbose("Stopped listening for {PacketType}", typeof(T).Name);
             var delegates = m_Subscribers[typeof(T)];
             if (delegates.Contains(subscription))
                 delegates.Remove(subscription);
@@ -74,7 +75,7 @@ namespace Missions.Network
 
         public virtual void HandlePacket(NetPeer peer, IPacket packet)
         {
-            Logger.Trace("Received message {Packet} from {Peer}", packet, peer.EndPoint);
+            Logger.Verbose("Received message {Packet} from {Peer}", packet, peer.EndPoint);
             object payload = ProtoBufSerializer.Deserialize(packet.Data);
 
             Type type = payload.GetType();

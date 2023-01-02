@@ -2,7 +2,6 @@
 using Coop.Mod.Patch.BoardGames;
 using Missions.Messages.BoardGames;
 using Missions.Network;
-using NLog;
 using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.AI;
@@ -21,7 +20,6 @@ namespace Coop.Mod.Missions
 {
     public class BoardGameLogic : IDisposable
     {
-        private static NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
         public static bool IsPlayingOtherPlayer { get; set; }
         public static bool IsChallenged { get; private set; }
         public Guid GameId { get; private set; }

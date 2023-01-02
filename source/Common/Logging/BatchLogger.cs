@@ -2,7 +2,8 @@
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
-using NLog;
+using Serilog;
+using Serilog.Events;
 
 namespace Common.Logging
 {
@@ -15,9 +16,9 @@ namespace Common.Logging
 		// A concurrent dictionary to store messages of type T and their counts.
 		private readonly ConcurrentDictionary<T, int> _messages = new ConcurrentDictionary<T, int>();
 		// A logger to log the messages.
-		private readonly Logger _logger = LogManager.GetCurrentClassLogger();
+		private readonly ILogger _logger = LogManager.GetLogger<BatchLogger<T>>();
 		// The log level to use when logging the messages.
-		private readonly LogLevel _level;
+		private readonly LogEventLevel _level;
 		// A cancellation token source to cancel the poller task.
 		private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
 		// A task to poll for messages to log.
@@ -30,7 +31,7 @@ namespace Common.Logging
 		/// </summary>
 		/// <param name="level">The log level to use when logging the messages.</param>
 		/// <param name="waitMilliseconds">The number of milliseconds to wait between polls (optional, default is 1000).</param>
-		public BatchLogger(LogLevel level, int waitMilliseconds = 1000)
+		public BatchLogger(LogEventLevel level, int waitMilliseconds = 1000)
 		{
 			_level = level;
 			_waitMilliseconds = waitMilliseconds;
@@ -57,7 +58,7 @@ namespace Common.Logging
 				{
 					// If the message can be removed from the dictionary, log it.
 					if (_messages.TryRemove(key, out var value))
-						_logger.Log(_level, "{Type} received {Times} times in last {WaitMilliseconds}ms",
+						_logger.Write(_level, "{Type} received {Times} times in last {WaitMilliseconds}ms",
 							key, value, _waitMilliseconds);
 				}
 			}
@@ -69,6 +70,8 @@ namespace Common.Logging
 		public void Dispose()
 		{
 			// Cancel the poller task.
+			if (_cancellation.IsCancellationRequested)
+				return;
 			_cancellation.Cancel();
 			// Wait for the poller task to complete.
 			while (!_poller.IsCompleted)

@@ -4,8 +4,9 @@ using Missions;
 using Missions.Messages;
 using Missions.Network;
 using Missions.Packets.Agents;
-using NLog;
 using System;
+using Common.Logging;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -14,15 +15,14 @@ namespace Coop.Mod.Missions
 {
     public class MissionClient : IDisposable
     {
-        private readonly NLog.Logger m_Logger = LogManager.GetCurrentClassLogger();
-
-        public BoardGameManager BoardGameManager { get; private set; }
+	    public BoardGameManager BoardGameManager { get; private set; }
         public MovementHandler MovementHandler { get; private set; }
         public INetworkMessageBroker MessageBroker { get; private set; }
 
-        private readonly LiteNetP2PClient m_Client;
 
-        private readonly Guid m_PlayerId;
+        private readonly ILogger m_Logger = LogManager.GetLogger<MissionClient>();
+		private readonly LiteNetP2PClient m_Client;
+		private readonly Guid m_PlayerId;
 
         public MissionClient(LiteNetP2PClient client)
         {
@@ -53,7 +53,7 @@ namespace Coop.Mod.Missions
 
         public void SendJoinInfo(NetPeer peer)
         {
-            m_Logger.Info("Sending join request");
+            m_Logger.Information("Sending join request");
             NetworkAgentRegistry.RegisterControlledAgent(m_PlayerId, Agent.Main);
 
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
@@ -63,7 +63,7 @@ namespace Coop.Mod.Missions
 
         private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)
         {
-            m_Logger.Info("Receive join request");
+            m_Logger.Information("Receive join request");
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
 
             MissionJoinInfo joinInfo = payload.What;
