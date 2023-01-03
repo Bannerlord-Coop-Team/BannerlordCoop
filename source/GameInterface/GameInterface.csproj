@@ -263,6 +263,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Behaviour\InitServerBehaviour.cs" />
+    <Compile Include="CompatibilityInfo.cs" />
     <Compile Include="Data\GameSaveData.cs" />
     <Compile Include="Data\ICharacterCreationData.cs" />
     <Compile Include="Data\IGameSaveData.cs" />

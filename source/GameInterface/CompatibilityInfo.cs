@@ -2,8 +2,11 @@
 using System.Collections.Generic;
 using System.Xml.Serialization;
 using TaleWorlds.Library;
+using GameInterface.Serialization;
+using System.Reflection;
+using Common.Extensions;
 
-namespace Common
+namespace GameInterface
 {
     [Serializable]
     public struct Version
@@ -15,18 +18,18 @@ namespace Common
 
         public Version(int major, int minor, int revision, int changeSet)
         {
-          Major = major;
-          Minor = minor;
-          Revision = revision;
-          ChangeSet = changeSet;
+            Major = major;
+            Minor = minor;
+            Revision = revision;
+            ChangeSet = changeSet;
         }
 
         public Version(ApplicationVersion applicationVersion)
         {
-          Major = applicationVersion.Major;
-          Minor = applicationVersion.Minor;
-          Revision = applicationVersion.Revision;
-          ChangeSet = applicationVersion.ChangeSet;
+            Major = applicationVersion.Major;
+            Minor = applicationVersion.Minor;
+            Revision = applicationVersion.Revision;
+            ChangeSet = applicationVersion.ChangeSet;
         }
     }
 
@@ -47,27 +50,25 @@ namespace Common
 
     public abstract class IModuleInfoProvider
     {
-      public abstract List<ModuleInfo> GetModuleInfos();
+        public abstract List<ModuleInfo> GetModuleInfos();
     }
 
     public class TaleWorldsModuleInfoProvider : IModuleInfoProvider
     {
-      public override List<ModuleInfo> GetModuleInfos()
-      {
-          var modules = TaleWorlds.ModuleManager.ModuleHelper.GetModules();
-          var moduleInfos = new List<ModuleInfo>();
-          foreach (TaleWorlds.ModuleManager.ModuleInfo moduleInfo in modules)
-          {
-              if (!moduleInfo.IsSelected)
-                continue;
-              moduleInfos.Add(new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, moduleInfo.Version));
-          }
+        public override List<ModuleInfo> GetModuleInfos()
+        {
+            var modules = TaleWorlds.ModuleManager.ModuleHelper.GetModules();
+            var moduleInfos = new List<ModuleInfo>();
+            foreach (TaleWorlds.ModuleManager.ModuleInfo moduleInfo in modules)
+            {
+                if (!moduleInfo.IsSelected)
+                    continue;
+                moduleInfos.Add(new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, moduleInfo.Version));
+            }
 
-          return moduleInfos;
-      }
+            return moduleInfos;
+        }
     }
-
-    [Serializable]
     public class CompatibilityInfo
     {
         public List<ModuleInfo> Modules { get; private set; }
@@ -122,26 +123,6 @@ namespace Common
             return false;
         }
 
-        public static CompatibilityInfo Deserialize(byte[] serialized)
-        {
-            var serializedString = System.Text.Encoding.ASCII.GetString(serialized);
-            var stringReader = new System.IO.StringReader(serializedString);
-            var serializer = new XmlSerializer(typeof(CompatibilityInfo));
-
-            return (CompatibilityInfo)serializer.Deserialize(stringReader);
-        }
-
-        public byte[] Serialize()
-        {
-            var stringWriter = new System.IO.StringWriter();
-            var serializer = new XmlSerializer(typeof(CompatibilityInfo));
-            serializer.Serialize(stringWriter, this);
-
-            var serializedString = stringWriter.GetStringBuilder().ToString();
-
-            return System.Text.Encoding.ASCII.GetBytes(serializedString);
-        }
-
         private CompatibilityInfo()
         {
             Modules = new List<ModuleInfo>();
@@ -152,5 +133,31 @@ namespace Common
             Modules.Add(moduleInfo);
         }
 
+    }
+
+    [Serializable]
+    public class CompatibilityInfoBinaryPackage : BinaryPackageBase<CompatibilityInfo>
+    {
+        public CompatibilityInfoBinaryPackage(CompatibilityInfo obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        {
+        }
+
+        protected override void PackInternal()
+        {
+            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
+            {
+                object obj = field.GetValue(Object);
+                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
+            }
+        }
+
+        protected override void UnpackInternal()
+        {
+            TypedReference reference = __makeref(Object);
+            foreach (FieldInfo field in StoredFields.Keys)
+            {
+                field.SetValueDirect(reference, StoredFields[field].Unpack());
+            }
+        }
     }
 }
