@@ -28,13 +28,15 @@ namespace Missions
         private readonly LiteNetP2PClient _P2PClient;
         
         private readonly IMessageBroker _messageBroker;
+        private readonly INetworkAgentRegistry _agentRegistry;
 
         private BoardGameLogic BoardGameLogic;
 
-        public BoardGameManager(LiteNetP2PClient P2PClient, IMessageBroker messageBroker)
+        public BoardGameManager(LiteNetP2PClient P2PClient, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
             _P2PClient = P2PClient;
             _messageBroker = messageBroker;
+            _agentRegistry = agentRegistry;
 
             ProcessSentencePatch.OnAgentInteraction += Handle_OnAgentInteraction;
 
@@ -52,12 +54,12 @@ namespace Missions
 
         private void SendGameRequest(Agent sender, Agent other)
         {
-            if (NetworkAgentRegistry.AgentToId.TryGetValue(sender, out Guid senderGuid) &&
-                NetworkAgentRegistry.AgentToId.TryGetValue(other, out Guid otherGuid))
+            if (_agentRegistry.AgentToId.TryGetValue(sender, out Guid senderGuid) &&
+                _agentRegistry.AgentToId.TryGetValue(other, out Guid otherGuid))
             {
                 BoardGameChallengeRequest request = new BoardGameChallengeRequest(senderGuid, otherGuid);
                 _messageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
-                _messageBroker.Publish(request);
+                _P2PClient.SendAllEvent(request);
             }
             else
             {
@@ -73,7 +75,7 @@ namespace Missions
 
             if (BoardGameLogic.IsPlayingOtherPlayer == false)
             {
-                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", NetworkAgentRegistry.ControlledAgents[sender].Name + " has challenged you to a board game", true, true, "Accept", "Decline",
+                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", _agentRegistry.ControlledAgents[sender].Name + " has challenged you to a board game", true, true, "Accept", "Decline",
                 new Action(() => { AcceptGameRequest(sender, other, netPeer); }), new Action(() => { DenyGameRequest(sender, other, netPeer); })));
             }
             else
@@ -90,7 +92,7 @@ namespace Missions
             _messageBroker.Publish(response, netPeer);
 
             //Has to do same thing as if (accepted) in Handle_ChallengeResponse
-            if (NetworkAgentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
+            if (_agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
                 group.ControlledAgents.TryGetValue(other, out Agent opponent))
             {
                 StartGame(false, gameId, opponent);
@@ -112,7 +114,7 @@ namespace Missions
             if (accepted)
             {
                 NetPeer netPeer = payload.Who as NetPeer;
-                if (NetworkAgentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
+                if (_agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
                     group.ControlledAgents.TryGetValue(opponentId, out Agent opponent))
                 {
                     StartGame(true, gameId, opponent);

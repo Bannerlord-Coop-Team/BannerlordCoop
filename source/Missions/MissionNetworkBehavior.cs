@@ -1,5 +1,7 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Coop.Mod.Missions;
+using Missions.Messages.Agents;
 using Missions.Network;
 using System;
 using System.Threading.Tasks;
@@ -9,8 +11,6 @@ namespace Missions
 {
     public class MissionNetworkBehavior : MissionBehavior
     {
-        public IMessageBroker MessageBroker { get; private set; }
-
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
         private LiteNetP2PClient m_Client;
@@ -18,9 +18,12 @@ namespace Missions
 
         private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
 
-        public MissionNetworkBehavior(LiteNetP2PClient client)
+        private readonly IMessageBroker _messageBroker;
+
+        public MissionNetworkBehavior(LiteNetP2PClient client, IMessageBroker messageBroker)
         {
             m_Client = client;
+            _messageBroker = messageBroker;
 
             // TODO find callback for loading mission
             Task.Factory.StartNew(async () =>
@@ -33,7 +36,7 @@ namespace Missions
                 string sceneName = Mission.SceneName;
                 m_Client.NatPunch(sceneName);
 
-                missionClient = new MissionClient(m_Client);
+                missionClient = new MissionClient(m_Client, _messageBroker);
                 await Task.Delay(WaitForConnectionsTime);
             });
         }
@@ -41,8 +44,6 @@ namespace Missions
         public override void OnRemoveBehavior()
         {
             base.OnRemoveBehavior();
-
-            NetworkAgentRegistry.Clear();
 
             missionClient.Dispose();
             m_Client.Stop();
@@ -52,10 +53,8 @@ namespace Missions
 
         public override void OnAgentDeleted(Agent affectedAgent)
         {
-            if (NetworkAgentRegistry.AgentToId.TryGetValue(affectedAgent, out Guid agentId))
-            {
-                NetworkAgentRegistry.RemoveNetworkControlledAgent(agentId);
-            }
+            _messageBroker.Publish(this, new AgentDeleted(affectedAgent));
+            
 
             base.OnAgentDeleted(affectedAgent);
         }
@@ -65,13 +64,6 @@ namespace Missions
             m_Client.Dispose();
             MBGameManager.EndGame();
             base.OnEndMission();
-        }
-
-        public override void OnMissionTick(float dt)
-        {
-            TimeSpan frameTime = TimeSpan.FromSeconds(dt);
-            m_Client.Update(frameTime);
-            base.OnMissionTick(dt);
         }
     }
 }

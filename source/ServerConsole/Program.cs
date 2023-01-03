@@ -43,7 +43,7 @@ namespace ServerConsole
                     .AddLogging(builder =>
                     {
                         builder.ClearProviders();
-                        builder.AddSerilog();
+                        builder.AddSerilog(Logger);
                     })
                     .AddSingleton(config)
                     .BuildServiceProvider();

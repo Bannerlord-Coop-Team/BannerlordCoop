@@ -1,4 +1,7 @@
-﻿using LiteNetLib;
+﻿using Common;
+using Common.Messaging;
+using LiteNetLib;
+using Missions.Messages.Agents;
 using Missions.Packets.Agents;
 using System;
 using System.Collections.Generic;
@@ -7,18 +10,61 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Network
 {
-    public class NetworkAgentRegistry
+    public interface INetworkAgentRegistry
     {
-        public static IReadOnlyDictionary<Agent, Guid> AgentToId => m_AgentToId;
-        private static readonly Dictionary<Agent, Guid> m_AgentToId = new Dictionary<Agent, Guid>();
+        IReadOnlyDictionary<Agent, Guid> AgentToId { get; }
+        IReadOnlyDictionary<Guid, Agent> ControlledAgents { get; }
+        IReadOnlyDictionary<NetPeer, AgentGroupController> OtherAgents { get; }
 
-        public static IReadOnlyDictionary<Guid, Agent> ControlledAgents => m_ControlledAgents;
-        private static readonly Dictionary<Guid, Agent> m_ControlledAgents = new Dictionary<Guid, Agent>();
+        void Clear();
+        bool RegisterControlledAgent(Guid agentId, Agent agent);
+        bool RegisterNetworkControlledAgent(NetPeer peer, Guid agentId, Agent agent);
+        bool RemoveControlledAgent(Guid agentId);
+        bool RemovePeer(NetPeer peer);
+    }
 
-        public static IReadOnlyDictionary<NetPeer, AgentGroupController> OtherAgents => m_OtherAgents;
-        private static readonly Dictionary<NetPeer, AgentGroupController> m_OtherAgents = new Dictionary<NetPeer, AgentGroupController>();
+    public class NetworkAgentRegistry : INetworkAgentRegistry
+    {
+        public static INetworkAgentRegistry Instance 
+        { 
+            get
+            {
+                if(_instance == null)
+                {
+                    _instance = new NetworkAgentRegistry(MessageBroker.Instance);
+                }
 
-        public static bool RegisterControlledAgent(Guid agentId, Agent agent)
+                return _instance;
+            } 
+        }
+        private static INetworkAgentRegistry _instance;
+
+        public IReadOnlyDictionary<Agent, Guid> AgentToId => m_AgentToId;
+        private readonly Dictionary<Agent, Guid> m_AgentToId = new Dictionary<Agent, Guid>();
+
+        public IReadOnlyDictionary<Guid, Agent> ControlledAgents => m_ControlledAgents;
+        private readonly Dictionary<Guid, Agent> m_ControlledAgents = new Dictionary<Guid, Agent>();
+
+        public IReadOnlyDictionary<NetPeer, AgentGroupController> OtherAgents => m_OtherAgents;
+        private readonly Dictionary<NetPeer, AgentGroupController> m_OtherAgents = new Dictionary<NetPeer, AgentGroupController>();
+        private readonly IMessageBroker _messageBroker;
+
+        public NetworkAgentRegistry(IMessageBroker messageBroker)
+        {
+            _messageBroker = messageBroker;
+            _messageBroker.Subscribe<AgentDeleted>(Handle_AgentDeleted);
+        }
+
+        private void Handle_AgentDeleted(MessagePayload<AgentDeleted> payload)
+        {
+            Agent affectedAgent = payload.What.Agent;
+            if (AgentToId.TryGetValue(affectedAgent, out Guid agentId))
+            {
+                RemoveNetworkControlledAgent(agentId);
+            }
+        }
+
+        public bool RegisterControlledAgent(Guid agentId, Agent agent)
         {
             if (m_AgentToId.ContainsKey(agent)) return false;
             if (m_ControlledAgents.ContainsKey(agentId)) return false;
@@ -29,7 +75,7 @@ namespace Missions.Network
             return true;
         }
 
-        public static bool RegisterNetworkControlledAgent(NetPeer peer, Guid agentId, Agent agent)
+        public bool RegisterNetworkControlledAgent(NetPeer peer, Guid agentId, Agent agent)
         {
             if (m_OtherAgents.TryGetValue(peer, out AgentGroupController controller))
             {
@@ -50,7 +96,7 @@ namespace Missions.Network
             return true;
         }
 
-        public static bool RemoveControlledAgent(Guid agentId)
+        public bool RemoveControlledAgent(Guid agentId)
         {
             if (m_ControlledAgents.TryGetValue(agentId, out Agent agent))
             {
@@ -59,7 +105,7 @@ namespace Missions.Network
             return false;
         }
 
-        public static bool RemoveNetworkControlledAgent(Guid agentId)
+        public bool RemoveNetworkControlledAgent(Guid agentId)
         {
             return m_OtherAgents.Values.Any(group =>
             {
@@ -75,7 +121,7 @@ namespace Missions.Network
             });
         }
 
-        public static bool RemovePeer(NetPeer peer)
+        public bool RemovePeer(NetPeer peer)
         {
             bool result = true;
             if (m_OtherAgents.TryGetValue(peer, out AgentGroupController controller))
@@ -90,7 +136,7 @@ namespace Missions.Network
             return result;
         }
 
-        public static void Clear()
+        public void Clear()
         {
             m_AgentToId.Clear();
             m_OtherAgents.Clear();

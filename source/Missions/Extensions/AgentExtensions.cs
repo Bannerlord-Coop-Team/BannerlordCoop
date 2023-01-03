@@ -7,7 +7,7 @@ namespace Missions.Extensions
     {
         public static bool IsNetworkAgent(this Agent agent)
         {
-            return NetworkAgentRegistry.AgentToId.ContainsKey(agent);
+            return NetworkAgentRegistry.Instance.AgentToId.ContainsKey(agent);
         }
     }
 }

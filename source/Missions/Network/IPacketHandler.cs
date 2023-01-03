@@ -20,12 +20,5 @@ namespace Missions.Network
         /// <param name="peer">Peer that sent the packet</param>
         /// <param name="packet">Packet of packet type</param>
         void HandlePacket(NetPeer peer, IPacket packet);
-
-        /// <summary>
-        /// Handler for when a peer disconnects from this client.
-        /// </summary>
-        /// <param name="peer">Peer that disconnected</param>
-        /// <param name="reason">Reason for disconnect</param>
-        void HandlePeerDisconnect(NetPeer peer, DisconnectInfo reason);
     }
 }

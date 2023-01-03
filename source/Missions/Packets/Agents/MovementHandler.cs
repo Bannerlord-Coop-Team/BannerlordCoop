@@ -9,6 +9,10 @@ using Common.Logging;
 using Serilog;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using Common.Messaging;
+using Missions.Messages.Network;
+using Common;
+using System.Reflection;
 
 namespace Missions.Packets.Agents
 {
@@ -40,16 +44,26 @@ namespace Missions.Packets.Agents
 
     public class MovementHandler : IPacketHandler, IDisposable
     {
-	    private readonly CancellationTokenSource m_AgentPollingCancelToken = new CancellationTokenSource();
+        private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
+
+        private readonly CancellationTokenSource m_AgentPollingCancelToken = new CancellationTokenSource();
         private readonly Task m_AgentPollingTask;
 
-        private readonly LiteNetP2PClient m_Client;
-        public MovementHandler(LiteNetP2PClient client)
+        private readonly LiteNetP2PClient _client;
+        private readonly IMessageBroker _messageBroker;
+        private readonly INetworkAgentRegistry _agentRegistry;
+
+        public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
-            m_Client = client;
+            
+            _client = client;
+            _messageBroker = messageBroker;
+            _agentRegistry = agentRegistry;
 
-            m_Client.AddHandler(this);
-
+            _messageBroker.Subscribe<PeerDisconnected>(Handle_PeerDisconnect);
+            
+            _client.AddHandler(this);
+            
             m_AgentPollingTask = Task.Run(PollAgents);
         }
 
@@ -60,7 +74,8 @@ namespace Missions.Packets.Agents
 
         public void Dispose()
         {
-            m_Client.RemoveHandler(this);
+            _client.RemoveHandler(this);
+            _messageBroker.Unsubscribe<PeerDisconnected>(Handle_PeerDisconnect);
             m_AgentPollingCancelToken.Cancel();
             m_AgentPollingTask.Wait();
         }
@@ -84,26 +99,13 @@ namespace Missions.Packets.Agents
             while (m_AgentPollingCancelToken.IsCancellationRequested == false &&
                    CurrentMission != null)
             {
-                foreach (Guid guid in NetworkAgentRegistry.ControlledAgents.Keys)
+                foreach (Guid guid in _agentRegistry.ControlledAgents.Keys)
                 {
-                    Agent agent = NetworkAgentRegistry.ControlledAgents[guid];
+                    Agent agent = _agentRegistry.ControlledAgents[guid];
                     if (agent.Mission != null)
                     {
                         MovementPacket packet = new MovementPacket(guid, agent);
-                        m_Client.SendAll(packet);
-                    }
-                    else
-                    {
-                        if (NetworkAgentRegistry.AgentToId.TryGetValue(agent, out Guid agentId))
-                        {
-                            GameLoopRunner.RunOnMainThread(() =>
-                            {
-                                agent.MakeDead(false, ActionIndexCache.act_none);
-                                agent.FadeOut(false, true);
-                            });
-
-                            NetworkAgentRegistry.RemoveControlledAgent(agentId);
-                        }
+                        _client.SendAll(packet);
                     }
                 }
 
@@ -113,24 +115,34 @@ namespace Missions.Packets.Agents
 
         public void HandlePacket(NetPeer peer, IPacket packet)
         {
-            if (NetworkAgentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController agentGroupController))
+            if (_agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController agentGroupController))
             {
                 MovementPacket movement = (MovementPacket)packet;
                 agentGroupController.ApplyMovement(movement);
             }
         }
 
-        public void HandlePeerDisconnect(NetPeer peer, DisconnectInfo reason)
+        private static readonly FieldInfo Agent_Ptr = typeof(Agent).GetField("_pointer", BindingFlags.NonPublic | BindingFlags.Instance);
+        public void Handle_PeerDisconnect(MessagePayload<PeerDisconnected> payload)
         {
-            if (NetworkAgentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController controller))
+            if (Mission.Current == null) return;
+
+            NetPeer peer = payload.What.NetPeer;
+
+            Logger.Debug("Handling disconnect for {peer}", peer);
+
+            if (_agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController controller))
             {
                 foreach (var agent in controller.ControlledAgents.Values)
                 {
-                    agent.MakeDead(false, ActionIndexCache.act_none);
-                    agent.FadeOut(false, true);
+                    if((UIntPtr)Agent_Ptr.GetValue(agent) != UIntPtr.Zero)
+                    {
+                        agent.MakeDead(false, ActionIndexCache.act_none);
+                        agent.FadeOut(false, true);
+                    }
                 }
 
-                NetworkAgentRegistry.RemovePeer(peer);
+                _agentRegistry.RemovePeer(peer);
             }
         }
 

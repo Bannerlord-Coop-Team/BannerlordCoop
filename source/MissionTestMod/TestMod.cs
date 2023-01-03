@@ -86,13 +86,16 @@ namespace MissionTestMod
             "StoryMode",
             "CustomBattle",
             "BirthAndDeath",
+            "MissionTestMod",
         };
         private static bool ValidateModules(MetaData metaData)
         {
             if(metaData == null) return false;
 
             var moduleNames = metaData.GetModules();
-            return moduleNames.All(name => allowedModules.Contains(name));
+            if (moduleNames.Any(name => !allowedModules.Contains(name))) return false;
+            
+            return true;
         }
 
         private static void StartGame(LoadResult loadResult)

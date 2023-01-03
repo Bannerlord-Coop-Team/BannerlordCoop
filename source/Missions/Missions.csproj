@@ -134,6 +134,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Messages\Agents\AgentDeleted.cs" />
     <Compile Include="BoardGameLogic.cs" />
     <Compile Include="BoardGameManager.cs" />
     <Compile Include="CoopMission.cs" />
@@ -163,7 +164,6 @@
     <Compile Include="Network\NetworkAgent.cs" />
     <Compile Include="Network\NetworkAgentRegistry.cs" />
     <Compile Include="Network\NetworkLooseWeapon.cs" />
-    <Compile Include="Network\NetworkMessageBroker.cs" />
     <Compile Include="Network\NetworkMount.cs" />
     <Compile Include="Network\NetworkSiegeEngine.cs" />
     <Compile Include="Network\Player.cs" />

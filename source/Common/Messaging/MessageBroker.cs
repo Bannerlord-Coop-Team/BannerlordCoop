@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,6 +18,7 @@ namespace Common.Messaging
 
     public class MessageBroker : IMessageBroker
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
         private static MessageBroker _instance;
         private readonly Dictionary<Type, List<Delegate>> _subscribers;
         public static MessageBroker Instance
@@ -41,6 +44,9 @@ namespace Common.Messaging
             {
                 return;
             }
+
+            Logger.Verbose($"Publishing {message.GetType()} from {source.GetType().Name}");
+
             var delegates = _subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(message, source);

@@ -1,9 +1,13 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using Common.Serialization;
+using Coop.Mod.Missions;
 using LiteNetLib;
 using Missions.Network;
 using ProtoBuf;
 using ProtoBuf.Meta;
+using Serilog;
 using System;
 using System.Reflection;
 
@@ -11,13 +15,18 @@ namespace Missions.Packets.Events
 {
     internal class EventPacketHandler : IPacketHandler
     {
+        private readonly ILogger Logger = LogManager.GetLogger<EventPacketHandler>();
+
         public PacketType PacketType => PacketType.Event;
 
-        public IMessageBroker MessageBroker { get; }
+        private readonly IMessageBroker _messageBroker;
+        private readonly LiteNetP2PClient _client;
 
-        public EventPacketHandler(IMessageBroker messageBroker)
+        public EventPacketHandler(LiteNetP2PClient client, IMessageBroker messageBroker)
         {
-            MessageBroker = messageBroker;
+            _messageBroker = messageBroker;
+            _client = client;
+            _client.AddHandler(this);
         }
 
 
@@ -26,38 +35,37 @@ namespace Missions.Packets.Events
         {
             EventPacket convertedPacket = (EventPacket)packet;
 
-            object @event = convertedPacket.Event;
+            INetworkEvent @event = convertedPacket.Event;
 
-            Publish.MakeGenericMethod(@event.GetType()).Invoke(MessageBroker, new object[] { peer, @event });
-        }
+            Logger.Information("Received network event from {Peer} of {EventType}", peer, @event.GetType());
 
-        public void HandlePeerDisconnect(NetPeer peer, DisconnectInfo reason)
-        {
-            throw new NotImplementedException();
+            Publish.MakeGenericMethod(@event.GetType()).Invoke(_messageBroker, new object[] { peer, @event });
         }
     }
 
-    [ProtoContract]
-    public readonly struct EventPacket : IPacket
+    [ProtoContract(SkipConstructor = true)]
+    public class EventPacket : IPacket
     {
         public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
 
         public PacketType PacketType => PacketType.Event;
 
-        [ProtoMember(1)]
-        public object Event { get; }
-
-        public EventPacket(IMessagePayload payload)
+        public INetworkEvent Event
         {
-            if (RuntimeTypeModel.Default.IsDefined(payload.GetType()) == false)
+            get
             {
-                throw new ArgumentException($"Type {payload.GetType().Name} is not serializable.");
+                return (INetworkEvent)ProtoBufSerializer.Deserialize(_event);
             }
-
-            Event = payload.What;
+            set
+            {
+                _event = ProtoBufSerializer.Serialize(value);
+            }
         }
 
-        public EventPacket(object @event)
+        [ProtoMember(1)]
+        public byte[] _event;
+
+        public EventPacket(INetworkEvent @event)
         {
             if (RuntimeTypeModel.Default.IsDefined(@event.GetType()) == false)
             {

@@ -24,14 +24,17 @@ namespace IntroServer.Server
 	        _netManager = new NetManager(this)
             {
                 NatPunchEnabled = true,
-                DisconnectTimeout = config.DisconnectTimeout.Milliseconds,
-                PingInterval = config.PingInterval.Milliseconds,
-                ReconnectDelay = config.ReconnectDelay.Milliseconds,
+                //DisconnectTimeout = config.DisconnectTimeout.Milliseconds,
+                //PingInterval = config.PingInterval.Milliseconds,
+                //ReconnectDelay = config.ReconnectDelay.Milliseconds,
             };
             _netManager.NatPunchModule.Init(this);
 
-            _netManager.Start(config.NATType == NATType.Internal 
-	            ? config.LanPort : config.WanPort);
+            if(_netManager.Start(config.NATType == NATType.Internal 
+	            ? config.LanPort : config.WanPort) == false)
+            {
+                _logger.LogError("Failed to start server");
+            }
         }
 
         public void Update()
@@ -121,10 +124,18 @@ namespace IntroServer.Server
             {
                 string[] data = token.Split('%');
 
-                if (data.Length != 2) return;
+                if (data.Length != 2)
+                {
+                    _logger.LogWarning("Invalid token format from {endpoint}: {token}", remoteEndPoint, token);
+                    return;
+                }
 
                 string instance = data[0];
-                if (Guid.TryParse(data[1], out Guid id) == false) return;
+                if (Guid.TryParse(data[1], out Guid id) == false)
+                {
+                    _logger.LogWarning("Invalid Guid format from {endpoint}: {token}", remoteEndPoint, token);
+                    return;
+                }
 
                 if (_peerRegistry.ContainsP2PPeer(instance, id))
                 {
