@@ -122,7 +122,6 @@ namespace Missions.Packets.Agents
             }
         }
 
-        private static readonly FieldInfo Agent_Ptr = typeof(Agent).GetField("_pointer", BindingFlags.NonPublic | BindingFlags.Instance);
         public void Handle_PeerDisconnect(MessagePayload<PeerDisconnected> payload)
         {
             if (Mission.Current == null) return;
@@ -135,11 +134,11 @@ namespace Missions.Packets.Agents
             {
                 foreach (var agent in controller.ControlledAgents.Values)
                 {
-                    if((UIntPtr)Agent_Ptr.GetValue(agent) != UIntPtr.Zero)
+                    GameLoopRunner.RunOnMainThread(() =>
                     {
                         agent.MakeDead(false, ActionIndexCache.act_none);
                         agent.FadeOut(false, true);
-                    }
+                    });
                 }
 
                 _agentRegistry.RemovePeer(peer);

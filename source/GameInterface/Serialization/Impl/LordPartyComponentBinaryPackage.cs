@@ -44,6 +44,11 @@ namespace GameInterface.Serialization.Impl
             if (kingdom != null)
             {
                 List<WarPartyComponent> kingdomComponents = (List<WarPartyComponent>)KingdomBinaryPackage.Kingdom_WarPartyComponents.GetValue(kingdom);
+                if(kingdomComponents == null)
+                {
+                    KingdomBinaryPackage.InitializeCachedLists.Invoke(kingdom, new object[0]);
+                }
+                
                 if (kingdomComponents.Contains(Object) == false)
                 {
                     kingdomComponents.Add(Object);
