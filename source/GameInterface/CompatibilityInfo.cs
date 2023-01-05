@@ -71,7 +71,7 @@ namespace GameInterface
     }
     public class CompatibilityInfo
     {
-        public List<ModuleInfo> Modules { get; private set; }
+        public List<ModuleInfo> Modules { get; private set; } = new List<ModuleInfo>();
         public static IModuleInfoProvider ModuleProvider { get; set; }
 
         static CompatibilityInfo()
@@ -121,11 +121,6 @@ namespace GameInterface
                 return CompatibleWith(obj as CompatibilityInfo);
             }
             return false;
-        }
-
-        private CompatibilityInfo()
-        {
-            Modules = new List<ModuleInfo>();
         }
 
         private void AddModule(ModuleInfo moduleInfo)
