@@ -3,6 +3,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 
@@ -92,19 +93,19 @@ namespace GameInterface.Serialization.Impl
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
             }
 
-            InitializeCachedLists.Invoke(Object, new object[0]);
+            InitializeCachedLists.Invoke(Object, Array.Empty<object>());
 
             // Cached armies are handed in the ArmyBinaryPackage
 
             // Cached WarPartyComponents are handed in the
             // BanditComponentBinaryPackage and LordPartyComponentBinaryPackage
 
-            Kingdom_Clans.SetValue(Object, ResolveIds<Clan>(clanIds));
-            Kingdom_Fiefs.SetValue(Object, ResolveIds<Town>(fiefIds));
-            Kingdom_Heroes.SetValue(Object, ResolveIds<Hero>(heroIds));
-            Kingdom_Lords.SetValue(Object, ResolveIds<Hero>(lordIds));
-            Kingdom_Settlements.SetValue(Object, ResolveIds<Settlement>(settlementIds));
-            Kingdom_Villages.SetValue(Object, ResolveIds<Village>(villageIds));
+            Kingdom_Clans.SetValue(Object, ResolveIds<Clan>(clanIds).ToList());
+            Kingdom_Fiefs.SetValue(Object, ResolveIds<Town>(fiefIds).ToList());
+            Kingdom_Heroes.SetValue(Object, ResolveIds<Hero>(heroIds).ToList());
+            Kingdom_Lords.SetValue(Object, ResolveIds<Hero>(lordIds).ToList());
+            Kingdom_Settlements.SetValue(Object, ResolveIds<Settlement>(settlementIds).ToList());
+            Kingdom_Villages.SetValue(Object, ResolveIds<Village>(villageIds).ToList());
         }
     }
 }
