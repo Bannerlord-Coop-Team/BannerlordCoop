@@ -27,9 +27,10 @@ namespace MissionTestMod
 	        if (System.Diagnostics.Debugger.IsAttached)
 	        {
 		        LogManager.Configuration
+			        .Enrich.WithProcessId()
 			        .WriteTo.Debug(
 				        outputTemplate:
-				        "[{Timestamp:HH:mm:ss} {Level:u3} ({SourceContext})] {Message:lj}{NewLine}{Exception}")
+						"[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
 			        .MinimumLevel.Verbose();
 	        }
 

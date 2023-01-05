@@ -228,7 +228,6 @@ namespace Coop.Mod.Missions
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor)));
             agentBuildData.Controller(Agent.ControllerType.None);
 
-            Logger.Information("Spawning Agent");
             Agent agent = default(Agent);
             GameLoopRunner.RunOnMainThread(() =>
             {

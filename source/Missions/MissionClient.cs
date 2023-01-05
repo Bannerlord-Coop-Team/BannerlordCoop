@@ -71,17 +71,20 @@ namespace Coop.Mod.Missions
 
         private void SendJoinInfo(NetPeer peer)
         {
-            Logger.Information("Sending join request");
+            Logger.Debug("Sending join request");
             _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
 
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
             MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position);
             _client.SendEvent(request, peer);
+            Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
+	            characterObject.IsPlayerCharacter ? "Player" : "Agent",
+	            characterObject.Name, request.PlayerId, peer.EndPoint);
         }
 
         private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)
         {
-            Logger.Information("Receive join request");
+            Logger.Debug("Received join request");
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
 
             MissionJoinInfo joinInfo = payload.What;
@@ -89,9 +92,11 @@ namespace Coop.Mod.Missions
             Guid newAgentId = joinInfo.PlayerId;
             Vec3 startingPos = joinInfo.StartingPosition;
 
+			Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer}",
+				joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent", 
+				joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
             // TODO remove test code
             Agent newAgent = MissionTestGameManager.SpawnAgent(startingPos, joinInfo.CharacterObject);
-
             _agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
         }
     }
