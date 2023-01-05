@@ -89,7 +89,7 @@ namespace Missions
             Guid gameId = Guid.NewGuid();
 
             BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, true, gameId);
-            _messageBroker.Publish(response, netPeer);
+            _P2PClient.SendEvent(response, netPeer);
 
             //Has to do same thing as if (accepted) in Handle_ChallengeResponse
             if (_agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
@@ -102,7 +102,7 @@ namespace Missions
         private void DenyGameRequest(Guid sender, Guid other, NetPeer netPeer)
         {
             BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, false, Guid.Empty);
-            _messageBroker.Publish(response, netPeer);
+            _P2PClient.SendEvent(response, netPeer);
         }
 
         private void Handle_ChallengeResponse(MessagePayload<BoardGameChallengeResponse> payload)

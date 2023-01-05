@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Coop.Mod.Patch.BoardGames;
+using Missions.Messages.Agents;
 using Missions.Messages.BoardGames;
 using Missions.Network;
 using Missions.Packets.Events;
@@ -47,6 +48,7 @@ namespace Coop.Mod.Missions
             _messageBroker.Subscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
             _messageBroker.Subscribe<PawnCapturedMessage>(Handle_PawnCapture);
             _messageBroker.Subscribe<BoardGameMoveRequest>(Handle_MoveRequest);
+            _messageBroker.Subscribe<AgentDeleted>(Handle_AgentDeleted);
 
             StartConversationAfterGamePatch.OnGameOver += OnGameOver;
             ForfeitGamePatch.OnForfeitGame += OnForfeitGame;
@@ -55,6 +57,16 @@ namespace Coop.Mod.Missions
             PreplaceUnitsPatch.OnPreplaceUnits += PreplaceUnits;
             HandlePlayerInputPatch.OnHandlePlayerInput += OnPlayerInput;
 
+        }
+
+        private void Handle_AgentDeleted(MessagePayload<AgentDeleted> payload)
+        {
+            if(payload.What.Agent.Equals(_boardGameLogic.OpposingAgent))
+            {
+                _boardGameLogic.AIForfeitGame();
+                MBInformationManager.AddQuickInformation(new TextObject("You won! Your opponent has disconnected"));
+                Dispose();
+            }
         }
 
         ~BoardGameLogic()
