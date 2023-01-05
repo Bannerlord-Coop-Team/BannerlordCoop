@@ -1,5 +1,5 @@
 ﻿using GameInterface.Serialization;
-using GameInterface.Serialization.Impl;
+using GameInterface.Serialization.Internal;
 using GameInterface.Tests.Serialization;
 using System.Collections.Generic;
 using System.Globalization;
