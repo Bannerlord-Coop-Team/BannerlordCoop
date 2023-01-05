@@ -1,7 +1,6 @@
 ﻿using ProtoBuf;
 using System;
 using System.IO;
-using System.Reflection;
 
 namespace Common.Serialization
 {
