@@ -26,9 +26,7 @@ namespace Missions.Packets.Events
         {
             _messageBroker = messageBroker;
             _client = client;
-            _client.AddHandler(this);
         }
-
 
         private static readonly MethodInfo Publish = typeof(IMessageBroker).GetMethod(nameof(IMessageBroker.Publish));
         public void HandlePacket(NetPeer peer, IPacket packet)

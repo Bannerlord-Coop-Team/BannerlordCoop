@@ -40,6 +40,8 @@ namespace Coop.Mod.Missions
 
             _messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
             _messageBroker.Subscribe<MissionJoinInfo>(Handle_JoinInfo);
+
+            _client.AddHandler(_eventPacketHandler);
         }
 
         
@@ -51,6 +53,8 @@ namespace Coop.Mod.Missions
 
         public void Dispose()
         {
+            _client.RemoveHandler(_eventPacketHandler);
+
             _messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
             _messageBroker.Unsubscribe<MissionJoinInfo>(Handle_JoinInfo);
 
