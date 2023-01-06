@@ -81,7 +81,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CompatibilityInfo.cs" />
     <Compile Include="CoopObjectManager.cs" />
     <Compile Include="DropoutStack.cs" />
     <Compile Include="Entity\IController.cs" />

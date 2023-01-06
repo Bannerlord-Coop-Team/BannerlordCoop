@@ -263,6 +263,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Behaviour\InitServerBehaviour.cs" />
+    <Compile Include="CompatibilityInfo.cs" />
     <Compile Include="Data\GameSaveData.cs" />
     <Compile Include="Data\ICharacterCreationData.cs" />
     <Compile Include="Data\IGameSaveData.cs" />
@@ -370,6 +371,7 @@
     <Compile Include="Serialization\Impl\MonsterBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\Mat3BinaryPackage.cs" />
     <Compile Include="Serialization\Impl\Vec3BinaryPackage.cs" />
+    <Compile Include="Serialization\Internal\CompatibilityInfoBinaryPackage.cs" />
     <Compile Include="Serialization\Native\DictionaryBinaryPackage.cs" />
     <Compile Include="Serialization\Native\EnumerableBinaryPackage.cs" />
     <Compile Include="Serialization\Impl\BannerBinaryPackage.cs" />

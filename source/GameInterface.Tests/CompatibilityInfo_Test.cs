@@ -1,8 +1,14 @@
-﻿using System.Collections.Generic;
+﻿using GameInterface.Serialization;
+using GameInterface.Serialization.Internal;
+using GameInterface.Tests.Serialization;
+using System.Collections.Generic;
+using System.Globalization;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using Xunit;
+using Xunit.Sdk;
 
-namespace Common.Tests
+namespace GameInterface.Tests
 {
     public class TestModuleProvider : IModuleInfoProvider
     {
@@ -60,6 +66,9 @@ namespace Common.Tests
             CompatibilityInfo.ModuleProvider = new TestModuleProvider();
             var compatInfo = CompatibilityInfo.Get();
 
+            BinaryPackageFactory factory = new BinaryPackageFactory();
+            CompatibilityInfoBinaryPackage package = new CompatibilityInfoBinaryPackage(compatInfo, factory);
+
             Assert.Equal(2, compatInfo.Modules.Count);
             Assert.Equal(TestModuleProvider.GameModule.Version, compatInfo.GameVersion());
         }
@@ -100,16 +109,56 @@ namespace Common.Tests
             CompatibilityInfo.ModuleProvider = new TestModuleProvider2();
             var compatInfo2 = CompatibilityInfo.Get();
 
-            var serialized1 = compatInfo1.Serialize();
-            var compatInfo1Deserialized = CompatibilityInfo.Deserialize(serialized1);
-            
-            var serialized2 = compatInfo2.Serialize();
-            var compatInfo2Deserialized = CompatibilityInfo.Deserialize(serialized2);
+            BinaryPackageFactory factory = new BinaryPackageFactory();
+            CompatibilityInfoBinaryPackage package1 = new CompatibilityInfoBinaryPackage(compatInfo1, factory);
+            CompatibilityInfoBinaryPackage package2 = new CompatibilityInfoBinaryPackage(compatInfo2, factory);
 
-            Assert.True(compatInfo1Deserialized.Equals(compatInfo1));
-            Assert.True(compatInfo2Deserialized.Equals(compatInfo2));
+            package1.Pack();
+            package2.Pack();
 
-            Assert.False(serialized1 == serialized2);
+            byte[] bytes1 = BinaryFormatterSerializer.Serialize(package1);
+            byte[] bytes2 = BinaryFormatterSerializer.Serialize(package2);
+
+            Assert.NotEmpty(bytes1);
+            Assert.NotEmpty(bytes2);
+        }
+
+        [Fact]
+        public void FullSerializationTest()
+        {
+            CompatibilityInfo.ModuleProvider = new TestModuleProvider();
+            var compatInfo1 = CompatibilityInfo.Get();
+            CompatibilityInfo.ModuleProvider = new TestModuleProvider2();
+            var compatInfo2 = CompatibilityInfo.Get();
+
+            BinaryPackageFactory factory = new BinaryPackageFactory();
+            CompatibilityInfoBinaryPackage package1 = new CompatibilityInfoBinaryPackage(compatInfo1, factory);
+            CompatibilityInfoBinaryPackage package2 = new CompatibilityInfoBinaryPackage(compatInfo2, factory);
+
+            package1.Pack();
+            package2.Pack();
+
+            byte[] bytes1 = BinaryFormatterSerializer.Serialize(package1);
+            byte[] bytes2 = BinaryFormatterSerializer.Serialize(package2);
+
+            Assert.NotEmpty(bytes1);
+            Assert.NotEmpty(bytes2);
+
+            object obj1 = BinaryFormatterSerializer.Deserialize(bytes1);
+            object obj2 = BinaryFormatterSerializer.Deserialize(bytes2);
+
+            Assert.IsType<CompatibilityInfoBinaryPackage>(obj1);
+            Assert.IsType<CompatibilityInfoBinaryPackage>(obj2);
+
+            CompatibilityInfoBinaryPackage returnedPackage1 = (CompatibilityInfoBinaryPackage)obj1;
+            CompatibilityInfoBinaryPackage returnedPackage2 = (CompatibilityInfoBinaryPackage)obj2;
+
+            CompatibilityInfo ret1 = returnedPackage1.Unpack<CompatibilityInfo>();
+            CompatibilityInfo ret2 = returnedPackage2.Unpack<CompatibilityInfo>();
+
+            Assert.False(ret1 == ret2);
+            Assert.Equal(ret1, compatInfo1);
+            Assert.Equal(ret2, compatInfo2);
         }
     }
 }
