@@ -17,6 +17,7 @@ using System.Linq;
 using Common.Logging;
 using Serilog;
 using TaleWorlds.CampaignSystem.Conversation;
+using Common.Messaging;
 
 namespace Missions
 {
@@ -24,18 +25,22 @@ namespace Missions
     {
         private readonly ILogger m_Logger = LogManager.GetLogger<BoardGameManager>();
 
-        public INetworkMessageBroker MessageBroker { get; private set; }
+        private readonly LiteNetP2PClient _P2PClient;
+        
+        private readonly IMessageBroker _messageBroker;
+        private readonly INetworkAgentRegistry _agentRegistry;
 
         private BoardGameLogic BoardGameLogic;
 
-        public BoardGameManager(INetworkMessageBroker messageBroker)
+        public BoardGameManager(LiteNetP2PClient P2PClient, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
-            MessageBroker = messageBroker;
+            _P2PClient = P2PClient;
+            _messageBroker = messageBroker;
+            _agentRegistry = agentRegistry;
 
             ProcessSentencePatch.OnAgentInteraction += Handle_OnAgentInteraction;
 
-            MessageBroker.Subscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
-
+            _messageBroker.Subscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
         }
 
         private void Handle_OnAgentInteraction(Agent sender, Agent other)
@@ -49,12 +54,12 @@ namespace Missions
 
         private void SendGameRequest(Agent sender, Agent other)
         {
-            if (NetworkAgentRegistry.AgentToId.TryGetValue(sender, out Guid senderGuid) &&
-                NetworkAgentRegistry.AgentToId.TryGetValue(other, out Guid otherGuid))
+            if (_agentRegistry.AgentToId.TryGetValue(sender, out Guid senderGuid) &&
+                _agentRegistry.AgentToId.TryGetValue(other, out Guid otherGuid))
             {
                 BoardGameChallengeRequest request = new BoardGameChallengeRequest(senderGuid, otherGuid);
-                MessageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
-                MessageBroker.Publish(request);
+                _messageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
+                _P2PClient.SendAllEvent(request);
             }
             else
             {
@@ -70,7 +75,7 @@ namespace Missions
 
             if (BoardGameLogic.IsPlayingOtherPlayer == false)
             {
-                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", NetworkAgentRegistry.ControlledAgents[sender].Name + " has challenged you to a board game", true, true, "Accept", "Decline",
+                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", _agentRegistry.ControlledAgents[sender].Name + " has challenged you to a board game", true, true, "Accept", "Decline",
                 new Action(() => { AcceptGameRequest(sender, other, netPeer); }), new Action(() => { DenyGameRequest(sender, other, netPeer); })));
             }
             else
@@ -84,10 +89,10 @@ namespace Missions
             Guid gameId = Guid.NewGuid();
 
             BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, true, gameId);
-            MessageBroker.Publish(response, netPeer);
+            _messageBroker.Publish(response, netPeer);
 
             //Has to do same thing as if (accepted) in Handle_ChallengeResponse
-            if (NetworkAgentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
+            if (_agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
                 group.ControlledAgents.TryGetValue(other, out Agent opponent))
             {
                 StartGame(false, gameId, opponent);
@@ -97,7 +102,7 @@ namespace Missions
         private void DenyGameRequest(Guid sender, Guid other, NetPeer netPeer)
         {
             BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, false, Guid.Empty);
-            MessageBroker.Publish(response, netPeer);
+            _messageBroker.Publish(response, netPeer);
         }
 
         private void Handle_ChallengeResponse(MessagePayload<BoardGameChallengeResponse> payload)
@@ -109,7 +114,7 @@ namespace Missions
             if (accepted)
             {
                 NetPeer netPeer = payload.Who as NetPeer;
-                if (NetworkAgentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
+                if (_agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
                     group.ControlledAgents.TryGetValue(opponentId, out Agent opponent))
                 {
                     StartGame(true, gameId, opponent);
@@ -121,7 +126,7 @@ namespace Missions
         {
             MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
             CultureObject.BoardGameType gameType = Settlement.CurrentSettlement.Culture.BoardGame;
-            BoardGameLogic = new BoardGameLogic(MessageBroker, gameId, boardGameLogic, gameType);
+            BoardGameLogic = new BoardGameLogic(_P2PClient, _messageBroker, gameId, boardGameLogic, gameType);
             BoardGameLogic.StartGame(startFirst, opposingAgent);
         }
     }

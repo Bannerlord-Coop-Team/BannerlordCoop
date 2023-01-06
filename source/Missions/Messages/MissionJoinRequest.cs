@@ -1,4 +1,5 @@
-﻿using Common.Serialization;
+﻿using Common.Messaging;
+using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.Impl;
 using ProtoBuf;
@@ -9,7 +10,7 @@ using TaleWorlds.Library;
 namespace Missions.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    public class MissionJoinInfo
+    public class MissionJoinInfo : INetworkEvent
     {
         [ProtoMember(1)]
         public readonly Guid PlayerId;

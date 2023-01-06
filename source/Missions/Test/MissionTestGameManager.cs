@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common.Messaging;
+using HarmonyLib;
 using IntroServer.Config;
 using Missions;
 using Missions.Network;
@@ -31,7 +32,7 @@ namespace Coop.Mod.Missions
             RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
         }
 
-        private static readonly ILogger m_Logger = LogManager.GetLogger<MissionTestGameManager>();
+        private static readonly ILogger Logger = LogManager.GetLogger<MissionTestGameManager>();
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
         private LiteNetP2PClient m_Client;
 
@@ -48,11 +49,15 @@ namespace Coop.Mod.Missions
         {
             NetworkConfiguration config = new NetworkConfiguration();
 
-            m_Client = new LiteNetP2PClient(config);
+            m_Client = new LiteNetP2PClient(config, MessageBroker.Instance);
 
-            if (m_Client.ConnectToP2PServer())
+            if(m_Client.ConnectToP2PServer())
             {
                 StartNewGame(this);
+            }
+            else
+            {
+                Logger.Error("Server Unreachable");
             }
         }
 
@@ -75,7 +80,7 @@ namespace Coop.Mod.Missions
             Location tavern = LocationComplex.Current.GetLocationWithId("tavern");
             string scene = tavern.GetSceneName(upgradeLevel);
             Mission mission = SandBoxMissions.OpenIndoorMission(scene, tavern);
-            mission.AddMissionBehavior(new MissionNetworkBehavior(m_Client));
+            mission.AddMissionBehavior(new MissionNetworkBehavior(m_Client, MessageBroker.Instance));
 
             //PlayerEncounter.EnterSettlement();
 
@@ -223,7 +228,6 @@ namespace Coop.Mod.Missions
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor)));
             agentBuildData.Controller(Agent.ControllerType.None);
 
-            m_Logger.Information("Spawning Agent");
             Agent agent = default(Agent);
             GameLoopRunner.RunOnMainThread(() =>
             {
@@ -253,8 +257,8 @@ namespace Coop.Mod.Missions
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor)));
             agentBuildData.Controller(Agent.ControllerType.None);
 
-            m_Logger.Information("Spawning Agent");
-            Agent agent = default(Agent);
+            Logger.Information("Spawning Agent");
+            Agent agent = default;
             GameLoopRunner.RunOnMainThread(() =>
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);

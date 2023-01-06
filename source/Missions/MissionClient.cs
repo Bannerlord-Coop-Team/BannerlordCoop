@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Messaging;
 using LiteNetLib;
 using Missions;
 using Missions.Messages;
@@ -10,32 +11,40 @@ using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using Missions.Messages.Network;
+using Missions.Packets.Events;
 
 namespace Coop.Mod.Missions
 {
     public class MissionClient : IDisposable
     {
-	    public BoardGameManager BoardGameManager { get; private set; }
+        private static readonly ILogger Logger = LogManager.GetLogger<MissionClient>();
+
+        public BoardGameManager BoardGameManager { get; private set; }
         public MovementHandler MovementHandler { get; private set; }
-        public INetworkMessageBroker MessageBroker { get; private set; }
+        private readonly EventPacketHandler _eventPacketHandler;
+        private readonly INetworkAgentRegistry _agentRegistry;
+        private readonly IMessageBroker _messageBroker;
+		private readonly LiteNetP2PClient _client;
+		private readonly Guid _playerId;
 
-
-        private readonly ILogger m_Logger = LogManager.GetLogger<MissionClient>();
-		private readonly LiteNetP2PClient m_Client;
-		private readonly Guid m_PlayerId;
-
-        public MissionClient(LiteNetP2PClient client)
+        public MissionClient(LiteNetP2PClient client, IMessageBroker messageBroker)
         {
-            m_Client = client;
-            m_PlayerId = Guid.NewGuid();
-            MessageBroker = new NetworkMessageBroker(m_Client);
-            BoardGameManager = new BoardGameManager(MessageBroker);
-            MovementHandler = new MovementHandler(m_Client);
+            _client = client;
+            _playerId = Guid.NewGuid();
+            _messageBroker = messageBroker;
+            _agentRegistry = NetworkAgentRegistry.Instance;
+            BoardGameManager = new BoardGameManager(client, _messageBroker, _agentRegistry);
+            MovementHandler = new MovementHandler(_client, _messageBroker, _agentRegistry);
+            _eventPacketHandler = new EventPacketHandler(_client, _messageBroker);
 
-            m_Client.OnClientConnected += SendJoinInfo;
+            _messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
+            _messageBroker.Subscribe<MissionJoinInfo>(Handle_JoinInfo);
 
-            MessageBroker.Subscribe<MissionJoinInfo>(Handle_JoinInfo);
+            _client.AddHandler(_eventPacketHandler);
         }
+
+        
 
         ~MissionClient()
         {
@@ -44,26 +53,38 @@ namespace Coop.Mod.Missions
 
         public void Dispose()
         {
-            m_Client.OnClientConnected -= SendJoinInfo;
-            MessageBroker.Unsubscribe<MissionJoinInfo>(Handle_JoinInfo);
+            _client.RemoveHandler(_eventPacketHandler);
+
+            _messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
+            _messageBroker.Unsubscribe<MissionJoinInfo>(Handle_JoinInfo);
 
             MovementHandler.Dispose();
-            MessageBroker.Dispose();
+            _messageBroker.Dispose();
+
+            _agentRegistry.Clear();
         }
 
-        public void SendJoinInfo(NetPeer peer)
+        private void Handle_PeerConnected(MessagePayload<PeerConnected> payload)
         {
-            m_Logger.Information("Sending join request");
-            NetworkAgentRegistry.RegisterControlledAgent(m_PlayerId, Agent.Main);
+            SendJoinInfo(payload.What.Peer);
+        }
+
+        private void SendJoinInfo(NetPeer peer)
+        {
+            Logger.Debug("Sending join request");
+            _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
 
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
-            MissionJoinInfo request = new MissionJoinInfo(characterObject, m_PlayerId, Agent.Main.Position);
-            MessageBroker.Publish(request, peer);
+            MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position);
+            _client.SendEvent(request, peer);
+            Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
+	            characterObject.IsPlayerCharacter ? "Player" : "Agent",
+	            characterObject.Name, request.PlayerId, peer.EndPoint);
         }
 
         private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)
         {
-            m_Logger.Information("Receive join request");
+            Logger.Debug("Received join request");
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
 
             MissionJoinInfo joinInfo = payload.What;
@@ -71,10 +92,12 @@ namespace Coop.Mod.Missions
             Guid newAgentId = joinInfo.PlayerId;
             Vec3 startingPos = joinInfo.StartingPosition;
 
+			Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer}",
+				joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent", 
+				joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
             // TODO remove test code
             Agent newAgent = MissionTestGameManager.SpawnAgent(startingPos, joinInfo.CharacterObject);
-
-            NetworkAgentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
+            _agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
         }
     }
 }

@@ -1,10 +1,11 @@
-﻿using ProtoBuf;
+﻿using Common.Messaging;
+using ProtoBuf;
 using System;
 
 namespace Missions.Messages.BoardGames
 {
     [ProtoContract]
-    public readonly struct BoardGameChallengeResponse
+    public readonly struct BoardGameChallengeResponse : INetworkEvent
     {
         public BoardGameChallengeResponse(Guid requestingPlayer, Guid targetPlayer, bool accepted, Guid gameId)
         {

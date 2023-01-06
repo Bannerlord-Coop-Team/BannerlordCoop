@@ -1,4 +1,5 @@
-﻿using Coop.Mod.Missions;
+﻿using Common.Messaging;
+using Coop.Mod.Missions;
 using HarmonyLib;
 using Missions.Network;
 using SandBox;
@@ -38,7 +39,7 @@ namespace Coop.Mod.Patch.BoardGames
         public static event Action<MissionBoardGameLogic> OnGameOver;
         static bool Prefix(MissionBoardGameLogic __instance, Agent conversationAgent)
         {
-            if (NetworkAgentRegistry.AgentToId.ContainsKey(conversationAgent))
+            if (NetworkAgentRegistry.Instance.AgentToId.ContainsKey(conversationAgent))
             {
                 OnGameOver?.Invoke(__instance);
 
@@ -46,7 +47,6 @@ namespace Coop.Mod.Patch.BoardGames
                 AgentNavigatorPropertyInfo.SetValue(conversationAgent.GetComponent<CampaignAgentComponent>(), null);
                 return false;
             }
-
             else
             {
                 return true;

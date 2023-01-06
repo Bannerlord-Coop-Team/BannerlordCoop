@@ -49,14 +49,14 @@ namespace IntroServer.Config
         ///     frame, it will be disconnected.
         /// </summary>
 #if DEBUG
-        public TimeSpan DisconnectTimeout { get; } = TimeSpan.FromMinutes(5);
+        public TimeSpan DisconnectTimeout { get; } = TimeSpan.FromSeconds(60);
 #else
         public TimeSpan DisconnectTimeout { get; } = TimeSpan.FromSeconds(60);
 #endif
         /// <summary>
         ///     Delay after a failed connection attempt until it is tried again.
         /// </summary>
-        public TimeSpan ReconnectDelay { get; } = TimeSpan.FromSeconds(2);
+        public TimeSpan ReconnectDelay { get; } = TimeSpan.FromSeconds(1);
         /// <summary>
         ///     Update cycle time for the network receiver.
         /// </summary>

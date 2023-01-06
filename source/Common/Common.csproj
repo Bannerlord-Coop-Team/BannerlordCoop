@@ -97,12 +97,13 @@
     <Compile Include="Messaging\EMessageResponse.cs" />
     <Compile Include="Messaging\ICommand.cs" />
     <Compile Include="Messaging\IEvent.cs" />
-    <Compile Include="Messaging\IMessageBroker.cs" />
     <Compile Include="IUpdatable.cs" />
-    <Compile Include="Messaging\MessageBrokerImpl.cs" />
+    <Compile Include="Messaging\INetworkEvent.cs" />
+    <Compile Include="Messaging\MessageBroker.cs" />
     <Compile Include="Messaging\MessagePayload.cs" />
     <Compile Include="MovingAverage.cs" />
     <Compile Include="OrderedHashSet.cs" />
+    <Compile Include="Poller.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Serialization\ProtoBufSerializer.cs" />

@@ -138,6 +138,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Messages\Agents\AgentDeleted.cs" />
     <Compile Include="BoardGameLogic.cs" />
     <Compile Include="BoardGameManager.cs" />
     <Compile Include="CoopMission.cs" />
@@ -154,12 +155,12 @@
     <Compile Include="Messages\MissionEventInfos.cs" />
     <Compile Include="Messages\MissionJoinRequest.cs" />
     <Compile Include="Messages\MissionMessages.cs" />
+    <Compile Include="Messages\Network\PeerConnected.cs" />
+    <Compile Include="Messages\Network\PeerDisconnected.cs" />
     <Compile Include="MissionClient.cs" />
     <Compile Include="MissionNetworkBehavior.cs" />
     <Compile Include="MissionShard.cs" />
     <Compile Include="Network\EDisconnectReason.cs" />
-    <Compile Include="Network\EventPacket.cs" />
-    <Compile Include="Network\INetworkMessageBroker.cs" />
     <Compile Include="Network\INetworkObject.cs" />
     <Compile Include="Network\IPacket.cs" />
     <Compile Include="Network\IPacketHandler.cs" />
@@ -167,7 +168,6 @@
     <Compile Include="Network\NetworkAgent.cs" />
     <Compile Include="Network\NetworkAgentRegistry.cs" />
     <Compile Include="Network\NetworkLooseWeapon.cs" />
-    <Compile Include="Network\NetworkMessageBroker.cs" />
     <Compile Include="Network\NetworkMount.cs" />
     <Compile Include="Network\NetworkSiegeEngine.cs" />
     <Compile Include="Network\Player.cs" />
@@ -178,6 +178,7 @@
     <Compile Include="Packets\Agents\AgentMountData.cs" />
     <Compile Include="Packets\Agents\MovementHandler.cs" />
     <Compile Include="Patch\Agents\AgentInteractionPatches.cs" />
+    <Compile Include="Packets\Events\EventPacketHandler.cs" />
     <Compile Include="Patch\BoardGames\BoardGamePatches.cs" />
     <Compile Include="Patch\PausePatch.cs" />
     <Compile Include="PlayerId.cs" />

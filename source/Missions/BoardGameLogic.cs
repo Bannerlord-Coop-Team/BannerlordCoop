@@ -1,7 +1,9 @@
 ﻿using Common;
+using Common.Messaging;
 using Coop.Mod.Patch.BoardGames;
 using Missions.Messages.BoardGames;
 using Missions.Network;
+using Missions.Packets.Events;
 using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.AI;
@@ -24,20 +26,27 @@ namespace Coop.Mod.Missions
         public static bool IsChallenged { get; private set; }
         public Guid GameId { get; private set; }
 
-        private readonly INetworkMessageBroker m_MessageBroker;
-        private readonly MissionBoardGameLogic m_BoardGameLogic;
-        private readonly BoardGameType m_BoardGameType;
+        private readonly LiteNetP2PClient _P2PClient;
+        private readonly IMessageBroker _messageBroker;
+        private readonly MissionBoardGameLogic _boardGameLogic;
+        private readonly BoardGameType _boardGameType;
 
-        public BoardGameLogic(INetworkMessageBroker messageBroker, Guid gameId, MissionBoardGameLogic boardGameLogic, BoardGameType gameType)
+        public BoardGameLogic(
+            LiteNetP2PClient P2PClient,
+            IMessageBroker messageBroker,
+            Guid gameId, 
+            MissionBoardGameLogic boardGameLogic, 
+            BoardGameType gameType)
         {
-            m_MessageBroker = messageBroker;
-            m_BoardGameLogic = boardGameLogic;
-            m_BoardGameType = gameType;
+            _P2PClient = P2PClient;
+            _messageBroker = messageBroker;
+            _boardGameLogic = boardGameLogic;
+            _boardGameType = gameType;
             GameId = gameId;
 
-            m_MessageBroker.Subscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
-            m_MessageBroker.Subscribe<PawnCapturedMessage>(Handle_PawnCapture);
-            m_MessageBroker.Subscribe<BoardGameMoveRequest>(Handle_MoveRequest);
+            _messageBroker.Subscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
+            _messageBroker.Subscribe<PawnCapturedMessage>(Handle_PawnCapture);
+            _messageBroker.Subscribe<BoardGameMoveRequest>(Handle_MoveRequest);
 
             StartConversationAfterGamePatch.OnGameOver += OnGameOver;
             ForfeitGamePatch.OnForfeitGame += OnForfeitGame;
@@ -57,9 +66,9 @@ namespace Coop.Mod.Missions
         {
             //IsPlayingOtherPlayer = false;
 
-            m_MessageBroker.Unsubscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
-            m_MessageBroker.Unsubscribe<PawnCapturedMessage>(Handle_PawnCapture);
-            m_MessageBroker.Unsubscribe<BoardGameMoveRequest>(Handle_MoveRequest);
+            _messageBroker.Unsubscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
+            _messageBroker.Unsubscribe<PawnCapturedMessage>(Handle_PawnCapture);
+            _messageBroker.Unsubscribe<BoardGameMoveRequest>(Handle_MoveRequest);
 
             StartConversationAfterGamePatch.OnGameOver -= OnGameOver;
             ForfeitGamePatch.OnForfeitGame -= OnForfeitGame;
@@ -77,10 +86,11 @@ namespace Coop.Mod.Missions
 
             // Need for SetGameOver() -> OpposingAgent.GetComponent<CampaignAgentComponent>().AgentNavigator.SpecialTargetTag = this._specialTagOfOpposingHero;
             opposingAgent?.GetComponent<CampaignAgentComponent>().CreateAgentNavigator();
-            OpposingAgentPropertyInfo.SetValue(m_BoardGameLogic, opposingAgent);
-            m_BoardGameLogic.SetBoardGame(m_BoardGameType);
-            m_BoardGameLogic.SetStartingPlayer(startFirst);
-            m_BoardGameLogic.StartBoardGame();
+
+            OpposingAgentPropertyInfo.SetValue(_boardGameLogic, opposingAgent);
+            _boardGameLogic.SetBoardGame(_boardGameType);
+            _boardGameLogic.SetStartingPlayer(startFirst);
+            _boardGameLogic.StartBoardGame();
         }
         
         private void OnGameOver(MissionBoardGameLogic boardGameLogic)
@@ -94,7 +104,7 @@ namespace Coop.Mod.Missions
 
         private void PreplaceUnits()
         {
-            BoardGameSeega seegaBoardGame = (BoardGameSeega)m_BoardGameLogic.Board;
+            BoardGameSeega seegaBoardGame = (BoardGameSeega)_boardGameLogic.Board;
 
             var MovePawnToTileDelayedMethod = seegaBoardGame.GetType().GetMethod("MovePawnToTileDelayed", BindingFlags.NonPublic | BindingFlags.Instance);
 
@@ -112,9 +122,9 @@ namespace Coop.Mod.Missions
             //    return;
             //}
 
-            int fromIndex = m_BoardGameLogic.Board.PlayerTwoUnits.IndexOf(pawn);
+            int fromIndex = _boardGameLogic.Board.PlayerTwoUnits.IndexOf(pawn);
             PawnCapturedMessage pawnCapturedEvent = new PawnCapturedMessage(GameId, fromIndex);
-            m_MessageBroker.Publish(pawnCapturedEvent);
+            _P2PClient.SendAllEvent(pawnCapturedEvent);
 
             //if (IsPlayingOtherPlayer)
             //{
@@ -126,7 +136,7 @@ namespace Coop.Mod.Missions
         {
             if (payload.What.GameId == GameId)
             {
-                BoardGameBase boardGame = m_BoardGameLogic.Board;
+                BoardGameBase boardGame = _boardGameLogic.Board;
                 PawnBase unitToCapture = boardGame.PlayerOneUnits[payload.What.Index];
                 boardGame.SetPawnCaptured(unitToCapture);
 
@@ -143,13 +153,13 @@ namespace Coop.Mod.Missions
         {
             if (Mission.Current.InputManager.IsHotKeyPressed("BoardGamePawnSelect"))
             {
-                PawnBase hoveredPawnIfAny = (PawnBase)GetHoveredPawnsMethodInfo?.Invoke(m_BoardGameLogic.Board, new object[] { });
+                PawnBase hoveredPawnIfAny = (PawnBase)GetHoveredPawnsMethodInfo?.Invoke(_boardGameLogic.Board, new object[] { });
 
-                if (hoveredPawnIfAny != null && ((BoardGameKonane)m_BoardGameLogic.Board).RemovablePawns.Contains(hoveredPawnIfAny))
+                if (hoveredPawnIfAny != null && ((BoardGameKonane)_boardGameLogic.Board).RemovablePawns.Contains(hoveredPawnIfAny))
                 {
-                    int fromIndex = m_BoardGameLogic.Board.PlayerOneUnits.IndexOf(hoveredPawnIfAny);
+                    int fromIndex = _boardGameLogic.Board.PlayerOneUnits.IndexOf(hoveredPawnIfAny);
                     PawnCapturedMessage pawnCapturedEvent = new PawnCapturedMessage(GameId, fromIndex);
-                    m_MessageBroker.Publish(pawnCapturedEvent);
+                    _P2PClient.SendAllEvent(pawnCapturedEvent);
                 }
             }
         }
@@ -161,18 +171,17 @@ namespace Coop.Mod.Missions
                 return;
             }
 
-            int FromIndex = m_BoardGameLogic.Board.PlayerOneUnits.IndexOf(move.Unit);
-            int ToIndex = m_BoardGameLogic.Board.Tiles.IndexOf(move.GoalTile);
-
+            int FromIndex = _boardGameLogic.Board.PlayerOneUnits.IndexOf(move.Unit);
+            int ToIndex = _boardGameLogic.Board.Tiles.IndexOf(move.GoalTile);
             BoardGameMoveRequest boardGameMoveEvent = new BoardGameMoveRequest(GameId, FromIndex, ToIndex);
-            m_MessageBroker.Publish(boardGameMoveEvent);
+            _P2PClient.SendAllEvent(boardGameMoveEvent);
         }
 
         private void Handle_MoveRequest(MessagePayload<BoardGameMoveRequest> payload)
         {
             if (payload.What.GameId == GameId)
             {
-                BoardGameBase boardGame = m_BoardGameLogic.Board;
+                BoardGameBase boardGame = _boardGameLogic.Board;
 
                 var unitToMove = boardGame.PlayerTwoUnits[payload.What.FromIndex];
                 var goalTile = boardGame.Tiles[payload.What.ToIndex];
@@ -201,7 +210,7 @@ namespace Coop.Mod.Missions
         private void OnForfeitGame(MissionBoardGameLogic missionBoardGame)
         {
             ForfeitGameMessage forfeitMessage = new ForfeitGameMessage(GameId);
-            m_MessageBroker.Publish(forfeitMessage);
+            _P2PClient.SendAllEvent(forfeitMessage);
             Dispose();
         }
 
@@ -209,7 +218,7 @@ namespace Coop.Mod.Missions
         {
             if(payload.What.GameId == GameId)
             {
-                m_BoardGameLogic.AIForfeitGame();
+                _boardGameLogic.AIForfeitGame();
                 MBInformationManager.AddQuickInformation(new TextObject("You won! Your opponent has surrendered"));
                 Dispose();
             }

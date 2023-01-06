@@ -1,25 +1,37 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace Common.Messaging
 {
-    public class MessageBrokerImpl
+    public interface IMessageBroker : IDisposable
     {
-        private static MessageBrokerImpl _instance;
+        void Publish<T>(object source, T message);
+
+        void Subscribe<T>(Action<MessagePayload<T>> subcription);
+
+        void Unsubscribe<T>(Action<MessagePayload<T>> subscription);
+    }
+
+    public class MessageBroker : IMessageBroker
+    {
+        private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
+        private static MessageBroker _instance;
         private readonly Dictionary<Type, List<Delegate>> _subscribers;
-        public static MessageBrokerImpl Instance
+        public static MessageBroker Instance
         {
             get
             {
                 if (_instance == null)
-                    _instance = new MessageBrokerImpl();
+                    _instance = new MessageBroker();
                 return _instance;
             }
         }
 
-        private MessageBrokerImpl()
+        private MessageBroker()
         {
             _subscribers = new Dictionary<Type, List<Delegate>>();
         }
@@ -32,6 +44,9 @@ namespace Common.Messaging
             {
                 return;
             }
+
+            Logger.Verbose($"Publishing {message.GetType()} from {source.GetType().Name}");
+
             var delegates = _subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(message, source);
