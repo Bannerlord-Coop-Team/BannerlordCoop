@@ -6,11 +6,11 @@ namespace Missions.Messages.Agents
 {
     public readonly struct BoardGameMoveMessage : IEvent
     {
-        public Move move { get; }
+        public Move Move { get; }
 
-        public BoardGameMoveMessage(Move inMove)
+        public BoardGameMoveMessage(Move move)
         {
-            move = inMove;
+            Move = move;
         }
     }
 }

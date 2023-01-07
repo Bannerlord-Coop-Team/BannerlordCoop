@@ -46,13 +46,13 @@ namespace Coop.Mod.Missions
             GameId = gameId;
 
             //Internal Messages
-            _messageBroker.Subscribe<StopConvoAfterGameMessage>(Handle_OnGameOver);
+            _messageBroker.Subscribe<StopConvoAfterGameMessage>(OnGameOver);
             _messageBroker.Subscribe<BoardGameMoveMessage>(OnPlayerInput);
-            _messageBroker.Subscribe<AgentDeleted>(Handle_AgentDeleted);
+            _messageBroker.Subscribe<AgentDeleted>(OnAgentDeleted);
             _messageBroker.Subscribe<OnForfeitMessage>(OnForfeitGame);
-            _messageBroker.Subscribe<OnHandlePreMovementStageMessage>(PreMovementStage);
+            _messageBroker.Subscribe<OnHandlePreMovementStageMessage>(OnPreMovementStage);
             _messageBroker.Subscribe<OnSetPawnCapturedMessage>(OnPawnCapture);
-            _messageBroker.Subscribe<PreplaceUnitsSeegaMessage>(PreplaceUnits);
+            _messageBroker.Subscribe<PreplaceUnitsSeegaMessage>(OnPreplaceUnits);
 
             //External Messages
             _messageBroker.Subscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
@@ -61,7 +61,7 @@ namespace Coop.Mod.Missions
 
         }
 
-        private void Handle_AgentDeleted(MessagePayload<AgentDeleted> payload)
+        private void OnAgentDeleted(MessagePayload<AgentDeleted> payload)
         {
             if(payload.What.Agent.Equals(_boardGameLogic.OpposingAgent))
             {
@@ -84,13 +84,13 @@ namespace Coop.Mod.Missions
             _messageBroker.Unsubscribe<PawnCapturedMessage>(Handle_PawnCapture);
             _messageBroker.Unsubscribe<BoardGameMoveRequest>(Handle_MoveRequest);
 
-            _messageBroker.Unsubscribe<StopConvoAfterGameMessage>(Handle_OnGameOver);
+            _messageBroker.Unsubscribe<StopConvoAfterGameMessage>(OnGameOver);
             _messageBroker.Unsubscribe<BoardGameMoveMessage>(OnPlayerInput);
-            _messageBroker.Unsubscribe<AgentDeleted>(Handle_AgentDeleted);
+            _messageBroker.Unsubscribe<AgentDeleted>(OnAgentDeleted);
             _messageBroker.Unsubscribe<OnForfeitMessage>(OnForfeitGame);
-            _messageBroker.Unsubscribe<OnHandlePreMovementStageMessage>(PreMovementStage);
+            _messageBroker.Unsubscribe<OnHandlePreMovementStageMessage>(OnPreMovementStage);
             _messageBroker.Unsubscribe<OnSetPawnCapturedMessage>(OnPawnCapture);
-            _messageBroker.Unsubscribe<PreplaceUnitsSeegaMessage>(PreplaceUnits);
+            _messageBroker.Unsubscribe<PreplaceUnitsSeegaMessage>(OnPreplaceUnits);
 
         }
 
@@ -109,7 +109,7 @@ namespace Coop.Mod.Missions
             _boardGameLogic.StartBoardGame();
         }
         
-        private void Handle_OnGameOver(MessagePayload<StopConvoAfterGameMessage> payload)
+        private void OnGameOver(MessagePayload<StopConvoAfterGameMessage> payload)
         {
             if (IsPlayingOtherPlayer)
             {
@@ -118,7 +118,7 @@ namespace Coop.Mod.Missions
             Dispose();
         }
 
-        private void PreplaceUnits(MessagePayload<PreplaceUnitsSeegaMessage> payload)
+        private void OnPreplaceUnits(MessagePayload<PreplaceUnitsSeegaMessage> payload)
         {
             BoardGameSeega seegaBoardGame = (BoardGameSeega)_boardGameLogic.Board;
 
@@ -159,7 +159,7 @@ namespace Coop.Mod.Missions
         }
 
         private static readonly MethodInfo GetHoveredPawnsMethodInfo = typeof(BoardGameBase).GetMethod("GetHoveredPawnIfAny", BindingFlags.NonPublic | BindingFlags.Instance);
-        private void PreMovementStage(MessagePayload<OnHandlePreMovementStageMessage> payload)
+        private void OnPreMovementStage(MessagePayload<OnHandlePreMovementStageMessage> payload)
         {
             if (Mission.Current.InputManager.IsHotKeyPressed("BoardGamePawnSelect"))
             {

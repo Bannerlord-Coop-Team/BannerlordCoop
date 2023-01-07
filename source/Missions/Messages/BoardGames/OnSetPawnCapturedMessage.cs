@@ -7,11 +7,11 @@ namespace Missions.Messages.Agents
 {
     public readonly struct OnSetPawnCapturedMessage : IEvent
     {
-        public PawnBase pawn { get; }
+        public PawnBase Pawn { get; }
 
-        public OnSetPawnCapturedMessage(PawnBase _pawn)
+        public OnSetPawnCapturedMessage(PawnBase pawn)
         {
-            pawn = _pawn;
+            Pawn = pawn;
         }
     }
 }
