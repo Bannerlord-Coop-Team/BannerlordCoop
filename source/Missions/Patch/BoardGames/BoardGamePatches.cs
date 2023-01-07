@@ -42,7 +42,7 @@ namespace Coop.Mod.Patch.BoardGames
         {
             if (NetworkAgentRegistry.Instance.AgentToId.ContainsKey(conversationAgent))
             {
-                StopConvoAfterGameMessage message = new StopConvoAfterGameMessage(false);
+                StopConvoAfterGameMessage message = new StopConvoAfterGameMessage();
 
                 MessageBroker.Instance.Publish(conversationAgent, message);
 
@@ -60,22 +60,22 @@ namespace Coop.Mod.Patch.BoardGames
     [HarmonyPatch(typeof(BoardGameBase), "HandlePlayerInput")]
     public class HandlePlayerInputPatch
     {
-        public static event Action<Move> OnHandlePlayerInput;
         static void Postfix(ref BoardGameBase __instance, ref Move __result)
         {
-            OnHandlePlayerInput?.Invoke(__result);
+            BoardGameMoveMessage message = new BoardGameMoveMessage(__result);
+            MessageBroker.Instance.Publish(Agent.Main, message);
         }
     }
 
     [HarmonyPatch(typeof(MissionBoardGameLogic), nameof(MissionBoardGameLogic.ForfeitGame))]
     public class ForfeitGamePatch
     {
-        public static event Action<MissionBoardGameLogic> OnForfeitGame; 
         static bool Prefix(MissionBoardGameLogic __instance)
         {
             if (BoardGameLogic.IsPlayingOtherPlayer)
             {
-                OnForfeitGame?.Invoke(__instance);
+                OnForfeitMessage message = new OnForfeitMessage();
+                MessageBroker.Instance.Publish(Agent.Main, message);
             }
 
              return true;
@@ -111,10 +111,10 @@ namespace Coop.Mod.Patch.BoardGames
     [HarmonyPatch(typeof(BoardGameKonane), "HandlePreMovementStage")]
     public class HandlePreMovementStagePatch
     {
-        public static event Action OnHandlePreMovementStage;
         public static void Prefix()
         {
-            OnHandlePreMovementStage?.Invoke();
+            OnHandlePreMovementStageMessage message = new OnHandlePreMovementStageMessage();
+            MessageBroker.Instance.Publish(Agent.Main, message);
         }
     }
 
@@ -134,24 +134,22 @@ namespace Coop.Mod.Patch.BoardGames
     [HarmonyPatch(typeof(BoardGameBase), nameof(BoardGameBase.SetPawnCaptured))]
     public class SetPawnCapturedPatch
     {
-        public static event Action<PawnBase> OnSetPawnCaptured;
         public static void Postfix(PawnBase pawn, bool fake)
         {
-            OnSetPawnCaptured?.Invoke(pawn);
+            OnSetPawnCapturedMessage message = new OnSetPawnCapturedMessage(pawn);
+            MessageBroker.Instance.Publish(Agent.Main, message);
         }
     }
 
     [HarmonyPatch(typeof(BoardGameSeega), "PreplaceUnits")]
     public class PreplaceUnitsPatch
     {
-        public static event Action OnPreplaceUnits;
-
         static bool Prefix()
         {
-
             if (BoardGameLogic.IsPlayingOtherPlayer && BoardGameLogic.IsChallenged) { return false; }
 
-            OnPreplaceUnits?.Invoke();
+            PreplaceUnitsSeegaMessage message = new PreplaceUnitsSeegaMessage();
+            MessageBroker.Instance.Publish(Agent.Main, message);
 
             return true;
 

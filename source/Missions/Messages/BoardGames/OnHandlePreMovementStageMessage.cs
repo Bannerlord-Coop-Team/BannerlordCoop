@@ -4,7 +4,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Messages.Agents
 {
-    public readonly struct StopConvoAfterGameMessage : IEvent
+    public readonly struct OnHandlePreMovementStageMessage : IEvent
     {
 
     }

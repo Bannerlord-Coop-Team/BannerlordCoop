@@ -138,6 +138,11 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Messages\BoardGames\BoardGameMoveMessage.cs" />
+    <Compile Include="Messages\BoardGames\OnSetPawnCapturedMessage.cs" />
+    <Compile Include="Messages\BoardGames\OnHandlePreMovementStageMessage.cs" />
+    <Compile Include="Messages\BoardGames\OnForfeitMessage.cs" />
+    <Compile Include="Messages\BoardGames\PreplaceUnitsSeegaMessage.cs" />
     <Compile Include="Messages\BoardGames\StopConvoAfterGameMessage.cs" />
     <Compile Include="Messages\Agents\AgentInteraction.cs" />
     <Compile Include="Messages\Agents\AgentDeleted.cs" />
