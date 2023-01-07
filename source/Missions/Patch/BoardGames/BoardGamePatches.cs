@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
 using Coop.Mod.Missions;
 using HarmonyLib;
+using Missions;
+using Missions.Messages.Agents;
 using Missions.Network;
 using SandBox;
 using SandBox.BoardGames;
@@ -36,12 +38,13 @@ namespace Coop.Mod.Patch.BoardGames
     public class StartConversationAfterGamePatch
     {
         private static readonly PropertyInfo AgentNavigatorPropertyInfo = typeof(CampaignAgentComponent).GetProperty("AgentNavigator");
-        public static event Action<MissionBoardGameLogic> OnGameOver;
-        static bool Prefix(MissionBoardGameLogic __instance, Agent conversationAgent)
+        static bool Prefix(Agent conversationAgent)
         {
             if (NetworkAgentRegistry.Instance.AgentToId.ContainsKey(conversationAgent))
             {
-                OnGameOver?.Invoke(__instance);
+                StopConvoAfterGameMessage message = new StopConvoAfterGameMessage(false);
+
+                MessageBroker.Instance.Publish(conversationAgent, message);
 
                 //Set AgentNavigator to null as this gets set in SetGameOver by default and breaks all future interactions
                 AgentNavigatorPropertyInfo.SetValue(conversationAgent.GetComponent<CampaignAgentComponent>(), null);

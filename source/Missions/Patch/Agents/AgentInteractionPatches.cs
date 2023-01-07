@@ -1,5 +1,7 @@
-﻿using HarmonyLib;
+﻿using Common.Messaging;
+using HarmonyLib;
 using Missions.Extensions;
+using Missions.Messages.Agents;
 using SandBox.Conversation.MissionLogics;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -38,7 +40,8 @@ namespace Coop.Mod.Patch.Agents
             if (conversationSentenceOption.Id == "lord_player_start_game" && targetAgent.IsNetworkAgent())
             {
                 MissionConversationLogic.Current.ConversationManager.EndConversation();
-                OnAgentInteraction?.Invoke(requesterAgent, targetAgent);
+                AgentInteraction message = new AgentInteraction(requesterAgent, targetAgent);
+                MessageBroker.Instance.Publish(requesterAgent, message);
                 return false;
             }
             return true;

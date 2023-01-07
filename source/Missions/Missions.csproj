@@ -138,6 +138,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Messages\BoardGames\StopConvoAfterGameMessage.cs" />
+    <Compile Include="Messages\Agents\AgentInteraction.cs" />
     <Compile Include="Messages\Agents\AgentDeleted.cs" />
     <Compile Include="BoardGameLogic.cs" />
     <Compile Include="BoardGameManager.cs" />

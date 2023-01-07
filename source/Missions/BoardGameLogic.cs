@@ -49,8 +49,9 @@ namespace Coop.Mod.Missions
             _messageBroker.Subscribe<PawnCapturedMessage>(Handle_PawnCapture);
             _messageBroker.Subscribe<BoardGameMoveRequest>(Handle_MoveRequest);
             _messageBroker.Subscribe<AgentDeleted>(Handle_AgentDeleted);
+            _messageBroker.Subscribe<StopConvoAfterGameMessage>(Handle_OnGameOver);
 
-            StartConversationAfterGamePatch.OnGameOver += OnGameOver;
+            //StartConversationAfterGamePatch.OnGameOver += OnGameOver;
             ForfeitGamePatch.OnForfeitGame += OnForfeitGame;
             HandlePreMovementStagePatch.OnHandlePreMovementStage += PreMovementStage;
             SetPawnCapturedPatch.OnSetPawnCaptured += OnPawnCapture;
@@ -82,7 +83,7 @@ namespace Coop.Mod.Missions
             _messageBroker.Unsubscribe<PawnCapturedMessage>(Handle_PawnCapture);
             _messageBroker.Unsubscribe<BoardGameMoveRequest>(Handle_MoveRequest);
 
-            StartConversationAfterGamePatch.OnGameOver -= OnGameOver;
+            //StartConversationAfterGamePatch.OnGameOver -= OnGameOver;
             ForfeitGamePatch.OnForfeitGame -= OnForfeitGame;
             HandlePreMovementStagePatch.OnHandlePreMovementStage -= PreMovementStage;
             SetPawnCapturedPatch.OnSetPawnCaptured -= OnPawnCapture;
@@ -105,7 +106,7 @@ namespace Coop.Mod.Missions
             _boardGameLogic.StartBoardGame();
         }
         
-        private void OnGameOver(MissionBoardGameLogic boardGameLogic)
+        private void Handle_OnGameOver(MessagePayload<StopConvoAfterGameMessage> payload)
         {
             if (IsPlayingOtherPlayer)
             {
