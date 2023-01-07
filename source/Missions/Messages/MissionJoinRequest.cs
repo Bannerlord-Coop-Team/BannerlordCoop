@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
-using GameInterface.Serialization.Impl;
+using GameInterface.Serialization.External;
 using ProtoBuf;
 using System;
 using TaleWorlds.CampaignSystem;

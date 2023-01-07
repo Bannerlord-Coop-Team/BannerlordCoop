@@ -1,5 +1,5 @@
 ﻿using GameInterface.Serialization;
-using GameInterface.Serialization.Impl;
+using GameInterface.Serialization.External;
 using TaleWorlds.Core;
 using Xunit;
 using System.Runtime.Serialization;

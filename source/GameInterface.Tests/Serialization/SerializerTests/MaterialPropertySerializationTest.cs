@@ -1,5 +1,5 @@
 ﻿using GameInterface.Serialization;
-using GameInterface.Serialization.Impl;
+using GameInterface.Serialization.External;
 using System;
 using Xunit;
 using static TaleWorlds.Core.HorseComponent;
