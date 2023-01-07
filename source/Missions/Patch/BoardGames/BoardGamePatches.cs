@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
 using Coop.Mod.Missions;
 using HarmonyLib;
+using Missions;
+using Missions.Messages.Agents;
 using Missions.Network;
 using SandBox;
 using SandBox.BoardGames;
@@ -36,12 +38,13 @@ namespace Coop.Mod.Patch.BoardGames
     public class StartConversationAfterGamePatch
     {
         private static readonly PropertyInfo AgentNavigatorPropertyInfo = typeof(CampaignAgentComponent).GetProperty("AgentNavigator");
-        public static event Action<MissionBoardGameLogic> OnGameOver;
-        static bool Prefix(MissionBoardGameLogic __instance, Agent conversationAgent)
+        static bool Prefix(Agent conversationAgent)
         {
             if (NetworkAgentRegistry.Instance.AgentToId.ContainsKey(conversationAgent))
             {
-                OnGameOver?.Invoke(__instance);
+                StopConvoAfterGameMessage message = new StopConvoAfterGameMessage();
+
+                MessageBroker.Instance.Publish(conversationAgent, message);
 
                 //Set AgentNavigator to null as this gets set in SetGameOver by default and breaks all future interactions
                 AgentNavigatorPropertyInfo.SetValue(conversationAgent.GetComponent<CampaignAgentComponent>(), null);
@@ -57,22 +60,22 @@ namespace Coop.Mod.Patch.BoardGames
     [HarmonyPatch(typeof(BoardGameBase), "HandlePlayerInput")]
     public class HandlePlayerInputPatch
     {
-        public static event Action<Move> OnHandlePlayerInput;
         static void Postfix(ref BoardGameBase __instance, ref Move __result)
         {
-            OnHandlePlayerInput?.Invoke(__result);
+            BoardGameMoveMessage message = new BoardGameMoveMessage(__result);
+            MessageBroker.Instance.Publish(Agent.Main, message);
         }
     }
 
     [HarmonyPatch(typeof(MissionBoardGameLogic), nameof(MissionBoardGameLogic.ForfeitGame))]
     public class ForfeitGamePatch
     {
-        public static event Action<MissionBoardGameLogic> OnForfeitGame; 
         static bool Prefix(MissionBoardGameLogic __instance)
         {
             if (BoardGameLogic.IsPlayingOtherPlayer)
             {
-                OnForfeitGame?.Invoke(__instance);
+                OnForfeitMessage message = new OnForfeitMessage();
+                MessageBroker.Instance.Publish(Agent.Main, message);
             }
 
              return true;
@@ -108,10 +111,10 @@ namespace Coop.Mod.Patch.BoardGames
     [HarmonyPatch(typeof(BoardGameKonane), "HandlePreMovementStage")]
     public class HandlePreMovementStagePatch
     {
-        public static event Action OnHandlePreMovementStage;
         public static void Prefix()
         {
-            OnHandlePreMovementStage?.Invoke();
+            OnHandlePreMovementStageMessage message = new OnHandlePreMovementStageMessage();
+            MessageBroker.Instance.Publish(Agent.Main, message);
         }
     }
 
@@ -131,24 +134,22 @@ namespace Coop.Mod.Patch.BoardGames
     [HarmonyPatch(typeof(BoardGameBase), nameof(BoardGameBase.SetPawnCaptured))]
     public class SetPawnCapturedPatch
     {
-        public static event Action<PawnBase> OnSetPawnCaptured;
         public static void Postfix(PawnBase pawn, bool fake)
         {
-            OnSetPawnCaptured?.Invoke(pawn);
+            OnSetPawnCapturedMessage message = new OnSetPawnCapturedMessage(pawn);
+            MessageBroker.Instance.Publish(Agent.Main, message);
         }
     }
 
     [HarmonyPatch(typeof(BoardGameSeega), "PreplaceUnits")]
     public class PreplaceUnitsPatch
     {
-        public static event Action OnPreplaceUnits;
-
         static bool Prefix()
         {
-
             if (BoardGameLogic.IsPlayingOtherPlayer && BoardGameLogic.IsChallenged) { return false; }
 
-            OnPreplaceUnits?.Invoke();
+            PreplaceUnitsSeegaMessage message = new PreplaceUnitsSeegaMessage();
+            MessageBroker.Instance.Publish(Agent.Main, message);
 
             return true;
 

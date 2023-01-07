@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Coop.Mod.Patch.BoardGames;
+using Missions.Messages.Agents;
 using Missions.Messages.BoardGames;
 using Missions.Network;
 using Missions.Packets.Events;
@@ -44,17 +45,30 @@ namespace Coop.Mod.Missions
             _boardGameType = gameType;
             GameId = gameId;
 
+            //Internal Messages
+            _messageBroker.Subscribe<StopConvoAfterGameMessage>(OnGameOver);
+            _messageBroker.Subscribe<BoardGameMoveMessage>(OnPlayerInput);
+            _messageBroker.Subscribe<AgentDeleted>(OnAgentDeleted);
+            _messageBroker.Subscribe<OnForfeitMessage>(OnForfeitGame);
+            _messageBroker.Subscribe<OnHandlePreMovementStageMessage>(OnPreMovementStage);
+            _messageBroker.Subscribe<OnSetPawnCapturedMessage>(OnPawnCapture);
+            _messageBroker.Subscribe<PreplaceUnitsSeegaMessage>(OnPreplaceUnits);
+
+            //External Messages
             _messageBroker.Subscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
             _messageBroker.Subscribe<PawnCapturedMessage>(Handle_PawnCapture);
             _messageBroker.Subscribe<BoardGameMoveRequest>(Handle_MoveRequest);
 
-            StartConversationAfterGamePatch.OnGameOver += OnGameOver;
-            ForfeitGamePatch.OnForfeitGame += OnForfeitGame;
-            HandlePreMovementStagePatch.OnHandlePreMovementStage += PreMovementStage;
-            SetPawnCapturedPatch.OnSetPawnCaptured += OnPawnCapture;
-            PreplaceUnitsPatch.OnPreplaceUnits += PreplaceUnits;
-            HandlePlayerInputPatch.OnHandlePlayerInput += OnPlayerInput;
+        }
 
+        private void OnAgentDeleted(MessagePayload<AgentDeleted> payload)
+        {
+            if(payload.What.Agent.Equals(_boardGameLogic.OpposingAgent))
+            {
+                _boardGameLogic.AIForfeitGame();
+                MBInformationManager.AddQuickInformation(new TextObject("You won! Your opponent has disconnected"));
+                Dispose();
+            }
         }
 
         ~BoardGameLogic()
@@ -70,12 +84,14 @@ namespace Coop.Mod.Missions
             _messageBroker.Unsubscribe<PawnCapturedMessage>(Handle_PawnCapture);
             _messageBroker.Unsubscribe<BoardGameMoveRequest>(Handle_MoveRequest);
 
-            StartConversationAfterGamePatch.OnGameOver -= OnGameOver;
-            ForfeitGamePatch.OnForfeitGame -= OnForfeitGame;
-            HandlePreMovementStagePatch.OnHandlePreMovementStage -= PreMovementStage;
-            SetPawnCapturedPatch.OnSetPawnCaptured -= OnPawnCapture;
-            PreplaceUnitsPatch.OnPreplaceUnits -= PreplaceUnits;
-            HandlePlayerInputPatch.OnHandlePlayerInput -= OnPlayerInput;
+            _messageBroker.Unsubscribe<StopConvoAfterGameMessage>(OnGameOver);
+            _messageBroker.Unsubscribe<BoardGameMoveMessage>(OnPlayerInput);
+            _messageBroker.Unsubscribe<AgentDeleted>(OnAgentDeleted);
+            _messageBroker.Unsubscribe<OnForfeitMessage>(OnForfeitGame);
+            _messageBroker.Unsubscribe<OnHandlePreMovementStageMessage>(OnPreMovementStage);
+            _messageBroker.Unsubscribe<OnSetPawnCapturedMessage>(OnPawnCapture);
+            _messageBroker.Unsubscribe<PreplaceUnitsSeegaMessage>(OnPreplaceUnits);
+
         }
 
         private static readonly PropertyInfo OpposingAgentPropertyInfo = typeof(MissionBoardGameLogic).GetProperty("OpposingAgent");
@@ -93,7 +109,7 @@ namespace Coop.Mod.Missions
             _boardGameLogic.StartBoardGame();
         }
         
-        private void OnGameOver(MissionBoardGameLogic boardGameLogic)
+        private void OnGameOver(MessagePayload<StopConvoAfterGameMessage> payload)
         {
             if (IsPlayingOtherPlayer)
             {
@@ -102,7 +118,7 @@ namespace Coop.Mod.Missions
             Dispose();
         }
 
-        private void PreplaceUnits()
+        private void OnPreplaceUnits(MessagePayload<PreplaceUnitsSeegaMessage> payload)
         {
             BoardGameSeega seegaBoardGame = (BoardGameSeega)_boardGameLogic.Board;
 
@@ -114,7 +130,7 @@ namespace Coop.Mod.Missions
             MovePawnToTileDelayedMethod.Invoke(seegaBoardGame, new object[] { seegaBoardGame.PlayerOneUnits[1], seegaBoardGame.GetTile(2, 4), false, false, 1f });
         }
 
-        private void OnPawnCapture(PawnBase pawn)
+        private void OnPawnCapture(MessagePayload<OnSetPawnCapturedMessage> payload)
         {
             //Only call SetPawnCaptured when it's a forceful remove as a result of no moves available as otherwise it gets handled locally from the move
             //if (!FocusBlockingPawnsPatch.ForceRemove)
@@ -122,7 +138,7 @@ namespace Coop.Mod.Missions
             //    return;
             //}
 
-            int fromIndex = _boardGameLogic.Board.PlayerTwoUnits.IndexOf(pawn);
+            int fromIndex = _boardGameLogic.Board.PlayerTwoUnits.IndexOf(payload.What.pawn);
             PawnCapturedMessage pawnCapturedEvent = new PawnCapturedMessage(GameId, fromIndex);
             _P2PClient.SendAllEvent(pawnCapturedEvent);
 
@@ -139,17 +155,11 @@ namespace Coop.Mod.Missions
                 BoardGameBase boardGame = _boardGameLogic.Board;
                 PawnBase unitToCapture = boardGame.PlayerOneUnits[payload.What.Index];
                 boardGame.SetPawnCaptured(unitToCapture);
-
-                if (!(boardGame is BoardGameSeega))
-                {
-                    boardGame.GetType().GetMethod("EndTurn", BindingFlags.NonPublic | BindingFlags.Instance)?
-                        .Invoke(boardGame, new object[] { });
-                }
             }
         }
 
         private static readonly MethodInfo GetHoveredPawnsMethodInfo = typeof(BoardGameBase).GetMethod("GetHoveredPawnIfAny", BindingFlags.NonPublic | BindingFlags.Instance);
-        private void PreMovementStage()
+        private void OnPreMovementStage(MessagePayload<OnHandlePreMovementStageMessage> payload)
         {
             if (Mission.Current.InputManager.IsHotKeyPressed("BoardGamePawnSelect"))
             {
@@ -164,15 +174,15 @@ namespace Coop.Mod.Missions
             }
         }
 
-        private void OnPlayerInput(Move move)
+        private void OnPlayerInput(MessagePayload<BoardGameMoveMessage> payload)
         {
-            if (!move.IsValid)
+            if (!payload.What.move.IsValid)
             {
                 return;
             }
 
-            int FromIndex = _boardGameLogic.Board.PlayerOneUnits.IndexOf(move.Unit);
-            int ToIndex = _boardGameLogic.Board.Tiles.IndexOf(move.GoalTile);
+            int FromIndex = _boardGameLogic.Board.PlayerOneUnits.IndexOf(payload.What.move.Unit);
+            int ToIndex = _boardGameLogic.Board.Tiles.IndexOf(payload.What.move.GoalTile);
             BoardGameMoveRequest boardGameMoveEvent = new BoardGameMoveRequest(GameId, FromIndex, ToIndex);
             _P2PClient.SendAllEvent(boardGameMoveEvent);
         }
@@ -205,9 +215,7 @@ namespace Coop.Mod.Missions
             }
         }
 
-
-        //OnGameOver has to be called on Forfeit somewhere
-        private void OnForfeitGame(MissionBoardGameLogic missionBoardGame)
+        private void OnForfeitGame(MessagePayload<OnForfeitMessage> payload)
         {
             ForfeitGameMessage forfeitMessage = new ForfeitGameMessage(GameId);
             _P2PClient.SendAllEvent(forfeitMessage);

@@ -18,6 +18,7 @@ using Common.Logging;
 using Serilog;
 using TaleWorlds.CampaignSystem.Conversation;
 using Common.Messaging;
+using Missions.Messages.Agents;
 
 namespace Missions
 {
@@ -38,16 +39,16 @@ namespace Missions
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
 
-            ProcessSentencePatch.OnAgentInteraction += Handle_OnAgentInteraction;
+            _messageBroker.Subscribe<AgentInteraction>(Handle_OnAgentInteraction);
 
             _messageBroker.Subscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
         }
 
-        private void Handle_OnAgentInteraction(Agent sender, Agent other)
+        private void Handle_OnAgentInteraction(MessagePayload<AgentInteraction> payload)
         {
-            if (Mission.Current.HasMissionBehavior<MissionBoardGameLogic>() && Agent.Main == sender)
+            if (Mission.Current.HasMissionBehavior<MissionBoardGameLogic>() && Agent.Main == payload.What.reqAgent)
             {
-                SendGameRequest(sender, other);
+                SendGameRequest(payload.What.reqAgent, payload.What.tarAgent);
             }
 
         }
@@ -89,7 +90,7 @@ namespace Missions
             Guid gameId = Guid.NewGuid();
 
             BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, true, gameId);
-            _messageBroker.Publish(response, netPeer);
+            _P2PClient.SendEvent(response, netPeer);
 
             //Has to do same thing as if (accepted) in Handle_ChallengeResponse
             if (_agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
@@ -102,7 +103,7 @@ namespace Missions
         private void DenyGameRequest(Guid sender, Guid other, NetPeer netPeer)
         {
             BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, false, Guid.Empty);
-            _messageBroker.Publish(response, netPeer);
+            _P2PClient.SendEvent(response, netPeer);
         }
 
         private void Handle_ChallengeResponse(MessagePayload<BoardGameChallengeResponse> payload)
