@@ -1,6 +1,4 @@
 ﻿using Common;
-using Coop.Mod;
-using Coop.Mod.Missions;
 using SandBox;
 using System;
 using System.Collections.Generic;
@@ -13,6 +11,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
+using Missions.Services;
 
 namespace MissionTestMod
 {

@@ -1,7 +1,4 @@
 ﻿using Common.Serialization;
-using Missions.Messages;
-using Missions.Packets.Events;
-using Missions.Serialization.Surrogates;
 using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
@@ -12,6 +9,9 @@ using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using Xunit;
+using Missions.Services.Network.Messages;
+using Missions.Services.Network.PacketHandlers;
+using Missions.Services.Network.Surrogates;
 
 namespace IntroductionServerTests
 {
