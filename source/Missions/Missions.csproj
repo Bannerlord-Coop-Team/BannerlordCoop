@@ -187,7 +187,7 @@
     <Compile Include="Services\Agents\Patches\AgentInteractionPatches.cs" />
     <Compile Include="Services\Network\PacketHandlers\EventPacketHandler.cs" />
     <Compile Include="Services\BoardGames\Patches\BoardGamePatches.cs" />
-    <Compile Include="Patches\PausePatch.cs" />
+    <Compile Include="Services\Pausing\Patches\PausePatch.cs" />
     <Compile Include="PlayerId.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\Network\Surrogates\Vec2Surrogate.cs" />
