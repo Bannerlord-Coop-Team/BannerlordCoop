@@ -30,7 +30,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -39,6 +39,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
@@ -63,10 +64,14 @@
       <HintPath>..\packages\Moq.4.18.2\lib\net462\Moq.dll</HintPath>
     </Reference>
     <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.3.1.17\lib\net461\protobuf-net.dll</HintPath>
+      <HintPath>..\packages\protobuf-net.3.1.22\lib\net462\protobuf-net.dll</HintPath>
     </Reference>
     <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.Core.3.1.17\lib\net461\protobuf-net.Core.dll</HintPath>
+      <HintPath>..\packages\protobuf-net.Core.3.1.22\lib\net462\protobuf-net.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="SandBox, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -77,6 +82,7 @@
     </Reference>
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data.Linq" />
     <Reference Include="System.Diagnostics.DiagnosticSource, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
@@ -109,6 +115,9 @@
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.Launcher.Library">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Launcher.Library.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.ObjectSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
     </Reference>
@@ -126,39 +135,92 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ModuleBuild_UnitTest.cs" />
+    <Compile Include="Bootstrap\Patches\GamePatches.cs" />
+    <Compile Include="Bootstrap\TestDebugger.cs" />
+    <Compile Include="CompatibilityInfo_Test.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Serialization\Collections\ArraySerializerTests.cs" />
-    <Compile Include="Serialization\Collections\ListSerializerTests.cs" />
-    <Compile Include="Serialization\DynamicModelGeneratorTests.cs" />
-    <Compile Include="Serialization\Dynamic\BodyPropertiesSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\CharacterObjectSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\CharacterSkillsSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\CharacterTraitsSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\EquipmentElementSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\EquipmentSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\ItemComponentSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\ItemModifierGroupSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\ItemModifierSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\ItemObjectSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\MBBodyPropertySerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\MBEquipmentRosterSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\MonsterSerializerTests.cs" />
-    <Compile Include="Serialization\Dynamic\PolymophismSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\SkeletonScaleSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\TemplateSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\HeroObjectSerializationTests.cs" />
-    <Compile Include="Serialization\Dynamic\WeaponDesignSerializationTests.cs" />
-    <Compile Include="Serialization\SerializationServiceTests.cs" />
-    <Compile Include="Serialization\SerializationTests.cs" />
-    <Compile Include="Serialization\SurrogateStub.cs" />
-    <Compile Include="Serialization\Surrogates\CraftingTemplateSurrogateTests.cs" />
-    <Compile Include="Serialization\Surrogates\TextObjectSurrogateTests.cs" />
-    <Compile Include="Serialization\Surrogates\Mat3SurrogateTests.cs" />
-    <Compile Include="Serialization\Surrogates\MatrixFrameSurrogateTests.cs" />
-    <Compile Include="Serialization\Surrogates\Vec2SurrogateTests.cs" />
-    <Compile Include="Serialization\Surrogates\Vec3SurrogateTests.cs" />
-    <Compile Include="Serialization\TestProtobufSerializer.cs" />
+    <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Bootstrap\GameBootStrap.cs" />
+    <Compile Include="Serialization\SerializerTests\ArmySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterAttributesSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CommonAreaPartyComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterPerksSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CommonAreaSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemModifierGroupSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterObjectSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\KingdomSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\LordPartyComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BannerComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ArmorComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HorseComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PathFaceRecordSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\StanceLinkSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MobilePartySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterAttributeSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PartyBaseSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WorkshopSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HeroDeveloperSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PartyAISerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CaravanPartyComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\SkeletonScaleSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MaterialPropertySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PieceDataSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WorkshopTypeSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WeaponDesignSerializationTest.cs" />
+    <Compile Include="Serialization\DictTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TroopRosterElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TroopRosterSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\VillageSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TownSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\SettlementSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterTraitsSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CultureObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PerkObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TraitObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BanditPartyComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\PolicyObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\SkillObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CraftingPieceSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WeaponComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WeaponDesignElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\WeaponComponentDataSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MatrixFrameSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemObjectSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\SaddleComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TextObjectSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\TradeItemComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CampaignTimeSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\EquipmentElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\EquipmentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HideoutSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemModifierSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CraftingTemplateSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BannerEffectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BasicCultureObjectSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemCategorySerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\DictionarySerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HeroLastSeenInfoSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ClanSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ArraySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HashSetSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemRosterElementSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ItemRosterSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ListSerializerTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MBReadOnlyListSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\DynamicBodyPropertiesSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BodyPropertiesSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\CharacterSkillsSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\Vec2SerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MonsterSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\Mat3SerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\Vec3SerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BladeDataSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\StaticBodyPropertiesSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BannerSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\HeroSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\ProofOfConcept\EdgeCaseClasses.cs" />
+    <Compile Include="Serialization\SerializerTests\ProofOfConcept\EdgeCaseSerializers.cs" />
+    <Compile Include="Serialization\SerializerTests\ProofOfConcept\GenericSerializationTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
@@ -169,6 +231,10 @@
     <Analyzer Include="..\packages\xunit.analyzers.1.0.0\analyzers\dotnet\cs\xunit.analyzers.fixes.dll" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{314f078f-41df-4a23-b25c-f558eff83d2a}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
     <ProjectReference Include="..\GameInterface\GameInterface.csproj">
       <Project>{d22cb8fa-40cc-4f47-986f-1c5a4415980b}</Project>
       <Name>GameInterface</Name>
