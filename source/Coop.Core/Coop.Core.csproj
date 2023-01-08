@@ -178,9 +178,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="FodyWeavers.xml" />
-  </ItemGroup>
-  <ItemGroup>
     <Folder Include="Debugging\Commands\" />
     <Folder Include="Messages\Commands\" />
     <Folder Include="Messages\Events\" />
