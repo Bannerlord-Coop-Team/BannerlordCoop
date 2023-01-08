@@ -1,8 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
-using Coop.Mod.Missions;
 using Missions.Messages;
-using Missions.Network;
+using Missions.Services.Network;
 using System;
 using System.Collections.Generic;
 

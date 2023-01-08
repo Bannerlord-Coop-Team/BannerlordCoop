@@ -3,7 +3,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.Library;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     [Serializable]
     public class MatrixFrameBinaryPackage : BinaryPackageBase<MatrixFrame>

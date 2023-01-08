@@ -1,14 +1,10 @@
 ﻿using Common.Serialization;
 using Missions.Messages;
-using Missions.Packets.Events;
-using Missions.Serialization.Surrogates;
+using Missions.Services.Network.PacketHandlers;
+using Missions.Services.Network.Surrogates;
 using ProtoBuf.Meta;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using Xunit;
@@ -31,7 +27,6 @@ namespace IntroductionServerTests
             Assert.NotNull(bytes);
 
             MissionJoinInfo newEvent = (MissionJoinInfo)eventPacket.Event;
-
         }
     }
 }

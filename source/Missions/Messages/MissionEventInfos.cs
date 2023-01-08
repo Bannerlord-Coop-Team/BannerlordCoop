@@ -1,6 +1,6 @@
-﻿using Missions.Network;
-using System;
+﻿using System;
 using TaleWorlds.CampaignSystem;
+using Missions.Services.Network;
 
 namespace Missions.Messages
 {

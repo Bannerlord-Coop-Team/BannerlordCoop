@@ -16,7 +16,7 @@ namespace Missions.Messages
         public readonly Guid PlayerId;
         [ProtoMember(2)]
         public readonly Vec3 StartingPosition;
-        
+
         public CharacterObject CharacterObject
         {
             get { return UnpackCharacter(); }

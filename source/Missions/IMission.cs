@@ -1,8 +1,8 @@
 ﻿using Missions.Messages;
-using Missions.Network;
+using Missions.Services.Network;
 using System;
 
-namespace Coop.Mod.Missions
+namespace Missions
 {
     public interface IMission
     {

@@ -248,9 +248,6 @@
     <Reference Include="TaleWorlds.ScreenSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
     </Reference>
-    <Reference Include="TaleWorlds.Starter.DotNetCore">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Starter.DotNetCore.dll</HintPath>
-    </Reference>
     <Reference Include="TaleWorlds.Starter.Library">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Starter.Library.dll</HintPath>
     </Reference>

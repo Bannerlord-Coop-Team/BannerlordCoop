@@ -3,7 +3,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     /// <summary>
     /// Binary package for HeroDeveloper

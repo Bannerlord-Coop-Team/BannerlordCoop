@@ -138,61 +138,61 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Messages\BoardGames\BoardGameMoveMessage.cs" />
-    <Compile Include="Messages\BoardGames\OnSetPawnCapturedMessage.cs" />
-    <Compile Include="Messages\BoardGames\OnHandlePreMovementStageMessage.cs" />
-    <Compile Include="Messages\BoardGames\OnForfeitMessage.cs" />
-    <Compile Include="Messages\BoardGames\PreplaceUnitsSeegaMessage.cs" />
-    <Compile Include="Messages\BoardGames\StopConvoAfterGameMessage.cs" />
-    <Compile Include="Messages\Agents\AgentInteraction.cs" />
-    <Compile Include="Messages\Agents\AgentDeleted.cs" />
-    <Compile Include="BoardGameLogic.cs" />
-    <Compile Include="BoardGameManager.cs" />
+    <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
+    <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />
+    <Compile Include="Services\BoardGames\Messages\OnHandlePreMovementStageMessage.cs" />
+    <Compile Include="Services\BoardGames\Messages\OnForfeitMessage.cs" />
+    <Compile Include="Services\BoardGames\Messages\PreplaceUnitsSeegaMessage.cs" />
+    <Compile Include="Services\BoardGames\Messages\StopConvoAfterGameMessage.cs" />
+    <Compile Include="Services\Agents\Messages\AgentInteraction.cs" />
+    <Compile Include="Services\Agents\Messages\AgentDeleted.cs" />
+    <Compile Include="Services\BoardGames\BoardGameLogic.cs" />
+    <Compile Include="Services\BoardGames\BoardGameManager.cs" />
     <Compile Include="CoopMission.cs" />
-    <Compile Include="Extensions\AgentExtensions.cs" />
+    <Compile Include="Services\Agents\Extensions\AgentExtensions.cs" />
     <Compile Include="GameLoopRunner.cs" />
     <Compile Include="IMission.cs" />
-    <Compile Include="IMissionPlayerNetwork.cs" />
+    <Compile Include="Services\Network\IMissionPlayerNetwork.cs" />
     <Compile Include="Messages\BattleNetworkMessages.cs" />
-    <Compile Include="Messages\BoardGames\BoardGameChallengeRequest.cs" />
-    <Compile Include="Messages\BoardGames\BoardGameChallengeResponse.cs" />
-    <Compile Include="Messages\BoardGames\BoardGameMoveRequest.cs" />
-    <Compile Include="Messages\BoardGames\ForfeitGameMessage.cs" />
-    <Compile Include="Messages\BoardGames\PawnCapturedMessage.cs" />
+    <Compile Include="Services\BoardGames\Messages\BoardGameChallengeRequest.cs" />
+    <Compile Include="Services\BoardGames\Messages\BoardGameChallengeResponse.cs" />
+    <Compile Include="Services\BoardGames\Messages\BoardGameMoveRequest.cs" />
+    <Compile Include="Services\BoardGames\Messages\ForfeitGameMessage.cs" />
+    <Compile Include="Services\BoardGames\Messages\PawnCapturedMessage.cs" />
     <Compile Include="Messages\MissionEventInfos.cs" />
     <Compile Include="Messages\MissionJoinRequest.cs" />
     <Compile Include="Messages\MissionMessages.cs" />
-    <Compile Include="Messages\Network\PeerConnected.cs" />
-    <Compile Include="Messages\Network\PeerDisconnected.cs" />
-    <Compile Include="MissionClient.cs" />
-    <Compile Include="MissionNetworkBehavior.cs" />
-    <Compile Include="MissionShard.cs" />
-    <Compile Include="Network\EDisconnectReason.cs" />
-    <Compile Include="Network\INetworkObject.cs" />
-    <Compile Include="Network\IPacket.cs" />
-    <Compile Include="Network\IPacketHandler.cs" />
-    <Compile Include="Network\LiteNetP2PClient.cs" />
-    <Compile Include="Network\NetworkAgent.cs" />
-    <Compile Include="Network\NetworkAgentRegistry.cs" />
-    <Compile Include="Network\NetworkLooseWeapon.cs" />
-    <Compile Include="Network\NetworkMount.cs" />
-    <Compile Include="Network\NetworkSiegeEngine.cs" />
-    <Compile Include="Network\Player.cs" />
-    <Compile Include="Packets\Agents\AgentActionData.cs" />
-    <Compile Include="Packets\Agents\AgentData.cs" />
-    <Compile Include="Packets\Agents\AgentEquipmentData.cs" />
-    <Compile Include="Packets\Agents\AgentGroupController.cs" />
-    <Compile Include="Packets\Agents\AgentMountData.cs" />
-    <Compile Include="Packets\Agents\MovementHandler.cs" />
-    <Compile Include="Patch\Agents\AgentInteractionPatches.cs" />
-    <Compile Include="Packets\Events\EventPacketHandler.cs" />
-    <Compile Include="Patch\BoardGames\BoardGamePatches.cs" />
-    <Compile Include="Patch\PausePatch.cs" />
+    <Compile Include="Services\Network\Messages\PeerConnected.cs" />
+    <Compile Include="Services\Network\Messages\PeerDisconnected.cs" />
+    <Compile Include="Services\Network\MissionClient.cs" />
+    <Compile Include="Services\Network\MissionNetworkBehavior.cs" />
+    <Compile Include="Services\Network\MissionShard.cs" />
+    <Compile Include="Services\Network\EDisconnectReason.cs" />
+    <Compile Include="Services\Network\INetworkObject.cs" />
+    <Compile Include="Services\Network\IPacket.cs" />
+    <Compile Include="Services\Network\IPacketHandler.cs" />
+    <Compile Include="Services\Network\LiteNetP2PClient.cs" />
+    <Compile Include="Services\Network\NetworkAgent.cs" />
+    <Compile Include="Services\Network\NetworkAgentRegistry.cs" />
+    <Compile Include="Services\Network\NetworkLooseWeapon.cs" />
+    <Compile Include="Services\Network\NetworkMount.cs" />
+    <Compile Include="Services\Network\NetworkSiegeEngine.cs" />
+    <Compile Include="Services\Network\Player.cs" />
+    <Compile Include="Services\Agents\Packets\AgentActionData.cs" />
+    <Compile Include="Services\Agents\Packets\AgentData.cs" />
+    <Compile Include="Services\Agents\Packets\AgentEquipmentData.cs" />
+    <Compile Include="Services\Agents\Packets\AgentGroupController.cs" />
+    <Compile Include="Services\Agents\Packets\AgentMountData.cs" />
+    <Compile Include="Services\Agents\Packets\MovementHandler.cs" />
+    <Compile Include="Services\Agents\Patches\AgentInteractionPatches.cs" />
+    <Compile Include="Services\Network\PacketHandlers\EventPacketHandler.cs" />
+    <Compile Include="Services\BoardGames\Patches\BoardGamePatches.cs" />
+    <Compile Include="Services\Pausing\Patches\PausePatch.cs" />
     <Compile Include="PlayerId.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Serialization\Surrogates\Vec2Surrogate.cs" />
-    <Compile Include="Serialization\Surrogates\Vec3Surrogate.cs" />
-    <Compile Include="Test\MissionTestGameManager.cs" />
+    <Compile Include="Services\Network\Surrogates\Vec2Surrogate.cs" />
+    <Compile Include="Services\Network\Surrogates\Vec3Surrogate.cs" />
+    <Compile Include="MissionTestGameManager.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
@@ -211,6 +211,9 @@
       <Project>{5FF39DA3-DBFC-4C2D-BD03-CD765EE9984B}</Project>
       <Name>IntroServer</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Services\Network\Packets\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

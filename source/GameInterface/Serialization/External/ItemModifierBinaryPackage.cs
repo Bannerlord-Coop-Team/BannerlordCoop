@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     [Serializable]
     public class ItemModifierBinaryPackage : BinaryPackageBase<ItemModifier>

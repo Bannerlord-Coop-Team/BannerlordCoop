@@ -1,7 +1,7 @@
 ﻿using System;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     [Serializable]
     public class MBGUIDBinaryPackage : BinaryPackageBase<MBGUID>

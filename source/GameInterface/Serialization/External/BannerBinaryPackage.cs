@@ -1,7 +1,7 @@
 ﻿using System;
 using TaleWorlds.Core;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     [Serializable]
     public class BannerBinaryPackage : BinaryPackageBase<Banner>
