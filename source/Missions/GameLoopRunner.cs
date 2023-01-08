@@ -2,9 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Missions.Services;
 
-namespace Missions.Services
+namespace Missions
 {
     public class GameLoopRunner : IUpdateable
     {

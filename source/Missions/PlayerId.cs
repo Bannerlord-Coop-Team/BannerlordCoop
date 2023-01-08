@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Missions.Services
+namespace Missions
 {
     public struct PlayerId
     {

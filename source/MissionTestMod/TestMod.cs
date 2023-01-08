@@ -12,6 +12,7 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using Missions.Services;
+using Missions;
 
 namespace MissionTestMod
 {

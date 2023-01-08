@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
 
-namespace Missions.Services
+namespace Missions
 {
     public class CoopMission : IMission, IMissionPlayerNetwork
     {
