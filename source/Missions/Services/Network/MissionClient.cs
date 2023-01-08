@@ -7,11 +7,11 @@ using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using Missions.Services.Network.Messages.Network;
 using Missions.Services.BoardGames;
-using Missions.Services.Network.Messages;
 using Missions.Services.Network.PacketHandlers;
-using Missions.Services.Network.Packets.Agents;
+using Missions.Messages;
+using Missions.Services.Network.Messages;
+using Missions.Services.Agents.Packets;
 
 namespace Missions.Services.Network
 {

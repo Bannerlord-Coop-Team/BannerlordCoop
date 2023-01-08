@@ -1,23 +1,18 @@
 ﻿using Common;
+using Common.Logging;
+using Common.Messaging;
 using LiteNetLib;
+using Missions.Services.Agents.Messages;
+using Missions.Services.Agents.Packets;
+using Missions.Services.BoardGames.Messages;
+using Missions.Services.Network;
 using SandBox.BoardGames.MissionLogics;
+using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.Core;
-using System.Collections.Generic;
-using System.Linq;
-using Common.Logging;
-using Serilog;
-using TaleWorlds.CampaignSystem.Conversation;
-using Common.Messaging;
-using Missions.Services.BoardGames;
-using Missions.Services.Network;
-using Missions.Services.Network.Messages.Agents;
-using Missions.Services.Network.Messages.BoardGames;
-using Missions.Services.Network.Packets.Agents;
 
 namespace Missions.Services.BoardGames
 {

@@ -1,9 +1,8 @@
-﻿using Common;
-using Common.Messaging;
+﻿using Common.Messaging;
+using Missions.Services.Agents.Messages;
 using System;
 using System.Threading.Tasks;
 using TaleWorlds.MountAndBlade;
-using Missions.Services.Network.Messages.Agents;
 
 namespace Missions.Services.Network
 {

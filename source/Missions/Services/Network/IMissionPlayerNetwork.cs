@@ -1,5 +1,5 @@
 ﻿using Common;
-using Missions.Services.Network.Messages;
+using Missions.Messages;
 
 namespace Missions.Services.Network
 {

@@ -1,5 +1,5 @@
-﻿using Missions.Services.Network;
-using Missions.Services.Network.Messages;
+﻿using Missions.Messages;
+using Missions.Services.Network;
 using System;
 
 namespace Missions

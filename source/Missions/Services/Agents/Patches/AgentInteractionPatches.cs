@@ -7,8 +7,8 @@ using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Missions.Services.Agents.Patches;
-using Missions.Services.Network.Extensions;
-using Missions.Services.Network.Messages.Agents;
+using Missions.Services.Agents.Extensions;
+using Missions.Services.Agents.Messages;
 
 namespace Missions.Services.Agents.Patches
 {

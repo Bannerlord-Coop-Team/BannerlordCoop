@@ -14,7 +14,7 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Missions.Services.BoardGames;
 using Missions.Services.Network;
-using Missions.Services.Network.Messages.BoardGames;
+using Missions.Services.BoardGames.Messages;
 
 namespace Missions.Services.BoardGames.Patches
 {

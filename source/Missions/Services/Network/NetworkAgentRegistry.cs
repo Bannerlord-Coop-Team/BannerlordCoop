@@ -6,8 +6,8 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
 using Missions.Services.Network;
-using Missions.Services.Network.Messages.Agents;
-using Missions.Services.Network.Packets.Agents;
+using Missions.Services.Agents.Messages;
+using Missions.Services.Agents.Packets;
 
 namespace Missions.Services.Network
 {

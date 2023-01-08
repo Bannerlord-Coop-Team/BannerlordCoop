@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Serialization;
 using IntroServer.Config;
@@ -6,18 +7,16 @@ using IntroServer.Data;
 using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Missions.Services.Network.Messages;
+using Missions.Services.Network.PacketHandlers;
+using Serilog;
+using Serilog.Events;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using Common.Logging;
-using Serilog;
-using Serilog.Events;
-using Version = System.Version;
 using System.Threading.Tasks;
-using Missions.Services.Network.Messages.Network;
-using Missions.Services.Network;
-using Missions.Services.Network.PacketHandlers;
+using Version = System.Version;
 
 namespace Missions.Services.Network
 {
