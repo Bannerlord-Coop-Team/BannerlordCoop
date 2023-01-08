@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     /// <summary>
     /// Binary package for CharacterObject

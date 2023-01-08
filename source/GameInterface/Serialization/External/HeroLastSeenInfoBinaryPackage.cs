@@ -3,7 +3,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     [Serializable]
     public class HeroLastSeenInfoBinaryPackage : BinaryPackageBase<Hero.HeroLastSeenInformation>

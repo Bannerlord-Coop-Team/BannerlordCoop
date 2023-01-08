@@ -2,7 +2,7 @@
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     [Serializable]
     public class HideoutBinaryPackage : BinaryPackageBase<Hideout>

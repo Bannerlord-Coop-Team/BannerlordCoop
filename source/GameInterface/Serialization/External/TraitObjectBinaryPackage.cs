@@ -2,7 +2,7 @@
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     [Serializable]
     public class TraitObjectBinaryPackage : BinaryPackageBase<TraitObject>

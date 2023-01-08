@@ -2,7 +2,7 @@
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     [Serializable]
     public class VillageBinaryPackage : BinaryPackageBase<Village>

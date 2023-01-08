@@ -7,7 +7,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     /// <summary>
     /// Binary package for MobileParty

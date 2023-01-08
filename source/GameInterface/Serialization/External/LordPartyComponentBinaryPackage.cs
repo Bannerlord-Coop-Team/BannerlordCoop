@@ -5,7 +5,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     /// <summary>
     /// Binary package for LordPartyComponent

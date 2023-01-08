@@ -3,7 +3,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.Core;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     [Serializable]
     public class CraftingPieceBinaryPackage : BinaryPackageBase<CraftingPiece>

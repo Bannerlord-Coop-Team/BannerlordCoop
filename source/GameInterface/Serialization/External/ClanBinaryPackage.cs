@@ -6,7 +6,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     [Serializable]
     public class ClanBinaryPackage : BinaryPackageBase<Clan>

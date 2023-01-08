@@ -4,7 +4,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using System.Collections.Generic;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     /// <summary>
     /// Binary package for Army

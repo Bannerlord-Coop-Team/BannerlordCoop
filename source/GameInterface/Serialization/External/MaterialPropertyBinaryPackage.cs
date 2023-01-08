@@ -3,7 +3,7 @@ using System;
 using System.Reflection;
 using static TaleWorlds.Core.HorseComponent;
 
-namespace GameInterface.Serialization.Impl
+namespace GameInterface.Serialization.External
 {
     /// <summary>
     /// Binary package for MaterialProperty
