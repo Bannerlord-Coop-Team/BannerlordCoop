@@ -1,7 +1,7 @@
 ﻿using GameInterface.Serialization;
 using Xunit;
 using TaleWorlds.CampaignSystem.Roster;
-using GameInterface.Serialization.Impl;
+using GameInterface.Serialization.External;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;

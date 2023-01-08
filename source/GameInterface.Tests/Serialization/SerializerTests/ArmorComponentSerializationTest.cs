@@ -1,6 +1,6 @@
 ﻿using Common.Extensions;
 using GameInterface.Serialization;
-using GameInterface.Serialization.Impl;
+using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
