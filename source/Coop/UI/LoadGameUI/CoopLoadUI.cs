@@ -72,7 +72,7 @@ namespace Coop.UI.LoadGameUI
 	class CoopLoadUI : SaveLoadVM
 	{
 		private new SelectedGameVM CurrentSelectedSave;
-		public CoopLoadUI() : base(false)
+		public CoopLoadUI() : base(false, false)
 		{
 			GetSavedGames().Clear();
 			SaveGameFileInfo[] saveFiles = MBSaveLoad.GetSaveFiles();

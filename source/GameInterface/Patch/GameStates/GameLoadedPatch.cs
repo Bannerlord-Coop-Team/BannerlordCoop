@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
-﻿using HarmonyLib;
+using GameInterface.Services.GameState.Messages;
+using HarmonyLib;
 using SandBox;
 using TaleWorlds.Core;
 

@@ -1,4 +1,4 @@
-﻿using Common;
+﻿using Common.Messaging;
 using Missions.Messages;
 
 namespace Missions.Services.Network

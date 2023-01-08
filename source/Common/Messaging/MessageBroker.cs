@@ -20,7 +20,7 @@ namespace Common.Messaging
     {
         private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
         private static MessageBroker _instance;
-        private readonly Dictionary<Type, List<Delegate>> _subscribers;
+        protected readonly Dictionary<Type, List<Delegate>> _subscribers;
         public static MessageBroker Instance
         {
             get
@@ -31,12 +31,12 @@ namespace Common.Messaging
             }
         }
 
-        private MessageBroker()
+        protected MessageBroker()
         {
             _subscribers = new Dictionary<Type, List<Delegate>>();
         }
 
-        public void Publish<T>(object source, T message)
+        public virtual void Publish<T>(object source, T message)
         {
             if (message == null || source == null)
                 return;
@@ -49,7 +49,7 @@ namespace Common.Messaging
 
             var delegates = _subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;
-            var payload = new MessagePayload<T>(message, source);
+            var payload = new MessagePayload<T>(source, message);
             foreach (var handler in delegates.Select
             (item => item as Action<MessagePayload<T>>))
             {
@@ -57,7 +57,7 @@ namespace Common.Messaging
             }
         }
 
-        public void Subscribe<T>(Action<MessagePayload<T>> subscription)
+        public virtual void Subscribe<T>(Action<MessagePayload<T>> subscription)
         {
             var delegates = _subscribers.ContainsKey(typeof(T)) ?
                             _subscribers[typeof(T)] : new List<Delegate>();
@@ -68,7 +68,7 @@ namespace Common.Messaging
             _subscribers[typeof(T)] = delegates;
         }
 
-        public void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
+        public virtual void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
         {
             if (!_subscribers.ContainsKey(typeof(T))) return;
             var delegates = _subscribers[typeof(T)];
@@ -78,7 +78,7 @@ namespace Common.Messaging
                 _subscribers.Remove(typeof(T));
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             _subscribers?.Clear();
         }

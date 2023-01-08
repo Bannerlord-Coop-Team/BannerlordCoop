@@ -3,11 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 
-<<<<<<<< HEAD:source/Coop.Core/GameLoopRunner.cs
-namespace Coop.Core
-========
 namespace Missions
->>>>>>>> taverns-vertical-slice:source/Missions/GameLoopRunner.cs
 {
     public class GameLoopRunner : IUpdateable
     {
