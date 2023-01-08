@@ -1,5 +1,6 @@
 ﻿using IntroServer.Config;
 using IntroServer.Server;
+using LiteNetLib;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -50,7 +51,7 @@ namespace ServerConsole
                 
                 TestServer = provider.GetRequiredService<MissionTestServer>();
 
-                Logger.Information(config.NATType == NATType.Internal
+                Logger.Information(config.NATType == NatAddressType.Internal
                     ? $"Server started on port: {config.LanPort}"
                     : $"Server started on port: {config.WanPort}");
 
