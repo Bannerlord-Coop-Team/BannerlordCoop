@@ -3,8 +3,6 @@ using Common.Messaging;
 using System;
 using System.Threading.Tasks;
 using TaleWorlds.MountAndBlade;
-using Missions.Services;
-using Missions.Services.Network;
 using Missions.Services.Network.Messages.Agents;
 
 namespace Missions.Services.Network

@@ -8,14 +8,12 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Missions.Services.Network.Messages.Network;
-using Missions.Services;
 using Missions.Services.BoardGames;
-using Missions.Services.Network;
 using Missions.Services.Network.Messages;
 using Missions.Services.Network.PacketHandlers;
 using Missions.Services.Network.Packets.Agents;
 
-namespace Missions.Services
+namespace Missions.Services.Network
 {
     public class MissionClient : IDisposable
     {
@@ -26,8 +24,8 @@ namespace Missions.Services
         private readonly EventPacketHandler _eventPacketHandler;
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IMessageBroker _messageBroker;
-		private readonly LiteNetP2PClient _client;
-		private readonly Guid _playerId;
+        private readonly LiteNetP2PClient _client;
+        private readonly Guid _playerId;
 
         public MissionClient(LiteNetP2PClient client, IMessageBroker messageBroker)
         {
@@ -45,7 +43,7 @@ namespace Missions.Services
             _client.AddHandler(_eventPacketHandler);
         }
 
-        
+
 
         ~MissionClient()
         {
@@ -79,8 +77,8 @@ namespace Missions.Services
             MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position);
             _client.SendEvent(request, peer);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
-	            characterObject.IsPlayerCharacter ? "Player" : "Agent",
-	            characterObject.Name, request.PlayerId, peer.EndPoint);
+                characterObject.IsPlayerCharacter ? "Player" : "Agent",
+                characterObject.Name, request.PlayerId, peer.EndPoint);
         }
 
         private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)
@@ -89,13 +87,13 @@ namespace Missions.Services
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
 
             MissionJoinInfo joinInfo = payload.What;
-            
+
             Guid newAgentId = joinInfo.PlayerId;
             Vec3 startingPos = joinInfo.StartingPosition;
 
-			Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer}",
-				joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent", 
-				joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
+            Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer}",
+                joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
+                joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
             // TODO remove test code
             Agent newAgent = MissionTestGameManager.SpawnAgent(startingPos, joinInfo.CharacterObject);
             _agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
