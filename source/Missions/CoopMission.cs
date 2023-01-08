@@ -1,9 +1,9 @@
 ﻿using Common;
 using Common.Messaging;
-using System;
-using System.Collections.Generic;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
+using System;
+using System.Collections.Generic;
 
 namespace Missions
 {

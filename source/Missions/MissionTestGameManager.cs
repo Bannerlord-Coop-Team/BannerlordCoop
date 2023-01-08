@@ -1,12 +1,14 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using HarmonyLib;
 using IntroServer.Config;
+using Missions.Services.Network;
+using Missions.Services.Network.Surrogates;
 using ProtoBuf.Meta;
 using SandBox;
+using Serilog;
 using System.Collections.Generic;
 using System.Linq;
-using Common.Logging;
-using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -18,10 +20,8 @@ using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem.Load;
-using Missions.Services.Network;
-using Missions.Services.Network.Surrogates;
 
-namespace Missions.Services
+namespace Missions
 {
     public class MissionTestGameManager : SandBoxGameManager
     {
@@ -50,7 +50,7 @@ namespace Missions.Services
 
             m_Client = new LiteNetP2PClient(config, MessageBroker.Instance);
 
-            if(m_Client.ConnectToP2PServer())
+            if (m_Client.ConnectToP2PServer())
             {
                 StartNewGame(this);
             }
@@ -123,7 +123,7 @@ namespace Missions.Services
             agentBuildData = agentBuildData.Team(Mission.Current.PlayerAllyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
-            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);
+            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);
             agent.FadeIn();
             agent.Controller = Agent.ControllerType.None;
             return agent;
@@ -138,7 +138,7 @@ namespace Missions.Services
             agentBuildData = agentBuildData.Team(isMain ? Mission.Current.PlayerTeam : Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
-            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor))), false, 0);                             //this spawns an archer
+            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);                             //this spawns an archer
             agent.FadeIn();
 
             if (isMain)
@@ -224,10 +224,10 @@ namespace Missions.Services
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(character.FirstCivilianEquipment);
-            agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor)));
+            agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.None);
 
-            Agent agent = default(Agent);
+            Agent agent = default;
             GameLoopRunner.RunOnMainThread(() =>
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
@@ -253,7 +253,7 @@ namespace Missions.Services
             agentBuildData.InitialDirection(vec);
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(character.FirstCivilianEquipment);
-            agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default(UniqueTroopDescriptor)));
+            agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.None);
 
             Logger.Information("Spawning Agent");
