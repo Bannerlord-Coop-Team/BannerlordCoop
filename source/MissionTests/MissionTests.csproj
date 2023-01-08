@@ -111,7 +111,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{9CDD9C4E-92CD-4F19-A4D9-D68CF975480C}</Project>
+      <Project>{314f078f-41df-4a23-b25c-f558eff83d2a}</Project>
       <Name>Common</Name>
     </ProjectReference>
     <ProjectReference Include="..\IntroServer\IntroServer.csproj">

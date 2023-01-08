@@ -1,14 +1,9 @@
-﻿using System;
+﻿using LiteNetLib;
+using System;
 using System.Net;
 
 namespace IntroServer.Config
 {
-    public enum NATType
-    {
-        Internal,
-        External,
-    }
-
     /// <summary>
     ///     Network settings for both client & server.
     /// </summary>
@@ -71,10 +66,10 @@ namespace IntroServer.Config
         ///     P2P NAT Type
         /// </summary>
 #if DEBUG
-        public NATType NATType { get; } = NATType.Internal;
+        public NatAddressType NATType { get; } = NatAddressType.Internal;
 #else
-        public NATType NATType { get; } = NATType.External;
+        public NatAddressType NATType { get; } = NatAddressType.External;
 #endif
-#endregion
+        #endregion
     }
 }

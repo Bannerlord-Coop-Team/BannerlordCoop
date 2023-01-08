@@ -1,4 +1,4 @@
-﻿using GameInterface.Serialization.Impl;
+﻿using GameInterface.Serialization.External;
 using GameInterface.Serialization;
 using Xunit;
 using TaleWorlds.CampaignSystem;

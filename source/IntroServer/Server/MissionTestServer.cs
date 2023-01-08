@@ -30,7 +30,7 @@ namespace IntroServer.Server
             };
             _netManager.NatPunchModule.Init(this);
 
-            if(_netManager.Start(config.NATType == NATType.Internal 
+            if(_netManager.Start(config.NATType == NatAddressType.Internal 
 	            ? config.LanPort : config.WanPort) == false)
             {
                 _logger.LogError("Failed to start server");

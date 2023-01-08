@@ -103,7 +103,7 @@ namespace Missions.Services.Network
             Logger.Information("Connecting to P2P Server");
             string connectionAddress;
             int port;
-            if (_networkConfig.NATType == NATType.Internal)
+            if (_networkConfig.NATType == NatAddressType.Internal)
             {
                 connectionAddress = _networkConfig.LanAddress.ToString();
                 port = _networkConfig.LanPort;
@@ -134,11 +134,11 @@ namespace Missions.Services.Network
         private void TryPunch(string instance)
         {
             string token = $"{instance}%{id}";
-            if (_networkConfig.NATType == NATType.Internal)
+            if (_networkConfig.NATType == NatAddressType.Internal)
             {
                 _netManager.NatPunchModule.SendNatIntroduceRequest(_networkConfig.LanAddress.ToString(), _networkConfig.LanPort, token);
             }
-            else if (_networkConfig.NATType == NATType.External)
+            else if (_networkConfig.NATType == NatAddressType.External)
             {
                 _netManager.NatPunchModule.SendNatIntroduceRequest(_networkConfig.WanAddress.ToString(), _networkConfig.WanPort, token);
             }
@@ -192,15 +192,9 @@ namespace Missions.Services.Network
             // No requests on client
         }
 
-        static readonly Dictionary<NATType, NatAddressType> natAddressTypeMap = new Dictionary<NATType, NatAddressType>()
-        {
-            { NATType.External, NatAddressType.External },
-            { NATType.Internal, NatAddressType.Internal },
-        };
-
         public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
         {
-            if (type == natAddressTypeMap[_networkConfig.NATType])
+            if (type == _networkConfig.NATType)
             {
                 Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
                 _netManager.Connect(targetEndPoint, token);
