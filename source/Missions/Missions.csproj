@@ -138,6 +138,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ArenaTestGameManager.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnHandlePreMovementStageMessage.cs" />
