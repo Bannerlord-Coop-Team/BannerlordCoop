@@ -95,7 +95,7 @@ namespace Missions.Services.Network
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
                 joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
             // TODO remove test code
-            Agent newAgent = MissionTestGameManager.SpawnAgent(startingPos, joinInfo.CharacterObject);
+            Agent newAgent = ArenaTestGameManager.SpawnAgent(startingPos, joinInfo.CharacterObject);
             _agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
         }
     }
