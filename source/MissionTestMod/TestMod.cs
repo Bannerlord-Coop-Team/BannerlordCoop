@@ -65,11 +65,6 @@ namespace MissionTestMod
         private bool missionLoaded = false;
         protected override void OnApplicationTick(float dt)
         {
-            if (!missionLoaded && Mission.Current != null && Mission.Current.IsLoadingFinished && arenaManager != null)
-            {
-                missionLoaded = true;
-                ArenaTestGameManager.StartArenaFight();
-            }
             if (m_IsFirstTick)
             {
                 GameLoopRunner.Instance.SetGameLoopThread();

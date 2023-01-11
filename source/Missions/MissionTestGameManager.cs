@@ -23,7 +23,7 @@ using TaleWorlds.SaveSystem.Load;
 
 namespace Missions
 {
-    public class MissionTestGameManager : SandBoxGameManager
+    public class MissionTestGameManager : SandBoxGameManager, IMissionGameManager
     {
         static MissionTestGameManager()
         {
@@ -215,7 +215,7 @@ namespace Missions
 
         }
 
-        public static Agent SpawnAgent(Vec3 startingPos, CharacterObject character)
+        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());

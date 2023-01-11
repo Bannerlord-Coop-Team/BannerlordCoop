@@ -27,7 +27,7 @@ using TaleWorlds.SaveSystem.Load;
 
 namespace Missions
 {
-    public class ArenaTestGameManager : SandBoxGameManager
+    public class ArenaTestGameManager : SandBoxGameManager, IMissionGameManager
     {
         static ArenaTestGameManager()
         {
@@ -38,6 +38,7 @@ namespace Missions
         private static readonly ILogger Logger = LogManager.GetLogger<ArenaTestGameManager>();
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
         private LiteNetP2PClient m_Client;
+        private bool missionLoaded;
 
         public ArenaTestGameManager(LoadResult loadedGameResult) : base(loadedGameResult)
         {
@@ -67,6 +68,13 @@ namespace Missions
         public override void OnLoadFinished()
         {
             base.OnLoadFinished();
+
+            if (!missionLoaded && Mission.Current != null && Mission.Current.IsLoadingFinished)
+            {
+                missionLoaded = true;
+                StartArenaFight();
+            }
+
             //get the settlement first
             Settlement settlement = Settlement.Find("town_ES3");
 
@@ -134,30 +142,6 @@ namespace Missions
             return agent;
         }
 
-        // DEBUG METHOD: To spawn in Arena and test fights
-        private static Agent SpawnArenaAgent(CharacterObject character, MatrixFrame frame, bool isMain)
-        {
-            AgentBuildData agentBuildData = new AgentBuildData(character);
-            agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
-            Mission mission = Mission.Current;
-            agentBuildData = agentBuildData.Team(isMain ? Mission.Current.PlayerTeam : Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
-            Vec2 vec = frame.rotation.f.AsVec2;
-            vec = vec.Normalized();
-            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);                             //this spawns an archer
-            agent.FadeIn();
-
-            if (isMain)
-            {
-                agent.Controller = Agent.ControllerType.Player;
-            }
-            else
-            {
-                agent.Controller = Agent.ControllerType.AI;
-            }
-
-            return agent;
-        }
-
         public static Agent AddPlayerToArena(bool isMain)
         {
             Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;
@@ -179,7 +163,7 @@ namespace Missions
 
 
             //// spawn an instance of the player (controlled by default)
-            return SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement, isMain);
+            return SpawnAgent(CharacterObject.PlayerCharacter, randomElement);
         }
 
         // DEBUG METHOD: Starts an Arena fight
@@ -216,11 +200,11 @@ namespace Missions
 
 
             //// spawn an instance of the player (controlled by default)
-            SpawnArenaAgent(CharacterObject.PlayerCharacter, randomElement, true);
+            SpawnAgent(CharacterObject.PlayerCharacter, randomElement);
 
         }
 
-        public static Agent SpawnAgent(Vec3 startingPos, CharacterObject character)
+        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
@@ -232,36 +216,6 @@ namespace Missions
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.None);
 
-            Agent agent = default;
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                agent = Mission.Current.SpawnAgent(agentBuildData);
-                agent.FadeIn();
-            });
-
-            return agent;
-        }
-
-        [CommandLineFunctionality.CommandLineArgumentFunction("spawn_tavern_agent", "test")]
-        public static Agent SpawnTavernAgent()
-        {
-            MatrixFrame frame = Mission.Current.Scene.FindEntitiesWithTag("sp_player_conversation").Single().GetGlobalFrame();
-
-            Vec2 vec = frame.rotation.f.AsVec2;
-            vec = vec.Normalized();
-
-            CharacterObject character = Hero.MainHero.CharacterObject;
-            AgentBuildData agentBuildData = new AgentBuildData(character);
-            agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
-            agentBuildData.InitialPosition(frame.origin);
-            agentBuildData.Team(Mission.Current.PlayerAllyTeam);
-            agentBuildData.InitialDirection(vec);
-            agentBuildData.NoHorses(true);
-            agentBuildData.Equipment(character.FirstCivilianEquipment);
-            agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-            agentBuildData.Controller(Agent.ControllerType.None);
-
-            Logger.Information("Spawning Agent");
             Agent agent = default;
             GameLoopRunner.RunOnMainThread(() =>
             {
