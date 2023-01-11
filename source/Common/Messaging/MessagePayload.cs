@@ -1,19 +1,21 @@
-﻿using System;
-using ProtoBuf;
+﻿using ProtoBuf;
+using System;
 
 namespace Common.Messaging
 {
-    public readonly struct MessagePayload<T>
+    [Serializable]
+    [ProtoContract(SkipConstructor = true)]
+    public struct MessagePayload<T>
     {
-        public object Who { get; }
+        public object Who { get; set; }
+        [ProtoMember(1)]
         public T What { get; }
+        [ProtoMember(2)]
         public DateTime When { get; }
 
-        public MessagePayload(object who, T what)
+        public MessagePayload(object source, T payload)
         {
-            Who = who;
-            What = what;
-            When = DateTime.UtcNow;
+            Who = source; What = payload; When = DateTime.UtcNow;
         }
     }
 }

@@ -40,6 +40,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
+            MessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void EnterMainMenu()

@@ -62,6 +62,20 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
+        public void Disconnect_Publishes_EnterMainMenu()
+        {
+            var isEventPublished = false;
+            messageBroker.Subscribe<EnterMainMenu>((payload) =>
+            {
+                isEventPublished = true;
+            });
+
+            clientLogic.Disconnect();
+
+            Assert.True(isEventPublished);
+        }
+
+        [Fact]
         public void NetworkGuidsResolved_Transitions_ResolveNetworkGuidsState()
         {
             messageBroker.Publish(this, new NetworkGuidsResolved());

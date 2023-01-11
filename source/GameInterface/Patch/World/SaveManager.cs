@@ -2,14 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text.RegularExpressions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
-using TaleWorlds.PlayerServices;
-using TaleWorlds.SaveSystem.Save;
 
 namespace Coop.Mod.Patch.World
 {

@@ -1,12 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Common.Messaging
+﻿namespace Common.Messaging
 {
-    public interface IEvent : IMessage
+    /// <summary>
+    /// Event that is managed by <see cref="IMessageBroker"/>
+    /// </summary>
+    /// <remarks>
+    /// This should not be used over a network connection.
+    /// For network events <see cref="INetworkEvent"/>
+    /// </remarks>
+    public interface IEvent
     {
     }
 }

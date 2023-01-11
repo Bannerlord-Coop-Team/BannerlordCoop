@@ -24,7 +24,7 @@ namespace Coop.Tests.Server.States
 
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
             IServerState currentState = new ServerRunningState(serverLogic.Object, messageBroker);
-            serverLogic.SetupSet(x => x.State).Callback(value => currentState = value);
+            serverLogic.SetupSet(x => x.State = currentState);
 
             currentState.Start();
 
@@ -38,7 +38,7 @@ namespace Coop.Tests.Server.States
 
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
             IServerState currentState = new ServerRunningState(serverLogic.Object, messageBroker);
-            serverLogic.SetupSet(x => x.State).Callback(value => currentState = value);
+            serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
 
             messageBroker.Subscribe<EnterMainMenu>((payload) =>
             {

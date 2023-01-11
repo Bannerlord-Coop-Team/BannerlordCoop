@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using GameInterface.Serialization;
 using ProtoBuf;
+using ProtoBuf.Meta;
 
 namespace Coop.Serialization
 {
@@ -14,12 +15,19 @@ namespace Coop.Serialization
         /// <returns>Byte array representing the message</returns>
         public byte[] Serialize(object message)
         {
-            var memoryStream = new MemoryStream();
-            Serializer.Serialize(memoryStream, message);
-            
-            return memoryStream.ToArray();
+            if (message == null) return new byte[1] { byte.MinValue };
+
+            using (var memoryStream = new MemoryStream())
+            {
+                // IsNull bit
+                memoryStream.WriteByte(byte.MaxValue);
+
+                Serializer.Serialize(memoryStream, message);
+
+                return memoryStream.ToArray();
+            }
         }
-        
+
         /// <summary>
         ///     Deserializes the message into the represented object.
         /// </summary>
@@ -27,8 +35,14 @@ namespace Coop.Serialization
         /// <returns>The object deserialized</returns>
         public T Deserialize<T>(byte[] message)
         {
-            var memoryStream = new MemoryStream(message);
-            return Serializer.Deserialize<T>(memoryStream);
+            using (var memoryStream = new MemoryStream(message))
+            {
+                var isNullByte = memoryStream.ReadByte();
+
+                if (isNullByte == byte.MinValue) return default;
+
+                return Serializer.Deserialize<T>(memoryStream);
+            }
         }
     }
 }
