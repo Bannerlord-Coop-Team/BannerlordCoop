@@ -1,17 +1,19 @@
 ﻿using Common;
+using Common.Logging;
+using Missions;
+using Missions.Services.Arena;
+using Missions.Services.Taverns;
 using SandBox;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Common.Logging;
-using Serilog;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
-using Missions;
 
 namespace MissionTestMod
 {
@@ -21,8 +23,7 @@ namespace MissionTestMod
 		private static UpdateableList Updateables { get; } = new UpdateableList();
         private static InitialStateOption JoinTavern;
         private static InitialStateOption JoinArena;
-        private static MissionTestGameManager tavernManager;
-        private static ArenaTestGameManager arenaManager;
+        private static IMissionGameManager _gameManager;
 
         protected override void OnSubModuleLoad()
         {
@@ -62,7 +63,6 @@ namespace MissionTestMod
         }
 
         private bool m_IsFirstTick = true;
-        private bool missionLoaded = false;
         protected override void OnApplicationTick(float dt)
         {
             if (m_IsFirstTick)
@@ -127,14 +127,14 @@ namespace MissionTestMod
 
         private static void StartGameTavern(LoadResult loadResult)
         {
-            tavernManager = new MissionTestGameManager(loadResult);
-            tavernManager.StartGameInTavern();
+            _gameManager = new TavernsGameManager(loadResult);
+            _gameManager.StartGame();
         }
 
         private static void StartGameArena(LoadResult loadResult)
         {
-            arenaManager = new ArenaTestGameManager(loadResult);
-            arenaManager.StartGameInArena();
+            _gameManager = new ArenaTestGameManager(loadResult);
+            _gameManager.StartGame();
         }
     }
 }
