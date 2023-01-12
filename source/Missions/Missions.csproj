@@ -138,6 +138,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnHandlePreMovementStageMessage.cs" />
@@ -152,6 +153,8 @@
     <Compile Include="Services\Agents\Extensions\AgentExtensions.cs" />
     <Compile Include="GameLoopRunner.cs" />
     <Compile Include="IMission.cs" />
+    <Compile Include="IMissionGameManager.cs" />
+    <Compile Include="Services\Arena\CoopArenaController.cs" />
     <Compile Include="Services\Network\IMissionPlayerNetwork.cs" />
     <Compile Include="Messages\BattleNetworkMessages.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameChallengeRequest.cs" />
@@ -164,7 +167,6 @@
     <Compile Include="Messages\MissionMessages.cs" />
     <Compile Include="Services\Network\Messages\PeerConnected.cs" />
     <Compile Include="Services\Network\Messages\PeerDisconnected.cs" />
-    <Compile Include="Services\Network\MissionClient.cs" />
     <Compile Include="Services\Network\MissionNetworkBehavior.cs" />
     <Compile Include="Services\Network\MissionShard.cs" />
     <Compile Include="Services\Network\EDisconnectReason.cs" />
@@ -192,7 +194,8 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\Network\Surrogates\Vec2Surrogate.cs" />
     <Compile Include="Services\Network\Surrogates\Vec3Surrogate.cs" />
-    <Compile Include="MissionTestGameManager.cs" />
+    <Compile Include="Services\Taverns\CoopTavernsController.cs" />
+    <Compile Include="Services\Taverns\TavernsGameManager.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

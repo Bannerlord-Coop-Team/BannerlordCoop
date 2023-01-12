@@ -1,51 +1,101 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using LiteNetLib;
+using Missions.Messages;
 using Missions.Services.Agents.Messages;
+using Missions.Services.Agents.Packets;
+using Missions.Services.Network.Messages;
+using Missions.Services.Network.PacketHandlers;
+using Serilog;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.SaveSystem;
 
 namespace Missions.Services.Network
 {
-    public class MissionNetworkBehavior : MissionBehavior
+    public class CoopMissionNetworkBehavior : MissionBehavior
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<CoopMissionNetworkBehavior>();
+
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private LiteNetP2PClient m_Client;
-        private MissionClient missionClient;
+        private readonly LiteNetP2PClient _client;
+        private readonly Guid _playerId;
 
         private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
 
         private readonly IMessageBroker _messageBroker;
+        private readonly INetworkAgentRegistry _agentRegistry;
+        private readonly MovementHandler _movementHandler;
+        private readonly EventPacketHandler _eventPacketHandler;
 
-        public MissionNetworkBehavior(LiteNetP2PClient client, IMessageBroker messageBroker)
+        public CoopMissionNetworkBehavior(
+            LiteNetP2PClient client, 
+            IMessageBroker messageBroker,
+            INetworkAgentRegistry agentRegistry)
         {
-            m_Client = client;
+            _client = client;
             _messageBroker = messageBroker;
+            _agentRegistry = agentRegistry;
+            _playerId = Guid.NewGuid();
+            _movementHandler = new MovementHandler(_client, _messageBroker, _agentRegistry);
+            _eventPacketHandler = new EventPacketHandler(_client, _messageBroker);
 
-            // TODO find callback for loading mission
-            Task.Factory.StartNew(async () =>
-            {
-                while (Mission == null || Mission.IsLoadingFinished == false)
-                {
-                    await Task.Delay(100);
-                }
+            _messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
 
-                string sceneName = Mission.SceneName;
-                m_Client.NatPunch(sceneName);
+            _client.AddHandler(_eventPacketHandler);
+        }
 
-                missionClient = new MissionClient(m_Client, _messageBroker);
-                await Task.Delay(WaitForConnectionsTime);
-            });
+        public override void AfterStart()
+        {
+            string sceneName = Mission.SceneName;
+            _client.NatPunch(sceneName);
+
+            //// TODO find way to make this not a task
+            //Task.Factory.StartNew(async () =>
+            //{
+            //    while (Mission == null || Mission.IsLoadingFinished == false)
+            //    {
+            //        await Task.Delay(100);
+            //    }
+
+            //    string sceneName = Mission.SceneName;
+            //    _client.NatPunch(sceneName);
+
+            //    await Task.Delay(WaitForConnectionsTime);
+            //});
+        }
+
+        private void Handle_PeerConnected(MessagePayload<PeerConnected> payload)
+        {
+            SendJoinInfo(payload.What.Peer);
+        }
+
+        private void SendJoinInfo(NetPeer peer)
+        {
+            Logger.Debug("Sending join request");
+            _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
+
+            CharacterObject characterObject = CharacterObject.PlayerCharacter;
+            MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position);
+            _client.SendEvent(request, peer);
+            Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
+                characterObject.IsPlayerCharacter ? "Player" : "Agent",
+                characterObject.Name, request.PlayerId, peer.EndPoint);
         }
 
         public override void OnRemoveBehavior()
         {
             base.OnRemoveBehavior();
 
-            missionClient.Dispose();
-            m_Client.Stop();
-            m_Client = null;
-            missionClient = null;
+            _messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
+
+            _client.RemoveHandler(_eventPacketHandler);
+            _client.Stop();
         }
 
         public override void OnAgentDeleted(Agent affectedAgent)
@@ -58,7 +108,7 @@ namespace Missions.Services.Network
 
         protected override void OnEndMission()
         {
-            m_Client.Dispose();
+            _client.Dispose();
             MBGameManager.EndGame();
             base.OnEndMission();
         }

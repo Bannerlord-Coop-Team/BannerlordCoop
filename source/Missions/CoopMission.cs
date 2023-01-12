@@ -12,8 +12,6 @@ namespace Missions
 
         public IMessageBroker MessageBroker;
 
-        public MissionClient Player;
-
         public List<NetworkAgent> NetworkAgents;
 
         public event Action<MissionCreatedInfo> MissionCreatedEvent;
