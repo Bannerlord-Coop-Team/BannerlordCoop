@@ -9,7 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using Xunit;
 
-namespace IntroductionServerTests
+namespace MissionTests
 {
     public class NetworkMessageSerializationTest
     {

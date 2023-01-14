@@ -9,12 +9,27 @@ using Common;
 
 namespace Missions.Services.Messaging
 {
+    /// <summary>
+    /// MessageBroker implementation allowing for network messaging capability
+    /// </summary>
     internal interface INetworkMessageBroker : IMessageBroker
     {
+
+        /// <summary>
+        /// Publishes events to all connected peers
+        /// </summary>
+        /// <param name="networkEvent">Event to publish</param>
         void PublishAllEvent(INetworkEvent networkEvent);
+
+        /// <summary>
+        /// Publishes event to specified peer
+        /// </summary>
+        /// <param name="networkEvent">Event to publish</param>
+        /// <param name="peer">Peer to send event</param>
         void PublishEvent(INetworkEvent networkEvent, NetPeer peer);
     }
 
+    /// <inheritdoc cref="INetworkMessageBroker"/>
     internal class NetworkMessageBroker : MessageBroker, INetworkMessageBroker
     {
         private readonly INetworkClient _client;
