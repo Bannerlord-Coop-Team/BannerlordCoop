@@ -1,6 +1,6 @@
-﻿using TaleWorlds.MountAndBlade;
-using Missions.Services.Network;
-using System.Linq;
+﻿using Missions.Services.Network;
+using System;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Extensions
 {
@@ -13,7 +13,12 @@ namespace Missions.Services.Agents.Extensions
 
         public static bool IsPlayerAgent(this Agent agent)
         {
-            return NetworkAgentRegistry.Instance.PlayerAgents.Any(kvp => kvp.Value == agent);
+            if (NetworkAgentRegistry.Instance.AgentToId.TryGetValue(agent, out Guid id))
+            {
+                return NetworkAgentRegistry.Instance.PlayerAgents.ContainsKey(id);
+            }
+
+            return false;
         }
     }
 }

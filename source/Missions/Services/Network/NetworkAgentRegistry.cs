@@ -79,11 +79,7 @@ namespace Missions.Services.Network
                 if (agent != null)
                 {
                     var result = m_AgentToId.Remove(agent);
-
-                    if (m_PlayerAgents.ContainsKey(agentId))
-                    {
-                        result &= m_PlayerAgents.Remove(agentId);
-                    }
+                    RemovePlayerAgent(agentId);
 
                     return result;
                 }
@@ -96,8 +92,8 @@ namespace Missions.Services.Network
 
         public bool RegisterControlledAgent(Guid agentId, Agent agent)
         {
-            if (m_AgentToId.ContainsKey(agent) ||
-                m_ControlledAgents.ContainsKey(agentId)) return false;
+            if (m_AgentToId.ContainsKey(agent)) return false;
+            if (m_ControlledAgents.ContainsKey(agentId)) return false;
 
             m_ControlledAgents.Add(agentId, agent);
             m_AgentToId.Add(agent, agentId);
@@ -109,7 +105,8 @@ namespace Missions.Services.Network
         {
             if (m_OtherAgents.TryGetValue(peer, out AgentGroupController controller))
             {
-                if (controller.Contains(agent) || controller.Contains(agentId)) return false;
+                if (controller.Contains(agent)) return false;
+                if (controller.Contains(agentId)) return false;
 
                 controller.AddAgent(agentId, agent);
                 m_AgentToId.Add(agent, agentId);
@@ -127,11 +124,11 @@ namespace Missions.Services.Network
 
         public bool RegisterPlayerAgent(Guid agentId, Agent agent)
         {
-            if (m_AgentToId.ContainsKey(agent) ||
-                m_PlayerAgents.ContainsKey(agentId)) return false;
+            if (m_AgentToId.ContainsKey(agent)) return false;
+            if (m_PlayerAgents.ContainsKey(agentId)) return false;
 
             m_PlayerAgents.Add(agentId, agent);
-            m_AgentToId.Add(agent, agentId);
+            RegisterControlledAgent(agentId, agent);
 
             return true;
         }
@@ -140,7 +137,8 @@ namespace Missions.Services.Network
         {
             if (m_OtherAgents.TryGetValue(peer, out AgentGroupController controller))
             {
-                if (controller.Contains(agent) || controller.Contains(agentId)) return false;
+                if (controller.Contains(agent)) return false;
+                if (controller.Contains(agentId)) return false;
 
                 controller.AddAgent(agentId, agent);
                 m_AgentToId.Add(agent, agentId);
@@ -169,12 +167,7 @@ namespace Missions.Services.Network
 
         public bool RemovePlayerAgent(Guid agentId)
         {
-            if (m_PlayerAgents.TryGetValue(agentId, out Agent agent))
-            {
-                return m_AgentToId.Remove(agent);
-            }
-
-            return false;
+            return m_PlayerAgents.Remove(agentId);
         }
 
         public bool RemovePeer(NetPeer peer)
@@ -186,10 +179,7 @@ namespace Missions.Services.Network
                 {
                     var innerResult = m_AgentToId.Remove(kvp.Value);
 
-                    if (kvp.Value.IsPlayerAgent())
-                    {
-                        innerResult &= m_PlayerAgents.Remove(kvp.Key);
-                    }
+                    RemovePlayerAgent(kvp.Key);
 
                     return innerResult;
                 });
