@@ -162,12 +162,6 @@ namespace Coop
             #endregion
         }
 
-        protected override void OnSubModuleUnloaded()
-        {
-            base.OnSubModuleUnloaded();
-            //_network.Stop();
-        }
-
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
         {
             base.OnBeforeInitialModuleScreenSetAsRoot();

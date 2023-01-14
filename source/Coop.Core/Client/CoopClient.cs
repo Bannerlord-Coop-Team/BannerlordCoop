@@ -10,26 +10,28 @@ using Coop.Core.Client.Messages;
 using Coop.Core.Communication.PacketHandlers;
 using Serilog;
 using Common.Logging;
+using Coop.Core.Communication.Network;
+using Common.Serialization;
 
 namespace Coop.Core.Client
 {
     public interface ICoopClient : ICoopNetwork, IUpdateable, INetEventListener
     {
-        void SendEvent(INetworkEvent networkEvent);
     }
 
-    public class CoopClient : ICoopClient
+    public class CoopClient : CoopNetworkBase, ICoopClient
     {
-        public int Priority => 0;
+        public override int Priority => 0;
         
         
         private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
 
-        private readonly INetworkConfiguration configuration;
         private readonly IClientLogic logic;
         private readonly IMessageBroker messageBroker;
+        private readonly IPacketManager packetManager;
         private readonly NetManager netManager;
-        public IPacketManager PacketManager { get; }
+
+        public override INetworkConfiguration Configuration { get; }
 
         private bool isConnected = false;
         private NetPeer serverPeer;
@@ -37,15 +39,16 @@ namespace Coop.Core.Client
         public CoopClient(
             INetworkConfiguration config, 
             IClientLogic logic, 
-            IMessageBroker messageBroker)
+            IMessageBroker messageBroker,
+            IPacketManager packetManager)
         {
-            configuration = config;
+            Configuration = config;
             this.logic = logic;
             this.messageBroker = messageBroker;
-            
+            this.packetManager = packetManager;
+
             // TODO add configuration
             netManager = new NetManager(this);
-            PacketManager = new PacketManager(netManager);
         }
 
         public void Disconnect()
@@ -70,7 +73,8 @@ namespace Coop.Core.Client
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
-            PacketManager.HandleRecieve(peer, reader);
+            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
+            packetManager.HandleRecieve(peer, packet);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -96,7 +100,7 @@ namespace Coop.Core.Client
             }
         }
 
-        public void Start()
+        public override void Start()
         {
             if (isConnected)
             {
@@ -104,34 +108,27 @@ namespace Coop.Core.Client
             }
 
             netManager.Start();
-            serverPeer = netManager.Connect(configuration.Address, configuration.Port, configuration.Token);
+            serverPeer = netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
         }
 
-        public void Stop()
+        public override void Stop()
         {
             logic.Stop();
         }
 
-        public void Update(TimeSpan frameTime)
+        public override void Update(TimeSpan frameTime)
         {
             netManager.PollEvents();
         }
 
-        /// <summary>
-        /// Sends an event to the server over the network
-        /// </summary>
-        /// <param name="networkEvent">Client event</param>
-        public void SendEvent(INetworkEvent networkEvent)
+        public override void SendAll(IPacket packet)
         {
-            if(serverPeer == null)
-            {
-                Logger.Error("Tried to send event while disconnected from server");
-                return;
-            }
+            SendAll(netManager, packet);
+        }
 
-            EventPacket eventPacket = new EventPacket(networkEvent);
-
-            PacketManager.Send(serverPeer, eventPacket);
+        public override void SendAllBut(NetPeer netPeer, IPacket packet)
+        {
+            SendAllBut(netManager, netPeer, packet);
         }
     }
 }

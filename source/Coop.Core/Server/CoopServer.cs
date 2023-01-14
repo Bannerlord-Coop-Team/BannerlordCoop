@@ -6,34 +6,39 @@ using Common.Messaging;
 using Coop.Core.Server.Connections;
 using Coop.Core.Configuration;
 using Coop.Core.Communication.PacketHandlers;
+using Common.Serialization;
+using LiteNetLib.Utils;
+using System.Linq;
+using Coop.Core.Communication.Network;
 
 namespace Coop.Core.Server
 {
-    public interface ICoopServer : ICoopNetwork, INatPunchListener, IDisposable
+    public interface ICoopServer : ICoopNetwork, INatPunchListener, INetEventListener, IDisposable
     {
     }
 
-    public class CoopServer : ICoopServer
+    public class CoopServer : CoopNetworkBase, ICoopServer
     {
-        public int Priority => 0;
+        public override int Priority => 0;
 
-        public IPacketManager PacketManager { get; }
+        public override INetworkConfiguration Configuration { get; }
 
-        private readonly INetworkConfiguration configuration;
         private readonly IMessageBroker messageBroker;
+        private readonly IPacketManager packetManager;
         private readonly NetManager netManager;
 
         public CoopServer(
             INetworkConfiguration configuration, 
-            IMessageBroker messageBroker)
+            IMessageBroker messageBroker,
+            IPacketManager packetManager)
         {
             // Dependancy assignment
-            this.configuration = configuration;
+            Configuration = configuration;
             this.messageBroker = messageBroker;
+            this.packetManager = packetManager;
 
             // TODO add configuration
             netManager = new NetManager(this);
-            PacketManager = new PacketManager(netManager);
 
             // Netmanager initialization
             netManager.NatPunchEnabled = true;
@@ -73,7 +78,8 @@ namespace Coop.Core.Server
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
-            PacketManager.HandleRecieve(peer, reader);
+            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
+            packetManager.HandleRecieve(peer, packet);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -93,20 +99,30 @@ namespace Coop.Core.Server
             messageBroker.Publish(this, message);
         }
 
-        public void Start()
+        public override void Update(TimeSpan frameTime)
+        {
+            netManager.PollEvents();
+            netManager.NatPunchModule.PollEvents();
+        }
+
+        public override void Start()
         {
             netManager.Start();
         }
 
-        public void Stop()
+        public override void Stop()
         {
             netManager.Stop();
         }
 
-        public void Update(TimeSpan frameTime)
+        public override void SendAll(IPacket packet)
         {
-            netManager.PollEvents();
-            netManager.NatPunchModule.PollEvents();
+            SendAll(netManager, packet);
+        }
+
+        public override void SendAllBut(NetPeer netPeer, IPacket packet)
+        {
+            SendAllBut(netManager, netPeer, packet);
         }
     }
 }

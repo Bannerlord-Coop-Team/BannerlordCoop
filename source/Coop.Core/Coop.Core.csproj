@@ -109,6 +109,7 @@
   <ItemGroup>
     <Compile Include="Client\Messages\NetworkDisconnected.cs" />
     <Compile Include="Client\Messages\NetworkConnected.cs" />
+    <Compile Include="Communication\Network\CoopNetworkBase.cs" />
     <Compile Include="Communication\PacketHandlers\EventPacketHandler.cs" />
     <Compile Include="Client\States\CampaignState.cs" />
     <Compile Include="Client\States\CharacterCreationState.cs" />
@@ -171,7 +172,7 @@
     <Compile Include="Server\Data\ServerData.cs" />
     <Compile Include="Server\States\ServerRunningState.cs" />
     <Compile Include="Server\States\ServerState.cs" />
-    <Compile Include="ICoopNetwork.cs" />
+    <Compile Include="Communication\Network\ICoopNetwork.cs" />
     <Compile Include="GameLoopRunner.cs" />
     <Compile Include="Client\CoopClient.cs" />
     <Compile Include="Server\CoopServer.cs" />
