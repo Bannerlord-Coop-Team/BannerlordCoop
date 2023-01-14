@@ -99,7 +99,7 @@ namespace Missions.Services
             vec = vec.Normalized();
             Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec)
                 .NoHorses(true)
-                .Equipment(CreateRandomEquipment(character))
+                .Equipment(CreateRandomEquipment())
                 .TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);
             agent.FadeIn();
             agent.Controller = Agent.ControllerType.Player;
@@ -114,7 +114,7 @@ namespace Missions.Services
             agentBuildData.Team(Mission.Current.PlayerAllyTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
-            agentBuildData.Equipment(CreateRandomEquipment(character));
+            agentBuildData.Equipment(CreateRandomEquipment());
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.None);
 
@@ -158,7 +158,7 @@ namespace Missions.Services
             SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
         }
 
-        public Equipment CreateRandomEquipment(CharacterObject character)
+        public Equipment CreateRandomEquipment()
         {
             Equipment equipment = new Equipment();
             // Tried the MBRandom but it didn't work
@@ -184,7 +184,7 @@ namespace Missions.Services
             List<Equipment> ArmorLoadoutList = new List<Equipment>();
 
             //Categorize Weapons and Clothes into item types
-            for(int i = 0; i <= allItems.Count-1; i++)
+            for (int i = 0; i <= allItems.Count - 1; i++)
             {
                 switch (allItems[i].ItemType.ToString())
                 {
