@@ -1,16 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade.ViewModelCollection.FaceGenerator;
-using TaleWorlds.MountAndBlade;
-using TaleWorlds.ScreenSystem;
 using TaleWorlds.MountAndBlade.GauntletUI.BodyGenerator;
 using TaleWorlds.Library;
 

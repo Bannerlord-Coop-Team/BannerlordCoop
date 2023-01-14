@@ -1,10 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 
 namespace Common
 {
@@ -27,8 +24,6 @@ namespace Common
     /// </summary>
     public class CoopObjectManager
     {
-        public static event Action<Guid, object> NewObjectRegistered;
-
         public static readonly Dictionary<Guid, WeakReference<object>> Objects = new Dictionary<Guid, WeakReference<object>>();
         private static readonly ConditionalWeakTable<object, GuidWrapper> Guids = new ConditionalWeakTable<object, GuidWrapper>();
         private static readonly Dictionary<Type, List<Guid>> AssociatedGuids = new Dictionary<Type, List<Guid>>();
@@ -103,13 +98,6 @@ namespace Common
             }
         }
 
-        public static Guid RegisterNewObject(object obj)
-        {
-            if (obj == null) throw new ArgumentNullException();
-            if (ContainsElement(obj)) throw new InvalidOperationException("Object was already registered.");
-            return AddObject(obj);
-        }
-
         private static bool AddObject(Guid guid, object obj)
         {
             if (ContainsElement(obj))
@@ -125,7 +113,7 @@ namespace Common
             Guids.Add(obj, new GuidWrapper(guid));
             Objects.Add(guid, new WeakReference<object>(obj));
             AddTypeEntry(obj, guid);
-            Task.Factory.StartNew(() => { NewObjectRegistered?.Invoke(guid, obj); });
+
             return true;
         }
 
@@ -146,20 +134,6 @@ namespace Common
             return GetGuid(obj);
         }
 
-        public static bool TryGetObject<T>(Guid id, out T obj) where T : class
-        {
-            obj = GetObject(id) as T;
-            if (obj == null) return false;
-            return true;
-        }
-
-        public static bool TryGetObject(Guid id, out object obj)
-        {
-            obj = GetObject(id);
-            if (obj == null) return false;
-            return true;
-        }
-
         public static object GetObject(Guid id)
         {
             if (id == null || id.Equals(Guid.Empty))
@@ -168,13 +142,13 @@ namespace Common
             }
 
             Objects.TryGetValue(id, out WeakReference<object> wp);
-            if (wp == null)
+            if(wp == null)
             {
                 return null;
             }
 
             wp.TryGetTarget(out object obj);
-            if (obj == null)
+            if(obj == null)
             {
                 // Expired, cleanup internal state
                 RemoveObject(id);
@@ -182,27 +156,6 @@ namespace Common
             return obj;
         }
 
-        /// <summary>
-        /// Gets the registered Guid for a given object.
-        /// </summary>
-        /// <param name="obj">Object to get Guid</param>
-        /// <returns>Key of object, Null if object is not registered in object manager.</returns>
-        public static bool TryGetGuid(object obj, out Guid guid)
-        {
-            guid = default;
-            if (obj == null)
-            {
-                return false;
-            }
-            else if (ContainsElement(obj))
-            {
-                GuidWrapper guidWrapper;
-                Guids.TryGetValue(obj, out guidWrapper);
-                guid = guidWrapper.Guid;
-                return true;
-            }
-            return false;
-        }
 
         /// <summary>
         /// Gets the registered Guid for a given object.

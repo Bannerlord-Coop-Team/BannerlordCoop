@@ -1,6 +1,4 @@
-﻿using Common.Components;
-
-namespace Common.LogicStates
+﻿namespace Common.LogicStates
 {
     public interface ILogic
     {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Common.Messaging;
+using Common.Serialization;
 using GameInterface.Serialization;
 using LiteNetLib;
 using LiteNetLib.Utils;
@@ -19,7 +20,6 @@ namespace Coop.Core.Communication.PacketHandlers
     public class PacketManager : IPacketManager
     {
         private readonly NetManager netManager;
-        private readonly ISerializer serializer;
         private readonly IMessageBroker messageBroker;
 
         private static readonly Dictionary<PacketType, List<IPacketHandler>> packetHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
@@ -37,10 +37,9 @@ namespace Coop.Core.Communication.PacketHandlers
             }
         }
 
-        public PacketManager(NetManager netManager, ISerializer serializer, IMessageBroker messageBroker)
+        public PacketManager(NetManager netManager, IMessageBroker messageBroker)
         {
             this.netManager = netManager;
-            this.serializer = serializer;
             this.messageBroker = messageBroker;
         }
 
@@ -69,7 +68,7 @@ namespace Coop.Core.Communication.PacketHandlers
             writer.Put((int)wrapper.Type);
 
             // Serialize and put data in writer (with length is important on receive end)
-            byte[] data = serializer.Serialize(packet);
+            byte[] data = ProtoBufSerializer.Serialize(packet);
             writer.PutBytesWithLength(data);
 
             // Send data

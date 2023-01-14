@@ -21,7 +21,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -30,6 +30,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
@@ -41,14 +42,11 @@
     <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
-    <Reference Include="NLog, Version=5.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
-      <HintPath>..\packages\NLog.5.0.1\lib\net46\NLog.dll</HintPath>
-    </Reference>
     <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.3.1.17\lib\net461\protobuf-net.dll</HintPath>
+      <HintPath>..\packages\protobuf-net.3.1.22\lib\net462\protobuf-net.dll</HintPath>
     </Reference>
     <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.Core.3.1.17\lib\net461\protobuf-net.Core.dll</HintPath>
+      <HintPath>..\packages\protobuf-net.Core.3.1.22\lib\net462\protobuf-net.Core.dll</HintPath>
     </Reference>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
@@ -65,6 +63,9 @@
     <Reference Include="SandBox.ViewModelCollection">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
     </Reference>
+    <Reference Include="Serilog, Version=2.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.2.12.0\lib\net47\Serilog.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
@@ -74,6 +75,7 @@
     </Reference>
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data.Linq" />
     <Reference Include="System.Diagnostics.DiagnosticSource, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
@@ -90,8 +92,8 @@
     <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
     </Reference>
-    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.2\lib\netstandard2.0\System.Threading.Tasks.Extensions.dll</HintPath>
+    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.4\lib\net461\System.Threading.Tasks.Extensions.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -246,9 +248,6 @@
     <Reference Include="TaleWorlds.ScreenSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
     </Reference>
-    <Reference Include="TaleWorlds.Starter.DotNetCore">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Starter.DotNetCore.dll</HintPath>
-    </Reference>
     <Reference Include="TaleWorlds.Starter.Library">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Starter.Library.dll</HintPath>
     </Reference>
@@ -261,6 +260,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Behaviour\InitServerBehaviour.cs" />
+    <Compile Include="CompatibilityInfo.cs" />
     <Compile Include="Data\GameSaveData.cs" />
     <Compile Include="Data\ICharacterCreationData.cs" />
     <Compile Include="Data\IGameSaveData.cs" />
@@ -296,26 +296,92 @@
     <Compile Include="Patch\World\SaveManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Helpers\SaveLoadHelper.cs" />
-    <Compile Include="Serialization\Collections\ArraySerializer.cs" />
-    <Compile Include="Serialization\Collections\ICollectionSerializer.cs" />
-    <Compile Include="Serialization\Collections\ListSerializer.cs" />
-    <Compile Include="Serialization\Dynamic\MetaTypeContainer.cs" />
-    <Compile Include="Serialization\ISerializer.cs" />
-    <Compile Include="Serialization\SerializationService.cs" />
-    <Compile Include="Serialization\Surrogates\CampaignTimeSurrogate.cs" />
-    <Compile Include="Serialization\Surrogates\HeroLastSeenInformationSurrogate.cs" />
-    <Compile Include="Serialization\Surrogates\IssueBaseSurrogate.cs" />
-    <Compile Include="Serialization\Surrogates\Mat3Surrogate.cs" />
-    <Compile Include="Serialization\Surrogates\MatrixFrameSurrogate.cs" />
-    <Compile Include="Serialization\Surrogates\MBCharacterSkillsSurrogate.cs" />
-    <Compile Include="Serialization\Dynamic\DynamicModelGenerator.cs" />
-    <Compile Include="Serialization\Surrogates\MobilePartySurrogate.cs" />
-    <Compile Include="Serialization\Surrogates\StringIdSurrogate.cs" />
-    <Compile Include="Serialization\Surrogates\TextObjectSurrogate.cs" />
-    <Compile Include="Serialization\ProtobufSerializer.cs" />
-    <Compile Include="Serialization\SerializationHelper.cs" />
-    <Compile Include="Serialization\Surrogates\Vec2Surrogate.cs" />
-    <Compile Include="Serialization\Surrogates\Vec3Surrogate.cs" />
+    <Compile Include="Serialization\BinaryPackageBase.cs" />
+    <Compile Include="Serialization\BinaryPackageFactory.cs" />
+    <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
+    <Compile Include="Serialization\External\ArmyBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CharacterAttributesBinaryPackage.cs" />
+    <Compile Include="Serialization\External\MBEquipmentRosterBinaryPackage.cs" />
+    <Compile Include="Serialization\External\MBBodyPropertyBinaryPackage.cs" />
+    <Compile Include="Serialization\External\MBCharacterSkillsBinaryPackage.cs" />
+    <Compile Include="Serialization\External\KingdomBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CommonAreaPartyComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CharacterAttributeBinaryPackage.cs" />
+    <Compile Include="Serialization\External\LordPartyComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\External\BannerComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\External\ArmorComponentSerializationTest.cs" />
+    <Compile Include="Serialization\External\CharacterPerksBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CommonAreaBinaryPackage.cs" />
+    <Compile Include="Serialization\External\MobilePartyBinaryPackage.cs" />
+    <Compile Include="Serialization\External\PathFaceRecordBinaryPackage.cs" />
+    <Compile Include="Serialization\External\StanceLinkBinaryPackage.cs" />
+    <Compile Include="Serialization\External\WorkshopTypeBinaryPackage.cs" />
+    <Compile Include="Serialization\External\WorkshopBinaryPackage.cs" />
+    <Compile Include="Serialization\External\HeroDeveloperBinaryPackage.cs" />
+    <Compile Include="Serialization\External\PartyAIBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CaravanPartyComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\External\PartyBaseBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CharacterObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\External\TroopRosterElementBinaryPackage.cs" />
+    <Compile Include="Serialization\External\TroopRosterBinaryPackage.cs" />
+    <Compile Include="Serialization\External\ItemModifierGroupBinaryPackage.cs" />
+    <Compile Include="Serialization\External\SkeletonScaleBinaryPackage.cs" />
+    <Compile Include="Serialization\External\HorseComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\External\PieceDataBinaryPackage.cs" />
+    <Compile Include="Serialization\External\MaterialPropertyBinaryPackage.cs" />
+    <Compile Include="Serialization\External\WeaponDesignBinaryPackage.cs" />
+    <Compile Include="Serialization\External\VillageBinaryPackage.cs" />
+    <Compile Include="Serialization\External\TownBinaryPackage.cs" />
+    <Compile Include="Serialization\External\SettlementBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CharacterTraitsBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CultureObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\External\PerkObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\External\TraitObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\External\BanditPartyComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\External\PolicyObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\External\SkillObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CraftingPieceBinaryPackage.cs" />
+    <Compile Include="Serialization\External\MBGUIDBinaryPackage.cs" />
+    <Compile Include="Serialization\External\WeaponComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\External\WeaponDesignElementBinaryPackage.cs" />
+    <Compile Include="Serialization\External\WeaponComponentDataBinaryPackage.cs" />
+    <Compile Include="Serialization\External\MatrixFrameBinaryPackage.cs" />
+    <Compile Include="Serialization\External\ItemObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\External\SaddleComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\External\TextObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\External\TradeItemComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CraftingTemplateBinaryPackage.cs" />
+    <Compile Include="Serialization\External\BannerEffectBinaryPackage.cs" />
+    <Compile Include="Serialization\External\BladeDataBinaryPackage.cs" />
+    <Compile Include="Serialization\External\EquipmentBinaryPackage.cs" />
+    <Compile Include="Serialization\External\EquipmentElementBinaryPackage.cs" />
+    <Compile Include="Serialization\External\HideoutBinaryPackage.cs" />
+    <Compile Include="Serialization\External\ItemModifierBinaryPackage.cs" />
+    <Compile Include="Serialization\External\DynamicBodyPropertiesBinaryPackage.cs" />
+    <Compile Include="Serialization\External\BasicCultureObjectBinaryPackage.cs" />
+    <Compile Include="Serialization\External\ItemCategoryBinaryPackage.cs" />
+    <Compile Include="Serialization\External\BodyPropertiesBinaryPackage.cs" />
+    <Compile Include="Serialization\External\ItemRosterBinaryPackage.cs" />
+    <Compile Include="Serialization\External\ItemRosterElementBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CharacterSkillsBinaryPackage.cs" />
+    <Compile Include="Serialization\External\Vec2BinaryPackage.cs" />
+    <Compile Include="Serialization\External\MonsterBinaryPackage.cs" />
+    <Compile Include="Serialization\External\Mat3BinaryPackage.cs" />
+    <Compile Include="Serialization\External\Vec3BinaryPackage.cs" />
+    <Compile Include="Serialization\Internal\CompatibilityInfoBinaryPackage.cs" />
+    <Compile Include="Serialization\Native\DictionaryBinaryPackage.cs" />
+    <Compile Include="Serialization\Native\EnumerableBinaryPackage.cs" />
+    <Compile Include="Serialization\External\BannerBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CampaignTimeBinaryPackage.cs" />
+    <Compile Include="Serialization\External\ClanBinaryPackage.cs" />
+    <Compile Include="Serialization\External\HeroBinaryPackage.cs" />
+    <Compile Include="Serialization\External\HeroLastSeenInfoBinaryPackage.cs" />
+    <Compile Include="Serialization\Native\IEnumerableBinaryPackage.cs" />
+    <Compile Include="Serialization\Native\KeyValuePairBinaryPackage.cs" />
+    <Compile Include="Serialization\Native\NativeBinaryPackageCollection.cs" />
+    <Compile Include="Serialization\Native\NullBinaryPackage.cs" />
+    <Compile Include="Serialization\Native\PrimitiveBinaryPackage.cs" />
+    <Compile Include="Serialization\External\StaticBodyPropertiesBinaryPackage.cs" />
     <Compile Include="Services\Example\Handlers\IExampleHandler.cs" />
     <Compile Include="Services\Example\IExampleService.cs" />
     <Compile Include="Services\Example\Interfaces\IExampleInterface.cs" />
@@ -358,15 +424,15 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{9cdd9c4e-92cd-4f19-a4d9-d68cf975480c}</Project>
-      <Name>Common</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <Folder Include="Services\Heros\Handlers\" />
     <Folder Include="Services\Heros\Interfaces\" />
     <Folder Include="Services\Heros\Messages\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{314f078f-41df-4a23-b25c-f558eff83d2a}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

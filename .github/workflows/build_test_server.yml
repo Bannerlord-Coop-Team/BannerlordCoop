@@ -1,0 +1,33 @@
+name: build IntroServer
+
+on:
+  # Workflow_dispatch allows for a button press execution of the action file on any branch (The action needs to exist on the primary brnach)
+  workflow_dispatch:
+
+  # These were left in from the original attempt, Which should allow for automated building on pushes/pr's
+  push:
+    branches: [ taverns-vertical-slice ]
+
+
+jobs:
+  build:
+
+    # We are working with C# , easiest to just keep on windows
+    runs-on: windows-latest
+
+    steps:
+      # Check out our code
+    - uses: actions/checkout@v2
+      # Prepare msbuild tools, can probably use dotnet and run's just like nuget but this was quicker to test
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1
+
+      # Run Nuget restore to ensure we have all the packages for the test server
+    - name: Nuget Restore
+      run: nuget restore source\IntroServer\IntroServer.csproj
+
+      # Build the test server with high Verboristy
+    - name: build Test Server
+      run: msbuild source\IntroServer\IntroServer.csproj -verbosity:diag
+
+      # Once some one gives me what tests to run we can try to incorporate them here. Currently the build just completes, and goes nowhere

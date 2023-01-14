@@ -1,7 +1,6 @@
 ﻿namespace Common.Messaging
 {
-    public interface ICommand : IMessage
+    public interface ICommand
     {
-
     }
 }

@@ -1,5 +1,4 @@
 ﻿using System;
-using JetBrains.Annotations;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Save;
 using System.IO;
