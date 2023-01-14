@@ -15,6 +15,9 @@ using LiteNetLib;
 using Serilog;
 using Common.Logging;
 using Missions.Services.Network;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Encounters;
+using System.Text.RegularExpressions;
 
 namespace Missions.Services
 {
@@ -96,7 +99,7 @@ namespace Missions.Services
             vec = vec.Normalized();
             Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec)
                 .NoHorses(true)
-                .Equipment(character.FirstBattleEquipment)
+                .Equipment(CreateRandomEquipment(character))
                 .TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);
             agent.FadeIn();
             agent.Controller = Agent.ControllerType.Player;
@@ -111,7 +114,7 @@ namespace Missions.Services
             agentBuildData.Team(Mission.Current.PlayerAllyTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
-            agentBuildData.Equipment(character.FirstBattleEquipment);
+            agentBuildData.Equipment(CreateRandomEquipment(character));
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.None);
 
@@ -153,6 +156,157 @@ namespace Missions.Services
 
             // spawn an instance of the player (controlled by default)
             SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
+        }
+
+        public Equipment CreateRandomEquipment(CharacterObject character)
+        {
+            Equipment equipment = new Equipment();
+            // Tried the MBRandom but it didn't work
+            var random = new Random();
+            //List of all items in the game
+            List<ItemObject> allItems = Game.Current.ObjectManager.GetObjectTypeList<ItemObject>().ToList();
+            //List of each equippable item type
+            List<ItemObject> CapeItems = new List<ItemObject>();
+            List<ItemObject> BodyArmorItems = new List<ItemObject>();
+            List<ItemObject> HeadArmorItems = new List<ItemObject>();
+            List<ItemObject> LegArmorItems = new List<ItemObject>();
+            List<ItemObject> HandArmorItems = new List<ItemObject>();
+            List<ItemObject> OneHandedWeaponItems = new List<ItemObject>();
+            List<ItemObject> TwoHandedWeaponItems = new List<ItemObject>();
+            List<ItemObject> PolearmWeaponItems = new List<ItemObject>();
+            List<ItemObject> ThrownItems = new List<ItemObject>();
+            List<ItemObject> BowItems = new List<ItemObject>();
+            List<ItemObject> ArrowsItems = new List<ItemObject>();
+            List<ItemObject> CrossbowItems = new List<ItemObject>();
+            List<ItemObject> BoltItems = new List<ItemObject>();
+            List<ItemObject> ShieldItems = new List<ItemObject>();
+            //creates list of "loadouts"
+            List<Equipment> ArmorLoadoutList = new List<Equipment>();
+
+            //Categorize Weapons and Clothes into item types
+            for(int i = 0; i <= allItems.Count-1; i++)
+            {
+                switch (allItems[i].ItemType.ToString())
+                {
+                    case "Cape":
+                        CapeItems.Add(allItems[i]);
+                        break;
+                    case "HeadArmor":
+                        HeadArmorItems.Add(allItems[i]);
+                        break;
+                    case "BodyArmor":
+                        BodyArmorItems.Add(allItems[i]);
+                        break;
+                    case "LegArmor":
+                        LegArmorItems.Add(allItems[i]);
+                        break;
+                    case "HandArmor":
+                        HandArmorItems.Add(allItems[i]);
+                        break;
+                    case "OneHandedWeapon":
+                        OneHandedWeaponItems.Add(allItems[i]);
+                        break;
+                    case "TwoHandedWeapon":
+                        TwoHandedWeaponItems.Add(allItems[i]);
+                        break;
+                    case "Polearm":
+                        PolearmWeaponItems.Add(allItems[i]);
+                        break;
+                    case "Thrown":
+                        ThrownItems.Add(allItems[i]);
+                        break;
+                    case "Bow":
+                        BowItems.Add(allItems[i]);
+                        break;
+                    case "Arrows":
+                        ArrowsItems.Add(allItems[i]);
+                        break;
+                    case "Crossbow":
+                        CrossbowItems.Add(allItems[i]);
+                        break;
+                    case "Bolts":
+                        BoltItems.Add(allItems[i]);
+                        break;
+                    case "Shield":
+                        ShieldItems.Add(allItems[i]);
+                        break;
+                }
+            }
+
+            //Randomization of each type of weapon
+            EquipmentElement OneHandedWeapon = new EquipmentElement(OneHandedWeaponItems[random.Next(0, OneHandedWeaponItems.Count - 1)]);
+            EquipmentElement TwoHandedWeapon = new EquipmentElement(TwoHandedWeaponItems[random.Next(0, TwoHandedWeaponItems.Count - 1)]);
+            EquipmentElement PolearmWeapon = new EquipmentElement(PolearmWeaponItems[random.Next(0, PolearmWeaponItems.Count - 1)]);
+            EquipmentElement ThrownWeapon = new EquipmentElement(ThrownItems[random.Next(0, ThrownItems.Count - 1)]);
+            EquipmentElement BowWeapon = new EquipmentElement(BowItems[random.Next(0, BowItems.Count - 1)]);
+            EquipmentElement Arrows = new EquipmentElement(ArrowsItems[random.Next(0, ArrowsItems.Count - 1)]);
+            EquipmentElement Crossbow = new EquipmentElement(CrossbowItems[random.Next(0, CrossbowItems.Count - 1)]);
+            EquipmentElement Bolts = new EquipmentElement(BoltItems[random.Next(0, BoltItems.Count - 1)]);
+            EquipmentElement Shield = new EquipmentElement(ShieldItems[random.Next(0, ShieldItems.Count - 1)]);
+
+            //Loadout Weapons
+            switch (random.Next(0, 5))
+            {
+                case 0:
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)0, OneHandedWeapon);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)1, Shield);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)2, BowWeapon);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)3, Arrows);
+                    break;
+                case 1:
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)0, PolearmWeapon);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)1, Shield);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)2, BowWeapon);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)3, Arrows);
+                    break;
+                case 2:
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)0, TwoHandedWeapon);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)1, Shield);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)2, Crossbow);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)3, Bolts);
+                    break;
+                case 3:
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)0, TwoHandedWeapon);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)1, ThrownWeapon);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)2, OneHandedWeapon);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)3, Shield);
+                    break;
+                case 4:
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)0, BowWeapon);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)1, Arrows);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)2, TwoHandedWeapon);
+                    break;
+                case 5:
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)0, PolearmWeapon);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)1, Shield);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)2, OneHandedWeapon);
+                    equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)3, ThrownWeapon);
+                    break;
+
+            }
+
+
+
+            Console.WriteLine(equipment);
+            //Console.WriteLine(test);
+            Console.WriteLine(", ", BodyArmorItems);
+            Console.WriteLine(", ", LegArmorItems);
+            //Console.WriteLine(test);
+
+            //Randomization of armor/clothing
+            EquipmentElement HeadArmor = new EquipmentElement(HeadArmorItems[random.Next(0, HeadArmorItems.Count - 1)]);
+            EquipmentElement BodyArmor = new EquipmentElement(BodyArmorItems[random.Next(0, BodyArmorItems.Count - 1)]);
+            EquipmentElement LegArmor = new EquipmentElement(LegArmorItems[random.Next(0, LegArmorItems.Count - 1)]);
+            EquipmentElement HandArmor = new EquipmentElement(HandArmorItems[random.Next(0, HandArmorItems.Count - 1)]);
+            EquipmentElement CapeArmor = new EquipmentElement(CapeItems[random.Next(0, CapeItems.Count - 1)]);
+
+            equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)5, HeadArmor);
+            equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)6, BodyArmor);
+            equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)7, LegArmor);
+            equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)8, HandArmor);
+            equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)9, CapeArmor);
+
+            return equipment;
         }
     }
 }
