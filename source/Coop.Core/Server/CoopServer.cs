@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using Common.Messaging;
 using Coop.Core.Server.Connections;
 using Coop.Core.Configuration;
+using Coop.Core.Communication.PacketHandlers;
 
 namespace Coop.Core.Server
 {
@@ -14,23 +15,30 @@ namespace Coop.Core.Server
 
     public class CoopServer : ICoopServer
     {
-        private readonly NetManager netManager;
+        public int Priority => 0;
+
+        public IPacketManager PacketManager { get; }
+
         private readonly INetworkConfiguration configuration;
         private readonly IMessageBroker messageBroker;
+        private readonly NetManager netManager;
 
-        public CoopServer(INetworkConfiguration configuration, IMessageBroker messageBroker)
+        public CoopServer(
+            INetworkConfiguration configuration, 
+            IMessageBroker messageBroker)
         {
             // Dependancy assignment
-            this.netManager = new NetManager(this);
             this.configuration = configuration;
             this.messageBroker = messageBroker;
+
+            // TODO add configuration
+            netManager = new NetManager(this);
+            PacketManager = new PacketManager(netManager);
 
             // Netmanager initialization
             netManager.NatPunchEnabled = true;
             netManager.NatPunchModule.Init(this);
         }
-
-        public int Priority => 0;
 
         public void Dispose()
         {
@@ -65,6 +73,7 @@ namespace Coop.Core.Server
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
+            PacketManager.HandleRecieve(peer, reader);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -91,7 +100,7 @@ namespace Coop.Core.Server
 
         public void Stop()
         {
-            netManager?.Stop();
+            netManager.Stop();
         }
 
         public void Update(TimeSpan frameTime)

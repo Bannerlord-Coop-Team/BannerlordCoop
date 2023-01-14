@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Coop.Core.Server;
 using Coop.Core.Server.States;
 using Coop.Tests.Stubs;
 using GameInterface.Services.GameDebug.Messages;
@@ -37,8 +38,10 @@ namespace Coop.Tests.Server.States
         {
 
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
+            Mock<ICoopServer> coopServer = new Mock<ICoopServer>();
             IServerState currentState = new ServerRunningState(serverLogic.Object, messageBroker);
             serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
+            serverLogic.Setup(m => m.NetworkServer).Returns(coopServer.Object);
 
             messageBroker.Subscribe<EnterMainMenu>((payload) =>
             {

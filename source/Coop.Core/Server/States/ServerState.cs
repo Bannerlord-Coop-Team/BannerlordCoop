@@ -17,6 +17,11 @@ namespace Coop.Core.Server.States
             Logic = logic;
         }
 
+        ~ServerStateBase()
+        {
+            Dispose();
+        }
+
         public abstract void Dispose();
         public abstract void Start();
         public abstract void Stop();

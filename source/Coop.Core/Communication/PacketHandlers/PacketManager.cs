@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Common.Logging;
 using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
@@ -11,39 +12,51 @@ using ProtoBuf;
 
 namespace Coop.Core.Communication.PacketHandlers
 {
-    public enum NetworkDistributionType
-    {
-        Invalid,
-
-    }
-
     public class PacketManager : IPacketManager
     {
         private readonly NetManager netManager;
-        private readonly IMessageBroker messageBroker;
 
-        private static readonly Dictionary<PacketType, List<IPacketHandler>> packetHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
+        private readonly Dictionary<PacketType, List<IPacketHandler>> packetHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
 
-        public static void RegisterPacketHandler(IPacketHandler handler)
-        {
-            if (packetHandlers.TryGetValue(handler.PacketType, out var handlers))
-            {
-                if (handlers.Contains(handler)) throw new InvalidOperationException($"{handler.GetType()} is already registered.");
-                handlers.Add(handler);
-            }
-            else
-            {
-                packetHandlers.Add(handler.PacketType, new List<IPacketHandler> { handler });
-            }
-        }
-
-        public PacketManager(NetManager netManager, IMessageBroker messageBroker)
+        public PacketManager(NetManager netManager)
         {
             this.netManager = netManager;
-            this.messageBroker = messageBroker;
         }
 
-        private void SendAllBut(NetPeer netPeer, IPacket packet)
+        public void RegisterPacketHandler(IPacketHandler handler)
+        {
+            var handlers = packetHandlers.ContainsKey(handler.PacketType) ?
+                            packetHandlers[handler.PacketType] : new List<IPacketHandler>();
+            if (!handlers.Contains(handler))
+            {
+                handlers.Add(handler);
+            }
+            packetHandlers[handler.PacketType] = handlers;
+        }
+
+        public void RemovePacketHandler(IPacketHandler handler)
+        {
+            if (!packetHandlers.ContainsKey(handler.PacketType)) return;
+            var handlers = packetHandlers[handler.PacketType];
+            if (handlers.Contains(handler))
+                handlers.Remove(handler);
+            if (handlers.Count == 0)
+                packetHandlers.Remove(handler.PacketType);
+        }
+
+        public void HandleRecieve(NetPeer peer, NetPacketReader reader)
+        {
+            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
+            if (packetHandlers.TryGetValue(packet.PacketType, out var handlers))
+            {
+                foreach (var handler in handlers)
+                {
+                    handler.HandlePacket(peer, packet);
+                }
+            }
+        }
+
+        public void SendAllBut(NetPeer netPeer, IPacket packet)
         {
             foreach (NetPeer peer in netManager.ConnectedPeerList.Where(peer => peer != netPeer))
             {
@@ -51,7 +64,7 @@ namespace Coop.Core.Communication.PacketHandlers
             }
         }
 
-        private void SendAll(IPacket packet)
+        public void SendAll(IPacket packet)
         {
             foreach (NetPeer peer in netManager.ConnectedPeerList)
             {
@@ -59,13 +72,13 @@ namespace Coop.Core.Communication.PacketHandlers
             }
         }
 
-        private void Send(NetPeer netPeer, IPacket packet)
+        public void Send(NetPeer netPeer, IPacket packet)
         {
             PacketWrapper wrapper = new PacketWrapper(packet);
 
             // Put type using writer
             NetDataWriter writer = new NetDataWriter();
-            writer.Put((int)wrapper.Type);
+            writer.Put((int)wrapper.PacketType);
 
             // Serialize and put data in writer (with length is important on receive end)
             byte[] data = ProtoBufSerializer.Serialize(packet);
@@ -79,7 +92,7 @@ namespace Coop.Core.Communication.PacketHandlers
     [ProtoContract(SkipConstructor = true)]
     internal readonly struct PacketWrapper : IPacket
     {
-        public PacketType Type => PacketType.PacketWrapper;
+        public PacketType PacketType => PacketType.PacketWrapper;
         public DeliveryMethod DeliveryMethod { get; }
 
         [ProtoMember(1)]

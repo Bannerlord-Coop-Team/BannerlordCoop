@@ -1,5 +1,5 @@
-﻿using Common.Messaging;
-using Coop.Core.Debugging.Logger;
+﻿using Common.Logging;
+using Serilog;
 
 namespace Coop.Core.Server.Connections.States
 {
@@ -10,7 +10,7 @@ namespace Coop.Core.Server.Connections.States
 
     public class ConnectionLogic : IConnectionLogic
     {
-        public ILogger Logger { get; }
+        private readonly ILogger Logger = LogManager.GetLogger<ConnectionLogic>();
         public IConnectionState State { get; set; }
 
         public ConnectionLogic()

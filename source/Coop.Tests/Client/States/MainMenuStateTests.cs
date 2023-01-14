@@ -1,11 +1,10 @@
 ﻿using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
+using GameInterface.Services.GameState.Messages;
 using Moq;
-using Coop.Core.Debugging.Logger;
 using Xunit;
 using Xunit.Abstractions;
-using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Tests.Client.States
 {
@@ -15,7 +14,7 @@ namespace Coop.Tests.Client.States
         public MainMenuStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(new Mock<ILogger>().Object, mockCoopClient.Object, messageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, messageBroker);
         }
 
         [Fact]

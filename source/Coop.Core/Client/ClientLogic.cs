@@ -1,6 +1,8 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Coop.Core.Client.States;
-using Coop.Core.Debugging.Logger;
+using Coop.Core.Communication.PacketHandlers;
+using Serilog;
 
 namespace Coop.Core.Client
 {
@@ -9,7 +11,7 @@ namespace Coop.Core.Client
     /// </summary>
     public class ClientLogic : IClientLogic
     {
-        public ILogger Logger { get; }
+        private readonly ILogger Logger = LogManager.GetLogger<EventPacketHandler>();
         public ICoopClient NetworkClient { get; }
         public IClientState State 
         {
@@ -24,11 +26,9 @@ namespace Coop.Core.Client
         private IClientState _state;
 
         public ClientLogic(
-            ILogger logger,
             ICoopClient networkClient, 
             IMessageBroker messageBroker)
         {
-            Logger = logger;
             NetworkClient = networkClient;
             State = new MainMenuState(this, messageBroker);
         }

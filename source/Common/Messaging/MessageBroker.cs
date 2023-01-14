@@ -31,7 +31,7 @@ namespace Common.Messaging
             }
         }
 
-        protected MessageBroker()
+        public MessageBroker()
         {
             _subscribers = new Dictionary<Type, List<Delegate>>();
         }

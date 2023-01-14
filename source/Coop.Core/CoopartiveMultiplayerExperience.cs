@@ -35,8 +35,6 @@ namespace Coop.Core
 
             var logic = _container.Resolve<ILogic>();
             logic.Start();
-
-
         }
 
         public void StartAsClient()

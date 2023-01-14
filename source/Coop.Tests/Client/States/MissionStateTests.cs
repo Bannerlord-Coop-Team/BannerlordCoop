@@ -1,8 +1,8 @@
 ﻿using Coop.Core.Client;
 using Coop.Core.Client.States;
-using Coop.Core.Debugging.Logger;
 using GameInterface.Services.GameState.Messages;
 using Moq;
+using Serilog;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -14,7 +14,7 @@ namespace Coop.Tests.Client.States
         public MissionStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(new Mock<ILogger>().Object, mockCoopClient.Object, messageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, messageBroker);
             clientLogic.State = new MissionState(clientLogic, messageBroker);
         }
 
