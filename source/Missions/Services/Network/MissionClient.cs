@@ -12,6 +12,7 @@ using Missions.Services.Network.PacketHandlers;
 using Missions.Messages;
 using Missions.Services.Network.Messages;
 using Missions.Services.Agents.Packets;
+using Missions.Services.Messaging;
 
 namespace Missions.Services.Network
 {
@@ -23,17 +24,17 @@ namespace Missions.Services.Network
         public MovementHandler MovementHandler { get; private set; }
         private readonly EventPacketHandler _eventPacketHandler;
         private readonly INetworkAgentRegistry _agentRegistry;
-        private readonly IMessageBroker _messageBroker;
+        private readonly INetworkMessageBroker _messageBroker;
         private readonly LiteNetP2PClient _client;
         private readonly Guid _playerId;
 
-        public MissionClient(LiteNetP2PClient client, IMessageBroker messageBroker)
+        internal MissionClient(LiteNetP2PClient client, INetworkMessageBroker messageBroker)
         {
             _client = client;
             _playerId = Guid.NewGuid();
             _messageBroker = messageBroker;
             _agentRegistry = NetworkAgentRegistry.Instance;
-            BoardGameManager = new BoardGameManager(client, _messageBroker, _agentRegistry);
+            BoardGameManager = new BoardGameManager(_messageBroker, _agentRegistry);
             MovementHandler = new MovementHandler(_client, _messageBroker, _agentRegistry);
             _eventPacketHandler = new EventPacketHandler(_client, _messageBroker);
 
@@ -75,7 +76,7 @@ namespace Missions.Services.Network
 
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
             MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position);
-            _client.SendEvent(request, peer);
+            _messageBroker.PublishEvent(request, peer);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
                 characterObject.Name, request.PlayerId, peer.EndPoint);

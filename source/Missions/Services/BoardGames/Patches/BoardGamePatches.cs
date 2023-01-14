@@ -15,6 +15,7 @@ using TaleWorlds.MountAndBlade;
 using Missions.Services.BoardGames;
 using Missions.Services.Network;
 using Missions.Services.BoardGames.Messages;
+using Missions.Services.Messaging;
 
 namespace Missions.Services.BoardGames.Patches
 {
@@ -43,7 +44,7 @@ namespace Missions.Services.BoardGames.Patches
             {
                 StopConvoAfterGameMessage message = new StopConvoAfterGameMessage();
 
-                MessageBroker.Instance.Publish(conversationAgent, message);
+                NetworkMessageBroker.Instance.Publish(conversationAgent, message);
 
                 //Set AgentNavigator to null as this gets set in SetGameOver by default and breaks all future interactions
                 AgentNavigatorPropertyInfo.SetValue(conversationAgent.GetComponent<CampaignAgentComponent>(), null);

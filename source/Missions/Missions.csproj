@@ -152,6 +152,7 @@
     <Compile Include="Services\Agents\Extensions\AgentExtensions.cs" />
     <Compile Include="GameLoopRunner.cs" />
     <Compile Include="IMission.cs" />
+    <Compile Include="Services\Messaging\NetworkMessageBroker.cs" />
     <Compile Include="Services\Network\IMissionPlayerNetwork.cs" />
     <Compile Include="Messages\BattleNetworkMessages.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameChallengeRequest.cs" />

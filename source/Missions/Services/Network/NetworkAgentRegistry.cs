@@ -26,6 +26,7 @@ namespace Missions.Services.Network
 
     public class NetworkAgentRegistry : INetworkAgentRegistry
     {
+        // TODO resolve in patches using DI framwork
         public static INetworkAgentRegistry Instance 
         { 
             get

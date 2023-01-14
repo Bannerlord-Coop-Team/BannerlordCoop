@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Missions.Services.Agents.Messages;
+using Missions.Services.Messaging;
 using System;
 using System.Threading.Tasks;
 using TaleWorlds.MountAndBlade;
@@ -15,9 +16,9 @@ namespace Missions.Services.Network
 
         private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
 
-        private readonly IMessageBroker _messageBroker;
+        private readonly INetworkMessageBroker _messageBroker;
 
-        public MissionNetworkBehavior(LiteNetP2PClient client, IMessageBroker messageBroker)
+        internal MissionNetworkBehavior(LiteNetP2PClient client, INetworkMessageBroker messageBroker)
         {
             m_Client = client;
             _messageBroker = messageBroker;

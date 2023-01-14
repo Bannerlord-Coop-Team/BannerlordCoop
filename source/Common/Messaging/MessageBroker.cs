@@ -21,6 +21,8 @@ namespace Common.Messaging
         private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
         private static MessageBroker _instance;
         private readonly Dictionary<Type, List<Delegate>> _subscribers;
+
+        // TODO resolve in patches using DI framework
         public static MessageBroker Instance
         {
             get
@@ -31,12 +33,12 @@ namespace Common.Messaging
             }
         }
 
-        private MessageBroker()
+        protected MessageBroker()
         {
             _subscribers = new Dictionary<Type, List<Delegate>>();
         }
 
-        public void Publish<T>(object source, T message)
+        public virtual void Publish<T>(object source, T message)
         {
             if (message == null || source == null)
                 return;
@@ -57,7 +59,7 @@ namespace Common.Messaging
             }
         }
 
-        public void Subscribe<T>(Action<MessagePayload<T>> subscription)
+        public virtual void Subscribe<T>(Action<MessagePayload<T>> subscription)
         {
             var delegates = _subscribers.ContainsKey(typeof(T)) ?
                             _subscribers[typeof(T)] : new List<Delegate>();
@@ -68,7 +70,7 @@ namespace Common.Messaging
             _subscribers[typeof(T)] = delegates;
         }
 
-        public void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
+        public virtual void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
         {
             if (!_subscribers.ContainsKey(typeof(T))) return;
             var delegates = _subscribers[typeof(T)];

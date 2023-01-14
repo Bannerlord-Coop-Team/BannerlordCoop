@@ -20,13 +20,21 @@ using Version = System.Version;
 
 namespace Missions.Services.Network
 {
-    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable
+    public interface INetworkClient
+    {
+        NetManager NetManager { get; }
+        void Send(IPacket packet, NetPeer peer);
+        void SendAll(IPacket packet);
+    }
+
+    public class LiteNetP2PClient : INetworkClient, INatPunchListener, INetEventListener, IUpdateable, IDisposable
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
         private static readonly Dictionary<PacketType, List<IPacketHandler>> PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
         
-        public int ConnectedPeersCount => _netManager.ConnectedPeersCount;
+        public int ConnectedPeersCount => NetManager.ConnectedPeersCount;
 
+        public NetManager NetManager { get; private set; }
         public NetPeer PeerServer { get; private set; }
         public int Priority => 2;
 
@@ -34,7 +42,6 @@ namespace Missions.Services.Network
 
         private readonly Guid id = Guid.NewGuid();
         private readonly BatchLogger<PacketType> _batchLogger = new BatchLogger<PacketType>(LogEventLevel.Verbose, 10000);
-        private readonly NetManager _netManager;
         private readonly NetworkConfiguration _networkConfig;
         private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
         private readonly IMessageBroker _messageBroker;
@@ -44,7 +51,7 @@ namespace Missions.Services.Network
             _networkConfig = config;
             _messageBroker = messageBroker;
 
-            _netManager = new NetManager(this)
+            NetManager = new NetManager(this)
             {
                 NatPunchEnabled = true,
                 //DisconnectTimeout = config.DisconnectTimeout.Milliseconds,
@@ -52,9 +59,9 @@ namespace Missions.Services.Network
                 //ReconnectDelay = config.ReconnectDelay.Milliseconds,
             };
 
-            _netManager.NatPunchModule.Init(this);
+            NetManager.NatPunchModule.Init(this);
 
-            _netManager.Start();
+            NetManager.Start();
 
             _poller = new Poller(Update, TimeSpan.FromMilliseconds(1000/60));
             _poller.Start();
@@ -93,8 +100,8 @@ namespace Missions.Services.Network
 
         public void Update(TimeSpan frameTime)
         {
-            _netManager.PollEvents();
-            _netManager.NatPunchModule.PollEvents();
+            NetManager.PollEvents();
+            NetManager.NatPunchModule.PollEvents();
         }
 
         public bool ConnectToP2PServer()
@@ -117,7 +124,7 @@ namespace Missions.Services.Network
                 id,
                 _version);
 
-            PeerServer = _netManager.Connect(connectionAddress,
+            PeerServer = NetManager.Connect(connectionAddress,
                                             port,
                                             clientInfo.ToString());
 
@@ -135,33 +142,19 @@ namespace Missions.Services.Network
             string token = $"{instance}%{id}";
             if (_networkConfig.NATType == NatAddressType.Internal)
             {
-                _netManager.NatPunchModule.SendNatIntroduceRequest(_networkConfig.LanAddress.ToString(), _networkConfig.LanPort, token);
+                NetManager.NatPunchModule.SendNatIntroduceRequest(_networkConfig.LanAddress.ToString(), _networkConfig.LanPort, token);
             }
             else if (_networkConfig.NATType == NatAddressType.External)
             {
-                _netManager.NatPunchModule.SendNatIntroduceRequest(_networkConfig.WanAddress.ToString(), _networkConfig.WanPort, token);
+                NetManager.NatPunchModule.SendNatIntroduceRequest(_networkConfig.WanAddress.ToString(), _networkConfig.WanPort, token);
             }
         }
 
         public void Stop()
         {
             _poller.Stop();
-            _netManager.DisconnectAll();
-            _netManager.Stop();
-        }
-
-        public void SendEvent(INetworkEvent networkEvent, NetPeer peer)
-        {
-            EventPacket eventPacket = new EventPacket(networkEvent);
-
-            Send(eventPacket, peer);
-        }
-
-        public void SendAllEvent(INetworkEvent networkEvent)
-        {
-            EventPacket eventPacket = new EventPacket(networkEvent);
-
-            SendAll(eventPacket);
+            NetManager.DisconnectAll();
+            NetManager.Stop();
         }
 
         public void Send(IPacket packet, NetPeer peer)
@@ -183,7 +176,7 @@ namespace Missions.Services.Network
         {
             NetDataWriter writer = new NetDataWriter();
             writer.PutBytesWithLength(ProtoBufSerializer.Serialize(packet));
-            _netManager.SendToAll(writer, packet.DeliveryMethod);
+            NetManager.SendToAll(writer, packet.DeliveryMethod);
         }
 
         public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -196,7 +189,7 @@ namespace Missions.Services.Network
             if (type == _networkConfig.NATType)
             {
                 Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
-                _netManager.Connect(targetEndPoint, token);
+                NetManager.Connect(targetEndPoint, token);
             }
         }
 
@@ -211,7 +204,7 @@ namespace Missions.Services.Network
                     _messageBroker.Publish(this, peerConnectedEvent);
                 });
             }
-            Logger.Information("{LocalPort} received connection from {peer}", _netManager.LocalPort, peer.EndPoint);
+            Logger.Information("{LocalPort} received connection from {peer}", NetManager.LocalPort, peer.EndPoint);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
