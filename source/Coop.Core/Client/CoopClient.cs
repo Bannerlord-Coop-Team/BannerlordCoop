@@ -26,7 +26,6 @@ namespace Coop.Core.Client
         
         private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
 
-        private readonly IClientLogic logic;
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
         private readonly NetManager netManager;
@@ -37,13 +36,11 @@ namespace Coop.Core.Client
         private NetPeer serverPeer;
 
         public CoopClient(
-            INetworkConfiguration config, 
-            IClientLogic logic, 
+            INetworkConfiguration config,
             IMessageBroker messageBroker,
             IPacketManager packetManager)
         {
             Configuration = config;
-            this.logic = logic;
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
 
@@ -113,7 +110,7 @@ namespace Coop.Core.Client
 
         public override void Stop()
         {
-            logic.Stop();
+            netManager.Stop();
         }
 
         public override void Update(TimeSpan frameTime)

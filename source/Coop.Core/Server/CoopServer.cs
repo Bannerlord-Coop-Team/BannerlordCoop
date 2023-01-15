@@ -28,22 +28,19 @@ namespace Coop.Core.Server
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
         private readonly IClientStateOrchestrator clientOrchestrator;
-        private readonly IServerLogic logic;
         private readonly NetManager netManager;
 
         public CoopServer(
             INetworkConfiguration configuration, 
             IMessageBroker messageBroker,
             IPacketManager packetManager,
-            IClientStateOrchestrator clientOrchestrator,
-            IServerLogic logic)
+            IClientStateOrchestrator clientOrchestrator)
         {
             // Dependancy assignment
             Configuration = configuration;
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
             this.clientOrchestrator = clientOrchestrator;
-            this.logic = logic;
 
             // TODO add configuration
             netManager = new NetManager(this);
