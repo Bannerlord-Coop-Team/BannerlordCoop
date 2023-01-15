@@ -97,6 +97,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Autofac\ContainerBuildTests.cs" />
     <Compile Include="Autofac\TestServerModule.cs" />
     <Compile Include="Autofac\TestClientModule.cs" />
     <Compile Include="Bootstrap.cs" />

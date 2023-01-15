@@ -10,6 +10,8 @@ using Common.Serialization;
 using LiteNetLib.Utils;
 using System.Linq;
 using Coop.Core.Communication.Network;
+using Coop.Core.Server.States;
+using Coop.Core.Server.Connections.Messages;
 
 namespace Coop.Core.Server
 {
@@ -25,17 +27,23 @@ namespace Coop.Core.Server
 
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
+        private readonly IClientStateOrchestrator clientOrchestrator;
+        private readonly IServerLogic logic;
         private readonly NetManager netManager;
 
         public CoopServer(
             INetworkConfiguration configuration, 
             IMessageBroker messageBroker,
-            IPacketManager packetManager)
+            IPacketManager packetManager,
+            IClientStateOrchestrator clientOrchestrator,
+            IServerLogic logic)
         {
             // Dependancy assignment
             Configuration = configuration;
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
+            this.clientOrchestrator = clientOrchestrator;
+            this.logic = logic;
 
             // TODO add configuration
             netManager = new NetManager(this);
@@ -89,13 +97,13 @@ namespace Coop.Core.Server
 
         public void OnPeerConnected(NetPeer peer)
         {
-            ClientConnected message = new ClientConnected(peer);
+            PlayerConnected message = new PlayerConnected(peer);
             messageBroker.Publish(this, message);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            ClientDisconnected message = new ClientDisconnected(peer, disconnectInfo);
+            PlayerDisconnected message = new PlayerDisconnected(peer, disconnectInfo);
             messageBroker.Publish(this, message);
         }
 

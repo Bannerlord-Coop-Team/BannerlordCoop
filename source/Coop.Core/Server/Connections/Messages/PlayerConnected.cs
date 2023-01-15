@@ -1,12 +1,11 @@
 ﻿using Common.Messaging;
 using LiteNetLib;
-using System;
 
 namespace Coop.Core.Server.Connections.Messages
 {
-    public readonly struct PlayerConnectedCampaign : ICommand
+    public readonly struct PlayerConnected : IEvent
     {
-        public PlayerConnectedCampaign(NetPeer playerId)
+        public PlayerConnected(NetPeer playerId)
         {
             PlayerId = playerId;
         }

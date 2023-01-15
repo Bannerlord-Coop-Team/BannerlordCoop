@@ -2,16 +2,13 @@
 using Common;
 using Common.LogicStates;
 using Coop.Core.Client;
-using Coop.Core.Communication.PacketHandlers;
 using Coop.Core.Server;
 using System;
-using System.Xml.Serialization;
 
 namespace Coop.Core
 {
     public class CoopartiveMultiplayerExperience : IUpdateable
     {
-
         public static UpdateableList Updateables { get; } = new UpdateableList();
 
         private static IContainer _container;

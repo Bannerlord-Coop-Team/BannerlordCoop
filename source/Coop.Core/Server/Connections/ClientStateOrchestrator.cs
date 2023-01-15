@@ -1,8 +1,9 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Connections.Messages;
+using LiteNetLib;
 using System.Collections.Generic;
 
-namespace Coop.Core.Server.Connections.States
+namespace Coop.Core.Server.Connections
 {
     /// <summary>
     /// Handle Client connection state as it pertains to loading in a given player
@@ -11,18 +12,19 @@ namespace Coop.Core.Server.Connections.States
     {
     }
 
+    /// <inheritdoc cref="IClientStateOrchestrator"/>
     public class ClientStateOrchestrator : IClientStateOrchestrator
     {
-        public IDictionary<string, IConnectionLogic> ConnectionStates { get; private set; } = new Dictionary<string, IConnectionLogic>();
+        public IDictionary<NetPeer, IConnectionLogic> ConnectionStates { get; private set; } = new Dictionary<NetPeer, IConnectionLogic>();
 
         private readonly IMessageBroker _messageBroker;
 
         public ClientStateOrchestrator(IMessageBroker messageBroker)
         {
             _messageBroker = messageBroker;
+            _messageBroker.Subscribe<PlayerConnected>(PlayerJoiningHandler);
             _messageBroker.Subscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
-            _messageBroker.Subscribe<ResolveCharacter>(PlayerJoiningHandler);
-            _messageBroker.Subscribe<ResolvedCharacter>(PlayerJoinedHandler);
+            _messageBroker.Subscribe<CharacterResolved>(PlayerJoinedHandler);
             _messageBroker.Subscribe<PlayerCreatingCharacter>(PlayerCreatingCharacterHandler);
             _messageBroker.Subscribe<PlayerTransferCharacter>(PlayerTransferCharacterHandler);
             _messageBroker.Subscribe<PlayerLoaded>(PlayerLoadedHandler);
@@ -30,7 +32,19 @@ namespace Coop.Core.Server.Connections.States
             _messageBroker.Subscribe<PlayerTransitionMission>(PlayerTransitionsMissionHandler);
         }
 
-        private void PlayerJoiningHandler(MessagePayload<ResolveCharacter> obj)
+        ~ClientStateOrchestrator()
+        {
+            _messageBroker.Unsubscribe<PlayerConnected>(PlayerJoiningHandler);
+            _messageBroker.Unsubscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
+            _messageBroker.Unsubscribe<CharacterResolved>(PlayerJoinedHandler);
+            _messageBroker.Unsubscribe<PlayerCreatingCharacter>(PlayerCreatingCharacterHandler);
+            _messageBroker.Unsubscribe<PlayerTransferCharacter>(PlayerTransferCharacterHandler);
+            _messageBroker.Unsubscribe<PlayerLoaded>(PlayerLoadedHandler);
+            _messageBroker.Unsubscribe<PlayerTransitionCampaign>(PlayerTransitionsCampaignHandler);
+            _messageBroker.Unsubscribe<PlayerTransitionMission>(PlayerTransitionsMissionHandler);
+        }
+
+        private void PlayerJoiningHandler(MessagePayload<PlayerConnected> obj)
         {
             var playerId = obj.What.PlayerId;
             var connectionLogic = new ConnectionLogic();
@@ -47,7 +61,7 @@ namespace Coop.Core.Server.Connections.States
             ConnectionStates.Remove(playerId);
         }
 
-        private void PlayerJoinedHandler(MessagePayload<ResolvedCharacter> obj)
+        private void PlayerJoinedHandler(MessagePayload<CharacterResolved> obj)
         {
             var playerId = obj.What.PlayerId;
             if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))

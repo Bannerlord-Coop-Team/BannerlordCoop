@@ -21,63 +21,27 @@ namespace Coop
     {
         // Test Symbols
         public static readonly bool TESTING_ENABLED = true;
+        // -------------
+
         public static UpdateableList Updateables { get; } = new UpdateableList();
 
         public static CoopartiveMultiplayerExperience Coop = new CoopartiveMultiplayerExperience();
-        // -------------
 
-        #region MainMenuButtons
-        public static InitialStateOption CoopCampaign =
-            new InitialStateOption(
-                "CoOp Campaign",
-                new TextObject("Host Co-op Campaign"),
-                9990,
-                () =>
-                {
-                    string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
-#if DEBUG
-                    foreach (string argument in array)
-                    {
+        public static InitialStateOption CoopCampaign;
 
-                    }
-
-                    //_network.Start();
-#else
-                    ScreenManager.PushScreen(
-                        ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                            new object[] { }));
-#endif
-                },
-                () => { return (false, new TextObject()); }
-            );
-
-        public static InitialStateOption JoinCoopGame =
-            new InitialStateOption(
-              "Join Coop Game",
-              new TextObject("Join Co-op Campaign"),
-              9991,
-              JoinWindow,
-              () => { return (false, new TextObject()); }
-            );
-        #endregion
+        public static InitialStateOption JoinCoopGame;
 
         public Main()
         {
             MBDebug.DisableLogging = false;
 
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
-
         }
 
         private static string ClientServerModeMessage = "";
 
-
-
-        public override void NoHarmonyInit()
-        {
-            // TODO init DI module
-        }
+        public override void NoHarmonyInit() { }
 
         public override void NoHarmonyLoad()
         {
@@ -141,7 +105,6 @@ namespace Coop
                             ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
                                 new object[] { }));
 #endif
-                        //_network.Start();
                     },
 
                     () => { return (false, new TextObject()); }
@@ -154,11 +117,13 @@ namespace Coop
                   9991,
                   JoinWindow,
               () => { return (false, new TextObject()); }
-                );
+            );
 
             Module.CurrentModule.AddInitialStateOption(CoopCampaign);
 
-            //Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
+#if !DEBUG
+            Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
+#endif
             #endregion
         }
 
@@ -166,13 +131,6 @@ namespace Coop
         {
             base.OnBeforeInitialModuleScreenSetAsRoot();
             InformationManager.DisplayMessage(new InformationMessage(ClientServerModeMessage));
-        }
-
-        //public Action<Game> OnGameInit;
-        public override void OnGameInitializationFinished(Game game)
-        {
-            base.OnGameInitializationFinished(game);
-            //OnGameInit?.Invoke(game);
         }
 
         public override void OnGameEnd(Game game)

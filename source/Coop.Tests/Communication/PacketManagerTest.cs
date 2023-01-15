@@ -83,7 +83,7 @@ namespace Coop.Tests.Communication
 
             var packetManager = new PacketManager();
 
-            
+
 
             packetManager.RegisterPacketHandler(packetHandler.Object);
 

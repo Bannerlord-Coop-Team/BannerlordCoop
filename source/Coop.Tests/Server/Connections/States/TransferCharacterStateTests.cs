@@ -1,4 +1,5 @@
-﻿using Coop.Core.Server.Connections.States;
+﻿using Coop.Core.Server.Connections;
+using Coop.Core.Server.Connections.States;
 using Xunit;
 using Xunit.Abstractions;
 

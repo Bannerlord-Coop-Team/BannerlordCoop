@@ -1,12 +1,15 @@
-﻿namespace Coop.Core.Server.Connections.Messages
+﻿using LiteNetLib;
+using System;
+
+namespace Coop.Core.Server.Connections.Messages
 {
     public readonly struct PlayerLoaded
     {
-        public PlayerLoaded(string playerId)
+        public PlayerLoaded(NetPeer playerId)
         {
             PlayerId = playerId;
         }
 
-        public string PlayerId { get; }
+        public NetPeer PlayerId { get; }
     }
 }

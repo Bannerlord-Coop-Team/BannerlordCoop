@@ -1,7 +1,9 @@
-﻿using Coop.Core.Server.Connections.Messages;
+﻿using Coop.Core.Server.Connections;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
-using System;
+using LiteNetLib;
 using System.Linq;
+using System.Runtime.Serialization;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -10,7 +12,7 @@ namespace Coop.Tests.Server.Connections.States
     public class ClientStateOrchestratorTests : CoopTest
     {
         private readonly ClientStateOrchestrator clientStateOrchestrator;
-        private readonly string _playerId = Guid.NewGuid().ToString();
+        private readonly NetPeer _playerId = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
         public ClientStateOrchestratorTests(ITestOutputHelper output) : base(output)
         {
             clientStateOrchestrator = new ClientStateOrchestrator(messageBroker);
@@ -19,26 +21,26 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerDisconnected_RemovePlayer()
         {
-            messageBroker.Publish(this, new ResolveCharacter(_playerId));
-            messageBroker.Publish(this, new PlayerDisconnected(_playerId));
+            messageBroker.Publish(this, new PlayerConnected(_playerId));
+            messageBroker.Publish(this, new PlayerDisconnected(_playerId, default(DisconnectInfo)));
 
             Assert.Empty(clientStateOrchestrator.ConnectionStates);
         }
 
         [Fact]
-        public void PlayerResolveCharacter_AddsNewPlayer()
+        public void PlayerPlayerConnected_AddsNewPlayer()
         {
-            messageBroker.Publish(this, new ResolveCharacter(_playerId));
+            messageBroker.Publish(this, new PlayerConnected(_playerId));
 
             Assert.Single(clientStateOrchestrator.ConnectionStates);
             Assert.IsType<ResolveCharacterState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
         }
 
         [Fact]
-        public void PlayerResolvedCharacter_UpdatesPlayerState_LoadingState()
+        public void PlayerCharacterResolved_UpdatesPlayerState_LoadingState()
         {
-            messageBroker.Publish(this, new ResolveCharacter(_playerId));
-            messageBroker.Publish(this, new ResolvedCharacter(_playerId));
+            messageBroker.Publish(this, new PlayerConnected(_playerId));
+            messageBroker.Publish(this, new CharacterResolved(_playerId));
 
             Assert.IsType<LoadingState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
         }
@@ -52,8 +54,8 @@ namespace Coop.Tests.Server.Connections.States
                 messagePublished = true;
             });
 
-            messageBroker.Publish(this, new ResolveCharacter(_playerId));
-            messageBroker.Publish(this, new ResolvedCharacter(_playerId));
+            messageBroker.Publish(this, new PlayerConnected(_playerId));
+            messageBroker.Publish(this, new CharacterResolved(_playerId));
 
             Assert.True(messagePublished);
         }
@@ -61,8 +63,8 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerLoaded_EntersCampaignState()
         {
-            messageBroker.Publish(this, new ResolveCharacter(_playerId));
-            messageBroker.Publish(this, new ResolvedCharacter(_playerId));
+            messageBroker.Publish(this, new PlayerConnected(_playerId));
+            messageBroker.Publish(this, new CharacterResolved(_playerId));
             messageBroker.Publish(this, new PlayerLoaded(_playerId));
 
             Assert.IsType<CampaignState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
@@ -71,8 +73,8 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerEntersMissionState()
         {
-            messageBroker.Publish(this, new ResolveCharacter(_playerId));
-            messageBroker.Publish(this, new ResolvedCharacter(_playerId));
+            messageBroker.Publish(this, new PlayerConnected(_playerId));
+            messageBroker.Publish(this, new CharacterResolved(_playerId));
             messageBroker.Publish(this, new PlayerLoaded(_playerId));
             messageBroker.Publish(this, new PlayerTransitionMission(_playerId));
 
@@ -83,8 +85,8 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerMissionState_TransitionsCampaignState()
         {
-            messageBroker.Publish(this, new ResolveCharacter(_playerId));
-            messageBroker.Publish(this, new ResolvedCharacter(_playerId));
+            messageBroker.Publish(this, new PlayerConnected(_playerId));
+            messageBroker.Publish(this, new CharacterResolved(_playerId));
             messageBroker.Publish(this, new PlayerLoaded(_playerId));
             messageBroker.Publish(this, new PlayerTransitionMission(_playerId));
             messageBroker.Publish(this, new PlayerTransitionCampaign(_playerId));

@@ -1,7 +1,8 @@
 ﻿using Common.Logging;
+using Coop.Core.Server.Connections.States;
 using Serilog;
 
-namespace Coop.Core.Server.Connections.States
+namespace Coop.Core.Server.Connections
 {
     public interface IConnectionLogic : IConnectionState
     {
