@@ -124,34 +124,20 @@ namespace Missions.Services.Network
 
         public bool RegisterPlayerAgent(Guid agentId, Agent agent)
         {
-            if (m_AgentToId.ContainsKey(agent)) return false;
+            if (RegisterControlledAgent(agentId, agent) == false) return false;
             if (m_PlayerAgents.ContainsKey(agentId)) return false;
 
             m_PlayerAgents.Add(agentId, agent);
-            RegisterControlledAgent(agentId, agent);
 
             return true;
         }
 
         public bool RegisterNetworkPlayerAgent(NetPeer peer, Guid agentId, Agent agent)
         {
-            if (m_OtherAgents.TryGetValue(peer, out AgentGroupController controller))
-            {
-                if (controller.Contains(agent)) return false;
-                if (controller.Contains(agentId)) return false;
-
-                controller.AddAgent(agentId, agent);
-                m_AgentToId.Add(agent, agentId);
-                m_PlayerAgents.Add(agentId, agent);
-            }
-            else
-            {
-                AgentGroupController newGroupController = new AgentGroupController();
-                newGroupController.AddAgent(agentId, agent);
-                m_AgentToId.Add(agent, agentId);
-                m_OtherAgents.Add(peer, newGroupController);
-                m_PlayerAgents.Add(agentId, agent);
-            }
+            if (RegisterNetworkControlledAgent(peer, agentId, agent) == false) return false;
+            if (m_PlayerAgents.ContainsKey(agentId)) return false;
+            
+            m_PlayerAgents.Add(agentId, agent);
 
             return true;
         }
