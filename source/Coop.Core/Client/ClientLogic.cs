@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.LogicStates;
 using Common.Messaging;
 using Coop.Core.Client.States;
 using Coop.Core.Communication.PacketHandlers;
@@ -9,6 +10,20 @@ namespace Coop.Core.Client
     /// <summary>
     /// Top level client-side state machine logic orchestrator
     /// </summary>
+    public interface IClientLogic : ILogic, IClientState
+    {
+        /// <summary>
+        /// Client-side state
+        /// </summary>
+        IClientState State { get; set; }
+
+        /// <summary>
+        /// Networking Client for Client-side
+        /// </summary>
+        ICoopClient NetworkClient { get; }
+    }
+
+    /// <inheritdoc cref="IClientLogic"/>
     public class ClientLogic : IClientLogic
     {
         private readonly ILogger Logger = LogManager.GetLogger<EventPacketHandler>();

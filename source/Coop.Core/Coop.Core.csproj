@@ -114,7 +114,6 @@
     <Compile Include="Client\States\CampaignState.cs" />
     <Compile Include="Client\States\CharacterCreationState.cs" />
     <Compile Include="Client\States\ClientStateBase.cs" />
-    <Compile Include="Client\IClientLogic.cs" />
     <Compile Include="Client\States\IClientState.cs" />
     <Compile Include="Client\States\LoadingState.cs" />
     <Compile Include="Client\States\MainMenuState.cs" />
@@ -148,7 +147,6 @@
     <Compile Include="Server\Connections\States\MissionState.cs" />
     <Compile Include="Server\Connections\States\TransferCharacterState.cs" />
     <Compile Include="Server\Messages\Events\ClientJoinRequested.cs" />
-    <Compile Include="Server\States\IServerLogic.cs" />
     <Compile Include="Server\ServerModule.cs" />
     <Compile Include="Client\ClientModule.cs" />
     <Compile Include="Communication\PacketHandlers\ExamplePacketHandler.cs" />

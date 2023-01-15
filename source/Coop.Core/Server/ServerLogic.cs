@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.LogicStates;
 using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Server.States;
@@ -8,6 +9,23 @@ using Serilog.Core;
 
 namespace Coop.Core.Server
 {
+    /// <summary>
+    /// Top level server-side state machine logic orchestrator
+    /// </summary>
+    public interface IServerLogic : ILogic, IServerState
+    {
+        /// <summary>
+        /// Server-side state
+        /// </summary>
+        IServerState State { get; set; }
+
+        /// <summary>
+        /// Networking Server for Server-side
+        /// </summary>
+        ICoopServer NetworkServer { get; }
+    }
+
+    /// <inheritdoc cref="IServerLogic"/>
     public class ServerLogic : IServerLogic
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
