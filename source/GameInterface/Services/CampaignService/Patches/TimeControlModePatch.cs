@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 
-namespace Coop.Mod.Patch.CampaignPatches
+namespace GameInterface.Services.CampaignService.Patches
 {
 
     /// <summary>
@@ -16,20 +16,20 @@ namespace Coop.Mod.Patch.CampaignPatches
     ///     </para>
     /// </summary>
     /// <remarks>
-    ///     This class prefixes setter of <see cref="TaleWorlds.CampaignSystem.Campaign.TimeControlMode"/> to change its behavior 
-    ///     and change its value just after <see cref="TaleWorlds.CampaignSystem.Campaign.SetTimeSpeed"/> is called
+    ///     This class prefixes setter of <see cref="Campaign.TimeControlMode"/> to change its behavior 
+    ///     and change its value just after <see cref="Campaign.SetTimeSpeed"/> is called
     /// </remarks>
     [HarmonyPatch(typeof(Campaign), nameof(Campaign.TimeControlMode))]
     static class TimeControlModePatch
     {
         /// <summary>
-        /// Grants access to the private field of the property <see cref="TaleWorlds.CampaignSystem.Campaign.TimeControlMode"/> used to override the setter logic.
+        /// Grants access to the private field of the property <see cref="Campaign.TimeControlMode"/> used to override the setter logic.
         /// </summary>
         static readonly AccessTools.FieldRef<Campaign, CampaignTimeControlMode> _timeControlModeRef =
             AccessTools.FieldRefAccess<Campaign, CampaignTimeControlMode>("_timeControlMode");
 
         /// <summary>
-        /// Overrides <see cref="TaleWorlds.CampaignSystem.Campaign.TimeControlMode"/> setter logic
+        /// Overrides <see cref="Campaign.TimeControlMode"/> setter logic
         /// </summary>
         /// <param name="__instance">Current Campaign</param>
         /// <param name="value">Reference to the new value</param>

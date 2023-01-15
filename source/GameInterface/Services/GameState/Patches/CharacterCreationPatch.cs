@@ -1,9 +1,9 @@
 ﻿using HarmonyLib;
-﻿using Common.Messaging;
+using Common.Messaging;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
 using GameInterface.Services.GameDebug.Messages;
 
-namespace GameInterface.Patch.GameStates
+namespace GameInterface.Services.GameState.Patches
 {
     [HarmonyPatch(typeof(CharacterCreationState))]
     internal class CharacterCreationPatch

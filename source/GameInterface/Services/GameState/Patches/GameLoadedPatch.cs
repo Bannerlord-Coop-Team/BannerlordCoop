@@ -4,7 +4,7 @@ using HarmonyLib;
 using SandBox;
 using TaleWorlds.Core;
 
-namespace GameInterface.Patch.GameStates
+namespace GameInterface.Services.GameState.Patches
 {
     [HarmonyPatch(typeof(SandBoxGameManager))]
     internal class GameLoadedPatch

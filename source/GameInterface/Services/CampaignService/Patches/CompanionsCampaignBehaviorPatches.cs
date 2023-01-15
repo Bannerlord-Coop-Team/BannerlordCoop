@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace Coop.Mod.Patch.CampaignPatches
+namespace GameInterface.Services.CampaignService.Patches
 {
     [HarmonyPatch(typeof(CompanionsCampaignBehavior))]
     internal class CompanionsCampaignBehaviorPatches

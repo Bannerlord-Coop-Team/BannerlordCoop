@@ -1,17 +1,16 @@
+using Common;
+using Common.Logging;
+using Common.Messaging;
+using Common.Serialization;
+using Coop.Core.Client.Messages;
+using Coop.Core.Communication.Network;
+using Coop.Core.Communication.PacketHandlers;
+using Coop.Core.Configuration;
+using LiteNetLib;
+using Serilog;
 using System;
 using System.Net;
-using Common;
-using LiteNetLib;
 using System.Net.Sockets;
-using Common.Messaging;
-using Coop.Core.Configuration;
-using Coop.Core.Client.States;
-using Coop.Core.Client.Messages;
-using Coop.Core.Communication.PacketHandlers;
-using Serilog;
-using Common.Logging;
-using Coop.Core.Communication.Network;
-using Common.Serialization;
 
 namespace Coop.Core.Client
 {

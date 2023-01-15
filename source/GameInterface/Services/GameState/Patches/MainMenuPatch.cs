@@ -3,7 +3,7 @@ using GameInterface.Services.GameState.Messages;
 using HarmonyLib;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Patch.GameStates
+namespace GameInterface.Services.GameState.Patches
 {
     internal class MainMenuPatch
     {

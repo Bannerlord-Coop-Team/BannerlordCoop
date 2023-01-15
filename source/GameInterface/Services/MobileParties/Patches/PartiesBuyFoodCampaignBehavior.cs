@@ -4,10 +4,10 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace Coop.Mod.Patch.Party
+namespace GameInterface.Services.MobileParties.Patches
 {
-    [HarmonyPatch(typeof(GarrisonTroopsCampaignBehavior), "OnSettlementEntered")]
-    internal class GarrisonTroopsCampaignBehaviorPatch
+    [HarmonyPatch(typeof(PartiesBuyFoodCampaignBehavior), "OnSettlementEntered")]
+    internal class PartiesBuyFoodCampaignBehaviorPatch
     {
         private static bool Prefix(ref MobileParty mobileParty, ref Settlement settlement, ref Hero hero)
         {

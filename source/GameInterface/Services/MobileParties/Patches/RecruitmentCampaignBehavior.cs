@@ -3,7 +3,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace Coop.Mod.Patch.Party
+namespace GameInterface.Services.MobileParties.Patches
 {
     [HarmonyPatch(typeof(RecruitmentCampaignBehavior), "CheckRecruiting")]
     internal class RecruitmentCampaignBehaviorPatch

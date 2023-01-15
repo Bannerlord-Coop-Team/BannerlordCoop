@@ -1,16 +1,24 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
+using Coop.Core.Client;
 using Coop.Core.Server.States;
 using GameInterface;
+using Serilog;
+using Serilog.Core;
 
 namespace Coop.Core.Server
 {
     public class ServerLogic : IServerLogic
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
+
         public IServerState State
         {
             get { return _state; }
             set
             {
+                Logger.Debug("Server is changing to {state} State", value);
+
                 _state?.Dispose();
                 _state = value;
             }

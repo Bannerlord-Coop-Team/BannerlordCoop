@@ -1,10 +1,10 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace Coop.Mod.Patch.MobilePartyPatches
+namespace GameInterface.Services.MobileParties.Patches
 {
     /// <summary>
-    ///     Patch that alter <see cref="TaleWorlds.CampaignSystem.MobileParty.ComputeIsWaiting"/> method so that the player's party is never waiting.
+    ///     Patch that alter <see cref="CampaignSystem.MobileParty.ComputeIsWaiting"/> method so that the player's party is never waiting.
     ///     <para> For more information see <seealso href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/133">issue #133</seealso></para>
     /// </summary>
     [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.ComputeIsWaiting))]
