@@ -185,22 +185,38 @@ namespace Missions.Services
         //creates dictionary containing all items in game and categorized by itemType
         public IDictionary<string, List<ItemObject>> InitializeItemDictionary()
         {
-            List<ItemObject> AllItems = Game.Current.ObjectManager.GetObjectTypeList<ItemObject>().ToList();
+            List<ItemObject> allItems = Game.Current.ObjectManager.GetObjectTypeList<ItemObject>().ToList();
             IDictionary<string, List<ItemObject>> result = new Dictionary<string, List<ItemObject>>();
 
-            for (int i = 0; i <= AllItems.Count - 1; i++)
+            for (int i = 0; i <= allItems.Count - 1; i++)
             {
-                bool KeyExists = result.ContainsKey(AllItems[i].ItemType.ToString());
-                if (!KeyExists)
+                bool keyExists = result.ContainsKey(allItems[i].ItemType.ToString());
+                if (!keyExists)
                 {
-                    result.Add(AllItems[i].ItemType.ToString(), new List<ItemObject>());
+                    result.Add(allItems[i].ItemType.ToString(), new List<ItemObject>());
                 }
-                result[AllItems[i].ItemType.ToString()].Add(AllItems[i]);
+                result[allItems[i].ItemType.ToString()].Add(allItems[i]);
 
             }
 
             return result;
 
+        }
+
+        //creates a loadout for weapons
+        public List<string> GenerateWeaponLoadout()
+        {
+            var random = new Random();
+            List<List<string>> weaponLoadouts = new List<List<string>>();
+            //you can add more loadouts by copying the line below and changing the string values in the brackets
+            //weapon itemType include: OneHandedWeapon, TwoHandedWeapon, Polearm, Thrown, Bow, Arrows, Crossbow, Bolts, Shield
+            weaponLoadouts.Add(new List<string> { "Bow", "Arrows", "Thrown" });
+            weaponLoadouts.Add(new List<string> { "TwoHandedWeapon" });
+            weaponLoadouts.Add(new List<string> { "Polearm" });
+            weaponLoadouts.Add(new List<string> { "OneHandedWeapon", "Thrown" });
+            weaponLoadouts.Add(new List<string> { "OneHandedWeapon", "Shield" });
+
+            return weaponLoadouts[random.Next(0, weaponLoadouts.Count - 1)];
         }
 
         //selects a random item according to the loadout
@@ -217,23 +233,7 @@ namespace Missions.Services
             return result;
         }
 
-        //creates a loadout for weapons
-        public List<string> GenerateWeaponLoadout()
-        {
-            var random = new Random();
-            List<List<string>> weaponLoadouts = new List<List<string>>();
-            //you can add more loadouts by copying the line below and changing the string values in the brackets
-            //weapon itemType include: OneHandedWeapon, TwoHandedWeapon, Polearm, Thrown, Bow, Arrows, Crossbow, Bolts, Shield
-            weaponLoadouts.Add(new List<string> { "Bow", "Arrows", "Thrown"});
-            weaponLoadouts.Add(new List<string> { "TwoHandedWeapon" });
-            weaponLoadouts.Add(new List<string> { "Polearm" });
-            weaponLoadouts.Add(new List<string> { "OneHandedWeapon", "Thrown" });
-            weaponLoadouts.Add(new List<string> { "OneHandedWeapon", "Shield" });
-
-            return weaponLoadouts[random.Next(0, weaponLoadouts.Count - 1)];
-        }
-
-        //casts itemObjects to EquipmentElement
+        //adds the weapon to equipment
         public void AddWeaponsToEquipment(List<EquipmentElement> weaponLoadout, Equipment equipment)
         {
 
@@ -243,7 +243,7 @@ namespace Missions.Services
             }
         }
 
-        //casts itemObjects to EquipmentElement
+        //adds the armor to equipment
         public void AddArmorToEquipment(List<EquipmentElement> armorLoadout, Equipment equipment)
         {
             equipment.AddEquipmentToSlotWithoutAgent(EquipmentIndex.Head, armorLoadout[0]);
@@ -253,7 +253,7 @@ namespace Missions.Services
             equipment.AddEquipmentToSlotWithoutAgent(EquipmentIndex.Cape, armorLoadout[4]);
         }
 
-        //casts itemObjects to EquipmentElement
+        //adds the horse and horseharness to equipment
         public void AddHorseToEquipment(List<EquipmentElement> horseLoadout, Equipment equipment)
         {
             equipment.AddEquipmentToSlotWithoutAgent(EquipmentIndex.Horse, horseLoadout[0]);
