@@ -5,6 +5,7 @@ using Missions.Services.Agents.Extensions;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
@@ -45,16 +46,16 @@ namespace Missions.Services.Network
         private static INetworkAgentRegistry _instance;
 
         public IReadOnlyDictionary<Agent, Guid> AgentToId => m_AgentToId;
-        private readonly Dictionary<Agent, Guid> m_AgentToId = new Dictionary<Agent, Guid>();
+        private readonly ConcurrentDictionary<Agent, Guid> m_AgentToId = new ConcurrentDictionary<Agent, Guid>();
 
         public IReadOnlyDictionary<Guid, Agent> ControlledAgents => m_ControlledAgents;
-        private readonly Dictionary<Guid, Agent> m_ControlledAgents = new Dictionary<Guid, Agent>();
+        private readonly ConcurrentDictionary<Guid, Agent> m_ControlledAgents = new ConcurrentDictionary<Guid, Agent>();
 
         public IReadOnlyDictionary<Guid, Agent> PlayerAgents => m_PlayerAgents;
-        private readonly Dictionary<Guid, Agent> m_PlayerAgents = new Dictionary<Guid, Agent>();
+        private readonly ConcurrentDictionary<Guid, Agent> m_PlayerAgents = new ConcurrentDictionary<Guid, Agent>();
 
         public IReadOnlyDictionary<NetPeer, AgentGroupController> OtherAgents => m_OtherAgents;
-        private readonly Dictionary<NetPeer, AgentGroupController> m_OtherAgents = new Dictionary<NetPeer, AgentGroupController>();
+        private readonly ConcurrentDictionary<NetPeer, AgentGroupController> m_OtherAgents = new ConcurrentDictionary<NetPeer, AgentGroupController>();
         private readonly IMessageBroker _messageBroker;
 
         public NetworkAgentRegistry(IMessageBroker messageBroker)
@@ -78,7 +79,7 @@ namespace Missions.Services.Network
                 Agent agent = group.RemoveAgent(agentId);
                 if (agent != null)
                 {
-                    var result = m_AgentToId.Remove(agent);
+                    var result = m_AgentToId.TryRemove(agent, out _);
                     RemovePlayerAgent(agentId);
 
                     return result;
@@ -95,8 +96,8 @@ namespace Missions.Services.Network
             if (m_AgentToId.ContainsKey(agent)) return false;
             if (m_ControlledAgents.ContainsKey(agentId)) return false;
 
-            m_ControlledAgents.Add(agentId, agent);
-            m_AgentToId.Add(agent, agentId);
+            m_ControlledAgents.TryAdd(agentId, agent);
+            m_AgentToId.TryAdd(agent, agentId);
 
             return true;
         }
@@ -109,14 +110,14 @@ namespace Missions.Services.Network
                 if (controller.Contains(agentId)) return false;
 
                 controller.AddAgent(agentId, agent);
-                m_AgentToId.Add(agent, agentId);
+                m_AgentToId.TryAdd(agent, agentId);
             }
             else
             {
                 AgentGroupController newGroupController = new AgentGroupController();
                 newGroupController.AddAgent(agentId, agent);
-                m_AgentToId.Add(agent, agentId);
-                m_OtherAgents.Add(peer, newGroupController);
+                m_AgentToId.TryAdd(agent, agentId);
+                m_OtherAgents.TryAdd(peer, newGroupController);
             }
 
             return true;
@@ -127,7 +128,7 @@ namespace Missions.Services.Network
             if (RegisterControlledAgent(agentId, agent) == false) return false;
             if (m_PlayerAgents.ContainsKey(agentId)) return false;
 
-            m_PlayerAgents.Add(agentId, agent);
+            m_PlayerAgents.TryAdd(agentId, agent);
 
             return true;
         }
@@ -137,7 +138,7 @@ namespace Missions.Services.Network
             if (RegisterNetworkControlledAgent(peer, agentId, agent) == false) return false;
             if (m_PlayerAgents.ContainsKey(agentId)) return false;
             
-            m_PlayerAgents.Add(agentId, agent);
+            m_PlayerAgents.TryAdd(agentId, agent);
 
             return true;
         }
@@ -146,14 +147,14 @@ namespace Missions.Services.Network
         {
             if (m_ControlledAgents.TryGetValue(agentId, out Agent agent))
             {
-                return m_AgentToId.Remove(agent);
+                return m_AgentToId.TryRemove(agent, out _);
             }
             return false;
         }
 
         public bool RemovePlayerAgent(Guid agentId)
         {
-            return m_PlayerAgents.Remove(agentId);
+            return m_PlayerAgents.TryRemove(agentId, out _);
         }
 
         public bool RemovePeer(NetPeer peer)
@@ -163,13 +164,13 @@ namespace Missions.Services.Network
             {
                 result &= controller.ControlledAgents.All(kvp => 
                 {
-                    var innerResult = m_AgentToId.Remove(kvp.Value);
+                    var innerResult = m_AgentToId.TryRemove(kvp.Value, out _);
 
                     RemovePlayerAgent(kvp.Key);
 
                     return innerResult;
                 });
-                result &= m_OtherAgents.Remove(peer);
+                result &= m_OtherAgents.TryRemove(peer, out _);
             }
             else
             {
