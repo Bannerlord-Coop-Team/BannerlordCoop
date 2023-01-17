@@ -1,9 +1,12 @@
 ﻿using Common;
+using Common.Logging;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
 using Coop.UI;
 using HarmonyLib;
+using Serilog;
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.Core;
@@ -17,7 +20,7 @@ using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop
 {
-    internal class Main : NoHarmonyLoader
+    internal class CoopMod : NoHarmonyLoader
     {
         // Test Symbols
         public static readonly bool TESTING_ENABLED = true;
@@ -32,7 +35,9 @@ namespace Coop
 
         public static InitialStateOption JoinCoopGame;
 
-        public Main()
+        private static ILogger Logger;
+
+        public CoopMod()
         {
             MBDebug.DisableLogging = false;
 
@@ -41,7 +46,49 @@ namespace Coop
 
         private static string ClientServerModeMessage = "";
 
-        public override void NoHarmonyInit() { }
+        private bool isServer = false;
+        public override void NoHarmonyInit() 
+        {
+            var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
+            
+            if (args.Contains("/server"))
+            {
+                isServer = true;
+            }
+            else if (args.Contains("/client"))
+            {
+                isServer = false;
+            }
+
+            SetupLogging();
+        }
+
+        private void SetupLogging()
+        {
+            if (System.Diagnostics.Debugger.IsAttached)
+            {
+                var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}";
+
+                var filePostfix = isServer ? "server" : "client";
+                var filePath = $"Coop_{filePostfix}.log";
+
+                try
+                {
+                    // Clear old filepath
+                    File.Delete(filePath);
+                } 
+                catch(IOException) { }
+
+                LogManager.Configuration
+                    .Enrich.WithProcessId()
+                    .WriteTo.Debug(outputTemplate: outputTemplate)
+                    .WriteTo.File(filePath, outputTemplate: outputTemplate)
+                    .MinimumLevel.Verbose();
+            }
+
+            Logger = LogManager.GetLogger<CoopMod>();
+            Logger.Verbose("Coop Mod Module Started");
+        }
 
         public override void NoHarmonyLoad()
         {
@@ -58,25 +105,10 @@ namespace Coop
                                 "_splashScreenPlayed",
                                 BindingFlags.Instance | BindingFlags.NonPublic)
                             .SetValue(Module.CurrentModule, true);
-#endif
-
-
-            var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
-#if DEBUG
-            bool isServer = false;
-            if (args.Contains("/server"))
-            {
-                isServer = true;
-            }
-            else if (args.Contains("/client"))
-            {
-                isServer = false;
-            }
-
 #else
-                        ScreenManager.PushScreen(
-                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                                new object[] { }));
+            ScreenManager.PushScreen(
+                ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                    new object[] { }));
 #endif
             #region ButtonAssignment
             CoopCampaign =
@@ -89,17 +121,14 @@ namespace Coop
 #if DEBUG
                         string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
-                        if (args.Contains("/server"))
+                        if (isServer)
                         {
                             Coop.StartAsServer();
                         }
-                        else if (args.Contains("/client"))
+                        else
                         {
                             Coop.StartAsClient();
                         }
-
-
-
 #else
                         ScreenManager.PushScreen(
                             ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
@@ -154,7 +183,9 @@ namespace Coop
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             Exception ex = (Exception)e.ExceptionObject;
-            //Logger.Fatal(ex, "Unhandled exception");
+            Logger.Fatal(ex, "Unhandled exception");
+            Logger.Fatal(ex.StackTrace);
+            Serilog.Log.CloseAndFlush();
         }
 
         internal static bool DisableIntroVideo = true;

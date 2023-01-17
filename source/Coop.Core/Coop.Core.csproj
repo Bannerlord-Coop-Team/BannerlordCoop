@@ -154,7 +154,6 @@
     <Compile Include="Communication\PacketHandlers\IPacketHandler.cs" />
     <Compile Include="Communication\PacketHandlers\IPacketManager.cs" />
     <Compile Include="Communication\PacketHandlers\PacketManager.cs" />
-    <Compile Include="Configuration\INetworkConfiguration.cs" />
     <Compile Include="Configuration\NetworkConfiguration.cs" />
     <Compile Include="CoopartiveMultiplayerExperience.cs" />
     <Compile Include="Client\ClientLogic.cs" />

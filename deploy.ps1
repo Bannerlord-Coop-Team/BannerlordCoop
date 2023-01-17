@@ -30,6 +30,7 @@ Write-Output $config
 # write SubModule.xml
 $subModuleContent = Get-Content -path $TemplateDir\SubModule.xml -Raw
 $subModuleContent = $subModuleContent.replace('${name}', $config.name)
+$subModuleContent = $subModuleContent.replace('${main_class}', $config.main_class)
 $subModuleContent = $subModuleContent.replace('${version}', $config.version)
 $subModuleContent = $subModuleContent.replace('${game_version}', $config.game_version)
 $subModuleContent | Out-File -Encoding utf8 -FilePath $DeployDir\SubModule.xml

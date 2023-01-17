@@ -12,7 +12,17 @@ namespace Coop.Core.Server.Connections
     public class ConnectionLogic : IConnectionLogic
     {
         private readonly ILogger Logger = LogManager.GetLogger<ConnectionLogic>();
-        public IConnectionState State { get; set; }
+        public IConnectionState State 
+        {
+            get { return _state; }
+            set
+            {
+                Logger.Debug("Client is changing to {state} State", value);
+
+                _state = value;
+            }
+        }
+        private IConnectionState _state;
 
         public ConnectionLogic()
         {

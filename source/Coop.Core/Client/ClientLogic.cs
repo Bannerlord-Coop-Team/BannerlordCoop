@@ -33,6 +33,8 @@ namespace Coop.Core.Client
             get { return _state; }
             set 
             {
+                Logger.Debug("Client is changing to {state} State", value);
+
                 _state?.Dispose();
                 _state = value;
             } 

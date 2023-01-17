@@ -12,6 +12,7 @@ using System.Linq;
 using Coop.Core.Communication.Network;
 using Coop.Core.Server.States;
 using Coop.Core.Server.Connections.Messages;
+using System.Configuration;
 
 namespace Coop.Core.Server
 {
@@ -78,7 +79,7 @@ namespace Coop.Core.Server
 
         public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
         {
-            throw new NotImplementedException();
+
         }
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
@@ -112,7 +113,7 @@ namespace Coop.Core.Server
 
         public override void Start()
         {
-            netManager.Start();
+            netManager.Start(Configuration.Port);
         }
 
         public override void Stop()

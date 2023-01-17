@@ -64,7 +64,7 @@ namespace Coop.Core.Client
 
         public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
         {
-            throw new NotImplementedException();
+            
         }
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
