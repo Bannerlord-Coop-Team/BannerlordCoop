@@ -71,7 +71,7 @@ namespace Missions.Services.Network
         private void SendJoinInfo(NetPeer peer)
         {
             Logger.Debug("Sending join request");
-            _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
+            _agentRegistry.RegisterPlayerAgent(_playerId, Agent.Main);
 
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
             MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position);
@@ -96,7 +96,7 @@ namespace Missions.Services.Network
                 joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
             // TODO remove test code
             Agent newAgent = MissionTestGameManager.SpawnAgent(startingPos, joinInfo.CharacterObject);
-            _agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
+            _agentRegistry.RegisterNetworkPlayerAgent(netPeer, newAgentId, newAgent);
         }
     }
 }

@@ -17,7 +17,7 @@ namespace Missions.Services.Agents.Patches
     {
         public static bool Prefix(ref Agent userAgent, ref Agent agent)
         {
-            if (!agent.IsNetworkAgent())
+            if (!agent.IsPlayerAgent())
             {
                 ProcessSentencePatch.SetInteractedAgents(null, null);
                 return true;
