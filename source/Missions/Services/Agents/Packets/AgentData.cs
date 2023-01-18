@@ -35,6 +35,24 @@ namespace Missions.Services.Agents.Packets
             }
         }
 
+        public AgentData(
+            Vec3 position,
+            Vec2 movementDirection,
+            Vec3 lookDirection,
+            Vec2 inputVector,
+            AgentEquipmentData agentEquipment,
+            AgentActionData agentActionData,
+            AgentMountData agentMountData)
+        {
+            Position = position;
+            MovementDirection = movementDirection;
+            LookDirection = lookDirection;
+            InputVector = inputVector;
+            AgentEquipment = agentEquipment;
+            ActionData = agentActionData;
+            MountData = agentMountData;
+        }
+
         public void Apply(Agent agent)
         {
             // if the player is dead, dont sync anything
@@ -83,7 +101,7 @@ namespace Missions.Services.Agents.Packets
         [ProtoMember(5)]
         public AgentEquipmentData AgentEquipment { get; }
         [ProtoMember(6)]
-        public AgentActionData ActionData { get; }
+        public AgentActionData ActionData { get;}
         [ProtoMember(7)]
         public AgentMountData MountData { get; }
     }
