@@ -5,32 +5,51 @@ using System.Net.Sockets;
 using Common.Messaging;
 using Coop.Core.Server.Connections;
 using Coop.Core.Configuration;
+using Coop.Core.Communication.PacketHandlers;
+using Common.Serialization;
+using LiteNetLib.Utils;
+using System.Linq;
+using Coop.Core.Communication.Network;
+using Coop.Core.Server.States;
+using Coop.Core.Server.Connections.Messages;
+using System.Configuration;
 
 namespace Coop.Core.Server
 {
-    public interface ICoopServer : ICoopNetwork, INatPunchListener, IDisposable
+    public interface ICoopServer : ICoopNetwork, INatPunchListener, INetEventListener, IDisposable
     {
     }
 
-    public class CoopServer : ICoopServer
+    public class CoopServer : CoopNetworkBase, ICoopServer
     {
-        private readonly NetManager netManager;
-        private readonly INetworkConfiguration configuration;
-        private readonly IMessageBroker messageBroker;
+        public override int Priority => 0;
 
-        public CoopServer(INetworkConfiguration configuration, IMessageBroker messageBroker)
+        public override INetworkConfiguration Configuration { get; }
+
+        private readonly IMessageBroker messageBroker;
+        private readonly IPacketManager packetManager;
+        private readonly IClientStateOrchestrator clientOrchestrator;
+        private readonly NetManager netManager;
+
+        public CoopServer(
+            INetworkConfiguration configuration, 
+            IMessageBroker messageBroker,
+            IPacketManager packetManager,
+            IClientStateOrchestrator clientOrchestrator)
         {
             // Dependancy assignment
-            this.netManager = new NetManager(this);
-            this.configuration = configuration;
+            Configuration = configuration;
             this.messageBroker = messageBroker;
+            this.packetManager = packetManager;
+            this.clientOrchestrator = clientOrchestrator;
+
+            // TODO add configuration
+            netManager = new NetManager(this);
 
             // Netmanager initialization
             netManager.NatPunchEnabled = true;
             netManager.NatPunchModule.Init(this);
         }
-
-        public int Priority => 0;
 
         public void Dispose()
         {
@@ -60,11 +79,13 @@ namespace Coop.Core.Server
 
         public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
         {
-            throw new NotImplementedException();
+
         }
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
+            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
+            packetManager.HandleRecieve(peer, packet);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -74,30 +95,40 @@ namespace Coop.Core.Server
 
         public void OnPeerConnected(NetPeer peer)
         {
-            ClientConnectedMessage message = new ClientConnectedMessage(peer);
+            PlayerConnected message = new PlayerConnected(peer);
             messageBroker.Publish(this, message);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            ClientDisconnectedMessage message = new ClientDisconnectedMessage(peer, disconnectInfo);
+            PlayerDisconnected message = new PlayerDisconnected(peer, disconnectInfo);
             messageBroker.Publish(this, message);
         }
 
-        public void Start()
-        {
-            netManager.Start();
-        }
-
-        public void Stop()
-        {
-            netManager?.Stop();
-        }
-
-        public void Update(TimeSpan frameTime)
+        public override void Update(TimeSpan frameTime)
         {
             netManager.PollEvents();
             netManager.NatPunchModule.PollEvents();
+        }
+
+        public override void Start()
+        {
+            netManager.Start(Configuration.Port);
+        }
+
+        public override void Stop()
+        {
+            netManager.Stop();
+        }
+
+        public override void SendAll(IPacket packet)
+        {
+            SendAll(netManager, packet);
+        }
+
+        public override void SendAllBut(NetPeer netPeer, IPacket packet)
+        {
+            SendAllBut(netManager, netPeer, packet);
         }
     }
 }

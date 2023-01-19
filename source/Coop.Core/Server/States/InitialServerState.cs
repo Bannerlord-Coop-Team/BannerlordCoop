@@ -8,15 +8,15 @@ namespace Coop.Core.Server.States
     {
         public InitialServerState(IServerLogic context, IMessageBroker messageBroker) : base(context, messageBroker)
         {
-            MessageBroker.Subscribe<GameLoaded>(Handle);
+            MessageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<GameLoaded>(Handle);
+            MessageBroker.Unsubscribe<GameLoaded>(Handle_GameLoaded);
         }
 
-        private void Handle(MessagePayload<GameLoaded> payload)
+        private void Handle_GameLoaded(MessagePayload<GameLoaded> payload)
         {
             // Start server when game is fully loaded
             Logic.NetworkServer.Start();

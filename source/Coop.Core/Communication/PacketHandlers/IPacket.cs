@@ -6,13 +6,14 @@ namespace Coop.Core.Communication.PacketHandlers
     {
         Invalid,
         PacketWrapper,
-        Message,
+        Event,
         Example,
+        Test,
     }
 
     public interface IPacket
     {
-        PacketType Type { get; }
+        PacketType PacketType { get; }
         DeliveryMethod DeliveryMethod { get; }
     }
 }

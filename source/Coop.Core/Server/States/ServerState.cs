@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using System;
 
 namespace Coop.Core.Server.States
 {
@@ -16,6 +15,11 @@ namespace Coop.Core.Server.States
         protected ServerStateBase(IServerLogic logic)
         {
             Logic = logic;
+        }
+
+        ~ServerStateBase()
+        {
+            Dispose();
         }
 
         public abstract void Dispose();

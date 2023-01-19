@@ -3,13 +3,22 @@ using Coop.Mod;
 
 namespace Coop.Core.Configuration
 {
+    public interface INetworkConfiguration
+    {
+        string Address { get; }
+        int Port { get; }
+        string Token { get; }
+        string P2PToken { get; }
+    }
+
     public class NetworkConfiguration : INetworkConfiguration
     {
-        public string Address => throw new NotImplementedException();
+        public string Address => "localhost";
 
-        public int Port => throw new NotImplementedException();
+        public int Port => 4200;
 
-        public string Token => throw new NotImplementedException();
+        // TODO find better token
+        public string Token => "TempToken";
 
         public string P2PToken => throw new NotImplementedException();
 

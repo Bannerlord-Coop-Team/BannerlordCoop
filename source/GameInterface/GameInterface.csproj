@@ -264,6 +264,7 @@
     <Compile Include="Data\GameSaveData.cs" />
     <Compile Include="Data\ICharacterCreationData.cs" />
     <Compile Include="Data\IGameSaveData.cs" />
+    <Compile Include="Exceptions\Exceptions.cs" />
     <Compile Include="Extentions\CampaignObjectManagerExtentions.cs" />
     <Compile Include="Extentions\CampaignTimeExtensions.cs" />
     <Compile Include="Extentions\MobilePartyExtensions.cs" />
@@ -275,25 +276,24 @@
     <Compile Include="Helpers\SaveGameData.cs" />
     <Compile Include="Helpers\ISaveLoadHelper.cs" />
     <Compile Include="IGameInterface.cs" />
-    <Compile Include="Patch\CampaignPatches\CompanionsCampaignBehaviorPatches.cs" />
-    <Compile Include="Patch\CampaignPatches\SetTimeSpeedPatch.cs" />
-    <Compile Include="Patch\CampaignPatches\TimeControlModePatch.cs" />
-    <Compile Include="Patch\Debugging.cs" />
-    <Compile Include="Patch\Exceptions.cs" />
-    <Compile Include="Patch\GameStates\CharacterCreationPatch.cs" />
-    <Compile Include="Patch\GameStates\GameLoadedPatch.cs" />
-    <Compile Include="Patch\GameStates\MainMenuPatch.cs" />
-    <Compile Include="Patch\Hero\HeroPatches.cs" />
-    <Compile Include="Patch\MobilePartyPatches\ComputeIsWaitingPatch.cs" />
-    <Compile Include="Patch\MobilePartyPatches\DisablePartyDecisionMaking.cs" />
-    <Compile Include="Patch\Party\GarrisonTroopsCampaignBehavior.cs" />
-    <Compile Include="Patch\Party\PartiesBuyFoodCampaignBehavior.cs" />
-    <Compile Include="Patch\Party\PartiesBuyHorseCampaignBehavior.cs" />
-    <Compile Include="Patch\Party\PartiesSellLootCampaignBehavior.cs" />
-    <Compile Include="Patch\Party\PartiesSellPrisonerCampaignBehavior.cs" />
-    <Compile Include="Patch\Party\RecruitmentCampaignBehavior.cs" />
-    <Compile Include="Patch\TemporaryTypesPatch.cs" />
-    <Compile Include="Patch\World\SaveManager.cs" />
+    <Compile Include="Services\CampaignService\Patches\CompanionsCampaignBehaviorPatches.cs" />
+    <Compile Include="Services\CampaignService\Patches\SetTimeSpeedPatch.cs" />
+    <Compile Include="Services\CampaignService\Patches\TimeControlModePatch.cs" />
+    <Compile Include="Services\Misc\Patches\Debugging.cs" />
+    <Compile Include="Services\GameState\Patches\CharacterCreationPatch.cs" />
+    <Compile Include="Services\GameState\Patches\GameLoadedPatch.cs" />
+    <Compile Include="Services\GameState\Patches\MainMenuPatch.cs" />
+    <Compile Include="Services\Heroes\Patches\HeroPatches.cs" />
+    <Compile Include="Services\MobileParties\Patches\ComputeIsWaitingPatch.cs" />
+    <Compile Include="Services\MobileParties\Patches\DisablePartyDecisionMaking.cs" />
+    <Compile Include="Services\MobileParties\Patches\GarrisonTroopsCampaignBehavior.cs" />
+    <Compile Include="Services\MobileParties\Patches\PartiesBuyFoodCampaignBehavior.cs" />
+    <Compile Include="Services\MobileParties\Patches\PartiesBuyHorseCampaignBehavior.cs" />
+    <Compile Include="Services\MobileParties\Patches\PartiesSellLootCampaignBehavior.cs" />
+    <Compile Include="Services\MobileParties\Patches\PartiesSellPrisonerCampaignBehavior.cs" />
+    <Compile Include="Services\MobileParties\Patches\RecruitmentCampaignBehavior.cs" />
+    <Compile Include="Services\Misc\Patches\TemporaryTypesPatch.cs" />
+    <Compile Include="Services\Save\Patches\SaveManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Helpers\SaveLoadHelper.cs" />
     <Compile Include="Serialization\BinaryPackageBase.cs" />
@@ -390,15 +390,12 @@
     <Compile Include="Services\GameDebug\Handlers\SkipCharacterCreationHandler.cs" />
     <Compile Include="Services\GameDebug\Interfaces\CharacterCreationInterface.cs" />
     <Compile Include="Services\GameDebug\Interfaces\GameDebugInterface.cs" />
-    <Compile Include="Services\GameDebug\Interfaces\ICharacterCreationInterface.cs" />
-    <Compile Include="Services\GameDebug\Interfaces\IGameDebugInterface.cs" />
     <Compile Include="Services\GameDebug\Messages\CharacterCreationStarted.cs" />
     <Compile Include="Services\GameDebug\Messages\StartDebugGame.cs" />
     <Compile Include="Services\GameState\Handlers\EnterCampaignHandler.cs" />
     <Compile Include="Services\GameState\Handlers\EnterMainMenuHandler.cs" />
     <Compile Include="Services\MobileParties\Handlers\RemoveMainPartyHandler.cs" />
     <Compile Include="Services\GameState\Handlers\StartCharacterCreationHandler.cs" />
-    <Compile Include="Services\MobileParties\Interfaces\IMainPartyInterface.cs" />
     <Compile Include="Services\MobileParties\Interfaces\MainPartyInterface.cs" />
     <Compile Include="Services\MobileParties\Messages\RemoveMainParty.cs" />
     <Compile Include="Services\IGameAbstraction.cs" />
@@ -411,7 +408,6 @@
     <Compile Include="Services\IServiceModule.cs" />
     <Compile Include="Services\ServiceModule.cs" />
     <Compile Include="Services\GameState\Interfaces\GameStateInterface.cs" />
-    <Compile Include="Services\GameState\Interfaces\IGameStateInterface.cs" />
     <Compile Include="Services\GameState\Messages\EnterMainMenu.cs" />
     <Compile Include="Services\GameState\Messages\GameLoaded.cs" />
     <Compile Include="Services\GameState\Messages\LoadGameSave.cs" />
@@ -424,9 +420,15 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Services\Heros\Handlers\" />
-    <Folder Include="Services\Heros\Interfaces\" />
-    <Folder Include="Services\Heros\Messages\" />
+    <Folder Include="Services\CampaignService\Handlers\" />
+    <Folder Include="Services\CampaignService\Interfaces\" />
+    <Folder Include="Services\CampaignService\Messages\" />
+    <Folder Include="Services\Heroes\Handlers\" />
+    <Folder Include="Services\Heroes\Interfaces\" />
+    <Folder Include="Services\Heroes\Messages\" />
+    <Folder Include="Services\Save\Handlers\" />
+    <Folder Include="Services\Save\Interfaces\" />
+    <Folder Include="Services\Save\Messages\" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">

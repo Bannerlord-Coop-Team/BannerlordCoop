@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Common.Logging;
 using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
@@ -11,75 +12,47 @@ using ProtoBuf;
 
 namespace Coop.Core.Communication.PacketHandlers
 {
-    public enum NetworkDistributionType
-    {
-        Invalid,
-
-    }
-
     public class PacketManager : IPacketManager
     {
-        private readonly NetManager netManager;
-        private readonly IMessageBroker messageBroker;
+        private readonly Dictionary<PacketType, List<IPacketHandler>> packetHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
 
-        private static readonly Dictionary<PacketType, List<IPacketHandler>> packetHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
-
-        public static void RegisterPacketHandler(IPacketHandler handler)
+        public void RegisterPacketHandler(IPacketHandler handler)
         {
-            if (packetHandlers.TryGetValue(handler.PacketType, out var handlers))
+            var handlers = packetHandlers.ContainsKey(handler.PacketType) ?
+                            packetHandlers[handler.PacketType] : new List<IPacketHandler>();
+            if (!handlers.Contains(handler))
             {
-                if (handlers.Contains(handler)) throw new InvalidOperationException($"{handler.GetType()} is already registered.");
                 handlers.Add(handler);
             }
-            else
+            packetHandlers[handler.PacketType] = handlers;
+        }
+
+        public void RemovePacketHandler(IPacketHandler handler)
+        {
+            if (!packetHandlers.ContainsKey(handler.PacketType)) return;
+            var handlers = packetHandlers[handler.PacketType];
+            if (handlers.Contains(handler))
+                handlers.Remove(handler);
+            if (handlers.Count == 0)
+                packetHandlers.Remove(handler.PacketType);
+        }
+
+        public void HandleRecieve(NetPeer peer, IPacket packet)
+        {
+            if (packetHandlers.TryGetValue(packet.PacketType, out var handlers))
             {
-                packetHandlers.Add(handler.PacketType, new List<IPacketHandler> { handler });
+                foreach (var handler in handlers)
+                {
+                    handler.HandlePacket(peer, packet);
+                }
             }
-        }
-
-        public PacketManager(NetManager netManager, IMessageBroker messageBroker)
-        {
-            this.netManager = netManager;
-            this.messageBroker = messageBroker;
-        }
-
-        private void SendAllBut(NetPeer netPeer, IPacket packet)
-        {
-            foreach (NetPeer peer in netManager.ConnectedPeerList.Where(peer => peer != netPeer))
-            {
-                Send(peer, packet);
-            }
-        }
-
-        private void SendAll(IPacket packet)
-        {
-            foreach (NetPeer peer in netManager.ConnectedPeerList)
-            {
-                Send(peer, packet);
-            }
-        }
-
-        private void Send(NetPeer netPeer, IPacket packet)
-        {
-            PacketWrapper wrapper = new PacketWrapper(packet);
-
-            // Put type using writer
-            NetDataWriter writer = new NetDataWriter();
-            writer.Put((int)wrapper.Type);
-
-            // Serialize and put data in writer (with length is important on receive end)
-            byte[] data = ProtoBufSerializer.Serialize(packet);
-            writer.PutBytesWithLength(data);
-
-            // Send data
-            netPeer.Send(writer.Data, wrapper.DeliveryMethod);
         }
     }
 
     [ProtoContract(SkipConstructor = true)]
     internal readonly struct PacketWrapper : IPacket
     {
-        public PacketType Type => PacketType.PacketWrapper;
+        public PacketType PacketType => PacketType.PacketWrapper;
         public DeliveryMethod DeliveryMethod { get; }
 
         [ProtoMember(1)]

@@ -33,20 +33,50 @@ namespace Coop.Tests.Communication
             var container = Bootstrap.InitializeAsServer();
             using var communicator = container.Resolve<IMessageBroker>();
 
+            // We need 2 so the key of ExampleIncomingMessage does not get removed in MessageBroker
             void DelegateHandler(MessagePayload<ExampleIncomingMessage> payload) { }
+            void DelegateHandler2(MessagePayload<ExampleIncomingMessage> payload) { }
             communicator.Subscribe<ExampleIncomingMessage>(DelegateHandler);
-            
+            communicator.Subscribe<ExampleIncomingMessage>(DelegateHandler2);
+
             var subscribers = typeof(MessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
                 ?.GetValue(communicator) as Dictionary<Type, List<Delegate>>;
-            
-            if (subscribers == null)
-                throw new Exception("Subscribers dictionary couldn't not be found.");
 
-            if (subscribers[typeof(ExampleIncomingMessage)].Count != 1)
-                throw new Exception("Subscription failed during the test.");
+            // Ensure subscribers dictionary was initialized
+            Assert.NotNull(subscribers);
+
+            // Ensure ExampleIncomingMessage key has 2 handlers
+            Assert.Equal(2, subscribers[typeof(ExampleIncomingMessage)].Count);
             
             communicator.Unsubscribe<ExampleIncomingMessage>(DelegateHandler);
-            Assert.True(subscribers[typeof(ExampleIncomingMessage)].Count == 0);
+
+            // Ensure ExampleIncomingMessage key now has 1 handler
+            Assert.Single(subscribers[typeof(ExampleIncomingMessage)]);
+        }
+
+        [Fact]
+        public void UnsubscribeAllEvents()
+        {
+            var container = Bootstrap.InitializeAsServer();
+            using var communicator = container.Resolve<IMessageBroker>();
+
+            // Add handler to message broker
+            void DelegateHandler(MessagePayload<ExampleIncomingMessage> payload) { }
+            communicator.Subscribe<ExampleIncomingMessage>(DelegateHandler);
+
+            var subscribers = typeof(MessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.GetValue(communicator) as Dictionary<Type, List<Delegate>>;
+
+            // Ensure subscribers dictionary was initialized
+            Assert.NotNull(subscribers);
+
+            // Ensure ExampleIncomingMessage key has 2 handlers
+            Assert.Single(subscribers[typeof(ExampleIncomingMessage)]);
+
+            communicator.Unsubscribe<ExampleIncomingMessage>(DelegateHandler);
+
+            // Ensure ExampleIncomingMessage key is now removed
+            Assert.Empty(subscribers);
         }
 
         [Fact]

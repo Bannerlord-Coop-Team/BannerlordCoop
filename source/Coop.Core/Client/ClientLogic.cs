@@ -1,21 +1,40 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.LogicStates;
+using Common.Messaging;
 using Coop.Core.Client.States;
-using Coop.Core.Debugging.Logger;
+using Coop.Core.Communication.PacketHandlers;
+using Serilog;
 
 namespace Coop.Core.Client
 {
     /// <summary>
     /// Top level client-side state machine logic orchestrator
     /// </summary>
+    public interface IClientLogic : ILogic, IClientState
+    {
+        /// <summary>
+        /// Client-side state
+        /// </summary>
+        IClientState State { get; set; }
+
+        /// <summary>
+        /// Networking Client for Client-side
+        /// </summary>
+        ICoopClient NetworkClient { get; }
+    }
+
+    /// <inheritdoc cref="IClientLogic"/>
     public class ClientLogic : IClientLogic
     {
-        public ILogger Logger { get; }
+        private readonly ILogger Logger = LogManager.GetLogger<EventPacketHandler>();
         public ICoopClient NetworkClient { get; }
         public IClientState State 
         {
             get { return _state; }
             set 
             {
+                Logger.Debug("Client is changing to {state} State", value);
+
                 _state?.Dispose();
                 _state = value;
             } 
@@ -24,11 +43,9 @@ namespace Coop.Core.Client
         private IClientState _state;
 
         public ClientLogic(
-            ILogger logger,
             ICoopClient networkClient, 
             IMessageBroker messageBroker)
         {
-            Logger = logger;
             NetworkClient = networkClient;
             State = new MainMenuState(this, messageBroker);
         }
@@ -50,7 +67,6 @@ namespace Coop.Core.Client
 
         public void Connect()
         {
-
             State.Connect();
         }
 

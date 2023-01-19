@@ -2,7 +2,6 @@
 using Common.Messaging;
 using Coop.Core.Communication.PacketHandlers;
 using Coop.Core.Configuration;
-using Coop.Core.Debugging.Logger;
 using Coop.Core.Server.Connections;
 using GameInterface;
 
@@ -12,10 +11,6 @@ namespace Coop.Core
     {
         protected override void Load(ContainerBuilder builder)
         {
-            #region Logging
-            builder.RegisterType<NLogLogger>().As<ILogger>().SingleInstance();
-            #endregion
-
             #region Network
             builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().OwnedByLifetimeScope();
             #endregion

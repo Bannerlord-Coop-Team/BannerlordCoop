@@ -31,7 +31,7 @@ namespace Coop.Core.Communication.PacketHandlers
     public readonly struct ExamplePacket : IPacket
     {
         [ProtoMember(1)]
-        public PacketType Type => PacketType.Example;
+        public PacketType PacketType => PacketType.Example;
         [ProtoMember(2)]
         public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableSequenced;
         [ProtoMember(3)]

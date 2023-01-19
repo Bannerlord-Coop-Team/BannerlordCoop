@@ -1,5 +1,15 @@
 ﻿using Autofac;
+using Common.Messaging;
+using Coop.Core.Communication.PacketHandlers;
+using Coop.Core.Server;
+using LiteNetLib;
+using System.Collections.Generic;
+using System.Reflection;
+using System;
 using Xunit;
+using Moq;
+using LiteNetLib.Utils;
+using Common.Serialization;
 
 namespace Coop.Tests.Communication
 {
@@ -8,34 +18,112 @@ namespace Coop.Tests.Communication
         [Fact]
         public void RegisterOnePacketHandler()
         {
-            var container = Bootstrap.InitializeAsServer();
-            //using var packetManager = container.Resolve<IPacketManager>();
+            var packetManager = new PacketManager();
+            var packetHandler = new TestPacketHandler();
 
-            Assert.Fail("To implement.");
+            packetManager.RegisterPacketHandler(packetHandler);
+
+            var registeredHandlers = typeof(PacketManager).GetField("packetHandlers", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.GetValue(packetManager) as Dictionary<PacketType, List<IPacketHandler>>;
+
+            Assert.NotEmpty(registeredHandlers);
+            Assert.True(registeredHandlers.ContainsKey(packetHandler.PacketType));
+
+            Assert.Single(registeredHandlers);
+            Assert.Single(registeredHandlers[packetHandler.PacketType]);
         }
 
         [Fact]
         public void RemoveOnePacketHandler()
         {
-            Assert.Fail("To implement.");
+            var packetManager = new PacketManager();
+            var packetHandler = new TestPacketHandler();
+            var packetHandler2 = new TestPacketHandler();
+
+            packetManager.RegisterPacketHandler(packetHandler);
+            packetManager.RegisterPacketHandler(packetHandler2);
+
+            var registeredHandlers = typeof(PacketManager).GetField("packetHandlers", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.GetValue(packetManager) as Dictionary<PacketType, List<IPacketHandler>>;
+
+            Assert.NotEmpty(registeredHandlers);
+            Assert.True(registeredHandlers.ContainsKey(packetHandler.PacketType));
+            Assert.Equal(2, registeredHandlers[packetHandler.PacketType].Count);
+
+            packetManager.RemovePacketHandler(packetHandler);
+
+            Assert.Single(registeredHandlers);
+            Assert.Single(registeredHandlers[packetHandler.PacketType]);
         }
 
         [Fact]
-        public void HandleOnePacket()
+        public void RemoveAllPacketHandler()
         {
-            Assert.Fail("To implement.");
+            var packetManager = new PacketManager();
+            var packetHandler = new TestPacketHandler();
+
+            packetManager.RegisterPacketHandler(packetHandler);
+
+            var registeredHandlers = typeof(PacketManager).GetField("packetHandlers", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.GetValue(packetManager) as Dictionary<PacketType, List<IPacketHandler>>;
+
+            packetManager.RemovePacketHandler(packetHandler);
+
+            Assert.Empty(registeredHandlers);
         }
 
         [Fact]
-        public void SendOnePacket()
+        public void HandlePacket()
         {
-            Assert.Fail("To implement.");
-        }
+            var handleCounter = 0;
+            var packetHandler = new Mock<IPacketHandler>();
+            packetHandler.Setup(m => m.HandlePacket(It.IsAny<NetPeer>(), It.IsAny<IPacket>()))
+                         .Callback(() => handleCounter++);
+            packetHandler.Setup(m => m.PacketType).Returns(() => PacketType.Test);
 
-        [Fact]
-        public void SendOnePacketExcept()
-        {
-            Assert.Fail("To implement.");
+            var packetManager = new PacketManager();
+
+
+
+            packetManager.RegisterPacketHandler(packetHandler.Object);
+
+            var registeredHandlers = typeof(PacketManager).GetField("packetHandlers", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.GetValue(packetManager) as Dictionary<PacketType, List<IPacketHandler>>;
+
+            Assert.NotEmpty(registeredHandlers);
+            Assert.True(registeredHandlers.ContainsKey(packetHandler.Object.PacketType));
+            Assert.Single(registeredHandlers[packetHandler.Object.PacketType]);
+
+            var packet = new TestPacket();
+
+            Assert.Equal(0, handleCounter);
+
+            packetManager.HandleRecieve(null, packet);
+
+            Assert.Equal(1, handleCounter);
+
+            packetManager.HandleRecieve(null, packet);
+
+            Assert.Equal(2, handleCounter);
         }
+    }
+
+    class TestPacketHandler : IPacketHandler
+    {
+        public PacketType PacketType => PacketType.Test;
+
+        public int HandleCount = 0;
+
+        public void HandlePacket(NetPeer peer, IPacket packet)
+        {
+            HandleCount++;
+        }
+    }
+
+    class TestPacket : IPacket
+    {
+        public PacketType PacketType => PacketType.Test;
+
+        public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
     }
 }

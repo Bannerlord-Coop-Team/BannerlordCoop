@@ -60,14 +60,14 @@
     <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
-    <Reference Include="NLog, Version=5.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
-      <HintPath>..\packages\NLog.5.0.1\lib\net46\NLog.dll</HintPath>
-    </Reference>
     <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
       <HintPath>..\packages\protobuf-net.3.1.17\lib\net461\protobuf-net.dll</HintPath>
     </Reference>
     <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
       <HintPath>..\packages\protobuf-net.Core.3.1.17\lib\net461\protobuf-net.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Serilog, Version=2.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.2.12.0\lib\net47\Serilog.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -109,10 +109,11 @@
   <ItemGroup>
     <Compile Include="Client\Messages\NetworkDisconnected.cs" />
     <Compile Include="Client\Messages\NetworkConnected.cs" />
+    <Compile Include="Communication\Network\CoopNetworkBase.cs" />
+    <Compile Include="Communication\PacketHandlers\EventPacketHandler.cs" />
     <Compile Include="Client\States\CampaignState.cs" />
     <Compile Include="Client\States\CharacterCreationState.cs" />
     <Compile Include="Client\States\ClientStateBase.cs" />
-    <Compile Include="Client\IClientLogic.cs" />
     <Compile Include="Client\States\IClientState.cs" />
     <Compile Include="Client\States\LoadingState.cs" />
     <Compile Include="Client\States\MainMenuState.cs" />
@@ -122,14 +123,30 @@
     <Compile Include="Client\States\ValidateModuleState.cs" />
     <Compile Include="CoopModule.cs" />
     <Compile Include="Server\Connections\Connection.cs" />
-    <Compile Include="Server\Connections\ConnectionManager.cs" />
     <Compile Include="Server\Connections\IConnection.cs" />
-    <Compile Include="Server\Connections\IConnectionManager.cs" />
     <Compile Include="Server\Connections\IConnectionState.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerConnectedCampaign.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerConnectedMission.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerCreatingCharacter.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerDisconnected.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerTransferCharacter.cs" />
+    <Compile Include="Server\Connections\Messages\CharacterResolved.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerConnected.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerLoaded.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerLoading.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerTransitionCampaign.cs" />
+    <Compile Include="Server\Connections\Messages\PlayerTransitionMission.cs" />
+    <Compile Include="Server\Connections\States\CampaignState.cs" />
+    <Compile Include="Server\Connections\States\ConnectionStateBase.cs" />
+    <Compile Include="Server\Connections\ConnectionLogic.cs" />
+    <Compile Include="Server\Connections\ClientStateOrchestrator.cs" />
+    <Compile Include="Server\Connections\States\CreateCharacterState.cs" />
     <Compile Include="Server\Connections\States\InitialConnectionState.cs" />
+    <Compile Include="Server\Connections\States\ResolveCharacterState.cs" />
+    <Compile Include="Server\Connections\States\LoadingState.cs" />
+    <Compile Include="Server\Connections\States\MissionState.cs" />
+    <Compile Include="Server\Connections\States\TransferCharacterState.cs" />
     <Compile Include="Server\Messages\Events\ClientJoinRequested.cs" />
-    <Compile Include="Server\States\ClientJoiningState.cs" />
-    <Compile Include="Server\States\IServerLogic.cs" />
     <Compile Include="Server\ServerModule.cs" />
     <Compile Include="Client\ClientModule.cs" />
     <Compile Include="Communication\PacketHandlers\ExamplePacketHandler.cs" />
@@ -137,11 +154,8 @@
     <Compile Include="Communication\PacketHandlers\IPacketHandler.cs" />
     <Compile Include="Communication\PacketHandlers\IPacketManager.cs" />
     <Compile Include="Communication\PacketHandlers\PacketManager.cs" />
-    <Compile Include="Configuration\INetworkConfiguration.cs" />
     <Compile Include="Configuration\NetworkConfiguration.cs" />
     <Compile Include="CoopartiveMultiplayerExperience.cs" />
-    <Compile Include="Debugging\Logger\ILogger.cs" />
-    <Compile Include="Debugging\Logger\NLogLogger.cs" />
     <Compile Include="Client\ClientLogic.cs" />
     <Compile Include="Client\Config\ClientConfig.cs" />
     <Compile Include="Data\ICoopPlayer.cs" />
@@ -154,7 +168,7 @@
     <Compile Include="Server\Data\ServerData.cs" />
     <Compile Include="Server\States\ServerRunningState.cs" />
     <Compile Include="Server\States\ServerState.cs" />
-    <Compile Include="ICoopNetwork.cs" />
+    <Compile Include="Communication\Network\ICoopNetwork.cs" />
     <Compile Include="GameLoopRunner.cs" />
     <Compile Include="Client\CoopClient.cs" />
     <Compile Include="Server\CoopServer.cs" />
@@ -180,11 +194,7 @@
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Debugging\Commands\" />
-    <Folder Include="Messages\Commands\" />
-    <Folder Include="Messages\Events\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>

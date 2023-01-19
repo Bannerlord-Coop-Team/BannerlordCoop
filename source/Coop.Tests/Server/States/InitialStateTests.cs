@@ -3,6 +3,8 @@ using Moq;
 using Xunit.Abstractions;
 using Xunit;
 using Coop.Core.Server.States;
+using GameInterface.Services.GameState.Messages;
+using Coop.Core.Server;
 
 namespace Coop.Tests.Server.States
 {
@@ -16,12 +18,14 @@ namespace Coop.Tests.Server.States
         public void InitialStateStart()
         {
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
+            Mock<ICoopServer> coopServer = new Mock<ICoopServer>();
             IServerState currentState = new InitialServerState(serverLogic.Object, messageBroker);
             serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
+            serverLogic.Setup(m => m.NetworkServer).Returns(coopServer.Object);
 
             messageBroker.Subscribe<LoadDebugGame>((payload) =>
             {
-                messageBroker.Publish(null, new DebugGameStarted());
+                messageBroker.Publish(null, new GameLoaded());
             });
 
             currentState.Start();

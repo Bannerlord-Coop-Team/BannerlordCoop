@@ -9,6 +9,11 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.GameDebug.Interfaces
 {
+    internal interface ICharacterCreationInterface : IGameAbstraction
+    {
+        void SkipCharacterCreation();
+    }
+
     internal class CharacterCreationInterface : ICharacterCreationInterface
     {
         public void SkipCharacterCreation()

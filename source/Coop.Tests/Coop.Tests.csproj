@@ -51,12 +51,13 @@
     <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="Moq, Version=4.18.0.0, Culture=neutral, PublicKeyToken=69f491c39445e920, processorArchitecture=MSIL">
       <HintPath>..\packages\Moq.4.18.2\lib\net462\Moq.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
-    <Reference Include="NLog, Version=5.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
-      <HintPath>..\packages\NLog.5.0.1\lib\net46\NLog.dll</HintPath>
+    <Reference Include="Serilog, Version=2.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.2.12.0\lib\net47\Serilog.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -96,6 +97,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Autofac\ContainerBuildTests.cs" />
     <Compile Include="Autofac\TestServerModule.cs" />
     <Compile Include="Autofac\TestClientModule.cs" />
     <Compile Include="Bootstrap.cs" />
@@ -110,7 +112,14 @@
     <Compile Include="Communication\CommunicatorMessageBrokerTest.cs" />
     <Compile Include="Communication\PacketManagerTest.cs" />
     <Compile Include="CoopTest.cs" />
-    <Compile Include="Debugging\LoggerTest.cs" />
+    <Compile Include="Server\Connections\States\CampaignStateTests.cs" />
+    <Compile Include="Server\Connections\States\ClientStateOrchestratorTests.cs" />
+    <Compile Include="Server\Connections\States\InitialConnectionStateTests.cs" />
+    <Compile Include="Server\Connections\States\TransferCharacterStateTests.cs" />
+    <Compile Include="Server\Connections\States\CreateCharacterStateTests.cs" />
+    <Compile Include="Server\Connections\States\ResolveCharacterStateTests.cs" />
+    <Compile Include="Server\Connections\States\LoadingStateTests.cs" />
+    <Compile Include="Server\Connections\States\MissionStateTests.cs" />
     <Compile Include="Server\States\InitialStateTests.cs" />
     <Compile Include="Server\States\RunningStateTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -9,6 +9,15 @@ using TaleWorlds.SaveSystem.Load;
 
 namespace GameInterface.Services.GameState.Interfaces
 {
+    internal interface IGameStateInterface : IGameAbstraction
+    {
+        void EnterMainMenu();
+        void StartCharacterCreation();
+        void StartNewGame();
+        void LoadSaveGame(IGameSaveData saveData);
+        IGameSaveData PackageGameSaveData();
+    }
+
     internal class GameStateInterface : IGameStateInterface
     {
         public void EnterMainMenu()

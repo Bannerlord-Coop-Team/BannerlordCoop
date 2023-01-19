@@ -1,14 +1,37 @@
-﻿using Coop.Core.Server.Connections;
+﻿using Common.Messaging;
 
 namespace Coop.Core.Server.Connections.States
 {
-    internal class InitialConnectionState : IConnectionState
+    public class InitialConnectionState : ConnectionStateBase
     {
-        IConnection _connection;
-
-        public InitialConnectionState(IConnection connection)
+        public InitialConnectionState(IConnectionLogic connectionLogic) 
+            : base(connectionLogic)
         {
-            _connection = connection;
+        }
+
+        public override void ResolveCharacter()
+        {
+            ConnectionLogic.State = new ResolveCharacterState(ConnectionLogic);
+        }
+
+        public override void CreateCharacter()
+        {
+        }
+
+        public override void TransferCharacter()
+        {
+        }
+
+        public override void Load()
+        {
+        }
+
+        public override void EnterCampaign()
+        {
+        }
+
+        public override void EnterMission()
+        {
         }
     }
 }

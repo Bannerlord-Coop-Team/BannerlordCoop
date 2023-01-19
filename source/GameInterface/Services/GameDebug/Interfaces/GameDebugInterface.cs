@@ -8,6 +8,11 @@ using TaleWorlds.SaveSystem;
 
 namespace GameInterface.Services.GameDebug.Interfaces
 {
+    internal interface IGameDebugInterface : IGameAbstraction
+    {
+        void LoadDebugGame();
+    }
+
     internal class GameDebugInterface : IGameDebugInterface
     {
         public static readonly string LOAD_GAME = "MP";
@@ -25,6 +30,4 @@ namespace GameInterface.Services.GameDebug.Interfaces
             MouseManager.ShowCursor(false);
         }
     }
-
-
 }

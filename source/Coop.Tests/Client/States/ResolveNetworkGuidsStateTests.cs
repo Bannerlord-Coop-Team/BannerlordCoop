@@ -1,6 +1,5 @@
 ﻿using Coop.Core.Client;
 using Coop.Core.Client.States;
-using Coop.Core.Debugging.Logger;
 using GameInterface.Services.GameState.Messages;
 using Moq;
 using Xunit;
@@ -14,7 +13,7 @@ namespace Coop.Tests.Client.States
         public ResolveNetworkGuidsStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(new Mock<ILogger>().Object, mockCoopClient.Object, messageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, messageBroker);
             clientLogic.State = new ResolveNetworkGuidsState(clientLogic, messageBroker);
         }
 
