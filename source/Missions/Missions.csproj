@@ -138,6 +138,11 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Services\Agents\Messages\ActionDataChanged.cs" />
+    <Compile Include="Services\Agents\Messages\LookDirectionChanged.cs" />
+    <Compile Include="Services\Agents\Messages\MountDataChanged.cs" />
+    <Compile Include="Services\Agents\Messages\Movement.cs" />
+    <Compile Include="Services\Agents\Messages\MovementInputVectorChanged.cs" />
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />
