@@ -107,7 +107,7 @@ namespace Missions.Services.Arena
                 new EquipmentControllerLeaveLogic(),
                 new MissionAgentHandler(location),
                 new CoopMissionNetworkBehavior(_client, MessageBroker.Instance, NetworkAgentRegistry.Instance),
-                new CoopArenaController(MessageBroker.Instance, NetworkAgentRegistry.Instance),
+                new CoopArenaController(MessageBroker.Instance, NetworkAgentRegistry.Instance, new RandomEquipmentGenerator()),
             }, true, true);
         }
 
