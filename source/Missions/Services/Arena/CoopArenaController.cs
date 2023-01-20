@@ -15,6 +15,13 @@ using LiteNetLib;
 using Serilog;
 using Common.Logging;
 using Missions.Services.Network;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Encounters;
+using System.Text.RegularExpressions;
+using JetBrains.Annotations;
+using TaleWorlds.CampaignSystem.Extensions;
+using System.Runtime.CompilerServices;
+using Missions.Services.Arena;
 
 namespace Missions.Services
 {
@@ -26,12 +33,16 @@ namespace Missions.Services
 
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
+        private readonly IRandomEquipmentGenerator _equipmentGenerator;
 
-        public CoopArenaController(IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
+        public CoopArenaController(
+            IMessageBroker messageBroker, 
+            INetworkAgentRegistry agentRegistry, 
+            IRandomEquipmentGenerator equipmentGenerator)
         {
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
-
+            _equipmentGenerator = equipmentGenerator;
             messageBroker.Subscribe<MissionJoinInfo>(Handle_JoinInfo);
         }
 
@@ -94,9 +105,11 @@ namespace Missions.Services
             agentBuildData = agentBuildData.Team(Mission.Current.PlayerAllyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
+            Equipment generatedEquipment = _equipmentGenerator.CreateRandomEquipment(true);
+
             Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec)
                 .NoHorses(true)
-                .Equipment(character.FirstBattleEquipment)
+                .Equipment(generatedEquipment)
                 .TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);
             agent.FadeIn();
             agent.Controller = Agent.ControllerType.Player;
@@ -111,7 +124,7 @@ namespace Missions.Services
             agentBuildData.Team(Mission.Current.PlayerAllyTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
-            agentBuildData.Equipment(character.FirstBattleEquipment);
+            agentBuildData.Equipment(_equipmentGenerator.CreateRandomEquipment(true););
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.None);
 
