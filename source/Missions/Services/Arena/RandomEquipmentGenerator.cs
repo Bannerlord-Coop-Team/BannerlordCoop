@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.Core;
+using ItemTypeEnum = TaleWorlds.Core.ItemObject.ItemTypeEnum;
 
 namespace Missions.Services.Arena
 {
@@ -23,16 +21,16 @@ namespace Missions.Services.Arena
     /// <inheritdoc cref="IRandomEquipmentGenerator"/>
     internal class RandomEquipmentGenerator : IRandomEquipmentGenerator
     {
-        private static readonly IDictionary<ItemObject.ItemTypeEnum, List<ItemObject>> ExistingItems = InitializeItemDictionary();
-        private static readonly ItemObject.ItemTypeEnum[] ArmorLoadout = new ItemObject.ItemTypeEnum[5] { ItemObject.ItemTypeEnum.HeadArmor, ItemObject.ItemTypeEnum.Cape, ItemObject.ItemTypeEnum.BodyArmor, ItemObject.ItemTypeEnum.HandArmor, ItemObject.ItemTypeEnum.LegArmor };
-        private static readonly ItemObject.ItemTypeEnum[] HorseLoadout = new ItemObject.ItemTypeEnum[2] { ItemObject.ItemTypeEnum.Horse, ItemObject.ItemTypeEnum.HorseHarness };
-        private static readonly ItemObject.ItemTypeEnum[][] WeaponLoadouts = new ItemObject.ItemTypeEnum[][]
+        private static readonly IDictionary<ItemTypeEnum, List<ItemObject>> ExistingItems = InitializeItemDictionary();
+        private static readonly ItemTypeEnum[] ArmorLoadout = new ItemTypeEnum[5] { ItemTypeEnum.HeadArmor, ItemTypeEnum.Cape, ItemTypeEnum.BodyArmor, ItemTypeEnum.HandArmor, ItemTypeEnum.LegArmor };
+        private static readonly ItemTypeEnum[] HorseLoadout = new ItemTypeEnum[2] { ItemTypeEnum.Horse, ItemTypeEnum.HorseHarness };
+        private static readonly ItemTypeEnum[][] WeaponLoadouts = new ItemTypeEnum[][]
         {
-            new ItemObject.ItemTypeEnum[] { ItemObject.ItemTypeEnum.TwoHandedWeapon },
-            new ItemObject.ItemTypeEnum[] { ItemObject.ItemTypeEnum.Polearm },
-            new ItemObject.ItemTypeEnum[] { ItemObject.ItemTypeEnum.OneHandedWeapon, ItemObject.ItemTypeEnum.Thrown },
-            new ItemObject.ItemTypeEnum[] { ItemObject.ItemTypeEnum.Bow, ItemObject.ItemTypeEnum.Arrows, ItemObject.ItemTypeEnum.Thrown },
-            new ItemObject.ItemTypeEnum[] { ItemObject.ItemTypeEnum.OneHandedWeapon, ItemObject.ItemTypeEnum.Shield },
+            new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon },
+            new ItemTypeEnum[] { ItemTypeEnum.Polearm },
+            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Thrown },
+            new ItemTypeEnum[] { ItemTypeEnum.Bow, ItemTypeEnum.Arrows, ItemTypeEnum.Thrown },
+            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Shield },
         };
 
         private readonly Random Random = new Random();
@@ -41,10 +39,10 @@ namespace Missions.Services.Arena
         /// Creates dictionary containing all items in game and categorized by itemType
         /// </summary>
         /// <returns>A dictionary</returns>
-        private static IDictionary<ItemObject.ItemTypeEnum, List<ItemObject>> InitializeItemDictionary()
+        private static IDictionary<ItemTypeEnum, List<ItemObject>> InitializeItemDictionary()
         {
             IEnumerable<ItemObject> allItems = Game.Current.ObjectManager.GetObjectTypeList<ItemObject>();
-            IDictionary<ItemObject.ItemTypeEnum, List<ItemObject>> result = new Dictionary<ItemObject.ItemTypeEnum, List<ItemObject>>();
+            IDictionary<ItemTypeEnum, List<ItemObject>> result = new Dictionary<ItemTypeEnum, List<ItemObject>>();
 
             foreach (var item in allItems)
             {
@@ -84,15 +82,15 @@ namespace Missions.Services.Arena
         /// </summary>
         /// <param name="itemTypes">Items to select randomly</param>
         /// <returns>New equipment element with random item</returns>
-        private EquipmentElement[] SelectRandomLoadout(ItemObject.ItemTypeEnum[] itemTypes)
+        private EquipmentElement[] SelectRandomLoadout(ItemTypeEnum[] itemTypes)
         {
-            ItemObject.ItemTypeEnum[] loadout = new ItemObject.ItemTypeEnum[itemTypes.Length];
+            ItemTypeEnum[] loadout = new ItemTypeEnum[itemTypes.Length];
 
             EquipmentElement[] equipment = new EquipmentElement[loadout.Length];
 
             for (int i = 0; i < loadout.Length; i++)
             {
-                ItemObject.ItemTypeEnum loadoutItem = loadout[i];
+                ItemTypeEnum loadoutItem = loadout[i];
                 int randomItemIndex = Random.Next(ExistingItems[loadoutItem].Count);
                 equipment[i] = new EquipmentElement(ExistingItems[loadoutItem][randomItemIndex]);
             }
@@ -106,7 +104,7 @@ namespace Missions.Services.Arena
         /// <param name="equipment">Equipment to add random weapons to</param>
         private void GenerateRandomWeaponEquipment(Equipment equipment)
         {
-            ItemObject.ItemTypeEnum[] weaponTypes = WeaponLoadouts[Random.Next(WeaponLoadouts.Length)];
+            ItemTypeEnum[] weaponTypes = WeaponLoadouts[Random.Next(WeaponLoadouts.Length)];
 
             EquipmentElement[] weaponLoadout = SelectRandomLoadout(weaponTypes);
 
