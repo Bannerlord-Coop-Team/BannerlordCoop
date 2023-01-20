@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using LiteNetLib;
+using Microsoft.Extensions.Caching.Memory;
 using Missions.Services.Agents.Extensions;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
@@ -63,7 +64,7 @@ namespace Missions.Services.Agents.Packets
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
-        private readonly ConcurrentDictionary<Guid, Movement> _previousPackets = new ConcurrentDictionary<Guid, Movement>();
+        private readonly IMemoryCache _memoryCache;
 
         public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
@@ -76,6 +77,13 @@ namespace Missions.Services.Agents.Packets
             _messageBroker.Subscribe<Movement>(Handle_Movement);
 
             _client.AddHandler(this);
+
+            var options = new MemoryCacheOptions
+            {
+                ExpirationScanFrequency = TimeSpan.FromSeconds(1)
+            };
+
+            _memoryCache = new MemoryCache(options);
         }
 
         ~MovementHandler()
@@ -107,17 +115,38 @@ namespace Missions.Services.Agents.Packets
 
         private void Handle_Movement(MessagePayload<Movement> payload)
         {
-            // TODO: limit to 30 packets/second per agent/guid
-
             Guid guid = payload.What.Guid;
 
-            if (_agentRegistry.ControlledAgents.TryGetValue(guid, out var agent))
+            if (CanSendPacket(guid) && _agentRegistry.ControlledAgents.TryGetValue(guid, out var agent))
             {
                 if (agent.Mission != null)
                 {
-                    _client.SendAll(payload.What.ToMovementPacket());
+                    SendPacket(guid, payload.What.ToMovementPacket());
                 }
             }
+        }
+
+        private void SendPacket(Guid guid, MovementPacket movementPacket)
+        {
+            var newValue = 1;
+            if (_memoryCache.TryGetValue(guid, out int memory))
+            {
+                newValue = memory + 1;
+            }
+
+            _memoryCache.Set(guid, newValue);
+
+            _client.SendAll(movementPacket);
+        }
+
+        private bool CanSendPacket(Guid guid)
+        {
+            if (_memoryCache.TryGetValue(guid, out int memory))
+            {
+                return memory <= PACKETS_PER_SECONDS;
+            }
+
+            return false;
         }
 
         public void HandlePacket(NetPeer peer, IPacket packet)
