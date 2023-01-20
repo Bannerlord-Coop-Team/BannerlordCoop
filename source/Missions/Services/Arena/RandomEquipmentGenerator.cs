@@ -7,11 +7,20 @@ using TaleWorlds.Core;
 
 namespace Missions.Services.Arena
 {
+    /// <summary>
+    /// Generator for random fighting equipment
+    /// </summary>
     internal interface IRandomEquipmentGenerator
     {
+        /// <summary>
+        /// Creates a new set of random equipment
+        /// </summary>
+        /// <param name="noHorse">Does the player have a horse</param>
+        /// <returns>New set of random equipment</returns>
         Equipment CreateRandomEquipment(bool noHorse);
     }
 
+    /// <inheritdoc cref="IRandomEquipmentGenerator"/>
     internal class RandomEquipmentGenerator : IRandomEquipmentGenerator
     {
         private static readonly IDictionary<ItemObject.ItemTypeEnum, List<ItemObject>> ExistingItems = InitializeItemDictionary();
