@@ -22,8 +22,8 @@ namespace Missions.Services.Arena
     internal class RandomEquipmentGenerator : IRandomEquipmentGenerator
     {
         private static readonly IDictionary<ItemTypeEnum, List<ItemObject>> ExistingItems = InitializeItemDictionary();
-        private static readonly ItemTypeEnum[] ArmorLoadout = new ItemTypeEnum[5] { ItemTypeEnum.HeadArmor, ItemTypeEnum.Cape, ItemTypeEnum.BodyArmor, ItemTypeEnum.HandArmor, ItemTypeEnum.LegArmor };
-        private static readonly ItemTypeEnum[] HorseLoadout = new ItemTypeEnum[2] { ItemTypeEnum.Horse, ItemTypeEnum.HorseHarness };
+        private static readonly ItemTypeEnum[] ArmorLoadout = new ItemTypeEnum[] { ItemTypeEnum.HeadArmor, ItemTypeEnum.Cape, ItemTypeEnum.BodyArmor, ItemTypeEnum.HandArmor, ItemTypeEnum.LegArmor };
+        private static readonly ItemTypeEnum[] HorseLoadout = new ItemTypeEnum[] { ItemTypeEnum.Horse, ItemTypeEnum.HorseHarness };
         private static readonly ItemTypeEnum[][] WeaponLoadouts = new ItemTypeEnum[][]
         {
             new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon },
