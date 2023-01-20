@@ -1,0 +1,150 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using TaleWorlds.Core;
+
+namespace Missions.Services.Arena
+{
+    internal interface IRandomEquipmentGenerator
+    {
+        Equipment CreateRandomEquipment(bool noHorse);
+    }
+
+    internal class RandomEquipmentGenerator : IRandomEquipmentGenerator
+    {
+        private static readonly IDictionary<ItemObject.ItemTypeEnum, List<ItemObject>> ExistingItems = InitializeItemDictionary();
+        private static readonly ItemObject.ItemTypeEnum[] ArmorLoadout = new ItemObject.ItemTypeEnum[5] { ItemObject.ItemTypeEnum.HeadArmor, ItemObject.ItemTypeEnum.Cape, ItemObject.ItemTypeEnum.BodyArmor, ItemObject.ItemTypeEnum.HandArmor, ItemObject.ItemTypeEnum.LegArmor };
+        private static readonly ItemObject.ItemTypeEnum[] HorseLoadout = new ItemObject.ItemTypeEnum[2] { ItemObject.ItemTypeEnum.Horse, ItemObject.ItemTypeEnum.HorseHarness };
+        private static readonly ItemObject.ItemTypeEnum[][] WeaponLoadouts = new ItemObject.ItemTypeEnum[][]
+        {
+            new ItemObject.ItemTypeEnum[] { ItemObject.ItemTypeEnum.TwoHandedWeapon },
+            new ItemObject.ItemTypeEnum[] { ItemObject.ItemTypeEnum.Polearm },
+            new ItemObject.ItemTypeEnum[] { ItemObject.ItemTypeEnum.OneHandedWeapon, ItemObject.ItemTypeEnum.Thrown },
+            new ItemObject.ItemTypeEnum[] { ItemObject.ItemTypeEnum.Bow, ItemObject.ItemTypeEnum.Arrows, ItemObject.ItemTypeEnum.Thrown },
+            new ItemObject.ItemTypeEnum[] { ItemObject.ItemTypeEnum.OneHandedWeapon, ItemObject.ItemTypeEnum.Shield },
+        };
+
+        private readonly Random Random = new Random();
+
+        /// <summary>
+        /// Creates dictionary containing all items in game and categorized by itemType
+        /// </summary>
+        /// <returns>A dictionary</returns>
+        private static IDictionary<ItemObject.ItemTypeEnum, List<ItemObject>> InitializeItemDictionary()
+        {
+            IEnumerable<ItemObject> allItems = Game.Current.ObjectManager.GetObjectTypeList<ItemObject>();
+            IDictionary<ItemObject.ItemTypeEnum, List<ItemObject>> result = new Dictionary<ItemObject.ItemTypeEnum, List<ItemObject>>();
+
+            foreach (var item in allItems)
+            {
+                bool keyExists = result.ContainsKey(item.ItemType);
+                if (!keyExists)
+                {
+                    result.Add(item.ItemType, new List<ItemObject>());
+                }
+                result[item.ItemType].Add(item);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Creates random equipment for characters
+        /// </summary>
+        /// <param name="hasHorse">Boolean for whether character has a horse</param>
+        /// <returns>Equipment object for the character</returns>
+        public Equipment CreateRandomEquipment(bool noHorse)
+        {
+            Equipment equipment = new Equipment();
+
+            GenerateRandomWeaponEquipment(equipment);
+            GenerateRandomArmorEquipment(equipment);
+            
+            if (noHorse == false)
+            {
+                GenerateRandomHorseEquipment(equipment);
+            }
+
+            return equipment;
+        }
+
+        /// <summary>
+        /// Selects a random set of items given their item types
+        /// </summary>
+        /// <param name="itemTypes">Items to select randomly</param>
+        /// <returns>New equipment element with random item</returns>
+        private EquipmentElement[] SelectRandomLoadout(ItemObject.ItemTypeEnum[] itemTypes)
+        {
+            ItemObject.ItemTypeEnum[] loadout = new ItemObject.ItemTypeEnum[itemTypes.Length];
+
+            EquipmentElement[] equipment = new EquipmentElement[loadout.Length];
+
+            for (int i = 0; i < loadout.Length; i++)
+            {
+                ItemObject.ItemTypeEnum loadoutItem = loadout[i];
+                int randomItemIndex = Random.Next(ExistingItems[loadoutItem].Count);
+                equipment[i] = new EquipmentElement(ExistingItems[loadoutItem][randomItemIndex]);
+            }
+
+            return equipment;
+        }
+
+        /// <summary>
+        /// Generates random weapons and places them into equipment
+        /// </summary>
+        /// <param name="equipment">Equipment to add random weapons to</param>
+        private void GenerateRandomWeaponEquipment(Equipment equipment)
+        {
+            ItemObject.ItemTypeEnum[] weaponTypes = WeaponLoadouts[Random.Next(WeaponLoadouts.Length)];
+
+            EquipmentElement[] weaponLoadout = SelectRandomLoadout(weaponTypes);
+
+            AddWeaponsToEquipment(weaponLoadout, equipment);
+        }
+
+        private void AddWeaponsToEquipment(EquipmentElement[] weaponLoadout, Equipment equipment)
+        {
+            for (int i = 0; i < weaponLoadout.Length; ++i)
+            {
+                equipment.AddEquipmentToSlotWithoutAgent((EquipmentIndex)i, weaponLoadout[i]);
+            }
+        }
+
+        /// <summary>
+        /// Generates random armor and places them into equipment
+        /// </summary>
+        /// <param name="equipment">Equipment to add armor weapons to</param>
+        private void GenerateRandomArmorEquipment(Equipment equipment)
+        {
+            EquipmentElement[] randomArmorLoadout = SelectRandomLoadout(ArmorLoadout);
+            AddArmorToEquipment(randomArmorLoadout, equipment);
+        }
+
+        private void AddArmorToEquipment(EquipmentElement[] armorLoadout, Equipment equipment)
+        {
+            equipment.AddEquipmentToSlotWithoutAgent(EquipmentIndex.Head, armorLoadout[0]);
+            equipment.AddEquipmentToSlotWithoutAgent(EquipmentIndex.Body, armorLoadout[1]);
+            equipment.AddEquipmentToSlotWithoutAgent(EquipmentIndex.Leg, armorLoadout[2]);
+            equipment.AddEquipmentToSlotWithoutAgent(EquipmentIndex.Gloves, armorLoadout[3]);
+            equipment.AddEquipmentToSlotWithoutAgent(EquipmentIndex.Cape, armorLoadout[4]);
+        }
+
+        /// <summary>
+        /// Generates random horse equipment and places them into equipment
+        /// </summary>
+        /// <param name="equipment">Equipment to add random weapons to</param>
+        private void GenerateRandomHorseEquipment(Equipment equipment)
+        {
+            EquipmentElement[] randomHorseLoadout = SelectRandomLoadout(HorseLoadout);
+            AddHorseToEquipment(randomHorseLoadout, equipment);
+        }
+
+        private void AddHorseToEquipment(EquipmentElement[] horseLoadout, Equipment equipment)
+        {
+            equipment.AddEquipmentToSlotWithoutAgent(EquipmentIndex.Horse, horseLoadout[0]);
+            equipment.AddEquipmentToSlotWithoutAgent(EquipmentIndex.HorseHarness, horseLoadout[1]);
+        }
+    }
+}

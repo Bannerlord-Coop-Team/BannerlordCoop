@@ -139,6 +139,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
+    <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnHandlePreMovementStageMessage.cs" />
