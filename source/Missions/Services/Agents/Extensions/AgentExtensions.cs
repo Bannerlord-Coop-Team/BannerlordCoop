@@ -1,6 +1,5 @@
-﻿using TaleWorlds.MountAndBlade;
-using Missions.Services.Network;
-using Missions.Services.Agents.Packets;
+﻿using Missions.Services.Network;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Extensions
 {
