@@ -2,21 +2,15 @@
 using Common.Logging;
 using Common.Messaging;
 using LiteNetLib;
-using Microsoft.Extensions.Caching.Memory;
-using Missions.Services.Agents.Extensions;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
-using Mono.Cecil.Cil;
+using Polly;
+using Polly.RateLimit;
 using ProtoBuf;
 using Serilog;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -56,7 +50,8 @@ namespace Missions.Services.Agents.Packets
 
     public class MovementHandler : IPacketHandler, IDisposable
     {
-        private const int PACKETS_PER_SECONDS = 30;
+        private const int PACKETS = 30;
+        private readonly static TimeSpan PACKET_TIME_SPAN = TimeSpan.FromSeconds(1);
 
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
 
@@ -64,7 +59,7 @@ namespace Missions.Services.Agents.Packets
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
-        private readonly IMemoryCache _memoryCache;
+        private Dictionary<Guid, ISyncPolicy> _agentIdToPolicy = new Dictionary<Guid, ISyncPolicy>();
 
         public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
@@ -77,13 +72,6 @@ namespace Missions.Services.Agents.Packets
             _messageBroker.Subscribe<Movement>(Handle_Movement);
 
             _client.AddHandler(this);
-
-            var options = new MemoryCacheOptions
-            {
-                ExpirationScanFrequency = TimeSpan.FromSeconds(1)
-            };
-
-            _memoryCache = new MemoryCache(options);
         }
 
         ~MovementHandler()
@@ -117,7 +105,7 @@ namespace Missions.Services.Agents.Packets
         {
             Guid guid = payload.What.Guid;
 
-            if (CanSendPacket(guid) && _agentRegistry.ControlledAgents.TryGetValue(guid, out var agent))
+            if (_agentRegistry.ControlledAgents.TryGetValue(guid, out var agent))
             {
                 if (agent.Mission != null)
                 {
@@ -128,25 +116,36 @@ namespace Missions.Services.Agents.Packets
 
         private void SendPacket(Guid guid, MovementPacket movementPacket)
         {
-            var newValue = 1;
-            if (_memoryCache.TryGetValue(guid, out int memory))
+            try
             {
-                newValue = memory + 1;
+                var policy = GetRateLimit(guid);
+                policy.Execute(() => _client.SendAll(movementPacket));
+            } 
+            catch (RateLimitRejectedException ex)
+            {
+                // this means we can't send any more packets,
+                // which is the desired behaviour in this case
             }
-
-            _memoryCache.Set(guid, newValue);
-
-            _client.SendAll(movementPacket);
         }
 
-        private bool CanSendPacket(Guid guid)
+        private ISyncPolicy GetRateLimit(Guid guid)
         {
-            if (_memoryCache.TryGetValue(guid, out int memory))
+            if (_agentIdToPolicy.TryGetValue(guid, out var policy))
             {
-                return memory <= PACKETS_PER_SECONDS;
+                return policy;
             }
 
-            return false;
+            // create a new instance of ISyncPolicy:
+            // the reason for this is that every agent should be able to send
+            // up to PACKETS in PACKET_TIME_SPAN.
+            //
+            // If we would reuse the same policy over and over again,
+            // we would only send PACKETS packets in PACKET_TIME_SPAN for all agents.
+            var newPolicy = Policy.RateLimit(PACKETS, PACKET_TIME_SPAN);
+
+            _agentIdToPolicy.Add(guid, newPolicy);
+
+            return newPolicy;
         }
 
         public void HandlePacket(NetPeer peer, IPacket packet)
