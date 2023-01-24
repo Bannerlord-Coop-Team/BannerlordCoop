@@ -3,6 +3,7 @@ using Common.LogicStates;
 using Common.Messaging;
 using Coop.Core.Client.States;
 using Coop.Core.Communication.PacketHandlers;
+using GameInterface;
 using Serilog;
 
 namespace Coop.Core.Client
@@ -33,7 +34,7 @@ namespace Coop.Core.Client
             get { return _state; }
             set 
             {
-                Logger.Debug("Client is changing to {state} State", value);
+                Logger.Debug("Client is changing to {state} State", value.GetType().Name);
 
                 _state?.Dispose();
                 _state = value;
@@ -42,12 +43,16 @@ namespace Coop.Core.Client
 
         private IClientState _state;
 
+        private readonly IGameInterface gameInterface;
+
         public ClientLogic(
             ICoopClient networkClient, 
-            IMessageBroker messageBroker)
+            IMessageBroker messageBroker,
+            IGameInterface gameInterface)
         {
             NetworkClient = networkClient;
             State = new MainMenuState(this, messageBroker);
+            this.gameInterface = gameInterface;
         }
 
         public void Start()

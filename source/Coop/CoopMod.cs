@@ -61,6 +61,8 @@ namespace Coop
             }
 
             SetupLogging();
+
+            GameLoopRunner.Instance.SetGameLoopThread();
         }
 
         private void SetupLogging()

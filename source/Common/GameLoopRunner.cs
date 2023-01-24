@@ -1,9 +1,8 @@
-﻿using Common;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Missions
+namespace Common
 {
     public class GameLoopRunner : IUpdateable
     {

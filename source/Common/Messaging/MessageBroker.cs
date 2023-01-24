@@ -40,12 +40,13 @@ namespace Common.Messaging
         {
             if (message == null || source == null)
                 return;
+
+            Logger.Verbose($"Publishing {message.GetType().Name} from {source.GetType().Name}");
+
             if (!_subscribers.ContainsKey(typeof(T)))
             {
                 return;
             }
-
-            Logger.Verbose($"Publishing {message.GetType()} from {source.GetType().Name}");
 
             var delegates = _subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;

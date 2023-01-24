@@ -48,6 +48,8 @@ namespace MissionTestMod
             Module.CurrentModule.AddInitialStateOption(JoinTavern);
             base.OnSubModuleLoad();
             Logger.Verbose("Bannerlord Coop Mod loaded");
+
+            GameLoopRunner.Instance.SetGameLoopThread();
         }
 
         private bool m_IsFirstTick = true;

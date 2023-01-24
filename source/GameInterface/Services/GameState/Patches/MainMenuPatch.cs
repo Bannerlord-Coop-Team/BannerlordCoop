@@ -7,18 +7,14 @@ namespace GameInterface.Services.GameState.Patches
 {
     internal class MainMenuPatch
     {
-        private static bool MainMenuReady { get; set; } = false;
-
-        [HarmonyPatch(typeof(MBInitialScreenBase), "OnFrameTick")]
-        class MainMenuReadyPatch
+        [HarmonyPatch(typeof(InitialState))]
+        class MainMenuEnteredPatch
         {
-            static void Postfix(ref object __instance)
+            [HarmonyPostfix]
+            [HarmonyPatch("OnActivate")]
+            static void OnActivate(ref InitialState __instance)
             {
-                if (!MainMenuReady && MBMusicManager.Current != null)
-                {
-                    MainMenuReady = true;
-                    MessageBroker.Instance.Publish(__instance, new MainMenuEntered());
-                }
+                MessageBroker.Instance.Publish(__instance, new MainMenuEntered());
             }
         }
     }

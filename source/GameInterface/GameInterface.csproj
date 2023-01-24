@@ -212,6 +212,10 @@
     <Reference Include="TaleWorlds.MountAndBlade.Launcher.Steam">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Launcher.Steam.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
     </Reference>
@@ -261,9 +265,6 @@
   <ItemGroup>
     <Compile Include="Behaviour\InitServerBehaviour.cs" />
     <Compile Include="CompatibilityInfo.cs" />
-    <Compile Include="Data\GameSaveData.cs" />
-    <Compile Include="Data\ICharacterCreationData.cs" />
-    <Compile Include="Data\IGameSaveData.cs" />
     <Compile Include="Exceptions\Exceptions.cs" />
     <Compile Include="Extentions\CampaignObjectManagerExtentions.cs" />
     <Compile Include="Extentions\CampaignTimeExtensions.cs" />
@@ -279,8 +280,17 @@
     <Compile Include="Services\CampaignService\Patches\CompanionsCampaignBehaviorPatches.cs" />
     <Compile Include="Services\CampaignService\Patches\SetTimeSpeedPatch.cs" />
     <Compile Include="Services\CampaignService\Patches\TimeControlModePatch.cs" />
+    <Compile Include="Services\CharacterCreation\Messages\CharacterCreatedHeroPackaged.cs" />
+    <Compile Include="Services\GameDebug\Patches\CharacterCreationIntoPatch.cs" />
+    <Compile Include="Services\CharacterCreation\Interfaces\CharacterCreationInterface.cs" />
+    <Compile Include="Services\CharacterCreation\Messages\CharacterCreationFinished.cs" />
+    <Compile Include="Services\GameState\Patches\CharacterCreationFinishedPatch.cs" />
+    <Compile Include="Services\Save\IGameSaveData.cs" />
+    <Compile Include="Services\UI\Handlers\LoadingScreenHandler.cs" />
+    <Compile Include="Services\UI\Interfaces\UIInterface.cs" />
+    <Compile Include="Services\UI\Messages\EndLoadingScreen.cs" />
+    <Compile Include="Services\UI\Messages\StartLoadingScreen.cs" />
     <Compile Include="Services\Misc\Patches\Debugging.cs" />
-    <Compile Include="Services\GameState\Patches\CharacterCreationPatch.cs" />
     <Compile Include="Services\GameState\Patches\GameLoadedPatch.cs" />
     <Compile Include="Services\GameState\Patches\MainMenuPatch.cs" />
     <Compile Include="Services\Heroes\Patches\HeroPatches.cs" />
@@ -388,14 +398,14 @@
     <Compile Include="Services\Example\Messages\ExampleCommand.cs" />
     <Compile Include="Services\GameDebug\Handlers\LoadDebugGameHandler.cs" />
     <Compile Include="Services\GameDebug\Handlers\SkipCharacterCreationHandler.cs" />
-    <Compile Include="Services\GameDebug\Interfaces\CharacterCreationInterface.cs" />
+    <Compile Include="Services\GameDebug\Interfaces\DebugCharacterCreationInterface.cs" />
     <Compile Include="Services\GameDebug\Interfaces\GameDebugInterface.cs" />
     <Compile Include="Services\GameDebug\Messages\CharacterCreationStarted.cs" />
     <Compile Include="Services\GameDebug\Messages\StartDebugGame.cs" />
     <Compile Include="Services\GameState\Handlers\EnterCampaignHandler.cs" />
     <Compile Include="Services\GameState\Handlers\EnterMainMenuHandler.cs" />
     <Compile Include="Services\MobileParties\Handlers\RemoveMainPartyHandler.cs" />
-    <Compile Include="Services\GameState\Handlers\StartCharacterCreationHandler.cs" />
+    <Compile Include="Services\CharacterCreation\Handlers\CharacterCreationHandler.cs" />
     <Compile Include="Services\MobileParties\Interfaces\MainPartyInterface.cs" />
     <Compile Include="Services\MobileParties\Messages\RemoveMainParty.cs" />
     <Compile Include="Services\IGameAbstraction.cs" />
@@ -405,14 +415,13 @@
     <Compile Include="Services\GameState\Messages\EnterMissionState.cs" />
     <Compile Include="Services\GameState\Messages\ResolveNetworkGuids.cs" />
     <Compile Include="Services\GameState\Messages\ValidateModule.cs" />
-    <Compile Include="Services\IServiceModule.cs" />
     <Compile Include="Services\ServiceModule.cs" />
     <Compile Include="Services\GameState\Interfaces\GameStateInterface.cs" />
     <Compile Include="Services\GameState\Messages\EnterMainMenu.cs" />
     <Compile Include="Services\GameState\Messages\GameLoaded.cs" />
     <Compile Include="Services\GameState\Messages\LoadGameSave.cs" />
     <Compile Include="Services\GameState\Messages\PackageGameSaveData.cs" />
-    <Compile Include="Services\GameState\Messages\StartCharacterCreation.cs" />
+    <Compile Include="Services\CharacterCreation\Messages\StartCharacterCreation.cs" />
     <Compile Include="Utils\ReflectionUtils.cs" />
   </ItemGroup>
   <ItemGroup>

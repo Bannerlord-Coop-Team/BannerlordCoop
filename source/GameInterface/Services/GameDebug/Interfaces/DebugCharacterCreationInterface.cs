@@ -1,31 +1,63 @@
-﻿using System.Linq;
+﻿using Common;
+using SandBox;
+using System;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
 using TaleWorlds.Core;
-using TaleWorlds.MountAndBlade.ViewModelCollection.FaceGenerator;
-using TaleWorlds.MountAndBlade.GauntletUI.BodyGenerator;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.GauntletUI;
+using TaleWorlds.MountAndBlade.GauntletUI.BodyGenerator;
+using TaleWorlds.MountAndBlade.View.Screens;
+using TaleWorlds.MountAndBlade.ViewModelCollection.FaceGenerator;
 
 namespace GameInterface.Services.GameDebug.Interfaces
 {
-    internal interface ICharacterCreationInterface : IGameAbstraction
+    internal interface IDebugCharacterCreationInterface : IGameAbstraction
     {
         void SkipCharacterCreation();
     }
 
-    internal class CharacterCreationInterface : ICharacterCreationInterface
+    internal class DebugCharacterCreationInterface : IDebugCharacterCreationInterface
     {
-        public void SkipCharacterCreation()
+        /// <summary>
+        /// Name of into video from <see cref="SandboxGameManager.OnLoadFinished"/>
+        /// </summary>
+        private static readonly string VideoPathName = "campaign_intro";
+
+        /// <summary>
+        /// Determines if game is currently running the character creation intro.
+        /// The character creation into is the first state of character creation.
+        /// </summary>
+        /// <returns>True if game is in character creation intro state, false otherwise</returns>
+        public static bool InCharacterCreationIntro()
         {
-            if(GameStateManager.Current?.ActiveState?.GetType() == typeof(CharacterCreationState))
-            {
-                SkipCharacterCreationInternal();
-            }
+            return GameStateManager.Current?.ActiveState is VideoPlaybackState videoState &&
+                   videoState.VideoPath.Contains(VideoPathName);
         }
 
-        private void SkipCharacterCreationInternal()
+        private readonly MethodInfo LaunchSandboxCharacterCreation = typeof(SandBoxGameManager).GetMethod("LaunchSandboxCharacterCreation", BindingFlags.NonPublic | BindingFlags.Instance);
+        public void SkipCharacterCreation()
         {
+            // Validation
+            if (InCharacterCreationIntro() == false) return;
+
+            // Logic
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                SkipCharacterCreationInternal();
+            });
+        }
+
+        public void SkipCharacterCreationInternal()
+        {
+            // Skip intro video
+            SandBoxGameManager gameManager = (SandBoxGameManager)Game.Current.GameManager;
+            LaunchSandboxCharacterCreation.Invoke(gameManager, Array.Empty<object>());
+
             CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
             if (characterCreationState.CurrentStage is CharacterCreationCultureStage)
             {
@@ -79,8 +111,6 @@ namespace GameInterface.Services.GameDebug.Interfaces
             {
                 characterCreationState.NextStage();
             }
-
-            characterCreationState = (GameStateManager.Current.ActiveState as CharacterCreationState);
         }
     }
 }

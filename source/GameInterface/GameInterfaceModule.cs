@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Messaging;
+using GameInterface.Serialization;
 using GameInterface.Services;
 
 namespace GameInterface
@@ -11,6 +12,7 @@ namespace GameInterface
             base.Load(builder);
             builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance();
             builder.RegisterType<GameInterface>().As<IGameInterface>().SingleInstance();
+            builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().SingleInstance();
             builder.RegisterModule<ServiceModule>();
         }
     }

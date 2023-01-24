@@ -6,6 +6,11 @@ using System.Linq;
 
 namespace GameInterface.Services
 {
+    internal interface IServiceModule
+    {
+        void InstantiateServices(IContainer container);
+    }
+
     internal class ServiceModule : Module, IServiceModule
     {
         protected override void Load(ContainerBuilder builder)
@@ -37,15 +42,10 @@ namespace GameInterface.Services
             base.Load(builder);
         }
 
-        static IHandler[] Handlers;
+        private IHandler[] Handlers;
         public void InstantiateServices(IContainer container)
         {
-            List<IHandler> handlers = new List<IHandler>();
-            foreach (var type in GetHandlers())
-            {
-                handlers.Add((IHandler)container.Resolve(type));
-            }
-            Handlers = handlers.ToArray();
+            Handlers = GetHandlers().Select(i => (IHandler)container.Resolve(i)).ToArray();
         }
 
         private IEnumerable<Type> GetHandlers()

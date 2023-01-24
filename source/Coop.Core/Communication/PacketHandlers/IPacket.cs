@@ -9,6 +9,7 @@ namespace Coop.Core.Communication.PacketHandlers
         Event,
         Example,
         Test,
+        Hero,
     }
 
     public interface IPacket

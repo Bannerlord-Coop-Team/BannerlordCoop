@@ -35,7 +35,7 @@ namespace Coop.Core.Server
             get { return _state; }
             set
             {
-                Logger.Debug("Server is changing to {state} State", value);
+                Logger.Debug("Server is changing to {state} State", value.GetType().Name);
 
                 _state?.Dispose();
                 _state = value;

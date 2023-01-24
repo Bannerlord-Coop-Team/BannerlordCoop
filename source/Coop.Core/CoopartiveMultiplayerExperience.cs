@@ -1,9 +1,12 @@
 ﻿using Autofac;
 using Common;
 using Common.LogicStates;
+using Common.Messaging;
 using Coop.Core.Client;
+using Coop.Core.Client.Messages;
 using Coop.Core.Server;
 using GameInterface;
+using GameInterface.Services.CharacterCreation.Messages;
 using System;
 
 namespace Coop.Core
@@ -23,14 +26,17 @@ namespace Coop.Core
 
         public void StartAsServer()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<CoopModule>();
-            builder.RegisterModule<ServerModule>();
-            builder.RegisterModule<GameInterfaceModule>();
-            _container = builder.Build();
+            if(_container == null)
+            {
+                ContainerBuilder builder = new ContainerBuilder();
+                builder.RegisterModule<CoopModule>();
+                builder.RegisterModule<ServerModule>();
+                builder.RegisterModule<GameInterfaceModule>();
+                _container = builder.Build();
 
-            var server = _container.Resolve<ICoopNetwork>();
-            Updateables.Add(server);
+                var server = _container.Resolve<ICoopNetwork>();
+                Updateables.Add(server);
+            }
 
             var logic = _container.Resolve<ILogic>();
             logic.Start();
@@ -38,17 +44,24 @@ namespace Coop.Core
 
         public void StartAsClient()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<CoopModule>();
-            builder.RegisterModule<ClientModule>();
-            builder.RegisterModule<GameInterfaceModule>();
-            _container = builder.Build();
+            if (_container == null)
+            {
+                ContainerBuilder builder = new ContainerBuilder();
+                builder.RegisterModule<CoopModule>();
+                builder.RegisterModule<ClientModule>();
+                builder.RegisterModule<GameInterfaceModule>();
+                _container = builder.Build();
 
-            var client = _container.Resolve<ICoopNetwork>();
-            Updateables.Add(client);
+                var client = _container.Resolve<ICoopNetwork>();
+                Updateables.Add(client);
+            }
 
             var logic = _container.Resolve<ILogic>();
             logic.Start();
+
+            // TODO remove test code
+            var messageBroker = _container.Resolve<IMessageBroker>();
+            messageBroker.Publish(this, new NetworkConnected(false));
         }
     }
 }

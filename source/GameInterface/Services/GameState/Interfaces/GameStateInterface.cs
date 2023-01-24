@@ -1,4 +1,4 @@
-﻿using GameInterface.Data;
+﻿using GameInterface.Services.Save;
 using SandBox;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -12,10 +12,10 @@ namespace GameInterface.Services.GameState.Interfaces
     internal interface IGameStateInterface : IGameAbstraction
     {
         void EnterMainMenu();
-        void StartCharacterCreation();
         void StartNewGame();
         void LoadSaveGame(IGameSaveData saveData);
         IGameSaveData PackageGameSaveData();
+        void EndGame();
     }
 
     internal class GameStateInterface : IGameStateInterface
@@ -62,14 +62,16 @@ namespace GameInterface.Services.GameState.Interfaces
             return new GameSaveData(saveBytes);
         }
 
-        public void StartCharacterCreation()
-        {
-            MBGameManager.StartNewGame(new SandBoxGameManager());
-        }
+        
 
         public void StartNewGame()
         {
             MBGameManager.StartNewGame(new SandBoxGameManager());
+        }
+
+        public void EndGame()
+        {
+            MBGameManager.EndGame();
         }
     }
 }

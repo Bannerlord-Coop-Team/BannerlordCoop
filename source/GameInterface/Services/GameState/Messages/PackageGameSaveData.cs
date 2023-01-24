@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using GameInterface.Data;
+using GameInterface.Services.Save;
 
 namespace GameInterface.Services.GameState.Messages
 {

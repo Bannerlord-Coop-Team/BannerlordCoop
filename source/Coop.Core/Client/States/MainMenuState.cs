@@ -1,5 +1,6 @@
 using Common.Messaging;
 using Coop.Core.Client.Messages;
+using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
@@ -29,12 +30,11 @@ namespace Coop.Core.Client.States
             if (obj.What.ClientPartyExists)
             {
                 Logic.State = new ReceivingSavedDataState(Logic, MessageBroker);
-                MessageBroker.Publish(this, new LoadGameSave());
             }
             else
             {
                 Logic.State = new CharacterCreationState(Logic, MessageBroker);
-                MessageBroker.Publish(this, new StartCreateCharacter());
+                MessageBroker.Publish(this, new StartCharacterCreation());
             }
         }
 

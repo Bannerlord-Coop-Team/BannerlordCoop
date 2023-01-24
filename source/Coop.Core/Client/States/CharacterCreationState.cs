@@ -1,4 +1,6 @@
 ﻿using Common.Messaging;
+using Coop.Core.Client.Packets;
+using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
@@ -10,8 +12,14 @@ namespace Coop.Core.Client.States
     {
         public CharacterCreationState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
+            MessageBroker.Subscribe<CharacterCreatedHeroPackaged>(Handle);
             MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<CharacterCreationFinished>(Handle);
+        }
+
+        public override void Dispose()
+        {
+            MessageBroker.Unsubscribe<CharacterCreatedHeroPackaged>(Handle);
+            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
         }
 
         private void Handle(MessagePayload<MainMenuEntered> obj)
@@ -19,21 +27,18 @@ namespace Coop.Core.Client.States
             Logic.State = new MainMenuState(Logic, MessageBroker);
         }
 
-        private void Handle(MessagePayload<CharacterCreationFinished> obj)
+        private void Handle(MessagePayload<CharacterCreatedHeroPackaged> obj)
         {
+            NewHeroPacket heroPacket = new NewHeroPacket(obj.What.Package);
+
+            // Send to server
+            Logic.NetworkClient.SendAll(heroPacket);
             Logic.State = new ReceivingSavedDataState(Logic, MessageBroker);
-            MessageBroker.Publish(this, new LoadGameSave());
         }
 
         public override void EnterMainMenu()
         {
             MessageBroker.Publish(this, new EnterMainMenu());
-        }
-
-        public override void Dispose()
-        {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<CharacterCreationFinished>(Handle);
         }
 
         public override void Connect()

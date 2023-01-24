@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
+using System;
 
 namespace Coop.Core.Client.States
 {
@@ -11,7 +12,13 @@ namespace Coop.Core.Client.States
         public ReceivingSavedDataState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
             MessageBroker.Subscribe<MainMenuEntered>(Handle);
+            MessageBroker.Subscribe<GameSaveRecieved>(Handle);
             MessageBroker.Subscribe<GameSaveLoaded>(Handle);
+        }
+
+        private void Handle(MessagePayload<GameSaveRecieved> obj)
+        {
+            throw new NotImplementedException();
         }
 
         private void Handle(MessagePayload<MainMenuEntered> obj)

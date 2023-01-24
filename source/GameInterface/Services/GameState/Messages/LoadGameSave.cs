@@ -1,9 +1,9 @@
 ﻿using Common.Messaging;
-using GameInterface.Data;
+using GameInterface.Services.Save;
 
 namespace GameInterface.Services.GameState.Messages
 {
-    public readonly struct LoadGameSave : ICommand
+    public readonly struct GameSaveRecieved : IEvent
     {
         public IGameSaveData SaveData { get; }
     }
