@@ -1,6 +1,14 @@
+<<<<<<< HEAD
 ﻿using Common.Messaging;
 using Missions.Services.Agents.Messages;
 using Missions.Services.BoardGames.Messages;
+=======
+﻿using Common;
+using Common.Messaging;
+using Missions.Services.Agents.Messages;
+using Missions.Services.BoardGames.Messages;
+using Missions.Services.Messaging;
+>>>>>>> NetworkEvent-refactor
 using Missions.Services.Network;
 using SandBox;
 using SandBox.BoardGames;
@@ -22,6 +30,7 @@ namespace Missions.Services.BoardGames
         public static bool IsChallenged { get; private set; }
         public Guid GameId { get; private set; }
 
+<<<<<<< HEAD
         private readonly LiteNetP2PClient _P2PClient;
         private readonly IMessageBroker _messageBroker;
         private readonly MissionBoardGameLogic _boardGameLogic;
@@ -30,11 +39,22 @@ namespace Missions.Services.BoardGames
         public BoardGameLogic(
             LiteNetP2PClient P2PClient,
             IMessageBroker messageBroker,
+=======
+        private readonly INetworkMessageBroker _messageBroker;
+        private readonly MissionBoardGameLogic _boardGameLogic;
+        private readonly BoardGameType _boardGameType;
+
+        internal BoardGameLogic(
+            INetworkMessageBroker messageBroker,
+>>>>>>> NetworkEvent-refactor
             Guid gameId, 
             MissionBoardGameLogic boardGameLogic, 
             BoardGameType gameType)
         {
+<<<<<<< HEAD
             _P2PClient = P2PClient;
+=======
+>>>>>>> NetworkEvent-refactor
             _messageBroker = messageBroker;
             _boardGameLogic = boardGameLogic;
             _boardGameType = gameType;
@@ -135,7 +155,11 @@ namespace Missions.Services.BoardGames
 
             int fromIndex = _boardGameLogic.Board.PlayerTwoUnits.IndexOf(payload.What.Pawn);
             PawnCapturedMessage pawnCapturedEvent = new PawnCapturedMessage(GameId, fromIndex);
+<<<<<<< HEAD
             _P2PClient.SendAllEvent(pawnCapturedEvent);
+=======
+            _messageBroker.PublishAllEvent(pawnCapturedEvent);
+>>>>>>> NetworkEvent-refactor
 
             //if (IsPlayingOtherPlayer)
             //{
@@ -164,7 +188,11 @@ namespace Missions.Services.BoardGames
                 {
                     int fromIndex = _boardGameLogic.Board.PlayerOneUnits.IndexOf(hoveredPawnIfAny);
                     PawnCapturedMessage pawnCapturedEvent = new PawnCapturedMessage(GameId, fromIndex);
+<<<<<<< HEAD
                     _P2PClient.SendAllEvent(pawnCapturedEvent);
+=======
+                    _messageBroker.PublishAllEvent(pawnCapturedEvent);
+>>>>>>> NetworkEvent-refactor
                 }
             }
         }
@@ -179,7 +207,11 @@ namespace Missions.Services.BoardGames
             int FromIndex = _boardGameLogic.Board.PlayerOneUnits.IndexOf(payload.What.Move.Unit);
             int ToIndex = _boardGameLogic.Board.Tiles.IndexOf(payload.What.Move.GoalTile);
             BoardGameMoveRequest boardGameMoveEvent = new BoardGameMoveRequest(GameId, FromIndex, ToIndex);
+<<<<<<< HEAD
             _P2PClient.SendAllEvent(boardGameMoveEvent);
+=======
+            _messageBroker.PublishAllEvent(boardGameMoveEvent);
+>>>>>>> NetworkEvent-refactor
         }
 
         private void Handle_MoveRequest(MessagePayload<BoardGameMoveRequest> payload)
@@ -213,7 +245,11 @@ namespace Missions.Services.BoardGames
         private void OnForfeitGame(MessagePayload<OnForfeitMessage> payload)
         {
             ForfeitGameMessage forfeitMessage = new ForfeitGameMessage(GameId);
+<<<<<<< HEAD
             _P2PClient.SendAllEvent(forfeitMessage);
+=======
+            _messageBroker.PublishAllEvent(forfeitMessage);
+>>>>>>> NetworkEvent-refactor
             Dispose();
         }
 

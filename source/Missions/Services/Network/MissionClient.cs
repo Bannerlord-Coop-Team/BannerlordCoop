@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 ﻿using Common.Messaging;
+=======
+﻿using Common;
+using Common.Messaging;
+>>>>>>> NetworkEvent-refactor
 using LiteNetLib;
 using System;
 using Common.Logging;
@@ -11,6 +16,10 @@ using Missions.Services.Network.PacketHandlers;
 using Missions.Messages;
 using Missions.Services.Network.Messages;
 using Missions.Services.Agents.Packets;
+<<<<<<< HEAD
+=======
+using Missions.Services.Messaging;
+>>>>>>> NetworkEvent-refactor
 
 namespace Missions.Services.Network
 {
@@ -22,17 +31,29 @@ namespace Missions.Services.Network
         public MovementHandler MovementHandler { get; private set; }
         private readonly EventPacketHandler _eventPacketHandler;
         private readonly INetworkAgentRegistry _agentRegistry;
+<<<<<<< HEAD
         private readonly IMessageBroker _messageBroker;
         private readonly LiteNetP2PClient _client;
         private readonly Guid _playerId;
 
         public MissionClient(LiteNetP2PClient client, IMessageBroker messageBroker)
+=======
+        private readonly INetworkMessageBroker _messageBroker;
+        private readonly LiteNetP2PClient _client;
+        private readonly Guid _playerId;
+
+        internal MissionClient(LiteNetP2PClient client, INetworkMessageBroker messageBroker)
+>>>>>>> NetworkEvent-refactor
         {
             _client = client;
             _playerId = Guid.NewGuid();
             _messageBroker = messageBroker;
             _agentRegistry = NetworkAgentRegistry.Instance;
+<<<<<<< HEAD
             BoardGameManager = new BoardGameManager(client, _messageBroker, _agentRegistry);
+=======
+            BoardGameManager = new BoardGameManager(_messageBroker, _agentRegistry);
+>>>>>>> NetworkEvent-refactor
             MovementHandler = new MovementHandler(_client, _messageBroker, _agentRegistry);
             _eventPacketHandler = new EventPacketHandler(_client, _messageBroker);
 
@@ -74,7 +95,11 @@ namespace Missions.Services.Network
 
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
             MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position);
+<<<<<<< HEAD
             _client.SendEvent(request, peer);
+=======
+            _messageBroker.PublishEvent(request, peer);
+>>>>>>> NetworkEvent-refactor
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
                 characterObject.Name, request.PlayerId, peer.EndPoint);

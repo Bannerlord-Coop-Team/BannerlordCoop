@@ -41,9 +41,12 @@
   <PropertyGroup>
     <StartupObject />
   </PropertyGroup>
+<<<<<<< HEAD
   <PropertyGroup>
     <RunPostBuildEvent>Always</RunPostBuildEvent>
   </PropertyGroup>
+=======
+>>>>>>> NetworkEvent-refactor
   <ItemGroup>
     <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
       <HintPath>..\packages\protobuf-net.3.1.22\lib\net462\protobuf-net.dll</HintPath>

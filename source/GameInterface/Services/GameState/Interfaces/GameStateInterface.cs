@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ﻿using GameInterface.Services.Save;
+=======
+﻿using GameInterface.Data;
+>>>>>>> NetworkEvent-refactor
 using SandBox;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -9,6 +13,7 @@ using TaleWorlds.SaveSystem.Load;
 
 namespace GameInterface.Services.GameState.Interfaces
 {
+<<<<<<< HEAD
     internal interface IGameStateInterface : IGameAbstraction
     {
         void EnterMainMenu();
@@ -18,6 +23,8 @@ namespace GameInterface.Services.GameState.Interfaces
         void EndGame();
     }
 
+=======
+>>>>>>> NetworkEvent-refactor
     internal class GameStateInterface : IGameStateInterface
     {
         public void EnterMainMenu()
@@ -62,16 +69,26 @@ namespace GameInterface.Services.GameState.Interfaces
             return new GameSaveData(saveBytes);
         }
 
+<<<<<<< HEAD
         
+=======
+        public void StartCharacterCreation()
+        {
+            MBGameManager.StartNewGame(new SandBoxGameManager());
+        }
+>>>>>>> NetworkEvent-refactor
 
         public void StartNewGame()
         {
             MBGameManager.StartNewGame(new SandBoxGameManager());
         }
+<<<<<<< HEAD
 
         public void EndGame()
         {
             MBGameManager.EndGame();
         }
+=======
+>>>>>>> NetworkEvent-refactor
     }
 }

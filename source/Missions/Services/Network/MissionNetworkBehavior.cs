@@ -1,5 +1,9 @@
 ﻿using Common.Messaging;
 using Missions.Services.Agents.Messages;
+<<<<<<< HEAD
+=======
+using Missions.Services.Messaging;
+>>>>>>> NetworkEvent-refactor
 using System;
 using System.Threading.Tasks;
 using TaleWorlds.MountAndBlade;
@@ -15,9 +19,15 @@ namespace Missions.Services.Network
 
         private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
 
+<<<<<<< HEAD
         private readonly IMessageBroker _messageBroker;
 
         public MissionNetworkBehavior(LiteNetP2PClient client, IMessageBroker messageBroker)
+=======
+        private readonly INetworkMessageBroker _messageBroker;
+
+        internal MissionNetworkBehavior(LiteNetP2PClient client, INetworkMessageBroker messageBroker)
+>>>>>>> NetworkEvent-refactor
         {
             m_Client = client;
             _messageBroker = messageBroker;

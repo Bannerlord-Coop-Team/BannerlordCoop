@@ -1,11 +1,19 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
+<<<<<<< HEAD
 [assembly: AssemblyTitle("IntroductionServerTests")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("IntroductionServerTests")]
+=======
+[assembly: AssemblyTitle("MissionTests")]
+[assembly: AssemblyDescription("")]
+[assembly: AssemblyConfiguration("")]
+[assembly: AssemblyCompany("")]
+[assembly: AssemblyProduct("MissionTests")]
+>>>>>>> NetworkEvent-refactor
 [assembly: AssemblyCopyright("Copyright ©  2022")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

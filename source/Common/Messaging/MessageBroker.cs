@@ -20,7 +20,9 @@ namespace Common.Messaging
     {
         private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
         private static MessageBroker _instance;
-        protected readonly Dictionary<Type, List<Delegate>> _subscribers;
+        private readonly Dictionary<Type, List<Delegate>> _subscribers;
+
+        // TODO resolve in patches using DI framework
         public static MessageBroker Instance
         {
             get
@@ -31,7 +33,7 @@ namespace Common.Messaging
             }
         }
 
-        public MessageBroker()
+        protected MessageBroker()
         {
             _subscribers = new Dictionary<Type, List<Delegate>>();
         }

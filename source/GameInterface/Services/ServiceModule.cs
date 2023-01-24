@@ -6,11 +6,14 @@ using System.Linq;
 
 namespace GameInterface.Services
 {
+<<<<<<< HEAD
     internal interface IServiceModule
     {
         void InstantiateServices(IContainer container);
     }
 
+=======
+>>>>>>> NetworkEvent-refactor
     internal class ServiceModule : Module, IServiceModule
     {
         protected override void Load(ContainerBuilder builder)
@@ -42,10 +45,22 @@ namespace GameInterface.Services
             base.Load(builder);
         }
 
+<<<<<<< HEAD
         private IHandler[] Handlers;
         public void InstantiateServices(IContainer container)
         {
             Handlers = GetHandlers().Select(i => (IHandler)container.Resolve(i)).ToArray();
+=======
+        static IHandler[] Handlers;
+        public void InstantiateServices(IContainer container)
+        {
+            List<IHandler> handlers = new List<IHandler>();
+            foreach (var type in GetHandlers())
+            {
+                handlers.Add((IHandler)container.Resolve(type));
+            }
+            Handlers = handlers.ToArray();
+>>>>>>> NetworkEvent-refactor
         }
 
         private IEnumerable<Type> GetHandlers()
