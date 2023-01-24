@@ -8,14 +8,11 @@ using TaleWorlds.SaveSystem;
 
 namespace GameInterface.Services.GameDebug.Interfaces
 {
-<<<<<<< HEAD
     internal interface IGameDebugInterface : IGameAbstraction
     {
         void LoadDebugGame();
     }
 
-=======
->>>>>>> NetworkEvent-refactor
     internal class GameDebugInterface : IGameDebugInterface
     {
         public static readonly string LOAD_GAME = "MP";
@@ -33,9 +30,4 @@ namespace GameInterface.Services.GameDebug.Interfaces
             MouseManager.ShowCursor(false);
         }
     }
-<<<<<<< HEAD
-=======
-
-
->>>>>>> NetworkEvent-refactor
 }

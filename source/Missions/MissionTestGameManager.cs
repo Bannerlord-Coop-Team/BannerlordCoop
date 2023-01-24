@@ -2,7 +2,6 @@
 using Common.Messaging;
 using HarmonyLib;
 using IntroServer.Config;
-using Missions.Services.Messaging;
 using Missions.Services.Network;
 using Missions.Services.Network.Surrogates;
 using ProtoBuf.Meta;
@@ -80,8 +79,7 @@ namespace Missions
             Location tavern = LocationComplex.Current.GetLocationWithId("tavern");
             string scene = tavern.GetSceneName(upgradeLevel);
             Mission mission = SandBoxMissions.OpenIndoorMission(scene, tavern);
-            INetworkMessageBroker networkMessageBroker = new NetworkMessageBroker(m_Client);
-            mission.AddMissionBehavior(new MissionNetworkBehavior(m_Client, networkMessageBroker));
+            mission.AddMissionBehavior(new MissionNetworkBehavior(m_Client, MessageBroker.Instance));
 
             //PlayerEncounter.EnterSettlement();
 

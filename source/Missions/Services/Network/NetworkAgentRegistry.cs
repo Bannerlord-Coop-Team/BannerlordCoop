@@ -1,9 +1,4 @@
-<<<<<<< HEAD
 ﻿using Common.Messaging;
-=======
-﻿using Common;
-using Common.Messaging;
->>>>>>> NetworkEvent-refactor
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
@@ -30,10 +25,6 @@ namespace Missions.Services.Network
 
     public class NetworkAgentRegistry : INetworkAgentRegistry
     {
-<<<<<<< HEAD
-=======
-        // TODO resolve in patches using DI framwork
->>>>>>> NetworkEvent-refactor
         public static INetworkAgentRegistry Instance 
         { 
             get

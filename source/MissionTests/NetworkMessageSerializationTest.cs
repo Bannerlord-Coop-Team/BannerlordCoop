@@ -9,11 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using Xunit;
 
-<<<<<<< HEAD
 namespace IntroductionServerTests
-=======
-namespace MissionTests
->>>>>>> NetworkEvent-refactor
 {
     public class NetworkMessageSerializationTest
     {

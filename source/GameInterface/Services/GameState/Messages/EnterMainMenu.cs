@@ -12,11 +12,7 @@ namespace GameInterface.Services.GameState.Messages
     /// <summary>
     /// Reply to <seealso cref="EnterMainMenu"/>.
     /// </summary>
-<<<<<<< HEAD
     public readonly struct MainMenuEntered : IEvent
-=======
-    public readonly struct MainMenuEntered : ICommand
->>>>>>> NetworkEvent-refactor
     {
     }
 }

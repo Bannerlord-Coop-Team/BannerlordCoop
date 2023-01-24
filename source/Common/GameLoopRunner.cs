@@ -2,11 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 
-<<<<<<<< HEAD:source/Common/GameLoopRunner.cs
 namespace Common
-========
-namespace Missions
->>>>>>>> NetworkEvent-refactor:source/Missions/GameLoopRunner.cs
 {
     public class GameLoopRunner : IUpdateable
     {

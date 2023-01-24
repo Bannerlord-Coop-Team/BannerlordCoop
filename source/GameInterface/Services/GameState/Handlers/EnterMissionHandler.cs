@@ -1,9 +1,4 @@
-<<<<<<< HEAD
 ﻿using Common.Messaging;
-=======
-﻿using Common;
-using Common.Messaging;
->>>>>>> NetworkEvent-refactor
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 
