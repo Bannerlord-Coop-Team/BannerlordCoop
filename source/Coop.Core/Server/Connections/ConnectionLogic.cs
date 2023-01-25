@@ -17,7 +17,7 @@ namespace Coop.Core.Server.Connections
             get { return _state; }
             set
             {
-                Logger.Debug("Client is changing to {state} State", value);
+                Logger.Debug("Connection is changing to {state} State", value.GetType().Name);
 
                 _state = value;
             }

@@ -16,7 +16,7 @@ namespace Coop.Core
     {
         public static UpdateableList Updateables { get; } = new UpdateableList();
 
-        public static IContainer Container { get; private set; }
+        private static IContainer _container;
 
         public int Priority => 0;
 
@@ -27,36 +27,40 @@ namespace Coop.Core
 
         public void StartAsServer()
         {
-            if(Container == null)
+            if(_container == null)
             {
                 ContainerBuilder builder = new ContainerBuilder();
                 builder.RegisterModule<CoopModule>();
                 builder.RegisterModule<ServerModule>();
-                Container = builder.Build();
+                _container = builder.Build();
 
-                var server = Container.Resolve<INetwork>();
+                var server = _container.Resolve<INetwork>();
                 Updateables.Add(server);
             }
 
-            var logic = Container.Resolve<ILogic>();
+            var logic = _container.Resolve<ILogic>();
             logic.Start();
         }
 
         public void StartAsClient()
         {
-            if (Container == null)
+            if (_container == null)
             {
                 ContainerBuilder builder = new ContainerBuilder();
                 builder.RegisterModule<CoopModule>();
                 builder.RegisterModule<ClientModule>();
-                Container = builder.Build();
+                _container = builder.Build();
 
-                var client = Container.Resolve<INetwork>();
+                var client = _container.Resolve<INetwork>();
                 Updateables.Add(client);
             }
 
-            var logic = Container.Resolve<ILogic>();
+            var logic = _container.Resolve<ILogic>();
             logic.Start();
+
+            // TODO remove test code
+            var messageBroker = _container.Resolve<IMessageBroker>();
+            messageBroker.Publish(this, new NetworkConnected(false));
         }
     }
 }
