@@ -1,16 +1,8 @@
-﻿using System;
-using Coop.Mod;
+﻿using Common.Network;
+using System;
 
 namespace Coop.Core.Configuration
 {
-    public interface INetworkConfiguration
-    {
-        string Address { get; }
-        int Port { get; }
-        string Token { get; }
-        string P2PToken { get; }
-    }
-
     public class NetworkConfiguration : INetworkConfiguration
     {
         public string Address => "localhost";

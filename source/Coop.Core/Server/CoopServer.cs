@@ -1,22 +1,18 @@
-﻿using System;
+﻿using Common.Messaging;
+using Common.Network;
+using Common.PacketHandlers;
+using Common.Serialization;
+using Coop.Core.Communication.Network;
+using Coop.Core.Server.Connections;
+using Coop.Core.Server.Connections.Messages;
 using LiteNetLib;
+using System;
 using System.Net;
 using System.Net.Sockets;
-using Common.Messaging;
-using Coop.Core.Server.Connections;
-using Coop.Core.Configuration;
-using Coop.Core.Communication.PacketHandlers;
-using Common.Serialization;
-using LiteNetLib.Utils;
-using System.Linq;
-using Coop.Core.Communication.Network;
-using Coop.Core.Server.States;
-using Coop.Core.Server.Connections.Messages;
-using System.Configuration;
 
 namespace Coop.Core.Server
 {
-    public interface ICoopServer : ICoopNetwork, INatPunchListener, INetEventListener, IDisposable
+    public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, IDisposable
     {
     }
 

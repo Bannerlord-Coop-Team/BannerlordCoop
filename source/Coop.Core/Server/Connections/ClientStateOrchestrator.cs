@@ -78,17 +78,16 @@ namespace Coop.Core.Server.Connections
                 return;
 
             connectionLogic.CreateCharacter();
-            _messageBroker.Publish(this, new PlayerCreatingCharacter(playerId));
         }
 
         private void PlayerTransferCharacterHandler(MessagePayload<PlayerTransferCharacter> obj)
         {
-            var playerId = obj.What.PlayerId;
+            var playerId = obj.Who as NetPeer;
             if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
                 return;
 
             connectionLogic.TransferCharacter();
-            _messageBroker.Publish(this, new PlayerTransferCharacter(playerId));
+            _messageBroker.Publish(this, new PlayerCharacterTransfered(playerId));
         }
 
         private void PlayerLoadedHandler(MessagePayload<PlayerLoaded> obj)

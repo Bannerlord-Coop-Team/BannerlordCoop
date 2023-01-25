@@ -1,8 +1,9 @@
 ﻿using LiteNetLib;
+using System;
 
-namespace Coop.Core.Communication.PacketHandlers
+namespace Common.PacketHandlers
 {
-    public interface IPacketHandler
+    public interface IPacketHandler : IDisposable
     {
         PacketType PacketType { get; }
 

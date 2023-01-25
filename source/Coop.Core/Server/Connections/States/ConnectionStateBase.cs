@@ -21,5 +21,6 @@ namespace Coop.Core.Server.Connections.States
         public abstract void Load();
         public abstract void EnterCampaign();
         public abstract void EnterMission();
+        public abstract void Dispose();
     }
 }

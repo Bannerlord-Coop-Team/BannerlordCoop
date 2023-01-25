@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using Coop.Core.Client.Packets;
+using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 
@@ -29,11 +31,8 @@ namespace Coop.Core.Client.States
 
         private void Handle(MessagePayload<CharacterCreatedHeroPackaged> obj)
         {
-            NewHeroPacket heroPacket = new NewHeroPacket(obj.What.Package);
-
-            // Send to server
-            Logic.NetworkClient.SendAll(heroPacket);
-            Logic.State = new ReceivingSavedDataState(Logic, MessageBroker);
+            INetworkEvent networkEvent = new PlayerTransferCharacter(obj.What.Package);
+            Logic.NetworkMessageBroker.PublishNetworkEvent(networkEvent);
         }
 
         public override void EnterMainMenu()

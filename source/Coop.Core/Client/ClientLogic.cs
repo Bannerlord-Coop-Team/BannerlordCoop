@@ -1,8 +1,8 @@
 ﻿using Common.Logging;
 using Common.LogicStates;
 using Common.Messaging;
+using Common.Network;
 using Coop.Core.Client.States;
-using Coop.Core.Communication.PacketHandlers;
 using GameInterface;
 using Serilog;
 
@@ -22,13 +22,15 @@ namespace Coop.Core.Client
         /// Networking Client for Client-side
         /// </summary>
         ICoopClient NetworkClient { get; }
+        INetworkMessageBroker NetworkMessageBroker { get; }
     }
 
     /// <inheritdoc cref="IClientLogic"/>
     public class ClientLogic : IClientLogic
     {
-        private readonly ILogger Logger = LogManager.GetLogger<EventPacketHandler>();
+        private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
         public ICoopClient NetworkClient { get; }
+        public INetworkMessageBroker NetworkMessageBroker { get; }
         public IClientState State 
         {
             get { return _state; }
@@ -46,11 +48,12 @@ namespace Coop.Core.Client
         private readonly IGameInterface gameInterface;
 
         public ClientLogic(
-            ICoopClient networkClient, 
-            IMessageBroker messageBroker,
+            ICoopClient networkClient,
+            INetworkMessageBroker messageBroker,
             IGameInterface gameInterface)
         {
             NetworkClient = networkClient;
+            NetworkMessageBroker = messageBroker;
             State = new MainMenuState(this, messageBroker);
             this.gameInterface = gameInterface;
         }

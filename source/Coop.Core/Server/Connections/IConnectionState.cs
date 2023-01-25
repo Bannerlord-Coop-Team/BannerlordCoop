@@ -1,8 +1,9 @@
 ﻿using Common.LogicStates;
+using System;
 
 namespace Coop.Core.Server.Connections
 {
-    public interface IConnectionState : IState
+    public interface IConnectionState : IState, IDisposable
     {
         /// <summary>
         /// Player joins server and is determine the existence of their given character

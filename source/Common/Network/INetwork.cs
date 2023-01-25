@@ -1,13 +1,9 @@
-﻿
-
-using Common;
-using Coop.Core.Communication.PacketHandlers;
-using Coop.Core.Configuration;
+﻿using Common.PacketHandlers;
 using LiteNetLib;
 
-namespace Coop.Core
+namespace Common.Network
 {
-    public interface ICoopNetwork : IUpdateable
+    public interface INetwork : IUpdateable
     {
         INetworkConfiguration Configuration { get; }
 

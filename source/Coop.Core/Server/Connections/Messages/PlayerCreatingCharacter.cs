@@ -1,9 +1,9 @@
-﻿using LiteNetLib;
-using System;
+﻿using Common.Messaging;
+using LiteNetLib;
 
 namespace Coop.Core.Server.Connections.Messages
 {
-    public readonly struct PlayerCreatingCharacter
+    public readonly struct PlayerCreatingCharacter : INetworkEvent
     {
         public PlayerCreatingCharacter(NetPeer playerId)
         {

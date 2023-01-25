@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
-using Coop.Core.Communication.PacketHandlers;
+using Common.Network;
+using Common.PacketHandlers;
 using Coop.Core.Configuration;
 using Coop.Core.Server.Connections;
 using GameInterface;
@@ -17,7 +18,11 @@ namespace Coop.Core
 
             #region Communication
             builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
-            builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance();
+            builder.RegisterType<EventPacketHandler>().AsSelf().SingleInstance().AutoActivate();
+            builder.RegisterType<NetworkMessageBroker>().As<INetworkMessageBroker>().As<IMessageBroker>()
+                .SingleInstance()
+                .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
+
             builder.RegisterType<Connection>().As<IConnection>();
             #endregion
 

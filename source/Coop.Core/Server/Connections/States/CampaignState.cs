@@ -7,6 +7,11 @@
 
         }
 
+        public override void Dispose()
+        {
+
+        }
+
         public override void ResolveCharacter()
         {
         }

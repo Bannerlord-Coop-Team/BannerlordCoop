@@ -1,17 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Common.Logging;
-using Common.Messaging;
-using Common.Serialization;
-using GameInterface.Serialization;
-using LiteNetLib;
-using LiteNetLib.Utils;
+﻿using LiteNetLib;
 using ProtoBuf;
+using System.Collections.Generic;
 
-namespace Coop.Core.Communication.PacketHandlers
+namespace Common.PacketHandlers
 {
+    public interface IPacketManager
+    {
+        void HandleRecieve(NetPeer peer, IPacket packet);
+        void RegisterPacketHandler(IPacketHandler handler);
+        void RemovePacketHandler(IPacketHandler handler);
+    }
+
     public class PacketManager : IPacketManager
     {
         private readonly Dictionary<PacketType, List<IPacketHandler>> packetHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
@@ -50,7 +49,7 @@ namespace Coop.Core.Communication.PacketHandlers
     }
 
     [ProtoContract(SkipConstructor = true)]
-    internal readonly struct PacketWrapper : IPacket
+    public readonly struct PacketWrapper : IPacket
     {
         public PacketType PacketType => PacketType.PacketWrapper;
         public DeliveryMethod DeliveryMethod { get; }

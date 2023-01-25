@@ -6,15 +6,27 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.Core.Communication.PacketHandlers
+namespace Common.PacketHandlers
 {
     public class ExamplePacketHandler : IPacketHandler
     {
-
         /// <summary>
         /// Handler type must match packet type
         /// </summary>
         public PacketType PacketType => PacketType.Example;
+
+        private readonly IPacketManager packetManager;
+
+        public ExamplePacketHandler(IPacketManager packetManager)
+        {
+            this.packetManager = packetManager;
+            packetManager.RegisterPacketHandler(this);
+        }
+
+        public void Dispose()
+        {
+            packetManager.RemovePacketHandler(this);
+        }
 
         public void HandlePacket(NetPeer peer, IPacket packet)
         {

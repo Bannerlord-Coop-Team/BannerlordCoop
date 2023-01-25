@@ -1,15 +1,19 @@
-﻿using LiteNetLib;
+﻿using Common.Messaging;
+using GameInterface.Serialization.External;
+using LiteNetLib;
+using ProtoBuf;
 using System;
 
 namespace Coop.Core.Server.Connections.Messages
 {
-    public readonly struct PlayerTransferCharacter
+    [ProtoContract(SkipConstructor = true)]
+    public readonly struct PlayerTransferCharacter : INetworkEvent
     {
-        public PlayerTransferCharacter(NetPeer playerId)
+        public PlayerTransferCharacter(HeroBinaryPackage playerHero)
         {
-            PlayerId = playerId;
+            PlayerHero = playerHero;
         }
 
-        public NetPeer PlayerId { get; }
+        public HeroBinaryPackage PlayerHero { get; }
     }
 }

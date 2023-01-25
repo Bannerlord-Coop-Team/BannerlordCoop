@@ -10,7 +10,6 @@ namespace GameInterface
         protected override void Load(ContainerBuilder builder)
         {
             base.Load(builder);
-            builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance();
             builder.RegisterType<GameInterface>().As<IGameInterface>().SingleInstance();
             builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().SingleInstance();
             builder.RegisterModule<ServiceModule>();

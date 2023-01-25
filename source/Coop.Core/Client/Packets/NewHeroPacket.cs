@@ -1,12 +1,7 @@
-﻿using Common.Serialization;
-using Coop.Core.Communication.PacketHandlers;
+﻿using Common.PacketHandlers;
+using Common.Serialization;
 using GameInterface.Serialization.External;
 using LiteNetLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Coop.Core.Client.Packets
 {

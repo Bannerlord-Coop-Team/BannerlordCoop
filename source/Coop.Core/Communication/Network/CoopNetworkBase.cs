@@ -1,17 +1,14 @@
-﻿using Common.Serialization;
-using Coop.Core.Communication.PacketHandlers;
-using LiteNetLib.Utils;
+﻿using Common.Network;
+using Common.PacketHandlers;
+using Common.Serialization;
 using LiteNetLib;
+using LiteNetLib.Utils;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Coop.Core.Configuration;
 
 namespace Coop.Core.Communication.Network
 {
-    public abstract class CoopNetworkBase : ICoopNetwork
+    public abstract class CoopNetworkBase : INetwork
     {
         public abstract INetworkConfiguration Configuration { get; }
         public abstract int Priority { get; }

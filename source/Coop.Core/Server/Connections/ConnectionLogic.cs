@@ -24,6 +24,11 @@ namespace Coop.Core.Server.Connections
         }
         private IConnectionState _state;
 
+        public void Dispose()
+        {
+            State.Dispose();
+        }
+
         public ConnectionLogic()
         {
             State = new InitialConnectionState(this);

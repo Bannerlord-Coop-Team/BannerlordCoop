@@ -28,7 +28,7 @@ namespace Coop.Core.Server
     /// <inheritdoc cref="IServerLogic"/>
     public class ServerLogic : IServerLogic
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
+        private static readonly ILogger Logger = LogManager.GetLogger<ServerLogic>();
 
         public IServerState State
         {

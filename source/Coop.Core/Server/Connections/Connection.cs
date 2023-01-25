@@ -21,7 +21,7 @@ namespace Coop.Core.Server.Connections
 
         public void Dispose()
         {
-            throw new NotImplementedException();
+            State.Dispose();
         }
     }
 }

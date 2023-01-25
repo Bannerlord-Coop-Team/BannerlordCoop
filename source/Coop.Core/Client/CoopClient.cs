@@ -1,11 +1,11 @@
 using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
+using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
 using Coop.Core.Communication.Network;
-using Coop.Core.Communication.PacketHandlers;
-using Coop.Core.Configuration;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -14,7 +14,7 @@ using System.Net.Sockets;
 
 namespace Coop.Core.Client
 {
-    public interface ICoopClient : ICoopNetwork, IUpdateable, INetEventListener
+    public interface ICoopClient : INetwork, IUpdateable, INetEventListener
     {
     }
 

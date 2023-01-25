@@ -276,7 +276,6 @@
     <Compile Include="Helpers\IExampleGameHelper.cs" />
     <Compile Include="Helpers\SaveGameData.cs" />
     <Compile Include="Helpers\ISaveLoadHelper.cs" />
-    <Compile Include="IGameInterface.cs" />
     <Compile Include="Services\CampaignService\Patches\CompanionsCampaignBehaviorPatches.cs" />
     <Compile Include="Services\CampaignService\Patches\SetTimeSpeedPatch.cs" />
     <Compile Include="Services\CampaignService\Patches\TimeControlModePatch.cs" />

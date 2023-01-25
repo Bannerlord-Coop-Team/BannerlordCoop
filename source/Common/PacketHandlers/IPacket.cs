@@ -1,6 +1,6 @@
 ﻿using LiteNetLib;
 
-namespace Coop.Core.Communication.PacketHandlers
+namespace Common.PacketHandlers
 {
     public enum PacketType
     {

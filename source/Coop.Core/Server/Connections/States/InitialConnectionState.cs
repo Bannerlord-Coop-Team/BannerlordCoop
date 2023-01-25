@@ -9,6 +9,11 @@ namespace Coop.Core.Server.Connections.States
         {
         }
 
+        public override void Dispose()
+        {
+
+        }
+
         public override void ResolveCharacter()
         {
             ConnectionLogic.State = new ResolveCharacterState(ConnectionLogic);

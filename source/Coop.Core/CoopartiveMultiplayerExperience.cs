@@ -2,6 +2,7 @@
 using Common;
 using Common.LogicStates;
 using Common.Messaging;
+using Common.Network;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Server;
@@ -15,7 +16,7 @@ namespace Coop.Core
     {
         public static UpdateableList Updateables { get; } = new UpdateableList();
 
-        private static IContainer _container;
+        public static IContainer Container { get; private set; }
 
         public int Priority => 0;
 
@@ -26,42 +27,36 @@ namespace Coop.Core
 
         public void StartAsServer()
         {
-            if(_container == null)
+            if(Container == null)
             {
                 ContainerBuilder builder = new ContainerBuilder();
                 builder.RegisterModule<CoopModule>();
                 builder.RegisterModule<ServerModule>();
-                builder.RegisterModule<GameInterfaceModule>();
-                _container = builder.Build();
+                Container = builder.Build();
 
-                var server = _container.Resolve<ICoopNetwork>();
+                var server = Container.Resolve<INetwork>();
                 Updateables.Add(server);
             }
 
-            var logic = _container.Resolve<ILogic>();
+            var logic = Container.Resolve<ILogic>();
             logic.Start();
         }
 
         public void StartAsClient()
         {
-            if (_container == null)
+            if (Container == null)
             {
                 ContainerBuilder builder = new ContainerBuilder();
                 builder.RegisterModule<CoopModule>();
                 builder.RegisterModule<ClientModule>();
-                builder.RegisterModule<GameInterfaceModule>();
-                _container = builder.Build();
+                Container = builder.Build();
 
-                var client = _container.Resolve<ICoopNetwork>();
+                var client = Container.Resolve<INetwork>();
                 Updateables.Add(client);
             }
 
-            var logic = _container.Resolve<ILogic>();
+            var logic = Container.Resolve<ILogic>();
             logic.Start();
-
-            // TODO remove test code
-            var messageBroker = _container.Resolve<IMessageBroker>();
-            messageBroker.Publish(this, new NetworkConnected(false));
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Serialization;
 using LiteNetLib;
@@ -8,23 +7,29 @@ using ProtoBuf.Meta;
 using Serilog;
 using System;
 using System.Reflection;
-using Coop.Core.Client;
 
-namespace Coop.Core.Communication.PacketHandlers
+namespace Common.PacketHandlers
 {
-    internal class EventPacketHandler : IPacketHandler
+    public class EventPacketHandler : IPacketHandler
     {
         private readonly ILogger Logger = LogManager.GetLogger<EventPacketHandler>();
 
         public PacketType PacketType => PacketType.Event;
 
         private readonly IMessageBroker _messageBroker;
-        private readonly ICoopClient _client;
+        private readonly IPacketManager _packetManager;
 
-        public EventPacketHandler(ICoopClient client, IMessageBroker messageBroker)
+        public EventPacketHandler(IMessageBroker messageBroker, IPacketManager packetManager)
         {
             _messageBroker = messageBroker;
-            _client = client;
+            _packetManager = packetManager;
+
+            _packetManager.RegisterPacketHandler(this);
+        }
+
+        public void Dispose()
+        {
+            _packetManager.RemovePacketHandler(this);
         }
 
         private static readonly MethodInfo Publish = typeof(IMessageBroker).GetMethod(nameof(IMessageBroker.Publish));
@@ -38,6 +43,8 @@ namespace Coop.Core.Communication.PacketHandlers
 
             Publish.MakeGenericMethod(@event.GetType()).Invoke(_messageBroker, new object[] { peer, @event });
         }
+
+        
     }
 
     [ProtoContract(SkipConstructor = true)]
@@ -60,7 +67,7 @@ namespace Coop.Core.Communication.PacketHandlers
         }
 
         [ProtoMember(1)]
-        public byte[] _event;
+        private byte[] _event;
 
         public EventPacket(INetworkEvent @event)
         {
