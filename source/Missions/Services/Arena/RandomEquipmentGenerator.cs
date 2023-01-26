@@ -84,7 +84,7 @@ namespace Missions.Services.Arena
         /// <returns>New equipment element with random item</returns>
         private EquipmentElement[] SelectRandomLoadout(ItemTypeEnum[] itemTypes)
         {
-            ItemTypeEnum[] loadout = new ItemTypeEnum[itemTypes.Length];
+            ItemTypeEnum[] loadout = itemTypes;
 
             EquipmentElement[] equipment = new EquipmentElement[loadout.Length];
 
