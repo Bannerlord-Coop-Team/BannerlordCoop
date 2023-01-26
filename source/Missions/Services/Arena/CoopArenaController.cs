@@ -71,6 +71,7 @@ namespace Missions.Services
                 joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
 
             Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject);
+            
             _agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
         }
 
@@ -124,7 +125,7 @@ namespace Missions.Services
             agentBuildData.Team(Mission.Current.PlayerAllyTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
-            agentBuildData.Equipment(_equipmentGenerator.CreateRandomEquipment(true););
+            agentBuildData.Equipment(_equipmentGenerator.CreateRandomEquipment(true));
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.None);
 
