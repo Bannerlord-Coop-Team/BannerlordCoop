@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.CharacterCreation.Messages;
@@ -29,7 +30,8 @@ namespace GameInterface.Services.CharacterCreation.Interfaces
         public void PackageMainHero()
         {
             HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
-            messageBroker.Publish(this, new CharacterCreatedHeroPackaged(package));
+            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
+            messageBroker.Publish(this, new CharacterCreatedHeroPackaged(bytes));
         }
 
         public void StartCharacterCreation()

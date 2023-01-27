@@ -103,10 +103,6 @@
     <Analyzer Include="..\packages\xunit.analyzers.1.0.0\analyzers\dotnet\cs\xunit.analyzers.fixes.dll" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{314f078f-41df-4a23-b25c-f558eff83d2a}</Project>
-      <Name>Common</Name>
-    </ProjectReference>
     <ProjectReference Include="..\IntroServer\IntroServer.csproj">
       <Project>{5FF39DA3-DBFC-4C2D-BD03-CD765EE9984B}</Project>
       <Name>IntroServer</Name>

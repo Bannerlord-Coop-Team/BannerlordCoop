@@ -9,11 +9,12 @@ namespace Coop.Core.Server.Connections.Messages
     [ProtoContract(SkipConstructor = true)]
     public readonly struct PlayerTransferCharacter : INetworkEvent
     {
-        public PlayerTransferCharacter(HeroBinaryPackage playerHero)
+        public PlayerTransferCharacter(byte[] playerHero)
         {
             PlayerHero = playerHero;
         }
 
-        public HeroBinaryPackage PlayerHero { get; }
+        [ProtoMember(1)]
+        public byte[] PlayerHero { get; }
     }
 }

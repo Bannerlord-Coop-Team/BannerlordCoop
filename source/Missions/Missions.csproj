@@ -199,7 +199,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{314f078f-41df-4a23-b25c-f558eff83d2a}</Project>
+      <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
       <Name>Common</Name>
     </ProjectReference>
     <ProjectReference Include="..\GameInterface\GameInterface.csproj">

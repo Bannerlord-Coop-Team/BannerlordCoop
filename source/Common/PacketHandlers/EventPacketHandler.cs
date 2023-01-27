@@ -43,8 +43,6 @@ namespace Common.PacketHandlers
 
             Publish.MakeGenericMethod(@event.GetType()).Invoke(_messageBroker, new object[] { peer, @event });
         }
-
-        
     }
 
     [ProtoContract(SkipConstructor = true)]

@@ -4,9 +4,9 @@ namespace GameInterface.Services.CharacterCreation.Messages
 {
     public readonly struct CharacterCreatedHeroPackaged
     {
-        public HeroBinaryPackage Package { get; }
+        public byte[] Package { get; }
 
-        public CharacterCreatedHeroPackaged(HeroBinaryPackage package)
+        public CharacterCreatedHeroPackaged(byte[] package)
         {
             Package = package;
         }

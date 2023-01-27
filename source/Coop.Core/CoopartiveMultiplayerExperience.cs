@@ -6,8 +6,6 @@ using Common.Network;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Server;
-using GameInterface;
-using GameInterface.Services.CharacterCreation.Messages;
 using System;
 
 namespace Coop.Core
@@ -59,8 +57,8 @@ namespace Coop.Core
             logic.Start();
 
             // TODO remove test code
-            var messageBroker = _container.Resolve<IMessageBroker>();
-            messageBroker.Publish(this, new NetworkConnected(false));
+            //var messageBroker = _container.Resolve<IMessageBroker>();
+            //messageBroker.Publish(this, new NetworkConnected(false));
         }
     }
 }

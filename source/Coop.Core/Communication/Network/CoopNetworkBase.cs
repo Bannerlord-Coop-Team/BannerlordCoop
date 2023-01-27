@@ -32,10 +32,7 @@ namespace Coop.Core.Communication.Network
         public virtual void Send(NetPeer netPeer, IPacket packet)
         {
             PacketWrapper wrapper = new PacketWrapper(packet);
-
-            // Put type using writer
             NetDataWriter writer = new NetDataWriter();
-            writer.Put((int)wrapper.PacketType);
 
             // Serialize and put data in writer (with length is important on receive end)
             byte[] data = ProtoBufSerializer.Serialize(packet);
