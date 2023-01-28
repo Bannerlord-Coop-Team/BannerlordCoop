@@ -25,6 +25,7 @@ using Missions.Services.Arena;
 using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
 using SandBox.View.Missions;
 using TaleWorlds.MountAndBlade.View;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Missions.Services
 {
@@ -78,9 +79,15 @@ namespace Missions.Services
             Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject);
             _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
 
+            Mission currentMission = Mission.Current;
+
             for (int i = 0; i < joinInfo.UnitId.Length; i++)
             {
-                Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], joinInfo.CharacterObject); // TODO: Change to correct object
+
+                //PartyAgentOrigin partyAgentOrigin = new PartyAgentOrigin(PartyBase.MainParty, CharacterObject.Find(joinInfo.UnitIdString[i]));
+                //Agent tempAi = currentMission.SpawnTroop(partyAgentOrigin, true, true, false, CharacterObject.Find(joinInfo.UnitIdString[i]).HasMount(), 1, 1, false, true, false, joinInfo.UnitStartingPosition[i], new Vec2());
+
+                Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]));
 
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
@@ -109,7 +116,7 @@ namespace Missions.Services
             Team playerTeam = new Team(new MBTeam(), BattleSideEnum.Attacker, Mission.Current);
             Agent.Main.SetTeam(playerTeam, false);
 
-            _tempAi = SpawnAgent(spawnFrames.GetRandomElement().origin, CharacterObject.PlayerCharacter);
+            _tempAi = SpawnAgent(spawnFrames.GetRandomElement().origin, CharacterObject.Find("aserai_veteran_infantry"));
             playerTeam.AddAgentToTeam(_tempAi);
 
             for (int i = 1; i < Agent.Main.Team.TeamAgents.Count; i++)
@@ -147,7 +154,7 @@ namespace Missions.Services
             agentBuildData.Team(Mission.Current.PlayerAllyTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
-            agentBuildData.Equipment(_equipmentGenerator.CreateRandomEquipment(true));
+            agentBuildData.Equipment(character.Equipment);
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.None);
 

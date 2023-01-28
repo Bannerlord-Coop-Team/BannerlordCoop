@@ -87,15 +87,17 @@ namespace Missions.Services.Network
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
 
             List<Vec3> unitPositions = new List<Vec3>();
-            foreach(Agent agent in Agent.Main.Team.TeamAgents)
+            List<string> unitIdStrings = new List<string>();
+            foreach (Agent agent in Agent.Main.Team.TeamAgents)
             {
                 if (agent != Agent.Main)
                 {
                     unitPositions.Add(agent.Position);
+                    unitIdStrings.Add(agent.Character.StringId);
                 }
             }
 
-            MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position, _unitId.ToArray(), unitPositions.ToArray());
+            MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position, _unitId.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
             _client.SendEvent(request, peer);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
