@@ -25,11 +25,20 @@ namespace Missions.Messages
 
         [ProtoMember(3)]
         private byte[] _packedCharacter;
-        public MissionJoinInfo(CharacterObject characterObject, Guid playerId, Vec3 startingPosition)
+
+        [ProtoMember(4)]
+        public readonly Guid[] UnitId;
+
+        [ProtoMember(5)]
+        public readonly Vec3[] UnitStartingPosition;
+
+        public MissionJoinInfo(CharacterObject characterObject, Guid playerId, Vec3 startingPosition, Guid[] unitId, Vec3[] unitStartingPosition)
         {
             PlayerId = playerId;
             StartingPosition = startingPosition;
             CharacterObject = characterObject;
+            UnitId = unitId;
+            UnitStartingPosition = unitStartingPosition;
         }
 
         private byte[] PackCharacter(CharacterObject characterObject)

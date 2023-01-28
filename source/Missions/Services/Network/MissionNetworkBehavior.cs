@@ -9,9 +9,11 @@ using Missions.Services.Network.Messages;
 using Missions.Services.Network.PacketHandlers;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 
@@ -25,6 +27,7 @@ namespace Missions.Services.Network
 
         private readonly LiteNetP2PClient _client;
         private readonly Guid _playerId;
+        public static List<Guid> _unitId = new List<Guid>();
 
         private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
 
@@ -42,6 +45,7 @@ namespace Missions.Services.Network
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
             _playerId = Guid.NewGuid();
+
             _movementHandler = new MovementHandler(_client, _messageBroker, _agentRegistry);
             _eventPacketHandler = new EventPacketHandler(_client, _messageBroker);
 
@@ -81,7 +85,17 @@ namespace Missions.Services.Network
             _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
 
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
-            MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position);
+
+            List<Vec3> unitPositions = new List<Vec3>();
+            foreach(Agent agent in Agent.Main.Team.TeamAgents)
+            {
+                if (agent != Agent.Main)
+                {
+                    unitPositions.Add(agent.Position);
+                }
+            }
+
+            MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position, _unitId.ToArray(), unitPositions.ToArray());
             _client.SendEvent(request, peer);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",

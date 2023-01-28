@@ -22,6 +22,9 @@ using JetBrains.Annotations;
 using TaleWorlds.CampaignSystem.Extensions;
 using System.Runtime.CompilerServices;
 using Missions.Services.Arena;
+using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
+using SandBox.View.Missions;
+using TaleWorlds.MountAndBlade.View;
 
 namespace Missions.Services
 {
@@ -34,6 +37,8 @@ namespace Missions.Services
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
+
+        private Agent _tempAi;
 
         public CoopArenaController(
             IMessageBroker messageBroker, 
@@ -71,11 +76,17 @@ namespace Missions.Services
                 joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
 
             Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject);
-            
-            _agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
+            _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
+
+            for (int i = 0; i < joinInfo.UnitId.Length; i++)
+            {
+                Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], joinInfo.CharacterObject); // TODO: Change to correct object
+
+                _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
+            }
         }
 
-        public Agent AddPlayerToArena()
+        public void AddPlayerToArena()
         {
             Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;
 
@@ -93,7 +104,18 @@ namespace Missions.Services
 
 
             // spawn an instance of the player (controlled by default)
-            return SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
+            SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
+
+            Team playerTeam = new Team(new MBTeam(), BattleSideEnum.Attacker, Mission.Current);
+            Agent.Main.SetTeam(playerTeam, false);
+
+            _tempAi = SpawnAgent(spawnFrames.GetRandomElement().origin, CharacterObject.PlayerCharacter);
+            playerTeam.AddAgentToTeam(_tempAi);
+
+            for (int i = 1; i < Agent.Main.Team.TeamAgents.Count; i++)
+            {
+                CoopMissionNetworkBehavior._unitId.Add(Guid.NewGuid());
+            }
         }
 
         // Spawn an agent based on its character object and frame. For now, Main agent character object is used

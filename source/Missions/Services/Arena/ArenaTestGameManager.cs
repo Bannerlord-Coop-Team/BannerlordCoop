@@ -23,6 +23,7 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
+using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.SaveSystem.Load;
 
 namespace Missions.Services.Arena
@@ -108,6 +109,7 @@ namespace Missions.Services.Arena
                 new MissionAgentHandler(location),
                 new CoopMissionNetworkBehavior(_client, MessageBroker.Instance, NetworkAgentRegistry.Instance),
                 new CoopArenaController(MessageBroker.Instance, NetworkAgentRegistry.Instance, new RandomEquipmentGenerator()),
+                //ViewCreator.CreateMissionOrderUIHandler(),
             }, true, true);
         }
 
