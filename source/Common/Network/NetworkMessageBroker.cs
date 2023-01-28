@@ -22,7 +22,7 @@ namespace Common.Network
         /// </summary>
         /// <param name="networkEvent">Event to publish</param>
         /// <param name="peer">Peer to send event</param>
-        void PublishNetworkEvent(INetworkEvent networkEvent, NetPeer peer);
+        void PublishNetworkEvent(NetPeer peer, INetworkEvent networkEvent);
     }
 
     /// <inheritdoc cref="INetworkMessageBroker"/>
@@ -37,7 +37,7 @@ namespace Common.Network
             _instance = this;
         }
 
-        public void PublishNetworkEvent(INetworkEvent networkEvent, NetPeer peer)
+        public void PublishNetworkEvent(NetPeer peer, INetworkEvent networkEvent)
         {
             EventPacket eventPacket = new EventPacket(networkEvent);
 

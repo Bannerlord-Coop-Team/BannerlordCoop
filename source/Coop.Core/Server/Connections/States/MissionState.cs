@@ -1,8 +1,11 @@
-﻿namespace Coop.Core.Server.Connections.States
+﻿using Common.Messaging;
+
+namespace Coop.Core.Server.Connections.States
 {
     public class MissionState : ConnectionStateBase
     {
-        public MissionState(IConnectionLogic connectionLogic) : base(connectionLogic)
+        public MissionState(IConnectionLogic connectionLogic)
+            : base(connectionLogic)
         {
         }
 
@@ -19,7 +22,7 @@
         {
         }
 
-        public override void TransferCharacter()
+        public override void TransferSave()
         {
         }
 

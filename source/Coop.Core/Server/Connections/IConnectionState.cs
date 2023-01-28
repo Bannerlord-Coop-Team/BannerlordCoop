@@ -18,7 +18,7 @@ namespace Coop.Core.Server.Connections
         /// <summary>
         /// New character info is being transferred to server
         /// </summary>
-        void TransferCharacter();
+        void TransferSave();
 
         /// <summary>
         /// Player loading server data as a whole

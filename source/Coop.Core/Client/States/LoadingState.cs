@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
+using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Messages;
+using System;
 
 namespace Coop.Core.Client.States
 {
@@ -11,17 +13,30 @@ namespace Coop.Core.Client.States
         public LoadingState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
             MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<NetworkGuidsResolved>(Handle);
+            MessageBroker.Subscribe<NetworkGameSaveDataRecieved>(Handle);
+            MessageBroker.Subscribe<GameLoaded>(Handle);
+        }
+
+        public override void Dispose()
+        {
+            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            MessageBroker.Unsubscribe<NetworkGameSaveDataRecieved>(Handle);
+            MessageBroker.Unsubscribe<GameLoaded>(Handle);
         }
 
         private void Handle(MessagePayload<MainMenuEntered> obj)
         {
-            Logic.State = new MainMenuState(Logic, MessageBroker);
+            Logic.Disconnect();
         }
 
-        private void Handle(MessagePayload<NetworkGuidsResolved> obj)
+        private void Handle(MessagePayload<NetworkGameSaveDataRecieved> obj)
         {
-            Logic.State = new ResolveNetworkGuidsState(Logic, MessageBroker);
+            MessageBroker.Publish(this, new LoadGameSave(obj.What.GameSaveData));
+        }
+
+        private void Handle(MessagePayload<GameLoaded> obj)
+        {
+            Logic.ResolveNetworkGuids();
         }
 
         public override void EnterMainMenu()
@@ -31,13 +46,7 @@ namespace Coop.Core.Client.States
 
         public override void ResolveNetworkGuids()
         {
-            MessageBroker.Publish(this, new ResolveNetworkGuids());
-        }
-
-        public override void Dispose()
-        {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<NetworkGuidsResolved>(Handle);
+            Logic.State = new ResolveNetworkGuidsState(Logic, MessageBroker);
         }
 
         public override void Connect()

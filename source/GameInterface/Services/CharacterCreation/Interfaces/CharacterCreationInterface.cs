@@ -12,7 +12,6 @@ namespace GameInterface.Services.CharacterCreation.Interfaces
 {
     internal interface ICharacterCreationInterface : IGameAbstraction
     {
-        void PackageMainHero();
         void StartCharacterCreation();
     }
 
@@ -25,13 +24,6 @@ namespace GameInterface.Services.CharacterCreation.Interfaces
         {
             this.binaryPackageFactory = binaryPackageFactory;
             this.messageBroker = messageBroker;
-        }
-
-        public void PackageMainHero()
-        {
-            HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
-            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
-            messageBroker.Publish(this, new CharacterCreatedHeroPackaged(bytes));
         }
 
         public void StartCharacterCreation()

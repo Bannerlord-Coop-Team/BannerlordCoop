@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Modules.Messages;
 
 namespace Coop.Core.Client.States
 {
@@ -12,6 +13,14 @@ namespace Coop.Core.Client.States
         {
             MessageBroker.Subscribe<MainMenuEntered>(Handle);
             MessageBroker.Subscribe<ModulesValidated>(Handle);
+
+            MessageBroker.Publish(this, new ValidateModules());
+        }
+
+        public override void Dispose()
+        {
+            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            MessageBroker.Unsubscribe<ModulesValidated>(Handle);
         }
 
         private void Handle(MessagePayload<MainMenuEntered> obj)
@@ -31,13 +40,7 @@ namespace Coop.Core.Client.States
 
         public override void LoadSavedData()
         {
-            MessageBroker.Publish(this, new ValidateModule());
-        }
-
-        public override void Dispose()
-        {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<ModulesValidated>(Handle);
+            MessageBroker.Publish(this, new ValidateModules());
         }
 
         public override void Connect()

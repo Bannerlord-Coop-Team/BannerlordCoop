@@ -42,12 +42,6 @@
     <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
-    <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.3.1.26\lib\net462\protobuf-net.dll</HintPath>
-    </Reference>
-    <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.Core.3.1.26\lib\net462\protobuf-net.Core.dll</HintPath>
-    </Reference>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>
@@ -279,12 +273,28 @@
     <Compile Include="Services\CampaignService\Patches\CompanionsCampaignBehaviorPatches.cs" />
     <Compile Include="Services\CampaignService\Patches\SetTimeSpeedPatch.cs" />
     <Compile Include="Services\CampaignService\Patches\TimeControlModePatch.cs" />
-    <Compile Include="Services\CharacterCreation\Messages\CharacterCreatedHeroPackaged.cs" />
+    <Compile Include="Services\CharacterCreation\Messages\StartCharacterCreation.cs" />
     <Compile Include="Services\GameDebug\Patches\CharacterCreationIntoPatch.cs" />
     <Compile Include="Services\CharacterCreation\Interfaces\CharacterCreationInterface.cs" />
-    <Compile Include="Services\CharacterCreation\Messages\CharacterCreationFinished.cs" />
+    <Compile Include="Services\GameState\Messages\EnterCampaignState.cs" />
     <Compile Include="Services\GameState\Patches\CharacterCreationFinishedPatch.cs" />
-    <Compile Include="Services\Save\IGameSaveData.cs" />
+    <Compile Include="Services\Heroes\Handlers\NewHeroHandler.cs" />
+    <Compile Include="Services\Heroes\Messages\NewPlayerHeroRecieved.cs" />
+    <Compile Include="Services\Heroes\Interfaces\HeroInterface.cs" />
+    <Compile Include="Services\Heroes\Messages\NewHeroPackaged.cs" />
+    <Compile Include="Services\Heroes\Messages\NewPlayerHeroRegistered.cs" />
+    <Compile Include="Services\Heroes\Messages\PackageMainHero.cs" />
+    <Compile Include="Services\Modules\Handlers\NewHeroHandler.cs" />
+    <Compile Include="Services\Modules\Interfaces\ModuleInterface.cs" />
+    <Compile Include="Services\Save\CoopInMemSaveDriver.cs" />
+    <Compile Include="Services\Save\Handlers\SaveHandler.cs" />
+    <Compile Include="Services\Save\Interfaces\SaveInterface.cs" />
+    <Compile Include="Services\Save\Messages\PackageGameSaveData.cs" />
+    <Compile Include="Services\Time\Handlers\TimeControlHandler.cs" />
+    <Compile Include="Services\Time\Interaces\TimeControlInterface.cs" />
+    <Compile Include="Services\Time\Messages\EnableGameTimeControls.cs" />
+    <Compile Include="Services\Time\Messages\PauseAndDisableGameTimeControls.cs" />
+    <Compile Include="Services\Time\Patches\TimePatches.cs" />
     <Compile Include="Services\UI\Handlers\LoadingScreenHandler.cs" />
     <Compile Include="Services\UI\Interfaces\UIInterface.cs" />
     <Compile Include="Services\UI\Messages\EndLoadingScreen.cs" />
@@ -410,17 +420,14 @@
     <Compile Include="Services\IGameAbstraction.cs" />
     <Compile Include="Services\GameState\Handlers\EnterMissionHandler.cs" />
     <Compile Include="Services\GameState\Messages\Connect.cs" />
-    <Compile Include="Services\GameState\Messages\EnterCampaignState.cs" />
     <Compile Include="Services\GameState\Messages\EnterMissionState.cs" />
     <Compile Include="Services\GameState\Messages\ResolveNetworkGuids.cs" />
-    <Compile Include="Services\GameState\Messages\ValidateModule.cs" />
+    <Compile Include="Services\Modules\Messages\ValidateModule.cs" />
     <Compile Include="Services\ServiceModule.cs" />
     <Compile Include="Services\GameState\Interfaces\GameStateInterface.cs" />
     <Compile Include="Services\GameState\Messages\EnterMainMenu.cs" />
     <Compile Include="Services\GameState\Messages\GameLoaded.cs" />
     <Compile Include="Services\GameState\Messages\LoadGameSave.cs" />
-    <Compile Include="Services\GameState\Messages\PackageGameSaveData.cs" />
-    <Compile Include="Services\CharacterCreation\Messages\StartCharacterCreation.cs" />
     <Compile Include="Utils\ReflectionUtils.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -431,12 +438,6 @@
     <Folder Include="Services\CampaignService\Handlers\" />
     <Folder Include="Services\CampaignService\Interfaces\" />
     <Folder Include="Services\CampaignService\Messages\" />
-    <Folder Include="Services\Heroes\Handlers\" />
-    <Folder Include="Services\Heroes\Interfaces\" />
-    <Folder Include="Services\Heroes\Messages\" />
-    <Folder Include="Services\Save\Handlers\" />
-    <Folder Include="Services\Save\Interfaces\" />
-    <Folder Include="Services\Save\Messages\" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">

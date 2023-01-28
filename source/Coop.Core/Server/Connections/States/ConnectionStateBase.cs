@@ -7,7 +7,6 @@ namespace Coop.Core.Server.Connections.States
     /// </summary>
     public abstract class ConnectionStateBase : IConnectionState
     {
-        public IMessageBroker MessageBroker;
         public IConnectionLogic ConnectionLogic;
 
         public ConnectionStateBase(IConnectionLogic connectionLogic)
@@ -17,7 +16,7 @@ namespace Coop.Core.Server.Connections.States
 
         public abstract void ResolveCharacter();
         public abstract void CreateCharacter();
-        public abstract void TransferCharacter();
+        public abstract void TransferSave();
         public abstract void Load();
         public abstract void EnterCampaign();
         public abstract void EnterMission();

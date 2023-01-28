@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 
-namespace Coop.Mod.Patch
+namespace GameInterface.Services.Heroes.Patches
 {
     [HarmonyPatch(typeof(Hero))]
     internal class HeroPatches
@@ -11,7 +11,7 @@ namespace Coop.Mod.Patch
         [HarmonyPatch(MethodType.Constructor)]
         static void Postfix(Hero __instance)
         {
-            
+
             //if(Coop.IsServer)
             //{
             //    string stacktrace = Environment.StackTrace;
@@ -22,7 +22,7 @@ namespace Coop.Mod.Patch
             //    string stacktrace = Environment.StackTrace;
             //    Logger.Info($"Creating new hero, {__instance.Name}");
             //}
-            
+
         }
     }
 }

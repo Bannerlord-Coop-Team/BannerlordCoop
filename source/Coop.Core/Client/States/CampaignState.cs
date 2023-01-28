@@ -1,5 +1,9 @@
 ﻿using Common.Messaging;
+using Coop.Core.Server.Connections;
+using Coop.Core.Server.Connections.Messages.Outgoing;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Time.Messages;
+using System;
 
 namespace Coop.Core.Client.States
 {
@@ -10,18 +14,24 @@ namespace Coop.Core.Client.States
     {
         public CampaignState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
+            MessageBroker.Subscribe<NetworkDisableTimeControls>(Handle);
+
             MessageBroker.Subscribe<MainMenuEntered>(Handle);
             MessageBroker.Subscribe<MissionStateEntered>(Handle);
         }
 
-        private void Handle(MessagePayload<MainMenuEntered> obj)
+        public override void Dispose()
         {
-            Logic.State = new MainMenuState(Logic, MessageBroker);
+            MessageBroker.Unsubscribe<NetworkDisableTimeControls>(Handle);
+
+            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            MessageBroker.Unsubscribe<MissionStateEntered>(Handle);
         }
 
-        private void Handle(MessagePayload<MissionStateEntered> obj)
+        private void Handle(MessagePayload<NetworkDisableTimeControls> obj)
         {
-            Logic.State = new MissionState(Logic, MessageBroker);
+            // TODO will conflict with timemode changed event
+            MessageBroker.Publish(this, new PauseAndDisableGameTimeControls());
         }
 
         public override void EnterMissionState()
@@ -29,15 +39,19 @@ namespace Coop.Core.Client.States
             MessageBroker.Publish(this, new EnterMissionState());
         }
 
+        private void Handle(MessagePayload<MissionStateEntered> obj)
+        {
+            Logic.State = new MissionState(Logic, MessageBroker);
+        }
+
         public override void EnterMainMenu()
         {
             MessageBroker.Publish(this, new EnterMainMenu());
         }
 
-        public override void Dispose()
+        private void Handle(MessagePayload<MainMenuEntered> obj)
         {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<MissionStateEntered>(Handle);
+            Logic.State = new MainMenuState(Logic, MessageBroker);
         }
 
         public override void Connect()

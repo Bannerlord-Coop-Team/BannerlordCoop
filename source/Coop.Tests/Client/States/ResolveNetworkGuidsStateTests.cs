@@ -13,14 +13,14 @@ namespace Coop.Tests.Client.States
         public ResolveNetworkGuidsStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, messageBroker);
-            clientLogic.State = new ResolveNetworkGuidsState(clientLogic, messageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, MessageBroker);
+            clientLogic.State = new ResolveNetworkGuidsState(clientLogic, MessageBroker);
         }
 
         [Fact]
         public void Ctor_Subscribes()
         {
-            var subscriberCount = messageBroker.GetTotalSubscribers();
+            var subscriberCount = MessageBroker.GetTotalSubscribers();
             Assert.Equal(2, subscriberCount);
         }
 
@@ -28,7 +28,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             var isEventPublished = false;
-            messageBroker.Subscribe<EnterMainMenu>((payload) =>
+            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -41,7 +41,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void EnterMainMenu_Transitions_MainMenuState()
         {
-            messageBroker.Publish(this, new MainMenuEntered());
+            MessageBroker.Publish(this, new MainMenuEntered());
 
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
@@ -49,7 +49,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void EnterMainMenu_Transitions_CampaignState()
         {
-            messageBroker.Publish(this, new CampaignStateEntered());
+            MessageBroker.Publish(this, new CampaignStateEntered());
 
             Assert.IsType<CampaignState>(clientLogic.State);
         }
@@ -58,7 +58,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             var isEventPublished = false;
-            messageBroker.Subscribe<EnterMainMenu>((payload) =>
+            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -73,7 +73,7 @@ namespace Coop.Tests.Client.States
         {
             clientLogic.Dispose();
 
-            var subscriberCount = messageBroker.GetTotalSubscribers();
+            var subscriberCount = MessageBroker.GetTotalSubscribers();
             Assert.Equal(0, subscriberCount);
         }
 

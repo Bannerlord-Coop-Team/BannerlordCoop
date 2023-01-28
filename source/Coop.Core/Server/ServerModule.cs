@@ -17,7 +17,7 @@ namespace Coop.Core.Server
             builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().SingleInstance();
             builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().SingleInstance();
             builder.RegisterType<InitialServerState>().As<IServerState>();
-            builder.RegisterType<ClientStateOrchestrator>().As<IClientStateOrchestrator>().SingleInstance();
+            builder.RegisterType<ClientRegistry>().As<IClientRegistry>().SingleInstance();
             base.Load(builder);
         }
     }

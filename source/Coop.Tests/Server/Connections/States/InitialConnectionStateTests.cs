@@ -31,7 +31,7 @@ namespace Coop.Tests.Server.Connections.States
 
             _connectionLogic.Load();
             _connectionLogic.CreateCharacter();
-            _connectionLogic.TransferCharacter();
+            _connectionLogic.TransferSave();
             _connectionLogic.EnterMission();
             _connectionLogic.EnterCampaign();
 

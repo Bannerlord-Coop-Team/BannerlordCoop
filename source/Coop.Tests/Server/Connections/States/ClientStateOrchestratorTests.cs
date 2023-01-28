@@ -1,5 +1,7 @@
 ﻿using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Connections.Messages.Incoming;
+using Coop.Core.Server.Connections.Messages.Outgoing;
 using Coop.Core.Server.Connections.States;
 using LiteNetLib;
 using System.Linq;
@@ -11,18 +13,18 @@ namespace Coop.Tests.Server.Connections.States
 {
     public class ClientStateOrchestratorTests : CoopTest
     {
-        private readonly ClientStateOrchestrator clientStateOrchestrator;
+        private readonly ClientRegistry clientStateOrchestrator;
         private readonly NetPeer _playerId = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
         public ClientStateOrchestratorTests(ITestOutputHelper output) : base(output)
         {
-            clientStateOrchestrator = new ClientStateOrchestrator(messageBroker);
+            clientStateOrchestrator = new ClientRegistry(MessageBroker);
         }
 
         [Fact]
         public void PlayerDisconnected_RemovePlayer()
         {
-            messageBroker.Publish(this, new PlayerConnected(_playerId));
-            messageBroker.Publish(this, new PlayerDisconnected(_playerId, default(DisconnectInfo)));
+            MessageBroker.Publish(this, new PlayerConnected(_playerId));
+            MessageBroker.Publish(this, new PlayerDisconnected(_playerId, default(DisconnectInfo)));
 
             Assert.Empty(clientStateOrchestrator.ConnectionStates);
         }
@@ -30,7 +32,7 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerPlayerConnected_AddsNewPlayer()
         {
-            messageBroker.Publish(this, new PlayerConnected(_playerId));
+            MessageBroker.Publish(this, new PlayerConnected(_playerId));
 
             Assert.Single(clientStateOrchestrator.ConnectionStates);
             Assert.IsType<ResolveCharacterState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
@@ -39,8 +41,8 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerCharacterResolved_UpdatesPlayerState_LoadingState()
         {
-            messageBroker.Publish(this, new PlayerConnected(_playerId));
-            messageBroker.Publish(this, new CharacterResolved(_playerId));
+            MessageBroker.Publish(this, new PlayerConnected(_playerId));
+            MessageBroker.Publish(this, new CharacterResolved(_playerId));
 
             Assert.IsType<LoadingState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
         }
@@ -49,13 +51,13 @@ namespace Coop.Tests.Server.Connections.States
         public void PlayerJoined_Publishes_PlayerLoading()
         {
             var messagePublished = false;
-            messageBroker.Subscribe<PlayerLoading>((_playerId) =>
+            MessageBroker.Subscribe<PlayerLoading>((_playerId) =>
             {
                 messagePublished = true;
             });
 
-            messageBroker.Publish(this, new PlayerConnected(_playerId));
-            messageBroker.Publish(this, new CharacterResolved(_playerId));
+            MessageBroker.Publish(this, new PlayerConnected(_playerId));
+            MessageBroker.Publish(this, new CharacterResolved(_playerId));
 
             Assert.True(messagePublished);
         }
@@ -63,9 +65,9 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerLoaded_EntersCampaignState()
         {
-            messageBroker.Publish(this, new PlayerConnected(_playerId));
-            messageBroker.Publish(this, new CharacterResolved(_playerId));
-            messageBroker.Publish(this, new PlayerLoaded(_playerId));
+            MessageBroker.Publish(this, new PlayerConnected(_playerId));
+            MessageBroker.Publish(this, new CharacterResolved(_playerId));
+            MessageBroker.Publish(this, new PlayerLoaded(_playerId));
 
             Assert.IsType<CampaignState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
         }
@@ -73,10 +75,10 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerEntersMissionState()
         {
-            messageBroker.Publish(this, new PlayerConnected(_playerId));
-            messageBroker.Publish(this, new CharacterResolved(_playerId));
-            messageBroker.Publish(this, new PlayerLoaded(_playerId));
-            messageBroker.Publish(this, new PlayerTransitionMission(_playerId));
+            MessageBroker.Publish(this, new PlayerConnected(_playerId));
+            MessageBroker.Publish(this, new CharacterResolved(_playerId));
+            MessageBroker.Publish(this, new PlayerLoaded(_playerId));
+            MessageBroker.Publish(this, new PlayerTransitionedToMission(_playerId));
 
             Assert.IsType<MissionState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
         }
@@ -85,11 +87,11 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void PlayerMissionState_TransitionsCampaignState()
         {
-            messageBroker.Publish(this, new PlayerConnected(_playerId));
-            messageBroker.Publish(this, new CharacterResolved(_playerId));
-            messageBroker.Publish(this, new PlayerLoaded(_playerId));
-            messageBroker.Publish(this, new PlayerTransitionMission(_playerId));
-            messageBroker.Publish(this, new PlayerTransitionCampaign(_playerId));
+            MessageBroker.Publish(this, new PlayerConnected(_playerId));
+            MessageBroker.Publish(this, new CharacterResolved(_playerId));
+            MessageBroker.Publish(this, new PlayerLoaded(_playerId));
+            MessageBroker.Publish(this, new PlayerTransitionedToMission(_playerId));
+            MessageBroker.Publish(this, new PlayerTransitionedToCampaign(_playerId));
 
             Assert.IsType<CampaignState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
         }

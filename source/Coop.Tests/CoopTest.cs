@@ -1,17 +1,21 @@
-﻿using Coop.Tests.Stubs;
+﻿using Common.Messaging;
+using Common.Network;
+using Coop.Tests.Stubs;
 using Xunit.Abstractions;
 
 namespace Coop.Tests
 {
     public class CoopTest
     {
-        public readonly MessageBrokerStub messageBroker;
-        public readonly ITestOutputHelper output;
+        public readonly IMessageBroker MessageBroker;
+        public readonly INetworkMessageBroker NetworkMessageBroker;
+        public readonly ITestOutputHelper Output;
 
         public CoopTest(ITestOutputHelper output)
         {
-            this.output = output;
-            messageBroker = new MessageBrokerStub();
+            Output = output;
+            MessageBroker = new MessageBrokerStub();
+            NetworkMessageBroker = new NetworkMessageBrokerStub();
         }
     }
 }

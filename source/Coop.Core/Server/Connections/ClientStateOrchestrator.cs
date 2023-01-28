@@ -1,6 +1,9 @@
 ﻿using Common.Messaging;
-using Coop.Core.Server.Connections.Messages;
+using Common.Network;
+using Coop.Core.Server.Connections.Messages.Incoming;
+using GameInterface.Services.CharacterCreation.Messages;
 using LiteNetLib;
+using System;
 using System.Collections.Generic;
 
 namespace Coop.Core.Server.Connections
@@ -8,46 +11,38 @@ namespace Coop.Core.Server.Connections
     /// <summary>
     /// Handle Client connection state as it pertains to loading in a given player
     /// </summary>
-    public interface IClientStateOrchestrator
+    public interface IClientRegistry
     {
     }
 
-    /// <inheritdoc cref="IClientStateOrchestrator"/>
-    public class ClientStateOrchestrator : IClientStateOrchestrator
+    /// <inheritdoc cref="IClientRegistry"/>
+    public class ClientRegistry : IClientRegistry
     {
         public IDictionary<NetPeer, IConnectionLogic> ConnectionStates { get; private set; } = new Dictionary<NetPeer, IConnectionLogic>();
 
-        private readonly IMessageBroker _messageBroker;
+        private readonly INetworkMessageBroker _messageBroker;
 
-        public ClientStateOrchestrator(IMessageBroker messageBroker)
+        public ClientRegistry(INetworkMessageBroker messageBroker)
         {
             _messageBroker = messageBroker;
             _messageBroker.Subscribe<PlayerConnected>(PlayerJoiningHandler);
             _messageBroker.Subscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
-            _messageBroker.Subscribe<CharacterResolved>(PlayerJoinedHandler);
-            _messageBroker.Subscribe<PlayerCreatingCharacter>(PlayerCreatingCharacterHandler);
-            _messageBroker.Subscribe<PlayerTransferCharacter>(PlayerTransferCharacterHandler);
-            _messageBroker.Subscribe<PlayerLoaded>(PlayerLoadedHandler);
-            _messageBroker.Subscribe<PlayerTransitionCampaign>(PlayerTransitionsCampaignHandler);
-            _messageBroker.Subscribe<PlayerTransitionMission>(PlayerTransitionsMissionHandler);
+            _messageBroker.Subscribe<PlayerTransitionedToCampaign>(PlayerTransitionsCampaignHandler);
+            _messageBroker.Subscribe<PlayerTransitionedToMission>(PlayerTransitionsMissionHandler);
         }
 
-        ~ClientStateOrchestrator()
+        ~ClientRegistry()
         {
             _messageBroker.Unsubscribe<PlayerConnected>(PlayerJoiningHandler);
             _messageBroker.Unsubscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
-            _messageBroker.Unsubscribe<CharacterResolved>(PlayerJoinedHandler);
-            _messageBroker.Unsubscribe<PlayerCreatingCharacter>(PlayerCreatingCharacterHandler);
-            _messageBroker.Unsubscribe<PlayerTransferCharacter>(PlayerTransferCharacterHandler);
-            _messageBroker.Unsubscribe<PlayerLoaded>(PlayerLoadedHandler);
-            _messageBroker.Unsubscribe<PlayerTransitionCampaign>(PlayerTransitionsCampaignHandler);
-            _messageBroker.Unsubscribe<PlayerTransitionMission>(PlayerTransitionsMissionHandler);
+            _messageBroker.Unsubscribe<PlayerTransitionedToCampaign>(PlayerTransitionsCampaignHandler);
+            _messageBroker.Unsubscribe<PlayerTransitionedToMission>(PlayerTransitionsMissionHandler);
         }
 
         private void PlayerJoiningHandler(MessagePayload<PlayerConnected> obj)
         {
             var playerId = obj.What.PlayerId;
-            var connectionLogic = new ConnectionLogic();
+            var connectionLogic = new ConnectionLogic(playerId, _messageBroker);
             ConnectionStates.Add(playerId, connectionLogic);
             connectionLogic.ResolveCharacter();
         }
@@ -55,42 +50,17 @@ namespace Coop.Core.Server.Connections
         private void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)
         {
             var playerId = obj.What.PlayerId;
-            if (!ConnectionStates.ContainsKey(playerId))
-                return;
-
-            ConnectionStates.Remove(playerId);
+            
+            if(ConnectionStates.TryGetValue(playerId, out IConnectionLogic logic))
+            {
+                ConnectionStates.Remove(playerId);
+                logic.Dispose();
+            }
         }
 
-        private void PlayerJoinedHandler(MessagePayload<CharacterResolved> obj)
-        {
-            var playerId = obj.What.PlayerId;
-            if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
-                return;
+        
 
-            connectionLogic.Load();
-            _messageBroker.Publish(this, new PlayerLoading(playerId));
-        }
-
-        private void PlayerCreatingCharacterHandler(MessagePayload<PlayerCreatingCharacter> obj)
-        {
-            var playerId = obj.What.PlayerId;
-            if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
-                return;
-
-            connectionLogic.CreateCharacter();
-        }
-
-        private void PlayerTransferCharacterHandler(MessagePayload<PlayerTransferCharacter> obj)
-        {
-            var playerId = obj.Who as NetPeer;
-            if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
-                return;
-
-            connectionLogic.TransferCharacter();
-            _messageBroker.Publish(this, new PlayerCharacterTransfered(playerId));
-        }
-
-        private void PlayerLoadedHandler(MessagePayload<PlayerLoaded> obj)
+        private void PlayerTransitionsCampaignHandler(MessagePayload<PlayerTransitionedToCampaign> obj)
         {
             var playerId = obj.What.PlayerId;
             if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
@@ -99,16 +69,7 @@ namespace Coop.Core.Server.Connections
             connectionLogic.EnterCampaign();
         }
 
-        private void PlayerTransitionsCampaignHandler(MessagePayload<PlayerTransitionCampaign> obj)
-        {
-            var playerId = obj.What.PlayerId;
-            if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
-                return;
-
-            connectionLogic.EnterCampaign();
-        }
-
-        private void PlayerTransitionsMissionHandler(MessagePayload<PlayerTransitionMission> obj)
+        private void PlayerTransitionsMissionHandler(MessagePayload<PlayerTransitionedToMission> obj)
         {
             var playerId = obj.What.PlayerId;
             if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))

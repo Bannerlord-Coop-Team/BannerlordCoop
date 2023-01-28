@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Messages;
 using System;
 
@@ -12,24 +13,17 @@ namespace Coop.Core.Client.States
         public ReceivingSavedDataState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
             MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<GameSaveRecieved>(Handle);
-            MessageBroker.Subscribe<GameSaveLoaded>(Handle);
+            MessageBroker.Subscribe<NetworkGameSaveDataRecieved>(Handle);
         }
 
-        private void Handle(MessagePayload<GameSaveRecieved> obj)
+        private void Handle(MessagePayload<NetworkGameSaveDataRecieved> obj)
         {
-            throw new NotImplementedException();
+            Logic.State = new ValidateModuleState(Logic, MessageBroker);
         }
 
         private void Handle(MessagePayload<MainMenuEntered> obj)
         {
             Logic.State = new MainMenuState(Logic, MessageBroker);
-        }
-
-        private void Handle(MessagePayload<GameSaveLoaded> obj)
-        {
-            Logic.State = new ValidateModuleState(Logic, MessageBroker);
-            MessageBroker.Publish(this, new ValidateModule());
         }
 
         public override void EnterMainMenu()
@@ -40,7 +34,7 @@ namespace Coop.Core.Client.States
         public override void Dispose()
         {
             MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<GameSaveLoaded>(Handle);
+            MessageBroker.Unsubscribe<NetworkGameSaveDataRecieved>(Handle);
         }
 
         public override void Connect()

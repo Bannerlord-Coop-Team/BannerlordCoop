@@ -16,6 +16,7 @@ namespace GameInterface.Services.GameState.Handlers
 
         private void Handle(MessagePayload<EnterCampaignState> obj)
         {
+            // TODO implement
             messageBroker.Publish(this, new CampaignStateEntered());
         }
     }

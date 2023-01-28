@@ -112,6 +112,7 @@
     <Compile Include="Communication\CommunicatorMessageBrokerTest.cs" />
     <Compile Include="Communication\PacketManagerTest.cs" />
     <Compile Include="CoopTest.cs" />
+    <Compile Include="NetworkMessageBrokerStub.cs" />
     <Compile Include="Server\Connections\States\CampaignStateTests.cs" />
     <Compile Include="Server\Connections\States\ClientStateOrchestratorTests.cs" />
     <Compile Include="Server\Connections\States\InitialConnectionStateTests.cs" />

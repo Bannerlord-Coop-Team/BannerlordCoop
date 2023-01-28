@@ -10,8 +10,19 @@ namespace Coop.Core.Client.States
     {
         public ResolveNetworkGuidsState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
-            messageBroker.Subscribe<MainMenuEntered>(Handle);
-            messageBroker.Subscribe<CampaignStateEntered>(Handle);
+            MessageBroker.Publish(this, new ResolveNetworkGuids());
+
+            MessageBroker.Subscribe<MainMenuEntered>(Handle);
+            MessageBroker.Subscribe<CampaignStateEntered>(Handle);
+
+            // TODO implement and remove state skip
+            Logic.State = new CampaignState(logic, messageBroker);
+        }
+
+        public override void Dispose()
+        {
+            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            MessageBroker.Unsubscribe<CampaignStateEntered>(Handle);
         }
 
         private void Handle(MessagePayload<MainMenuEntered> obj)
@@ -32,12 +43,6 @@ namespace Coop.Core.Client.States
         public override void EnterMainMenu()
         {
             MessageBroker.Publish(this, new EnterMainMenu());
-        }
-
-        public override void Dispose()
-        {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<CampaignStateEntered>(Handle);
         }
 
         public override void Connect()

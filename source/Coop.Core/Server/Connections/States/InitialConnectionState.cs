@@ -4,7 +4,7 @@ namespace Coop.Core.Server.Connections.States
 {
     public class InitialConnectionState : ConnectionStateBase
     {
-        public InitialConnectionState(IConnectionLogic connectionLogic) 
+        public InitialConnectionState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
         {
         }
@@ -23,7 +23,7 @@ namespace Coop.Core.Server.Connections.States
         {
         }
 
-        public override void TransferCharacter()
+        public override void TransferSave()
         {
         }
 

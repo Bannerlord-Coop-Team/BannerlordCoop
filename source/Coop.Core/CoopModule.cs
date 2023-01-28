@@ -22,8 +22,6 @@ namespace Coop.Core
             builder.RegisterType<NetworkMessageBroker>().As<INetworkMessageBroker>().As<IMessageBroker>()
                 .SingleInstance()
                 .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
-
-            builder.RegisterType<Connection>().As<IConnection>();
             #endregion
 
             #region GameInterface

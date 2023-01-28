@@ -19,9 +19,9 @@ namespace Coop.Tests.Server.Connections.States
         {
             _connectionLogic.State = new CreateCharacterState(_connectionLogic);
 
-            _connectionLogic.TransferCharacter();
+            _connectionLogic.TransferSave();
 
-            Assert.IsType<TransferCharacterState>(_connectionLogic.State);
+            Assert.IsType<TransferSaveState>(_connectionLogic.State);
         }
 
         [Fact]

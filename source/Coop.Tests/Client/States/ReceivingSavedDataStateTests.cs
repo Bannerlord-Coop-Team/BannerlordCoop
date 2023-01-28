@@ -1,6 +1,7 @@
 ﻿using Coop.Core.Client;
 using Coop.Core.Client.States;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Modules.Messages;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
@@ -13,14 +14,14 @@ namespace Coop.Tests.Client.States
         public ReceivingSavedDataStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, messageBroker);
-            clientLogic.State = new ReceivingSavedDataState(clientLogic, messageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, MessageBroker);
+            clientLogic.State = new ReceivingSavedDataState(clientLogic, MessageBroker);
         }
 
         [Fact]
         public void Ctor_Subscribes()
         {
-            var subscriberCount = messageBroker.GetTotalSubscribers();
+            var subscriberCount = MessageBroker.GetTotalSubscribers();
             Assert.Equal(2, subscriberCount);
         }
 
@@ -28,7 +29,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             var isEventPublished = false;
-            messageBroker.Subscribe<EnterMainMenu>((payload) =>
+            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -41,7 +42,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void EnterMainMenu_Transitions_MainMenuState()
         {
-            messageBroker.Publish(this, new MainMenuEntered());
+            MessageBroker.Publish(this, new MainMenuEntered());
 
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
@@ -49,7 +50,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void EnterMainMenu_Transitions_ValidateModuleState()
         {
-            messageBroker.Publish(this, new GameSaveLoaded());
+            MessageBroker.Publish(this, new GameSaveLoaded());
 
             Assert.IsType<ValidateModuleState>(clientLogic.State);
         }
@@ -58,12 +59,12 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_ValidateModule()
         {
             var isEventPublished = false;
-            messageBroker.Subscribe<ValidateModule>((payload) =>
+            MessageBroker.Subscribe<ValidateModules>((payload) =>
             {
                 isEventPublished = true;
             });
 
-            messageBroker.Publish(this, new GameSaveLoaded());
+            MessageBroker.Publish(this, new GameSaveLoaded());
 
             Assert.True(isEventPublished);
         }
@@ -72,7 +73,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             var isEventPublished = false;
-            messageBroker.Subscribe<EnterMainMenu>((payload) =>
+            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -87,7 +88,7 @@ namespace Coop.Tests.Client.States
         {
             clientLogic.Dispose();
 
-            var subscriberCount = messageBroker.GetTotalSubscribers();
+            var subscriberCount = MessageBroker.GetTotalSubscribers();
             Assert.Equal(0, subscriberCount);
         }
 

@@ -20,7 +20,7 @@
         {
         }
 
-        public override void TransferCharacter()
+        public override void TransferSave()
         {
         }
 

@@ -40,7 +40,7 @@ namespace Coop.Tests.Server.Connections.States
             _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
 
             _connectionLogic.ResolveCharacter();
-            _connectionLogic.TransferCharacter();
+            _connectionLogic.TransferSave();
             _connectionLogic.EnterCampaign();
             _connectionLogic.EnterMission();
 

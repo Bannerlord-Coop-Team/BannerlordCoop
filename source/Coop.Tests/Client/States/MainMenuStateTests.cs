@@ -14,20 +14,20 @@ namespace Coop.Tests.Client.States
         public MainMenuStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, messageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, MessageBroker);
         }
 
         [Fact]
         public void Ctor_SubscribesNetworkConnected()
         {
-            var subscriberCount = messageBroker.GetTotalSubscribers();
+            var subscriberCount = MessageBroker.GetTotalSubscribers();
             Assert.Equal(1, subscriberCount);
         }
 
         [Fact]
         public void Connect_CharacterNotCreated_EnterCharacterCreation()
         {
-            messageBroker.Publish(this, new NetworkConnected(false));
+            MessageBroker.Publish(this, new NetworkConnected(false));
 
             Assert.IsType<CharacterCreationState>(clientLogic.State);
         }
@@ -35,7 +35,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void Connect_CharacterCreated_ReceivingSavedDataState()
         {
-            messageBroker.Publish(this, new NetworkConnected(true));
+            MessageBroker.Publish(this, new NetworkConnected(true));
 
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
@@ -44,7 +44,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             var isEventPublished = false;
-            messageBroker.Subscribe<EnterMainMenu>((payload) =>
+            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -59,7 +59,7 @@ namespace Coop.Tests.Client.States
         {
             clientLogic.Dispose();
 
-            var subscriberCount = messageBroker.GetTotalSubscribers();
+            var subscriberCount = MessageBroker.GetTotalSubscribers();
             Assert.Equal(0, subscriberCount);
         }
 

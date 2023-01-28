@@ -19,12 +19,6 @@ namespace GameInterface.Services.CharacterCreation.Handlers
             this.messageBroker = messageBroker;
 
             messageBroker.Subscribe<StartCharacterCreation>(Handle);
-            messageBroker.Subscribe<CharacterCreationFinished>(Handle);
-        }
-
-        private void Handle(MessagePayload<CharacterCreationFinished> obj)
-        {
-            characterCreationInterface.PackageMainHero();
         }
 
         private void Handle(MessagePayload<StartCharacterCreation> obj)

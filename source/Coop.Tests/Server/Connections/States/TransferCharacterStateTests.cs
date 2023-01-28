@@ -17,7 +17,7 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void LoadMethod_TransitionState_LoadingState()
         {
-            _connectionLogic.State = new TransferCharacterState(_connectionLogic);
+            _connectionLogic.State = new TransferSaveState(_connectionLogic);
 
             _connectionLogic.Load();
 
@@ -27,15 +27,15 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            _connectionLogic.State = new TransferCharacterState(_connectionLogic);
+            _connectionLogic.State = new TransferSaveState(_connectionLogic);
 
             _connectionLogic.ResolveCharacter();
             _connectionLogic.CreateCharacter();
-            _connectionLogic.TransferCharacter();
+            _connectionLogic.TransferSave();
             _connectionLogic.EnterCampaign();
             _connectionLogic.EnterMission();
 
-            Assert.IsType<TransferCharacterState>(_connectionLogic.State);
+            Assert.IsType<TransferSaveState>(_connectionLogic.State);
         }
     }
 }

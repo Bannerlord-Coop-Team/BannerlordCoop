@@ -19,13 +19,13 @@ namespace Coop.Tests.Server.States
         {
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
             Mock<ICoopServer> coopServer = new Mock<ICoopServer>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, messageBroker);
+            IServerState currentState = new InitialServerState(serverLogic.Object, MessageBroker);
             serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
             serverLogic.Setup(m => m.NetworkServer).Returns(coopServer.Object);
 
-            messageBroker.Subscribe<LoadDebugGame>((payload) =>
+            MessageBroker.Subscribe<LoadDebugGame>((payload) =>
             {
-                messageBroker.Publish(null, new GameLoaded());
+                MessageBroker.Publish(null, new GameLoaded());
             });
 
             currentState.Start();
@@ -38,7 +38,7 @@ namespace Coop.Tests.Server.States
         {
 
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, messageBroker);
+            IServerState currentState = new InitialServerState(serverLogic.Object, MessageBroker);
             serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
 
             currentState.Stop();
@@ -51,13 +51,13 @@ namespace Coop.Tests.Server.States
         {
 
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, messageBroker);
+            IServerState currentState = new InitialServerState(serverLogic.Object, MessageBroker);
 
-            Assert.NotEqual(0, messageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
 
             currentState.Dispose();
 
-            Assert.Equal(0, messageBroker.GetTotalSubscribers());
+            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
         }
     }
 }

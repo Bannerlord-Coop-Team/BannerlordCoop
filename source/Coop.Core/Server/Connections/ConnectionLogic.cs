@@ -1,17 +1,29 @@
 ﻿using Common.Logging;
+using Common.Messaging;
+using Common.Network;
 using Coop.Core.Server.Connections.States;
+using LiteNetLib;
 using Serilog;
 
 namespace Coop.Core.Server.Connections
 {
     public interface IConnectionLogic : IConnectionState
     {
-        IConnectionState State { get; set; }
+        NetPeer PlayerId { get; }
+        uint HeroId { get; set; }
+        INetworkMessageBroker NetworkMessageBroker { get; }
+        IConnectionState State { get; set; }    
     }
 
     public class ConnectionLogic : IConnectionLogic
     {
         private readonly ILogger Logger = LogManager.GetLogger<ConnectionLogic>();
+
+        public NetPeer PlayerId { get; }
+        public uint HeroId { get; set; }
+
+        public INetworkMessageBroker NetworkMessageBroker { get; }
+
         public IConnectionState State 
         {
             get { return _state; }
@@ -21,47 +33,29 @@ namespace Coop.Core.Server.Connections
 
                 _state = value;
             }
-        }
+        }        
+
         private IConnectionState _state;
 
-        public void Dispose()
-        {
-            State.Dispose();
-        }
-
-        public ConnectionLogic()
+        public ConnectionLogic(NetPeer playerId, INetworkMessageBroker messageBroker)
         {
             State = new InitialConnectionState(this);
+            PlayerId = playerId;
+            NetworkMessageBroker = messageBroker;
         }
 
-        public void ResolveCharacter()
-        {
-            State.ResolveCharacter();
-        }
+        public void Dispose() => State.Dispose();
 
-        public void CreateCharacter()
-        {
-            State.CreateCharacter();
-        }
+        public void ResolveCharacter() => State.ResolveCharacter();
 
-        public void TransferCharacter()
-        {
-            State.TransferCharacter();
-        }
+        public void CreateCharacter() => State.CreateCharacter();
 
-        public void Load()
-        {
-            State.Load();
-        }
+        public void TransferSave() => State.TransferSave();
 
-        public void EnterCampaign()
-        {
-            State.EnterCampaign();
-        }
+        public void Load() => State.Load();
 
-        public void EnterMission()
-        {
-            State.EnterMission();
-        }
+        public void EnterCampaign() => State.EnterCampaign();
+
+        public void EnterMission() => State.EnterMission();
     }
 }
