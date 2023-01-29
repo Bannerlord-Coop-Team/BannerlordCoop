@@ -1,19 +1,17 @@
-﻿using Common.Messaging;
-using GameInterface.Services.CharacterCreation.Interfaces;
-using GameInterface.Services.CharacterCreation.Messages;
+﻿using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
     internal class NewHeroHandler : IHandler
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<NewHeroHandler>();
+
         private readonly IHeroInterface heroInterface;
         private readonly IMessageBroker messageBroker;
 
@@ -25,21 +23,38 @@ namespace GameInterface.Services.Heroes.Handlers
             this.messageBroker = messageBroker;
 
             messageBroker.Subscribe<PackageMainHero>(Handle);
-            messageBroker.Subscribe<NewPlayerHeroRecieved>(Handle);
+            messageBroker.Subscribe<RegisterNewPlayerHero>(Handle);
         }
 
         private void Handle(MessagePayload<PackageMainHero> obj)
         {
-            heroInterface.PackageMainHero();
+            try
+            {
+                heroInterface.PackageMainHero();
+            }
+            catch (Exception e)
+            {
+                Logger.Error("Error while packing new Hero: {error}", e.Message);
+            }
         }
 
-        private void Handle(MessagePayload<NewPlayerHeroRecieved> obj)
+        private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
         {
+            var registrationId = obj.What.RegistrationEventId;
             byte[] bytes = obj.What.Bytes;
 
-            Hero hero = heroInterface.UnpackMainHero(bytes);
+            try
+            {
+                Hero hero = heroInterface.UnpackMainHero(bytes);
 
-            messageBroker.Publish(obj.Who, new NewPlayerHeroRegistered(hero.Id));
+                var registerMessage = new NewPlayerHeroRegistered(registrationId, hero);
+
+                messageBroker.Publish(this, registerMessage);
+            }
+            catch(Exception e)
+            {
+                Logger.Error("Error while unpacking new Hero: {error}", e.Message);
+            }
         }
     }
 }

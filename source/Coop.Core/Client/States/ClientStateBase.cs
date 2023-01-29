@@ -12,6 +12,7 @@ namespace Coop.Core.Client.States
 
         public ClientStateBase(IClientLogic logic, IMessageBroker messageBroker)
         {
+            MessageBroker = messageBroker;
             Logic = logic;
         }
 

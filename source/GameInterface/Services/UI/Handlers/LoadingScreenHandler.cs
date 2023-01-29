@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 using TaleWorlds.Engine;
@@ -21,12 +22,18 @@ namespace GameInterface.Services.GameDebug.Interfaces
 
         private void Handle(MessagePayload<StartLoadingScreen> obj)
         {
-            LoadingWindow.EnableGlobalLoadingWindow();
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                LoadingWindow.EnableGlobalLoadingWindow();
+            }, bBlocking: false);
         }
 
         private void Handle(MessagePayload<EndLoadingScreen> obj)
         {
-            LoadingWindow.DisableGlobalLoadingWindow();
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                LoadingWindow.DisableGlobalLoadingWindow();
+            }, bBlocking: false);
         }
     }
 }

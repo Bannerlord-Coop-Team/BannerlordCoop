@@ -45,7 +45,7 @@ namespace Common
         }
         public int Priority { get; } = UpdatePriority.MainLoop.GameLoopRunner;
 
-        public static void RunOnMainThread(Action action, bool bBlocking = true)
+        public static void RunOnMainThread(Action action, bool bBlocking = false)
         {
             if (Thread.CurrentThread.ManagedThreadId == Instance.m_GameLoopThreadId)
             {

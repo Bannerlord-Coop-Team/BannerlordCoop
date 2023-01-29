@@ -123,6 +123,7 @@
     <Compile Include="Client\States\ResolveNetworkGuidsState.cs" />
     <Compile Include="Client\States\ValidateModuleState.cs" />
     <Compile Include="CoopModule.cs" />
+    <Compile Include="Server\Connections\ClientRegistry.cs" />
     <Compile Include="Server\Connections\IConnectionState.cs" />
     <Compile Include="Server\Connections\Messages\Incoming\PlayerConnectedCampaign.cs" />
     <Compile Include="Server\Connections\Messages\Incoming\PlayerConnectedMission.cs" />
@@ -140,7 +141,6 @@
     <Compile Include="Server\Connections\States\CampaignState.cs" />
     <Compile Include="Server\Connections\States\ConnectionStateBase.cs" />
     <Compile Include="Server\Connections\ConnectionLogic.cs" />
-    <Compile Include="Server\Connections\ClientStateOrchestrator.cs" />
     <Compile Include="Server\Connections\States\CreateCharacterState.cs" />
     <Compile Include="Server\Connections\Messages\Outgoing\NetworkEnableTimeControls.cs" />
     <Compile Include="Server\Connections\States\InitialConnectionState.cs" />

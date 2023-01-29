@@ -83,7 +83,9 @@ namespace Coop.Core.Client
             if(isConnected == false)
             {
                 isConnected = true;
-                messageBroker.Publish(this, new NetworkConnected());
+
+                // TODO update NetworkConnected to be a INetworkEvent
+                messageBroker.Publish(this, new NetworkConnected(false));
             }
         }
 

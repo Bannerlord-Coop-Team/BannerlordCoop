@@ -15,7 +15,7 @@ namespace Coop.Core.Client.States
             MessageBroker.Subscribe<NetworkConnected>(Handle);
         }
 
-        public override void Dispose()
+        public override void Dispose() 
         {
             MessageBroker.Unsubscribe<NetworkConnected>(Handle);
         }
@@ -33,8 +33,8 @@ namespace Coop.Core.Client.States
             }
             else
             {
-                Logic.State = new CharacterCreationState(Logic, MessageBroker);
                 MessageBroker.Publish(this, new StartCharacterCreation());
+                Logic.State = new CharacterCreationState(Logic, MessageBroker);
             }
         }
 

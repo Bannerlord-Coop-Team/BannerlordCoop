@@ -12,29 +12,25 @@ namespace Coop.Core.Client.States
     {
         public ReceivingSavedDataState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
         {
-            MessageBroker.Subscribe<MainMenuEntered>(Handle);
             MessageBroker.Subscribe<NetworkGameSaveDataRecieved>(Handle);
+        }
+
+        public override void Dispose()
+        {
+            MessageBroker.Unsubscribe<NetworkGameSaveDataRecieved>(Handle);
         }
 
         private void Handle(MessagePayload<NetworkGameSaveDataRecieved> obj)
         {
-            Logic.State = new ValidateModuleState(Logic, MessageBroker);
-        }
+            var commandLoad = new LoadGameSave(obj.What.GameSaveData);
+            MessageBroker.Publish(this, commandLoad);
 
-        private void Handle(MessagePayload<MainMenuEntered> obj)
-        {
-            Logic.State = new MainMenuState(Logic, MessageBroker);
+            Logic.State = new ValidateModuleState(Logic, MessageBroker);
         }
 
         public override void EnterMainMenu()
         {
             MessageBroker.Publish(this, new EnterMainMenu());
-        }
-
-        public override void Dispose()
-        {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<NetworkGameSaveDataRecieved>(Handle);
         }
 
         public override void Connect()

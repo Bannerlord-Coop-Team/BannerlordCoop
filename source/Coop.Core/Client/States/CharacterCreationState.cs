@@ -3,6 +3,7 @@ using Coop.Core.Server.Connections.Messages.Incoming;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using System;
 
 namespace Coop.Core.Client.States
 {
@@ -18,12 +19,12 @@ namespace Coop.Core.Client.States
             MessageBroker.Subscribe<MainMenuEntered>(Handle);
         }
 
-        
-
         public override void Dispose()
         {
+            MessageBroker.Unsubscribe<CharacterCreationFinished>(Handle);
             MessageBroker.Unsubscribe<NewHeroPackaged>(Handle);
             MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            MessageBroker.Unsubscribe<GameLoaded>(Handle);
         }
 
         private void Handle(MessagePayload<MainMenuEntered> obj)
@@ -40,6 +41,14 @@ namespace Coop.Core.Client.States
         {
             INetworkEvent networkEvent = new NetworkTransferedHero(obj.What.Package);
             Logic.NetworkMessageBroker.PublishNetworkEvent(networkEvent);
+
+            MessageBroker.Subscribe<GameLoaded>(Handle);
+        }
+
+        private void Handle(MessagePayload<GameLoaded> obj)
+        {
+            Logic.EnterMainMenu();
+            Logic.State = new ReceivingSavedDataState(Logic, MessageBroker);
         }
 
         public override void EnterMainMenu()

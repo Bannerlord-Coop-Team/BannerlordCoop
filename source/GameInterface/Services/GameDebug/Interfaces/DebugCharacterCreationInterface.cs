@@ -61,7 +61,8 @@ namespace GameInterface.Services.GameDebug.Interfaces
             CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
             if (characterCreationState.CurrentStage is CharacterCreationCultureStage)
             {
-                CultureObject culture = CharacterCreationContentBase.Instance.GetCultures().GetRandomElementInefficiently();
+                var cultures = CharacterCreationContentBase.Instance.GetCultures();
+                CultureObject culture = cultures.First(c => c.Name.ToString() == "Empire");
                 CharacterCreationContentBase.Instance.SetSelectedCulture(culture, characterCreationState.CharacterCreation);
                 characterCreationState.NextStage();
             }

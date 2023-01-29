@@ -1,21 +1,19 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.CharacterCreation.Interfaces;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Interfaces;
-using GameInterface.Services.UI.Messages;
 
 namespace GameInterface.Services.CharacterCreation.Handlers
 {
     internal class CharacterCreationHandler : IHandler
     {
-        private readonly ICharacterCreationInterface characterCreationInterface;
+        private readonly IGameStateInterface gameStateInterface;
         private readonly IMessageBroker messageBroker;
 
         public CharacterCreationHandler(
-            ICharacterCreationInterface characterCreationInterface,
+            IGameStateInterface gameStateInterface,
             IMessageBroker messageBroker)
         {
-            this.characterCreationInterface = characterCreationInterface;
+            this.gameStateInterface = gameStateInterface;
             this.messageBroker = messageBroker;
 
             messageBroker.Subscribe<StartCharacterCreation>(Handle);
@@ -23,7 +21,7 @@ namespace GameInterface.Services.CharacterCreation.Handlers
 
         private void Handle(MessagePayload<StartCharacterCreation> obj)
         {
-            characterCreationInterface.StartCharacterCreation();
+            gameStateInterface.StartNewGame();
         }
     }
 }

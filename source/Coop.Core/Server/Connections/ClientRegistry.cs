@@ -59,7 +59,7 @@ namespace Coop.Core.Server.Connections
         }
 
         
-
+        // TODO move to respective state
         private void PlayerTransitionsCampaignHandler(MessagePayload<PlayerTransitionedToCampaign> obj)
         {
             var playerId = obj.What.PlayerId;
@@ -69,6 +69,7 @@ namespace Coop.Core.Server.Connections
             connectionLogic.EnterCampaign();
         }
 
+        // TODO move to respective state
         private void PlayerTransitionsMissionHandler(MessagePayload<PlayerTransitionedToMission> obj)
         {
             var playerId = obj.What.PlayerId;

@@ -10,6 +10,8 @@ namespace Coop.Core.Server.Connections.States
 {
     public class CreateCharacterState : ConnectionStateBase
     {
+        private Guid HeroRegistrationTransactionId;
+
         public CreateCharacterState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
         {
@@ -19,11 +21,10 @@ namespace Coop.Core.Server.Connections.States
             ConnectionLogic.NetworkMessageBroker.Subscribe<NewPlayerHeroRegistered>(PlayerHeroRegisteredHandler);
         }
 
-        
-
         public override void Dispose()
         {
             ConnectionLogic.NetworkMessageBroker.Unsubscribe<NetworkTransferedHero>(PlayerTransferedHeroHandler);
+            ConnectionLogic.NetworkMessageBroker.Unsubscribe<NewPlayerHeroRegistered>(PlayerHeroRegisteredHandler);
         }
 
         private void PlayerTransferedHeroHandler(MessagePayload<NetworkTransferedHero> obj)
@@ -32,16 +33,18 @@ namespace Coop.Core.Server.Connections.States
             
             if(playerId == ConnectionLogic.PlayerId)
             {
-                ConnectionLogic.NetworkMessageBroker.Publish(obj.Who, new NewPlayerHeroRecieved(obj.What.PlayerHero));
+                HeroRegistrationTransactionId = Guid.NewGuid();
+                var registerCommand = new RegisterNewPlayerHero(HeroRegistrationTransactionId, obj.What.PlayerHero);
+                ConnectionLogic.NetworkMessageBroker.Publish(this, registerCommand);
             }
         }
         private void PlayerHeroRegisteredHandler(MessagePayload<NewPlayerHeroRegistered> obj)
         {
-            var playerId = obj.Who as NetPeer;
+            var eventId = obj.What.RegistrationEventId;
 
-            if (playerId == ConnectionLogic.PlayerId)
+            if (HeroRegistrationTransactionId == eventId)
             {
-                ConnectionLogic.HeroId = obj.What.GUID;
+                ConnectionLogic.HeroId = obj.What.HeroGUID;
                 ConnectionLogic.TransferSave();
             }
         }

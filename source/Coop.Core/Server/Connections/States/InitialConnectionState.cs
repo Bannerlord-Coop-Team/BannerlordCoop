@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Coop.Core.Client.States;
 
 namespace Coop.Core.Server.Connections.States
 {
@@ -16,7 +17,9 @@ namespace Coop.Core.Server.Connections.States
 
         public override void ResolveCharacter()
         {
-            ConnectionLogic.State = new ResolveCharacterState(ConnectionLogic);
+            // TODO Implement resolve character state
+            //ConnectionLogic.State = new ResolveCharacterState(ConnectionLogic);
+            ConnectionLogic.State = new CreateCharacterState(ConnectionLogic);
         }
 
         public override void CreateCharacter()

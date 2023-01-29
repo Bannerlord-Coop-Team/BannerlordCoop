@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Save;
+﻿using Common;
+using GameInterface.Services.Save;
 using SandBox;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -27,19 +28,27 @@ namespace GameInterface.Services.GameState.Interfaces
         private static readonly FieldInfo info_data = typeof(InMemDriver).GetField("_data", BindingFlags.Instance | BindingFlags.NonPublic);
         public void LoadSaveGame(byte[] saveData)
         {
+            GameLoopRunner.RunOnMainThread(() => InteralLoadSaveGame(saveData));
+        }
+        
+        private void InteralLoadSaveGame(byte[] saveData)
+        {
             ISaveDriver driver = new CoopInMemSaveDriver(saveData);
             LoadResult loadResult = SaveManager.Load("", driver);
             MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
-        }        
+        }
 
         public void StartNewGame()
         {
-            MBGameManager.StartNewGame(new SandBoxGameManager());
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                MBGameManager.StartNewGame(new SandBoxGameManager());
+            });
         }
 
         public void EndGame()
         {
-            MBGameManager.EndGame();
+            GameLoopRunner.RunOnMainThread(MBGameManager.EndGame);
         }
     }
 }
