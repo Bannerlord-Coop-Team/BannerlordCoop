@@ -41,7 +41,6 @@ namespace Missions.Services
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
 
         private Agent _tempAi;
-        private Team playerTeam;
 
         public CoopArenaController(
             IMessageBroker messageBroker, 
@@ -78,10 +77,10 @@ namespace Missions.Services
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
                 joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
 
-            Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject);
+            Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true);
             _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
 
-            Mission currentMission = Mission.Current;
+            //Mission currentMission = Mission.Current;
 
             for (int i = 0; i < joinInfo.UnitIdString.Length; i++)
             {
@@ -89,7 +88,7 @@ namespace Missions.Services
                 //PartyAgentOrigin partyAgentOrigin = new PartyAgentOrigin(PartyBase.MainParty, CharacterObject.Find(joinInfo.UnitIdString[i]));
                 //Agent tempAi = currentMission.SpawnTroop(partyAgentOrigin, true, true, false, CharacterObject.Find(joinInfo.UnitIdString[i]).HasMount(), 1, 1, false, true, false, joinInfo.UnitStartingPosition[i], new Vec2());
 
-                Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]));
+                Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
                 
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
@@ -97,7 +96,16 @@ namespace Missions.Services
 
         public void AddPlayerToArena()
         {
+            // reset teams if any exists
+            Mission.Current.ResetMission();
+
+            Mission.Current.Teams.Add(BattleSideEnum.Defender, Hero.MainHero.MapFaction.Color, Hero.MainHero.MapFaction.Color2, null, true, false, true);
+            Mission.Current.Teams.Add(BattleSideEnum.Attacker, Hero.MainHero.MapFaction.Color2, Hero.MainHero.MapFaction.Color, null, true, false, true);
+
+            // players is attacker team
             Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;
+
+
 
             List<MatrixFrame> spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
                                              select e.GetGlobalFrame()).ToList();
@@ -115,11 +123,9 @@ namespace Missions.Services
             // spawn an instance of the player (controlled by default)
             SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
 
-            playerTeam = new Team(new MBTeam(), BattleSideEnum.Attacker, Mission.Current);
-            Agent.Main.SetTeam(playerTeam, false);
+            Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            _tempAi = SpawnAgent(spawnFrames.GetRandomElement().origin, CharacterObject.Find("aserai_veteran_infantry"));
-            playerTeam.AddAgentToTeam(_tempAi);
+            _tempAi = SpawnAgent(spawnFrames.GetRandomElement().origin, CharacterObject.Find("aserai_veteran_infantry"), false);
 
             for (int i = 1; i < Agent.Main.Team.TeamAgents.Count; i++)
             {
@@ -136,7 +142,7 @@ namespace Missions.Services
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             Mission mission = Mission.Current;
-            agentBuildData = agentBuildData.Team(Mission.Current.PlayerAllyTeam).InitialPosition(frame.origin);
+            agentBuildData = agentBuildData.Team(Mission.Current.PlayerTeam).InitialPosition(frame.origin);
             agentBuildData.NoHorses(true);
 
             Vec2 vec = frame.rotation.f.AsVec2;
@@ -154,15 +160,14 @@ namespace Missions.Services
             return agent;
         }
 
-        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character)
+        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool isEnemy)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             agentBuildData.InitialPosition(startingPos);
-            agentBuildData.Team(Mission.Current.PlayerEnemyTeam);
+            agentBuildData.Team(isEnemy ? Mission.Current.PlayerEnemyTeam : Mission.Current.PlayerTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
-            
             agentBuildData.Equipment(character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment);
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.None);

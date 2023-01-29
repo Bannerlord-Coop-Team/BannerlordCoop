@@ -113,12 +113,12 @@ namespace Missions.Services.Arena
             }, true, true);
         }
 
-        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character)
+        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool isEnemy)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             agentBuildData.InitialPosition(startingPos);
-            agentBuildData.Team(Mission.Current.PlayerAllyTeam);
+            agentBuildData.Team(isEnemy ? Mission.Current.DefenderTeam : Mission.Current.AttackerTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(character.FirstCivilianEquipment);
