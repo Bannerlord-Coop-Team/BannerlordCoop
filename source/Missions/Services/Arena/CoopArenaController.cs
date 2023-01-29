@@ -26,6 +26,7 @@ using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
 using SandBox.View.Missions;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.CampaignSystem.Party;
+using System.Reflection;
 
 namespace Missions.Services
 {
@@ -40,6 +41,7 @@ namespace Missions.Services
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
 
         private Agent _tempAi;
+        private Team playerTeam;
 
         public CoopArenaController(
             IMessageBroker messageBroker, 
@@ -81,14 +83,14 @@ namespace Missions.Services
 
             Mission currentMission = Mission.Current;
 
-            for (int i = 0; i < joinInfo.UnitId.Length; i++)
+            for (int i = 0; i < joinInfo.UnitIdString.Length; i++)
             {
 
                 //PartyAgentOrigin partyAgentOrigin = new PartyAgentOrigin(PartyBase.MainParty, CharacterObject.Find(joinInfo.UnitIdString[i]));
                 //Agent tempAi = currentMission.SpawnTroop(partyAgentOrigin, true, true, false, CharacterObject.Find(joinInfo.UnitIdString[i]).HasMount(), 1, 1, false, true, false, joinInfo.UnitStartingPosition[i], new Vec2());
 
                 Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]));
-
+                
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
         }
@@ -113,7 +115,7 @@ namespace Missions.Services
             // spawn an instance of the player (controlled by default)
             SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
 
-            Team playerTeam = new Team(new MBTeam(), BattleSideEnum.Attacker, Mission.Current);
+            playerTeam = new Team(new MBTeam(), BattleSideEnum.Attacker, Mission.Current);
             Agent.Main.SetTeam(playerTeam, false);
 
             _tempAi = SpawnAgent(spawnFrames.GetRandomElement().origin, CharacterObject.Find("aserai_veteran_infantry"));
@@ -125,24 +127,30 @@ namespace Missions.Services
             }
         }
 
+        
         // Spawn an agent based on its character object and frame. For now, Main agent character object is used
         // This should be the real character object in the future
+        private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("BattleEquipment", BindingFlags.Public | BindingFlags.Instance);
         private Agent SpawnPlayerAgent(CharacterObject character, MatrixFrame frame)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             Mission mission = Mission.Current;
             agentBuildData = agentBuildData.Team(Mission.Current.PlayerAllyTeam).InitialPosition(frame.origin);
+            agentBuildData.NoHorses(true);
+
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
             Equipment generatedEquipment = _equipmentGenerator.CreateRandomEquipment(true);
+            agentBuildData.Equipment(generatedEquipment);
+            Hero_BattleEquipment.SetValue(character.HeroObject, generatedEquipment); 
+            agentBuildData.InitialDirection(vec);
+            agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
+            agentBuildData.Controller(Agent.ControllerType.Player);
 
-            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec)
-                .NoHorses(true)
-                .Equipment(generatedEquipment)
-                .TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);
+            Agent agent = mission.SpawnAgent(agentBuildData);
             agent.FadeIn();
-            agent.Controller = Agent.ControllerType.Player;
+
             return agent;
         }
 
@@ -151,10 +159,11 @@ namespace Missions.Services
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             agentBuildData.InitialPosition(startingPos);
-            agentBuildData.Team(Mission.Current.PlayerAllyTeam);
+            agentBuildData.Team(Mission.Current.PlayerEnemyTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
-            agentBuildData.Equipment(character.Equipment);
+            
+            agentBuildData.Equipment(character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment);
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.None);
 
