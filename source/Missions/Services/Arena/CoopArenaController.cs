@@ -126,7 +126,10 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            _tempAi = SpawnAgent(randomElement.origin, CharacterObject.Find("aserai_veteran_infantry"), false);
+            IEnumerable<CharacterObject> listC = CharacterObject.All.Where(x => !x.IsHero);
+            Random r = new Random();
+
+            _tempAi = SpawnAgent(randomElement.origin, listC.ElementAt(r.Next(listC.Count())), false);
 
             for (int i = 1; i < Agent.Main.Team.TeamAgents.Count; i++)
             {
