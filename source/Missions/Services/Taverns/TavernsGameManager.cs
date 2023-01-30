@@ -8,6 +8,7 @@ using Missions.Services.Network.Surrogates;
 using ProtoBuf.Meta;
 using SandBox;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -26,12 +27,6 @@ namespace Missions.Services.Taverns
 {
     public class TavernsGameManager : SandBoxGameManager, IMissionGameManager
     {
-        static TavernsGameManager()
-        {
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
-        }
-
         private static readonly ILogger Logger = LogManager.GetLogger<TavernsGameManager>();
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
         private LiteNetP2PClient _client;

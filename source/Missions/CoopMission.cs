@@ -14,11 +14,6 @@ namespace Missions
 
         public List<NetworkAgent> NetworkAgents;
 
-        public event Action<MissionCreatedInfo> MissionCreatedEvent;
-        public event Action<PlayerDisconnectedInfo> PlayerDisconnectedEvent;
-        public event Action<PlayerLeftInfo> PlayerLeftMissionEvent;
-        public event Action<MissionResultInfo> MissionConcludedEvent;
-
         public void ClaimControl()
         {
             throw new NotImplementedException();

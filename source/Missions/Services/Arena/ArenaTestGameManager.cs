@@ -11,6 +11,7 @@ using SandBox;
 using SandBox.Missions.MissionLogics;
 using SandBox.Missions.MissionLogics.Arena;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -32,22 +33,11 @@ namespace Missions.Services.Arena
 {
     public class ArenaTestGameManager : SandBoxGameManager, IMissionGameManager
     {
-        static ArenaTestGameManager()
-        {
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
-        }
-
         private static readonly ILogger Logger = LogManager.GetLogger<ArenaTestGameManager>();
-        private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
+        
         private LiteNetP2PClient _client;
 
         public ArenaTestGameManager(LoadResult loadedGameResult) : base(loadedGameResult)
-        {
-            harmony.PatchAll();
-        }
-
-        ~ArenaTestGameManager()
         {
         }
 
@@ -141,12 +131,6 @@ namespace Missions.Services.Arena
             List<GameEntity> entities = new List<GameEntity>();
             scene.GetEntities(ref entities);
             return entities.Where(entity => entity.Tags.Any(tag => tag.StartsWith("sp_"))).Select(entity => entity.Name).ToArray();
-        }
-
-        public override void OnGameEnd(Game game)
-        {
-            harmony.UnpatchAll();
-            base.OnGameEnd(game);
         }
     }
 }
