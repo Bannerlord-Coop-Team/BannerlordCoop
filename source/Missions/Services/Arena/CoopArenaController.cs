@@ -50,12 +50,12 @@ namespace Missions.Services
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
-            messageBroker.Subscribe<MissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
         }
 
         ~CoopArenaController()
         {
-            _messageBroker.Unsubscribe<MissionJoinInfo>(Handle_JoinInfo);
+            _messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
         }
 
         public override void AfterStart()
@@ -63,12 +63,12 @@ namespace Missions.Services
             AddPlayerToArena();
         }
 
-        private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)
+        private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
         {
             Logger.Debug("Received join request");
-            NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
+            NetPeer netPeer = (NetPeer)payload.Who;
 
-            MissionJoinInfo joinInfo = payload.What;
+            NetworkMissionJoinInfo joinInfo = payload.What;
 
             Guid newAgentId = joinInfo.PlayerId;
             Vec3 startingPos = joinInfo.StartingPosition;
@@ -103,7 +103,7 @@ namespace Missions.Services
             Mission.Current.Teams.Add(BattleSideEnum.Attacker, Hero.MainHero.MapFaction.Color2, Hero.MainHero.MapFaction.Color, null, true, false, true);
 
             // players is attacker team
-            Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;
+            Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;  
 
 
 
@@ -177,7 +177,7 @@ namespace Missions.Services
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
-            });
+            }, true);
 
             return agent;
         }

@@ -1,12 +1,119 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{E474A5B5-3F73-46CB-B68C-E8FA5199950B}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Common</RootNamespace>
+    <AssemblyName>Common</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
   </PropertyGroup>
-
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="protobuf-net" Version="3.1.22" />
-    <PackageReference Include="Serilog" Version="2.12.0" />
+    <Reference Include="LiteNetLib, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\LiteNetLib.0.9.5.2\lib\net35\LiteNetLib.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.3.1.26\lib\net462\protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.Core.3.1.26\lib\net462\protobuf-net.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Serilog, Version=2.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.2.12.0\lib\net47\Serilog.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Collections.Immutable, Version=1.2.5.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Collections.Immutable.1.7.1\lib\net461\System.Collections.Immutable.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Core" />
+    <Reference Include="System.Memory, Version=4.0.1.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Memory.4.5.5\lib\net461\System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.4.5.3\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
-
+  <ItemGroup>
+    <Compile Include="CoopObjectManager.cs" />
+    <Compile Include="DropoutStack.cs" />
+    <Compile Include="Entity\IController.cs" />
+    <Compile Include="Entity\IEntity.cs" />
+    <Compile Include="Entity\IWrapper.cs" />
+    <Compile Include="Entity\ObjectWrapper.cs" />
+    <Compile Include="Extensions\ReflectionExtensions.cs" />
+    <Compile Include="Extentions.cs" />
+    <Compile Include="FrameLimiter.cs" />
+    <Compile Include="GameLoopRunner.cs" />
+    <Compile Include="Globals.cs" />
+    <Compile Include="IUpdatable.cs" />
+    <Compile Include="Logging\BatchLogger.cs" />
+    <Compile Include="Logging\LogManager.cs" />
+    <Compile Include="LogicStates\ILogic.cs" />
+    <Compile Include="LogicStates\IState.cs" />
+    <Compile Include="Messaging\EMessageResponse.cs" />
+    <Compile Include="Messaging\ICommand.cs" />
+    <Compile Include="Messaging\IEvent.cs" />
+    <Compile Include="Messaging\IHandler.cs" />
+    <Compile Include="Messaging\INetworkEvent.cs" />
+    <Compile Include="Messaging\MessageBroker.cs" />
+    <Compile Include="Messaging\MessagePayload.cs" />
+    <Compile Include="MovingAverage.cs" />
+    <Compile Include="Network\INetwork.cs" />
+    <Compile Include="Network\INetworkConfiguration.cs" />
+    <Compile Include="Network\NetworkMessageBroker.cs" />
+    <Compile Include="OrderedHashSet.cs" />
+    <Compile Include="PacketHandlers\EventPacketHandler.cs" />
+    <Compile Include="PacketHandlers\ExamplePacketHandler.cs" />
+    <Compile Include="PacketHandlers\IPacket.cs" />
+    <Compile Include="PacketHandlers\IPacketHandler.cs" />
+    <Compile Include="PacketHandlers\PacketManager.cs" />
+    <Compile Include="Poller.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Serialization\ProtoBufSerializer.cs" />
+    <Compile Include="State\IState.cs" />
+    <Compile Include="UnreliableMessagePayload.cs" />
+    <Compile Include="UpdateableList.cs" />
+    <Compile Include="UpdatePriority.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.config" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

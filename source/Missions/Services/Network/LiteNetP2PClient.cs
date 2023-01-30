@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
+using Common.PacketHandlers;
 using Common.Serialization;
 using IntroServer.Config;
 using IntroServer.Data;
@@ -8,11 +10,11 @@ using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Missions.Services.Network.Messages;
-using Missions.Services.Network.PacketHandlers;
 using Serilog;
 using Serilog.Events;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -20,15 +22,16 @@ using Version = System.Version;
 
 namespace Missions.Services.Network
 {
-    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable
+    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable, INetwork
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
-        private static readonly Dictionary<PacketType, List<IPacketHandler>> PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
-        
         public int ConnectedPeersCount => _netManager.ConnectedPeersCount;
 
         public NetPeer PeerServer { get; private set; }
         public int Priority => 2;
+
+        public IPacketManager PacketManager { get; } = new PacketManager();
+        public INetworkConfiguration Configuration { get; }
 
         private string _instance;
 
@@ -39,10 +42,16 @@ namespace Missions.Services.Network
         private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
         private readonly IMessageBroker _messageBroker;
         private readonly Poller _poller;
-        public LiteNetP2PClient(NetworkConfiguration config, IMessageBroker messageBroker)
+        
+        public LiteNetP2PClient(NetworkConfiguration config)
         {
             _networkConfig = config;
-            _messageBroker = messageBroker;
+            // Assigns singleton, to be replaced with DI
+            _messageBroker = new NetworkMessageBroker()
+            {
+                Network = this,
+            };
+
 
             _netManager = new NetManager(this)
             {
@@ -69,26 +78,6 @@ namespace Missions.Services.Network
         {
             _batchLogger.Dispose();
             Stop();
-        }
-
-        public void AddHandler(IPacketHandler handler)
-        {
-            if (PacketHandlers.ContainsKey(handler.PacketType))
-            {
-                PacketHandlers[handler.PacketType].Add(handler);
-            }
-            else
-            {
-                PacketHandlers.Add(handler.PacketType, new List<IPacketHandler> { handler });
-            }
-        }
-
-        public void RemoveHandler(IPacketHandler handler)
-        {
-            if (PacketHandlers.TryGetValue(handler.PacketType, out List<IPacketHandler> list))
-            {
-                list.Remove(handler);
-            }
         }
 
         public void Update(TimeSpan frameTime)
@@ -143,6 +132,11 @@ namespace Missions.Services.Network
             }
         }
 
+        public void Start()
+        {
+            throw new NotImplementedException();   
+        }
+
         public void Stop()
         {
             _poller.Stop();
@@ -150,32 +144,26 @@ namespace Missions.Services.Network
             _netManager.Stop();
         }
 
-        public void SendEvent(INetworkEvent networkEvent, NetPeer peer)
-        {
-            EventPacket eventPacket = new EventPacket(networkEvent);
-
-            Send(eventPacket, peer);
-        }
-
-        public void SendAllEvent(INetworkEvent networkEvent)
-        {
-            EventPacket eventPacket = new EventPacket(networkEvent);
-
-            SendAll(eventPacket);
-        }
-
-        public void Send(IPacket packet, NetPeer peer)
+        public void Send(NetPeer netPeer, IPacket packet)
         {
             NetDataWriter writer = new NetDataWriter();
 
             try
             {
                 writer.PutBytesWithLength(ProtoBufSerializer.Serialize(packet));
-                peer.Send(writer, packet.DeliveryMethod);
+                netPeer.Send(writer, packet.DeliveryMethod);
             }
             catch(Exception ex)
             {
                 Logger.Error("Serialization failed: {ErrMessage}", ex.Message);
+            }
+        }
+
+        public void SendAllBut(NetPeer netPeer, IPacket packet)
+        {
+            foreach (var peer in _netManager.ConnectedPeerList.Where(peer => peer != netPeer))
+            {
+                Send(peer, packet);
             }
         }
 
@@ -231,14 +219,7 @@ namespace Missions.Services.Network
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
-            if (PacketHandlers.TryGetValue(packet.PacketType, out var handlers))
-            {
-                _batchLogger.Log(packet.PacketType);
-                foreach (var handler in handlers)
-                {
-                    handler.HandlePacket(peer, packet);
-                }
-            }
+            PacketManager.HandleRecieve(peer, packet);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)

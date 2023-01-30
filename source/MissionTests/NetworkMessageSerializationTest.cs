@@ -1,6 +1,6 @@
-﻿using Common.Serialization;
+﻿using Common.PacketHandlers;
+using Common.Serialization;
 using Missions.Messages;
-using Missions.Services.Network.PacketHandlers;
 using Missions.Services.Network.Surrogates;
 using ProtoBuf.Meta;
 using System;
@@ -20,13 +20,13 @@ namespace IntroductionServerTests
             RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
 
             var character = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
-            MissionJoinInfo missionJoinInfo = new MissionJoinInfo(character, default(Guid), default(Vec3), default(Guid[]), default(Vec3[]));
+            NetworkMissionJoinInfo missionJoinInfo = new NetworkMissionJoinInfo(character, default(Guid), default(Vec3), default(Guid[]), default(Vec3[]), Array.Empty<string>());
             EventPacket eventPacket = new EventPacket(missionJoinInfo);
             byte[] bytes = ProtoBufSerializer.Serialize(eventPacket);
 
             Assert.NotNull(bytes);
 
-            MissionJoinInfo newEvent = (MissionJoinInfo)eventPacket.Event;
+            NetworkMissionJoinInfo newEvent = (NetworkMissionJoinInfo)eventPacket.Event;
         }
     }
 }

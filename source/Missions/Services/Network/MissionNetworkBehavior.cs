@@ -1,12 +1,13 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
+using Common.PacketHandlers;
 using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Network.Messages;
-using Missions.Services.Network.PacketHandlers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -32,27 +33,26 @@ namespace Missions.Services.Network
 
         private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
 
-        private readonly IMessageBroker _messageBroker;
+        private readonly INetworkMessageBroker _networkMessageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly MovementHandler _movementHandler;
         private readonly EventPacketHandler _eventPacketHandler;
 
         public CoopMissionNetworkBehavior(
             LiteNetP2PClient client, 
-            IMessageBroker messageBroker,
+            INetworkMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry)
         {
             _client = client;
-            _messageBroker = messageBroker;
+            _networkMessageBroker = messageBroker;
             _agentRegistry = agentRegistry;
             _playerId = Guid.NewGuid();
 
-            _movementHandler = new MovementHandler(_client, _messageBroker, _agentRegistry);
-            _eventPacketHandler = new EventPacketHandler(_client, _messageBroker);
+            // TODO DI
+            _movementHandler = new MovementHandler(_client, _networkMessageBroker, _agentRegistry);
+            _eventPacketHandler = new EventPacketHandler(_networkMessageBroker, client.PacketManager);
 
-            _messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
-
-            _client.AddHandler(_eventPacketHandler);
+            _networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
         }
 
         public override void AfterStart()
@@ -98,8 +98,8 @@ namespace Missions.Services.Network
                 }
             }
 
-            MissionJoinInfo request = new MissionJoinInfo(characterObject, _playerId, Agent.Main.Position, _unitId.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
-            _client.SendEvent(request, peer);
+            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, _playerId, Agent.Main.Position, _unitId.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
+            _networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
                 characterObject.Name, request.PlayerId, peer.EndPoint);
@@ -109,15 +109,13 @@ namespace Missions.Services.Network
         {
             base.OnRemoveBehavior();
 
-            _messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
-
-            _client.RemoveHandler(_eventPacketHandler);
+            _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
             _client.Stop();
         }
 
         public override void OnAgentDeleted(Agent affectedAgent)
         {
-            _messageBroker.Publish(this, new AgentDeleted(affectedAgent));
+            _networkMessageBroker.Publish(this, new AgentDeleted(affectedAgent));
             
 
             base.OnAgentDeleted(affectedAgent);

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.PacketHandlers;
 using LiteNetLib;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
@@ -46,21 +47,25 @@ namespace Missions.Services.Agents.Packets
 
         private readonly CancellationTokenSource m_AgentPollingCancelToken = new CancellationTokenSource();
         private readonly Task m_AgentPollingTask;
-
+        private readonly IPacketManager _packetManager;
         private readonly LiteNetP2PClient _client;
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
         public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
+            Logger.Verbose("Creating {name}", this.GetType().Name);
 
+            // TODO DI
+            _packetManager = client.PacketManager;
             _client = client;
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
+            
 
             _messageBroker.Subscribe<PeerDisconnected>(Handle_PeerDisconnect);
 
-            _client.AddHandler(this);
+            _packetManager.RegisterPacketHandler(this);
 
             m_AgentPollingTask = Task.Run(PollAgents);
         }
@@ -72,7 +77,7 @@ namespace Missions.Services.Agents.Packets
 
         public void Dispose()
         {
-            _client.RemoveHandler(this);
+            _packetManager.RemovePacketHandler(this);
             _messageBroker.Unsubscribe<PeerDisconnected>(Handle_PeerDisconnect);
             m_AgentPollingCancelToken.Cancel();
             m_AgentPollingTask.Wait();
@@ -88,7 +93,7 @@ namespace Missions.Services.Agents.Packets
                 GameLoopRunner.RunOnMainThread(() =>
                 {
                     current = Mission.Current;
-                });
+                }, true);
                 return current;
             }
         }

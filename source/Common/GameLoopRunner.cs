@@ -1,9 +1,8 @@
-﻿using Common;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Missions
+namespace Common
 {
     public class GameLoopRunner : IUpdateable
     {
@@ -15,6 +14,8 @@ namespace Missions
 
         private readonly object m_QueueLock = new object();
         private int m_GameLoopThreadId;
+
+        public bool IsInitialized => m_GameLoopThreadId != 0;
 
         private GameLoopRunner()
         {
@@ -44,7 +45,7 @@ namespace Missions
         }
         public int Priority { get; } = UpdatePriority.MainLoop.GameLoopRunner;
 
-        public static void RunOnMainThread(Action action, bool bBlocking = true)
+        public static void RunOnMainThread(Action action, bool bBlocking = false)
         {
             if (Thread.CurrentThread.ManagedThreadId == Instance.m_GameLoopThreadId)
             {

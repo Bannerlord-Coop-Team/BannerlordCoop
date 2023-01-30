@@ -15,6 +15,7 @@ using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Network;
 using Missions.Services.BoardGames;
+using Common.Network;
 
 namespace Missions.Services.Taverns
 {
@@ -23,32 +24,32 @@ namespace Missions.Services.Taverns
         private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly IMessageBroker _messageBroker;
+        private readonly INetworkMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
         private readonly BoardGameManager _boardGameManager;
 
-        public CoopTavernsController(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
+        public CoopTavernsController(LiteNetP2PClient client, INetworkMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
 
             _boardGameManager = new BoardGameManager(client, _messageBroker, _agentRegistry);
 
-            messageBroker.Subscribe<MissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
         }
 
         ~CoopTavernsController()
         {
-            _messageBroker.Unsubscribe<MissionJoinInfo>(Handle_JoinInfo);
+            _messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
         }
 
-        private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)
+        private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
         {
             Logger.Debug("Received join request");
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
 
-            MissionJoinInfo joinInfo = payload.What;
+            NetworkMissionJoinInfo joinInfo = payload.What;
 
             Guid newAgentId = joinInfo.PlayerId;
             Vec3 startingPos = joinInfo.StartingPosition;
@@ -79,7 +80,7 @@ namespace Missions.Services.Taverns
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
-            });
+            }, true);
 
             return agent;
         }

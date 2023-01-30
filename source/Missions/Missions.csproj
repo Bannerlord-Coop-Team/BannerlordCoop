@@ -46,10 +46,10 @@
       <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.3.1.22\lib\net462\protobuf-net.dll</HintPath>
+      <HintPath>..\packages\protobuf-net.3.1.26\lib\net462\protobuf-net.dll</HintPath>
     </Reference>
     <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.Core.3.1.22\lib\net462\protobuf-net.Core.dll</HintPath>
+      <HintPath>..\packages\protobuf-net.Core.3.1.26\lib\net462\protobuf-net.Core.dll</HintPath>
     </Reference>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
@@ -82,8 +82,8 @@
       <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
     <Reference Include="System.IO.Compression" />
-    <Reference Include="System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Memory.4.5.4\lib\net461\System.Memory.dll</HintPath>
+    <Reference Include="System.Memory, Version=4.0.1.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Memory.4.5.5\lib\net461\System.Memory.dll</HintPath>
     </Reference>
     <Reference Include="System.Numerics" />
     <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
@@ -153,7 +153,6 @@
     <Compile Include="Services\BoardGames\BoardGameManager.cs" />
     <Compile Include="CoopMission.cs" />
     <Compile Include="Services\Agents\Extensions\AgentExtensions.cs" />
-    <Compile Include="GameLoopRunner.cs" />
     <Compile Include="IMission.cs" />
     <Compile Include="IMissionGameManager.cs" />
     <Compile Include="Services\Arena\CoopArenaController.cs" />
@@ -165,7 +164,7 @@
     <Compile Include="Services\BoardGames\Messages\ForfeitGameMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\PawnCapturedMessage.cs" />
     <Compile Include="Messages\MissionEventInfos.cs" />
-    <Compile Include="Messages\MissionJoinRequest.cs" />
+    <Compile Include="Messages\NetworkMissionJoinInfo.cs" />
     <Compile Include="Messages\MissionMessages.cs" />
     <Compile Include="Services\Network\Messages\PeerConnected.cs" />
     <Compile Include="Services\Network\Messages\PeerDisconnected.cs" />
@@ -173,8 +172,6 @@
     <Compile Include="Services\Network\MissionShard.cs" />
     <Compile Include="Services\Network\EDisconnectReason.cs" />
     <Compile Include="Services\Network\INetworkObject.cs" />
-    <Compile Include="Services\Network\IPacket.cs" />
-    <Compile Include="Services\Network\IPacketHandler.cs" />
     <Compile Include="Services\Network\LiteNetP2PClient.cs" />
     <Compile Include="Services\Network\NetworkAgent.cs" />
     <Compile Include="Services\Network\NetworkAgentRegistry.cs" />
@@ -189,7 +186,6 @@
     <Compile Include="Services\Agents\Packets\AgentMountData.cs" />
     <Compile Include="Services\Agents\Packets\MovementHandler.cs" />
     <Compile Include="Services\Agents\Patches\AgentInteractionPatches.cs" />
-    <Compile Include="Services\Network\PacketHandlers\EventPacketHandler.cs" />
     <Compile Include="Services\BoardGames\Patches\BoardGamePatches.cs" />
     <Compile Include="Services\Pausing\Patches\PausePatch.cs" />
     <Compile Include="PlayerId.cs" />
@@ -205,7 +201,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{314f078f-41df-4a23-b25c-f558eff83d2a}</Project>
+      <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
       <Name>Common</Name>
     </ProjectReference>
     <ProjectReference Include="..\GameInterface\GameInterface.csproj">

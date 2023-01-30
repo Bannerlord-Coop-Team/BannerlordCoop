@@ -34,8 +34,6 @@ namespace Missions.Services.Agents.Patches
     {
         private static Agent requesterAgent;
         private static Agent targetAgent;
-
-        public static event Action<Agent, Agent> OnAgentInteraction;
         public static bool Prefix(ConversationSentenceOption conversationSentenceOption)
         {
             if (conversationSentenceOption.Id == "lord_player_start_game" && targetAgent.IsNetworkAgent())
