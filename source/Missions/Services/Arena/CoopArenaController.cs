@@ -117,7 +117,8 @@ namespace Missions.Services
             }
 
             // get a random spawn point
-            MatrixFrame randomElement = spawnFrames.GetRandomElement();
+            Random rand = new Random();
+            MatrixFrame randomElement = spawnFrames[rand.Next(spawnFrames.Count)];  
 
 
             // spawn an instance of the player (controlled by default)
@@ -125,7 +126,7 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            _tempAi = SpawnAgent(spawnFrames.GetRandomElement().origin, CharacterObject.Find("aserai_veteran_infantry"), false);
+            _tempAi = SpawnAgent(randomElement.origin, CharacterObject.Find("aserai_veteran_infantry"), false);
 
             for (int i = 1; i < Agent.Main.Team.TeamAgents.Count; i++)
             {
@@ -170,7 +171,7 @@ namespace Missions.Services
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment);
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-            agentBuildData.Controller(Agent.ControllerType.None);
+            agentBuildData.Controller(isEnemy ? Agent.ControllerType.None : Agent.ControllerType.AI);
 
             Agent agent = default;
             GameLoopRunner.RunOnMainThread(() =>
@@ -178,6 +179,11 @@ namespace Missions.Services
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
             }, true);
+
+            if (agent.IsAIControlled)
+            {
+                agent.SetWatchState(Agent.WatchState.Alarmed);
+            }
 
             return agent;
         }

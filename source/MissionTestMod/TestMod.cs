@@ -44,10 +44,10 @@ namespace MissionTestMod
 
             harmony.PatchAll();
 
+            Logger = LogManager.GetLogger<TestMod>();
             RegisterSurrogates();
 
-            Logger = LogManager.GetLogger<TestMod>();
-			Logger.Verbose("Building Network Configuration");
+            Logger.Verbose("Building Network Configuration");
 
 			Updateables.Add(GameLoopRunner.Instance);
 
