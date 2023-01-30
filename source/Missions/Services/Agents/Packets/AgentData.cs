@@ -53,22 +53,6 @@ namespace Missions.Services.Agents.Packets
             MountData = agentMountData;
         }
 
-        public AgentData(Agent agent, Vec2 movementDirection) : 
-            this(Vec3.Invalid, movementDirection, Vec3.Invalid, Vec2.Invalid, new AgentEquipmentData(agent), null, null)
-        { }
-
-        public AgentData(Agent agent, Vec3 lookDirection) :
-            this(Vec3.Invalid, Vec2.Invalid, lookDirection, Vec2.Invalid, new AgentEquipmentData(agent), null, null)
-        { }
-
-        public AgentData(Agent agent, AgentActionData actionData) :
-            this(Vec3.Invalid, Vec2.Invalid, Vec3.Invalid, Vec2.Invalid, new AgentEquipmentData(agent), actionData, null)
-        { }
-
-        public AgentData(Agent agent, AgentMountData mountData) :
-            this(Vec3.Invalid, Vec2.Invalid, Vec3.Invalid, Vec2.Invalid, new AgentEquipmentData(agent), null, mountData)
-        { }
-
         public void Apply(Agent agent)
         {
             // if the player is dead, dont sync anything

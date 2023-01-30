@@ -69,7 +69,10 @@ namespace Missions.Services.Agents.Packets
             _agentRegistry = agentRegistry;
 
             _messageBroker.Subscribe<PeerDisconnected>(Handle_PeerDisconnect);
-            _messageBroker.Subscribe<Movement>(Handle_Movement);
+            _messageBroker.Subscribe<ActionDataChanged>(Handle_ActionDataChanged);
+            _messageBroker.Subscribe<LookDirectionChanged>(Handle_LookDirectionChanged);
+            _messageBroker.Subscribe<MountDataChanged>(Handle_MountDataChanged);
+            _messageBroker.Subscribe<MovementInputVectorChanged>(Handle_MovementInputVectorChanged);
 
             _client.AddHandler(this);
         }
@@ -83,7 +86,10 @@ namespace Missions.Services.Agents.Packets
         {
             _client.RemoveHandler(this);
             _messageBroker.Unsubscribe<PeerDisconnected>(Handle_PeerDisconnect);
-            _messageBroker.Unsubscribe<Movement>(Handle_Movement);
+            _messageBroker.Unsubscribe<ActionDataChanged>(Handle_ActionDataChanged);
+            _messageBroker.Unsubscribe<LookDirectionChanged>(Handle_LookDirectionChanged);
+            _messageBroker.Unsubscribe<MountDataChanged>(Handle_MountDataChanged);
+            _messageBroker.Unsubscribe<MovementInputVectorChanged>(Handle_MovementInputVectorChanged);
         }
 
         public PacketType PacketType => PacketType.Movement;
@@ -101,7 +107,27 @@ namespace Missions.Services.Agents.Packets
             }
         }
 
-        private void Handle_Movement(MessagePayload<Movement> payload)
+        private void Handle_ActionDataChanged(MessagePayload<ActionDataChanged> payload)
+        {
+
+        }
+
+        private void Handle_LookDirectionChanged(MessagePayload<LookDirectionChanged> payload)
+        {
+
+        }
+
+        private void Handle_MountDataChanged(MessagePayload<MountDataChanged> payload)
+        {
+
+        }
+
+        private void Handle_MovementInputVectorChanged(MessagePayload<MovementInputVectorChanged> payload)
+        {
+
+        }
+
+        private void Handle_Movement(MessagePayload<IMovement> payload)
         {
             Guid guid = payload.What.Guid;
 
