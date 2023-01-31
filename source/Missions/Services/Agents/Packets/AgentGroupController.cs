@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
@@ -7,6 +9,8 @@ namespace Missions.Services.Agents.Packets
 {
     public class AgentGroupController
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<AgentGroupController>();
+
         public IReadOnlyDictionary<Guid, Agent> ControlledAgents => m_ControlledAgents;
         private readonly Dictionary<Guid, Agent> m_ControlledAgents = new Dictionary<Guid, Agent>();
 
@@ -43,7 +47,7 @@ namespace Missions.Services.Agents.Packets
             }
             else
             {
-                throw new InvalidOperationException($"{movement.AgentId} has not been registered as a controlled agent");
+                Logger.Warning($"{movement.AgentId} has not been registered as a controlled agent");
             }
         }
     }
