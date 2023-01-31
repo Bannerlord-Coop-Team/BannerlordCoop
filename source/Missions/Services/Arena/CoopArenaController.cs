@@ -103,9 +103,7 @@ namespace Missions.Services
             Mission.Current.Teams.Add(BattleSideEnum.Attacker, Hero.MainHero.MapFaction.Color2, Hero.MainHero.MapFaction.Color, null, true, false, true);
 
             // players is attacker team
-            Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;  
-
-
+            Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;
 
             List<MatrixFrame> spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
                                              select e.GetGlobalFrame()).ToList();
@@ -130,11 +128,6 @@ namespace Missions.Services
             Random r = new Random();
 
             _tempAi = SpawnAgent(randomElement.origin, listC.ElementAt(r.Next(listC.Count())), false);
-
-            for (int i = 1; i < Agent.Main.Team.TeamAgents.Count; i++)
-            {
-                CoopMissionNetworkBehavior._unitId.Add(Guid.NewGuid());
-            }
         }
 
         

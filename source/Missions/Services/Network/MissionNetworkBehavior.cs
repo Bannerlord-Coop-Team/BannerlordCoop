@@ -11,6 +11,7 @@ using Missions.Services.Network.Messages;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
@@ -29,7 +30,6 @@ namespace Missions.Services.Network
 
         private readonly LiteNetP2PClient _client;
         private readonly Guid _playerId;
-        public static List<Guid> _unitId = new List<Guid>();
 
         private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
 
@@ -82,23 +82,24 @@ namespace Missions.Services.Network
 
         private void SendJoinInfo(NetPeer peer)
         {
-            Logger.Debug("Sending join request");
-            _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
-
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
+            _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
 
             List<Vec3> unitPositions = new List<Vec3>();
             List<string> unitIdStrings = new List<string>();
-            foreach (Agent agent in Agent.Main.Team.TeamAgents)
+            List<Guid> guids = new List<Guid>();
+            foreach (Agent agent in Agent.Main.Team.TeamAgents.Where(agent => agent != Agent.Main))
             {
-                if (agent != Agent.Main)
-                {
-                    unitPositions.Add(agent.Position);
-                    unitIdStrings.Add(agent.Character.StringId);
-                }
+                var newGuid = Guid.NewGuid();
+                _agentRegistry.RegisterControlledAgent(newGuid, agent);
+                guids.Add(newGuid);
+                unitPositions.Add(agent.Position);
+                unitIdStrings.Add(agent.Character.StringId);
             }
 
-            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, _playerId, Agent.Main.Position, _unitId.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
+            Logger.Debug("Sending join request");
+
+            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, _playerId, Agent.Main.Position, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
             _networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
@@ -110,6 +111,7 @@ namespace Missions.Services.Network
             base.OnRemoveBehavior();
 
             _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
+            _agentRegistry.Clear();
             _client.Stop();
         }
 
