@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.Core;
 using ItemTypeEnum = TaleWorlds.Core.ItemObject.ItemTypeEnum;
 
@@ -26,11 +27,11 @@ namespace Missions.Services.Arena
         private static readonly ItemTypeEnum[] HorseLoadout = new ItemTypeEnum[] { ItemTypeEnum.Horse, ItemTypeEnum.HorseHarness };
         private static readonly ItemTypeEnum[][] WeaponLoadouts = new ItemTypeEnum[][]
         {
-            new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon },
-            new ItemTypeEnum[] { ItemTypeEnum.Polearm },
-            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Thrown },
+            //new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon },
+            //new ItemTypeEnum[] { ItemTypeEnum.Polearm },
+            //new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Thrown },
             new ItemTypeEnum[] { ItemTypeEnum.Bow, ItemTypeEnum.Arrows, ItemTypeEnum.Thrown },
-            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Shield },
+            //new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Shield },
         };
 
         private readonly Random Random = new Random();
@@ -46,16 +47,29 @@ namespace Missions.Services.Arena
 
             foreach (var item in allItems)
             {
+
                 bool keyExists = result.ContainsKey(item.ItemType);
                 if (!keyExists)
                 {
                     result.Add(item.ItemType, new List<ItemObject>());
                 }
-                result[item.ItemType].Add(item);
-            }
 
+                result[item.ItemType].Add(item);
+
+                //Here im harcoding the elements that are causing the arrows not to spawn and the same for the throwing weapons
+                if (
+                item.StringId == "ballista_projectile_burning" || item.StringId == "ballista_projectile" || item.StringId == "throwing_stone" || item.StringId == "boulder" ||
+                item.StringId == "pot" || item.StringId == "grapeshot_stack" || item.StringId == "grapeshot_fire_stack" || item.StringId == "grapeshot_projectile" ||
+                item.StringId == "grapeshot_fire_projectile"
+                )
+                {
+                    result[item.ItemType].Remove(item);
+                }
+            }
             return result;
         }
+
+
 
         /// <summary>
         /// Creates random equipment for characters
@@ -68,7 +82,7 @@ namespace Missions.Services.Arena
 
             GenerateRandomWeaponEquipment(equipment);
             GenerateRandomArmorEquipment(equipment);
-            
+
             if (noHorse == false)
             {
                 GenerateRandomHorseEquipment(equipment);
@@ -91,10 +105,11 @@ namespace Missions.Services.Arena
             for (int i = 0; i < loadout.Length; i++)
             {
                 ItemTypeEnum loadoutItem = loadout[i];
+
+                //Some items doesnt exists, they are harcoded at the dictionary
                 int randomItemIndex = Random.Next(ExistingItems[loadoutItem].Count);
                 equipment[i] = new EquipmentElement(ExistingItems[loadoutItem][randomItemIndex]);
             }
-
             return equipment;
         }
 
