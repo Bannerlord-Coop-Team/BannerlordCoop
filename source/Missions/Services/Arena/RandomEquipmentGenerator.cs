@@ -27,11 +27,11 @@ namespace Missions.Services.Arena
         private static readonly ItemTypeEnum[] HorseLoadout = new ItemTypeEnum[] { ItemTypeEnum.Horse, ItemTypeEnum.HorseHarness };
         private static readonly ItemTypeEnum[][] WeaponLoadouts = new ItemTypeEnum[][]
         {
-            //new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon },
-            //new ItemTypeEnum[] { ItemTypeEnum.Polearm },
-            //new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Thrown },
+            new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon },
+            new ItemTypeEnum[] { ItemTypeEnum.Polearm },
+            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Thrown },
             new ItemTypeEnum[] { ItemTypeEnum.Bow, ItemTypeEnum.Arrows, ItemTypeEnum.Thrown },
-            //new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Shield },
+            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Shield },
         };
 
         private readonly Random Random = new Random();
