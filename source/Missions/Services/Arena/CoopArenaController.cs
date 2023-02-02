@@ -84,10 +84,6 @@ namespace Missions.Services
 
             for (int i = 0; i < joinInfo.UnitIdString.Length; i++)
             {
-
-                //PartyAgentOrigin partyAgentOrigin = new PartyAgentOrigin(PartyBase.MainParty, CharacterObject.Find(joinInfo.UnitIdString[i]));
-                //Agent tempAi = currentMission.SpawnTroop(partyAgentOrigin, true, true, false, CharacterObject.Find(joinInfo.UnitIdString[i]).HasMount(), 1, 1, false, true, false, joinInfo.UnitStartingPosition[i], new Vec2());
-
                 Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
                 
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
@@ -130,9 +126,10 @@ namespace Missions.Services
             _tempAi = SpawnAgent(randomElement.origin, listC.ElementAt(r.Next(listC.Count())), false);
         }
 
-        
-        // Spawn an agent based on its character object and frame. For now, Main agent character object is used
-        // This should be the real character object in the future
+        /// <summary>
+        /// Spawn an agent based on its character object and frame. For now, Main agent character object is used
+        /// This should be the real character object in the future
+        /// </summary>
         private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("BattleEquipment", BindingFlags.Public | BindingFlags.Instance);
         private Agent SpawnPlayerAgent(CharacterObject character, MatrixFrame frame)
         {
