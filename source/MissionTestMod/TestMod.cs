@@ -1,8 +1,11 @@
 ﻿using Common;
 using Common.Logging;
+using HarmonyLib;
 using Missions;
 using Missions.Services.Arena;
+using Missions.Services.Network.Surrogates;
 using Missions.Services.Taverns;
+using ProtoBuf.Meta;
 using SandBox;
 using Serilog;
 using System;
@@ -19,7 +22,9 @@ namespace MissionTestMod
 {
     public class TestMod : MBSubModuleBase
     {
-	    private static ILogger Logger;
+        private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
+
+        private static ILogger Logger;
 		private static UpdateableList Updateables { get; } = new UpdateableList();
         private static InitialStateOption JoinTavern;
         private static InitialStateOption JoinArena;
@@ -37,8 +42,12 @@ namespace MissionTestMod
 			        .MinimumLevel.Verbose();
 	        }
 
-	        Logger = LogManager.GetLogger<TestMod>();
-			Logger.Verbose("Building Network Configuration");
+            harmony.PatchAll();
+
+            Logger = LogManager.GetLogger<TestMod>();
+            RegisterSurrogates();
+
+            Logger.Verbose("Building Network Configuration");
 
 			Updateables.Add(GameLoopRunner.Instance);
 
@@ -58,8 +67,24 @@ namespace MissionTestMod
 
             Module.CurrentModule.AddInitialStateOption(JoinTavern);
             Module.CurrentModule.AddInitialStateOption(JoinArena);
+
+
             base.OnSubModuleLoad();
             Logger.Verbose("Bannerlord Coop Mod loaded");
+        }
+
+        protected override void OnSubModuleUnloaded()
+        {
+            harmony.UnpatchAll();
+            base.OnSubModuleUnloaded();
+        }
+
+        private void RegisterSurrogates()
+        {
+            Logger.Verbose("Registering ProtoBuf Surrogates");
+
+            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
         }
 
         private bool m_IsFirstTick = true;

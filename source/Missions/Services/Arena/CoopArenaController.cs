@@ -22,6 +22,11 @@ using JetBrains.Annotations;
 using TaleWorlds.CampaignSystem.Extensions;
 using System.Runtime.CompilerServices;
 using Missions.Services.Arena;
+using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
+using SandBox.View.Missions;
+using TaleWorlds.MountAndBlade.View;
+using TaleWorlds.CampaignSystem.Party;
+using System.Reflection;
 
 namespace Missions.Services
 {
@@ -35,6 +40,8 @@ namespace Missions.Services
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
 
+        private Agent _tempAi;
+
         public CoopArenaController(
             IMessageBroker messageBroker, 
             INetworkAgentRegistry agentRegistry, 
@@ -43,12 +50,12 @@ namespace Missions.Services
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
-            messageBroker.Subscribe<MissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
         }
 
         ~CoopArenaController()
         {
-            _messageBroker.Unsubscribe<MissionJoinInfo>(Handle_JoinInfo);
+            _messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
         }
 
         public override void AfterStart()
@@ -56,12 +63,12 @@ namespace Missions.Services
             AddPlayerToArena();
         }
 
-        private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)
+        private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
         {
             Logger.Debug("Received join request");
-            NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
+            NetPeer netPeer = (NetPeer)payload.Who;
 
-            MissionJoinInfo joinInfo = payload.What;
+            NetworkMissionJoinInfo joinInfo = payload.What;
 
             Guid newAgentId = joinInfo.PlayerId;
             Vec3 startingPos = joinInfo.StartingPosition;
@@ -70,13 +77,28 @@ namespace Missions.Services
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
                 joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
 
-            Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject);
-            
-            _agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
+            Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true);
+            _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
+
+            //Mission currentMission = Mission.Current;
+
+            for (int i = 0; i < joinInfo.UnitIdString.Length; i++)
+            {
+                Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
+                
+                _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
+            }
         }
 
-        public Agent AddPlayerToArena()
+        public void AddPlayerToArena()
         {
+            // reset teams if any exists
+            Mission.Current.ResetMission();
+
+            Mission.Current.Teams.Add(BattleSideEnum.Defender, Hero.MainHero.MapFaction.Color, Hero.MainHero.MapFaction.Color2, null, true, false, true);
+            Mission.Current.Teams.Add(BattleSideEnum.Attacker, Hero.MainHero.MapFaction.Color2, Hero.MainHero.MapFaction.Color, null, true, false, true);
+
+            // players is attacker team
             Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;
 
             List<MatrixFrame> spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
@@ -89,52 +111,73 @@ namespace Missions.Services
             }
 
             // get a random spawn point
-            MatrixFrame randomElement = spawnFrames.GetRandomElement();
+            Random rand = new Random();
+            MatrixFrame randomElement = spawnFrames[rand.Next(spawnFrames.Count)];  
 
 
             // spawn an instance of the player (controlled by default)
-            return SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
+            SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
+
+            Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
+
+            IEnumerable<CharacterObject> listC = CharacterObject.All.Where(x => !x.IsHero);
+            Random r = new Random();
+
+            _tempAi = SpawnAgent(randomElement.origin, listC.ElementAt(r.Next(listC.Count())), false);
         }
 
-        // Spawn an agent based on its character object and frame. For now, Main agent character object is used
-        // This should be the real character object in the future
+
+        private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("BattleEquipment", BindingFlags.Public | BindingFlags.Instance);
+        /// <summary>
+        /// Spawn an agent based on its character object and frame. For now, Main agent character object is used
+        /// This should be the real character object in the future
+        /// </summary>
         private Agent SpawnPlayerAgent(CharacterObject character, MatrixFrame frame)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             Mission mission = Mission.Current;
-            agentBuildData = agentBuildData.Team(Mission.Current.PlayerAllyTeam).InitialPosition(frame.origin);
+            agentBuildData = agentBuildData.Team(Mission.Current.PlayerTeam).InitialPosition(frame.origin);
+            agentBuildData.NoHorses(true);
+
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
             Equipment generatedEquipment = _equipmentGenerator.CreateRandomEquipment(true);
+            agentBuildData.Equipment(generatedEquipment);
+            Hero_BattleEquipment.SetValue(character.HeroObject, generatedEquipment); 
+            agentBuildData.InitialDirection(vec);
+            agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
+            agentBuildData.Controller(Agent.ControllerType.Player);
 
-            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec)
-                .NoHorses(true)
-                .Equipment(generatedEquipment)
-                .TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);
+            Agent agent = mission.SpawnAgent(agentBuildData);
             agent.FadeIn();
-            agent.Controller = Agent.ControllerType.Player;
+
             return agent;
         }
 
-        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character)
+        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool isEnemy)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             agentBuildData.InitialPosition(startingPos);
-            agentBuildData.Team(Mission.Current.PlayerAllyTeam);
+            agentBuildData.Team(isEnemy ? Mission.Current.PlayerEnemyTeam : Mission.Current.PlayerTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
-            agentBuildData.Equipment(_equipmentGenerator.CreateRandomEquipment(true));
+            agentBuildData.Equipment(character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment);
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-            agentBuildData.Controller(Agent.ControllerType.None);
+            agentBuildData.Controller(isEnemy ? Agent.ControllerType.None : Agent.ControllerType.AI);
 
             Agent agent = default;
             GameLoopRunner.RunOnMainThread(() =>
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
-            });
+            }, true);
+
+            if (agent.IsAIControlled)
+            {
+                agent.SetWatchState(Agent.WatchState.Alarmed);
+            }
 
             return agent;
         }

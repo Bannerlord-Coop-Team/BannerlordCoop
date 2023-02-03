@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Serialization;
 using LiteNetLib;
@@ -8,24 +7,36 @@ using ProtoBuf.Meta;
 using Serilog;
 using System;
 using System.Reflection;
-using Missions.Services.Network;
-using Missions.Services.Network.PacketHandlers;
 
-namespace Missions.Services.Network.PacketHandlers
+namespace Common.PacketHandlers
 {
-    internal class EventPacketHandler : IPacketHandler
+    public class EventPacketHandler : IPacketHandler
     {
         private readonly ILogger Logger = LogManager.GetLogger<EventPacketHandler>();
 
         public PacketType PacketType => PacketType.Event;
 
         private readonly IMessageBroker _messageBroker;
-        private readonly LiteNetP2PClient _client;
+        private readonly IPacketManager _packetManager;
 
-        public EventPacketHandler(LiteNetP2PClient client, IMessageBroker messageBroker)
+        public EventPacketHandler(IMessageBroker messageBroker, IPacketManager packetManager)
         {
+            Logger.Verbose("Creating {name}", this.GetType().Name);
+
             _messageBroker = messageBroker;
-            _client = client;
+            _packetManager = packetManager;
+
+            _packetManager.RegisterPacketHandler(this);
+        }
+
+        ~EventPacketHandler()
+        {
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            _packetManager.RemovePacketHandler(this);
         }
 
         private static readonly MethodInfo Publish = typeof(IMessageBroker).GetMethod(nameof(IMessageBroker.Publish));
@@ -61,7 +72,7 @@ namespace Missions.Services.Network.PacketHandlers
         }
 
         [ProtoMember(1)]
-        public byte[] _event;
+        private byte[] _event;
 
         public EventPacket(INetworkEvent @event)
         {

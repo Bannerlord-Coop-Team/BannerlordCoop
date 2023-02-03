@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Network;
 using Missions.Services.Agents.Messages;
 using Missions.Services.BoardGames.Messages;
 using Missions.Services.Network;
@@ -24,36 +25,36 @@ namespace Missions.Services.BoardGames
         public Guid GameId { get; private set; }
 
         private readonly LiteNetP2PClient _P2PClient;
-        private readonly IMessageBroker _messageBroker;
+        private readonly INetworkMessageBroker _networkMessageBroker;
         private readonly MissionBoardGameLogic _boardGameLogic;
         private readonly BoardGameType _boardGameType;
 
         public BoardGameLogic(
             LiteNetP2PClient P2PClient,
-            IMessageBroker messageBroker,
+            INetworkMessageBroker networkMessageBroker,
             Guid gameId, 
             MissionBoardGameLogic boardGameLogic, 
             BoardGameType gameType)
         {
             _P2PClient = P2PClient;
-            _messageBroker = messageBroker;
+            _networkMessageBroker = networkMessageBroker;
             _boardGameLogic = boardGameLogic;
             _boardGameType = gameType;
             GameId = gameId;
 
             //Internal Messages
-            _messageBroker.Subscribe<StopConvoAfterGameMessage>(OnGameOver);
-            _messageBroker.Subscribe<BoardGameMoveMessage>(OnPlayerInput);
-            _messageBroker.Subscribe<AgentDeleted>(OnAgentDeleted);
-            _messageBroker.Subscribe<OnForfeitMessage>(OnForfeitGame);
-            _messageBroker.Subscribe<OnHandlePreMovementStageMessage>(OnPreMovementStage);
-            _messageBroker.Subscribe<OnSetPawnCapturedMessage>(OnPawnCapture);
-            _messageBroker.Subscribe<PreplaceUnitsSeegaMessage>(OnPreplaceUnits);
+            _networkMessageBroker.Subscribe<StopConvoAfterGameMessage>(OnGameOver);
+            _networkMessageBroker.Subscribe<BoardGameMoveMessage>(OnPlayerInput);
+            _networkMessageBroker.Subscribe<AgentDeleted>(OnAgentDeleted);
+            _networkMessageBroker.Subscribe<OnForfeitMessage>(OnForfeitGame);
+            _networkMessageBroker.Subscribe<OnHandlePreMovementStageMessage>(OnPreMovementStage);
+            _networkMessageBroker.Subscribe<OnSetPawnCapturedMessage>(OnPawnCapture);
+            _networkMessageBroker.Subscribe<PreplaceUnitsSeegaMessage>(OnPreplaceUnits);
 
             //External Messages
-            _messageBroker.Subscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
-            _messageBroker.Subscribe<PawnCapturedMessage>(Handle_PawnCapture);
-            _messageBroker.Subscribe<BoardGameMoveRequest>(Handle_MoveRequest);
+            _networkMessageBroker.Subscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
+            _networkMessageBroker.Subscribe<PawnCapturedMessage>(Handle_PawnCapture);
+            _networkMessageBroker.Subscribe<BoardGameMoveRequest>(Handle_MoveRequest);
 
         }
 
@@ -76,17 +77,17 @@ namespace Missions.Services.BoardGames
         {
             //IsPlayingOtherPlayer = false;
 
-            _messageBroker.Unsubscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
-            _messageBroker.Unsubscribe<PawnCapturedMessage>(Handle_PawnCapture);
-            _messageBroker.Unsubscribe<BoardGameMoveRequest>(Handle_MoveRequest);
+            _networkMessageBroker.Unsubscribe<ForfeitGameMessage>(Handle_ForfeitGameMessage);
+            _networkMessageBroker.Unsubscribe<PawnCapturedMessage>(Handle_PawnCapture);
+            _networkMessageBroker.Unsubscribe<BoardGameMoveRequest>(Handle_MoveRequest);
 
-            _messageBroker.Unsubscribe<StopConvoAfterGameMessage>(OnGameOver);
-            _messageBroker.Unsubscribe<BoardGameMoveMessage>(OnPlayerInput);
-            _messageBroker.Unsubscribe<AgentDeleted>(OnAgentDeleted);
-            _messageBroker.Unsubscribe<OnForfeitMessage>(OnForfeitGame);
-            _messageBroker.Unsubscribe<OnHandlePreMovementStageMessage>(OnPreMovementStage);
-            _messageBroker.Unsubscribe<OnSetPawnCapturedMessage>(OnPawnCapture);
-            _messageBroker.Unsubscribe<PreplaceUnitsSeegaMessage>(OnPreplaceUnits);
+            _networkMessageBroker.Unsubscribe<StopConvoAfterGameMessage>(OnGameOver);
+            _networkMessageBroker.Unsubscribe<BoardGameMoveMessage>(OnPlayerInput);
+            _networkMessageBroker.Unsubscribe<AgentDeleted>(OnAgentDeleted);
+            _networkMessageBroker.Unsubscribe<OnForfeitMessage>(OnForfeitGame);
+            _networkMessageBroker.Unsubscribe<OnHandlePreMovementStageMessage>(OnPreMovementStage);
+            _networkMessageBroker.Unsubscribe<OnSetPawnCapturedMessage>(OnPawnCapture);
+            _networkMessageBroker.Unsubscribe<PreplaceUnitsSeegaMessage>(OnPreplaceUnits);
 
         }
 
@@ -136,7 +137,7 @@ namespace Missions.Services.BoardGames
 
             int fromIndex = _boardGameLogic.Board.PlayerTwoUnits.IndexOf(payload.What.Pawn);
             PawnCapturedMessage pawnCapturedEvent = new PawnCapturedMessage(GameId, fromIndex);
-            _P2PClient.SendAllEvent(pawnCapturedEvent);
+            _networkMessageBroker.PublishNetworkEvent(pawnCapturedEvent);
 
             //if (IsPlayingOtherPlayer)
             //{
@@ -165,7 +166,7 @@ namespace Missions.Services.BoardGames
                 {
                     int fromIndex = _boardGameLogic.Board.PlayerOneUnits.IndexOf(hoveredPawnIfAny);
                     PawnCapturedMessage pawnCapturedEvent = new PawnCapturedMessage(GameId, fromIndex);
-                    _P2PClient.SendAllEvent(pawnCapturedEvent);
+                    _networkMessageBroker.PublishNetworkEvent(pawnCapturedEvent);
                 }
             }
         }
@@ -180,7 +181,7 @@ namespace Missions.Services.BoardGames
             int FromIndex = _boardGameLogic.Board.PlayerOneUnits.IndexOf(payload.What.Move.Unit);
             int ToIndex = _boardGameLogic.Board.Tiles.IndexOf(payload.What.Move.GoalTile);
             BoardGameMoveRequest boardGameMoveEvent = new BoardGameMoveRequest(GameId, FromIndex, ToIndex);
-            _P2PClient.SendAllEvent(boardGameMoveEvent);
+            _networkMessageBroker.PublishNetworkEvent(boardGameMoveEvent);
         }
 
         private void Handle_MoveRequest(MessagePayload<BoardGameMoveRequest> payload)
@@ -214,7 +215,7 @@ namespace Missions.Services.BoardGames
         private void OnForfeitGame(MessagePayload<OnForfeitMessage> payload)
         {
             ForfeitGameMessage forfeitMessage = new ForfeitGameMessage(GameId);
-            _P2PClient.SendAllEvent(forfeitMessage);
+            _networkMessageBroker.PublishNetworkEvent(forfeitMessage);
             Dispose();
         }
 

@@ -1,7 +1,7 @@
 ﻿using ProtoBuf;
 using System;
 
-namespace Common
+namespace Common.Messaging
 {
     [Serializable]
     [ProtoContract(SkipConstructor = true)]
@@ -13,7 +13,7 @@ namespace Common
         [ProtoMember(2)]
         public DateTime When { get; }
 
-        public MessagePayload(T payload, object source)
+        public MessagePayload(object source, T payload)
         {
             Who = source; What = payload; When = DateTime.UtcNow;
         }
