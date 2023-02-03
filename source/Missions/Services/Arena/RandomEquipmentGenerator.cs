@@ -22,6 +22,9 @@ namespace Missions.Services.Arena
     /// <inheritdoc cref="IRandomEquipmentGenerator"/>
     internal class RandomEquipmentGenerator : IRandomEquipmentGenerator
     {
+        //Here im harcoding the elements that are causing the arrows not to spawn and the same for the throwing weapons
+        private static readonly HashSet<string> ExcludedItems = new HashSet<string>{"ballista_projectile_burning", "ballista_projectile", "throwing_stone", "boulder",
+            "pot", "grapeshot_stack", "grapeshot_fire_stack", "grapeshot_projectile", "grapeshot_fire_projectile" };
         private static readonly IDictionary<ItemTypeEnum, List<ItemObject>> ExistingItems = InitializeItemDictionary();
         private static readonly ItemTypeEnum[] ArmorLoadout = new ItemTypeEnum[] { ItemTypeEnum.HeadArmor, ItemTypeEnum.Cape, ItemTypeEnum.BodyArmor, ItemTypeEnum.HandArmor, ItemTypeEnum.LegArmor };
         private static readonly ItemTypeEnum[] HorseLoadout = new ItemTypeEnum[] { ItemTypeEnum.Horse, ItemTypeEnum.HorseHarness };
@@ -45,16 +48,13 @@ namespace Missions.Services.Arena
         {
             IEnumerable<ItemObject> allItems = Game.Current.ObjectManager.GetObjectTypeList<ItemObject>();
             IDictionary<ItemTypeEnum, List<ItemObject>> result = new Dictionary<ItemTypeEnum, List<ItemObject>>();
-            //Here im harcoding the elements that are causing the arrows not to spawn and the same for the throwing weapons
-            HashSet<string> deleteItems = new HashSet<string>{"ballista_projectile_burning", "ballista_projectile", "throwing_stone", "boulder",
-            "pot", "grapeshot_stack", "grapeshot_fire_stack", "grapeshot_projectile", "grapeshot_fire_projectile" };
-
+            
             foreach (var item in allItems)
             {
 
                 bool keyExists = result.ContainsKey(item.ItemType);
 
-                if (deleteItems.Contains(item.StringId)) continue;
+                if (ExcludedItems.Contains(item.StringId)) continue;
                 if (!keyExists)
                 {
                     result.Add(item.ItemType, new List<ItemObject>());
