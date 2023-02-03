@@ -140,6 +140,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
+    <Compile Include="Services\Agents\Patches\AgentDeathPatch.cs" />
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />

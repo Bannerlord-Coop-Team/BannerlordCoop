@@ -41,6 +41,7 @@ namespace Missions.Services
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
 
         private Agent _tempAi;
+        private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
 
         public CoopArenaController(
             IMessageBroker messageBroker, 
@@ -90,6 +91,20 @@ namespace Missions.Services
             }
         }
 
+        public void RespawnPlayer()
+        {
+
+            Random rand = new Random();
+            MatrixFrame randomElement = spawnFrames[rand.Next(spawnFrames.Count)];
+
+            SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
+            Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
+
+            IEnumerable<CharacterObject> listC = CharacterObject.All.Where(x => !x.IsHero && !x.IsChildTemplate);
+
+            _tempAi = SpawnAgent(randomElement.origin, listC.ElementAt(rand.Next(listC.Count())), false);
+        }
+
         public void AddPlayerToArena()
         {
             // reset teams if any exists
@@ -101,7 +116,7 @@ namespace Missions.Services
             // players is attacker team
             Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;
 
-            List<MatrixFrame> spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
+            spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
                                              select e.GetGlobalFrame()).ToList();
             for (int i = 0; i < spawnFrames.Count; i++)
             {
@@ -120,10 +135,9 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            IEnumerable<CharacterObject> listC = CharacterObject.All.Where(x => !x.IsHero);
-            Random r = new Random();
+            IEnumerable<CharacterObject> listC = CharacterObject.All.Where(x => !x.IsHero && !x.IsChildTemplate);
 
-            _tempAi = SpawnAgent(randomElement.origin, listC.ElementAt(r.Next(listC.Count())), false);
+            _tempAi = SpawnAgent(randomElement.origin, listC.ElementAt(rand.Next(listC.Count())), false);
         }
 
 
