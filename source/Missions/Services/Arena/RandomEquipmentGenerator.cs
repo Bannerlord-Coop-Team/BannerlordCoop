@@ -34,6 +34,7 @@ namespace Missions.Services.Arena
             new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Shield },
         };
 
+
         private readonly Random Random = new Random();
 
         /// <summary>
@@ -44,28 +45,22 @@ namespace Missions.Services.Arena
         {
             IEnumerable<ItemObject> allItems = Game.Current.ObjectManager.GetObjectTypeList<ItemObject>();
             IDictionary<ItemTypeEnum, List<ItemObject>> result = new Dictionary<ItemTypeEnum, List<ItemObject>>();
+            //Here im harcoding the elements that are causing the arrows not to spawn and the same for the throwing weapons
+            HashSet<string> deleteItems = new HashSet<string>{"ballista_projectile_burning", "ballista_projectile", "throwing_stone", "boulder",
+            "pot", "grapeshot_stack", "grapeshot_fire_stack", "grapeshot_projectile", "grapeshot_fire_projectile" };
 
             foreach (var item in allItems)
             {
 
                 bool keyExists = result.ContainsKey(item.ItemType);
-                if (<HashSet>.Contains(item.StringId) continue;
+
+                if (deleteItems.Contains(item.StringId)) continue;
                 if (!keyExists)
                 {
                     result.Add(item.ItemType, new List<ItemObject>());
                 }
 
                 result[item.ItemType].Add(item);
-
-                //Here im harcoding the elements that are causing the arrows not to spawn and the same for the throwing weapons
-                if (
-                item.StringId == "ballista_projectile_burning" || item.StringId == "ballista_projectile" || item.StringId == "throwing_stone" || item.StringId == "boulder" ||
-                item.StringId == "pot" || item.StringId == "grapeshot_stack" || item.StringId == "grapeshot_fire_stack" || item.StringId == "grapeshot_projectile" ||
-                item.StringId == "grapeshot_fire_projectile"
-                )
-                {
-                    result[item.ItemType].Remove(item);
-                }
             }
             return result;
         }
