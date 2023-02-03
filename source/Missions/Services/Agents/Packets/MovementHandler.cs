@@ -11,6 +11,9 @@ using ProtoBuf;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.Remoting.Messaging;
+using System.Threading;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -61,6 +64,10 @@ namespace Missions.Services.Agents.Packets
 
         private Dictionary<Guid, ISyncPolicy> _agentIdToPolicy = new Dictionary<Guid, ISyncPolicy>();
 
+        private Dictionary<Guid, AgentMovementDelta> _agentMovementDeltas = new Dictionary<Guid, AgentMovementDelta>();
+
+        private Timer _senderTimer;
+
         public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
 
@@ -75,6 +82,9 @@ namespace Missions.Services.Agents.Packets
             _messageBroker.Subscribe<MovementInputVectorChanged>(Handle_MovementInputVectorChanged);
 
             _client.AddHandler(this);
+
+            // start the SendMessage every PACKET_TIME_SPAN.Seconds, PACKET_TIME_SPAN.Seconds after it was initialized
+            _senderTimer = new Timer(SendMessage, null, PACKET_TIME_SPAN.Seconds, PACKET_TIME_SPAN.Seconds);
         }
 
         ~MovementHandler()
@@ -90,6 +100,7 @@ namespace Missions.Services.Agents.Packets
             _messageBroker.Unsubscribe<LookDirectionChanged>(Handle_LookDirectionChanged);
             _messageBroker.Unsubscribe<MountDataChanged>(Handle_MountDataChanged);
             _messageBroker.Unsubscribe<MovementInputVectorChanged>(Handle_MovementInputVectorChanged);
+            _senderTimer?.Dispose();
         }
 
         public PacketType PacketType => PacketType.Movement;
@@ -109,39 +120,67 @@ namespace Missions.Services.Agents.Packets
 
         private void Handle_ActionDataChanged(MessagePayload<ActionDataChanged> payload)
         {
+            var delta = GetDelta(payload.What);
 
+            delta.CalculateMovement(payload.What);
         }
 
         private void Handle_LookDirectionChanged(MessagePayload<LookDirectionChanged> payload)
         {
+            var delta = GetDelta(payload.What);
 
-        }
+            delta.CalculateMovement(payload.What);
+        }    
 
         private void Handle_MountDataChanged(MessagePayload<MountDataChanged> payload)
         {
+            var delta = GetDelta(payload.What);
 
+            delta.CalculateMovement(payload.What);
         }
 
         private void Handle_MovementInputVectorChanged(MessagePayload<MovementInputVectorChanged> payload)
         {
+            var delta = GetDelta(payload.What);
 
+            delta.CalculateMovement(payload.What);
         }
 
-        private void Handle_Movement(MessagePayload<IMovement> payload)
+        private AgentMovementDelta GetDelta(IMovement payload)
         {
-            Guid guid = payload.What.Guid;
-
-            if (_agentRegistry.ControlledAgents.TryGetValue(guid, out var agent))
+            if (_agentMovementDeltas.TryGetValue(payload.Guid, out var delta))
             {
-                if (agent.Mission != null)
-                {
-                    SendPacket(guid, payload.What.ToMovementPacket());
-                }
+                return delta;
+            }
+
+            delta = new AgentMovementDelta(payload.Agent, payload.Guid);
+
+            _agentMovementDeltas.Add(payload.Guid, delta);
+
+            return delta;
+        }
+
+        private IEnumerable<AgentMovementDelta> PopAllDeltas()
+        {
+            foreach (var kv in _agentMovementDeltas)
+            {
+                yield return kv.Value;
+            }
+
+            _agentMovementDeltas.Clear();
+        }
+
+        private void SendMessage(object state)
+        {
+            foreach (var delta in PopAllDeltas())
+            {
+                SendPacket(delta.Guid, delta.GetPacketFromDelta());
             }
         }
 
         private void SendPacket(Guid guid, MovementPacket movementPacket)
         {
+            // TODO: is Polly really necessary any more? => tendency is no
             try
             {
                 var policy = GetRateLimit(guid);
@@ -193,19 +232,23 @@ namespace Missions.Services.Agents.Packets
 
             if (_agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController controller))
             {
-                foreach (var agent in controller.ControlledAgents.Values)
+                foreach (var kv in controller.ControlledAgents)
                 {
+                    var agent = kv.Value;
+                    var guid = kv.Key;
+
                     GameLoopRunner.RunOnMainThread(() =>
                     {
                         agent.MakeDead(false, ActionIndexCache.act_none);
                         agent.FadeOut(false, true);
                     });
+
+                    _agentMovementDeltas.Remove(guid);
                 }
 
                 _agentRegistry.RemovePeer(peer);
             }
         }
-
 
         public static Vec2 InterpolatePosition(Vec2 controlInput, Vec3 rotation, Vec2 currentPosition, Vec2 newPosition)
         {

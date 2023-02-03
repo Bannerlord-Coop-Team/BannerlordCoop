@@ -1,20 +1,18 @@
-﻿using System;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using LiteNetLib;
+using Missions.Messages;
+using Missions.Services.Network;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using Common.Messaging;
-using Common;
-using Missions.Messages;
-using LiteNetLib;
-using Serilog;
-using Common.Logging;
-using Missions.Services.Network;
 
 namespace Missions.Services
 {

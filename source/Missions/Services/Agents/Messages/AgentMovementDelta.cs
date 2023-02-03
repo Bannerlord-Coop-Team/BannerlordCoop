@@ -5,15 +5,32 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
 {
-    internal sealed class MovementMessageHandler
+    /// <summary>
+    /// Represents the delta of an agent's movement in a set time limit.
+    /// </summary>
+    internal sealed class AgentMovementDelta
     {
         private Vec3 _lookDirectionDelta = Vec3.Zero;
         private Vec2 _inputVectorDelta = Vec2.Zero;
+
         private AgentActionData _actionDataDelta = null;
         private AgentMountData _mountDataDelta = null;
-        private Vec3 _currentPosition = Vec3.Zero;
-        private Guid _guid;
-        private Agent _agent;
+
+        private Vec3 _currentPosition;
+        public Guid Guid { get; }
+        public Agent Agent { get; }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="agent"></param>
+        /// <param name="guid"></param>
+        public AgentMovementDelta(Agent agent, Guid guid)
+        {
+            Guid = guid;
+            Agent = agent;
+            _currentPosition = agent.Position;
+        }
 
         public void CalculateMovement(LookDirectionChanged change)
         {
@@ -25,11 +42,11 @@ namespace Missions.Services.Agents.Messages
             _inputVectorDelta += change.InputVector;
         }
 
-        public void CalculateMovement(AgentActionData change)
+        public void CalculateMovement(ActionDataChanged change)
         {
             if (_actionDataDelta is null)
             {
-                _actionDataDelta = change;
+                _actionDataDelta = change.AgentActionData;
             }
             else
             {
@@ -37,11 +54,11 @@ namespace Missions.Services.Agents.Messages
             }
         }
 
-        public void CalculateMovement(AgentMountData change)
+        public void CalculateMovement(MountDataChanged change)
         {
             if (_mountDataDelta is null)
             {
-                _mountDataDelta = change;
+                _mountDataDelta = change.AgentMountData;
             }
             else
             {
@@ -51,7 +68,7 @@ namespace Missions.Services.Agents.Messages
 
         public MovementPacket GetPacketFromDelta()
         {
-            return new MovementPacket(_guid, new AgentData(_currentPosition, _agent.GetMovementDirection(), _lookDirectionDelta, _inputVectorDelta, null, _actionDataDelta, _mountDataDelta));
+            return new MovementPacket(Guid, new AgentData(_currentPosition, Agent.GetMovementDirection(), _lookDirectionDelta, _inputVectorDelta, null, _actionDataDelta, _mountDataDelta));
         }
     }
 }
