@@ -49,6 +49,7 @@ namespace Missions.Services.Arena
             {
 
                 bool keyExists = result.ContainsKey(item.ItemType);
+                if (<HashSet>.Contains(item.StringId) continue;
                 if (!keyExists)
                 {
                     result.Add(item.ItemType, new List<ItemObject>());
