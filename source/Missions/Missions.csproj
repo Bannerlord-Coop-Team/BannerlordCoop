@@ -57,9 +57,6 @@
     <Reference Include="Microsoft.Extensions.Primitives, Version=7.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Extensions.Primitives.7.0.0\lib\net462\Microsoft.Extensions.Primitives.dll</HintPath>
     </Reference>
-    <Reference Include="Polly, Version=7.0.0.0, Culture=neutral, PublicKeyToken=c8a3ffc3f8f825cc, processorArchitecture=MSIL">
-      <HintPath>..\packages\Polly.7.2.3\lib\net472\Polly.dll</HintPath>
-    </Reference>
     <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
       <HintPath>..\packages\protobuf-net.3.1.22\lib\net462\protobuf-net.dll</HintPath>
     </Reference>
@@ -162,7 +159,7 @@
     <Compile Include="Services\Agents\Messages\MountDataChanged.cs" />
     <Compile Include="Services\Agents\Messages\IMovement.cs" />
     <Compile Include="Services\Agents\Messages\MovementInputVectorChanged.cs" />
-    <Compile Include="Services\Agents\Messages\MovementMessageHandler.cs" />
+    <Compile Include="Services\Agents\Messages\AgentMovementDelta.cs" />
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />
