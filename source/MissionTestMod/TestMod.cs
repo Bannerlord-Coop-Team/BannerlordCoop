@@ -10,6 +10,8 @@ using SandBox;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -31,16 +33,31 @@ namespace MissionTestMod
         private static IMissionGameManager _gameManager;
 
         protected override void OnSubModuleLoad()
-        {
-	        if (System.Diagnostics.Debugger.IsAttached)
+        { 
+            if (Debugger.IsAttached)
 	        {
-		        LogManager.Configuration
-			        .Enrich.WithProcessId()
-			        .WriteTo.Debug(
-				        outputTemplate:
-						"[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
-			        .MinimumLevel.Verbose();
-	        }
+                var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}";
+
+                var filePath = $"Arena_Vertical_Slice_{Process.GetCurrentProcess().Id}.log";
+
+                var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+
+                // Delete all old log files
+                foreach (var file in dir.EnumerateFiles("Arena_Vertical_Slice_*.log"))
+                {
+                    try
+                    {
+                        file.Delete();
+                    }
+                    catch (IOException) { }
+                }
+
+                LogManager.Configuration
+                    .Enrich.WithProcessId()
+                    .WriteTo.Debug(outputTemplate: outputTemplate)
+                    .WriteTo.File(filePath, outputTemplate: outputTemplate)
+                    .MinimumLevel.Verbose();
+            }
 
             harmony.PatchAll();
 
