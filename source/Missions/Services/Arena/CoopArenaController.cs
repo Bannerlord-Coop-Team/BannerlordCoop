@@ -27,6 +27,7 @@ using SandBox.View.Missions;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.CampaignSystem.Party;
 using System.Reflection;
+using Missions.Services.Agents.Messages;
 
 namespace Missions.Services
 {
@@ -52,6 +53,7 @@ namespace Missions.Services
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
             messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
         }
 
         ~CoopArenaController()
@@ -89,6 +91,13 @@ namespace Missions.Services
                 
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
+        }
+
+        private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
+        private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
+        {
+            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { payload.What.Agent, payload.What.WeaponIndex, payload.What.Position, 
+                payload.What.Velocity, payload.What.Orientation, payload.What.HasRigidBody, payload.What.IsPrimaryWeaponShot, payload.What.ForcedMissileIndex });
         }
 
         public void RespawnPlayer()
