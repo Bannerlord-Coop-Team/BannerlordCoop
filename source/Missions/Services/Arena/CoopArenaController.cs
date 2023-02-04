@@ -28,6 +28,7 @@ using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.CampaignSystem.Party;
 using System.Reflection;
 using Missions.Services.Agents.Messages;
+using Missions.Services.Agents.Patches;
 
 namespace Missions.Services
 {
@@ -93,11 +94,20 @@ namespace Missions.Services
             }
         }
 
+        public override void OnAgentShootMissile(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
+        {
+            base.OnAgentShootMissile(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
+            if (!Agent.Main.Team.TeamAgents.Contains(shooterAgent)) { return; }
+            AgentShoot message = new AgentShoot(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
+
+            MessageBroker.Instance.Publish(shooterAgent, message);
+        }
+
         private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
         private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
         {
             OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { payload.What.Agent, payload.What.WeaponIndex, payload.What.Position, 
-                payload.What.Velocity, payload.What.Orientation, payload.What.HasRigidBody, payload.What.IsPrimaryWeaponShot, payload.What.ForcedMissileIndex });
+                payload.What.Velocity, payload.What.Orientation, payload.What.HasRigidBody, true, payload.What.ForcedMissileIndex });
         }
 
         public void RespawnPlayer()

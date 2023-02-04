@@ -25,12 +25,10 @@ namespace Missions.Services.Agents.Messages
         public Mat3 Orientation { get; }
         [ProtoMember(6)]
         public bool HasRigidBody { get; }
-        [ProtoMember(7)]
-        public bool IsPrimaryWeaponShot { get; }
         [ProtoMember(8)]
         public int ForcedMissileIndex { get; }
 
-        public AgentShoot(Agent agent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, bool isPrimaryWeaponShot, int forcedMissileIndex)
+        public AgentShoot(Agent agent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
         {
             Agent = agent;
             WeaponIndex = weaponIndex;
@@ -38,7 +36,6 @@ namespace Missions.Services.Agents.Messages
             Velocity = velocity;
             Orientation = orientation;
             HasRigidBody = hasRigidBody;
-            IsPrimaryWeaponShot = isPrimaryWeaponShot;
             ForcedMissileIndex = forcedMissileIndex;
         }
     }

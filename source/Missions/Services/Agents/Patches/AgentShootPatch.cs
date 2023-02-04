@@ -19,9 +19,9 @@ namespace Missions.Services.Agents.Patches
     public class OnAgentShootMissilePatch
     {
         public static void Postfix(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity,
-            Mat3 orientation, bool hasRigidBody, bool isPrimaryWeaponShot, int forcedMissileIndex)
+            Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
         {
-            AgentShoot message = new AgentShoot(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, isPrimaryWeaponShot, forcedMissileIndex);
+            AgentShoot message = new AgentShoot(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
 
             MessageBroker.Instance.Publish(shooterAgent, message);
         }
