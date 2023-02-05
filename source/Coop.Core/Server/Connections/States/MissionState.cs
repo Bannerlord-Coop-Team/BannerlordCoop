@@ -1,4 +1,6 @@
 ﻿using Common.Messaging;
+using Coop.Core.Server.Connections.Messages.Incoming;
+using LiteNetLib;
 
 namespace Coop.Core.Server.Connections.States
 {
@@ -7,15 +9,22 @@ namespace Coop.Core.Server.Connections.States
         public MissionState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
         {
+            ConnectionLogic.NetworkMessageBroker.Subscribe<PlayerTransitionedToCampaign>(PlayerTransitionsCampaignHandler);
         }
 
         public override void Dispose()
         {
-
+            ConnectionLogic.NetworkMessageBroker.Unsubscribe<PlayerTransitionedToCampaign>(PlayerTransitionsCampaignHandler);
         }
 
-        public override void ResolveCharacter()
+        private void PlayerTransitionsCampaignHandler(MessagePayload<PlayerTransitionedToCampaign> obj)
         {
+            var playerId = (NetPeer)obj.Who;
+
+            if (playerId == ConnectionLogic.PlayerId)
+            {
+                ConnectionLogic.EnterCampaign();
+            }
         }
 
         public override void CreateCharacter()

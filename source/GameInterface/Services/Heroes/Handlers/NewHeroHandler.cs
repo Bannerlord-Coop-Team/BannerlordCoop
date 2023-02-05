@@ -47,6 +47,8 @@ namespace GameInterface.Services.Heroes.Handlers
             {
                 Hero hero = heroInterface.UnpackMainHero(bytes);
 
+                Logger.Information("New Hero ID: {id}", hero.Id.InternalValue);
+
                 var registerMessage = new NewPlayerHeroRegistered(registrationId, hero);
 
                 messageBroker.Publish(this, registerMessage);

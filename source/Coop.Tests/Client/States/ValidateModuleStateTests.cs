@@ -64,7 +64,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void ModulesValidated_Transitions_LoadingState()
         {
-            MessageBroker.Publish(this, new ModulesValidated());
+            MessageBroker.Publish(this, new ModulesProcessed());
 
             Assert.IsType<LoadingState>(clientLogic.State);
         }

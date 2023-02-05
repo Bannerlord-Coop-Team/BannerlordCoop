@@ -8,11 +8,9 @@ namespace Coop.Core.Client.States
     public abstract class ClientStateBase : IClientState
     {
         protected readonly IClientLogic Logic;
-        protected readonly IMessageBroker MessageBroker;
 
-        public ClientStateBase(IClientLogic logic, IMessageBroker messageBroker)
+        public ClientStateBase(IClientLogic logic)
         {
-            MessageBroker = messageBroker;
             Logic = logic;
         }
 

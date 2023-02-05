@@ -4,6 +4,7 @@ using Coop.Core.Server.Connections.Messages.Outgoing;
 using GameInterface.Services.Heroes.Handlers;
 using GameInterface.Services.Heroes.Interfaces;
 using LiteNetLib;
+using Serilog.Core;
 using System;
 
 namespace Coop.Core.Server.Connections.States
@@ -15,8 +16,6 @@ namespace Coop.Core.Server.Connections.States
         public CreateCharacterState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
         {
-            ConnectionLogic.NetworkMessageBroker.Publish(this, new PlayerCreatingCharacter(ConnectionLogic.PlayerId));
-
             ConnectionLogic.NetworkMessageBroker.Subscribe<NetworkTransferedHero>(PlayerTransferedHeroHandler);
             ConnectionLogic.NetworkMessageBroker.Subscribe<NewPlayerHeroRegistered>(PlayerHeroRegisteredHandler);
         }
@@ -62,10 +61,6 @@ namespace Coop.Core.Server.Connections.States
         }
 
         public override void Load()
-        {
-        }
-
-        public override void ResolveCharacter()
         {
         }
 

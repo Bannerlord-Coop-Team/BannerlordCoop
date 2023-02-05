@@ -4,6 +4,9 @@ using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.GameDebug.Handlers;
+using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Heroes.Messages;
 using Serilog;
 using Serilog.Core;
 using System;
@@ -15,6 +18,7 @@ namespace GameInterface.Services.Heroes.Interfaces
     internal interface IHeroInterface : IGameAbstraction
     {
         void PackageMainHero();
+        void ResolveHero(ResolveHero message);
         Hero UnpackMainHero(byte[] bytes);
     }
 
@@ -46,6 +50,12 @@ namespace GameInterface.Services.Heroes.Interfaces
             MBObjectManager.Instance.RegisterObject(hero.CharacterObject);
             MBObjectManager.Instance.RegisterObject(hero.Clan);
             return MBObjectManager.Instance.RegisterObject(hero);
+        }
+
+        public void ResolveHero(ResolveHero message)
+        {
+            // TODO implement
+            messageBroker.Publish(this, new ResolveDebugHero(message.TransactionId, message.PlayerId));
         }
     }
 }

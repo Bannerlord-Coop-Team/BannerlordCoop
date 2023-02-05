@@ -14,7 +14,6 @@ namespace Coop.Core.Server.Connections.States
             ConnectionLogic = connectionLogic;
         }
 
-        public abstract void ResolveCharacter();
         public abstract void CreateCharacter();
         public abstract void TransferSave();
         public abstract void Load();

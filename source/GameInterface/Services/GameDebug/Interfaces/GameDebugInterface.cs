@@ -9,12 +9,12 @@ using Common;
 
 namespace GameInterface.Services.GameDebug.Interfaces
 {
-    internal interface IGameDebugInterface : IGameAbstraction
+    internal interface IDebugGameInterface : IGameAbstraction
     {
         void LoadDebugGame();
     }
 
-    internal class GameDebugInterface : IGameDebugInterface
+    internal class DebugGameInterface : IDebugGameInterface
     {
         public static readonly string LOAD_GAME = "MP";
 
@@ -34,6 +34,11 @@ namespace GameInterface.Services.GameDebug.Interfaces
         {
             MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
             MouseManager.ShowCursor(false);
+        }
+
+        private void LoadGameFromServer()
+        {
+            // TODO
         }
     }
 }

@@ -8,36 +8,36 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class MissionState : ClientStateBase
     {
-        public MissionState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        public MissionState(IClientLogic logic) : base(logic)
         {
-            MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<CampaignStateEntered>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<CampaignStateEntered>(Handle);
         }
 
         private void Handle(MessagePayload<MainMenuEntered> obj)
         {
-            Logic.State = new MainMenuState(Logic, MessageBroker);
+            Logic.State = new MainMenuState(Logic);
         }
 
         private void Handle(MessagePayload<CampaignStateEntered> obj)
         {
-            Logic.State = new CampaignState(Logic, MessageBroker);
+            Logic.State = new CampaignState(Logic);
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<CampaignStateEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<CampaignStateEntered>(Handle);
         }
 
         public override void EnterCampaignState()
         {
-            MessageBroker.Publish(this, new EnterCampaignState());
+            Logic.NetworkMessageBroker.Publish(this, new EnterCampaignState());
         }
 
         public override void EnterMainMenu()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void Connect()
@@ -46,7 +46,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void EnterMissionState()
@@ -67,7 +67,6 @@ namespace Coop.Core.Client.States
 
         public override void ResolveNetworkGuids()
         {
-            throw new System.NotImplementedException();
         }
     }
 }

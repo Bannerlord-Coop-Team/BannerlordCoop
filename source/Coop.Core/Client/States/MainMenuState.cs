@@ -10,14 +10,14 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class MainMenuState : ClientStateBase
     {
-        public MainMenuState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        public MainMenuState(IClientLogic logic) : base(logic)
         {
-            MessageBroker.Subscribe<NetworkConnected>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<NetworkConnected>(Handle);
         }
 
         public override void Dispose() 
         {
-            MessageBroker.Unsubscribe<NetworkConnected>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<NetworkConnected>(Handle);
         }
 
         public override void Connect()
@@ -27,20 +27,12 @@ namespace Coop.Core.Client.States
 
         private void Handle(MessagePayload<NetworkConnected> obj)
         {
-            if (obj.What.ClientPartyExists)
-            {
-                Logic.State = new ReceivingSavedDataState(Logic, MessageBroker);
-            }
-            else
-            {
-                MessageBroker.Publish(this, new StartCharacterCreation());
-                Logic.State = new CharacterCreationState(Logic, MessageBroker);
-            }
+            Logic.State = new ValidateModuleState(Logic);
         }
 
         public override void Disconnect()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void EnterMainMenu()

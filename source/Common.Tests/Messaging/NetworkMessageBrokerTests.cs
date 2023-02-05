@@ -40,7 +40,7 @@ namespace Common.Tests.Messaging
 
             Assert.Equal(0, publishCounter);
 
-            messageBroker.PublishNetworkEvent(new TestEvent(), null);
+            messageBroker.PublishNetworkEvent(null, new TestEvent());
 
             Assert.Equal(1, publishCounter);
         }

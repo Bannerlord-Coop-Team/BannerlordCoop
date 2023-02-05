@@ -1,10 +1,8 @@
 ﻿using Autofac;
 using Common;
 using Common.LogicStates;
-using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client;
-using Coop.Core.Client.Messages;
 using Coop.Core.Server;
 using System;
 

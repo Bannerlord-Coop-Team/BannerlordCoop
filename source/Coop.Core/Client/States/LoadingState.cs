@@ -10,28 +10,14 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class LoadingState : ClientStateBase
     {
-        public LoadingState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        public LoadingState(IClientLogic logic) : base(logic)
         {
-            MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<NetworkGameSaveDataRecieved>(Handle);
-            MessageBroker.Subscribe<GameLoaded>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<GameLoaded>(Handle);
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<NetworkGameSaveDataRecieved>(Handle);
-            MessageBroker.Unsubscribe<GameLoaded>(Handle);
-        }
-
-        private void Handle(MessagePayload<MainMenuEntered> obj)
-        {
-            Logic.Disconnect();
-        }
-
-        private void Handle(MessagePayload<NetworkGameSaveDataRecieved> obj)
-        {
-            MessageBroker.Publish(this, new LoadGameSave(obj.What.GameSaveData));
+            Logic.NetworkMessageBroker.Unsubscribe<GameLoaded>(Handle);
         }
 
         private void Handle(MessagePayload<GameLoaded> obj)
@@ -41,12 +27,12 @@ namespace Coop.Core.Client.States
 
         public override void EnterMainMenu()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void ResolveNetworkGuids()
         {
-            Logic.State = new ResolveNetworkGuidsState(Logic, MessageBroker);
+            Logic.State = new ResolveNetworkGuidsState(Logic);
         }
 
         public override void Connect()
@@ -55,7 +41,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void ExitGame()

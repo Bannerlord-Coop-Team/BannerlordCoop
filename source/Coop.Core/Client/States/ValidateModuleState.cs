@@ -1,6 +1,11 @@
 ﻿using Common.Messaging;
+using Coop.Core.Client.Messages;
+using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.GameDebug.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Modules.Messages;
+using System.Threading.Tasks;
 
 namespace Coop.Core.Client.States
 {
@@ -9,38 +14,47 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class ValidateModuleState : ClientStateBase
     {
-        public ValidateModuleState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        public ValidateModuleState(IClientLogic logic) : base(logic)
         {
-            MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<ModulesValidated>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<NetworkClientValidated>(Handle);
 
-            MessageBroker.Publish(this, new ValidateModules());
+            Logic.NetworkMessageBroker.PublishNetworkEvent(new NetworkClientValidate(DebugHeroInterface.Player1_Id));
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<ModulesValidated>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<NetworkClientValidated>(Handle);
         }
 
         private void Handle(MessagePayload<MainMenuEntered> obj)
         {
-            Logic.State = new MainMenuState(Logic, MessageBroker);
+            Logic.State = new MainMenuState(Logic);
         }
 
-        private void Handle(MessagePayload<ModulesValidated> obj)
+        private void Handle(MessagePayload<NetworkClientValidated> obj)
         {
-            Logic.State = new LoadingState(Logic, MessageBroker);
+            if (obj.What.HeroExists)
+            {
+                Logic.HeroId = obj.What.HeroId;
+                Logic.State = new ReceivingSavedDataState(Logic);
+            }
+            else
+            {
+                Logic.NetworkMessageBroker.Publish(this, new StartCharacterCreation());
+                Logic.State = new CharacterCreationState(Logic);
+            }
         }
 
         public override void EnterMainMenu()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void LoadSavedData()
         {
-            MessageBroker.Publish(this, new ValidateModules());
+            Logic.NetworkMessageBroker.Publish(this, new ValidateModules());
         }
 
         public override void Connect()
@@ -49,7 +63,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void EnterCampaignState()

@@ -10,9 +10,10 @@ namespace GameInterface
 
     public class GameInterface : IGameInterface
     {
+        private readonly Harmony harmony;
         public GameInterface()
         {
-            Harmony harmony = new Harmony("com.Coop.GameInterface");
+            harmony = new Harmony("com.Coop.GameInterface");
             harmony.PatchAll();
         }
     }

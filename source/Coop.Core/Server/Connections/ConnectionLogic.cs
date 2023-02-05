@@ -39,14 +39,12 @@ namespace Coop.Core.Server.Connections
 
         public ConnectionLogic(NetPeer playerId, INetworkMessageBroker messageBroker)
         {
-            State = new InitialConnectionState(this);
             PlayerId = playerId;
             NetworkMessageBroker = messageBroker;
+            State = new ResolveCharacterState(this);
         }
 
         public void Dispose() => State.Dispose();
-
-        public void ResolveCharacter() => State.ResolveCharacter();
 
         public void CreateCharacter() => State.CreateCharacter();
 

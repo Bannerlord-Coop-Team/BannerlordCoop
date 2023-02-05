@@ -1,6 +1,8 @@
-﻿namespace GameInterface.Services.GameState.Messages
+﻿using Common.Messaging;
+
+namespace GameInterface.Services.GameState.Messages
 {
-    public readonly struct GameLoaded
+    public readonly struct GameLoaded : IEvent
     {
     }
 }

@@ -9,53 +9,29 @@ using Common.Extensions;
 namespace GameInterface
 {
     [Serializable]
-    public struct Version
-    {
-        public int Major;
-        public int Minor;
-        public int Revision;
-        public int ChangeSet;
-
-        public Version(int major, int minor, int revision, int changeSet)
-        {
-            Major = major;
-            Minor = minor;
-            Revision = revision;
-            ChangeSet = changeSet;
-        }
-
-        public Version(ApplicationVersion applicationVersion)
-        {
-            Major = applicationVersion.Major;
-            Minor = applicationVersion.Minor;
-            Revision = applicationVersion.Revision;
-            ChangeSet = applicationVersion.ChangeSet;
-        }
-    }
-
-    [Serializable]
     public struct ModuleInfo
     {
         public string Id { get; set; }
         public bool IsOfficial { get; set; }
-        public Version Version { get; set; }
+        public ApplicationVersion Version { get; set; }
 
-        public ModuleInfo(string id, bool isOfficial, ApplicationVersion applicationVersion)
+        public ModuleInfo(string id, bool isOfficial, ApplicationVersion version)
         {
             Id = id;
             IsOfficial = isOfficial;
-            Version = new Version(applicationVersion);
+            Version = version;
         }
     }
 
-    public abstract class IModuleInfoProvider
+    public interface IModuleInfoProvider
     {
-        public abstract List<ModuleInfo> GetModuleInfos();
+        List<ModuleInfo> GetModuleInfos();
     }
 
+    // TODO move to module interface
     public class TaleWorldsModuleInfoProvider : IModuleInfoProvider
     {
-        public override List<ModuleInfo> GetModuleInfos()
+        public List<ModuleInfo> GetModuleInfos()
         {
             var modules = TaleWorlds.ModuleManager.ModuleHelper.GetModules();
             var moduleInfos = new List<ModuleInfo>();
@@ -94,7 +70,7 @@ namespace GameInterface
             return info;
         }
 
-        public Version GameVersion()
+        public ApplicationVersion GameVersion()
         {
             return Modules.Find(m => m.IsOfficial).Version;
         }
@@ -116,17 +92,14 @@ namespace GameInterface
 
         public override bool Equals(object obj)
         {
-            if (obj is CompatibilityInfo)
-            {
-                return CompatibleWith(obj as CompatibilityInfo);
-            }
-            return false;
+            if (obj is CompatibilityInfo == false) return false;
+
+            return CompatibleWith(obj as CompatibilityInfo);
         }
 
         private void AddModule(ModuleInfo moduleInfo)
         {
             Modules.Add(moduleInfo);
         }
-
     }
 }

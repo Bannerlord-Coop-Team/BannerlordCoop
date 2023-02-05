@@ -1,10 +1,14 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.Messages.Incoming;
+using Coop.Core.Server.Connections.States;
 using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.Time.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Coop.Core.Server.Connections
 {
@@ -44,7 +48,6 @@ namespace Coop.Core.Server.Connections
             var playerId = obj.What.PlayerId;
             var connectionLogic = new ConnectionLogic(playerId, _messageBroker);
             ConnectionStates.Add(playerId, connectionLogic);
-            connectionLogic.ResolveCharacter();
         }
 
         private void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)
@@ -58,25 +61,33 @@ namespace Coop.Core.Server.Connections
             }
         }
 
-        
-        // TODO move to respective state
         private void PlayerTransitionsCampaignHandler(MessagePayload<PlayerTransitionedToCampaign> obj)
         {
-            var playerId = obj.What.PlayerId;
+            var playerId = (NetPeer)obj.Who;
             if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
                 return;
 
             connectionLogic.EnterCampaign();
+
+            EnableTimeControls();
         }
 
-        // TODO move to respective state
         private void PlayerTransitionsMissionHandler(MessagePayload<PlayerTransitionedToMission> obj)
         {
-            var playerId = obj.What.PlayerId;
+            var playerId = (NetPeer)obj.Who;
             if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
                 return;
 
             connectionLogic.EnterMission();
+        }
+
+        private void EnableTimeControls()
+        {
+            // Only re-enable if all connections are finished loading
+            if (ConnectionStates.Any(state => state.Value is LoadingState)) return;
+
+            _messageBroker.Publish(this, new NetworkEnableTimeControls());
+            _messageBroker.Publish(this, new EnableGameTimeControls());
         }
     }
 }

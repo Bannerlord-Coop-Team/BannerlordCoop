@@ -8,6 +8,7 @@ namespace GameInterface.Services.Heroes.Interfaces
 {
     public readonly struct RegisterNewPlayerHero : ICommand
     {
+        // TODO change to peer id
         public Guid RegistrationEventId { get; }
 
         public byte[] Bytes { get; }

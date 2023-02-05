@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.Messages.Outgoing;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Time.Messages;
@@ -14,6 +15,7 @@ namespace Coop.Core.Server.Connections.States
         public TransferSaveState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
         {
+            // maybe remove?
             ConnectionLogic.NetworkMessageBroker.Publish(this, new PlayerRecievingSave(ConnectionLogic.PlayerId));
 
             ConnectionLogic.NetworkMessageBroker.Subscribe<GameSaveDataPackaged>(Handle);
@@ -60,10 +62,6 @@ namespace Coop.Core.Server.Connections.States
         public override void Load()
         {
             ConnectionLogic.State = new LoadingState(ConnectionLogic);
-        }
-
-        public override void ResolveCharacter()
-        {
         }
 
         public override void TransferSave()

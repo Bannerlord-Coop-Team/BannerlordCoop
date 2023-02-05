@@ -6,11 +6,6 @@ namespace Coop.Core.Server.Connections
     public interface IConnectionState : IState, IDisposable
     {
         /// <summary>
-        /// Player joins server and is determine the existence of their given character
-        /// </summary>
-        void ResolveCharacter();
-
-        /// <summary>
         /// Player is in the process of creating a character
         /// </summary>
         void CreateCharacter();

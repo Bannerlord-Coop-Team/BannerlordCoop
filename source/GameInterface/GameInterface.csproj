@@ -258,13 +258,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Behaviour\InitServerBehaviour.cs" />
-    <Compile Include="CompatibilityInfo.cs" />
+    <Compile Include="GameInterface.cs" />
+    <Compile Include="Services\Modules\CompatibilityInfo.cs" />
     <Compile Include="Exceptions\Exceptions.cs" />
     <Compile Include="Extentions\CampaignObjectManagerExtentions.cs" />
     <Compile Include="Extentions\CampaignTimeExtensions.cs" />
     <Compile Include="Extentions\MobilePartyExtensions.cs" />
     <Compile Include="Behaviour\GameLoadedBehaviour.cs" />
-    <Compile Include="GameInterface.cs" />
     <Compile Include="GameInterfaceModule.cs" />
     <Compile Include="Helpers\ExampleGameHelper.cs" />
     <Compile Include="Helpers\IExampleGameHelper.cs" />
@@ -274,11 +274,18 @@
     <Compile Include="Services\CampaignService\Patches\SetTimeSpeedPatch.cs" />
     <Compile Include="Services\CampaignService\Patches\TimeControlModePatch.cs" />
     <Compile Include="Services\CharacterCreation\Messages\StartCharacterCreation.cs" />
+    <Compile Include="Services\GameDebug\Handlers\DebugResolveHandler.cs" />
+    <Compile Include="Services\GameDebug\Interfaces\DebugHeroInterface.cs" />
+    <Compile Include="Services\GameDebug\Messages\ResolveDebugHero.cs" />
     <Compile Include="Services\GameDebug\Patches\CharacterCreationIntoPatch.cs" />
     <Compile Include="Services\GameState\Handlers\LoadGameHandler.cs" />
     <Compile Include="Services\GameState\Messages\EnterCampaignState.cs" />
     <Compile Include="Services\GameState\Patches\CharacterCreationFinishedPatch.cs" />
     <Compile Include="Services\Heroes\Handlers\NewHeroHandler.cs" />
+    <Compile Include="Services\Heroes\Messages\HeroResolved.cs" />
+    <Compile Include="Services\Heroes\Messages\ResolveHeroNotFound.cs" />
+    <Compile Include="Services\Heroes\Messages\ResolveHero.cs" />
+    <Compile Include="Services\Heroes\Handlers\ResolveHeroHandler.cs" />
     <Compile Include="Services\Heroes\Interfaces\HeroInterface.cs" />
     <Compile Include="Services\Heroes\Messages\NewHeroPackaged.cs" />
     <Compile Include="Services\Heroes\Messages\RegisterNewPlayerHero.cs" />

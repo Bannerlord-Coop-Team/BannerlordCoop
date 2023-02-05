@@ -10,27 +10,39 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class ReceivingSavedDataState : ClientStateBase
     {
-        public ReceivingSavedDataState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        byte[] saveData;
+
+        public ReceivingSavedDataState(IClientLogic logic) : base(logic)
         {
-            MessageBroker.Subscribe<NetworkGameSaveDataRecieved>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<NetworkGameSaveDataRecieved>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<NetworkGameSaveDataRecieved>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<NetworkGameSaveDataRecieved>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
         }
 
         private void Handle(MessagePayload<NetworkGameSaveDataRecieved> obj)
         {
-            var commandLoad = new LoadGameSave(obj.What.GameSaveData);
-            MessageBroker.Publish(this, commandLoad);
+            saveData = obj.What.GameSaveData;
+            Logic.EnterMainMenu();
+        }
 
-            Logic.State = new ValidateModuleState(Logic, MessageBroker);
+        private void Handle(MessagePayload<MainMenuEntered> obj)
+        {
+            if (saveData == null) return;
+
+            var commandLoad = new LoadGameSave(saveData);
+            Logic.NetworkMessageBroker.Publish(this, commandLoad);
+
+            Logic.State = new LoadingState(Logic);
         }
 
         public override void EnterMainMenu()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void Connect()
@@ -39,7 +51,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void ExitGame()

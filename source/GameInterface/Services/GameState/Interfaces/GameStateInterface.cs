@@ -1,7 +1,11 @@
 ﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Save;
 using SandBox;
+using System;
 using System.Reflection;
+using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -22,10 +26,9 @@ namespace GameInterface.Services.GameState.Interfaces
     {
         public void EnterMainMenu()
         {
-            MBGameManager.EndGame();
+            EndGame();
         }
 
-        private static readonly FieldInfo info_data = typeof(InMemDriver).GetField("_data", BindingFlags.Instance | BindingFlags.NonPublic);
         public void LoadSaveGame(byte[] saveData)
         {
             GameLoopRunner.RunOnMainThread(() => InteralLoadSaveGame(saveData));
@@ -33,6 +36,8 @@ namespace GameInterface.Services.GameState.Interfaces
         
         private void InteralLoadSaveGame(byte[] saveData)
         {
+            if (saveData == null) throw new ArgumentNullException($"Received save data was null");
+
             ISaveDriver driver = new CoopInMemSaveDriver(saveData);
             LoadResult loadResult = SaveManager.Load("", driver);
             MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));

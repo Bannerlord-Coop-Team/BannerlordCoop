@@ -1,6 +1,13 @@
 ﻿using Common.Messaging;
-using Coop.Core.Server.Connections.Messages.Incoming;
+using Coop.Core.Client.Messages;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.Messages.Outgoing;
+using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Heroes.Messages;
+using LiteNetLib;
+using System;
+using System.Threading.Tasks;
 
 namespace Coop.Core.Server.Connections.States
 {
@@ -9,38 +16,46 @@ namespace Coop.Core.Server.Connections.States
         public ResolveCharacterState(IConnectionLogic connectionLogic) 
             : base(connectionLogic)
         {
-            ConnectionLogic.NetworkMessageBroker.Subscribe<CharacterResolved>(PlayerJoinedHandler);
-            ConnectionLogic.NetworkMessageBroker.Subscribe<PlayerCreatingCharacter>(PlayerCreatingCharacterHandler);
+            ConnectionLogic.NetworkMessageBroker.Subscribe<NetworkClientValidate>(ClientValidateHandler);
+            ConnectionLogic.NetworkMessageBroker.Subscribe<HeroResolved>(ResolveHeroHandler);
+            ConnectionLogic.NetworkMessageBroker.Subscribe<ResolveHeroNotFound>(HeroNotFoundHandler);
         }
 
         public override void Dispose()
         {
-            ConnectionLogic.NetworkMessageBroker.Unsubscribe<CharacterResolved>(PlayerJoinedHandler);
-            ConnectionLogic.NetworkMessageBroker.Unsubscribe<PlayerCreatingCharacter>(PlayerCreatingCharacterHandler);
+            ConnectionLogic.NetworkMessageBroker.Unsubscribe<NetworkClientValidate>(ClientValidateHandler);
+            ConnectionLogic.NetworkMessageBroker.Unsubscribe<HeroResolved>(ResolveHeroHandler);
+            ConnectionLogic.NetworkMessageBroker.Unsubscribe<ResolveHeroNotFound>(HeroNotFoundHandler);
         }
 
-        private void PlayerJoinedHandler(MessagePayload<CharacterResolved> obj)
+        private void ClientValidateHandler(MessagePayload<NetworkClientValidate> obj)
         {
-            var playerId = obj.What.PlayerId;
+            var playerId = obj.Who as NetPeer;
 
             if (playerId == ConnectionLogic.PlayerId)
             {
-                ConnectionLogic.Load();
+                ConnectionLogic.NetworkMessageBroker.Publish(this, new ResolveDebugHero(playerId.Id, obj.What.PlayerId));
             }
         }
 
-        private void PlayerCreatingCharacterHandler(MessagePayload<PlayerCreatingCharacter> obj)
+        private void ResolveHeroHandler(MessagePayload<HeroResolved> obj)
         {
-            var playerId = obj.What.PlayerId;
-
-            if (playerId == ConnectionLogic.PlayerId)
+            if (obj.What.TransactionId == ConnectionLogic.PlayerId.Id)
             {
+                var validateMessage = new NetworkClientValidated(true, obj.What.HeroId);
+                ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(validateMessage);
+                ConnectionLogic.TransferSave();
+            }
+        }
+
+        private void HeroNotFoundHandler(MessagePayload<ResolveHeroNotFound> obj)
+        {
+            if (obj.What.PeerId == ConnectionLogic.PlayerId.Id)
+            {
+                var validateMessage = new NetworkClientValidated(false, 0);
+                ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(validateMessage);
                 ConnectionLogic.CreateCharacter();
             }
-        }
-
-        public override void ResolveCharacter()
-        {
         }
 
         public override void CreateCharacter()
@@ -50,11 +65,11 @@ namespace Coop.Core.Server.Connections.States
 
         public override void TransferSave()
         {
+            ConnectionLogic.State = new TransferSaveState(ConnectionLogic);
         }
 
         public override void Load()
         {
-            ConnectionLogic.State = new LoadingState(ConnectionLogic);
         }
 
         public override void EnterCampaign()

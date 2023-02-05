@@ -129,6 +129,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Missions\Missions.csproj">
       <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
       <Name>Missions</Name>

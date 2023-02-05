@@ -8,10 +8,10 @@ namespace GameInterface.Services.GameDebug.Handlers
 {
     internal class LoadDebugGameHandler : IHandler
     {
-        private readonly IGameDebugInterface gameDebugInterface;
+        private readonly IDebugGameInterface gameDebugInterface;
         private readonly IMessageBroker messageBroker;
 
-        public LoadDebugGameHandler(IGameDebugInterface gameDebugInterface, IMessageBroker messageBroker)
+        public LoadDebugGameHandler(IDebugGameInterface gameDebugInterface, IMessageBroker messageBroker)
         {
             this.gameDebugInterface = gameDebugInterface;
             this.messageBroker = messageBroker;

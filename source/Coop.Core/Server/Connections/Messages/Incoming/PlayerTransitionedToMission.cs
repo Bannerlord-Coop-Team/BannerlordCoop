@@ -3,13 +3,7 @@ using LiteNetLib;
 
 namespace Coop.Core.Server.Connections.Messages.Incoming
 {
-    public readonly struct PlayerTransitionedToMission : ICommand
+    public readonly struct PlayerTransitionedToMission : INetworkEvent
     {
-        public NetPeer PlayerId { get; }
-
-        public PlayerTransitionedToMission(NetPeer playerId)
-        {
-            PlayerId = playerId;
-        }
     }
 }

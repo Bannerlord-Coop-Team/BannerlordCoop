@@ -125,14 +125,14 @@
     <Compile Include="CoopModule.cs" />
     <Compile Include="Server\Connections\ClientRegistry.cs" />
     <Compile Include="Server\Connections\IConnectionState.cs" />
+    <Compile Include="Server\Connections\Messages\Incoming\NetworkRequestSaveData.cs" />
+    <Compile Include="Server\Connections\Messages\NetworkClientValidation.cs" />
     <Compile Include="Server\Connections\Messages\Incoming\PlayerConnectedCampaign.cs" />
     <Compile Include="Server\Connections\Messages\Incoming\PlayerConnectedMission.cs" />
-    <Compile Include="Server\Connections\Messages\Outgoing\NetworkDisableTimeControls.cs" />
-    <Compile Include="Server\Connections\Messages\Outgoing\PlayerCreatingCharacter.cs" />
+    <Compile Include="Server\Connections\Messages\NetworkTimeControls.cs" />
     <Compile Include="Server\Connections\Messages\Incoming\PlayerDisconnected.cs" />
     <Compile Include="Server\Connections\Messages\Incoming\NetworkTransferedHero.cs" />
     <Compile Include="Server\Connections\Messages\Outgoing\PlayerTransferingHero.cs" />
-    <Compile Include="Server\Connections\Messages\Outgoing\CharacterResolved.cs" />
     <Compile Include="Server\Connections\Messages\Incoming\PlayerConnected.cs" />
     <Compile Include="Server\Connections\Messages\Incoming\PlayerLoaded.cs" />
     <Compile Include="Server\Connections\Messages\Outgoing\PlayerLoading.cs" />
@@ -142,8 +142,6 @@
     <Compile Include="Server\Connections\States\ConnectionStateBase.cs" />
     <Compile Include="Server\Connections\ConnectionLogic.cs" />
     <Compile Include="Server\Connections\States\CreateCharacterState.cs" />
-    <Compile Include="Server\Connections\Messages\Outgoing\NetworkEnableTimeControls.cs" />
-    <Compile Include="Server\Connections\States\InitialConnectionState.cs" />
     <Compile Include="Server\Connections\Messages\Outgoing\PlayerRecievingSave.cs" />
     <Compile Include="Server\Connections\States\ResolveCharacterState.cs" />
     <Compile Include="Server\Connections\States\LoadingState.cs" />

@@ -20,7 +20,7 @@ namespace GameInterface.Services.Modules.Interfaces
         public void ValidateModules()
         {
             // TODO implement
-            messageBroker.Publish(this, new ModulesValidated());
+            messageBroker.Publish(this, new ModulesProcessed());
         }
     }
 }

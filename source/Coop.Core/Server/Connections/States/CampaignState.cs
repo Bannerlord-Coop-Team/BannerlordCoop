@@ -1,19 +1,23 @@
-﻿namespace Coop.Core.Server.Connections.States
+﻿using Common.Messaging;
+using Coop.Core.Server.Connections.Messages.Incoming;
+
+namespace Coop.Core.Server.Connections.States
 {
     public class CampaignState : ConnectionStateBase
     {
         public CampaignState(IConnectionLogic connectionLogic) : base(connectionLogic)
         {
-
+            ConnectionLogic.NetworkMessageBroker.Subscribe<PlayerTransitionedToMission>(PlayerTransitionsMissionHandler);
         }
 
         public override void Dispose()
         {
-
+            ConnectionLogic.NetworkMessageBroker.Unsubscribe<PlayerTransitionedToMission>(PlayerTransitionsMissionHandler);
         }
 
-        public override void ResolveCharacter()
+        private void PlayerTransitionsMissionHandler(MessagePayload<PlayerTransitionedToMission> obj)
         {
+            ConnectionLogic.EnterMission();
         }
 
         public override void CreateCharacter()

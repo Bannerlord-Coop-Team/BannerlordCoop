@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Connections.Messages.Incoming;
-using Coop.Core.Server.Connections.Messages.Outgoing;
-using GameInterface.Services.Time.Messages;
+using LiteNetLib;
 
 namespace Coop.Core.Server.Connections.States
 {
@@ -10,29 +9,23 @@ namespace Coop.Core.Server.Connections.States
         public LoadingState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
         {
-            ConnectionLogic.NetworkMessageBroker.Publish(this, new PlayerLoading(ConnectionLogic.PlayerId));
-            ConnectionLogic.NetworkMessageBroker.Subscribe<PlayerLoaded>(PlayerLoadedHandler);
+            ConnectionLogic.NetworkMessageBroker.Subscribe<PlayerTransitionedToCampaign>(PlayerTransitionsCampaignHandler);
         }
 
         public override void Dispose()
         {
-            ConnectionLogic.NetworkMessageBroker.Unsubscribe<PlayerLoaded>(PlayerLoadedHandler);
+            ConnectionLogic.NetworkMessageBroker.Unsubscribe<PlayerTransitionedToCampaign>(PlayerTransitionsCampaignHandler);
         }
 
-        private void PlayerLoadedHandler(MessagePayload<PlayerLoaded> obj)
+        // TODO send message from client
+        private void PlayerTransitionsCampaignHandler(MessagePayload<PlayerTransitionedToCampaign> obj)
         {
-            var playerId = obj.What.PlayerId;
-            
-            if(playerId == ConnectionLogic.PlayerId)
+            var playerId = (NetPeer)obj.Who;
+
+            if (playerId == ConnectionLogic.PlayerId)
             {
                 ConnectionLogic.EnterCampaign();
             }
-        }
-
-        
-
-        public override void ResolveCharacter()
-        {
         }
 
         public override void CreateCharacter()
@@ -49,9 +42,6 @@ namespace Coop.Core.Server.Connections.States
 
         public override void EnterCampaign()
         {
-            ConnectionLogic.NetworkMessageBroker.Publish(this, new NetworkEnableTimeControls());
-            ConnectionLogic.NetworkMessageBroker.Publish(this, new EnableGameTimeControls());
-
             ConnectionLogic.State = new CampaignState(ConnectionLogic);
         }
 

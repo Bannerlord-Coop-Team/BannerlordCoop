@@ -43,18 +43,15 @@ namespace Coop.Core.Server
         }
         private IServerState _state;
 
-        private readonly IGameInterface gameInterface;
-
         public IMessageBroker MessageBroker { get; }
 
         public ICoopServer NetworkServer { get; }
 
-        public ServerLogic(IMessageBroker messageBroker, ICoopServer networkServer, IGameInterface gameInterface)
+        public ServerLogic(IMessageBroker messageBroker, ICoopServer networkServer)
         {
             State = new InitialServerState(this, messageBroker);
             MessageBroker = messageBroker;
             NetworkServer = networkServer;
-            this.gameInterface = gameInterface;
         }
 
         public void Start()

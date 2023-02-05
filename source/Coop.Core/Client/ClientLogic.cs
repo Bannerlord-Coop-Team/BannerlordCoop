@@ -23,6 +23,7 @@ namespace Coop.Core.Client
         /// </summary>
         ICoopClient NetworkClient { get; }
         INetworkMessageBroker NetworkMessageBroker { get; }
+        uint HeroId { get; set; }
     }
 
     /// <inheritdoc cref="IClientLogic"/>
@@ -31,6 +32,7 @@ namespace Coop.Core.Client
         private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
         public ICoopClient NetworkClient { get; }
         public INetworkMessageBroker NetworkMessageBroker { get; }
+        public uint HeroId { get; set; }
         public IClientState State 
         {
             get { return _state; }
@@ -45,17 +47,13 @@ namespace Coop.Core.Client
 
         private IClientState _state;
 
-        private readonly IGameInterface gameInterface;
-
         public ClientLogic(
             ICoopClient networkClient,
-            INetworkMessageBroker messageBroker,
-            IGameInterface gameInterface)
+            INetworkMessageBroker messageBroker)
         {
             NetworkClient = networkClient;
             NetworkMessageBroker = messageBroker;
-            State = new MainMenuState(this, messageBroker);
-            this.gameInterface = gameInterface;
+            State = new MainMenuState(this);
         }
 
         public void Start()

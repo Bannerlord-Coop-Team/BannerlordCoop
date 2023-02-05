@@ -2,6 +2,7 @@
 using GameInterface.Services.CharacterCreation.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.GameState.Patches
 {

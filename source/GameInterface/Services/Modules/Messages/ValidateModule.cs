@@ -7,7 +7,8 @@ namespace GameInterface.Services.Modules.Messages
 
     }
 
-    public readonly struct ModulesValidated : IEvent
+    public readonly struct ModulesProcessed : IEvent
     {
+        public ModuleInfo[] Modules { get; }
     }
 }
