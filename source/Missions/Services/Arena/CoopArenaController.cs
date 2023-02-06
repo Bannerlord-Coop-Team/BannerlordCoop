@@ -27,6 +27,7 @@ using SandBox.View.Missions;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.CampaignSystem.Party;
 using System.Reflection;
+using Missions.Services.Agents.Packets;
 
 namespace Missions.Services
 {
@@ -50,7 +51,7 @@ namespace Missions.Services
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
-            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);''
         }
 
         ~CoopArenaController()
@@ -61,6 +62,13 @@ namespace Missions.Services
         public override void AfterStart()
         {
             AddPlayerToArena();
+        }
+
+
+        private void Handle_AgentDamage(MessagePayload<AgentDamageData> payload)
+        {
+            NetPeer netPeer = (NetPeer)payload.Who;
+            AgentDamageData agentDamaData = payload.What;
         }
 
         private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
