@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.Core;
 using ItemTypeEnum = TaleWorlds.Core.ItemObject.ItemTypeEnum;
 
@@ -21,6 +22,9 @@ namespace Missions.Services.Arena
     /// <inheritdoc cref="IRandomEquipmentGenerator"/>
     internal class RandomEquipmentGenerator : IRandomEquipmentGenerator
     {
+        //Here im harcoding the elements that are causing the arrows not to spawn and the same for the throwing weapons
+        private static readonly HashSet<string> ExcludedItems = new HashSet<string>{"ballista_projectile_burning", "ballista_projectile", "throwing_stone", "boulder",
+            "pot", "grapeshot_stack", "grapeshot_fire_stack", "grapeshot_projectile", "grapeshot_fire_projectile" };
         private static readonly IDictionary<ItemTypeEnum, List<ItemObject>> ExistingItems = InitializeItemDictionary();
         private static readonly ItemTypeEnum[] ArmorLoadout = new ItemTypeEnum[] { ItemTypeEnum.HeadArmor, ItemTypeEnum.Cape, ItemTypeEnum.BodyArmor, ItemTypeEnum.HandArmor, ItemTypeEnum.LegArmor };
         private static readonly ItemTypeEnum[] HorseLoadout = new ItemTypeEnum[] { ItemTypeEnum.Horse, ItemTypeEnum.HorseHarness };
@@ -33,6 +37,7 @@ namespace Missions.Services.Arena
             new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Shield },
         };
 
+
         private readonly Random Random = new Random();
 
         /// <summary>
@@ -43,19 +48,24 @@ namespace Missions.Services.Arena
         {
             IEnumerable<ItemObject> allItems = Game.Current.ObjectManager.GetObjectTypeList<ItemObject>();
             IDictionary<ItemTypeEnum, List<ItemObject>> result = new Dictionary<ItemTypeEnum, List<ItemObject>>();
-
+            
             foreach (var item in allItems)
             {
+
                 bool keyExists = result.ContainsKey(item.ItemType);
+
+                if (ExcludedItems.Contains(item.StringId)) continue;
                 if (!keyExists)
                 {
                     result.Add(item.ItemType, new List<ItemObject>());
                 }
+
                 result[item.ItemType].Add(item);
             }
-
             return result;
         }
+
+
 
         /// <summary>
         /// Creates random equipment for characters
@@ -68,7 +78,7 @@ namespace Missions.Services.Arena
 
             GenerateRandomWeaponEquipment(equipment);
             GenerateRandomArmorEquipment(equipment);
-            
+
             if (noHorse == false)
             {
                 GenerateRandomHorseEquipment(equipment);
@@ -91,10 +101,11 @@ namespace Missions.Services.Arena
             for (int i = 0; i < loadout.Length; i++)
             {
                 ItemTypeEnum loadoutItem = loadout[i];
+
+                //Some items doesnt exists, they are harcoded at the dictionary
                 int randomItemIndex = Random.Next(ExistingItems[loadoutItem].Count);
                 equipment[i] = new EquipmentElement(ExistingItems[loadoutItem][randomItemIndex]);
             }
-
             return equipment;
         }
 
