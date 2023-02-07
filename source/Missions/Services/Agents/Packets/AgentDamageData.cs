@@ -8,20 +8,21 @@ using System.Threading.Tasks;
 
 namespace Missions.Services.Agents.Packets
 {
+    [ProtoContract(SkipConstructor = true)]
     public class AgentDamageData : INetworkEvent
     {
-        public AgentDamageData(Guid sourceAgent, Guid targetAgent, double damage)
+        public AgentDamageData(Guid attackerAgentId, Guid victimAgentId, double damage)
         {
-            SourceAgent = sourceAgent;
-            TargetAgent = targetAgent;
+            AttackerAgentId = attackerAgentId;
+            VictimAgentId = victimAgentId;
             Damage = damage;
 
         }
 
         [ProtoMember(1)]
-        public Guid SourceAgent { get; }
+        public Guid AttackerAgentId { get; }
         [ProtoMember(2)]
-        public Guid TargetAgent { get; }
+        public Guid VictimAgentId { get; }
 
         [ProtoMember(3)]
         public double Damage { get; }

@@ -1,33 +1,21 @@
-﻿using System;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using LiteNetLib;
+using Missions.Messages;
+using Missions.Services.Agents.Packets;
+using Missions.Services.Arena;
+using Missions.Services.Network;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem.AgentOrigins;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using Common.Messaging;
-using Common;
-using Missions.Messages;
-using LiteNetLib;
-using Serilog;
-using Common.Logging;
-using Missions.Services.Network;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Encounters;
-using System.Text.RegularExpressions;
-using JetBrains.Annotations;
-using TaleWorlds.CampaignSystem.Extensions;
-using System.Runtime.CompilerServices;
-using Missions.Services.Arena;
-using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
-using SandBox.View.Missions;
-using TaleWorlds.MountAndBlade.View;
-using TaleWorlds.CampaignSystem.Party;
-using System.Reflection;
-using Missions.Services.Agents.Packets;
 
 namespace Missions.Services
 {
@@ -51,7 +39,8 @@ namespace Missions.Services
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
-            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);''
+            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
         }
 
         ~CoopArenaController()
@@ -67,8 +56,38 @@ namespace Missions.Services
 
         private void Handle_AgentDamage(MessagePayload<AgentDamageData> payload)
         {
-            NetPeer netPeer = (NetPeer)payload.Who;
             AgentDamageData agentDamaData = payload.What;
+            NetPeer netPeer = payload.Who as NetPeer;
+            
+
+            Agent effectedAgent = null;
+            Agent effectorAgent = null;
+            // grab the network registry group controller
+            _agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController agentGroupController);
+
+            if(agentGroupController != null && agentGroupController.ControlledAgents.ContainsKey(agentDamaData.VictimAgentId)) {
+                agentGroupController.ControlledAgents.TryGetValue(agentDamaData.VictimAgentId, out effectedAgent);
+            }
+            else if (_agentRegistry.ControlledAgents.ContainsKey(agentDamaData.VictimAgentId))
+            {
+                _agentRegistry.ControlledAgents.TryGetValue(agentDamaData.VictimAgentId, out effectedAgent);
+            }
+            if (agentGroupController != null && agentGroupController.ControlledAgents.ContainsKey(agentDamaData.AttackerAgentId))
+            {
+                agentGroupController.ControlledAgents.TryGetValue(agentDamaData.AttackerAgentId, out effectorAgent);
+            }
+            else if (_agentRegistry.ControlledAgents.ContainsKey(agentDamaData.AttackerAgentId))
+            {
+                _agentRegistry.ControlledAgents.TryGetValue(agentDamaData.AttackerAgentId, out effectorAgent);
+            }
+
+
+            Blow b = new Blow();
+            b.InflictedDamage = (int)agentDamaData.Damage;
+            b.OwnerId = effectorAgent.Index;
+            AttackCollisionData collisionData = new AttackCollisionData();
+            effectedAgent.RegisterBlow(b, collisionData);
+            
         }
 
         private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
@@ -88,12 +107,17 @@ namespace Missions.Services
             Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true);
             _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
 
-            //Mission currentMission = Mission.Current;
+            Mission currentMission = Mission.Current;
+
+            if(joinInfo.UnitIdString == null)
+            {
+                return;
+            }
 
             for (int i = 0; i < joinInfo.UnitIdString.Length; i++)
             {
                 Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
-                
+
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
         }
