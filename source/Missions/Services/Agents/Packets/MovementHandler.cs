@@ -142,16 +142,21 @@ namespace Missions.Services.Agents.Packets
             delta.CalculateMovement(payload.What);
         }
 
-        private AgentMovementDelta GetDelta(IMovement payload)
+        private AgentMovementDelta GetDelta(IMovementEvent payload)
         {
-            if (_agentMovementDeltas.TryGetValue(payload.Guid, out var delta))
+            if (!_agentRegistry.AgentToId.TryGetValue(payload.Agent, out var payloadGuid))
+            {
+                throw new ArgumentException($"No {nameof(Agent)} found");
+            }
+
+            if (_agentMovementDeltas.TryGetValue(payloadGuid, out var delta))
             {
                 return delta;
             }
 
-            delta = new AgentMovementDelta(payload.Agent, payload.Guid);
+            delta = new AgentMovementDelta(payload.Agent, payloadGuid);
 
-            _agentMovementDeltas.Add(payload.Guid, delta);
+            _agentMovementDeltas.Add(payloadGuid, delta);
 
             return delta;
         }

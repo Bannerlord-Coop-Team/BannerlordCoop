@@ -7,7 +7,7 @@ namespace Missions.Services.Agents.Messages
     /// <summary>
     /// An <see cref="IEvent"/> propagating that the <see cref="Agent"/>'s input vector has changed.
     /// </summary>
-    internal readonly struct MovementInputVectorChanged : IMovement
+    internal readonly struct MovementInputVectorChanged : IMovementEvent
     {
         /// <summary>
         /// The changed input vector.
@@ -17,17 +17,13 @@ namespace Missions.Services.Agents.Messages
         /// <inheritdoc />
         public Agent Agent { get; }
 
-        /// <inheritdoc />
-        public Guid Guid { get; }
-
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="agent"></param>
-        public MovementInputVectorChanged(Guid guid, Agent agent)
+        public MovementInputVectorChanged(Agent agent)
         {
             Agent = agent;
-            Guid = guid;
             InputVector = agent.MovementInputVector;
         }
     }

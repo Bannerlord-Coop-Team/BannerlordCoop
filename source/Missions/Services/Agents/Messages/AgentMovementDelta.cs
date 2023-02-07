@@ -49,7 +49,7 @@ namespace Missions.Services.Agents.Messages
         /// <param name="change"></param>
         public void CalculateMovement(LookDirectionChanged change)
         {
-            _lookDirectionDelta += change.LookDirection;
+            _lookDirectionDelta = change.LookDirection;
         }
 
         /// <summary>
@@ -58,7 +58,7 @@ namespace Missions.Services.Agents.Messages
         /// <param name="change"></param>
         public void CalculateMovement(MovementInputVectorChanged change)
         {
-            _inputVectorDelta += change.InputVector;
+            _inputVectorDelta = change.InputVector;
         }
 
         /// <summary>
