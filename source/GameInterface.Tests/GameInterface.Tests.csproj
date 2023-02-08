@@ -142,6 +142,8 @@
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Bootstrap\GameBootStrap.cs" />
     <Compile Include="Serialization\SerializerTests\ArmySerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BlowSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\BlowWeaponRecordSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterAttributesSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CommonAreaPartyComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterPerksSerializationTest.cs" />
@@ -154,6 +156,7 @@
     <Compile Include="Serialization\SerializerTests\ArmorComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\HorseComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PathFaceRecordSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\AttackCollisionDataSerilizationTest.cs" />
     <Compile Include="Serialization\SerializerTests\StanceLinkSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\MobilePartySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterAttributeSerializationTest.cs" />

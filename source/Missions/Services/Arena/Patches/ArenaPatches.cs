@@ -1,4 +1,7 @@
 ﻿using Common.Network;
+using Common.Serialization;
+using GameInterface.Serialization;
+using GameInterface.Serialization.External;
 using HarmonyLib;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Network;
@@ -17,7 +20,7 @@ namespace Missions.Services.Arena.Patches
             if (!NetworkAgentRegistry.Instance.ControlledAgents.ContainsKey(attackerId)) return true;
             AgentDamageData _agentDamageData;
             NetworkAgentRegistry.Instance.AgentToId.TryGetValue(victim, out Guid victimId);
-            _agentDamageData = new AgentDamageData(attackerId, victimId, b.InflictedDamage);
+            _agentDamageData = new AgentDamageData(attackerId, victimId, b.InflictedDamage, collisionData, b);
             NetworkMessageBroker.Instance.PublishNetworkEvent(_agentDamageData);
 
             return true;
