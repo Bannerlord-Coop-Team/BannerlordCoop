@@ -12,6 +12,9 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Services.Arena.Patches
 {
     [HarmonyPatch(typeof(Mission), "RegisterBlow")]
+    /// <summary>
+    /// Intercept agent damage and determine if a network call is needed
+    /// </summary>
     public class AgentDamagePatch
     {
         static bool Prefix(Agent attacker, Agent victim, GameEntity realHitEntity, Blow b, ref AttackCollisionData collisionData, in MissionWeapon attackerWeapon, ref CombatLogData combatLogData)
