@@ -298,6 +298,9 @@
     <Compile Include="Helpers\SaveLoadHelper.cs" />
     <Compile Include="Serialization\BinaryPackageBase.cs" />
     <Compile Include="Serialization\BinaryPackageFactory.cs" />
+    <Compile Include="Serialization\External\AttackCollisionDataBinaryPackage.cs" />
+    <Compile Include="Serialization\External\BlowBinaryPackage.cs" />
+    <Compile Include="Serialization\External\BlowWeaponRecordBinaryPackage.cs" />
     <Compile Include="Serialization\Generics\MBReadOnlyListBinaryPackage.cs" />
     <Compile Include="Serialization\External\ArmyBinaryPackage.cs" />
     <Compile Include="Serialization\External\CharacterAttributesBinaryPackage.cs" />

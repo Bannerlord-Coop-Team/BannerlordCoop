@@ -82,10 +82,9 @@ namespace Missions.Services
             }
 
 
-            Blow b = new Blow();
-            b.InflictedDamage = (int)agentDamaData.Damage;
+            Blow b = agentDamaData.Blow;
             b.OwnerId = effectorAgent.Index;
-            AttackCollisionData collisionData = new AttackCollisionData();
+            AttackCollisionData collisionData = agentDamaData.AttackCollisionData;
             effectedAgent.RegisterBlow(b, collisionData);
             
         }
