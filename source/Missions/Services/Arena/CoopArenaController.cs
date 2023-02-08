@@ -29,6 +29,7 @@ using TaleWorlds.CampaignSystem.Party;
 using System.Reflection;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Patches;
+using Common.Network;
 
 namespace Missions.Services
 {
@@ -39,6 +40,7 @@ namespace Missions.Services
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
         private readonly IMessageBroker _messageBroker;
+        private readonly INetworkMessageBroker _networkMessageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
 
@@ -46,20 +48,23 @@ namespace Missions.Services
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
 
         public CoopArenaController(
-            IMessageBroker messageBroker, 
+            IMessageBroker messageBroker,
+            INetworkMessageBroker networkMessageBroker,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator)
         {
             _messageBroker = messageBroker;
+            _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
             messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            messageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
+            _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
         }
 
         ~CoopArenaController()
         {
             _messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            _networkMessageBroker.Unsubscribe<AgentShoot>(Handle_AgentShoot);
         }
 
         public override void AfterStart()
@@ -96,18 +101,21 @@ namespace Missions.Services
 
         public override void OnAgentShootMissile(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
         {
-            base.OnAgentShootMissile(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
-            if (!Agent.Main.Team.TeamAgents.Contains(shooterAgent)) { return; }
-            AgentShoot message = new AgentShoot(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
+            if (Agent.Main.Team.TeamAgents.Contains(shooterAgent))
+            {
+                AgentShoot message = new AgentShoot(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
 
-            MessageBroker.Instance.Publish(shooterAgent, message);
+                _networkMessageBroker.Publish(shooterAgent, message);
+            }
         }
 
         private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
         private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
         {
-            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { payload.What.Agent, payload.What.WeaponIndex, payload.What.Position, 
-                payload.What.Velocity, payload.What.Orientation, payload.What.HasRigidBody, true, payload.What.ForcedMissileIndex });
+            if (Agent.Main.Team.TeamAgents.Contains(payload.Who as Agent ?? throw new InvalidCastException("Payload 'Who' was not of type Agent"))) { return; }
+
+            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { payload.What.Agent, payload.What.WeaponIndex, payload.What.Position,
+                payload.What.Velocity, payload.What.Orientation, payload.What.HasRigidBody, payload.What.ForcedMissileIndex });
         }
 
         public void RespawnPlayer()

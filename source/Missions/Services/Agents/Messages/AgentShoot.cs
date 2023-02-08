@@ -11,7 +11,8 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
 {
-    internal readonly struct AgentShoot : INetworkEvent
+    [ProtoContract]
+    public readonly struct AgentShoot : INetworkEvent
     {
         [ProtoMember(1)]
         public Agent Agent { get; }
@@ -25,7 +26,7 @@ namespace Missions.Services.Agents.Messages
         public Mat3 Orientation { get; }
         [ProtoMember(6)]
         public bool HasRigidBody { get; }
-        [ProtoMember(8)]
+        [ProtoMember(7)]
         public int ForcedMissileIndex { get; }
 
         public AgentShoot(Agent agent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
