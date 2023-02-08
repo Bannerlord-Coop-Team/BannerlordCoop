@@ -85,8 +85,11 @@ namespace Missions.Services
             Blow b = agentDamaData.Blow;
             b.OwnerId = effectorAgent.Index;
             AttackCollisionData collisionData = agentDamaData.AttackCollisionData;
-            effectedAgent.RegisterBlow(b, collisionData);
-            
+
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                effectedAgent.RegisterBlow(b, collisionData);
+            });            
         }
 
         private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
