@@ -19,6 +19,9 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services
 {
+    /// <summary>
+    /// Mission Controller that does all the logic in the Coop Arena
+    /// </summary>
     internal class CoopArenaController : MissionBehavior
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
