@@ -31,7 +31,7 @@ namespace Missions.Services.Arena.Patches
             NetworkAgentRegistry.Instance.AgentToId.TryGetValue(victim, out Guid victimId);
 
             // construct a agent damage data
-            _agentDamageData = new AgentDamageData(attackerId, victimId, b.InflictedDamage, collisionData, b);
+            _agentDamageData = new AgentDamageData(attackerId, victimId, collisionData, b);
 
             // publish the event
             NetworkMessageBroker.Instance.PublishNetworkEvent(_agentDamageData);

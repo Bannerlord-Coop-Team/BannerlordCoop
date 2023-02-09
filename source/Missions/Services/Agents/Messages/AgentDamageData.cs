@@ -11,15 +11,23 @@ namespace Missions.Services.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public class AgentDamageData : INetworkEvent
     {
-        public AgentDamageData(Guid attackerAgentId, Guid victimAgentId, double damage, AttackCollisionData attackCollisionData, Blow blow)
-        {
-            AttackerAgentId = attackerAgentId;
-            VictimAgentId = victimAgentId;
-            Damage = damage;
-            AttackCollisionData = attackCollisionData;
-            Blow = blow;
 
-        }
+        [ProtoMember(1)]
+        public Guid AttackerAgentId { get; }
+        [ProtoMember(2)]
+        public Guid VictimAgentId { get; }
+
+        [ProtoMember(3)]
+        private byte[] _packedAttackCollisionData;
+
+        [ProtoMember(4)]
+        private byte[] _packedBlow;
+
+        private Blow _blowObject;
+        private AttackCollisionData _attackCollisionDataObject;
+        private bool isBlowUnpacked = false;
+        private bool isAttackCollisionDataUnpacked = false;
+
 
         public Blow Blow
         {
@@ -33,12 +41,14 @@ namespace Missions.Services.Agents.Packets
             set { _packedAttackCollisionData = PackAttackCollisionData(value); }
         }
 
+        public AgentDamageData(Guid attackerAgentId, Guid victimAgentId, AttackCollisionData attackCollisionData, Blow blow)
+        {
+            AttackerAgentId = attackerAgentId;
+            VictimAgentId = victimAgentId;
+            AttackCollisionData = attackCollisionData;
+            Blow = blow;
 
-        private Blow _blowObject;
-        private AttackCollisionData _attackCollisionDataObject;
-        private bool isBlowUnpacked = false;
-        private bool isAttackCollisionDataUnpacked = false;
-
+        }
 
         private byte[] PackBlow(Blow blow)
         {
@@ -84,22 +94,5 @@ namespace Missions.Services.Agents.Packets
             isAttackCollisionDataUnpacked = true;
             return _attackCollisionDataObject;
         }
-
-
-
-
-        [ProtoMember(1)]
-        public Guid AttackerAgentId { get; }
-        [ProtoMember(2)]
-        public Guid VictimAgentId { get; }
-
-        [ProtoMember(3)]
-        public double Damage { get; }
-
-        [ProtoMember(4)]
-        private byte[] _packedAttackCollisionData;
-
-        [ProtoMember(5)]
-        private byte[] _packedBlow;
     }
 }

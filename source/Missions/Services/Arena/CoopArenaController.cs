@@ -126,14 +126,8 @@ namespace Missions.Services
             Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true);
             _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
 
-            
 
-            if(joinInfo.UnitIdString == null)
-            {
-                return;
-            }
-
-            for (int i = 0; i < joinInfo.UnitIdString.Length; i++)
+            for (int i = 0; i < joinInfo?.UnitIdString.Length; i++)
             {
                 Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
 
