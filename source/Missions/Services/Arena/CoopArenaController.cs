@@ -30,6 +30,7 @@ using System.Reflection;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Patches;
 using Common.Network;
+using Missions.Services.Agents.Packets;
 
 namespace Missions.Services
 {
@@ -103,19 +104,20 @@ namespace Missions.Services
         {
             if (Agent.Main.Team.TeamAgents.Contains(shooterAgent))
             {
-                AgentShoot message = new AgentShoot(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
+                _agentRegistry.AgentToId.TryGetValue(shooterAgent, out Guid shooterAgentGuid);
+                AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
 
-                _networkMessageBroker.Publish(shooterAgent, message);
+                _networkMessageBroker.PublishNetworkEvent(message);
             }
         }
 
         private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
         private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
         {
-            if (Agent.Main.Team.TeamAgents.Contains(payload.Who as Agent ?? throw new InvalidCastException("Payload 'Who' was not of type Agent"))) { return; }
+            _agentRegistry.OtherAgents.TryGetValue(payload.Who as NetPeer, out AgentGroupController agentGroupController);
 
-            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { payload.What.Agent, payload.What.WeaponIndex, payload.What.Position,
-                payload.What.Velocity, payload.What.Orientation, payload.What.HasRigidBody, payload.What.ForcedMissileIndex });
+            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { agentGroupController.ControlledAgents[payload.What.AgentGuid], payload.What.WeaponIndex, payload.What.Position,
+                payload.What.Velocity, payload.What.Orientation, payload.What.HasRigidBody, true, payload.What.ForcedMissileIndex });
         }
 
         public void RespawnPlayer()
