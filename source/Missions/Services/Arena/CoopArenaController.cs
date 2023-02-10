@@ -47,6 +47,7 @@ namespace Missions.Services
 
         private Agent _tempAi;
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
+        private readonly CharacterObject[] _gameCharacters;
 
         public CoopArenaController(
             IMessageBroker messageBroker,
@@ -58,6 +59,7 @@ namespace Missions.Services
             _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
+            _gameCharacters = CharacterObject.All.Where(x => !x.IsHero && x.Age > 18).ToArray();
             messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
         }
@@ -128,20 +130,6 @@ namespace Missions.Services
                 shot.ForcedMissileIndex });
         }
 
-        public void RespawnPlayer()
-        {
-
-            Random rand = new Random();
-            MatrixFrame randomElement = spawnFrames[rand.Next(spawnFrames.Count)];
-
-            SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
-            Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
-
-            IEnumerable<CharacterObject> listC = CharacterObject.All.Where(x => !x.IsHero && !x.IsChildTemplate);
-
-            _tempAi = SpawnAgent(randomElement.origin, listC.ElementAt(rand.Next(listC.Count())), false);
-        }
-
         public void AddPlayerToArena()
         {
             // reset teams if any exists
@@ -172,9 +160,7 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            IEnumerable<CharacterObject> listC = CharacterObject.All.Where(x => !x.IsHero && !x.IsChildTemplate);
-
-            _tempAi = SpawnAgent(randomElement.origin, listC.ElementAt(rand.Next(listC.Count())), false);
+            _tempAi = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
         }
 
 
