@@ -1,9 +1,6 @@
 ﻿using Common.Network;
-using Common.Serialization;
-using GameInterface.Serialization;
-using GameInterface.Serialization.External;
 using HarmonyLib;
-using Missions.Services.Agents.Packets;
+using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
 using System;
 using TaleWorlds.Engine;

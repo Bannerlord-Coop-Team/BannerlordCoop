@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using LiteNetLib;
 using Missions.Messages;
+using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Arena;
 using Missions.Services.Network;

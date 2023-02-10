@@ -6,7 +6,7 @@ using ProtoBuf;
 using System;
 using TaleWorlds.MountAndBlade;
 
-namespace Missions.Services.Agents.Packets
+namespace Missions.Services.Agents.Messages
 {
     [ProtoContract(SkipConstructor = true)]
     public class AgentDamageData : INetworkEvent

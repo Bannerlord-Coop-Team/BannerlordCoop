@@ -18,11 +18,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void BlowWeaponRecord_Serialize()
         {
-            BlowWeaponRecord blowWR = new BlowWeaponRecord();
+            BlowWeaponRecord blowWeaponRecord = new BlowWeaponRecord();
 
-            blowWR.CurrentPosition = new TaleWorlds.Library.Vec3(1, 1, 1);
+            blowWeaponRecord.CurrentPosition = new TaleWorlds.Library.Vec3(1, 1, 1);
             BinaryPackageFactory factory = new BinaryPackageFactory();
-            BlowWeaponRecordBinaryPackage package = new BlowWeaponRecordBinaryPackage(blowWR, factory);
+            BlowWeaponRecordBinaryPackage package = new BlowWeaponRecordBinaryPackage(blowWeaponRecord, factory);
 
             package.Pack();
 
@@ -34,18 +34,18 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void BlowWeaponRecord_Full_Serialize()
         {
 
-            BlowWeaponRecord bwr = new BlowWeaponRecord();
-            bwr.AffectorWeaponSlotOrMissileIndex = 1;
-            bwr.BoneNoToAttach = 2;
-            bwr.CurrentPosition = new TaleWorlds.Library.Vec3(7, 8, 9);
-            bwr.ItemFlags = TaleWorlds.Core.ItemFlags.CanBePickedUpFromCorpse;
-            bwr.WeaponClass = TaleWorlds.Core.WeaponClass.Boulder;
-            bwr.StartingPosition = new TaleWorlds.Library.Vec3(10, 11, 12);
-            bwr.Velocity = new TaleWorlds.Library.Vec3(13, 14, 15);
-            bwr.WeaponFlags = TaleWorlds.Core.WeaponFlags.AffectsAreaBig;
-            bwr.Weight = 0.5f;
+            BlowWeaponRecord blowWeaponRecord = new BlowWeaponRecord();
+            blowWeaponRecord.AffectorWeaponSlotOrMissileIndex = 1;
+            blowWeaponRecord.BoneNoToAttach = 2;
+            blowWeaponRecord.CurrentPosition = new TaleWorlds.Library.Vec3(7, 8, 9);
+            blowWeaponRecord.ItemFlags = TaleWorlds.Core.ItemFlags.CanBePickedUpFromCorpse;
+            blowWeaponRecord.WeaponClass = TaleWorlds.Core.WeaponClass.Boulder;
+            blowWeaponRecord.StartingPosition = new TaleWorlds.Library.Vec3(10, 11, 12);
+            blowWeaponRecord.Velocity = new TaleWorlds.Library.Vec3(13, 14, 15);
+            blowWeaponRecord.WeaponFlags = TaleWorlds.Core.WeaponFlags.AffectsAreaBig;
+            blowWeaponRecord.Weight = 0.5f;
             BinaryPackageFactory factory = new BinaryPackageFactory();
-            BlowWeaponRecordBinaryPackage package = new BlowWeaponRecordBinaryPackage(bwr, factory);
+            BlowWeaponRecordBinaryPackage package = new BlowWeaponRecordBinaryPackage(blowWeaponRecord, factory);
 
             package.Pack();
 
@@ -53,20 +53,20 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.NotEmpty(bytes);
 
-            var f = new BinaryPackageFactory();
-            var bf = BinaryFormatterSerializer.Deserialize<BlowWeaponRecordBinaryPackage>(bytes);
-            bf.BinaryPackageFactory = f;
+            var deseriliazedFactory = new BinaryPackageFactory();
+            var deserialzedlowWeaponRecordBinaryPackage = BinaryFormatterSerializer.Deserialize<BlowWeaponRecordBinaryPackage>(bytes);
+            deserialzedlowWeaponRecordBinaryPackage.BinaryPackageFactory = deseriliazedFactory;
 
-            BlowWeaponRecord b = bf.Unpack<BlowWeaponRecord>();
-            Assert.Equal(b.AffectorWeaponSlotOrMissileIndex, bwr.AffectorWeaponSlotOrMissileIndex);
-            Assert.Equal(b.BoneNoToAttach, bwr.BoneNoToAttach);
-            Assert.Equal(b.CurrentPosition, bwr.CurrentPosition);
-            Assert.Equal(b.ItemFlags, bwr.ItemFlags);
-            Assert.Equal(b.WeaponClass, bwr.WeaponClass);
-            Assert.Equal(b.StartingPosition, bwr.StartingPosition);
-            Assert.Equal(b.Velocity, bwr.Velocity);
-            Assert.Equal(b.WeaponFlags, bwr.WeaponFlags);
-            Assert.Equal(b.Weight, bwr.Weight);
+            BlowWeaponRecord deserializedBlowWeaponRecord = deserialzedlowWeaponRecordBinaryPackage.Unpack<BlowWeaponRecord>();
+            Assert.Equal(deserializedBlowWeaponRecord.AffectorWeaponSlotOrMissileIndex, blowWeaponRecord.AffectorWeaponSlotOrMissileIndex);
+            Assert.Equal(deserializedBlowWeaponRecord.BoneNoToAttach, blowWeaponRecord.BoneNoToAttach);
+            Assert.Equal(deserializedBlowWeaponRecord.CurrentPosition, blowWeaponRecord.CurrentPosition);
+            Assert.Equal(deserializedBlowWeaponRecord.ItemFlags, blowWeaponRecord.ItemFlags);
+            Assert.Equal(deserializedBlowWeaponRecord.WeaponClass, blowWeaponRecord.WeaponClass);
+            Assert.Equal(deserializedBlowWeaponRecord.StartingPosition, blowWeaponRecord.StartingPosition);
+            Assert.Equal(deserializedBlowWeaponRecord.Velocity, blowWeaponRecord.Velocity);
+            Assert.Equal(deserializedBlowWeaponRecord.WeaponFlags, blowWeaponRecord.WeaponFlags);
+            Assert.Equal(deserializedBlowWeaponRecord.Weight, blowWeaponRecord.Weight);
         }
     }
 }
