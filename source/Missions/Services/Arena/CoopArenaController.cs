@@ -116,8 +116,16 @@ namespace Missions.Services
         {
             _agentRegistry.OtherAgents.TryGetValue(payload.Who as NetPeer, out AgentGroupController agentGroupController);
 
-            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { agentGroupController.ControlledAgents[payload.What.AgentGuid], payload.What.WeaponIndex, payload.What.Position,
-                payload.What.Velocity, payload.What.Orientation, payload.What.HasRigidBody, true, payload.What.ForcedMissileIndex });
+            AgentShoot shot = payload.What;
+            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { 
+                agentGroupController.ControlledAgents[shot.AgentGuid], 
+                shot.WeaponIndex, 
+                shot.Position,
+                shot.Velocity, 
+                shot.Orientation, 
+                shot.HasRigidBody, 
+                true, 
+                shot.ForcedMissileIndex });
         }
 
         public void RespawnPlayer()
