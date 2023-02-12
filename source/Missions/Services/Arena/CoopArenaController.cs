@@ -17,6 +17,29 @@ using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using Common.Messaging;
+using Common;
+using Missions.Messages;
+using LiteNetLib;
+using Serilog;
+using Common.Logging;
+using Missions.Services.Network;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Encounters;
+using System.Text.RegularExpressions;
+using JetBrains.Annotations;
+using TaleWorlds.CampaignSystem.Extensions;
+using System.Runtime.CompilerServices;
+using Missions.Services.Arena;
+using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
+using SandBox.View.Missions;
+using TaleWorlds.MountAndBlade.View;
+using TaleWorlds.CampaignSystem.Party;
+using System.Reflection;
+using Missions.Services.Agents.Messages;
+using Missions.Services.Agents.Patches;
+using Common.Network;
+using Missions.Services.Agents.Packets;
 
 namespace Missions.Services
 {
@@ -30,26 +53,34 @@ namespace Missions.Services
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
         private readonly IMessageBroker _messageBroker;
+        private readonly INetworkMessageBroker _networkMessageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
 
         private Agent _tempAi;
+        private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
+        private readonly CharacterObject[] _gameCharacters;
 
         public CoopArenaController(
-            IMessageBroker messageBroker, 
+            IMessageBroker messageBroker,
+            INetworkMessageBroker networkMessageBroker,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator)
         {
             _messageBroker = messageBroker;
+            _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
+            _gameCharacters = CharacterObject.All.Where(x => !x.IsHero && x.Age > 18).ToArray();
             messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             messageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
+            _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
         }
 
         ~CoopArenaController()
         {
             _messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            _networkMessageBroker.Unsubscribe<AgentShoot>(Handle_AgentShoot);
         }
 
         public override void AfterStart()
@@ -136,6 +167,34 @@ namespace Missions.Services
             }
         }
 
+        public override void OnAgentShootMissile(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
+        {
+            if (Agent.Main.Team.TeamAgents.Contains(shooterAgent))
+            {
+                _agentRegistry.AgentToId.TryGetValue(shooterAgent, out Guid shooterAgentGuid);
+                AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
+
+                _networkMessageBroker.PublishNetworkEvent(message);
+            }
+        }
+
+        private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
+        private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
+        {
+            _agentRegistry.OtherAgents.TryGetValue(payload.Who as NetPeer, out AgentGroupController agentGroupController);
+
+            AgentShoot shot = payload.What;
+            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { 
+                agentGroupController.ControlledAgents[shot.AgentGuid], 
+                shot.WeaponIndex, 
+                shot.Position,
+                shot.Velocity, 
+                shot.Orientation, 
+                shot.HasRigidBody, 
+                true, 
+                shot.ForcedMissileIndex });
+        }
+
         public void AddPlayerToArena()
         {
             // reset teams if any exists
@@ -147,7 +206,7 @@ namespace Missions.Services
             // players is attacker team
             Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;
 
-            List<MatrixFrame> spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
+            spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
                                              select e.GetGlobalFrame()).ToList();
             for (int i = 0; i < spawnFrames.Count; i++)
             {
@@ -166,10 +225,7 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            IEnumerable<CharacterObject> listC = CharacterObject.All.Where(x => !x.IsHero);
-            Random r = new Random();
-
-            _tempAi = SpawnAgent(randomElement.origin, listC.ElementAt(r.Next(listC.Count())), false);
+            _tempAi = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
         }
 
 
