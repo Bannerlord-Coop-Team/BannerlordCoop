@@ -1,21 +1,17 @@
-﻿using Common.Logging;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem.AgentOrigins;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
-using Common;
+using Common.Network;
 using LiteNetLib;
 using Missions.Messages;
-using Missions.Services.Network;
 using Missions.Services.BoardGames;
-using Common.Network;
+using Missions.Services.Network;
+using Serilog;
+using System;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Taverns
 {

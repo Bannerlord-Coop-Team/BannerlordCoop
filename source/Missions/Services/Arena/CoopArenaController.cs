@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Agents.Messages;
@@ -17,29 +18,6 @@ using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using Common.Messaging;
-using Common;
-using Missions.Messages;
-using LiteNetLib;
-using Serilog;
-using Common.Logging;
-using Missions.Services.Network;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Encounters;
-using System.Text.RegularExpressions;
-using JetBrains.Annotations;
-using TaleWorlds.CampaignSystem.Extensions;
-using System.Runtime.CompilerServices;
-using Missions.Services.Arena;
-using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
-using SandBox.View.Missions;
-using TaleWorlds.MountAndBlade.View;
-using TaleWorlds.CampaignSystem.Party;
-using System.Reflection;
-using Missions.Services.Agents.Messages;
-using Missions.Services.Agents.Patches;
-using Common.Network;
-using Missions.Services.Agents.Packets;
 
 namespace Missions.Services
 {
