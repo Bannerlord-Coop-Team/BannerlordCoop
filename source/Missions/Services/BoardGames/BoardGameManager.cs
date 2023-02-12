@@ -50,8 +50,8 @@ namespace Missions.Services.BoardGames
 
         private void SendGameRequest(Agent sender, Agent other)
         {
-            if (_agentRegistry.AgentToId.TryGetValue(sender, out Guid senderGuid) &&
-                _agentRegistry.AgentToId.TryGetValue(other, out Guid otherGuid))
+            if (_agentRegistry.TryGetAgentId(sender, out Guid senderGuid) &&
+                _agentRegistry.TryGetAgentId(other, out Guid otherGuid))
             {
                 BoardGameChallengeRequest request = new BoardGameChallengeRequest(senderGuid, otherGuid);
                 _networkMessageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
@@ -88,8 +88,7 @@ namespace Missions.Services.BoardGames
             _networkMessageBroker.PublishNetworkEvent(netPeer, response);
 
             //Has to do same thing as if (accepted) in Handle_ChallengeResponse
-            if (_agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
-                group.ControlledAgents.TryGetValue(other, out Agent opponent))
+            if (_agentRegistry.TryGetAgent(other, out Agent opponent))
             {
                 StartGame(false, gameId, opponent);
             }
@@ -110,8 +109,7 @@ namespace Missions.Services.BoardGames
             if (accepted)
             {
                 NetPeer netPeer = payload.Who as NetPeer;
-                if (_agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController group) &&
-                    group.ControlledAgents.TryGetValue(opponentId, out Agent opponent))
+                if (_agentRegistry.TryGetAgent(opponentId, out Agent opponent))
                 {
                     StartGame(true, gameId, opponent);
                 }
