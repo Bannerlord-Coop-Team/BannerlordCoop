@@ -10,6 +10,8 @@ using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Serilog;
 using Common.Logging;
+using TaleWorlds.Core;
+using System.Security.Policy;
 
 namespace Missions.Services.Network
 {
@@ -200,6 +202,96 @@ namespace Missions.Services.Network
                 result &= false;
             }
             return result;
+        }
+
+        public bool IsControlled(Agent agent)
+        {
+            if (ControlledAgents.Values.Contains(agent)) { return true; }
+            return false;
+        }
+
+        public bool IsControlled(Guid agentId)
+        {
+            if (ControlledAgents.ContainsKey(agentId)) { return true; }
+            return false;
+        }
+
+        public bool IsAgentRegistered(Agent agent)
+        {
+            if (ControlledAgents.Values.Contains(agent)) { return true; }
+
+            foreach(AgentGroupController controller in OtherAgents.Values)
+            {
+                if (controller.Contains(agent)) { return true; }
+            }
+
+            return false;
+        }
+
+        public bool IsAgentRegistered(Guid guid)
+        {
+            if (ControlledAgents.ContainsKey(guid)) { return true; }
+
+            foreach (AgentGroupController controller in OtherAgents.Values)
+            {
+                if (controller.Contains(guid)) { return true; }
+            }
+
+            return false;
+        } 
+
+        public bool TryGetAgentId(Agent agent, out Guid guid)
+        {
+            if (IsControlled(agent))
+            {
+                guid = AgentToId[agent];
+                return true;
+            }
+            if (IsAgentRegistered(agent))
+            {
+                foreach (AgentGroupController controller in OtherAgents.Values)
+                {
+                    if(controller.Contains(agent))
+                    {
+                        guid = controller.ControlledAgents.FirstOrDefault(x => x.Value == agent).Key; //Create inverse dictionary in controllers for performance?
+                        return true;
+                    }
+                }
+            }
+            guid = default(Guid);
+            return false;
+        }
+
+        public bool TryGetAgent(Guid guid, out Agent agent)
+        {
+            if (IsControlled(guid))
+            {
+                agent = ControlledAgents[guid];
+                return true;
+            }
+            if (IsAgentRegistered(guid))
+            {
+                foreach (AgentGroupController controller in OtherAgents.Values)
+                {
+                    if (controller.Contains(guid))
+                    {
+                        agent = controller.ControlledAgents[guid];
+                        return true;
+                    }
+                }
+            }
+            agent = default(Agent);
+            return false;
+        }
+
+        public bool TryGetGroupController(NetPeer peer, out AgentGroupController agentGroupController)
+        {
+            if (OtherAgents.ContainsKey(peer))
+            {
+                agentGroupController = OtherAgents[peer];
+            }
+            agentGroupController = null;
+            return false;
         }
 
         /// <inheritdoc/>
