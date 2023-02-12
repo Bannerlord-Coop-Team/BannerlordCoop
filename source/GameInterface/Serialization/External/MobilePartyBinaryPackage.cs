@@ -1,4 +1,5 @@
 ﻿using Common.Extensions;
+using GameInterface.Extentions;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -96,14 +97,19 @@ namespace GameInterface.Serialization.External
         private static readonly MethodInfo MobileParty_InitCached = typeof(MobileParty).GetMethod("InitCached", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
-            MobileParty mobileParty = MBObjectManager.Instance.GetObject<MobileParty>(stringId);
-            if(mobileParty != null)
+            // If the stringId already exists in the object manager use that object
+            // Otherwise, create a new object and initialize it
+            if (stringId != null)
             {
-                Object = mobileParty;
-                return;
+                var newObject = MBObjectManager.Instance.GetObject<MobileParty>(stringId);
+                if (newObject != null)
+                {
+                    Object = newObject;
+                    return;
+                }
             }
 
-            MobileParty_InitCached.Invoke(Object, new object[0]);
+            MobileParty_InitCached.Invoke(Object, Array.Empty<object>());
 
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
@@ -115,6 +121,10 @@ namespace GameInterface.Serialization.External
             MobileParty_Engineer     .SetValue(Object, ResolveId<Hero>(engineerId));
             MobileParty_Quartermaster.SetValue(Object, ResolveId<Hero>(quartermasterId));
             MobileParty_Surgeon      .SetValue(Object, ResolveId<Hero>(surgeonId));
+
+            Object.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>("TransferredParty");
+
+            Campaign.Current?.CampaignObjectManager?.AddMobileParty(Object);
         }
     }
 }

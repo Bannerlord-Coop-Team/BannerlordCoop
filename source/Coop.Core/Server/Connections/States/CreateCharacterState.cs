@@ -1,9 +1,11 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Coop.Core.Server.Connections.Messages.Incoming;
 using Coop.Core.Server.Connections.Messages.Outgoing;
 using GameInterface.Services.Heroes.Handlers;
 using GameInterface.Services.Heroes.Interfaces;
 using LiteNetLib;
+using Serilog;
 using Serilog.Core;
 using System;
 
@@ -11,6 +13,8 @@ namespace Coop.Core.Server.Connections.States
 {
     public class CreateCharacterState : ConnectionStateBase
     {
+        private readonly ILogger Logger = LogManager.GetLogger<CreateCharacterState>();
+
         private Guid HeroRegistrationTransactionId;
 
         public CreateCharacterState(IConnectionLogic connectionLogic)
@@ -43,7 +47,10 @@ namespace Coop.Core.Server.Connections.States
 
             if (HeroRegistrationTransactionId == eventId)
             {
-                ConnectionLogic.HeroId = obj.What.HeroGUID;
+                
+
+                ConnectionLogic.HeroStringId = obj.What.HeroStringId;
+                Logger.Information("Hero StringId: {stringId}", obj.What.HeroStringId);
                 ConnectionLogic.TransferSave();
             }
         }

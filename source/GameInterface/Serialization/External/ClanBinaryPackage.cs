@@ -1,4 +1,5 @@
 ﻿using Common.Extensions;
+using GameInterface.Extentions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -66,7 +67,7 @@ namespace GameInterface.Serialization.External
                 }
             }
 
-            Clan_InitMembers.Invoke(Object, new object[0]);
+            Clan_InitMembers.Invoke(Object, Array.Empty<object>());
 
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
@@ -79,6 +80,10 @@ namespace GameInterface.Serialization.External
             Clan_lordsCache.SetValue(Object, ResolveIds<Hero>(lordsIds).ToList());
             Clan_heroesCache.SetValue(Object, ResolveIds<Hero>(heroesIds).ToList());
             Clan_companionsCache.SetValue(Object, ResolveIds<Hero>(companionsIds).ToList());
+
+            Object.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Clan>("TransferredClan");
+
+            Campaign.Current?.CampaignObjectManager?.AddClan(Object);
         }
     }
 }

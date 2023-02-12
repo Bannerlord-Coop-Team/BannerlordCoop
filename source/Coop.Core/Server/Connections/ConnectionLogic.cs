@@ -10,7 +10,7 @@ namespace Coop.Core.Server.Connections
     public interface IConnectionLogic : IConnectionState
     {
         NetPeer PlayerId { get; }
-        uint HeroId { get; set; }
+        string HeroStringId { get; set; }
         INetworkMessageBroker NetworkMessageBroker { get; }
         IConnectionState State { get; set; }    
     }
@@ -20,7 +20,7 @@ namespace Coop.Core.Server.Connections
         private readonly ILogger Logger = LogManager.GetLogger<ConnectionLogic>();
 
         public NetPeer PlayerId { get; }
-        public uint HeroId { get; set; }
+        public string HeroStringId { get; set; }
 
         public INetworkMessageBroker NetworkMessageBroker { get; }
 

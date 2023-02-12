@@ -45,11 +45,7 @@ namespace GameInterface.Services.Heroes.Interfaces
         public Hero UnpackMainHero(byte[] bytes)
         {
             HeroBinaryPackage package = BinaryFormatterSerializer.Deserialize<HeroBinaryPackage>(bytes);
-            var hero = package.Unpack<Hero>();
-            MBObjectManager.Instance.RegisterObject(hero.PartyBelongedTo);
-            MBObjectManager.Instance.RegisterObject(hero.CharacterObject);
-            MBObjectManager.Instance.RegisterObject(hero.Clan);
-            return MBObjectManager.Instance.RegisterObject(hero);
+            return package.Unpack<Hero>();
         }
 
         public void ResolveHero(ResolveHero message)

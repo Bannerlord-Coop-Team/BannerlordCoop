@@ -110,6 +110,7 @@
     <Compile Include="UnreliableMessagePayload.cs" />
     <Compile Include="UpdateableList.cs" />
     <Compile Include="UpdatePriority.cs" />
+    <Compile Include="Util\GoogleDriveDownloader.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

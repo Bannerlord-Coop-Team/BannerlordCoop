@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
+using GameInterface.Extentions;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Serialization.External
 {
@@ -106,6 +108,10 @@ namespace GameInterface.Serialization.External
             Kingdom_Lords.SetValue(Object, ResolveIds<Hero>(lordIds).ToList());
             Kingdom_Settlements.SetValue(Object, ResolveIds<Settlement>(settlementIds).ToList());
             Kingdom_Villages.SetValue(Object, ResolveIds<Village>(villageIds).ToList());
+
+            Object.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Kingdom>("TransferredKingdom");
+
+            Campaign.Current?.CampaignObjectManager?.AddKingdom(Object);
         }
     }
 }

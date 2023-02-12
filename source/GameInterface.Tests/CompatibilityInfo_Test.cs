@@ -25,7 +25,7 @@ namespace GameInterface.Tests
             ModModule = new ModuleInfo("TestModule2", false, modVersion);
         }
 
-        public override List<ModuleInfo> GetModuleInfos()
+        public List<ModuleInfo> GetModuleInfos()
         {
             return new List<ModuleInfo>
             {
@@ -49,7 +49,7 @@ namespace GameInterface.Tests
             ModModule = new ModuleInfo("TestModule2", false, modVersion);
         }
 
-        public override List<ModuleInfo> GetModuleInfos()
+        public List<ModuleInfo> GetModuleInfos()
         {
             return new List<ModuleInfo>
             {

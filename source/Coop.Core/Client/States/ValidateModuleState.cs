@@ -1,8 +1,10 @@
 ﻿using Common.Messaging;
+using Common.Util;
 using Coop.Core.Client.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameDebug.Interfaces;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Modules.Messages;
 using System.Threading.Tasks;
@@ -37,8 +39,10 @@ namespace Coop.Core.Client.States
         {
             if (obj.What.HeroExists)
             {
-                Logic.HeroId = obj.What.HeroId;
-                Logic.State = new ReceivingSavedDataState(Logic);
+                Logic.HeroStringId = obj.What.HeroStringId;
+                Logic.NetworkMessageBroker.Publish(this, new LoadDebugGame());
+                Logic.State = new LoadingState(Logic);
+                //Logic.State = new ReceivingSavedDataState(Logic);
             }
             else
             {

@@ -42,7 +42,7 @@ namespace Coop.Core.Server.Connections.States
         {
             if (obj.What.TransactionId == ConnectionLogic.PlayerId.Id)
             {
-                var validateMessage = new NetworkClientValidated(true, obj.What.HeroId);
+                var validateMessage = new NetworkClientValidated(true, obj.What.HeroStringId);
                 ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(validateMessage);
                 ConnectionLogic.TransferSave();
             }
@@ -52,7 +52,7 @@ namespace Coop.Core.Server.Connections.States
         {
             if (obj.What.PeerId == ConnectionLogic.PlayerId.Id)
             {
-                var validateMessage = new NetworkClientValidated(false, 0);
+                var validateMessage = new NetworkClientValidated(false, string.Empty);
                 ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(validateMessage);
                 ConnectionLogic.CreateCharacter();
             }

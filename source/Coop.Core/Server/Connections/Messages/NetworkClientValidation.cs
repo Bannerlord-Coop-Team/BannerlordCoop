@@ -21,12 +21,12 @@ namespace Coop.Core.Server.Connections.Messages
         [ProtoMember(1)]
         public bool HeroExists { get; }
         [ProtoMember(2)]
-        public uint HeroId { get; }
+        public string HeroStringId { get; }
 
-        public NetworkClientValidated(bool heroExists, uint heroId)
+        public NetworkClientValidated(bool heroExists, string heroStringId)
         {
             HeroExists = heroExists;
-            HeroId = heroId;
+            HeroStringId = heroStringId;
         }
     }
 }

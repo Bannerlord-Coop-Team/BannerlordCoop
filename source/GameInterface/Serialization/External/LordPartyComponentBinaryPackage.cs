@@ -1,4 +1,5 @@
 ﻿using Common.Extensions;
+using GameInterface.Extentions;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -39,22 +40,8 @@ namespace GameInterface.Serialization.External
                 field.SetValueDirect(reference, StoredFields[field].Unpack());
             }
 
-            // Resolves _warPartyComponentsCache for Kingdom
-            Kingdom kingdom = Object.Clan?.Kingdom;
-            if (kingdom != null)
-            {
-                List<WarPartyComponent> kingdomComponents = (List<WarPartyComponent>)KingdomBinaryPackage.Kingdom_WarPartyComponents.GetValue(kingdom);
-                if(kingdomComponents == null)
-                {
-                    KingdomBinaryPackage.InitializeCachedLists.Invoke(kingdom, Array.Empty<object>());
-                    kingdomComponents = (List<WarPartyComponent>)KingdomBinaryPackage.Kingdom_WarPartyComponents.GetValue(kingdom);
-				}
-                
-                if (kingdomComponents.Contains(Object) == false)
-                {
-                    kingdomComponents.Add(Object);
-                }
-            }
+            MethodInfo Initialize = typeof(PartyComponent).GetMethod("Initialize", BindingFlags.NonPublic | BindingFlags.Instance);
+            Initialize.Invoke(Object, new object[] { Object.MobileParty });
         }
     }
 }

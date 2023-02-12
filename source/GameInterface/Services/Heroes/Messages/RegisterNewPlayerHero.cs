@@ -23,18 +23,18 @@ namespace GameInterface.Services.Heroes.Interfaces
     {
         public Guid RegistrationEventId { get; }
 
-        public uint HeroGUID { get; }
-        public uint PartyGUID { get; }
-        public uint CharacterObjectGUID { get; }
-        public uint ClanGUID { get; }
+        public string HeroStringId { get; }
+        public string PartyStringId { get; }
+        public string CharacterObjectStringId { get; }
+        public string ClanStringId { get; }
 
         public NewPlayerHeroRegistered(Guid registrationId, Hero hero)
         {
             RegistrationEventId = registrationId;
-            HeroGUID = hero.Id.InternalValue;
-            PartyGUID = hero.PartyBelongedTo.Id.InternalValue;
-            CharacterObjectGUID = hero.CharacterObject.Id.InternalValue;
-            ClanGUID = hero.Clan.Id.InternalValue;
+            HeroStringId = hero.StringId;
+            PartyStringId = hero.PartyBelongedTo.StringId;
+            CharacterObjectStringId = hero.CharacterObject.StringId;
+            ClanStringId = hero.Clan.StringId;
         }
     }
 }
