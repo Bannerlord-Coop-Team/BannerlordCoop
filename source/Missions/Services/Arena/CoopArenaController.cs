@@ -1,39 +1,29 @@
-﻿using System;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using LiteNetLib;
+using Missions.Messages;
+using Missions.Services.Agents.Messages;
+using Missions.Services.Agents.Packets;
+using Missions.Services.Arena;
+using Missions.Services.Network;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem.AgentOrigins;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using Common.Messaging;
-using Common;
-using Missions.Messages;
-using LiteNetLib;
-using Serilog;
-using Common.Logging;
-using Missions.Services.Network;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Encounters;
-using System.Text.RegularExpressions;
-using JetBrains.Annotations;
-using TaleWorlds.CampaignSystem.Extensions;
-using System.Runtime.CompilerServices;
-using Missions.Services.Arena;
-using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
-using SandBox.View.Missions;
-using TaleWorlds.MountAndBlade.View;
-using TaleWorlds.CampaignSystem.Party;
-using System.Reflection;
-using Missions.Services.Agents.Messages;
-using Missions.Services.Agents.Patches;
-using Common.Network;
-using Missions.Services.Agents.Packets;
 
 namespace Missions.Services
 {
+    /// <summary>
+    /// Mission Controller that does all the logic in the Coop Arena
+    /// </summary>
     internal class CoopArenaController : MissionBehavior
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
@@ -61,6 +51,7 @@ namespace Missions.Services
             _equipmentGenerator = equipmentGenerator;
             _gameCharacters = CharacterObject.All.Where(x => !x.IsHero && x.Age > 18).ToArray();
             messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
         }
 
@@ -73,6 +64,59 @@ namespace Missions.Services
         public override void AfterStart()
         {
             AddPlayerToArena();
+        }
+
+
+        /// <summary>
+        /// A network damage handler for an agent
+        /// </summary>
+        /// <param name="payload">AgentDamage Data which include Attacker GUID, Defender GUID, Blow and AttackCollisionData</param>
+        private void Handle_AgentDamage(MessagePayload<AgentDamageData> payload)
+        {
+            AgentDamageData agentDamaData = payload.What;
+            NetPeer netPeer = payload.Who as NetPeer;
+            
+
+            Agent effectedAgent = null;
+            Agent effectorAgent = null;
+            // grab the network registry group controller
+            _agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController agentGroupController);
+
+            // start with the attack receiver
+            // first check if the receiver of the damage is one the sender's agents
+            if(agentGroupController != null && agentGroupController.ControlledAgents.ContainsKey(agentDamaData.VictimAgentId)) {
+                agentGroupController.ControlledAgents.TryGetValue(agentDamaData.VictimAgentId, out effectedAgent);
+            }
+            // otherwise next, check if it is one of our agents
+            else if (_agentRegistry.ControlledAgents.ContainsKey(agentDamaData.VictimAgentId))
+            {
+                _agentRegistry.ControlledAgents.TryGetValue(agentDamaData.VictimAgentId, out effectedAgent);
+            }
+            // now with the attacker
+            // check if the attacker is one of the senders (should always be true?)
+            if (agentGroupController != null && agentGroupController.ControlledAgents.ContainsKey(agentDamaData.AttackerAgentId))
+            {
+                agentGroupController.ControlledAgents.TryGetValue(agentDamaData.AttackerAgentId, out effectorAgent);
+            }
+            else if (_agentRegistry.ControlledAgents.ContainsKey(agentDamaData.AttackerAgentId))
+            {
+                _agentRegistry.ControlledAgents.TryGetValue(agentDamaData.AttackerAgentId, out effectorAgent);
+            }
+
+            // extract the blow
+            Blow b = agentDamaData.Blow;
+
+            // assign the blow owner from our own index
+            b.OwnerId = effectorAgent.Index;
+
+            // extract the collision data
+            AttackCollisionData collisionData = agentDamaData.AttackCollisionData;
+
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                // register a blow on the effected agent
+                effectedAgent.RegisterBlow(b, collisionData);
+            });            
         }
 
         private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
@@ -92,12 +136,11 @@ namespace Missions.Services
             Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true);
             _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
 
-            //Mission currentMission = Mission.Current;
 
-            for (int i = 0; i < joinInfo.UnitIdString.Length; i++)
+            for (int i = 0; i < joinInfo.UnitIdString?.Length; i++)
             {
                 Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
-                
+
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
         }

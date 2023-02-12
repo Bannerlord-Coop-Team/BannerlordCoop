@@ -141,7 +141,9 @@
   <ItemGroup>
     <Compile Include="Services\Agents\Messages\AgentShoot.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
+    <Compile Include="Services\Agents\Messages\AgentDamageData.cs" />
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
+    <Compile Include="Services\Arena\Patches\ArenaPatches.cs" />
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />

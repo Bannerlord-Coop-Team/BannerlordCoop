@@ -36,9 +36,11 @@ namespace Missions.Services.Arena
         private static readonly ILogger Logger = LogManager.GetLogger<ArenaTestGameManager>();
         
         private LiteNetP2PClient _client;
+        private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
 
         public ArenaTestGameManager(LoadResult loadedGameResult) : base(loadedGameResult)
         {
+            harmony.PatchAll();
         }
 
         public void StartGame()
