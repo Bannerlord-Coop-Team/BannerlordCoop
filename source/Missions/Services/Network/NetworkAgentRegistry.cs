@@ -253,18 +253,21 @@ namespace Missions.Services.Network
             return result;
         }
 
+        /// <inheritdoc/>
         public bool IsControlled(Agent agent)
         {
             if (ControlledAgents.Values.Contains(agent)) { return true; }
             return false;
         }
 
+        /// <inheritdoc/>
         public bool IsControlled(Guid agentId)
         {
             if (ControlledAgents.ContainsKey(agentId)) { return true; }
             return false;
         }
 
+        /// <inheritdoc/>
         public bool IsAgentRegistered(Agent agent)
         {
             if (ControlledAgents.Values.Contains(agent)) { return true; }
@@ -277,6 +280,7 @@ namespace Missions.Services.Network
             return false;
         }
 
+        /// <inheritdoc/>
         public bool IsAgentRegistered(Guid guid)
         {
             if (ControlledAgents.ContainsKey(guid)) { return true; }
@@ -287,8 +291,9 @@ namespace Missions.Services.Network
             }
 
             return false;
-        } 
+        }
 
+        /// <inheritdoc/>
         public bool TryGetAgentId(Agent agent, out Guid guid)
         {
             if (IsControlled(agent))
@@ -311,6 +316,7 @@ namespace Missions.Services.Network
             return false;
         }
 
+        /// <inheritdoc/>
         public bool TryGetAgent(Guid guid, out Agent agent)
         {
             if (IsControlled(guid))
@@ -333,6 +339,7 @@ namespace Missions.Services.Network
             return false;
         }
 
+        /// <inheritdoc/>
         public bool TryGetGroupController(NetPeer peer, out AgentGroupController agentGroupController)
         {
             if (OtherAgents.ContainsKey(peer))
