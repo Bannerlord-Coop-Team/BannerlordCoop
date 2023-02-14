@@ -289,7 +289,7 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public bool TryGetAgentId(Agent agent, out Guid guid)
         {
-            if (AgentToId.TryGetValue(agent, out Guid agendId)
+            if (AgentToId.TryGetValue(agent, out Guid agentId))
             {
                 guid = agentId;
                 return true;
@@ -301,7 +301,7 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public bool TryGetAgent(Guid guid, out Agent agent)
         {
-            if (ControlledAgents.TryGetValue(guid, out Agent resolvedAgent)
+            if (ControlledAgents.TryGetValue(guid, out Agent resolvedAgent))
             {
                 agent = resolvedAgent;
                 return true;
@@ -324,9 +324,10 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public bool TryGetGroupController(NetPeer peer, out AgentGroupController agentGroupController)
         {
-            if (OtherAgents.ContainsKey(peer))
+            if (OtherAgents.TryGetValue(peer, out AgentGroupController resolvedController))
             {
-                agentGroupController = OtherAgents[peer];
+                agentGroupController = resolvedController;
+                return true;
             }
             agentGroupController = default;
             return false;
