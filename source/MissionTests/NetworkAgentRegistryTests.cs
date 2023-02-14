@@ -20,7 +20,6 @@ namespace MissionTests
         {
             Agent newAgent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
             newAgent.Age = 10;
-            newAgent.Health = 55;
             Guid guid = Guid.NewGuid();
 
             networkAgentRegistry.RegisterControlledAgent(guid, newAgent);
@@ -34,7 +33,7 @@ namespace MissionTests
             Assert.True(networkAgentRegistry.IsAgentRegistered(guid));
             Assert.Equal(guid, testId);
             Assert.Equal(newAgent.Age, testAgent.Age);
-            Assert.Equal(newAgent.Health, testAgent.Health);
+            Assert.Equal(newAgent, testAgent);
         }
     }
 }

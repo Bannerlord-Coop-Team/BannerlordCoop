@@ -256,7 +256,7 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public bool IsControlled(Agent agent)
         {
-            if (ControlledAgents.Values.Contains(agent)) { return true; }
+            if (ControlledAgents.ContainsKey(AgentToId[agent])) { return true; }
             return false;
         }
 
@@ -270,14 +270,7 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public bool IsAgentRegistered(Agent agent)
         {
-            if (ControlledAgents.Values.Contains(agent)) { return true; }
-
-            foreach(AgentGroupController controller in OtherAgents.Values)
-            {
-                if (controller.Contains(agent)) { return true; }
-            }
-
-            return false;
+            return AgentToId.ContainsKey(agent);
         }
 
         /// <inheritdoc/>
