@@ -289,21 +289,10 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public bool TryGetAgentId(Agent agent, out Guid guid)
         {
-            if (IsControlled(agent))
+            if (AgentToId.TryGetValue(agent, out Guid agendId)
             {
-                guid = AgentToId[agent];
+                guid = agentId;
                 return true;
-            }
-            if (IsAgentRegistered(agent))
-            {
-                foreach (AgentGroupController controller in OtherAgents.Values)
-                {
-                    if(controller.Contains(agent))
-                    {
-                        guid = controller.ControlledAgents.FirstOrDefault(x => x.Value == agent).Key; //Create inverse dictionary in controllers for performance?
-                        return true;
-                    }
-                }
             }
             guid = default(Guid);
             return false;
