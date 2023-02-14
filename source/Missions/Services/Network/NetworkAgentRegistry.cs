@@ -328,7 +328,7 @@ namespace Missions.Services.Network
             {
                 agentGroupController = OtherAgents[peer];
             }
-            agentGroupController = null;
+            agentGroupController = default;
             return false;
         }
 
