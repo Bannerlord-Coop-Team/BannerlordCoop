@@ -317,7 +317,7 @@ namespace Missions.Services.Network
                     }
                 }
             }
-            agent = default(Agent);
+            agent = default;
             return false;
         }
 
