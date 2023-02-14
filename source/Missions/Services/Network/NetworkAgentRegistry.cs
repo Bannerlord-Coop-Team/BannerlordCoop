@@ -301,9 +301,9 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public bool TryGetAgent(Guid guid, out Agent agent)
         {
-            if (IsControlled(guid))
+            if (ControlledAgents.TryGetValue(guid, out Agent resolvedAgent)
             {
-                agent = ControlledAgents[guid];
+                agent = resolvedAgent;
                 return true;
             }
             if (IsAgentRegistered(guid))
