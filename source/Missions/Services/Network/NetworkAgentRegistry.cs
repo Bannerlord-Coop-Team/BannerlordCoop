@@ -10,6 +10,8 @@ using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Serilog;
 using Common.Logging;
+using TaleWorlds.Core;
+using System.Security.Policy;
 
 namespace Missions.Services.Network
 {
@@ -76,6 +78,55 @@ namespace Missions.Services.Network
         /// <param name="peer">Peer to remove</param>
         /// <returns>True if removal was successful, false otherwise</returns>
         bool RemovePeer(NetPeer peer);
+
+        /// <summary>
+        /// Is agent controlled locally?
+        /// </summary>
+        /// <param name="agent">Agent to check if controlled</param>
+        /// <returns>True if agent is controlled locally, false otherwise</returns>
+        bool IsControlled(Agent agent);
+
+        /// <summary>
+        /// Is Agent guid controlled locally?
+        /// </summary>
+        /// <param name="guid">Agent guid to check if controlled</param>
+        /// <returns>True if Agent guid is controlled locally, false otherwise</returns>
+        bool IsControlled(Guid guid);
+
+        /// <summary>
+        /// Is Agent registered?
+        /// </summary>
+        /// <param name="agent">Agent to check if registered</param>
+        /// <returns>True if Agent is registered, false otherwise</returns>
+        bool IsAgentRegistered(Agent agent);
+
+        /// <summary>
+        /// Is Agent guid registered?
+        /// </summary>
+        /// <param name="guid">Agent guid to check if registered</param>
+        /// <returns>True if Agent guid is registered, false otherwise</returns>
+        bool IsAgentRegistered(Guid guid);
+
+        /// <summary>
+        /// Try to get the Agent guid from the Agent
+        /// </summary>
+        /// <param name="agent">Agent to check for guid</param>
+        /// <returns>True if Agent guid is found and assigns guid, false otherwise</returns>
+        bool TryGetAgentId(Agent agent, out Guid guid);
+
+        /// <summary>
+        /// Try to get the Agent from a guid
+        /// </summary>
+        /// <param name="guid">guid to check for Agent</param>
+        /// <returns>True if guid is found and assigns agent, false otherwise</returns>
+        bool TryGetAgent(Guid guid, out Agent agent);
+
+        /// <summary>
+        /// Try to get the Agent from a guid
+        /// </summary>
+        /// <param name="guid">guid to check for Agent</param>
+        /// <returns>True if guid is found and assigns agent, false otherwise</returns>
+        bool TryGetGroupController(NetPeer peer, out AgentGroupController agentGroupController);
     }
 
     /// <inheritdoc/>
@@ -200,6 +251,86 @@ namespace Missions.Services.Network
                 result &= false;
             }
             return result;
+        }
+
+        /// <inheritdoc/>
+        public bool IsControlled(Agent agent)
+        {
+            if (ControlledAgents.ContainsKey(AgentToId[agent])) { return true; }
+            return false;
+        }
+
+        /// <inheritdoc/>
+        public bool IsControlled(Guid agentId)
+        {
+            if (ControlledAgents.ContainsKey(agentId)) { return true; }
+            return false;
+        }
+
+        /// <inheritdoc/>
+        public bool IsAgentRegistered(Agent agent)
+        {
+            return AgentToId.ContainsKey(agent);
+        }
+
+        /// <inheritdoc/>
+        public bool IsAgentRegistered(Guid guid)
+        {
+            if (ControlledAgents.ContainsKey(guid)) { return true; }
+
+            foreach (AgentGroupController controller in OtherAgents.Values)
+            {
+                if (controller.Contains(guid)) { return true; }
+            }
+
+            return false;
+        }
+
+        /// <inheritdoc/>
+        public bool TryGetAgentId(Agent agent, out Guid guid)
+        {
+            if (AgentToId.TryGetValue(agent, out Guid agentId))
+            {
+                guid = agentId;
+                return true;
+            }
+            guid = default;
+            return false;
+        }
+
+        /// <inheritdoc/>
+        public bool TryGetAgent(Guid guid, out Agent agent)
+        {
+            if (ControlledAgents.TryGetValue(guid, out Agent resolvedAgent))
+            {
+                agent = resolvedAgent;
+                return true;
+            }
+            if (IsAgentRegistered(guid))
+            {
+                foreach (AgentGroupController controller in OtherAgents.Values)
+                {
+                    if (controller.Contains(guid))
+                    {
+                        agent = controller.ControlledAgents[guid];
+                        return true;
+                    }
+                }
+            }
+            agent = default;
+            return false;
+        }
+
+        /// <inheritdoc/>
+        public bool TryGetGroupController(NetPeer peer, out AgentGroupController agentGroupController)
+        {
+            if (OtherAgents.TryGetValue(peer, out AgentGroupController resolvedController))
+            {
+                agentGroupController = resolvedController;
+                return true;
+            }
+            agentGroupController = default;
+            return false;
         }
 
         /// <inheritdoc/>
