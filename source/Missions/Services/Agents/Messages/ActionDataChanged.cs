@@ -7,7 +7,7 @@ namespace Missions.Services.Agents.Messages
     /// <summary>
     /// An <see cref="IEvent"/> used to propagate movement related changes of <see cref="AgentActionData"/> of an <see cref="Agent"/>.
     /// </summary>
-    internal readonly struct ActionDataChanged : IMovementEvent
+    public readonly struct ActionDataChanged : IMovementEvent
     {
         /// <summary>
         /// The changed <see cref="AgentActionData"/> propagated by this <see cref="IEvent"/>.

@@ -7,7 +7,7 @@ namespace Missions.Services.Agents.Messages
     /// <summary>
     /// An <see cref="IEvent"/> propagating that the <see cref="Agent"/>'s input vector has changed.
     /// </summary>
-    internal readonly struct MovementInputVectorChanged : IMovementEvent
+    public readonly struct MovementInputVectorChanged : IMovementEvent
     {
         /// <summary>
         /// The changed input vector.

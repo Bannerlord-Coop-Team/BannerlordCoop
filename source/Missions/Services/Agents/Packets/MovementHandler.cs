@@ -146,7 +146,7 @@ namespace Missions.Services.Agents.Packets
         {
             if (!_agentRegistry.AgentToId.TryGetValue(payload.Agent, out var payloadGuid))
             {
-                throw new ArgumentException($"No {nameof(Agent)} found");
+                Logger.Error("No {agent} found", nameof(Agent));
             }
 
             if (_agentMovementDeltas.TryGetValue(payloadGuid, out var delta))
@@ -154,7 +154,14 @@ namespace Missions.Services.Agents.Packets
                 return delta;
             }
 
-            delta = new AgentMovementDelta(payload.Agent, payloadGuid);
+            var agent = payload.Agent;
+            delta = new AgentMovementDelta(
+                agent.Position, 
+                agent.GetMovementDirection(),
+                new AgentEquipmentData(agent),
+                new AgentActionData(agent), 
+                new AgentMountData(agent), 
+                payloadGuid);
 
             _agentMovementDeltas.Add(payloadGuid, delta);
 

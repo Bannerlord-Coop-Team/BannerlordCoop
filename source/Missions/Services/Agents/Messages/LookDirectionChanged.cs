@@ -7,7 +7,7 @@ namespace Missions.Services.Agents.Messages
     /// <summary>
     /// An <see cref="IEvent"/> propagating the <see cref="Agent"/>'s change in look direction.
     /// </summary>
-    internal readonly struct LookDirectionChanged : IMovementEvent
+    public readonly struct LookDirectionChanged : IMovementEvent
     {
         /// <summary>
         /// The changed vector representing the look direction.

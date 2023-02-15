@@ -97,6 +97,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AgentMovementDeltaSerializationTest.cs" />
     <Compile Include="ClientInfoTests.cs" />
     <Compile Include="NetworkMessageSerializationTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
