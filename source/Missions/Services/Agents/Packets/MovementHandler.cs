@@ -76,7 +76,6 @@ namespace Missions.Services.Agents.Packets
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
             
-
             _messageBroker.Subscribe<PeerDisconnected>(Handle_PeerDisconnect);
             _messageBroker.Subscribe<ActionDataChanged>(Handle_ActionDataChanged);
             _messageBroker.Subscribe<LookDirectionChanged>(Handle_LookDirectionChanged);
@@ -150,7 +149,7 @@ namespace Missions.Services.Agents.Packets
 
         private AgentMovementDelta GetDelta(IMovementEvent payload)
         {
-            if (!_agentRegistry.AgentToId.TryGetValue(payload.Agent, out var payloadGuid))
+            if (!_agentRegistry.TryGetAgentId(payload.Agent, out var payloadGuid))
             {
                 Logger.Error("No {agent} found", nameof(Agent));
             }
@@ -194,7 +193,7 @@ namespace Missions.Services.Agents.Packets
 
         public void HandlePacket(NetPeer peer, IPacket packet)
         {
-            if (_agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController agentGroupController))
+            if (_agentRegistry.TryGetGroupController(peer, out AgentGroupController agentGroupController))
             {
                 MovementPacket movement = (MovementPacket)packet;
                 agentGroupController.ApplyMovement(movement);
@@ -209,7 +208,7 @@ namespace Missions.Services.Agents.Packets
 
             Logger.Debug("Handling disconnect for {peer}", peer);
 
-            if (_agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController controller))
+            if (_agentRegistry.TryGetGroupController(peer, out AgentGroupController controller))
             {
                 foreach (var kv in controller.ControlledAgents)
                 {

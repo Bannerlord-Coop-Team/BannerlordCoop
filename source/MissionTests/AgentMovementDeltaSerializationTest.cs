@@ -14,8 +14,15 @@ namespace IntroductionServerTests
         [Fact]
         public void Serialize_Test()
         {
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
+            try
+            {
+                RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
+                RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
+            }
+            catch
+            {
+                // nop
+            }
 
             var delta = new AgentMovementDelta(Vec3.Zero, Vec2.Zero, new AgentEquipmentData(), null, null, Guid.NewGuid());
 

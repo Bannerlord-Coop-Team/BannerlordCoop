@@ -16,8 +16,15 @@ namespace IntroductionServerTests
         [Fact]
         public void Serialize_Test()
         {
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
+            try
+            {
+                RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
+                RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
+            }
+            catch
+            {
+                // nop
+            }
 
             var character = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
             NetworkMissionJoinInfo missionJoinInfo = new NetworkMissionJoinInfo(character, default(Guid), default(Vec3), default(Guid[]), default(Vec3[]), Array.Empty<string>());
