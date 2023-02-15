@@ -294,7 +294,7 @@ namespace Missions.Services.Network
                 guid = agentId;
                 return true;
             }
-            guid = default(Guid);
+            guid = default;
             return false;
         }
 
