@@ -10,7 +10,7 @@ using TaleWorlds.Library;
 namespace Missions.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    public class MissionJoinInfo : INetworkEvent
+    public class NetworkMissionJoinInfo : INetworkEvent
     {
         [ProtoMember(1)]
         public readonly Guid PlayerId;
@@ -22,14 +22,28 @@ namespace Missions.Messages
             get { return UnpackCharacter(); }
             set { _packedCharacter = PackCharacter(value); }
         }
+        private CharacterObject _characterObject;
 
         [ProtoMember(3)]
         private byte[] _packedCharacter;
-        public MissionJoinInfo(CharacterObject characterObject, Guid playerId, Vec3 startingPosition)
+
+        [ProtoMember(4)]
+        public readonly Guid[] UnitId;
+
+        [ProtoMember(5)]
+        public readonly Vec3[] UnitStartingPosition;
+
+        [ProtoMember(6)]
+        public readonly string[] UnitIdString;
+
+        public NetworkMissionJoinInfo(CharacterObject characterObject, Guid playerId, Vec3 startingPosition, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString)
         {
             PlayerId = playerId;
             StartingPosition = startingPosition;
             CharacterObject = characterObject;
+            UnitId = unitId;
+            UnitStartingPosition = unitStartingPosition;
+            UnitIdString = unitIdString;
         }
 
         private byte[] PackCharacter(CharacterObject characterObject)
@@ -43,11 +57,15 @@ namespace Missions.Messages
 
         private CharacterObject UnpackCharacter()
         {
+            if (_characterObject != null) return _characterObject;
+
             var factory = new BinaryPackageFactory();
             var character = BinaryFormatterSerializer.Deserialize<CharacterObjectBinaryPackage>(_packedCharacter);
             character.BinaryPackageFactory = factory;
 
-            return character.Unpack<CharacterObject>();
+            _characterObject = character.Unpack<CharacterObject>();
+
+            return _characterObject;
         }
     }
 }

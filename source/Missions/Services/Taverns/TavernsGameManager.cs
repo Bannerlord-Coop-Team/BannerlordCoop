@@ -1,5 +1,6 @@
-﻿using Common.Logging;
-using Common.Messaging;
+﻿using Common;
+using Common.Logging;
+using Common.Network;
 using HarmonyLib;
 using IntroServer.Config;
 using Missions.Services.Network;
@@ -7,6 +8,7 @@ using Missions.Services.Network.Surrogates;
 using ProtoBuf.Meta;
 using SandBox;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -25,12 +27,6 @@ namespace Missions.Services.Taverns
 {
     public class TavernsGameManager : SandBoxGameManager, IMissionGameManager
     {
-        static TavernsGameManager()
-        {
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
-        }
-
         private static readonly ILogger Logger = LogManager.GetLogger<TavernsGameManager>();
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
         private LiteNetP2PClient _client;
@@ -44,7 +40,7 @@ namespace Missions.Services.Taverns
         {
             NetworkConfiguration config = new NetworkConfiguration();
 
-            _client = new LiteNetP2PClient(config, MessageBroker.Instance);
+            _client = new LiteNetP2PClient(config);
 
             if (_client.ConnectToP2PServer())
             {
@@ -62,7 +58,6 @@ namespace Missions.Services.Taverns
             //get the settlement first
             Settlement settlement = Settlement.Find("town_ES3");
 
-            CharacterObject characterObject = CharacterObject.PlayerCharacter;
             LocationEncounter locationEncounter = new TownEncounter(settlement);
 
             // create an encounter of the town with the player
@@ -75,8 +70,8 @@ namespace Missions.Services.Taverns
             Location tavern = LocationComplex.Current.GetLocationWithId("tavern");
             string scene = tavern.GetSceneName(upgradeLevel);
             Mission mission = SandBoxMissions.OpenIndoorMission(scene, tavern);
-            mission.AddMissionBehavior(new CoopMissionNetworkBehavior(_client, MessageBroker.Instance, NetworkAgentRegistry.Instance));
-            mission.AddMissionBehavior(new CoopTavernsController(_client, MessageBroker.Instance, NetworkAgentRegistry.Instance));
+            mission.AddMissionBehavior(new CoopMissionNetworkBehavior(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance));
+            mission.AddMissionBehavior(new CoopTavernsController(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance));
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("spawn_tavern_agent", "test")]
@@ -104,7 +99,7 @@ namespace Missions.Services.Taverns
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
-            });
+            }, true);
 
             return agent;
         }

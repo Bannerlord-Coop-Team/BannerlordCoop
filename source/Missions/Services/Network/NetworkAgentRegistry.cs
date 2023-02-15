@@ -8,24 +8,80 @@ using TaleWorlds.MountAndBlade;
 using Missions.Services.Network;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
+using Serilog;
+using Common.Logging;
 
 namespace Missions.Services.Network
 {
     public interface INetworkAgentRegistry
     {
+        /// <summary>
+        /// Used to easily convert Agent to Id
+        /// </summary>
+        /// <remarks>
+        /// Works with controlled and non-controlled agents
+        /// </remarks>
         IReadOnlyDictionary<Agent, Guid> AgentToId { get; }
+        /// <summary>
+        /// Agents directly controlled by the client
+        /// </summary>
         IReadOnlyDictionary<Guid, Agent> ControlledAgents { get; }
+        /// <summary>
+        /// Agents not controlled by the client.
+        /// These are controlled by network events.
+        /// </summary>
         IReadOnlyDictionary<NetPeer, AgentGroupController> OtherAgents { get; }
 
+        /// <summary>
+        /// Clears all data
+        /// </summary>
         void Clear();
+
+        /// <summary>
+        /// Register a controlled agent.
+        /// </summary>
+        /// <remarks>
+        /// A controlled agent is meant to be managed by this
+        /// client.
+        /// </remarks>
+        /// <param name="agentId">Id to assign the agent</param>
+        /// <param name="agent">Agent to add</param>
+        /// <returns>True if addition was successful, false otherwise</returns>
         bool RegisterControlledAgent(Guid agentId, Agent agent);
+
+        /// <summary>
+        /// Register a network controlled agent.
+        /// </summary>
+        /// <remarks>
+        /// A network controlled agent is meant to be managed across
+        /// the network.
+        /// </remarks>
+        /// <param name="peer">Peer that will control this agent</param>
+        /// <param name="agentId">Id assigned to the agent</param>
+        /// <param name="agent">Agent to register</param>
+        /// <returns>True if addition was successful, false otherwise</returns>
         bool RegisterNetworkControlledAgent(NetPeer peer, Guid agentId, Agent agent);
+
+        /// <summary>
+        /// Remove a controlled agent.
+        /// </summary>
+        /// <param name="agentId">Agent id to remove</param>
+        /// <returns>True if removal was successful, false otherwise</returns>
         bool RemoveControlledAgent(Guid agentId);
+
+        /// <summary>
+        /// Remove peer from network controllers.
+        /// This removes all controlled agents under this peer.
+        /// </summary>
+        /// <param name="peer">Peer to remove</param>
+        /// <returns>True if removal was successful, false otherwise</returns>
         bool RemovePeer(NetPeer peer);
     }
 
+    /// <inheritdoc/>
     public class NetworkAgentRegistry : INetworkAgentRegistry
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<NetworkAgentRegistry>();
         public static INetworkAgentRegistry Instance 
         { 
             get
@@ -40,14 +96,17 @@ namespace Missions.Services.Network
         }
         private static INetworkAgentRegistry _instance;
 
-        public IReadOnlyDictionary<Agent, Guid> AgentToId => m_AgentToId;
-        private readonly Dictionary<Agent, Guid> m_AgentToId = new Dictionary<Agent, Guid>();
+        /// <inheritdoc/>
+        public IReadOnlyDictionary<Agent, Guid> AgentToId => _agentToId;
+        private readonly Dictionary<Agent, Guid> _agentToId = new Dictionary<Agent, Guid>();
 
-        public IReadOnlyDictionary<Guid, Agent> ControlledAgents => m_ControlledAgents;
-        private readonly Dictionary<Guid, Agent> m_ControlledAgents = new Dictionary<Guid, Agent>();
+        /// <inheritdoc/>
+        public IReadOnlyDictionary<Guid, Agent> ControlledAgents => _controlledAgents;
+        private readonly Dictionary<Guid, Agent> _controlledAgents = new Dictionary<Guid, Agent>();
 
-        public IReadOnlyDictionary<NetPeer, AgentGroupController> OtherAgents => m_OtherAgents;
-        private readonly Dictionary<NetPeer, AgentGroupController> m_OtherAgents = new Dictionary<NetPeer, AgentGroupController>();
+        /// <inheritdoc/>
+        public IReadOnlyDictionary<NetPeer, AgentGroupController> OtherAgents => _otherAgents;
+        private readonly Dictionary<NetPeer, AgentGroupController> _otherAgents = new Dictionary<NetPeer, AgentGroupController>();
         private readonly IMessageBroker _messageBroker;
 
         public NetworkAgentRegistry(IMessageBroker messageBroker)
@@ -56,6 +115,7 @@ namespace Missions.Services.Network
             _messageBroker.Subscribe<AgentDeleted>(Handle_AgentDeleted);
         }
 
+        // TODO move to different file
         private void Handle_AgentDeleted(MessagePayload<AgentDeleted> payload)
         {
             Agent affectedAgent = payload.What.Agent;
@@ -65,55 +125,59 @@ namespace Missions.Services.Network
             }
         }
 
+        /// <inheritdoc/>
         public bool RegisterControlledAgent(Guid agentId, Agent agent)
         {
-            if (m_AgentToId.ContainsKey(agent)) return false;
-            if (m_ControlledAgents.ContainsKey(agentId)) return false;
+            if (_agentToId.ContainsKey(agent)) return false;
+            if (_controlledAgents.ContainsKey(agentId)) return false;
 
-            m_ControlledAgents.Add(agentId, agent);
-            m_AgentToId.Add(agent, agentId);
+            _controlledAgents.Add(agentId, agent);
+            _agentToId.Add(agent, agentId);
 
             return true;
         }
 
+        /// <inheritdoc/>
         public bool RegisterNetworkControlledAgent(NetPeer peer, Guid agentId, Agent agent)
         {
-            if (m_OtherAgents.TryGetValue(peer, out AgentGroupController controller))
+            if (_otherAgents.TryGetValue(peer, out AgentGroupController controller))
             {
                 if (controller.Contains(agent)) return false;
                 if (controller.Contains(agentId)) return false;
 
                 controller.AddAgent(agentId, agent);
-                m_AgentToId.Add(agent, agentId);
+                _agentToId.Add(agent, agentId);
             }
             else
             {
                 AgentGroupController newGroupController = new AgentGroupController();
                 newGroupController.AddAgent(agentId, agent);
-                m_AgentToId.Add(agent, agentId);
-                m_OtherAgents.Add(peer, newGroupController);
+                _agentToId.Add(agent, agentId);
+                _otherAgents.Add(peer, newGroupController);
             }
 
             return true;
         }
 
+        /// <inheritdoc/>
         public bool RemoveControlledAgent(Guid agentId)
         {
-            if (m_ControlledAgents.TryGetValue(agentId, out Agent agent))
+            if (_controlledAgents.TryGetValue(agentId, out Agent agent))
             {
-                return m_AgentToId.Remove(agent);
+                return _agentToId.Remove(agent);
             }
             return false;
         }
 
+        /// <inheritdoc/>
         public bool RemoveNetworkControlledAgent(Guid agentId)
         {
-            return m_OtherAgents.Values.Any(group =>
+            return _otherAgents.Values.Any(group =>
             {
                 Agent agent = group.RemoveAgent(agentId);
                 if (agent != null)
                 {
-                    return m_AgentToId.Remove(agent);
+                    return _agentToId.Remove(agent);
                 }
                 else
                 {
@@ -122,13 +186,14 @@ namespace Missions.Services.Network
             });
         }
 
+        /// <inheritdoc/>
         public bool RemovePeer(NetPeer peer)
         {
             bool result = true;
-            if (m_OtherAgents.TryGetValue(peer, out AgentGroupController controller))
+            if (_otherAgents.TryGetValue(peer, out AgentGroupController controller))
             {
-                result &= controller.ControlledAgents.All(kvp => m_AgentToId.Remove(kvp.Value));
-                result &= m_OtherAgents.Remove(peer);
+                result &= controller.ControlledAgents.All(kvp => _agentToId.Remove(kvp.Value));
+                result &= _otherAgents.Remove(peer);
             }
             else
             {
@@ -137,11 +202,12 @@ namespace Missions.Services.Network
             return result;
         }
 
+        /// <inheritdoc/>
         public void Clear()
         {
-            m_AgentToId.Clear();
-            m_OtherAgents.Clear();
-            m_AgentToId.Clear();
+            _agentToId.Clear();
+            _otherAgents.Clear();
+            _agentToId.Clear();
         }
     }
 }

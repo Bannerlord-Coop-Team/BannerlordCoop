@@ -1,20 +1,17 @@
-﻿using Common.Logging;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem.AgentOrigins;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
-using Common;
+using Common.Network;
 using LiteNetLib;
 using Missions.Messages;
-using Missions.Services.Network;
 using Missions.Services.BoardGames;
+using Missions.Services.Network;
+using Serilog;
+using System;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Taverns
 {
@@ -23,32 +20,32 @@ namespace Missions.Services.Taverns
         private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly IMessageBroker _messageBroker;
+        private readonly INetworkMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
         private readonly BoardGameManager _boardGameManager;
 
-        public CoopTavernsController(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
+        public CoopTavernsController(LiteNetP2PClient client, INetworkMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
 
             _boardGameManager = new BoardGameManager(client, _messageBroker, _agentRegistry);
 
-            messageBroker.Subscribe<MissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
         }
 
         ~CoopTavernsController()
         {
-            _messageBroker.Unsubscribe<MissionJoinInfo>(Handle_JoinInfo);
+            _messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
         }
 
-        private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)
+        private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
         {
             Logger.Debug("Received join request");
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
 
-            MissionJoinInfo joinInfo = payload.What;
+            NetworkMissionJoinInfo joinInfo = payload.What;
 
             Guid newAgentId = joinInfo.PlayerId;
             Vec3 startingPos = joinInfo.StartingPosition;
@@ -79,7 +76,7 @@ namespace Missions.Services.Taverns
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
-            });
+            }, true);
 
             return agent;
         }

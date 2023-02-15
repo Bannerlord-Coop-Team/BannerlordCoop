@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.PacketHandlers;
 using LiteNetLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
@@ -56,6 +57,7 @@ namespace Missions.Services.Agents.Packets
 
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
 
+        private readonly IPacketManager _packetManager;
         private readonly LiteNetP2PClient _client;
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
@@ -66,10 +68,14 @@ namespace Missions.Services.Agents.Packets
 
         public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
+            Logger.Verbose("Creating {name}", this.GetType().Name);
 
+            // TODO DI
+            _packetManager = client.PacketManager;
             _client = client;
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
+            
 
             _messageBroker.Subscribe<PeerDisconnected>(Handle_PeerDisconnect);
             _messageBroker.Subscribe<ActionDataChanged>(Handle_ActionDataChanged);
@@ -77,7 +83,7 @@ namespace Missions.Services.Agents.Packets
             _messageBroker.Subscribe<MountDataChanged>(Handle_MountDataChanged);
             _messageBroker.Subscribe<MovementInputVectorChanged>(Handle_MovementInputVectorChanged);
 
-            _client.AddHandler(this);
+            _packetManager.RegisterPacketHandler(this);
 
             // start the SendMessage every PACKET_UPDATE_RATE milliseconds, TIME_BETWEEN_PACKETS.Seconds after it was initialized
             _senderTimer = new Timer(SendMessage, null, TIME_BETWEEN_PACKETS.Seconds, PACKET_UPDATE_RATE);
@@ -90,7 +96,7 @@ namespace Missions.Services.Agents.Packets
 
         public void Dispose()
         {
-            _client.RemoveHandler(this);
+            _packetManager.RemovePacketHandler(this);
             _messageBroker.Unsubscribe<PeerDisconnected>(Handle_PeerDisconnect);
             _messageBroker.Unsubscribe<ActionDataChanged>(Handle_ActionDataChanged);
             _messageBroker.Unsubscribe<LookDirectionChanged>(Handle_LookDirectionChanged);
@@ -109,7 +115,7 @@ namespace Missions.Services.Agents.Packets
                 GameLoopRunner.RunOnMainThread(() =>
                 {
                     current = Mission.Current;
-                });
+                }, true);
                 return current;
             }
         }

@@ -1,5 +1,7 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using HarmonyLib;
 using IntroServer.Config;
 using Missions.Services.Network;
@@ -9,6 +11,7 @@ using SandBox;
 using SandBox.Missions.MissionLogics;
 using SandBox.Missions.MissionLogics.Arena;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -23,36 +26,28 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
+using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.SaveSystem.Load;
 
 namespace Missions.Services.Arena
 {
     public class ArenaTestGameManager : SandBoxGameManager, IMissionGameManager
     {
-        static ArenaTestGameManager()
-        {
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
-        }
-
         private static readonly ILogger Logger = LogManager.GetLogger<ArenaTestGameManager>();
-        private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
+        
         private LiteNetP2PClient _client;
+        private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
 
         public ArenaTestGameManager(LoadResult loadedGameResult) : base(loadedGameResult)
         {
             harmony.PatchAll();
         }
 
-        ~ArenaTestGameManager()
-        {
-        }
-
         public void StartGame()
         {
             NetworkConfiguration config = new NetworkConfiguration();
 
-            _client = new LiteNetP2PClient(config, MessageBroker.Instance);
+            _client = new LiteNetP2PClient(config);
 
             if (_client.ConnectToP2PServer())
             {
@@ -71,7 +66,6 @@ namespace Missions.Services.Arena
             //get the settlement first
             Settlement settlement = Settlement.Find("town_ES3");
 
-            CharacterObject characterObject = CharacterObject.PlayerCharacter;
             LocationEncounter locationEncounter = new TownEncounter(settlement);
 
             // create an encounter of the town with the player
@@ -106,17 +100,18 @@ namespace Missions.Services.Arena
                 new CampaignMissionComponent(),
                 new EquipmentControllerLeaveLogic(),
                 new MissionAgentHandler(location),
-                new CoopMissionNetworkBehavior(_client, MessageBroker.Instance, NetworkAgentRegistry.Instance),
-                new CoopArenaController(MessageBroker.Instance, NetworkAgentRegistry.Instance),
+                new CoopMissionNetworkBehavior(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance),
+                new CoopArenaController(MessageBroker.Instance, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance, new RandomEquipmentGenerator()),
+                //ViewCreator.CreateMissionOrderUIHandler(),
             }, true, true);
         }
 
-        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character)
+        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool isEnemy)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
             agentBuildData.InitialPosition(startingPos);
-            agentBuildData.Team(Mission.Current.PlayerAllyTeam);
+            agentBuildData.Team(isEnemy ? Mission.Current.DefenderTeam : Mission.Current.AttackerTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(character.FirstCivilianEquipment);
@@ -128,7 +123,7 @@ namespace Missions.Services.Arena
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
-            });
+            }, true);
 
             return agent;
         }
@@ -138,12 +133,6 @@ namespace Missions.Services.Arena
             List<GameEntity> entities = new List<GameEntity>();
             scene.GetEntities(ref entities);
             return entities.Where(entity => entity.Tags.Any(tag => tag.StartsWith("sp_"))).Select(entity => entity.Name).ToArray();
-        }
-
-        public override void OnGameEnd(Game game)
-        {
-            harmony.UnpatchAll();
-            base.OnGameEnd(game);
         }
     }
 }
