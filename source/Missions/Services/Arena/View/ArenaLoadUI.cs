@@ -159,12 +159,7 @@ namespace Missions.Services.Arena.View
 
 		private void OnDeleteSavedGame(SavedGameVM savedGame)
 		{
-			string titleText = new TextObject("{=QHV8aeEg}Delete Save", null).ToString();
-			string text = new TextObject("{=HH2mZq8J}Are you sure you want to delete this save game?", null).ToString();
-			InformationManager.ShowInquiry(new InquiryData(titleText, text, true, true, new TextObject("{=aeouhelq}Yes", null).ToString(), new TextObject("{=8OkPHu4f}No", null).ToString(), delegate ()
-			{
-				MBSaveLoad.DeleteSaveGame(savedGame.Save.Name);
-			}, null, ""), false);
+			InformationManager.DisplayMessage(new InformationMessage("Cannot delete saves from here"));
 		}
 
 
