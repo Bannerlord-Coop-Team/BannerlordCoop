@@ -255,10 +255,6 @@ namespace Missions.Services
                 agent.FadeIn();
             }, true);
 
-            if (agent.IsAIControlled)
-            {
-                agent.SetWatchState(Agent.WatchState.Alarmed);
-            }
 
             return agent;
         }
