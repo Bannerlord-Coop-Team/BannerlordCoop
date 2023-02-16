@@ -3,6 +3,7 @@ using Common.Logging;
 using HarmonyLib;
 using Missions;
 using Missions.Services.Arena;
+using Missions.Services.Arena.View;
 using Missions.Services.Network.Surrogates;
 using Missions.Services.Taverns;
 using ProtoBuf.Meta;
@@ -17,8 +18,10 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.ScreenSystem;
 
 namespace MissionTestMod
 {
@@ -72,7 +75,16 @@ namespace MissionTestMod
               "Join Online Tavern",
               new TextObject("Join Online Tavern"),
               9991,
-              StartClientInTavern,
+              () =>
+              {
+                  ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<ArenaLoadGameGauntletScreen>(new object[]
+                  {
+                      new Action<SaveGameFileInfo>((SaveGameFileInfo saveGame)=>
+                      {
+                          SandBoxSaveHelper.TryLoadSave(saveGame, StartGameArena, null);
+                      })
+                  }));
+              },
               () => (false, new TextObject()));
 
             JoinArena = new InitialStateOption(
@@ -117,20 +129,7 @@ namespace MissionTestMod
             Updateables.UpdateAll(frameTime);
         }
 
-        private static void StartClientInTavern()
-        {
-	        SaveGameFileInfo[] saveFiles = MBSaveLoad.GetSaveFiles(null);
-            SaveGameFileInfo save = saveFiles.FirstOrDefault(s => ValidateModules(s.MetaData));
 
-            if(save == null)
-            {
-                InformationManager.DisplayMessage(new InformationMessage("Unable to find a save without Mods. Create a fresh game and try again."));
-            }
-            else
-            {
-                SandBoxSaveHelper.TryLoadSave(save, StartGameTavern, null);
-            }
-        }
 
         private static void StartClientInArena()
         {
