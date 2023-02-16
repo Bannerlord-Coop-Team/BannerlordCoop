@@ -24,9 +24,13 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
+using TaleWorlds.MountAndBlade.Missions.Handlers;
 using TaleWorlds.MountAndBlade.Source.Missions;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
 using TaleWorlds.MountAndBlade.View;
+using TaleWorlds.MountAndBlade.View.MissionViews.Multiplayer;
+using TaleWorlds.MountAndBlade.View.MissionViews.Order;
 using TaleWorlds.SaveSystem.Load;
 
 namespace Missions.Services.Arena
@@ -102,6 +106,8 @@ namespace Missions.Services.Arena
                 new MissionAgentHandler(location),
                 new CoopMissionNetworkBehavior(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance),
                 new CoopArenaController(MessageBroker.Instance, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance, new RandomEquipmentGenerator()),
+                new OrderTroopPlacer(),
+                new CoopGuantletArenaMissionOrderUIHandler(),
                 //ViewCreator.CreateMissionOrderUIHandler(),
             }, true, true);
         }

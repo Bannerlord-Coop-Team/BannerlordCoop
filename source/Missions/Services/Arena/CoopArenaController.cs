@@ -18,17 +18,18 @@ using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.ViewModelCollection.Order;
 
 namespace Missions.Services
 {
     /// <summary>
     /// Mission Controller that does all the logic in the Coop Arena
     /// </summary>
-    internal class CoopArenaController : MissionBehavior
+    internal class CoopArenaController : MissionLogic
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
 
-        public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
+        public override MissionBehaviorType BehaviorType => MissionBehaviorType.Logic;
 
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkMessageBroker _networkMessageBroker;
