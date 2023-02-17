@@ -252,6 +252,12 @@ namespace Missions.Services
             GameLoopRunner.RunOnMainThread(() =>
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
+                Formation formation = Mission.Current.PlayerTeam.FormationsIncludingSpecialAndEmpty.ElementAt(0);
+                formation.SetControlledByAI(false);
+                formation.AddUnit(agent);
+                formation.Captain = Agent.Main;
+                formation.PlayerOwner = Agent.Main;
+                
                 agent.FadeIn();
             }, true);
 
