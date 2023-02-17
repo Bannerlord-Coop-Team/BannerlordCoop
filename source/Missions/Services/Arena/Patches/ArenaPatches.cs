@@ -3,6 +3,8 @@ using HarmonyLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
 using System;
+using System.Collections.Generic;
+using System.Runtime.Remoting.Messaging;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 
@@ -34,6 +36,16 @@ namespace Missions.Services.Arena.Patches
             NetworkMessageBroker.Instance.PublishNetworkEvent(_agentDamageData);
 
             return true;
+        }
+    }
+
+    [HarmonyPatch(typeof(OrderController), "SimulateDestinationFrames")]
+    public class OrderControllerPatch
+    {
+        static bool Prefix(out List<WorldPosition> simulationAgentFrames, float minDistance = 3f)
+        {
+            simulationAgentFrames = new List<WorldPosition>();
+            return false;
         }
     }
 }
