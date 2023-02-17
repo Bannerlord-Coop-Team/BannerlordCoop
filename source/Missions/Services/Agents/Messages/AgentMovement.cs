@@ -1,5 +1,8 @@
-﻿using Missions.Services.Agents.Packets;
+﻿using Common.PacketHandlers;
+using LiteNetLib;
+using Missions.Services.Agents.Packets;
 using ProtoBuf;
+using SandBox.Missions.MissionLogics;
 using System;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -10,7 +13,7 @@ namespace Missions.Services.Agents.Messages
     /// Represents the delta of an <see cref="Agent"/>'s movement between the time it was created and the time it was last updated.
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public class AgentMovementDelta
+    public class AgentMovement : IPacket
     {
         /// <summary>
         /// The <see cref="Vec3"/> representing the direction an <see cref="Agent"/> is looking at.
@@ -61,11 +64,21 @@ namespace Missions.Services.Agents.Messages
         public Guid AgentId { get; }
 
         /// <summary>
+        /// The <see cref="PacketType"/>.
+        /// </summary>
+        public PacketType PacketType => PacketType.Movement;
+
+        /// <summary>
+        /// The <see cref="DeliveryMethod"/>.
+        /// </summary>
+        public DeliveryMethod DeliveryMethod => DeliveryMethod.Unreliable;
+
+        /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="agent"></param>
         /// <param name="guid"></param>
-        public AgentMovementDelta(
+        public AgentMovement(
             Vec3 agentCurrentPosition, 
             Vec2 agentMovementDirection, 
             AgentEquipmentData agentEquipmentData, 
@@ -82,7 +95,7 @@ namespace Missions.Services.Agents.Messages
         }
 
         /// <summary>
-        /// Re-calculate this <see cref="AgentMovementDelta"/>.
+        /// Re-calculate this <see cref="AgentMovement"/>.
         /// </summary>
         /// <param name="change"></param>
         public void CalculateMovement(LookDirectionChanged change)
@@ -91,7 +104,7 @@ namespace Missions.Services.Agents.Messages
         }
 
         /// <summary>
-        /// Re-calculate this <see cref="AgentMovementDelta"/>.
+        /// Re-calculate this <see cref="AgentMovement"/>.
         /// </summary>
         /// <param name="change"></param>
         public void CalculateMovement(MovementInputVectorChanged change)
@@ -100,7 +113,7 @@ namespace Missions.Services.Agents.Messages
         }
 
         /// <summary>
-        /// Re-calculate this <see cref="AgentMovementDelta"/>.
+        /// Re-calculate this <see cref="AgentMovement"/>.
         /// </summary>
         /// <param name="change"></param>
         public void CalculateMovement(ActionDataChanged change)
@@ -109,7 +122,7 @@ namespace Missions.Services.Agents.Messages
         }
 
         /// <summary>
-        /// Re-calculate this <see cref="AgentMovementDelta"/>.
+        /// Re-calculate this <see cref="AgentMovement"/>.
         /// </summary>
         /// <param name="change"></param>
         public void CalculateMovement(MountDataChanged change)
@@ -118,22 +131,16 @@ namespace Missions.Services.Agents.Messages
         }
 
         /// <summary>
-        /// Generate a <see cref="MovementPacket"/> from this <see cref="AgentMovementDelta"/>.
+        /// Applies the given <see cref="Agent"/> to the <see cref="AgentData"/>
+        /// returned by this method.
         /// </summary>
+        /// <param name="agent"></param>
         /// <returns></returns>
-        public MovementPacket GetPacket()
+        public AgentData Apply(Agent agent)
         {
-            return new MovementPacket(
-                AgentId, 
-                new AgentData(
-                    CurrentPosition,
-                    AgentMovementDirection,
-                    LookDirectionDelta, 
-                    InputDirectionDelta,
-                    AgentEquipmentData,
-                    ActionDataDelta, 
-                    MountDataDelta)
-                );
+            var agentData = new AgentData(CurrentPosition, AgentMovementDirection, LookDirectionDelta, InputDirectionDelta, AgentEquipmentData, null, null);
+            agentData.Apply(agent);
+            return agentData;
         }
 
         /// <inheritdoc/>
@@ -141,15 +148,15 @@ namespace Missions.Services.Agents.Messages
         {
             if (ReferenceEquals(null, obj)) return false;
 
-            return Equals((AgentMovementDelta)obj);
+            return Equals((AgentMovement)obj);
         }
 
         /// <summary>
-        /// Compares <paramref name="other"/> with this instance of <see cref="AgentMovementDelta"/>.
+        /// Compares <paramref name="other"/> with this instance of <see cref="AgentMovement"/>.
         /// </summary>
         /// <param name="other"></param>
         /// <returns></returns>
-        public bool Equals(AgentMovementDelta other)
+        public bool Equals(AgentMovement other)
         {
             return other == this 
                 || other.AgentId == AgentId 
@@ -160,6 +167,19 @@ namespace Missions.Services.Agents.Messages
                 && other.CurrentPosition == CurrentPosition
                 && other.AgentMovementDirection == AgentMovementDirection
                 && other.AgentEquipmentData.Equals(AgentEquipmentData);
+        }
+
+        /// <inheritdoc/>
+        public override int GetHashCode()
+        {
+            return AgentId.GetHashCode() 
+                ^ LookDirectionDelta.GetHashCode() 
+                ^ InputDirectionDelta.GetHashCode() 
+                ^ ActionDataDelta?.GetHashCode() ?? 37
+                ^ MountDataDelta?.GetHashCode() ?? 37
+                ^ CurrentPosition.GetHashCode() 
+                ^ AgentMovementDirection.GetHashCode() 
+                ^ AgentEquipmentData.GetHashCode();
         }
     }
 }

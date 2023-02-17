@@ -15,38 +15,7 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Packets
-{
-    [ProtoContract]
-    public readonly struct MovementPacket : IPacket
-    {
-        public DeliveryMethod DeliveryMethod => DeliveryMethod.Unreliable;
-
-        public PacketType PacketType => PacketType.Movement;
-
-        public byte[] Data => new byte[0];
-
-        [ProtoMember(1)]
-        public AgentData Agent { get; }
-        [ProtoMember(2)]
-        public Guid AgentId { get; }
-
-        public MovementPacket(Guid agentGuid, Agent agent)
-        {
-            AgentId = agentGuid;
-            Agent = new AgentData(agent);
-        }
-
-        public MovementPacket(Guid agentGuid, AgentData agentData)
-        {
-            AgentId = agentGuid;
-            Agent = agentData;
-        }
-
-        public void Apply(Agent agent)
-        {
-            Agent.Apply(agent);
-        }
-    }
+{  
 
     public class MovementHandler : IPacketHandler, IDisposable
     {
@@ -62,7 +31,7 @@ namespace Missions.Services.Agents.Packets
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
-        private Dictionary<Guid, AgentMovementDelta> _agentMovementDeltas = new Dictionary<Guid, AgentMovementDelta>();
+        private Dictionary<Guid, AgentMovement> _agentMovementDeltas = new Dictionary<Guid, AgentMovement>();
 
         private Timer _senderTimer;
 
@@ -147,7 +116,7 @@ namespace Missions.Services.Agents.Packets
             delta.CalculateMovement(payload.What);
         }
 
-        private AgentMovementDelta GetDelta(IMovementEvent payload)
+        private AgentMovement GetDelta(IMovementEvent payload)
         {
             if (!_agentRegistry.TryGetAgentId(payload.Agent, out var payloadGuid))
             {
@@ -160,7 +129,7 @@ namespace Missions.Services.Agents.Packets
             }
 
             var agent = payload.Agent;
-            delta = new AgentMovementDelta(
+            delta = new AgentMovement(
                 agent.Position, 
                 agent.GetMovementDirection(),
                 new AgentEquipmentData(agent),
@@ -173,7 +142,7 @@ namespace Missions.Services.Agents.Packets
             return delta;
         }
 
-        private IEnumerable<AgentMovementDelta> PopAllDeltas()
+        private IEnumerable<AgentMovement> PopAllDeltas()
         {
             foreach (var kv in _agentMovementDeltas)
             {
@@ -187,7 +156,7 @@ namespace Missions.Services.Agents.Packets
         {
             foreach (var delta in PopAllDeltas())
             {
-                _client.SendAll(delta.GetPacket());
+                _client.SendAll(delta);
             }
         }
 
@@ -195,7 +164,7 @@ namespace Missions.Services.Agents.Packets
         {
             if (_agentRegistry.TryGetGroupController(peer, out AgentGroupController agentGroupController))
             {
-                MovementPacket movement = (MovementPacket)packet;
+                var movement = (AgentMovement)packet;
                 agentGroupController.ApplyMovement(movement);
             }
         }
