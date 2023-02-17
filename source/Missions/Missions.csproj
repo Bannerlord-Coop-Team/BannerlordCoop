@@ -158,7 +158,7 @@
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
     <Compile Include="Services\Arena\Patches\ArenaPatches.cs" />
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
-    <Compile Include="Services\Arena\View\ArenaLoadUI.cs" />
+    <Compile Include="View\MissionsLoadUI.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnHandlePreMovementStageMessage.cs" />
