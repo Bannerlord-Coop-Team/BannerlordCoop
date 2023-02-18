@@ -69,10 +69,14 @@ namespace Missions.Services.BoardGames
             Guid other = payload.What.RequestingPlayer;
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
 
+            if (_agentRegistry.TryGetAgent(sender, out Agent agent) == false) return;
+            if (_agentRegistry.IsAgentRegistered(other) == false) return; 
+
             if (BoardGameLogic.IsPlayingOtherPlayer == false)
             {
-                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", _agentRegistry.ControlledAgents[sender].Name + " has challenged you to a board game", true, true, "Accept", "Decline",
+                InformationManager.ShowInquiry(new InquiryData("Board Game Challenge", agent.Name + " has challenged you to a board game", true, true, "Accept", "Decline",
                 new Action(() => { AcceptGameRequest(sender, other, netPeer); }), new Action(() => { DenyGameRequest(sender, other, netPeer); })));
+
             }
             else
             {
