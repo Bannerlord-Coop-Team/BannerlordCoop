@@ -153,7 +153,7 @@ namespace Missions.Services
         {
             if (Agent.Main.Team.TeamAgents.Contains(shooterAgent))
             {
-                _agentRegistry.AgentToId.TryGetValue(shooterAgent, out Guid shooterAgentGuid);
+                _agentRegistry.TryGetAgentId(shooterAgent, out Guid shooterAgentGuid);
                 AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
 
                 _networkMessageBroker.PublishNetworkEvent(message);
@@ -163,7 +163,7 @@ namespace Missions.Services
         private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
         private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
         {
-            _agentRegistry.OtherAgents.TryGetValue(payload.Who as NetPeer, out AgentGroupController agentGroupController);
+            _agentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
 
             AgentShoot shot = payload.What;
             OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { 
