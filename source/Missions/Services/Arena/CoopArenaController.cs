@@ -35,9 +35,8 @@ namespace Missions.Services
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
 
-        private Agent _tempAi;
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
-        private readonly CharacterObject[] _gameCharacters;
+        private CharacterObject[] _gameCharacters;
 
         public CoopArenaController(
             IMessageBroker messageBroker,
@@ -49,7 +48,6 @@ namespace Missions.Services
             _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
-            _gameCharacters = CharacterObject.All.Where(x => !x.IsHero && x.Age > 18).ToArray();
             messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             messageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
@@ -63,7 +61,9 @@ namespace Missions.Services
 
         public override void AfterStart()
         {
+            _gameCharacters = CharacterObject.All?.Where(x => !x.IsHero && x.Age > 18).ToArray();
             AddPlayerToArena();
+
         }
 
 
@@ -203,7 +203,7 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            _tempAi = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
+            SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
         }
 
 

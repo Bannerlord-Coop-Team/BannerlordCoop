@@ -9,7 +9,7 @@ namespace Missions.Services.Arena
     /// <summary>
     /// Generator for random fighting equipment
     /// </summary>
-    internal interface IRandomEquipmentGenerator
+    public interface IRandomEquipmentGenerator
     {
         /// <summary>
         /// Creates a new set of random equipment
@@ -20,7 +20,7 @@ namespace Missions.Services.Arena
     }
 
     /// <inheritdoc cref="IRandomEquipmentGenerator"/>
-    internal class RandomEquipmentGenerator : IRandomEquipmentGenerator
+    public class RandomEquipmentGenerator : IRandomEquipmentGenerator
     {
         //Here im harcoding the elements that are causing the arrows not to spawn and the same for the throwing weapons
         private static readonly HashSet<string> ExcludedItems = new HashSet<string>{"ballista_projectile_burning", "ballista_projectile", "throwing_stone", "boulder",
@@ -46,6 +46,8 @@ namespace Missions.Services.Arena
         /// <returns>A dictionary</returns>
         private static IDictionary<ItemTypeEnum, List<ItemObject>> InitializeItemDictionary()
         {
+            if (Game.Current?.ObjectManager == null) return new Dictionary<ItemTypeEnum, List<ItemObject>>();
+
             IEnumerable<ItemObject> allItems = Game.Current.ObjectManager.GetObjectTypeList<ItemObject>();
             IDictionary<ItemTypeEnum, List<ItemObject>> result = new Dictionary<ItemTypeEnum, List<ItemObject>>();
             

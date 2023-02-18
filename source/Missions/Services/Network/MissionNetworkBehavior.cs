@@ -41,7 +41,10 @@ namespace Missions.Services.Network
         public CoopMissionNetworkBehavior(
             LiteNetP2PClient client, 
             INetworkMessageBroker messageBroker,
-            INetworkAgentRegistry agentRegistry)
+            INetworkAgentRegistry agentRegistry,
+            MovementHandler movementHandler,
+            EventPacketHandler eventPacketHandler
+            )
         {
             _client = client;
             _networkMessageBroker = messageBroker;
@@ -49,8 +52,10 @@ namespace Missions.Services.Network
             _playerId = Guid.NewGuid();
 
             // TODO DI
-            _movementHandler = new MovementHandler(_client, _networkMessageBroker, _agentRegistry);
-            _eventPacketHandler = new EventPacketHandler(_networkMessageBroker, client.PacketManager);
+            _movementHandler = movementHandler;
+            _eventPacketHandler = eventPacketHandler;
+            //_movementHandler = new MovementHandler(_client, _networkMessageBroker, _agentRegistry);
+            //_eventPacketHandler = new EventPacketHandler(_networkMessageBroker, client.PacketManager);
 
             _networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
         }
