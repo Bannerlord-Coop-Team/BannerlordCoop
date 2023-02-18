@@ -25,7 +25,7 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
-    <Optimize>false</Optimize>
+    <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -113,11 +113,6 @@
     <Reference Include="TaleWorlds.Engine">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
     </Reference>
-    <Reference Include="TaleWorlds.Engine.GauntletUI, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.GauntletUI.Data, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
     <Reference Include="TaleWorlds.InputSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
     </Reference>
@@ -142,25 +137,15 @@
     <Reference Include="TaleWorlds.SaveSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
     </Reference>
-    <Reference Include="TaleWorlds.ScreenSystem, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.TwoDimension, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Services\Agents\Messages\AgentShoot.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamageData.cs" />
-    <Compile Include="Services\Agents\Messages\AgentDied.cs" />
-    <Compile Include="Services\Agents\Patches\AgentDamagePatch.cs" />
-    <Compile Include="Services\Agents\Patches\AgentKilledPatch.cs" />
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
+    <Compile Include="MissionModule.cs" />
+    <Compile Include="Services\Arena\Patches\ArenaPatches.cs" />
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
-    <Compile Include="View\MissionsLoadUI.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnHandlePreMovementStageMessage.cs" />

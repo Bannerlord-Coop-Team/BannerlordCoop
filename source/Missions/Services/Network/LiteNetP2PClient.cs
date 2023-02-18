@@ -43,15 +43,9 @@ namespace Missions.Services.Network
         private readonly IMessageBroker _messageBroker;
         private readonly Poller _poller;
         
-        public LiteNetP2PClient(NetworkConfiguration config)
+        public LiteNetP2PClient(NetworkConfiguration config, IMessageBroker messageBroker)
         {
             _networkConfig = config;
-            // Assigns singleton, to be replaced with DI
-            _messageBroker = new NetworkMessageBroker()
-            {
-                Network = this,
-            };
-
 
             _netManager = new NetManager(this)
             {
