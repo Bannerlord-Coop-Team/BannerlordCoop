@@ -1,6 +1,7 @@
 {
     "modsDir" : "mb2\\Modules",
     "name" : "MissionTestMod",
+    "main_class" : "TestMod",
     "version" : "v0.0.1",
     "game_version" : "e1.8.0"
 }

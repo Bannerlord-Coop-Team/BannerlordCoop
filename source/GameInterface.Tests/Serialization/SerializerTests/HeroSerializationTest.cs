@@ -137,7 +137,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             foreach (var vals in values1.Zip(values2, (v1, v2) => (v1, v2)))
             {
-                Assert.Same(vals.v1, vals.v2);
+                Assert.Equal(vals.v1, vals.v2);
             }
         }
 
