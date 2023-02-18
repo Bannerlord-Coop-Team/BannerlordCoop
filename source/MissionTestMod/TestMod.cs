@@ -75,16 +75,15 @@ namespace MissionTestMod
               "Join Online Tavern",
               new TextObject("Join Online Tavern"),
               9991,
-
-             SelectCharacterTavern,
+              SelectSaveTavern,
               () => (false, new TextObject()));
 
             JoinArena = new InitialStateOption(
-                "Join Online Arena",
-                 new TextObject("Join Online Arena"),
-                 9990,
-                 SelectCharacterArena,
-                 () => (false, new TextObject()));
+               "Join Online Arena",
+               new TextObject("Join Online Arena"),
+               9990,
+               SelectSaveArena,
+               () => (false, new TextObject()));
 
             Module.CurrentModule.AddInitialStateOption(JoinTavern);
             Module.CurrentModule.AddInitialStateOption(JoinArena);
@@ -121,7 +120,7 @@ namespace MissionTestMod
             Updateables.UpdateAll(frameTime);
         }
 
-        private static void SelectCharacterArena()
+        private static void SelectSaveArena()
         {
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<MissionLoadGameGauntletScreen>(new object[]
                   {
@@ -133,7 +132,7 @@ namespace MissionTestMod
         }
 
 
-        private static void SelectCharacterTavern()
+        private static void SelectSaveTavern()
         {
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<MissionLoadGameGauntletScreen>(new object[]
                   {
