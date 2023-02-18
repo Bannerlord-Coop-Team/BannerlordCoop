@@ -17,10 +17,10 @@ namespace Missions.Services.Arena.Patches
         static bool Prefix(Agent attacker, Agent victim, GameEntity realHitEntity, Blow b, ref AttackCollisionData collisionData, in MissionWeapon attackerWeapon, ref CombatLogData combatLogData)
         {
             // first, check if the attacker exists in the agent to ID groud, if not, no networking is needed (not a network agent)
-            if (!NetworkAgentRegistry.Instance.AgentToId.TryGetValue(attacker, out Guid attackerId)) return true;
+            if (NetworkAgentRegistry.Instance.TryGetAgentId(attacker, out Guid attackerId) == false) return true;
 
             // next, check if the attacker is one of ours, if not, no networking is needed (not our agent dealing damage)
-            if (!NetworkAgentRegistry.Instance.ControlledAgents.ContainsKey(attackerId)) return true;
+            if (NetworkAgentRegistry.Instance.IsControlled(attackerId) == false) return true;
 
             AgentDamageData _agentDamageData;
 

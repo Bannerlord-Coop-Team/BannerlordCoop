@@ -14,7 +14,7 @@ namespace Missions.Services.Agents.Patches
         {
             if(__instance.Health <= 0)
             {
-                MessageBroker.Instance.Publish(new AgentDied(__instance));
+                MessageBroker.Instance.Publish(__instance, new AgentDied(__instance));
             }
         }
     }

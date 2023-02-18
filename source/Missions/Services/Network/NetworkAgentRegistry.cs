@@ -163,17 +163,6 @@ namespace Missions.Services.Network
         public NetworkAgentRegistry(IMessageBroker messageBroker)
         {
             _messageBroker = messageBroker;
-            _messageBroker.Subscribe<AgentDeleted>(Handle_AgentDeleted);
-        }
-
-        // TODO move to different file
-        private void Handle_AgentDeleted(MessagePayload<AgentDeleted> payload)
-        {
-            Agent affectedAgent = payload.What.Agent;
-            if (AgentToId.TryGetValue(affectedAgent, out Guid agentId))
-            {
-                RemoveNetworkControlledAgent(agentId);
-            }
         }
 
         /// <inheritdoc/>
@@ -215,6 +204,7 @@ namespace Missions.Services.Network
         {
             if (_controlledAgents.TryGetValue(agentId, out Agent agent))
             {
+                _controlledAgents.Remove(agentId);
                 return _agentToId.Remove(agent);
             }
             return false;

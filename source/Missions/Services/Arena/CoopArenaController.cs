@@ -180,8 +180,9 @@ namespace Missions.Services
         private void Handler_AgentDeath(MessagePayload<AgentDied> obj)
         {
             Agent agent = obj.What.Agent;
-            if(_agentRegistry.AgentToId.TryGetValue(agent, out Guid agentId))
+            if(_agentRegistry.TryGetAgentId(agent, out Guid agentId))
             {
+                _agentRegistry.RemoveControlledAgent(agentId);
             }
         }
 
