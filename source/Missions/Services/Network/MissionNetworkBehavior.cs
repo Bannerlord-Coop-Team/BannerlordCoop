@@ -59,20 +59,6 @@ namespace Missions.Services.Network
         {
             string sceneName = Mission.SceneName;
             _client.NatPunch(sceneName);
-
-            //// TODO find way to make this not a task
-            //Task.Factory.StartNew(async () =>
-            //{
-            //    while (Mission == null || Mission.IsLoadingFinished == false)
-            //    {
-            //        await Task.Delay(100);
-            //    }
-
-            //    string sceneName = Mission.SceneName;
-            //    _client.NatPunch(sceneName);
-
-            //    await Task.Delay(WaitForConnectionsTime);
-            //});
         }
 
         private void Handle_PeerConnected(MessagePayload<PeerConnected> payload)
@@ -91,6 +77,8 @@ namespace Missions.Services.Network
             foreach (Guid agentId in _agentRegistry.ControlledAgents.Keys)
             {
                 Agent agent = _agentRegistry.ControlledAgents[agentId];
+
+                if (agent == Agent.Main) continue;
 
                 guids.Add(agentId);
                 unitPositions.Add(agent.Position);

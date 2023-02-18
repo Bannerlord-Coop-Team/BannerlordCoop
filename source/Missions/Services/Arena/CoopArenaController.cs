@@ -31,28 +31,24 @@ namespace Missions.Services
 
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly IMessageBroker _messageBroker;
         private readonly INetworkMessageBroker _networkMessageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
 
-        private Agent _tempAi;
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
         private readonly CharacterObject[] _gameCharacters;
 
         public CoopArenaController(
-            IMessageBroker messageBroker,
             INetworkMessageBroker networkMessageBroker,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator)
         {
-            _messageBroker = messageBroker;
             _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
             _gameCharacters = CharacterObject.All.Where(x => !x.IsHero && x.Age > 18).ToArray();
-            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            messageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
+            _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            _networkMessageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
             _networkMessageBroker.Subscribe<AgentDied>(Handler_AgentDeath);
         }
@@ -61,8 +57,10 @@ namespace Missions.Services
 
         ~CoopArenaController()
         {
-            _messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            _networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            _networkMessageBroker.Unsubscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Unsubscribe<AgentShoot>(Handle_AgentShoot);
+            _networkMessageBroker.Unsubscribe<AgentDied>(Handler_AgentDeath);
         }
 
         public override void AfterStart()
@@ -183,7 +181,9 @@ namespace Missions.Services
             if(_agentRegistry.TryGetAgentId(agent, out Guid agentId))
             {
                 _agentRegistry.RemoveControlledAgent(agentId);
+                _agentRegistry.RemoveNetworkControlledAgent(agentId);
             }
+            
         }
 
         public void AddPlayerToArena()
@@ -218,7 +218,6 @@ namespace Missions.Services
 
             Agent ai = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
 
-            _agentRegistry.RegisterControlledAgent(Guid.NewGuid(), player);
             _agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
         }
 

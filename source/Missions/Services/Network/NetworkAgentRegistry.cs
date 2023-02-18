@@ -72,6 +72,13 @@ namespace Missions.Services.Network
         bool RemoveControlledAgent(Guid agentId);
 
         /// <summary>
+        /// Remove a network controlled agent.
+        /// </summary>
+        /// <param name="agentId">Agent id to remove</param>
+        /// <returns>True if removal was successful, false otherwise</returns>
+        bool RemoveNetworkControlledAgent(Guid agentId);
+
+        /// <summary>
         /// Remove peer from network controllers.
         /// This removes all controlled agents under this peer.
         /// </summary>

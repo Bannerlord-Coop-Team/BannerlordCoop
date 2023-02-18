@@ -87,6 +87,8 @@ namespace Missions.Services.Arena
 
         private void StartArenaMission(Location location, int upgradeLevel)
         {
+            NetworkAgentRegistry.Instance.Clear();
+
             string civilianUpgradeLevelTag = Campaign.Current.Models.LocationModel.GetCivilianUpgradeLevelTag(upgradeLevel);
             Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(location.GetSceneName(upgradeLevel), "", false), (mission) => new MissionBehavior[]
             {
@@ -101,7 +103,7 @@ namespace Missions.Services.Arena
                 new EquipmentControllerLeaveLogic(),
                 new MissionAgentHandler(location),
                 new CoopMissionNetworkBehavior(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance),
-                new CoopArenaController(MessageBroker.Instance, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance, new RandomEquipmentGenerator()),
+                new CoopArenaController(NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance, new RandomEquipmentGenerator()),
                 //ViewCreator.CreateMissionOrderUIHandler(),
             }, true, true);
         }
