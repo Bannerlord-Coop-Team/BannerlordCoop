@@ -6,6 +6,7 @@ using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
+using Missions.Services.Agents.Patches;
 using Missions.Services.Arena;
 using Missions.Services.Network;
 using Serilog;
@@ -53,7 +54,10 @@ namespace Missions.Services
             messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             messageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
+            _networkMessageBroker.Subscribe<AgentDied>(Handler_AgentDeath);
         }
+
+        
 
         ~CoopArenaController()
         {
@@ -115,7 +119,7 @@ namespace Missions.Services
             GameLoopRunner.RunOnMainThread(() =>
             {
                 // register a blow on the effected agent
-                effectedAgent.RegisterBlow(b, collisionData);
+                effectedAgent?.RegisterBlow(b, collisionData);
             });            
         }
 
@@ -171,6 +175,14 @@ namespace Missions.Services
                 shot.HasRigidBody, 
                 true, 
                 shot.ForcedMissileIndex });
+        }
+
+        private void Handler_AgentDeath(MessagePayload<AgentDied> obj)
+        {
+            Agent agent = obj.What.Agent;
+            if(_agentRegistry.AgentToId.TryGetValue(agent, out Guid agentId))
+            {
+            }
         }
 
         public void AddPlayerToArena()

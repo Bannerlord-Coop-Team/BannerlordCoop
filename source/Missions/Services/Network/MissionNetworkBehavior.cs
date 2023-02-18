@@ -88,11 +88,11 @@ namespace Missions.Services.Network
             List<Vec3> unitPositions = new List<Vec3>();
             List<string> unitIdStrings = new List<string>();
             List<Guid> guids = new List<Guid>();
-            foreach (Agent agent in Agent.Main.Team.TeamAgents.Where(agent => agent != Agent.Main))
+            foreach (Guid agentId in _agentRegistry.ControlledAgents.Keys)
             {
-                var newGuid = Guid.NewGuid();
-                _agentRegistry.RegisterControlledAgent(newGuid, agent);
-                guids.Add(newGuid);
+                Agent agent = _agentRegistry.ControlledAgents[agentId];
+
+                guids.Add(agentId);
                 unitPositions.Add(agent.Position);
                 unitIdStrings.Add(agent.Character.StringId);
             }
