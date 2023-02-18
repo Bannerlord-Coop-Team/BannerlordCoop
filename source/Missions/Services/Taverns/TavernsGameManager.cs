@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using Common.Logging;
 using Common.Network;
 using HarmonyLib;
@@ -29,6 +30,7 @@ namespace Missions.Services.Taverns
     {
         private static readonly ILogger Logger = LogManager.GetLogger<TavernsGameManager>();
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
+        private IContainer _container;
         private LiteNetP2PClient _client;
 
         public TavernsGameManager(LoadResult loadedGameResult) : base(loadedGameResult)
@@ -38,9 +40,13 @@ namespace Missions.Services.Taverns
 
         public void StartGame()
         {
-            NetworkConfiguration config = new NetworkConfiguration();
+            ContainerBuilder builder = new ContainerBuilder();
 
-            _client = new LiteNetP2PClient(config);
+            builder.RegisterModule<MissionModule>();
+
+            _container = builder.Build();
+
+            _client = _container.Resolve<LiteNetP2PClient>();
 
             if (_client.ConnectToP2PServer())
             {
@@ -70,8 +76,10 @@ namespace Missions.Services.Taverns
             Location tavern = LocationComplex.Current.GetLocationWithId("tavern");
             string scene = tavern.GetSceneName(upgradeLevel);
             Mission mission = SandBoxMissions.OpenIndoorMission(scene, tavern);
-            mission.AddMissionBehavior(new CoopMissionNetworkBehavior(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance));
-            mission.AddMissionBehavior(new CoopTavernsController(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance));
+            mission.AddMissionBehavior(_container.Resolve<CoopMissionNetworkBehavior>());
+            mission.AddMissionBehavior(_container.Resolve<CoopTavernsController>());
+            //mission.AddMissionBehavior(new CoopMissionNetworkBehavior(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance));
+            //mission.AddMissionBehavior(new CoopTavernsController(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance));
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("spawn_tavern_agent", "test")]

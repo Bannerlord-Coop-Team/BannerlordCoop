@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -38,16 +39,23 @@ namespace Missions.Services.Arena
         private LiteNetP2PClient _client;
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
 
+        private IContainer _container;
+
         public ArenaTestGameManager(LoadResult loadedGameResult) : base(loadedGameResult)
         {
+            
             harmony.PatchAll();
         }
 
         public void StartGame()
         {
-            NetworkConfiguration config = new NetworkConfiguration();
+            ContainerBuilder builder = new ContainerBuilder();
 
-            _client = new LiteNetP2PClient(config);
+            builder.RegisterModule<MissionModule>();
+
+            _container = builder.Build();
+
+            _client = _container.Resolve<LiteNetP2PClient>();
 
             if (_client.ConnectToP2PServer())
             {
@@ -87,6 +95,8 @@ namespace Missions.Services.Arena
 
         private void StartArenaMission(Location location, int upgradeLevel)
         {
+            
+
             string civilianUpgradeLevelTag = Campaign.Current.Models.LocationModel.GetCivilianUpgradeLevelTag(upgradeLevel);
             Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(location.GetSceneName(upgradeLevel), "", false), (mission) => new MissionBehavior[]
             {
@@ -100,8 +110,10 @@ namespace Missions.Services.Arena
                 new CampaignMissionComponent(),
                 new EquipmentControllerLeaveLogic(),
                 new MissionAgentHandler(location),
-                new CoopMissionNetworkBehavior(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance),
-                new CoopArenaController(MessageBroker.Instance, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance, new RandomEquipmentGenerator()),
+                _container.Resolve<CoopMissionNetworkBehavior>(),
+                _container.Resolve<CoopArenaController>(),
+                //new CoopMissionNetworkBehavior(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance),
+                //new CoopArenaController(MessageBroker.Instance, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance, new RandomEquipmentGenerator()),
                 //ViewCreator.CreateMissionOrderUIHandler(),
             }, true, true);
         }
