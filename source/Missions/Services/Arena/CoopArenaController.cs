@@ -212,11 +212,14 @@ namespace Missions.Services
 
 
             // spawn an instance of the player (controlled by default)
-            SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
+            Agent player = SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            _tempAi = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
+            Agent ai = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
+
+            _agentRegistry.RegisterControlledAgent(Guid.NewGuid(), player);
+            _agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
         }
 
 
@@ -229,7 +232,6 @@ namespace Missions.Services
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
-            Mission mission = Mission.Current;
             agentBuildData = agentBuildData.Team(Mission.Current.PlayerTeam).InitialPosition(frame.origin);
             agentBuildData.NoHorses(true);
 
@@ -242,7 +244,12 @@ namespace Missions.Services
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.Player);
 
-            Agent agent = mission.SpawnAgent(agentBuildData);
+            Agent agent = default;
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                agent = Mission.Current.SpawnAgent(agentBuildData);
+                agent.FadeIn();
+            }, true);
             agent.FadeIn();
 
             return agent;
