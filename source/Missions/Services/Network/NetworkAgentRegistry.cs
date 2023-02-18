@@ -146,7 +146,7 @@ namespace Missions.Services.Network
             {
                 if(_instance == null)
                 {
-                    _instance = new NetworkAgentRegistry(MessageBroker.Instance);
+                    _instance = new NetworkAgentRegistry();
                 }
 
                 return _instance;
@@ -165,16 +165,12 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public IReadOnlyDictionary<NetPeer, AgentGroupController> OtherAgents => _otherAgents;
         private readonly Dictionary<NetPeer, AgentGroupController> _otherAgents = new Dictionary<NetPeer, AgentGroupController>();
-        private readonly IMessageBroker _messageBroker;
-
-        public NetworkAgentRegistry(IMessageBroker messageBroker)
-        {
-            _messageBroker = messageBroker;
-        }
 
         /// <inheritdoc/>
         public bool RegisterControlledAgent(Guid agentId, Agent agent)
         {
+            if (agent == null) return false;
+
             if (_agentToId.ContainsKey(agent)) return false;
             if (_controlledAgents.ContainsKey(agentId)) return false;
 
@@ -187,6 +183,8 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public bool RegisterNetworkControlledAgent(NetPeer peer, Guid agentId, Agent agent)
         {
+            if (agent == null) return false;
+
             if (_otherAgents.TryGetValue(peer, out AgentGroupController controller))
             {
                 if (controller.Contains(agent)) return false;
@@ -253,6 +251,8 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public bool IsControlled(Agent agent)
         {
+            if (agent == null) return false;
+
             if (ControlledAgents.ContainsKey(AgentToId[agent])) { return true; }
             return false;
         }
@@ -267,6 +267,8 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public bool IsAgentRegistered(Agent agent)
         {
+            if (agent == null) return false;
+
             return AgentToId.ContainsKey(agent);
         }
 
@@ -286,6 +288,9 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public bool TryGetAgentId(Agent agent, out Guid guid)
         {
+            guid = default;
+            if (agent == null) return false;
+
             if (AgentToId.TryGetValue(agent, out Guid agentId))
             {
                 guid = agentId;
@@ -333,7 +338,7 @@ namespace Missions.Services.Network
         /// <inheritdoc/>
         public void Clear()
         {
-            _agentToId.Clear();
+            _controlledAgents.Clear();
             _otherAgents.Clear();
             _agentToId.Clear();
         }

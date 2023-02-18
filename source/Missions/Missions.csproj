@@ -156,9 +156,9 @@
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamageData.cs" />
     <Compile Include="Services\Agents\Messages\AgentDied.cs" />
+    <Compile Include="Services\Agents\Patches\AgentDamagePatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentKilledPatch.cs" />
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
-    <Compile Include="Services\Arena\Patches\ArenaPatches.cs" />
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
     <Compile Include="View\MissionsLoadUI.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />

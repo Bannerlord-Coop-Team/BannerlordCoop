@@ -135,9 +135,11 @@ namespace Missions.Services
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
                 joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
 
-            Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true);
-            _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
-
+            if(joinInfo.IsPlayerAlive)
+            {
+                Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true);
+                _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
+            }
 
             for (int i = 0; i < joinInfo.UnitIdString?.Length; i++)
             {
@@ -159,11 +161,13 @@ namespace Missions.Services
         }
 
         private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static FieldInfo Mission_missiles = typeof(Mission).GetField("_missiles", BindingFlags.NonPublic | BindingFlags.Instance);
         private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
         {
             _agentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
 
             AgentShoot shot = payload.What;
+
             OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { 
                 agentGroupController.ControlledAgents[shot.AgentGuid], 
                 shot.WeaponIndex, 

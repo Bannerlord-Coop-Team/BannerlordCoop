@@ -55,7 +55,7 @@ namespace Missions.Services.Network
             _networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
         }
 
-        public override void AfterStart()
+        public override void OnRenderingStarted()
         {
             string sceneName = Mission.SceneName;
             _client.NatPunch(sceneName);
@@ -87,7 +87,9 @@ namespace Missions.Services.Network
 
             Logger.Debug("Sending join request");
 
-            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, _playerId, Agent.Main.Position, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
+            bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
+            Vec3 position = Agent.Main?.Position ?? default;
+            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, isPlayerAlive, _playerId, position, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
             _networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
