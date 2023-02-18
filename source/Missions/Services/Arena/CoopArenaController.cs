@@ -291,5 +291,11 @@ namespace Missions.Services
             // spawn an instance of the player (controlled by default)
             SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
         }
+
+        protected override void OnEndMission()
+        {
+            base.OnEndMission();
+            _agentRegistry.Clear();
+        }
     }
 }
