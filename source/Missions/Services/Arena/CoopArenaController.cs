@@ -46,9 +46,12 @@ namespace Missions.Services
             _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
-            _gameCharacters = CharacterObject.All.Where(x => !x.IsHero && x.Age > 18).ToArray();
-            _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            _networkMessageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
+            _gameCharacters = CharacterObject.All.Where(x => !x.IsHero && x.Age > 18 
+                && !x.BattleEquipments.Any(y => y.HasWeaponOfClass(WeaponClass.Bow) || y.HasWeaponOfClass(WeaponClass.Dagger) || 
+                y.HasWeaponOfClass(WeaponClass.Crossbow) || y.HasWeaponOfClass(WeaponClass.Javelin) || y.HasWeaponOfClass(WeaponClass.ThrowingAxe)
+                || y.HasWeaponOfClass(WeaponClass.ThrowingKnife))).ToArray(); //Remove all HasWeaponOfClass when bows are needed
+            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
             _networkMessageBroker.Subscribe<AgentDied>(Handler_AgentDeath);
         }
@@ -144,7 +147,7 @@ namespace Missions.Services
             for (int i = 0; i < joinInfo.UnitIdString?.Length; i++)
             {
                 Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
-
+                
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
         }
