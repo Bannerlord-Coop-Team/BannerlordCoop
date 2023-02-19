@@ -24,14 +24,14 @@ namespace IntroductionServerTests
                 // nop
             }
 
-            var delta = new AgentMovement(Vec3.Zero, Vec2.Zero, new AgentEquipmentData(), null, null, Guid.NewGuid());
+            var delta = new AgentMovement(Guid.NewGuid());
 
             var bytes = ProtoBufSerializer.Serialize(delta);
 
             Assert.NotNull(bytes);
             Assert.NotEmpty(bytes);
 
-            var desDelta = ProtoBufSerializer.Deserialize(bytes) as AgentMovement;
+            var desDelta = (AgentMovement)ProtoBufSerializer.Deserialize(bytes);
 
             Assert.Equal(delta, desDelta);
         }

@@ -206,7 +206,6 @@
     <Compile Include="Services\Network\NetworkSiegeEngine.cs" />
     <Compile Include="Services\Network\Player.cs" />
     <Compile Include="Services\Agents\Packets\AgentActionData.cs" />
-    <Compile Include="Services\Agents\Packets\AgentData.cs" />
     <Compile Include="Services\Agents\Packets\AgentEquipmentData.cs" />
     <Compile Include="Services\Agents\Packets\AgentGroupController.cs" />
     <Compile Include="Services\Agents\Packets\AgentMountData.cs" />

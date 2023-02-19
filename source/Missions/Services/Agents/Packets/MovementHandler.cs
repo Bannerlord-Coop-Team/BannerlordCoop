@@ -133,8 +133,7 @@ namespace Missions.Services.Agents.Packets
                 agent.Position, 
                 agent.GetMovementDirection(),
                 new AgentEquipmentData(agent),
-                new AgentActionData(agent), 
-                new AgentMountData(agent), 
+                agent, 
                 payloadGuid);
 
             _agentMovementDeltas.Add(payloadGuid, delta);
