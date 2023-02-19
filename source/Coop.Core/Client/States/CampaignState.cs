@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
-using Coop.Core.Server.Connections.Messages.Outgoing;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Time.Messages;
 using System;
@@ -81,6 +80,10 @@ namespace Coop.Core.Client.States
         }
 
         public override void ResolveNetworkGuids()
+        {
+        }
+
+        public override void ValidateModules()
         {
         }
     }

@@ -1,7 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using Coop.Core.Server.Connections.Messages.Incoming;
-using Coop.Core.Server.Connections.Messages.Outgoing;
+using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Heroes.Handlers;
 using GameInterface.Services.Heroes.Interfaces;
 using LiteNetLib;
@@ -14,8 +13,6 @@ namespace Coop.Core.Server.Connections.States
     public class CreateCharacterState : ConnectionStateBase
     {
         private readonly ILogger Logger = LogManager.GetLogger<CreateCharacterState>();
-
-        private Guid HeroRegistrationTransactionId;
 
         public CreateCharacterState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
@@ -32,22 +29,22 @@ namespace Coop.Core.Server.Connections.States
 
         private void PlayerTransferedHeroHandler(MessagePayload<NetworkTransferedHero> obj)
         {
-            var playerId = obj.Who as NetPeer;
+            var peerId = ((NetPeer)obj.Who).Id;
             
-            if(playerId == ConnectionLogic.PlayerId)
+            if(peerId == ConnectionLogic.PlayerId.Id)
             {
-                HeroRegistrationTransactionId = Guid.NewGuid();
-                var registerCommand = new RegisterNewPlayerHero(HeroRegistrationTransactionId, obj.What.PlayerHero);
+                var registerCommand = new RegisterNewPlayerHero(peerId, obj.What.PlayerHero);
                 ConnectionLogic.NetworkMessageBroker.Publish(this, registerCommand);
             }
         }
         private void PlayerHeroRegisteredHandler(MessagePayload<NewPlayerHeroRegistered> obj)
         {
-            var eventId = obj.What.RegistrationEventId;
+            var peerId = obj.What.PeerId;
 
-            if (HeroRegistrationTransactionId == eventId)
+            if (peerId == ConnectionLogic.PlayerId.Id)
             {
-                
+                NetworkPlayerData playerData = new NetworkPlayerData(obj.What);
+                ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(playerData);
 
                 ConnectionLogic.HeroStringId = obj.What.HeroStringId;
                 Logger.Information("Hero StringId: {stringId}", obj.What.HeroStringId);

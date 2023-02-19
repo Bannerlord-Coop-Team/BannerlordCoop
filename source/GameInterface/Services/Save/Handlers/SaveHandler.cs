@@ -21,10 +21,10 @@ namespace GameInterface.Services.Heroes.Handlers
 
         private void Handle(MessagePayload<PackageGameSaveData> obj)
         {
-            var tranferId = obj.What.TransfeId;
+            var peerId = obj.What.PeerId;
             var gameData = saveInterface.SaveCurrentGame();
 
-            var packagedMessage = new GameSaveDataPackaged(tranferId, gameData);
+            var packagedMessage = new GameSaveDataPackaged(peerId, gameData);
             messageBroker.Publish(this, packagedMessage);
         }
     }

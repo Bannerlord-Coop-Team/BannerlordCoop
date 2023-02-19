@@ -2,9 +2,9 @@
 using LiteNetLib;
 using System;
 
-namespace Coop.Core.Server.Connections.Messages.Incoming
+namespace Coop.Core.Server.Connections.Messages
 {
-    public readonly struct PlayerDisconnected : ICommand
+    public readonly struct PlayerDisconnected : IEvent
     {
         public PlayerDisconnected(NetPeer playerId, DisconnectInfo disconnectInfo)
         {

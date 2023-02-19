@@ -1,7 +1,13 @@
 ﻿using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Connections.States;
+using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Modules.Messages;
+using GameInterface.Services.Time.Messages;
+using LiteNetLib.Utils;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
@@ -14,29 +20,72 @@ namespace Coop.Tests.Client.States
         public ValidateModuleStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, MessageBroker);
-            clientLogic.State = new ValidateModuleState(clientLogic, MessageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, NetworkMessageBroker);
+            clientLogic.State = new ValidateModuleState(clientLogic);
         }
 
         [Fact]
-        public void Ctor_Subscribes()
+        public void Dispose_RemovesAllHandlers()
         {
-            var subscriberCount = MessageBroker.GetTotalSubscribers();
-            Assert.Equal(2, subscriberCount);
+            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+
+            clientLogic.State.Dispose();
+
+            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+        }
+
+        [Fact]
+        public void ValidateModuleState_EntryEvents()
+        {
+            // Setup event callbacks
+            var networkClientValidateCount = 0;
+            NetworkMessageBroker.TestNetworkSubscribe<NetworkClientValidate>((payload) =>
+            {
+                networkClientValidateCount += 1;
+            });
+
+            // Trigger state entry
+            clientLogic.State = new ValidateModuleState(clientLogic);
+
+            // All events are called exactly once
+            Assert.Equal(1, networkClientValidateCount);
+        }
+
+        [Fact]
+        public void NetworkClientValidated_Tranitions_ReceivingSavedDataState()
+        {
+            NetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(true, string.Empty));
+
+            Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
+        }
+
+        [Fact]
+        public void NetworkClientValidated_Tranitions_CharacterCreationState()
+        {
+            var startCharacterCreationCount = 0;
+            MessageBroker.Subscribe<StartCharacterCreation>((payload) =>
+            {
+                startCharacterCreationCount += 1;
+            });
+
+            NetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(false, string.Empty));
+
+            Assert.Equal(1, startCharacterCreationCount);
         }
 
         [Fact]
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
-            var isEventPublished = false;
+            var enterMainMenuCount = 0;
             MessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
-                isEventPublished = true;
+                enterMainMenuCount += 1;
             });
 
             clientLogic.EnterMainMenu();
 
-            Assert.True(isEventPublished);
+            // All events are called exactly once
+            Assert.Equal(1, enterMainMenuCount);
         }
 
         [Fact]
@@ -48,25 +97,11 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void LoadSavedData_Publishes_ValidatedModule()
+        public void LoadSavedData_Transitions_ReceivingSavedDataState()
         {
-            var isEventPublished = false;
-            MessageBroker.Subscribe<ValidateModules>((payload) =>
-            {
-                isEventPublished = true;
-            });
-
             clientLogic.LoadSavedData();
 
-            Assert.True(isEventPublished);
-        }
-
-        [Fact]
-        public void ModulesValidated_Transitions_LoadingState()
-        {
-            MessageBroker.Publish(this, new ModulesProcessed());
-
-            Assert.IsType<LoadingState>(clientLogic.State);
+            Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
         [Fact]
@@ -84,12 +119,26 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void Dispose_RemovesAllHandlers()
+        public void StartCharacterCreation_Publishes_StartCharacterCreation()
         {
-            clientLogic.Dispose();
+            var startCharacterCreationCount = 0;
+            MessageBroker.Subscribe<StartCharacterCreation>((payload) =>
+            {
+                startCharacterCreationCount += 1;
+            });
 
-            var subscriberCount = MessageBroker.GetTotalSubscribers();
-            Assert.Equal(0, subscriberCount);
+            clientLogic.StartCharacterCreation();
+
+            // All events are called exactly once
+            Assert.Equal(1, startCharacterCreationCount);
+        }
+
+        [Fact]
+        public void CharacterCreationStarted_Transitions_CharacterCreationState()
+        {
+            MessageBroker.Publish(this, new CharacterCreationStarted());
+
+            Assert.IsType<CharacterCreationState>(clientLogic.State);
         }
 
         [Fact]
@@ -101,19 +150,22 @@ namespace Coop.Tests.Client.States
             clientLogic.Disconnect();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
 
-            clientLogic.ExitGame();
+            clientLogic.EnterCampaignState();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
 
-            clientLogic.LoadSavedData();
+            clientLogic.EnterMissionState();
+            Assert.IsType<ValidateModuleState>(clientLogic.State);
+
+            clientLogic.ExitGame();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
 
             clientLogic.StartCharacterCreation();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
 
-            clientLogic.EnterCampaignState();
+            clientLogic.ResolveNetworkGuids();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
 
-            clientLogic.EnterMissionState();
+            clientLogic.ValidateModules();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
         }
     }

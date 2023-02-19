@@ -14,54 +14,37 @@ namespace Coop.Core.Client.States
             Logic = logic;
         }
 
-        /// <summary>
-        /// Unsubscribe all event listeners on a given state controller
-        /// </summary>
+        /// <inheritdoc/>
         public abstract void Dispose();
 
-        /// <summary>
-        /// Connect to Coop Server
-        /// </summary>
+        /// <inheritdoc/>
         public abstract void Connect();
 
-        /// <summary>
-        /// Disconnect from Coop Server
-        /// </summary>
+        /// <inheritdoc/>
         public abstract void Disconnect();
 
-        /// <summary>
-        /// Begin character creation for Coop Server
-        /// </summary>
+        /// <inheritdoc/>
         public abstract void StartCharacterCreation();
 
-        /// <summary>
-        /// Load Data before entering Coop Server
-        /// </summary>
+        /// <inheritdoc/>
         public abstract void LoadSavedData();
 
-        /// <summary>
-        /// Ensure data alignment before Entering Coop Server
-        /// </summary>
+        /// <inheritdoc/>
         public abstract void ResolveNetworkGuids();
 
-        /// <summary>
-        /// Exit Bannerlord
-        /// </summary>
+        /// <inheritdoc/>
         public abstract void ExitGame();
 
-        /// <summary>
-        /// Enter Bannerlord's main menu
-        /// </summary>
+        /// <inheritdoc/>
         public abstract void EnterMainMenu();
 
-        /// <summary>
-        /// Join coop server campaign map
-        /// </summary>
+        /// <inheritdoc/>
         public abstract void EnterCampaignState();
 
-        /// <summary>
-        /// Join p2p mission (battle) instance
-        /// </summary>
+        /// <inheritdoc/>
         public abstract void EnterMissionState();
+
+        /// <inheritdoc/>
+        public abstract void ValidateModules();
     }
 }

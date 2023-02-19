@@ -14,15 +14,18 @@ namespace Coop.Tests.Client.States
         public CampaignStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, MessageBroker);
-            clientLogic.State = new CampaignState(clientLogic, MessageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, NetworkMessageBroker);
+            clientLogic.State = new CampaignState(clientLogic);
         }
 
         [Fact]
-        public void Ctor_Subscribes()
+        public void Dispose_RemovesAllHandlers()
         {
-            var subscriberCount = MessageBroker.GetTotalSubscribers();
-            Assert.Equal(2, subscriberCount);
+            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+
+            clientLogic.State.Dispose();
+
+            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
@@ -81,15 +84,6 @@ namespace Coop.Tests.Client.States
             clientLogic.Disconnect();
 
             Assert.True(isEventPublished);
-        }
-
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            clientLogic.Dispose();
-
-            var subscriberCount = MessageBroker.GetTotalSubscribers();
-            Assert.Equal(0, subscriberCount);
         }
 
         [Fact]

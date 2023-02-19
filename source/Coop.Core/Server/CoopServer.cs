@@ -4,7 +4,7 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Communication.Network;
 using Coop.Core.Server.Connections;
-using Coop.Core.Server.Connections.Messages.Incoming;
+using Coop.Core.Server.Connections.Messages;
 using LiteNetLib;
 using System;
 using System.Net;
@@ -20,8 +20,6 @@ namespace Coop.Core.Server
     {
         public override int Priority => 0;
 
-        public override INetworkConfiguration Configuration { get; }
-
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
         private readonly IClientRegistry clientOrchestrator;
@@ -31,10 +29,9 @@ namespace Coop.Core.Server
             INetworkConfiguration configuration, 
             IMessageBroker messageBroker,
             IPacketManager packetManager,
-            IClientRegistry clientOrchestrator)
+            IClientRegistry clientOrchestrator) : base(configuration)
         {
             // Dependancy assignment
-            Configuration = configuration;
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
             this.clientOrchestrator = clientOrchestrator;

@@ -4,7 +4,7 @@ using LiteNetLib;
 using ProtoBuf;
 using System;
 
-namespace Coop.Core.Server.Connections.Messages.Incoming
+namespace Coop.Core.Server.Connections.Messages
 {
     [ProtoContract(SkipConstructor = true)]
     public readonly struct NetworkTransferedHero : INetworkEvent

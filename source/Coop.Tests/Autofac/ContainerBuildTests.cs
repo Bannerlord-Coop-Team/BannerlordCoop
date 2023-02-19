@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.LogicStates;
+using Common.Network;
 using Coop.Core;
 using Coop.Core.Client;
 using Coop.Core.Server;
@@ -19,7 +20,7 @@ namespace Coop.Tests.Autofac
 
             Assert.NotNull(container);
 
-            var client = container.Resolve<ICoopNetwork>();
+            var client = container.Resolve<INetwork>();
             Assert.NotNull(client);
 
             var logic = container.Resolve<ILogic>();
@@ -36,7 +37,7 @@ namespace Coop.Tests.Autofac
 
             Assert.NotNull(container);
 
-            var server = container.Resolve<ICoopNetwork>();
+            var server = container.Resolve<INetwork>();
             Assert.NotNull(server);
 
             var logic = container.Resolve<ILogic>();

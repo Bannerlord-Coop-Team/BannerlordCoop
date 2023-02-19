@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
-using Coop.Core.Server.Connections.Messages.Incoming;
+using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.Time.Messages;
 using LiteNetLib;
+using System.Data;
 
 namespace Coop.Core.Server.Connections.States
 {
@@ -9,22 +11,22 @@ namespace Coop.Core.Server.Connections.States
         public LoadingState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
         {
-            ConnectionLogic.NetworkMessageBroker.Subscribe<PlayerTransitionedToCampaign>(PlayerTransitionsCampaignHandler);
+            ConnectionLogic.NetworkMessageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
         }
 
         public override void Dispose()
         {
-            ConnectionLogic.NetworkMessageBroker.Unsubscribe<PlayerTransitionedToCampaign>(PlayerTransitionsCampaignHandler);
+            ConnectionLogic.NetworkMessageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
         }
 
-        // TODO send message from client
-        private void PlayerTransitionsCampaignHandler(MessagePayload<PlayerTransitionedToCampaign> obj)
+        private void PlayerCampaignEnteredHandler(MessagePayload<NetworkPlayerCampaignEntered> obj)
         {
             var playerId = (NetPeer)obj.Who;
 
             if (playerId == ConnectionLogic.PlayerId)
             {
                 ConnectionLogic.EnterCampaign();
+                ConnectionLogic.NetworkMessageBroker.Publish(this, new PlayerCampaignEntered());
             }
         }
 

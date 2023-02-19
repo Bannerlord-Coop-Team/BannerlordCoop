@@ -1,9 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
-using Coop.Core.Server.Connections.Messages.Incoming;
 using Coop.Core.Server.Connections.States;
-using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Time.Messages;
 using LiteNetLib;
 using System;
@@ -15,7 +13,7 @@ namespace Coop.Core.Server.Connections
     /// <summary>
     /// Handle Client connection state as it pertains to loading in a given player
     /// </summary>
-    public interface IClientRegistry
+    public interface IClientRegistry : IDisposable
     {
     }
 
@@ -31,16 +29,14 @@ namespace Coop.Core.Server.Connections
             _messageBroker = messageBroker;
             _messageBroker.Subscribe<PlayerConnected>(PlayerJoiningHandler);
             _messageBroker.Subscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
-            _messageBroker.Subscribe<PlayerTransitionedToCampaign>(PlayerTransitionsCampaignHandler);
-            _messageBroker.Subscribe<PlayerTransitionedToMission>(PlayerTransitionsMissionHandler);
+            _messageBroker.Subscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
         }
 
-        ~ClientRegistry()
+        public void Dispose()
         {
             _messageBroker.Unsubscribe<PlayerConnected>(PlayerJoiningHandler);
             _messageBroker.Unsubscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
-            _messageBroker.Unsubscribe<PlayerTransitionedToCampaign>(PlayerTransitionsCampaignHandler);
-            _messageBroker.Unsubscribe<PlayerTransitionedToMission>(PlayerTransitionsMissionHandler);
+            _messageBroker.Unsubscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
         }
 
         private void PlayerJoiningHandler(MessagePayload<PlayerConnected> obj)
@@ -61,32 +57,17 @@ namespace Coop.Core.Server.Connections
             }
         }
 
-        private void PlayerTransitionsCampaignHandler(MessagePayload<PlayerTransitionedToCampaign> obj)
+        private void PlayerCampaignEnteredHandler(MessagePayload<PlayerCampaignEntered> obj)
         {
-            var playerId = (NetPeer)obj.Who;
-            if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
-                return;
-
-            connectionLogic.EnterCampaign();
-
             EnableTimeControls();
-        }
-
-        private void PlayerTransitionsMissionHandler(MessagePayload<PlayerTransitionedToMission> obj)
-        {
-            var playerId = (NetPeer)obj.Who;
-            if (!ConnectionStates.TryGetValue(playerId, out IConnectionLogic connectionLogic))
-                return;
-
-            connectionLogic.EnterMission();
         }
 
         private void EnableTimeControls()
         {
             // Only re-enable if all connections are finished loading
-            if (ConnectionStates.Any(state => state.Value is LoadingState)) return;
+            if (ConnectionStates.Any(state => state.Value.State is LoadingState)) return;
 
-            _messageBroker.Publish(this, new NetworkEnableTimeControls());
+            _messageBroker.PublishNetworkEvent(new NetworkEnableTimeControls());
             _messageBroker.Publish(this, new EnableGameTimeControls());
         }
     }

@@ -112,10 +112,10 @@
     <Compile Include="Communication\CommunicatorMessageBrokerTest.cs" />
     <Compile Include="Communication\PacketManagerTest.cs" />
     <Compile Include="CoopTest.cs" />
+    <Compile Include="Extensions\NetPeerExtensions.cs" />
     <Compile Include="NetworkMessageBrokerStub.cs" />
     <Compile Include="Server\Connections\States\CampaignStateTests.cs" />
-    <Compile Include="Server\Connections\States\ClientStateOrchestratorTests.cs" />
-    <Compile Include="Server\Connections\States\InitialConnectionStateTests.cs" />
+    <Compile Include="Server\Connections\States\ClientRegistryTests.cs" />
     <Compile Include="Server\Connections\States\TransferCharacterStateTests.cs" />
     <Compile Include="Server\Connections\States\CreateCharacterStateTests.cs" />
     <Compile Include="Server\Connections\States\ResolveCharacterStateTests.cs" />

@@ -30,7 +30,7 @@ namespace Coop.Core.Server.Connections
             set
             {
                 Logger.Debug("Connection is changing to {state} State", value.GetType().Name);
-
+                _state?.Dispose();
                 _state = value;
             }
         }        

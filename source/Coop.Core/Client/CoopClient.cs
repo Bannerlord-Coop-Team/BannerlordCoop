@@ -29,17 +29,14 @@ namespace Coop.Core.Client
         private readonly IPacketManager packetManager;
         private readonly NetManager netManager;
 
-        public override INetworkConfiguration Configuration { get; }
-
         private bool isConnected = false;
         private NetPeer serverPeer;
 
         public CoopClient(
             INetworkConfiguration config,
             IMessageBroker messageBroker,
-            IPacketManager packetManager)
+            IPacketManager packetManager) : base(config)
         {
-            Configuration = config;
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
 
@@ -84,8 +81,7 @@ namespace Coop.Core.Client
             {
                 isConnected = true;
 
-                // TODO update NetworkConnected to be a INetworkEvent
-                messageBroker.Publish(this, new NetworkConnected(false));
+                messageBroker.Publish(this, new NetworkConnected());
             }
         }
 

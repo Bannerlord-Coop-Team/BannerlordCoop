@@ -8,29 +8,28 @@ namespace GameInterface.Services.Heroes.Interfaces
 {
     public readonly struct RegisterNewPlayerHero : ICommand
     {
-        // TODO change to peer id
-        public Guid RegistrationEventId { get; }
+        public int PeerId { get; }
 
         public byte[] Bytes { get; }
-        public RegisterNewPlayerHero(Guid registrationId, byte[] bytes)
+        public RegisterNewPlayerHero(int peerId, byte[] bytes)
         {
-            RegistrationEventId = registrationId;
+            PeerId = peerId;
             Bytes = bytes;
         }
     }
 
     public readonly struct NewPlayerHeroRegistered : IEvent
     {
-        public Guid RegistrationEventId { get; }
+        public int PeerId { get; }
 
         public string HeroStringId { get; }
         public string PartyStringId { get; }
         public string CharacterObjectStringId { get; }
         public string ClanStringId { get; }
 
-        public NewPlayerHeroRegistered(Guid registrationId, Hero hero)
+        public NewPlayerHeroRegistered(int peerId, Hero hero)
         {
-            RegistrationEventId = registrationId;
+            PeerId = peerId;
             HeroStringId = hero.StringId;
             PartyStringId = hero.PartyBelongedTo.StringId;
             CharacterObjectStringId = hero.CharacterObject.StringId;

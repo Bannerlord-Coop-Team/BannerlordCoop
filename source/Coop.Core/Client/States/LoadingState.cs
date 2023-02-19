@@ -63,5 +63,9 @@ namespace Coop.Core.Client.States
         public override void EnterMissionState()
         {
         }
+
+        public override void ValidateModules()
+        {
+        }
     }
 }

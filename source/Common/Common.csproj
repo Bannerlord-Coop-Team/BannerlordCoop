@@ -89,6 +89,7 @@
     <Compile Include="Messaging\ICommand.cs" />
     <Compile Include="Messaging\IEvent.cs" />
     <Compile Include="Messaging\IHandler.cs" />
+    <Compile Include="Messaging\IInternalMessage.cs" />
     <Compile Include="Messaging\INetworkEvent.cs" />
     <Compile Include="Messaging\MessageBroker.cs" />
     <Compile Include="Messaging\MessagePayload.cs" />

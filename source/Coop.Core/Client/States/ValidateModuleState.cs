@@ -19,6 +19,7 @@ namespace Coop.Core.Client.States
         public ValidateModuleState(IClientLogic logic) : base(logic)
         {
             Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<CharacterCreationStarted>(Handle);
             Logic.NetworkMessageBroker.Subscribe<NetworkClientValidated>(Handle);
 
             Logic.NetworkMessageBroker.PublishNetworkEvent(new NetworkClientValidate(DebugHeroInterface.Player1_Id));
@@ -27,12 +28,8 @@ namespace Coop.Core.Client.States
         public override void Dispose()
         {
             Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<CharacterCreationStarted>(Handle);
             Logic.NetworkMessageBroker.Unsubscribe<NetworkClientValidated>(Handle);
-        }
-
-        private void Handle(MessagePayload<MainMenuEntered> obj)
-        {
-            Logic.State = new MainMenuState(Logic);
         }
 
         private void Handle(MessagePayload<NetworkClientValidated> obj)
@@ -40,14 +37,11 @@ namespace Coop.Core.Client.States
             if (obj.What.HeroExists)
             {
                 Logic.HeroStringId = obj.What.HeroStringId;
-                Logic.NetworkMessageBroker.Publish(this, new LoadDebugGame());
-                Logic.State = new LoadingState(Logic);
-                //Logic.State = new ReceivingSavedDataState(Logic);
+                Logic.LoadSavedData();
             }
             else
             {
-                Logic.NetworkMessageBroker.Publish(this, new StartCharacterCreation());
-                Logic.State = new CharacterCreationState(Logic);
+                Logic.StartCharacterCreation();   
             }
         }
 
@@ -56,9 +50,18 @@ namespace Coop.Core.Client.States
             Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
+        private void Handle(MessagePayload<MainMenuEntered> obj)
+        {
+            Logic.State = new MainMenuState(Logic);
+        }
+
         public override void LoadSavedData()
         {
-            Logic.NetworkMessageBroker.Publish(this, new ValidateModules());
+            Logic.NetworkMessageBroker.Publish(this, new LoadDebugGame());
+
+            // TODO reenable debug code
+            //Logic.State = new LoadingState(Logic);
+            Logic.State = new ReceivingSavedDataState(Logic);
         }
 
         public override void Connect()
@@ -84,9 +87,19 @@ namespace Coop.Core.Client.States
 
         public override void StartCharacterCreation()
         {
+            Logic.NetworkMessageBroker.Publish(this, new StartCharacterCreation());
+        }
+
+        private void Handle(MessagePayload<CharacterCreationStarted> obj)
+        {
+            Logic.State = new CharacterCreationState(Logic);
         }
 
         public override void ResolveNetworkGuids()
+        {
+        }
+
+        public override void ValidateModules()
         {
         }
     }

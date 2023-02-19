@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
 using Coop.Core.Server.Connections.Messages;
-using Coop.Core.Server.Connections.Messages.Outgoing;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
@@ -40,7 +39,7 @@ namespace Coop.Core.Server.Connections.States
 
         private void ResolveHeroHandler(MessagePayload<HeroResolved> obj)
         {
-            if (obj.What.TransactionId == ConnectionLogic.PlayerId.Id)
+            if (obj.What.PeerId == ConnectionLogic.PlayerId.Id)
             {
                 var validateMessage = new NetworkClientValidated(true, obj.What.HeroStringId);
                 ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(validateMessage);

@@ -10,8 +10,13 @@ namespace Coop.Core.Communication.Network
 {
     public abstract class CoopNetworkBase : INetwork
     {
-        public abstract INetworkConfiguration Configuration { get; }
+        public INetworkConfiguration Configuration { get; }
         public abstract int Priority { get; }
+
+        protected CoopNetworkBase(INetworkConfiguration configuration)
+        {
+            Configuration = configuration;
+        }
 
         public virtual void SendAllBut(NetManager netManager, NetPeer netPeer, IPacket packet)
         {

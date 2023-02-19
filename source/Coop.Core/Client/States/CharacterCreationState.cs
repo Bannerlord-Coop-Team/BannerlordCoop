@@ -1,10 +1,8 @@
 ﻿using Common.Messaging;
-using Coop.Core.Server.Connections.Messages.Incoming;
+using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
-using GameInterface.Services.GameState.Handlers;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
-using System;
 
 namespace Coop.Core.Client.States
 {
@@ -80,6 +78,10 @@ namespace Coop.Core.Client.States
         }
 
         public override void ResolveNetworkGuids()
+        {
+        }
+
+        public override void ValidateModules()
         {
         }
     }

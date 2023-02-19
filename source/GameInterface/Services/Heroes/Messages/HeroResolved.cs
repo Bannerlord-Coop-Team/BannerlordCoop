@@ -5,12 +5,12 @@ namespace GameInterface.Services.Heroes.Messages
 {
     public readonly struct HeroResolved : IEvent
     {
-        public int TransactionId { get; }
+        public int PeerId { get; }
         public string HeroStringId { get; }
 
-        public HeroResolved(int transactionId, string heroStringId)
+        public HeroResolved(int peerId, string heroStringId)
         {
-            TransactionId = transactionId;
+            PeerId = peerId;
             HeroStringId = heroStringId;
         }
     }

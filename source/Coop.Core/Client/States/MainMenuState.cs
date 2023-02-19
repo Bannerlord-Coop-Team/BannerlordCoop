@@ -27,7 +27,7 @@ namespace Coop.Core.Client.States
 
         private void Handle(MessagePayload<NetworkConnected> obj)
         {
-            Logic.State = new ValidateModuleState(Logic);
+            Logic.ValidateModules();
         }
 
         public override void Disconnect()
@@ -61,6 +61,11 @@ namespace Coop.Core.Client.States
 
         public override void ResolveNetworkGuids()
         {
+        }
+
+        public override void ValidateModules()
+        {
+            Logic.State = new ValidateModuleState(Logic);
         }
     }
 }

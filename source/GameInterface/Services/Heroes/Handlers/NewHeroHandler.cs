@@ -40,7 +40,7 @@ namespace GameInterface.Services.Heroes.Handlers
 
         private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
         {
-            var registrationId = obj.What.RegistrationEventId;
+            var registrationId = obj.What.PeerId;
             byte[] bytes = obj.What.Bytes;
 
             try

@@ -66,54 +66,26 @@ namespace Coop.Core.Client
             Disconnect();
         }
 
-        public void Dispose()
-        {
-            State.Dispose();
-        }
+        public void Dispose() => State.Dispose();
 
-        public void Connect()
-        {
-            State.Connect();
-        }
+        public void Connect() => State.Connect();
 
-        public void Disconnect()
-        {
-            State.Disconnect();
-        }
+        public void Disconnect() => State.Disconnect();
 
-        public void StartCharacterCreation()
-        {
-            State.StartCharacterCreation();
-        }
+        public void StartCharacterCreation() => State.StartCharacterCreation();
 
-        public void LoadSavedData()
-        {
-            State.LoadSavedData();
-        }
+        public void LoadSavedData() => State.LoadSavedData();
 
-        public void ResolveNetworkGuids()
-        {
-            State.ResolveNetworkGuids();
-        }
+        public void ResolveNetworkGuids() => State.ResolveNetworkGuids();
 
-        public void ExitGame()
-        {
-            State.ExitGame();
-        }
+        public void ExitGame() => State.ExitGame();
 
-        public void EnterMainMenu()
-        {
-            State.EnterMainMenu();
-        }
+        public void EnterMainMenu() => State.EnterMainMenu();
 
-        public void EnterCampaignState()
-        {
-            State.EnterCampaignState();
-        }
+        public void EnterCampaignState() => State.EnterCampaignState();
 
-        public void EnterMissionState()
-        {
-            State.EnterMissionState();
-        }
+        public void EnterMissionState() => State.EnterMissionState();
+
+        public void ValidateModules() => State.ValidateModules();
     }
 }
