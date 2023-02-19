@@ -20,7 +20,7 @@ namespace IntroductionServerTests
             RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
 
             var character = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
-            NetworkMissionJoinInfo missionJoinInfo = new NetworkMissionJoinInfo(character, default(Guid), default(Vec3), default(Guid[]), default(Vec3[]), Array.Empty<string>());
+            NetworkMissionJoinInfo missionJoinInfo = new NetworkMissionJoinInfo(character, false, default(Guid), default(Vec3), default(Guid[]), default(Vec3[]), Array.Empty<string>());
             EventPacket eventPacket = new EventPacket(missionJoinInfo);
             byte[] bytes = ProtoBufSerializer.Serialize(eventPacket);
 
