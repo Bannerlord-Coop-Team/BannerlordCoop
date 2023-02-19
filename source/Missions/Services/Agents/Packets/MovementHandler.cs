@@ -185,8 +185,11 @@ namespace Missions.Services.Agents.Packets
 
                     GameLoopRunner.RunOnMainThread(() =>
                     {
-                        agent.MakeDead(false, ActionIndexCache.act_none);
-                        agent.FadeOut(false, true);
+                        if(agent.Health > 0)
+                        {
+                            agent.MakeDead(false, ActionIndexCache.act_none);
+                            agent.FadeOut(false, true);
+                        }
                     });
 
                     _agentMovementDeltas.Remove(guid);

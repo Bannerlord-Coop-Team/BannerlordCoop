@@ -28,16 +28,9 @@ namespace ServerConsole
 				.ForContext<Program>();
 			try
             {
-                Logger.Verbose("Building Network Configuration");
-                var configurationBuilder = new ConfigurationBuilder()
-                    .SetBasePath(Directory.GetCurrentDirectory())
-                    .AddJsonFile("appsettings.json", optional: true)
-                    .AddUserSecrets<Program>();
-    
-                var config = configurationBuilder
-                    .Build()
-                    .Get<NetworkConfiguration>(options => 
-                        options.BindNonPublicProperties = true)!;
+                var config = new NetworkConfiguration();
+
+                Logger.Verbose("Config: {config}", config);
 
                 await using var provider = new ServiceCollection()
                     .AddTransient<MissionTestServer>()

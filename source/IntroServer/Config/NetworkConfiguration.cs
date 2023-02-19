@@ -18,7 +18,7 @@ namespace IntroServer.Config
         /// </summary>
         public int LanPort { get; } = 4201;
 
-        private string WanAddressText { get; set; }
+        private string WanAddressText { get; set; } = "144.202.53.18";
         /// <summary>
         ///     ip address of the server in WAN.
         /// </summary>
