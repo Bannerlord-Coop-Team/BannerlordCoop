@@ -6,6 +6,7 @@ using ProtoBuf;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Messages
 {
@@ -36,7 +37,10 @@ namespace Missions.Messages
         [ProtoMember(6)]
         public readonly string[] UnitIdString;
 
-        public NetworkMissionJoinInfo(CharacterObject characterObject, Guid playerId, Vec3 startingPosition, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString)
+        [ProtoMember(7)]
+        public readonly bool IsPlayerAlive;
+
+        public NetworkMissionJoinInfo(CharacterObject characterObject, bool isPlayerAlive, Guid playerId, Vec3 startingPosition, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString)
         {
             PlayerId = playerId;
             StartingPosition = startingPosition;
@@ -44,6 +48,7 @@ namespace Missions.Messages
             UnitId = unitId;
             UnitStartingPosition = unitStartingPosition;
             UnitIdString = unitIdString;
+            IsPlayerAlive = isPlayerAlive;
         }
 
         private byte[] PackCharacter(CharacterObject characterObject)

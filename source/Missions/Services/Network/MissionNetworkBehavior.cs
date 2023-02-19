@@ -60,24 +60,10 @@ namespace Missions.Services.Network
             _networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
         }
 
-        public override void AfterStart()
+        public override void OnRenderingStarted()
         {
             string sceneName = Mission.SceneName;
             _client.NatPunch(sceneName);
-
-            //// TODO find way to make this not a task
-            //Task.Factory.StartNew(async () =>
-            //{
-            //    while (Mission == null || Mission.IsLoadingFinished == false)
-            //    {
-            //        await Task.Delay(100);
-            //    }
-
-            //    string sceneName = Mission.SceneName;
-            //    _client.NatPunch(sceneName);
-
-            //    await Task.Delay(WaitForConnectionsTime);
-            //});
         }
 
         private void Handle_PeerConnected(MessagePayload<PeerConnected> payload)
@@ -93,18 +79,22 @@ namespace Missions.Services.Network
             List<Vec3> unitPositions = new List<Vec3>();
             List<string> unitIdStrings = new List<string>();
             List<Guid> guids = new List<Guid>();
-            foreach (Agent agent in Agent.Main.Team.TeamAgents.Where(agent => agent != Agent.Main))
+            foreach (Guid agentId in _agentRegistry.ControlledAgents.Keys)
             {
-                var newGuid = Guid.NewGuid();
-                _agentRegistry.RegisterControlledAgent(newGuid, agent);
-                guids.Add(newGuid);
+                Agent agent = _agentRegistry.ControlledAgents[agentId];
+
+                if (agent == Agent.Main) continue;
+
+                guids.Add(agentId);
                 unitPositions.Add(agent.Position);
                 unitIdStrings.Add(agent.Character.StringId);
             }
 
             Logger.Debug("Sending join request");
 
-            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, _playerId, Agent.Main.Position, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
+            bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
+            Vec3 position = Agent.Main?.Position ?? default;
+            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, isPlayerAlive, _playerId, position, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
             _networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",

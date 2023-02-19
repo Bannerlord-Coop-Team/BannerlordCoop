@@ -6,6 +6,7 @@ using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
+using Missions.Services.Agents.Patches;
 using Missions.Services.Arena;
 using Missions.Services.Network;
 using Serilog;
@@ -30,40 +31,44 @@ namespace Missions.Services
 
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly IMessageBroker _messageBroker;
         private readonly INetworkMessageBroker _networkMessageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
 
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
-        private CharacterObject[] _gameCharacters;
+        private readonly CharacterObject[] _gameCharacters;
 
         public CoopArenaController(
-            IMessageBroker messageBroker,
             INetworkMessageBroker networkMessageBroker,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator)
         {
-            _messageBroker = messageBroker;
             _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
+            _gameCharacters = CharacterObject.All.Where(x => !x.IsHero && x.Age > 18 
+                && !x.BattleEquipments.Any(y => y.HasWeaponOfClass(WeaponClass.Bow) || y.HasWeaponOfClass(WeaponClass.Dagger) || 
+                y.HasWeaponOfClass(WeaponClass.Crossbow) || y.HasWeaponOfClass(WeaponClass.Javelin) || y.HasWeaponOfClass(WeaponClass.ThrowingAxe)
+                || y.HasWeaponOfClass(WeaponClass.ThrowingKnife))).ToArray(); //Remove all HasWeaponOfClass when bows are needed
             messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             messageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
+            _networkMessageBroker.Subscribe<AgentDied>(Handler_AgentDeath);
         }
+
+        
 
         ~CoopArenaController()
         {
-            _messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            _networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            _networkMessageBroker.Unsubscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Unsubscribe<AgentShoot>(Handle_AgentShoot);
+            _networkMessageBroker.Unsubscribe<AgentDied>(Handler_AgentDeath);
         }
 
         public override void AfterStart()
         {
-            _gameCharacters = CharacterObject.All?.Where(x => !x.IsHero && x.Age > 18).ToArray();
             AddPlayerToArena();
-
         }
 
 
@@ -115,7 +120,7 @@ namespace Missions.Services
             GameLoopRunner.RunOnMainThread(() =>
             {
                 // register a blow on the effected agent
-                effectedAgent.RegisterBlow(b, collisionData);
+                effectedAgent?.RegisterBlow(b, collisionData);
             });            
         }
 
@@ -133,14 +138,16 @@ namespace Missions.Services
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
                 joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
 
-            Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true);
-            _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
-
+            if(joinInfo.IsPlayerAlive)
+            {
+                Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true);
+                _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
+            }
 
             for (int i = 0; i < joinInfo.UnitIdString?.Length; i++)
             {
                 Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
-
+                
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
         }
@@ -157,11 +164,13 @@ namespace Missions.Services
         }
 
         private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static FieldInfo Mission_missiles = typeof(Mission).GetField("_missiles", BindingFlags.NonPublic | BindingFlags.Instance);
         private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
         {
             _agentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
 
             AgentShoot shot = payload.What;
+
             OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { 
                 agentGroupController.ControlledAgents[shot.AgentGuid], 
                 shot.WeaponIndex, 
@@ -171,6 +180,17 @@ namespace Missions.Services
                 shot.HasRigidBody, 
                 true, 
                 shot.ForcedMissileIndex });
+        }
+
+        private void Handler_AgentDeath(MessagePayload<AgentDied> obj)
+        {
+            Agent agent = obj.What.Agent;
+            if(_agentRegistry.TryGetAgentId(agent, out Guid agentId))
+            {
+                _agentRegistry.RemoveControlledAgent(agentId);
+                _agentRegistry.RemoveNetworkControlledAgent(agentId);
+            }
+            
         }
 
         public void AddPlayerToArena()
@@ -199,11 +219,13 @@ namespace Missions.Services
 
 
             // spawn an instance of the player (controlled by default)
-            SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
+            Agent player = SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
+            Agent ai = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
+
+            _agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
         }
 
 
@@ -216,7 +238,6 @@ namespace Missions.Services
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
-            Mission mission = Mission.Current;
             agentBuildData = agentBuildData.Team(Mission.Current.PlayerTeam).InitialPosition(frame.origin);
             agentBuildData.NoHorses(true);
 
@@ -229,7 +250,12 @@ namespace Missions.Services
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.Player);
 
-            Agent agent = mission.SpawnAgent(agentBuildData);
+            Agent agent = default;
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                agent = Mission.Current.SpawnAgent(agentBuildData);
+                agent.FadeIn();
+            }, true);
             agent.FadeIn();
 
             return agent;
@@ -290,6 +316,12 @@ namespace Missions.Services
 
             // spawn an instance of the player (controlled by default)
             SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
+        }
+
+        protected override void OnEndMission()
+        {
+            base.OnEndMission();
+            _agentRegistry.Clear();
         }
     }
 }
