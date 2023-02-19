@@ -29,28 +29,6 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void EnterMainMenu_Publishes_EnterMainMenuEvent()
-        {
-            var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
-
-            clientLogic.EnterMainMenu();
-
-            Assert.True(isEventPublished);
-        }
-
-        [Fact]
-        public void EnterMainMenu_Transitions_MainMenuState()
-        {
-            MessageBroker.Publish(this, new MainMenuEntered());
-
-            Assert.IsType<MainMenuState>(clientLogic.State);
-        }
-
-        [Fact]
         public void EnterCampaignState_Transitions_CampaignState()
         {
             MessageBroker.Publish(this, new CampaignStateEntered());
@@ -70,6 +48,28 @@ namespace Coop.Tests.Client.States
             clientLogic.EnterCampaignState();
 
             Assert.True(isEventPublished);
+        }
+
+        [Fact]
+        public void EnterMainMenu_Publishes_EnterMainMenuEvent()
+        {
+            var isEventPublished = false;
+            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            {
+                isEventPublished = true;
+            });
+
+            clientLogic.EnterMainMenu();
+
+            Assert.True(isEventPublished);
+        }
+
+        [Fact]
+        public void EnterMainMenu_Transitions_MainMenuState()
+        {
+            MessageBroker.Publish(this, new MainMenuEntered());
+
+            Assert.IsType<MainMenuState>(clientLogic.State);
         }
 
         [Fact]
@@ -95,6 +95,9 @@ namespace Coop.Tests.Client.States
             clientLogic.Disconnect();
             Assert.IsType<MissionState>(clientLogic.State);
 
+            clientLogic.EnterMainMenu();
+            Assert.IsType<MissionState>(clientLogic.State);
+
             clientLogic.ExitGame();
             Assert.IsType<MissionState>(clientLogic.State);
 
@@ -105,6 +108,12 @@ namespace Coop.Tests.Client.States
             Assert.IsType<MissionState>(clientLogic.State);
 
             clientLogic.EnterCampaignState();
+            Assert.IsType<MissionState>(clientLogic.State);
+
+            clientLogic.ResolveNetworkGuids();
+            Assert.IsType<MissionState>(clientLogic.State);
+
+            clientLogic.ValidateModules();
             Assert.IsType<MissionState>(clientLogic.State);
         }
     }

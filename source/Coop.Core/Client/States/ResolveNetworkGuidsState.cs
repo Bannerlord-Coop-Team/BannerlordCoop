@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Modules.Messages;
+using System;
 
 namespace Coop.Core.Client.States
 {
@@ -10,40 +12,36 @@ namespace Coop.Core.Client.States
     {
         public ResolveNetworkGuidsState(IClientLogic logic) : base(logic)
         {
-            Logic.NetworkMessageBroker.Publish(this, new ResolveNetworkGuids());
-
             Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
-            Logic.NetworkMessageBroker.Subscribe<CampaignStateEntered>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<NetworkGuidsResolved>(Handle);
 
-            // TODO implement and remove state skip
-            Dispose();
-            Logic.State = new CampaignState(logic);
+            Logic.NetworkMessageBroker.Publish(this, new ResolveNetworkGuids());
         }
 
         public override void Dispose()
         {
             Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            Logic.NetworkMessageBroker.Unsubscribe<CampaignStateEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<NetworkGuidsResolved>(Handle);
         }
 
-        private void Handle(MessagePayload<MainMenuEntered> obj)
+        private void Handle(MessagePayload<NetworkGuidsResolved> obj)
         {
-            Logic.State = new MainMenuState(Logic);
-        }
-
-        private void Handle(MessagePayload<CampaignStateEntered> obj)
-        {
-            Logic.State = new CampaignState(Logic);
+            Logic.EnterCampaignState();
         }
 
         public override void EnterCampaignState()
         {
-            Logic.NetworkMessageBroker.Publish(this, new EnterCampaignState());
+            Logic.State = new CampaignState(Logic);
         }
 
         public override void EnterMainMenu()
         {
             Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+        }
+
+        private void Handle(MessagePayload<MainMenuEntered> obj)
+        {
+            Logic.State = new MainMenuState(Logic);
         }
 
         public override void Connect()

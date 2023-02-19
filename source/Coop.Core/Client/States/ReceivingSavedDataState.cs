@@ -33,6 +33,7 @@ namespace Coop.Core.Client.States
         private void Handle(MessagePayload<MainMenuEntered> obj)
         {
             if (saveData == null) return;
+            if (saveData.Length == 0) return;
 
             var commandLoad = new LoadGameSave(saveData);
             Logic.NetworkMessageBroker.Publish(this, commandLoad);
@@ -52,6 +53,7 @@ namespace Coop.Core.Client.States
         public override void Disconnect()
         {
             Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+            Logic.State = new MainMenuState(Logic);
         }
 
         public override void ExitGame()

@@ -13,21 +13,28 @@ namespace Coop.Core.Client.States
         public LoadingState(IClientLogic logic) : base(logic)
         {
             Logic.NetworkMessageBroker.Subscribe<GameLoaded>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
         }
 
         public override void Dispose()
         {
             Logic.NetworkMessageBroker.Unsubscribe<GameLoaded>(Handle);
-        }
-
-        private void Handle(MessagePayload<GameLoaded> obj)
-        {
-            Logic.ResolveNetworkGuids();
+            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
         }
 
         public override void EnterMainMenu()
         {
             Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+        }
+
+        private void Handle(MessagePayload<MainMenuEntered> obj)
+        {
+            Logic.State = new MainMenuState(Logic);
+        }
+
+        private void Handle(MessagePayload<GameLoaded> obj)
+        {
+            Logic.ResolveNetworkGuids();
         }
 
         public override void ResolveNetworkGuids()

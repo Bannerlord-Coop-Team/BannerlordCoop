@@ -31,9 +31,9 @@ namespace GameInterface.Services.GameDebug.Interfaces
         }
 
         private static readonly PropertyInfo FileDriver_SavePath = typeof(FileDriver).GetProperty("SavePath", BindingFlags.NonPublic | BindingFlags.Static);
-        private static readonly PlatformDirectoryPath SaveDir = (PlatformDirectoryPath)FileDriver_SavePath.GetValue(null);
+        private static readonly PlatformDirectoryPath SaveDir = (PlatformDirectoryPath)FileDriver_SavePath?.GetValue(null);
         private static readonly PlatformFilePath SavePath = new PlatformFilePath(SaveDir, $"{LOAD_GAME}.sav");
-        private static readonly string FullSavePath = TaleWorlds.Library.Common.PlatformFileHelper.GetFileFullPath(SavePath);
+        private static readonly string FullSavePath = TaleWorlds.Library.Common.PlatformFileHelper?.GetFileFullPath(SavePath);
         private void InternalLoadDebugGame()
         {
             Logger.Information("Downloading save file to: {savePath}", FullSavePath);

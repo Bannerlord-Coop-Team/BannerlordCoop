@@ -1,7 +1,9 @@
 ﻿using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Messages;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
@@ -29,6 +31,44 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
+        public void HeroPackaged_Publishes_NetworkTransferedHero()
+        {
+            var networkTransferedHeroCount = 0;
+            NetworkMessageBroker.TestNetworkSubscribe<NetworkTransferedHero>((payload) =>
+            {
+                networkTransferedHeroCount += 1;
+            });
+
+            NetworkMessageBroker.Publish(this, new NewHeroPackaged());
+
+            Assert.Equal(1, networkTransferedHeroCount);
+        }
+
+        [Fact]
+        public void HeroPackaged_Transitions_ReceivingSavedDataState()
+        {
+            NetworkMessageBroker.Publish(this, new NewHeroPackaged());
+
+            clientLogic.EnterMainMenu();
+
+            Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
+        }
+
+        [Fact]
+        public void CharacterCreationFinished_Publishes_PackageMainHero()
+        {
+            var packageMainHeroCount = 0;
+            NetworkMessageBroker.Subscribe<PackageMainHero>((payload) =>
+            {
+                packageMainHeroCount += 1;
+            });
+
+            NetworkMessageBroker.Publish(this, new CharacterCreationFinished());
+
+            Assert.Equal(1, packageMainHeroCount);
+        }
+
+        [Fact]
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             var isEventPublished = false;
@@ -51,39 +91,11 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void EnterMainMenu_Transitions_ReceivingSavedDataState()
+        public void LoadSavedData_Transitions_ReceivingSavedDataState()
         {
-            MessageBroker.Publish(this, new CharacterCreationFinished());
+            clientLogic.LoadSavedData();
 
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
-        }
-
-        [Fact]
-        public void EnterMainMenu_Publishes_LoadGameSave()
-        {
-            var isEventPublished = false;
-            MessageBroker.Subscribe<LoadGameSave>((payload) =>
-            {
-                isEventPublished = true;
-            });
-
-            MessageBroker.Publish(this, new CharacterCreationFinished());
-
-            Assert.True(isEventPublished);
-        }
-
-        [Fact]
-        public void Disconnect_Publishes_EnterMainMenu()
-        {
-            var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
-
-            clientLogic.Disconnect();
-
-            Assert.True(isEventPublished);
         }
 
         [Fact]
@@ -98,9 +110,6 @@ namespace Coop.Tests.Client.States
             clientLogic.ExitGame();
             Assert.IsType<CharacterCreationState>(clientLogic.State);
 
-            clientLogic.LoadSavedData();
-            Assert.IsType<CharacterCreationState>(clientLogic.State);
-
             clientLogic.StartCharacterCreation();
             Assert.IsType<CharacterCreationState>(clientLogic.State);
 
@@ -108,6 +117,12 @@ namespace Coop.Tests.Client.States
             Assert.IsType<CharacterCreationState>(clientLogic.State);
 
             clientLogic.EnterMissionState();
+            Assert.IsType<CharacterCreationState>(clientLogic.State);
+
+            clientLogic.ResolveNetworkGuids();
+            Assert.IsType<CharacterCreationState>(clientLogic.State);
+
+            clientLogic.ValidateModules();
             Assert.IsType<CharacterCreationState>(clientLogic.State);
         }
     }

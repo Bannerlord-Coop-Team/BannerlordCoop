@@ -50,17 +50,19 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void ResolveNetworkGuids_Publishes_ResolveNetworkGuids()
+        public void GameLoaded_Transitions_ResolveNetworkGuidsState()
         {
-            var isEventPublished = false;
-            MessageBroker.Subscribe<ResolveNetworkGuids>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            MessageBroker.Publish(this, new GameLoaded());
 
+            Assert.IsType<ResolveNetworkGuidsState>(clientLogic.State);
+        }
+
+        [Fact]
+        public void ResolveNetworkGuids_Transitions_ResolveNetworkGuidsState()
+        {
             clientLogic.ResolveNetworkGuids();
 
-            Assert.True(isEventPublished);
+            Assert.IsType<ResolveNetworkGuidsState>(clientLogic.State);
         }
 
         [Fact]
@@ -75,14 +77,6 @@ namespace Coop.Tests.Client.States
             clientLogic.Disconnect();
 
             Assert.True(isEventPublished);
-        }
-
-        [Fact]
-        public void NetworkGuidsResolved_Transitions_ResolveNetworkGuidsState()
-        {
-            MessageBroker.Publish(this, new NetworkGuidsResolved());
-
-            Assert.IsType<ResolveNetworkGuidsState>(clientLogic.State);
         }
 
         [Fact]
@@ -107,6 +101,9 @@ namespace Coop.Tests.Client.States
             Assert.IsType<LoadingState>(clientLogic.State);
 
             clientLogic.EnterMissionState();
+            Assert.IsType<LoadingState>(clientLogic.State);
+
+            clientLogic.ValidateModules();
             Assert.IsType<LoadingState>(clientLogic.State);
         }
     }

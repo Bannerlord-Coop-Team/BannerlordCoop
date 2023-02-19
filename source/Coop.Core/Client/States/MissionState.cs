@@ -14,16 +14,6 @@ namespace Coop.Core.Client.States
             Logic.NetworkMessageBroker.Subscribe<CampaignStateEntered>(Handle);
         }
 
-        private void Handle(MessagePayload<MainMenuEntered> obj)
-        {
-            Logic.State = new MainMenuState(Logic);
-        }
-
-        private void Handle(MessagePayload<CampaignStateEntered> obj)
-        {
-            Logic.State = new CampaignState(Logic);
-        }
-
         public override void Dispose()
         {
             Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
@@ -35,9 +25,19 @@ namespace Coop.Core.Client.States
             Logic.NetworkMessageBroker.Publish(this, new EnterCampaignState());
         }
 
+        private void Handle(MessagePayload<CampaignStateEntered> obj)
+        {
+            Logic.State = new CampaignState(Logic);
+        }
+
         public override void EnterMainMenu()
         {
             Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+        }
+
+        private void Handle(MessagePayload<MainMenuEntered> obj)
+        {
+            Logic.State = new MainMenuState(Logic);
         }
 
         public override void Connect()

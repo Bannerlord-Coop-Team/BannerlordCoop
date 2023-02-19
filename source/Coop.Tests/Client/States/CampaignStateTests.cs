@@ -1,6 +1,8 @@
 ﻿using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Time.Messages;
 using Moq;
 using Serilog;
 using Xunit;
@@ -29,33 +31,17 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void EnterMainMenu_Publishes_EnterMainMenuEvent()
+        public void NetworkDisableTimeControls_Publishes_PauseAndDisableGameTimeControls()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            MessageBroker.Subscribe<PauseAndDisableGameTimeControls>((payload) =>
             {
                 isEventPublished = true;
             });
 
-            clientLogic.EnterMainMenu();
+            NetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkDisableTimeControls());
 
             Assert.True(isEventPublished);
-        }
-
-        [Fact]
-        public void EnterMainMenu_Transitions_MainMenuState()
-        {
-            MessageBroker.Publish(this, new MainMenuEntered());
-
-            Assert.IsType<MainMenuState>(clientLogic.State);
-        }
-
-        [Fact]
-        public void MissionState_Transitions_MissionState()
-        {
-            MessageBroker.Publish(this, new MissionStateEntered());
-
-            Assert.IsType<MissionState>(clientLogic.State);
         }
 
         [Fact]
@@ -70,6 +56,36 @@ namespace Coop.Tests.Client.States
             clientLogic.EnterMissionState();
 
             Assert.True(isEventPublished);
+        }
+
+        [Fact]
+        public void MissionState_Transitions_MissionState()
+        {
+            MessageBroker.Publish(this, new MissionStateEntered());
+
+            Assert.IsType<MissionState>(clientLogic.State);
+        }
+
+        [Fact]
+        public void EnterMainMenu_Publishes_EnterMainMenuEvent()
+        {
+            var isEventPublished = false;
+            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            {
+                isEventPublished = true;
+            });
+
+            clientLogic.EnterMainMenu();
+
+            Assert.True(isEventPublished);
+        }
+
+        [Fact]
+        public void MainMenuEntered_Transitions_MainMenuState()
+        {
+            MessageBroker.Publish(this, new MainMenuEntered());
+
+            Assert.IsType<MainMenuState>(clientLogic.State);
         }
 
         [Fact]
@@ -105,6 +121,12 @@ namespace Coop.Tests.Client.States
             Assert.IsType<CampaignState>(clientLogic.State);
 
             clientLogic.EnterCampaignState();
+            Assert.IsType<CampaignState>(clientLogic.State);
+
+            clientLogic.ResolveNetworkGuids();
+            Assert.IsType<CampaignState>(clientLogic.State);
+
+            clientLogic.ValidateModules();
             Assert.IsType<CampaignState>(clientLogic.State);
         }
     }

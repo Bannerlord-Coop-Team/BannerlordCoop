@@ -30,7 +30,7 @@ namespace Coop.Core.Client.States
             INetworkEvent networkEvent = new NetworkTransferedHero(obj.What.Package);
             Logic.NetworkMessageBroker.PublishNetworkEvent(networkEvent);
 
-            Logic.State = new ReceivingSavedDataState(Logic);
+            Logic.LoadSavedData();
         }
 
         private void Handle(MessagePayload<CharacterCreationFinished> obj)
@@ -38,14 +38,14 @@ namespace Coop.Core.Client.States
             Logic.NetworkMessageBroker.Publish(this, new PackageMainHero());
         }
 
-        private void Handle(MessagePayload<MainMenuEntered> obj)
-        {
-            Logic.State = new MainMenuState(Logic);
-        }
-
         public override void EnterMainMenu()
         {
             Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+        }
+
+        private void Handle(MessagePayload<MainMenuEntered> obj)
+        {
+            Logic.State = new MainMenuState(Logic);
         }
 
         public override void Connect()
@@ -63,6 +63,7 @@ namespace Coop.Core.Client.States
 
         public override void LoadSavedData()
         {
+            Logic.State = new ReceivingSavedDataState(Logic);
         }
 
         public override void StartCharacterCreation()
