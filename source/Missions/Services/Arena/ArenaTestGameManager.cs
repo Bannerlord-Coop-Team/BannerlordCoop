@@ -84,7 +84,7 @@ namespace Missions.Services.Arena
 
             Location arena = settlement.LocationComplex.GetLocationWithId("arena");
 
-            //return arena scene name of current town
+            //return arena scenae name of current town
             int upgradeLevel = settlement.IsTown ? settlement.Town.GetWallLevel() : 1;
 
             //Open a new arena mission with the scene; commented out because we are not doing Arena testing right now

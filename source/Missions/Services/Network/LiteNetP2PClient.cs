@@ -46,7 +46,6 @@ namespace Missions.Services.Network
         public LiteNetP2PClient(NetworkConfiguration config, IMessageBroker messageBroker)
         {
             _networkConfig = config;
-            _messageBroker = messageBroker;
 
             _netManager = new NetManager(this)
             {
