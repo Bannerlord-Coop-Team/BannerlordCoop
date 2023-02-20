@@ -1,6 +1,10 @@
-﻿using Missions.Services.Network;
+﻿using Common.Messaging;
+using Missions.Services.Network;
 using System;
+using System.Collections.Generic;
 using System.Runtime.Serialization;
+using System.Text;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 
@@ -8,7 +12,8 @@ namespace MissionTests
 {
     public class NetworkAgentRegistryTests
     {
-        NetworkAgentRegistry networkAgentRegistry = new NetworkAgentRegistry();
+        NetworkAgentRegistry networkAgentRegistry = new NetworkAgentRegistry(new MessageBroker());
+
 
         [Fact]
         public void FullTestLocal()

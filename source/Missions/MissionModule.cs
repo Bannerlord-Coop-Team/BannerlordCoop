@@ -26,7 +26,6 @@ namespace Missions
             builder.RegisterType<CoopArenaController>().AsSelf();
             builder.RegisterType<NetworkConfiguration>().AsSelf();
             builder.RegisterType<MovementHandler>().AsSelf();
-            builder.RegisterType<EventPacketHandler>().AsSelf();
 
             // Singletons
             builder.RegisterInstance(NetworkMessageBroker.Instance)
@@ -40,6 +39,7 @@ namespace Missions
             builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf();
             builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().SingleInstance();
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
+            builder.RegisterType<EventPacketHandler>().As<IPacketHandler>();
 
             base.Load(builder);
         }
