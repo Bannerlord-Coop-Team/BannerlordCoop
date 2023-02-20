@@ -39,7 +39,8 @@ namespace Missions
             builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf();
             builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().SingleInstance();
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
-            builder.RegisterType<EventPacketHandler>().As<IPacketHandler>();
+            builder.RegisterType<EventPacketHandler>().As<IPacketHandler>().AsSelf();
+            builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
 
             base.Load(builder);
         }
