@@ -41,6 +41,9 @@
   <PropertyGroup>
     <StartupObject />
   </PropertyGroup>
+  <PropertyGroup>
+    <RunPostBuildEvent>Always</RunPostBuildEvent>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Lib.Harmony.2.2.2\lib\net472\0Harmony.dll</HintPath>
@@ -149,7 +152,6 @@
   <PropertyGroup>
     <PostBuildEvent>powershell -ExecutionPolicy Unrestricted ^
             -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\" ^
-            -TargetDir "$(SolutionDir)MissionTestMod\bin\$(Configuration)\\" ^
-            -Libs MissionTestMod.dll,Common.dll,0harmony.dll,LiteNetLib.dll,NLog.dll</PostBuildEvent>
+            -TargetDir "$(SolutionDir)MissionTestMod\bin\$(Configuration)"</PostBuildEvent>
   </PropertyGroup>
 </Project>
