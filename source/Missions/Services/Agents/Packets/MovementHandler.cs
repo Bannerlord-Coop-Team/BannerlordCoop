@@ -140,11 +140,8 @@ namespace Missions.Services.Agents.Packets
                 {
                     GameLoopRunner.RunOnMainThread(() =>
                     {
-                        if(agent.Health > 0)
-                        {
-                            agent.MakeDead(false, ActionIndexCache.act_none);
-                            agent.FadeOut(false, true);
-                        }
+                        agent.MakeDead(false, ActionIndexCache.act_none);
+                        agent.FadeOut(false, true);
                     });
                 }
 

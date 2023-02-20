@@ -95,7 +95,7 @@ namespace Missions.Services.Arena
 
         private void StartArenaMission(Location location, int upgradeLevel)
         {
-            NetworkAgentRegistry.Instance.Clear();
+            
 
             string civilianUpgradeLevelTag = Campaign.Current.Models.LocationModel.GetCivilianUpgradeLevelTag(upgradeLevel);
             Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(location.GetSceneName(upgradeLevel), "", false), (mission) => new MissionBehavior[]

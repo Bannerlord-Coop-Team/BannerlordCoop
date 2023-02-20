@@ -97,8 +97,6 @@ namespace Missions.Services.Network
                 port = _networkConfig.WanPort;
             }
 
-            Logger.Information($"Connecting to {connectionAddress}:{port}");
-
             ClientInfo clientInfo = new ClientInfo(
                 id,
                 _version);

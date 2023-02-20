@@ -32,8 +32,8 @@ namespace Missions.Services.Arena
         {
             new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon },
             new ItemTypeEnum[] { ItemTypeEnum.Polearm },
-            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, /*ItemTypeEnum.Thrown*/ },
-            //new ItemTypeEnum[] { ItemTypeEnum.Bow, ItemTypeEnum.Arrows, ItemTypeEnum.Thrown }, Both comments are for testing without missiles
+            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Thrown },
+            new ItemTypeEnum[] { ItemTypeEnum.Bow, ItemTypeEnum.Arrows, ItemTypeEnum.Thrown },
             new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Shield },
         };
 

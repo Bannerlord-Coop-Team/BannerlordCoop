@@ -39,7 +39,7 @@ namespace Missions.Services.BoardGames.Patches
         private static readonly PropertyInfo AgentNavigatorPropertyInfo = typeof(CampaignAgentComponent).GetProperty("AgentNavigator");
         static bool Prefix(Agent conversationAgent)
         {
-            if (NetworkAgentRegistry.Instance.IsAgentRegistered(conversationAgent))
+            if (NetworkAgentRegistry.Instance.AgentToId.ContainsKey(conversationAgent))
             {
                 StopConvoAfterGameMessage message = new StopConvoAfterGameMessage();
 
