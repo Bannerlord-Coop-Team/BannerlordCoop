@@ -3,18 +3,19 @@ using Common.Logging;
 using HarmonyLib;
 using Missions;
 using Missions.Services.Arena;
-using Missions.View;
 using Missions.Services.Network.Surrogates;
 using Missions.Services.Taverns;
+using Missions.View;
 using ProtoBuf.Meta;
 using SandBox;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using TaleWorlds.Core;
+using System.IO.Pipes;
+using System.Threading;
+using TaleWorlds.Engine;
+using TaleWorlds.Engine.Options;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
@@ -33,7 +34,9 @@ namespace MissionTestMod
         private static UpdateableList Updateables { get; } = new UpdateableList();
         private static InitialStateOption JoinTavern;
         private static InitialStateOption JoinArena;
+        private static InitialStateOption StartCoopServer;
         private static IMissionGameManager _gameManager;
+        private static Process ServerProcess;
 
         protected override void OnSubModuleLoad()
         {
@@ -85,17 +88,131 @@ namespace MissionTestMod
                SelectSaveArena,
                () => (false, new TextObject()));
 
+            StartCoopServer = new InitialStateOption(
+           "Start Coop Server",
+           new TextObject("Start Coop Server"),
+           9992,
+           () =>
+           {
+
+               ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<MissionLoadGameGauntletScreen>(new object[]
+                  {
+                      new Action<SaveGameFileInfo>((SaveGameFileInfo saveGame)=>
+                      {
+                          StartCoopServerInstance();
+                      })
+                  }));
+
+
+           },
+            () => (false, new TextObject()));
+
             Module.CurrentModule.AddInitialStateOption(JoinTavern);
             Module.CurrentModule.AddInitialStateOption(JoinArena);
+            Module.CurrentModule.AddInitialStateOption(StartCoopServer);
 
 
             base.OnSubModuleLoad();
             Logger.Verbose("Bannerlord Coop Mod loaded");
+            
+            if (Utilities.CommandLineArgumentExists("/headless"))
+            {
+                Mutex.TryOpenExisting("CoopServerReady", out Mutex mutex);
+                mutex?.ReleaseMutex();
+                System.Reflection.FieldInfo splashScreen = TaleWorlds.MountAndBlade.Module.CurrentModule.GetType().GetField("_splashScreenPlayed", 
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                splashScreen.SetValue(TaleWorlds.MountAndBlade.Module.CurrentModule, true);
+                NativeOptions.SetConfig(NativeOptions.NativeOptionsType.MasterVolume, 0f);
+
+                Utilities.ToggleRender();
+                var client = new NamedPipeClientStream("PipesOfPiece");
+                client.Connect();
+                StreamReader reader = new StreamReader(client);
+                StreamWriter writer = new StreamWriter(client);
+                string saveIndex = reader.ReadLine();    
+                writer.WriteLine("Ready");
+                writer.Flush();
+
+            }
+        }
+
+        private void StartCoopServerInstance()
+        {
+            var server = new NamedPipeServerStream("PipesOfPiece");
+            StreamReader reader = new StreamReader(server);
+            StreamWriter writer = new StreamWriter(server);
+
+            Thread thread = new Thread(() =>
+            {
+                DisableSafeMode();
+                StartServerProcess("/headless");
+                server.WaitForConnection();
+                writer.WriteLine("0");
+                writer.Flush();
+                reader.ReadLine();
+                InformationManager.HideInquiry();
+            });
+            thread.IsBackground = true;
+            thread.Start();
+            InquiryData data = new InquiryData("Awaiting Server ",
+                 "Awaiting for response from server. Please wait...", false, false, "", "", null, null);
+            InformationManager.ShowInquiry(data);
+        }
+
+
+        private static void StartServerProcess(string additionalArgs)
+        {
+            if(ServerProcess == null) ServerProcess = new Process();
+            ServerProcess.StartInfo.WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory;
+            ServerProcess.StartInfo.FileName = "\"" + AppDomain.CurrentDomain.BaseDirectory + @"\Bannerlord.exe" + "\"";
+            ServerProcess.StartInfo.Arguments = $"/singleplayer {additionalArgs} _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*MissionTestMod*_MODULES_";
+            ServerProcess.StartInfo.CreateNoWindow = true;
+            ServerProcess.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
+            ServerProcess.Start();
+        }
+
+        private void DisableSafeMode()
+        {
+            string configFile = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), Utilities.GetApplicationName(), "Configs", "engine_config.txt");
+            string[] lines = File.ReadAllLines(configFile);
+            bool safetly_exited_changed = false;
+            bool display_mode_changed = false;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string[] parts = lines[i].Split('=');
+                if (parts[0].Trim().Equals("safely_exited"))
+                {
+                    if (!parts[1].Trim().Equals("1"))
+                    {
+                        lines[i] = $"{parts[0]}= 1";
+                    }
+                    safetly_exited_changed = true;
+
+                }
+                if (parts[0].Trim().Equals("display_mode"))
+                {
+                    if (!parts[1].Trim().Equals("0"))
+                    {
+                        lines[i] = $"{parts[0]}=0";
+                    }
+                    display_mode_changed = true;
+
+                }
+                if(safetly_exited_changed && display_mode_changed)
+                {
+                    File.WriteAllLines(configFile, lines);
+                    break; 
+                }
+                
+
+            }
+
         }
 
         protected override void OnSubModuleUnloaded()
         {
             harmony.UnpatchAll();
+            ServerProcess?.Kill();
             base.OnSubModuleUnloaded();
         }
 
@@ -110,6 +227,7 @@ namespace MissionTestMod
         private bool m_IsFirstTick = true;
         protected override void OnApplicationTick(float dt)
         {
+            
             if (m_IsFirstTick)
             {
                 GameLoopRunner.Instance.SetGameLoopThread();
