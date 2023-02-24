@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Modules.Messages;
+using System;
 
 namespace Coop.Core.Client.States
 {
@@ -8,36 +10,38 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class ResolveNetworkGuidsState : ClientStateBase
     {
-        public ResolveNetworkGuidsState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        public ResolveNetworkGuidsState(IClientLogic logic) : base(logic)
         {
-            messageBroker.Subscribe<MainMenuEntered>(Handle);
-            messageBroker.Subscribe<CampaignStateEntered>(Handle);
-        }
+            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<NetworkGuidsResolved>(Handle);
 
-        private void Handle(MessagePayload<MainMenuEntered> obj)
-        {
-            Logic.State = new MainMenuState(Logic, MessageBroker);
-        }
-
-        private void Handle(MessagePayload<CampaignStateEntered> obj)
-        {
-            Logic.State = new CampaignState(Logic, MessageBroker);
-        }
-
-        public override void EnterCampaignState()
-        {
-            MessageBroker.Publish(this, new EnterCampaignState());
-        }
-
-        public override void EnterMainMenu()
-        {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new ResolveNetworkGuids());
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<CampaignStateEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<NetworkGuidsResolved>(Handle);
+        }
+
+        private void Handle(MessagePayload<NetworkGuidsResolved> obj)
+        {
+            Logic.EnterCampaignState();
+        }
+
+        public override void EnterCampaignState()
+        {
+            Logic.State = new CampaignState(Logic);
+        }
+
+        public override void EnterMainMenu()
+        {
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+        }
+
+        private void Handle(MessagePayload<MainMenuEntered> obj)
+        {
+            Logic.State = new MainMenuState(Logic);
         }
 
         public override void Connect()
@@ -46,7 +50,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void EnterMissionState()
@@ -66,6 +70,10 @@ namespace Coop.Core.Client.States
         }
 
         public override void ResolveNetworkGuids()
+        {
+        }
+
+        public override void ValidateModules()
         {
         }
     }

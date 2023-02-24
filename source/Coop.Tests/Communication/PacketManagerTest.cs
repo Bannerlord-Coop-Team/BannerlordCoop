@@ -1,15 +1,9 @@
-﻿using Autofac;
-using Common.Messaging;
-using Coop.Core.Communication.PacketHandlers;
-using Coop.Core.Server;
+﻿using Common.PacketHandlers;
 using LiteNetLib;
+using Moq;
 using System.Collections.Generic;
 using System.Reflection;
-using System;
 using Xunit;
-using Moq;
-using LiteNetLib.Utils;
-using Common.Serialization;
 
 namespace Coop.Tests.Communication
 {
@@ -117,6 +111,10 @@ namespace Coop.Tests.Communication
         public void HandlePacket(NetPeer peer, IPacket packet)
         {
             HandleCount++;
+        }
+
+        public void Dispose()
+        {
         }
     }
 

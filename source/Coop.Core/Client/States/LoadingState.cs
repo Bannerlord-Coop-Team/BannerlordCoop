@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
+using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Messages;
+using System;
 
 namespace Coop.Core.Client.States
 {
@@ -8,36 +10,36 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class LoadingState : ClientStateBase
     {
-        public LoadingState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        public LoadingState(IClientLogic logic) : base(logic)
         {
-            MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<NetworkGuidsResolved>(Handle);
-        }
-
-        private void Handle(MessagePayload<MainMenuEntered> obj)
-        {
-            Logic.State = new MainMenuState(Logic, MessageBroker);
-        }
-
-        private void Handle(MessagePayload<NetworkGuidsResolved> obj)
-        {
-            Logic.State = new ResolveNetworkGuidsState(Logic, MessageBroker);
-        }
-
-        public override void EnterMainMenu()
-        {
-            MessageBroker.Publish(this, new EnterMainMenu());
-        }
-
-        public override void ResolveNetworkGuids()
-        {
-            MessageBroker.Publish(this, new ResolveNetworkGuids());
+            Logic.NetworkMessageBroker.Subscribe<GameLoaded>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<NetworkGuidsResolved>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<GameLoaded>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+        }
+
+        public override void EnterMainMenu()
+        {
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+        }
+
+        private void Handle(MessagePayload<MainMenuEntered> obj)
+        {
+            Logic.State = new MainMenuState(Logic);
+        }
+
+        private void Handle(MessagePayload<GameLoaded> obj)
+        {
+            Logic.ResolveNetworkGuids();
+        }
+
+        public override void ResolveNetworkGuids()
+        {
+            Logic.State = new ResolveNetworkGuidsState(Logic);
         }
 
         public override void Connect()
@@ -46,7 +48,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void ExitGame()
@@ -66,6 +68,10 @@ namespace Coop.Core.Client.States
         }
 
         public override void EnterMissionState()
+        {
+        }
+
+        public override void ValidateModules()
         {
         }
     }

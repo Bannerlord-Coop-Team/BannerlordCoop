@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
+using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Messages;
+using System;
 
 namespace Coop.Core.Client.States
 {
@@ -8,32 +10,40 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class ReceivingSavedDataState : ClientStateBase
     {
-        public ReceivingSavedDataState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
-        {
-            MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<GameSaveLoaded>(Handle);
-        }
+        byte[] saveData;
 
-        private void Handle(MessagePayload<MainMenuEntered> obj)
+        public ReceivingSavedDataState(IClientLogic logic) : base(logic)
         {
-            Logic.State = new MainMenuState(Logic, MessageBroker);
-        }
-
-        private void Handle(MessagePayload<GameSaveLoaded> obj)
-        {
-            Logic.State = new ValidateModuleState(Logic, MessageBroker);
-            MessageBroker.Publish(this, new ValidateModule());
-        }
-
-        public override void EnterMainMenu()
-        {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Subscribe<NetworkGameSaveDataRecieved>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<GameSaveLoaded>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<NetworkGameSaveDataRecieved>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+        }
+
+        private void Handle(MessagePayload<NetworkGameSaveDataRecieved> obj)
+        {
+            saveData = obj.What.GameSaveData;
+            Logic.EnterMainMenu();
+        }
+
+        private void Handle(MessagePayload<MainMenuEntered> obj)
+        {
+            if (saveData == null) return;
+            if (saveData.Length == 0) return;
+
+            var commandLoad = new LoadGameSave(saveData);
+            Logic.NetworkMessageBroker.Publish(this, commandLoad);
+
+            Logic.State = new LoadingState(Logic);
+        }
+
+        public override void EnterMainMenu()
+        {
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void Connect()
@@ -42,7 +52,8 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+            Logic.State = new MainMenuState(Logic);
         }
 
         public override void ExitGame()
@@ -66,6 +77,10 @@ namespace Coop.Core.Client.States
         }
 
         public override void ResolveNetworkGuids()
+        {
+        }
+
+        public override void ValidateModules()
         {
         }
     }

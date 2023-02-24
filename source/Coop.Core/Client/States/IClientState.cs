@@ -52,5 +52,10 @@ namespace Coop.Core.Client.States
         /// Join p2p mission (battle) instance
         /// </summary>
         void EnterMissionState();
+
+        /// <summary>
+        /// Validates game data before starting join process
+        /// </summary>
+        void ValidateModules();
     }
 }

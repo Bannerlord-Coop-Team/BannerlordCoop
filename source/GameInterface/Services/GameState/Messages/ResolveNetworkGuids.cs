@@ -6,7 +6,7 @@ namespace GameInterface.Services.GameState.Messages
     {
     }
 
-    public readonly struct NetworkGuidsResolved : ICommand
+    public readonly struct NetworkGuidsResolved : IEvent
     {
     }
 }

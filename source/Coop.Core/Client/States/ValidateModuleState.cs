@@ -1,5 +1,13 @@
 ﻿using Common.Messaging;
+using Common.Util;
+using Coop.Core.Client.Messages;
+using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.GameDebug.Interfaces;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Modules.Messages;
+using System.Threading.Tasks;
 
 namespace Coop.Core.Client.States
 {
@@ -8,36 +16,52 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class ValidateModuleState : ClientStateBase
     {
-        public ValidateModuleState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        public ValidateModuleState(IClientLogic logic) : base(logic)
         {
-            MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<ModulesValidated>(Handle);
-        }
+            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<CharacterCreationStarted>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<NetworkClientValidated>(Handle);
 
-        private void Handle(MessagePayload<MainMenuEntered> obj)
-        {
-            Logic.State = new MainMenuState(Logic, MessageBroker);
-        }
-
-        private void Handle(MessagePayload<ModulesValidated> obj)
-        {
-            Logic.State = new LoadingState(Logic, MessageBroker);
-        }
-
-        public override void EnterMainMenu()
-        {
-            MessageBroker.Publish(this, new EnterMainMenu());
-        }
-
-        public override void LoadSavedData()
-        {
-            MessageBroker.Publish(this, new ValidateModule());
+            Logic.NetworkMessageBroker.PublishNetworkEvent(new NetworkClientValidate(DebugHeroInterface.Player1_Id));
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<ModulesValidated>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<CharacterCreationStarted>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<NetworkClientValidated>(Handle);
+        }
+
+        private void Handle(MessagePayload<NetworkClientValidated> obj)
+        {
+            if (obj.What.HeroExists)
+            {
+                Logic.HeroStringId = obj.What.HeroStringId;
+                Logic.LoadSavedData();
+            }
+            else
+            {
+                Logic.StartCharacterCreation();   
+            }
+        }
+
+        public override void EnterMainMenu()
+        {
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+        }
+
+        private void Handle(MessagePayload<MainMenuEntered> obj)
+        {
+            Logic.State = new MainMenuState(Logic);
+        }
+
+        public override void LoadSavedData()
+        {
+            Logic.NetworkMessageBroker.Publish(this, new LoadDebugGame());
+
+            // TODO reenable debug code
+            //Logic.State = new LoadingState(Logic);
+            Logic.State = new ReceivingSavedDataState(Logic);
         }
 
         public override void Connect()
@@ -46,7 +70,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void EnterCampaignState()
@@ -63,9 +87,19 @@ namespace Coop.Core.Client.States
 
         public override void StartCharacterCreation()
         {
+            Logic.NetworkMessageBroker.Publish(this, new StartCharacterCreation());
+        }
+
+        private void Handle(MessagePayload<CharacterCreationStarted> obj)
+        {
+            Logic.State = new CharacterCreationState(Logic);
         }
 
         public override void ResolveNetworkGuids()
+        {
+        }
+
+        public override void ValidateModules()
         {
         }
     }

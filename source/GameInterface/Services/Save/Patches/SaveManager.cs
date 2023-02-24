@@ -8,6 +8,7 @@ using TaleWorlds.Library;
 
 namespace Coop.Mod.Patch.World
 {
+    // TODO redo as service
     class CoopSaveManager
     {
         public static readonly Dictionary<string, Guid> PlayerParties = new Dictionary<string, Guid>();

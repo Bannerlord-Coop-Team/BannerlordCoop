@@ -1,4 +1,6 @@
-﻿using TaleWorlds.CampaignSystem.Party;
+﻿using Common;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Interfaces
 {
@@ -11,7 +13,16 @@ namespace GameInterface.Services.MobileParties.Interfaces
     {
         public void RemoveMainParty()
         {
-            MobileParty.MainParty?.RemoveParty();
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                if(MobileParty.MainParty != null)
+                {
+                    // TODO see if remove works again
+                    MobileParty.MainParty.IsActive = false;
+                    MobileParty.MainParty.IsVisible = false;
+                }
+                
+            }, bBlocking: false);
         }
     }
 }

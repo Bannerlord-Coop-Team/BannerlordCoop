@@ -69,8 +69,8 @@
       <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
     <Reference Include="System.IO.Compression" />
-    <Reference Include="System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Memory.4.5.4\lib\net461\System.Memory.dll</HintPath>
+    <Reference Include="System.Memory, Version=4.0.1.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Memory.4.5.5\lib\net461\System.Memory.dll</HintPath>
     </Reference>
     <Reference Include="System.Numerics" />
     <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
@@ -112,9 +112,10 @@
     <Compile Include="Communication\CommunicatorMessageBrokerTest.cs" />
     <Compile Include="Communication\PacketManagerTest.cs" />
     <Compile Include="CoopTest.cs" />
+    <Compile Include="Extensions\NetPeerExtensions.cs" />
+    <Compile Include="NetworkMessageBrokerStub.cs" />
     <Compile Include="Server\Connections\States\CampaignStateTests.cs" />
-    <Compile Include="Server\Connections\States\ClientStateOrchestratorTests.cs" />
-    <Compile Include="Server\Connections\States\InitialConnectionStateTests.cs" />
+    <Compile Include="Server\Connections\States\ClientRegistryTests.cs" />
     <Compile Include="Server\Connections\States\TransferCharacterStateTests.cs" />
     <Compile Include="Server\Connections\States\CreateCharacterStateTests.cs" />
     <Compile Include="Server\Connections\States\ResolveCharacterStateTests.cs" />
@@ -132,7 +133,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{9CDD9C4E-92CD-4F19-A4D9-D68CF975480C}</Project>
+      <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
       <Name>Common</Name>
     </ProjectReference>
     <ProjectReference Include="..\Coop.Core\Coop.Core.csproj">

@@ -1,12 +1,8 @@
-﻿namespace Coop.Core.Client.Messages
-{
-    public readonly struct NetworkConnected
-    {
-        public NetworkConnected(bool clientPartyExists)
-        {
-            ClientPartyExists = clientPartyExists;
-        }
+﻿using Common.Messaging;
 
-        public bool ClientPartyExists { get; }
+namespace Coop.Core.Client.Messages
+{
+    public readonly struct NetworkConnected : IEvent
+    {
     }
 }

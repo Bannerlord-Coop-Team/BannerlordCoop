@@ -14,53 +14,47 @@ namespace Coop.Tests.Client.States
         public MainMenuStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, messageBroker);
-        }
-
-        [Fact]
-        public void Ctor_SubscribesNetworkConnected()
-        {
-            var subscriberCount = messageBroker.GetTotalSubscribers();
-            Assert.Equal(1, subscriberCount);
-        }
-
-        [Fact]
-        public void Connect_CharacterNotCreated_EnterCharacterCreation()
-        {
-            messageBroker.Publish(this, new NetworkConnected(false));
-
-            Assert.IsType<CharacterCreationState>(clientLogic.State);
-        }
-
-        [Fact]
-        public void Connect_CharacterCreated_ReceivingSavedDataState()
-        {
-            messageBroker.Publish(this, new NetworkConnected(true));
-
-            Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
-        }
-
-        [Fact]
-        public void Disconnect_Publishes_EnterMainMenu()
-        {
-            var isEventPublished = false;
-            messageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
-
-            clientLogic.Disconnect();
-
-            Assert.True(isEventPublished);
+            clientLogic = new ClientLogic(mockCoopClient.Object, NetworkMessageBroker);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            clientLogic.Dispose();
+            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
 
-            var subscriberCount = messageBroker.GetTotalSubscribers();
-            Assert.Equal(0, subscriberCount);
+            clientLogic.State.Dispose();
+
+            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+        }
+
+        [Fact]
+        public void ValidateModulesMethod_Transitions_ValidateModuleState()
+        {
+            clientLogic.State.ValidateModules();
+
+            Assert.IsType<ValidateModuleState>(clientLogic.State);
+        }
+
+        [Fact]
+        public void Connect_ValidateModuleState()
+        {
+            MessageBroker.Publish(this, new NetworkConnected());
+
+            Assert.IsType<ValidateModuleState>(clientLogic.State);
+        }
+
+        [Fact]
+        public void Disconnect_Publishes_EnterMainMenu()
+        {
+            var enterMainMenuCount = 0;
+            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            {
+                enterMainMenuCount += 1;
+            });
+
+            clientLogic.Disconnect();
+
+            Assert.Equal(1, enterMainMenuCount);
         }
 
         [Fact]

@@ -1,5 +1,13 @@
 ﻿using Coop.Core.Server.Connections;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
+using Coop.Tests.Extensions;
+using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Heroes.Messages;
+using LiteNetLib;
+using System;
+using System.Reflection;
+using System.Runtime.Serialization;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -8,10 +16,24 @@ namespace Coop.Tests.Server.Connections.States
     public class CreateCharacterStateTests : CoopTest
     {
         private readonly IConnectionLogic _connectionLogic;
-
+        private readonly NetPeer _playerId = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
+        private readonly NetPeer _differentPlayer = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
         public CreateCharacterStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic();
+            _connectionLogic = new ConnectionLogic(_playerId, NetworkMessageBroker);
+            _differentPlayer.SetId(_playerId.Id + 1);
+        }
+
+        [Fact]
+        public void Dispose_RemovesAllHandlers()
+        {
+            _connectionLogic.State = new CampaignState(_connectionLogic);
+
+            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+
+            _connectionLogic.State.Dispose();
+
+            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
@@ -19,9 +41,9 @@ namespace Coop.Tests.Server.Connections.States
         {
             _connectionLogic.State = new CreateCharacterState(_connectionLogic);
 
-            _connectionLogic.TransferCharacter();
+            _connectionLogic.TransferSave();
 
-            Assert.IsType<TransferCharacterState>(_connectionLogic.State);
+            Assert.IsType<TransferSaveState>(_connectionLogic.State);
         }
 
         [Fact]
@@ -29,11 +51,90 @@ namespace Coop.Tests.Server.Connections.States
         {
             _connectionLogic.State = new CreateCharacterState(_connectionLogic);
 
-            _connectionLogic.ResolveCharacter();
             _connectionLogic.CreateCharacter();
             _connectionLogic.Load();
             _connectionLogic.EnterCampaign();
             _connectionLogic.EnterMission();
+
+            Assert.IsType<CreateCharacterState>(_connectionLogic.State);
+        }
+
+        [Fact]
+        public void NetworkTransferedHero_ValidPlayerId()
+        {
+            _connectionLogic.State = new CreateCharacterState(_connectionLogic);
+
+            var registerNewPlayerHeroCount = 0;
+            NetworkMessageBroker.Subscribe<RegisterNewPlayerHero>((payload) =>
+            {
+                registerNewPlayerHeroCount += 1;
+
+                // Message should state hero does not exist
+                Assert.Equal(_playerId.Id, payload.What.PeerId);
+            });
+
+            // Publish hero resolved, this would be from game interface
+            NetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkTransferedHero(Array.Empty<byte>()));
+
+            // A single message is sent
+            Assert.Equal(1, registerNewPlayerHeroCount);
+
+            Assert.IsType<CreateCharacterState>(_connectionLogic.State);
+        }
+
+        [Fact]
+        public void NetworkTransferedHero_InvalidPlayerId()
+        {
+            _connectionLogic.State = new CreateCharacterState(_connectionLogic);
+
+            var registerNewPlayerHeroCount = 0;
+            NetworkMessageBroker.Subscribe<RegisterNewPlayerHero>((payload) =>
+            {
+                registerNewPlayerHeroCount += 1;
+            });
+
+            // Publish hero resolved, this would be from game interface
+            NetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkTransferedHero(Array.Empty<byte>()));
+
+            // A single message is sent
+            Assert.Equal(0, registerNewPlayerHeroCount);
+
+            Assert.IsType<CreateCharacterState>(_connectionLogic.State);
+        }
+
+        [Fact]
+        public void NewPlayerHeroRegistered_ValidPlayerId()
+        {
+            _connectionLogic.State = new CreateCharacterState(_connectionLogic);
+
+            var registerNewPlayerHeroCount = 0;
+            NetworkMessageBroker.TestNetworkSubscribe<NetworkPlayerData>((payload) =>
+            {
+                registerNewPlayerHeroCount += 1;
+            });
+
+            // Publish hero resolved, this would be from game interface
+            NetworkMessageBroker.Publish(_playerId, new NewPlayerHeroRegistered());
+
+            Assert.IsType<TransferSaveState>(_connectionLogic.State);
+        }
+
+        [Fact]
+        public void NewPlayerHeroRegistered_InvalidPlayerId()
+        {
+            _connectionLogic.State = new CreateCharacterState(_connectionLogic);
+
+            var registerNewPlayerHeroCount = 0;
+            NetworkMessageBroker.TestNetworkSubscribe<NetworkPlayerData>((payload) =>
+            {
+                registerNewPlayerHeroCount += 1;
+            });
+
+            // Publish hero resolved, this would be from game interface
+            NetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkTransferedHero(Array.Empty<byte>()));
+
+            // A single message is sent
+            Assert.Equal(0, registerNewPlayerHeroCount);
 
             Assert.IsType<CreateCharacterState>(_connectionLogic.State);
         }

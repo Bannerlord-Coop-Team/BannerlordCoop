@@ -1,19 +1,15 @@
-﻿using LiteNetLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Common.Messaging;
+using LiteNetLib;
 
 namespace Coop.Core.Client.Messages
 {
-    public readonly struct NetworkDisconnected
+    public readonly struct NetworkDisconnected : IEvent
     {
+        public DisconnectInfo DisconnectInfo { get; }
+
         public NetworkDisconnected(DisconnectInfo disconnectInfo)
         {
             DisconnectInfo = disconnectInfo;
         }
-
-        public DisconnectInfo DisconnectInfo { get; }
     }
 }

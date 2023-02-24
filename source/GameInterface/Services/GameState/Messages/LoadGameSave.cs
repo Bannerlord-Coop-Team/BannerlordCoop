@@ -1,11 +1,15 @@
 ﻿using Common.Messaging;
-using GameInterface.Data;
 
 namespace GameInterface.Services.GameState.Messages
 {
     public readonly struct LoadGameSave : ICommand
     {
-        public IGameSaveData SaveData { get; }
+        public byte[] SaveData { get; }
+
+        public LoadGameSave(byte[] saveData)
+        {
+            SaveData = saveData;
+        }
     }
 
     public readonly struct GameSaveLoaded : IEvent

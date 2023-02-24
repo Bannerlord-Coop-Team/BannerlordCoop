@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network;
 using Coop.Core.Configuration;
 using Coop.Tests.Stubs;
 using LiteNetLib;

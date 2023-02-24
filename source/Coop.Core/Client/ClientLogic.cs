@@ -1,8 +1,9 @@
 ﻿using Common.Logging;
 using Common.LogicStates;
 using Common.Messaging;
+using Common.Network;
 using Coop.Core.Client.States;
-using Coop.Core.Communication.PacketHandlers;
+using GameInterface;
 using Serilog;
 
 namespace Coop.Core.Client
@@ -21,19 +22,23 @@ namespace Coop.Core.Client
         /// Networking Client for Client-side
         /// </summary>
         ICoopClient NetworkClient { get; }
+        INetworkMessageBroker NetworkMessageBroker { get; }
+        string HeroStringId { get; set; }
     }
 
     /// <inheritdoc cref="IClientLogic"/>
     public class ClientLogic : IClientLogic
     {
-        private readonly ILogger Logger = LogManager.GetLogger<EventPacketHandler>();
+        private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
         public ICoopClient NetworkClient { get; }
+        public INetworkMessageBroker NetworkMessageBroker { get; }
+        public string HeroStringId { get; set; }
         public IClientState State 
         {
             get { return _state; }
             set 
             {
-                Logger.Debug("Client is changing to {state} State", value);
+                Logger.Debug("Client is changing to {state} State", value.GetType().Name);
 
                 _state?.Dispose();
                 _state = value;
@@ -43,11 +48,12 @@ namespace Coop.Core.Client
         private IClientState _state;
 
         public ClientLogic(
-            ICoopClient networkClient, 
-            IMessageBroker messageBroker)
+            ICoopClient networkClient,
+            INetworkMessageBroker messageBroker)
         {
             NetworkClient = networkClient;
-            State = new MainMenuState(this, messageBroker);
+            NetworkMessageBroker = messageBroker;
+            State = new MainMenuState(this);
         }
 
         public void Start()
@@ -60,54 +66,26 @@ namespace Coop.Core.Client
             Disconnect();
         }
 
-        public void Dispose()
-        {
-            State.Dispose();
-        }
+        public void Dispose() => State.Dispose();
 
-        public void Connect()
-        {
-            State.Connect();
-        }
+        public void Connect() => State.Connect();
 
-        public void Disconnect()
-        {
-            State.Disconnect();
-        }
+        public void Disconnect() => State.Disconnect();
 
-        public void StartCharacterCreation()
-        {
-            State.StartCharacterCreation();
-        }
+        public void StartCharacterCreation() => State.StartCharacterCreation();
 
-        public void LoadSavedData()
-        {
-            State.LoadSavedData();
-        }
+        public void LoadSavedData() => State.LoadSavedData();
 
-        public void ResolveNetworkGuids()
-        {
-            State.ResolveNetworkGuids();
-        }
+        public void ResolveNetworkGuids() => State.ResolveNetworkGuids();
 
-        public void ExitGame()
-        {
-            State.ExitGame();
-        }
+        public void ExitGame() => State.ExitGame();
 
-        public void EnterMainMenu()
-        {
-            State.EnterMainMenu();
-        }
+        public void EnterMainMenu() => State.EnterMainMenu();
 
-        public void EnterCampaignState()
-        {
-            State.EnterCampaignState();
-        }
+        public void EnterCampaignState() => State.EnterCampaignState();
 
-        public void EnterMissionState()
-        {
-            State.EnterMissionState();
-        }
+        public void EnterMissionState() => State.EnterMissionState();
+
+        public void ValidateModules() => State.ValidateModules();
     }
 }

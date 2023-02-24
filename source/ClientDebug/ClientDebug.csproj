@@ -39,6 +39,9 @@
   <PropertyGroup>
     <StartupObject />
   </PropertyGroup>
+  <PropertyGroup>
+    <RunPostBuildEvent>Always</RunPostBuildEvent>
+  </PropertyGroup>
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
@@ -46,4 +49,11 @@
     <Compile Include="Main.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PreBuildEvent>
+    </PreBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PostBuildEvent>"$(DevEnvDir)devenv" "$(SolutionDir)Coop.sln" /Rebuild $(configuration) /project "$(SolutionDir)Coop\Coop.csproj"</PostBuildEvent>
+  </PropertyGroup>
 </Project>

@@ -1,11 +1,11 @@
 using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
+using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
 using Coop.Core.Communication.Network;
-using Coop.Core.Communication.PacketHandlers;
-using Coop.Core.Configuration;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -14,7 +14,7 @@ using System.Net.Sockets;
 
 namespace Coop.Core.Client
 {
-    public interface ICoopClient : ICoopNetwork, IUpdateable, INetEventListener
+    public interface ICoopClient : INetwork, IUpdateable, INetEventListener
     {
     }
 
@@ -29,17 +29,14 @@ namespace Coop.Core.Client
         private readonly IPacketManager packetManager;
         private readonly NetManager netManager;
 
-        public override INetworkConfiguration Configuration { get; }
-
         private bool isConnected = false;
         private NetPeer serverPeer;
 
         public CoopClient(
             INetworkConfiguration config,
             IMessageBroker messageBroker,
-            IPacketManager packetManager)
+            IPacketManager packetManager) : base(config)
         {
-            Configuration = config;
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
 
@@ -83,6 +80,7 @@ namespace Coop.Core.Client
             if(isConnected == false)
             {
                 isConnected = true;
+
                 messageBroker.Publish(this, new NetworkConnected());
             }
         }

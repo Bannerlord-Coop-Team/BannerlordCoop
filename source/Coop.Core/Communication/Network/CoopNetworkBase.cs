@@ -1,20 +1,22 @@
-﻿using Common.Serialization;
-using Coop.Core.Communication.PacketHandlers;
-using LiteNetLib.Utils;
+﻿using Common.Network;
+using Common.PacketHandlers;
+using Common.Serialization;
 using LiteNetLib;
+using LiteNetLib.Utils;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Coop.Core.Configuration;
 
 namespace Coop.Core.Communication.Network
 {
-    public abstract class CoopNetworkBase : ICoopNetwork
+    public abstract class CoopNetworkBase : INetwork
     {
-        public abstract INetworkConfiguration Configuration { get; }
+        public INetworkConfiguration Configuration { get; }
         public abstract int Priority { get; }
+
+        protected CoopNetworkBase(INetworkConfiguration configuration)
+        {
+            Configuration = configuration;
+        }
 
         public virtual void SendAllBut(NetManager netManager, NetPeer netPeer, IPacket packet)
         {
@@ -35,10 +37,7 @@ namespace Coop.Core.Communication.Network
         public virtual void Send(NetPeer netPeer, IPacket packet)
         {
             PacketWrapper wrapper = new PacketWrapper(packet);
-
-            // Put type using writer
             NetDataWriter writer = new NetDataWriter();
-            writer.Put((int)wrapper.PacketType);
 
             // Serialize and put data in writer (with length is important on receive end)
             byte[] data = ProtoBufSerializer.Serialize(packet);

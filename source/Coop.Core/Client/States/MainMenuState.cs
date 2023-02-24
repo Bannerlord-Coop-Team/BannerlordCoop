@@ -1,5 +1,6 @@
 using Common.Messaging;
 using Coop.Core.Client.Messages;
+using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
@@ -9,14 +10,14 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class MainMenuState : ClientStateBase
     {
-        public MainMenuState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        public MainMenuState(IClientLogic logic) : base(logic)
         {
-            MessageBroker.Subscribe<NetworkConnected>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<NetworkConnected>(Handle);
         }
 
-        public override void Dispose()
+        public override void Dispose() 
         {
-            MessageBroker.Unsubscribe<NetworkConnected>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<NetworkConnected>(Handle);
         }
 
         public override void Connect()
@@ -26,21 +27,12 @@ namespace Coop.Core.Client.States
 
         private void Handle(MessagePayload<NetworkConnected> obj)
         {
-            if (obj.What.ClientPartyExists)
-            {
-                Logic.State = new ReceivingSavedDataState(Logic, MessageBroker);
-                MessageBroker.Publish(this, new LoadGameSave());
-            }
-            else
-            {
-                Logic.State = new CharacterCreationState(Logic, MessageBroker);
-                MessageBroker.Publish(this, new StartCreateCharacter());
-            }
+            Logic.ValidateModules();
         }
 
         public override void Disconnect()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void EnterMainMenu()
@@ -69,6 +61,11 @@ namespace Coop.Core.Client.States
 
         public override void ResolveNetworkGuids()
         {
+        }
+
+        public override void ValidateModules()
+        {
+            Logic.State = new ValidateModuleState(Logic);
         }
     }
 }

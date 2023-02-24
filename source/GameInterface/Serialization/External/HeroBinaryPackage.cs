@@ -1,4 +1,5 @@
 ﻿using Common.Extensions;
+using GameInterface.Extentions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -102,6 +103,13 @@ namespace GameInterface.Serialization.External
 
             // Set the object's ex-spouses list as read-only
             Object.ExSpouses = exSpouses.GetReadOnlyList();
+
+            MethodInfo OnLordAdded = typeof(Clan).GetMethod("OnLordAdded", BindingFlags.NonPublic | BindingFlags.Instance);
+            OnLordAdded.Invoke(Object.Clan, new object[] { Object });
+
+            Object.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>("TransferredHero");
+
+            Campaign.Current?.CampaignObjectManager?.AddHero(Object);
         }
     }
 }

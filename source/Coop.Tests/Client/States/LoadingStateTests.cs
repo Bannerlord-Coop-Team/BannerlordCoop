@@ -13,22 +13,25 @@ namespace Coop.Tests.Client.States
         public LoadingStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, messageBroker);
-            clientLogic.State = new LoadingState(clientLogic, messageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, NetworkMessageBroker);
+            clientLogic.State = new LoadingState(clientLogic);
         }
 
         [Fact]
-        public void Ctor_Subscribes()
+        public void Dispose_RemovesAllHandlers()
         {
-            var subscriberCount = messageBroker.GetTotalSubscribers();
-            Assert.Equal(2, subscriberCount);
+            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+
+            clientLogic.State.Dispose();
+
+            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             var isEventPublished = false;
-            messageBroker.Subscribe<EnterMainMenu>((payload) =>
+            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -41,30 +44,32 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void EnterMainMenu_Transitions_MainMenuState()
         {
-            messageBroker.Publish(this, new MainMenuEntered());
+            MessageBroker.Publish(this, new MainMenuEntered());
 
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
 
         [Fact]
-        public void ResolveNetworkGuids_Publishes_ResolveNetworkGuids()
+        public void GameLoaded_Transitions_ResolveNetworkGuidsState()
         {
-            var isEventPublished = false;
-            messageBroker.Subscribe<ResolveNetworkGuids>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            MessageBroker.Publish(this, new GameLoaded());
 
+            Assert.IsType<ResolveNetworkGuidsState>(clientLogic.State);
+        }
+
+        [Fact]
+        public void ResolveNetworkGuids_Transitions_ResolveNetworkGuidsState()
+        {
             clientLogic.ResolveNetworkGuids();
 
-            Assert.True(isEventPublished);
+            Assert.IsType<ResolveNetworkGuidsState>(clientLogic.State);
         }
 
         [Fact]
         public void Disconnect_Publishes_EnterMainMenu()
         {
             var isEventPublished = false;
-            messageBroker.Subscribe<EnterMainMenu>((payload) =>
+            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -72,23 +77,6 @@ namespace Coop.Tests.Client.States
             clientLogic.Disconnect();
 
             Assert.True(isEventPublished);
-        }
-
-        [Fact]
-        public void NetworkGuidsResolved_Transitions_ResolveNetworkGuidsState()
-        {
-            messageBroker.Publish(this, new NetworkGuidsResolved());
-
-            Assert.IsType<ResolveNetworkGuidsState>(clientLogic.State);
-        }
-
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            clientLogic.Dispose();
-
-            var subscriberCount = messageBroker.GetTotalSubscribers();
-            Assert.Equal(0, subscriberCount);
         }
 
         [Fact]
@@ -113,6 +101,9 @@ namespace Coop.Tests.Client.States
             Assert.IsType<LoadingState>(clientLogic.State);
 
             clientLogic.EnterMissionState();
+            Assert.IsType<LoadingState>(clientLogic.State);
+
+            clientLogic.ValidateModules();
             Assert.IsType<LoadingState>(clientLogic.State);
         }
     }

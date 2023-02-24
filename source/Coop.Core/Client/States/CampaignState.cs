@@ -1,5 +1,9 @@
 ﻿using Common.Messaging;
+using Coop.Core.Server.Connections;
+using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Time.Messages;
+using System;
 
 namespace Coop.Core.Client.States
 {
@@ -8,36 +12,46 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class CampaignState : ClientStateBase
     {
-        public CampaignState(IClientLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+        public CampaignState(IClientLogic logic) : base(logic)
         {
-            MessageBroker.Subscribe<MainMenuEntered>(Handle);
-            MessageBroker.Subscribe<MissionStateEntered>(Handle);
-        }
+            Logic.NetworkMessageBroker.Subscribe<NetworkDisableTimeControls>(Handle);
 
-        private void Handle(MessagePayload<MainMenuEntered> obj)
-        {
-            Logic.State = new MainMenuState(Logic, MessageBroker);
-        }
-
-        private void Handle(MessagePayload<MissionStateEntered> obj)
-        {
-            Logic.State = new MissionState(Logic, MessageBroker);
-        }
-
-        public override void EnterMissionState()
-        {
-            MessageBroker.Publish(this, new EnterMissionState());
-        }
-
-        public override void EnterMainMenu()
-        {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<MissionStateEntered>(Handle);
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            MessageBroker.Unsubscribe<MissionStateEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<NetworkDisableTimeControls>(Handle);
+
+            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<MissionStateEntered>(Handle);
+        }
+
+        private void Handle(MessagePayload<NetworkDisableTimeControls> obj)
+        {
+            // TODO will conflict with timemode changed event
+            Logic.NetworkMessageBroker.Publish(this, new PauseAndDisableGameTimeControls());
+        }
+
+        public override void EnterMissionState()
+        {
+            Logic.NetworkMessageBroker.Publish(this, new EnterMissionState());
+        }
+
+        private void Handle(MessagePayload<MissionStateEntered> obj)
+        {
+            Logic.State = new MissionState(Logic);
+        }
+
+        public override void EnterMainMenu()
+        {
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+        }
+
+        private void Handle(MessagePayload<MainMenuEntered> obj)
+        {
+            Logic.State = new MainMenuState(Logic);
         }
 
         public override void Connect()
@@ -46,7 +60,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
-            MessageBroker.Publish(this, new EnterMainMenu());
+            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void ExitGame()
@@ -66,6 +80,10 @@ namespace Coop.Core.Client.States
         }
 
         public override void ResolveNetworkGuids()
+        {
+        }
+
+        public override void ValidateModules()
         {
         }
     }
