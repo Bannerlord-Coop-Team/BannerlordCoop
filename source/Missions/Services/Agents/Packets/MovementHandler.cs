@@ -75,19 +75,6 @@ namespace Missions.Services.Agents.Packets
 
         public PacketType PacketType => PacketType.Movement;
 
-        Mission CurrentMission
-        {
-            get
-            {
-                Mission current = null;
-                GameLoopRunner.RunOnMainThread(() =>
-                {
-                    current = Mission.Current;
-                }, true);
-                return current;
-            }
-        }
-
         private void Handle_ActionDataChanged(MessagePayload<ActionDataChanged> payload)
         {
             var delta = GetDelta(payload.What);
