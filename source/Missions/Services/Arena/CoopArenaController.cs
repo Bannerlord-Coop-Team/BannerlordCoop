@@ -134,9 +134,11 @@ namespace Missions.Services
             Guid newAgentId = joinInfo.PlayerId;
             Vec3 startingPos = joinInfo.StartingPosition;
 
-            Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer}",
+            Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer} with {ControlledAgentCount} controlled agents",
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
-                joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
+                joinInfo.CharacterObject.Name, newAgentId, 
+                netPeer.EndPoint,
+                joinInfo.UnitIdString.Length);
 
             if(joinInfo.IsPlayerAlive)
             {
@@ -190,7 +192,6 @@ namespace Missions.Services
                 _agentRegistry.RemoveControlledAgent(agentId);
                 _agentRegistry.RemoveNetworkControlledAgent(agentId);
             }
-            
         }
 
         public void AddPlayerToArena()
