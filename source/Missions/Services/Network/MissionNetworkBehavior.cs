@@ -46,13 +46,10 @@ namespace Missions.Services.Network
             _client = client;
             _networkMessageBroker = messageBroker;
             _agentRegistry = agentRegistry;
-            _playerId = Guid.NewGuid();
 
             // TODO DI
             _movementHandler = new MovementHandler(_client, _networkMessageBroker, _agentRegistry);
             _eventPacketHandler = new EventPacketHandler(_networkMessageBroker, client.PacketManager);
-
-            _networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
         }
 
         public override void OnRenderingStarted()
@@ -61,46 +58,12 @@ namespace Missions.Services.Network
             _client.NatPunch(sceneName);
         }
 
-        private void Handle_PeerConnected(MessagePayload<PeerConnected> payload)
-        {
-            SendJoinInfo(payload.What.Peer);
-        }
-
-        private void SendJoinInfo(NetPeer peer)
-        {
-            CharacterObject characterObject = CharacterObject.PlayerCharacter;
-            _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
-
-            List<Vec3> unitPositions = new List<Vec3>();
-            List<string> unitIdStrings = new List<string>();
-            List<Guid> guids = new List<Guid>();
-            foreach (Guid agentId in _agentRegistry.ControlledAgents.Keys)
-            {
-                Agent agent = _agentRegistry.ControlledAgents[agentId];
-
-                if (agent == Agent.Main) continue;
-
-                guids.Add(agentId);
-                unitPositions.Add(agent.Position);
-                unitIdStrings.Add(agent.Character.StringId);
-            }
-
-            Logger.Debug("Sending join request");
-
-            bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
-            Vec3 position = Agent.Main?.Position ?? default;
-            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, isPlayerAlive, _playerId, position, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
-            _networkMessageBroker.PublishNetworkEvent(peer, request);
-            Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
-                characterObject.IsPlayerCharacter ? "Player" : "Agent",
-                characterObject.Name, request.PlayerId, peer.EndPoint);
-        }
+        
 
         public override void OnRemoveBehavior()
         {
             base.OnRemoveBehavior();
 
-            _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
             _agentRegistry.Clear();
             _client.Stop();
         }
@@ -109,7 +72,6 @@ namespace Missions.Services.Network
         {
             _networkMessageBroker.Publish(this, new AgentDeleted(affectedAgent));
             
-
             base.OnAgentDeleted(affectedAgent);
         }
 
