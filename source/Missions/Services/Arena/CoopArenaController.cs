@@ -50,8 +50,8 @@ namespace Missions.Services
                 && !x.BattleEquipments.Any(y => y.HasWeaponOfClass(WeaponClass.Bow) || y.HasWeaponOfClass(WeaponClass.Dagger) || 
                 y.HasWeaponOfClass(WeaponClass.Crossbow) || y.HasWeaponOfClass(WeaponClass.Javelin) || y.HasWeaponOfClass(WeaponClass.ThrowingAxe)
                 || y.HasWeaponOfClass(WeaponClass.ThrowingKnife))).ToArray(); //Remove all HasWeaponOfClass when bows are needed
-            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            messageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
+            _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            _networkMessageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
             _networkMessageBroker.Subscribe<AgentDied>(Handler_AgentDeath);
         }
