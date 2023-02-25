@@ -1,5 +1,4 @@
 ﻿using Missions.Services.Agents.Packets;
-using System;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
@@ -21,11 +20,11 @@ namespace Missions.Services.Agents.Messages
         /// Constructor
         /// </summary>
         /// <param name="agent"></param>
-        /// <param name="agentActionData"></param>
-        public ActionDataChanged(Agent agent, AgentActionData agentActionData)
+        /// <param name="actionData">optional</param>
+        public ActionDataChanged(Agent agent, AgentActionData actionData = null)
         {
             Agent = agent;
-            AgentActionData = agentActionData;
+            AgentActionData = actionData ?? new AgentActionData(agent);
         }
 
     }

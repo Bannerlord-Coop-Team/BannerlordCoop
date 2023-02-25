@@ -6,7 +6,6 @@ using LiteNetLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
-using ProtoBuf;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -15,7 +14,7 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Packets
-{  
+{
 
     public class MovementHandler : IPacketHandler, IDisposable
     {
@@ -35,6 +34,8 @@ namespace Missions.Services.Agents.Packets
 
         private Timer _senderTimer;
 
+        private AgentPublisher _agentPublisher;
+
         public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
             Logger.Verbose("Creating {name}", this.GetType().Name);
@@ -50,6 +51,8 @@ namespace Missions.Services.Agents.Packets
             _messageBroker.Subscribe<LookDirectionChanged>(Handle_LookDirectionChanged);
             _messageBroker.Subscribe<MountDataChanged>(Handle_MountDataChanged);
             _messageBroker.Subscribe<MovementInputVectorChanged>(Handle_MovementInputVectorChanged);
+
+            _agentPublisher = new AgentPublisher(messageBroker, PACKET_UPDATE_RATE);
 
             _packetManager.RegisterPacketHandler(this);
 

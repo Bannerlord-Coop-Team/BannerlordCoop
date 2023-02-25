@@ -1,5 +1,4 @@
 ﻿using Missions.Services.Agents.Packets;
-using System;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
@@ -22,11 +21,11 @@ namespace Missions.Services.Agents.Messages
         /// Constructor
         /// </summary>
         /// <param name="agent"></param>
-        /// <param name="agentMountData"></param>
-        public MountDataChanged(Agent agent, AgentMountData agentMountData)
+        /// <param name="agentMountData">optional</param>
+        public MountDataChanged(Agent agent, AgentMountData agentMountData = null)
         {
             Agent = agent;
-            AgentMountData = agentMountData;
+            AgentMountData = agentMountData ?? new AgentMountData(agent);
         }
     }
 }
