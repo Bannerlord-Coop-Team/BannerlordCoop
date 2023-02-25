@@ -169,6 +169,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Services\Agents\Messages\ActionDataChanged.cs" />
+    <Compile Include="Services\Agents\Messages\AgentPublisher.cs" />
     <Compile Include="Services\Agents\Messages\LookDirectionChanged.cs" />
     <Compile Include="Services\Agents\Messages\MountDataChanged.cs" />
     <Compile Include="Services\Agents\Messages\IMovementEvent.cs" />
