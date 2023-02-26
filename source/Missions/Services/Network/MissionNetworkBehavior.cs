@@ -49,7 +49,6 @@ namespace Missions.Services.Network
             _client = client;
             _networkMessageBroker = messageBroker;
             _agentRegistry = agentRegistry;
-            _playerId = Guid.NewGuid();
 
             // TODO DI
             _movementHandler = movementHandler;
@@ -115,7 +114,6 @@ namespace Missions.Services.Network
         {
             base.OnRemoveBehavior();
 
-            _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
             _agentRegistry.Clear();
             _client.Stop();
         }
@@ -124,7 +122,6 @@ namespace Missions.Services.Network
         {
             _networkMessageBroker.Publish(this, new AgentDeleted(affectedAgent));
             
-
             base.OnAgentDeleted(affectedAgent);
         }
 
