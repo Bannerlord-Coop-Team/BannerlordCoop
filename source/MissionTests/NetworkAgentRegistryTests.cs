@@ -12,7 +12,7 @@ namespace MissionTests
 {
     public class NetworkAgentRegistryTests
     {
-        NetworkAgentRegistry networkAgentRegistry = new NetworkAgentRegistry(new MessageBroker());
+        NetworkAgentRegistry networkAgentRegistry = new NetworkAgentRegistry();
 
 
         [Fact]
