@@ -1,5 +1,4 @@
 ﻿using LiteNetLib;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,18 +7,12 @@ namespace IntroServer.Server
 {
     internal class PeerRegistry
     {
-        private readonly Dictionary<string, List<P2PPeer>> _instancePeers = new Dictionary<string, List<P2PPeer>>();
-        private readonly Dictionary<Guid, NetPeer> _peers = new Dictionary<Guid, NetPeer>();
-        private readonly ILogger<MissionTestServer> _logger;
-
-        public PeerRegistry(ILogger<MissionTestServer> logger)
-        {
-            _logger = logger;
-        }
+        private readonly Dictionary<string, List<P2PPeer>> m_instancePeers = new Dictionary<string, List<P2PPeer>>();
+        private readonly Dictionary<Guid, NetPeer> m_peers = new Dictionary<Guid, NetPeer>();
 
         public NetPeer GetPeer(Guid id)
         {
-            if (_peers.TryGetValue(id, out NetPeer value))
+            if (m_peers.TryGetValue(id, out NetPeer value))
             {
                 return value;
             }
@@ -28,30 +21,28 @@ namespace IntroServer.Server
 
         public void RegisterPeer(string instance, P2PPeer peer)
         {
-            if (_instancePeers.TryGetValue(instance, out List<P2PPeer> peers))
+            if (m_instancePeers.TryGetValue(instance, out List<P2PPeer> peers))
             {
                 peers.Add(peer);
             }
             else
             {
-                _instancePeers.Add(instance, new List<P2PPeer> { peer });
+                m_instancePeers.Add(instance, new List<P2PPeer> { peer });
             }
-
-            _logger.LogDebug("Adding peer to {instance}, total peers in instance {PeerCount}", instance, _instancePeers[instance].Count);
         }
 
         public void RegisterPeer(Guid id, NetPeer peer)
         {
-            if (_peers.ContainsKey(id) == false)
+            if (m_peers.ContainsKey(id) == false)
             {
-                _peers.Add(id, peer);
+                m_peers.Add(id, peer);
             }
         }
 
 
         public void RemovePeer(Guid id)
         {
-            if (_peers.TryGetValue(id, out NetPeer peer))
+            if (m_peers.TryGetValue(id, out NetPeer peer))
             {
                 RemovePeer(peer);
             }
@@ -59,24 +50,25 @@ namespace IntroServer.Server
 
         public void RemovePeer(NetPeer peer)
         {
-            foreach (var instancePeers in _instancePeers)
+            foreach (var instancePeers in m_instancePeers)
             {
                 var peers = instancePeers.Value;
-                foreach(var peerToRemove in peers.Where(p => p.NetPeer == peer).ToList())
+                P2PPeer peerToRemove = peers.SingleOrDefault(p => p.NetPeer == peer);
+                if (peerToRemove != null)
                 {
                     peers.Remove(peerToRemove);
                 }
             }
 
-            Guid id = _peers.SingleOrDefault(kvp => kvp.Value == peer).Key;
+            Guid id = m_peers.Where(e => e.Value == peer).Select(e => e.Key).SingleOrDefault();
 
-            _peers.Remove(id);
+            m_peers.Remove(id);
         }
 
         public bool ContainsP2PPeer(string instance, Guid id)
         {
-            if (_instancePeers.TryGetValue(instance, out var p2PPeers) &&
-               _peers.TryGetValue(id, out var NetPeer))
+            if (m_instancePeers.TryGetValue(instance, out var p2PPeers) &&
+               m_peers.TryGetValue(id, out var NetPeer))
             {
                 return p2PPeers.Where(p => p.NetPeer == NetPeer).Count() > 0;
             }
@@ -85,12 +77,12 @@ namespace IntroServer.Server
 
         public IEnumerable<P2PPeer> GetPeersInInstance(string instance)
         {
-            if (_instancePeers.TryGetValue(instance, out List<P2PPeer> peers))
+            if (m_instancePeers.TryGetValue(instance, out List<P2PPeer> peers))
             {
                 return peers;
             }
 
-            return Array.Empty<P2PPeer>();
+            return new P2PPeer[0];
         }
     }
 }

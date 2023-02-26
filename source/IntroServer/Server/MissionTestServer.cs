@@ -5,7 +5,6 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
-using System.Linq;
 
 namespace IntroServer.Server
 {
@@ -15,15 +14,14 @@ namespace IntroServer.Server
 
 	    private readonly ILogger _logger;
 		private readonly NetManager _netManager;
-        private readonly PeerRegistry _peerRegistry;
+	    private readonly PeerRegistry _peerRegistry = new PeerRegistry();
 
         private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
 
         public MissionTestServer(NetworkConfiguration config, ILogger<MissionTestServer> logger)
         {
 	        _logger = logger;
-            _peerRegistry = new PeerRegistry(logger);
-            _netManager = new NetManager(this)
+	        _netManager = new NetManager(this)
             {
                 NatPunchEnabled = true,
                 //DisconnectTimeout = config.DisconnectTimeout.Milliseconds,
@@ -95,8 +93,8 @@ namespace IntroServer.Server
 
         public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
         {
-            //if (latency > 0)
-				//_logger.LogDebug("Network latency update of {Latency} for {Peer}", latency, peer.EndPoint);
+            if (latency > 0)
+				_logger.LogDebug("Network latency update of {Latency} for {Peer}", latency, peer.EndPoint);
         }
 
         public void OnNetworkReceive(
@@ -141,14 +139,10 @@ namespace IntroServer.Server
 
                 if (_peerRegistry.ContainsP2PPeer(instance, id))
                 {
-                    _logger.LogWarning("Player was already registered for {instance} instance", instance);
                     return;
                 }
 
-                var peers = _peerRegistry.GetPeersInInstance(instance);
-                _logger.LogInformation("Connection {PeerCount} peers via P2P", peers.Count() + 1);
-
-                foreach (var existingPeer in peers)
+                foreach (var existingPeer in _peerRegistry.GetPeersInInstance(instance))
                 {
                     _logger.LogInformation("Connecting {LocalAgent} to {Peer}", localEndPoint, existingPeer.InternalAddr);
                     _netManager.NatPunchModule.NatIntroduce(
@@ -156,7 +150,7 @@ namespace IntroServer.Server
                         existingPeer.ExternalAddr, // host external
                         localEndPoint, // client internal
                         remoteEndPoint, // client external
-                        token + '%' + remoteEndPoint.Address.ToString() // request token
+                        token // request token
                     );
                 }
 
