@@ -58,8 +58,6 @@ namespace Missions.Services.Network
             _client.NatPunch(sceneName);
         }
 
-        
-
         public override void OnRemoveBehavior()
         {
             base.OnRemoveBehavior();

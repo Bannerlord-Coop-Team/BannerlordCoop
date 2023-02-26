@@ -183,11 +183,8 @@ namespace Missions.Services.Network
 
         public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
         {
-            if (type == _networkConfig.NATType)
-            {
-                Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
-                _netManager.Connect(targetEndPoint, token);
-            }
+            Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
+            _netManager.Connect(targetEndPoint, token);
         }
 
         public void OnPeerConnected(NetPeer peer)
@@ -238,18 +235,15 @@ namespace Missions.Services.Network
         {
             string[] data = request.Data.GetString().Split('%');
 
-            if (data.Length != 2) return;
+            if (data.Length != 3) return;
 
             string instance = data[0];
+            IPAddress address = IPAddress.Parse(data[2]);
 
-            if (_instance == instance)
-            {
-                request.Accept();
-            }
-            else
-            {
-                request.Reject();
-            }
+            if (address.Equals(request.RemoteEndPoint.Address)) request.Reject();
+            if (_instance != instance) request.Reject();
+
+            request.Accept();
         }
     }
 }

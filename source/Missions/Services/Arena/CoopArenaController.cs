@@ -180,6 +180,9 @@ namespace Missions.Services
             Guid newAgentId = joinInfo.PlayerId;
             Vec3 startingPos = joinInfo.StartingPosition;
 
+            // If agent already spawned skip
+            if (_agentRegistry.TryGetAgent(newAgentId, out _)) return;
+
             Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer} with {ControlledAgentCount} controlled agents",
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
                 joinInfo.CharacterObject.Name, newAgentId, 
