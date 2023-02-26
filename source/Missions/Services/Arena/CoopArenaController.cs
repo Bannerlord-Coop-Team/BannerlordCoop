@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using LiteNetLib;
 using Missions.Messages;
+using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Agents.Patches;
@@ -59,6 +60,10 @@ namespace Missions.Services
             _networkMessageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
             _networkMessageBroker.Subscribe<AgentDied>(Handler_AgentDeath);
+            _networkMessageBroker.Subscribe<WeaponDropInternal>(WeaponDropHandler.WeaponDropSend);
+            _networkMessageBroker.Subscribe<WeaponDropExternal>(WeaponDropHandler.WeaponDropRecieve);
+            _networkMessageBroker.Subscribe<WeaponPickupInternal>(WeaponPickupHandler.WeaponPickupSend);
+            _networkMessageBroker.Subscribe<WeaponPickupExternal>(WeaponPickupHandler.WeaponPickupReceive);
         }
 
         ~CoopArenaController()
@@ -73,6 +78,8 @@ namespace Missions.Services
             _networkMessageBroker.Unsubscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Unsubscribe<AgentShoot>(Handle_AgentShoot);
             _networkMessageBroker.Unsubscribe<AgentDied>(Handler_AgentDeath);
+            _networkMessageBroker.Unsubscribe<WeaponDropInternal>(WeaponDropHandler.WeaponDropSend);
+            _networkMessageBroker.Unsubscribe<WeaponDropExternal>(WeaponDropHandler.WeaponDropRecieve);
         }
 
         public override void AfterStart()

@@ -152,6 +152,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Services\Agents\Handlers\WeaponDropHandler.cs" />
+    <Compile Include="Services\Agents\Handlers\WeaponPickupHandler.cs" />
+    <Compile Include="Services\Agents\Messages\WeaponDropExternal.cs" />
+    <Compile Include="Services\Agents\Messages\WeaponDropInternal.cs" />
+    <Compile Include="Services\Agents\Messages\WeaponPickupExternal.cs" />
+    <Compile Include="Services\Agents\Messages\WeaponPickupInternal.cs" />
     <Compile Include="Services\Agents\Messages\AgentShoot.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamageData.cs" />
