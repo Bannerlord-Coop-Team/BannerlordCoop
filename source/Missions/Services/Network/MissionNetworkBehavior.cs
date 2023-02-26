@@ -41,15 +41,15 @@ namespace Missions.Services.Network
         public CoopMissionNetworkBehavior(
             LiteNetP2PClient client, 
             INetworkMessageBroker messageBroker,
-            INetworkAgentRegistry agentRegistry)
+            INetworkAgentRegistry agentRegistry,
+            MovementHandler movementHandler,
+            EventPacketHandler eventPacketHandler)
         {
             _client = client;
             _networkMessageBroker = messageBroker;
             _agentRegistry = agentRegistry;
-
-            // TODO DI
-            _movementHandler = new MovementHandler(_client, _networkMessageBroker, _agentRegistry);
-            _eventPacketHandler = new EventPacketHandler(_networkMessageBroker, client.PacketManager);
+            _movementHandler = movementHandler;
+            _eventPacketHandler = eventPacketHandler;
         }
 
         public override void OnRenderingStarted()
