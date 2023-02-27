@@ -19,8 +19,10 @@ namespace Missions.Services.Agents.Patches
             Agent = agent;
             EquipmentIndex = equipmentIndex;
             WeaponObject = weaponObject;
-            WeaponModifier = itemModifier;
-            Banner = banner;
+            if (itemModifier == null) WeaponModifier = new ItemModifier();
+            else WeaponModifier = itemModifier;
+            if (banner == null) Banner = new Banner();
+            else Banner = banner;
         }
     }
 }

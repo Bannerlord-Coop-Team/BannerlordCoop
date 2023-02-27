@@ -1,13 +1,11 @@
 ﻿using Common.Messaging;
-using GameInterface.Serialization.External;
+using Common.Serialization;
 using GameInterface.Serialization;
+using GameInterface.Serialization.External;
 using ProtoBuf;
 using System;
+using System.Diagnostics;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
-using TaleWorlds.MountAndBlade;
-using static TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks;
-using Common.Serialization;
 
 namespace Missions.Services.Agents.Patches
 {
@@ -65,7 +63,7 @@ namespace Missions.Services.Agents.Patches
             var factory = new BinaryPackageFactory();
             var itemObjectPackage = new ItemObjectBinaryPackage(itemObject, factory);
             itemObjectPackage.Pack();
-
+            System.Diagnostics.Debug.WriteLine("packedItemObject");
             return BinaryFormatterSerializer.Serialize(itemObjectPackage);
         }
 
@@ -77,6 +75,7 @@ namespace Missions.Services.Agents.Patches
 
             _itemObject = itemObject.Unpack<ItemObject>();
 
+            System.Diagnostics.Debug.WriteLine("UnpackedItemObject");
             return _itemObject;
         }
 
@@ -86,6 +85,7 @@ namespace Missions.Services.Agents.Patches
             var itemModifierPackage = new ItemModifierBinaryPackage(itemModifier, factory);
             itemModifierPackage.Pack();
 
+            System.Diagnostics.Debug.WriteLine("packedItemMod");
             return BinaryFormatterSerializer.Serialize(itemModifierPackage);
         }
 
@@ -96,7 +96,7 @@ namespace Missions.Services.Agents.Patches
             itemModifier.BinaryPackageFactory = factory;
 
             _itemModifier = itemModifier.Unpack<ItemModifier>();
-
+            System.Diagnostics.Debug.WriteLine("unpackedItemMod");
             return _itemModifier;
         }
 
@@ -107,6 +107,7 @@ namespace Missions.Services.Agents.Patches
             var bannerPackage = new BannerBinaryPackage(banner, factory);
             bannerPackage.Pack();
 
+            System.Diagnostics.Debug.WriteLine("packedBanner");
             return BinaryFormatterSerializer.Serialize(bannerPackage);
         }
 
@@ -118,6 +119,7 @@ namespace Missions.Services.Agents.Patches
 
             _banner = banner.Unpack<Banner>();
 
+            System.Diagnostics.Debug.WriteLine("unpackedBanner");
             return _banner;
         }
     }
