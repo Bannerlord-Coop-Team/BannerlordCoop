@@ -69,17 +69,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CoopObjectManager.cs" />
     <Compile Include="DropoutStack.cs" />
-    <Compile Include="Entity\IController.cs" />
-    <Compile Include="Entity\IEntity.cs" />
-    <Compile Include="Entity\IWrapper.cs" />
-    <Compile Include="Entity\ObjectWrapper.cs" />
     <Compile Include="Extensions\ReflectionExtensions.cs" />
     <Compile Include="Extentions.cs" />
     <Compile Include="FrameLimiter.cs" />
     <Compile Include="GameLoopRunner.cs" />
-    <Compile Include="Globals.cs" />
     <Compile Include="IUpdatable.cs" />
     <Compile Include="Logging\BatchLogger.cs" />
     <Compile Include="Logging\LogManager.cs" />
@@ -97,7 +91,6 @@
     <Compile Include="Network\INetwork.cs" />
     <Compile Include="Network\INetworkConfiguration.cs" />
     <Compile Include="Network\NetworkMessageBroker.cs" />
-    <Compile Include="OrderedHashSet.cs" />
     <Compile Include="PacketHandlers\EventPacketHandler.cs" />
     <Compile Include="PacketHandlers\ExamplePacketHandler.cs" />
     <Compile Include="PacketHandlers\IPacket.cs" />
@@ -107,8 +100,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Serialization\ProtoBufSerializer.cs" />
-    <Compile Include="State\IState.cs" />
-    <Compile Include="UnreliableMessagePayload.cs" />
     <Compile Include="UpdateableList.cs" />
     <Compile Include="UpdatePriority.cs" />
     <Compile Include="Util\GoogleDriveDownloader.cs" />

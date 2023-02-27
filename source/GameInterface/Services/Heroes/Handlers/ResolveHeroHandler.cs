@@ -6,7 +6,7 @@ using Serilog;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
-    internal class ResolveHeroHandler
+    internal class ResolveHeroHandler : IHandler
     {
         private static readonly ILogger Logger = LogManager.GetLogger<NewHeroHandler>();
 

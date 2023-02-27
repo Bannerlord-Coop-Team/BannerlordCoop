@@ -260,6 +260,9 @@
     <Compile Include="Behaviour\InitServerBehaviour.cs" />
     <Compile Include="Extentions\PartyComponentExtensions.cs" />
     <Compile Include="GameInterface.cs" />
+    <Compile Include="Services\Heroes\Handlers\SwitchMobilePartyHandler.cs" />
+    <Compile Include="Services\Heroes\Messages\SwitchToParty.cs" />
+    <Compile Include="Services\MobileParties\Patches\PartyMovementPatch.cs" />
     <Compile Include="Services\Modules\CompatibilityInfo.cs" />
     <Compile Include="Exceptions\Exceptions.cs" />
     <Compile Include="Extentions\CampaignObjectManagerExtentions.cs" />

@@ -19,6 +19,8 @@ namespace GameInterface.Services.MobileParties.Interfaces
     {
         private static readonly MethodInfo PartyBase_OnFinishLoadState = typeof(PartyBase).GetMethod("OnFinishLoadState", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly MethodInfo AddMobileParty = typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        internal static readonly HashSet<MobileParty> ControlledParties = new HashSet<MobileParty>();
         public void ManageNewParty(MobileParty party)
         {
             AddMobileParty.Invoke(Campaign.Current.CampaignObjectManager, new object[] { party });

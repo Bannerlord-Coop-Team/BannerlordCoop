@@ -165,7 +165,6 @@ namespace IntroServer.Server
             {
                 _logger.LogError(ex, "Error while handling NAT introduction: {ErrorMessage}", ex.Message);
             }
-
         }
 
         public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)

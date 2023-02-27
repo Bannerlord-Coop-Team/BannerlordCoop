@@ -2,6 +2,7 @@
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Time.Messages;
 using System;
 
@@ -18,6 +19,8 @@ namespace Coop.Core.Client.States
 
             Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
             Logic.NetworkMessageBroker.Subscribe<MissionStateEntered>(Handle);
+
+            Logic.NetworkMessageBroker.Publish(this, new SwitchToHero(Logic.HeroStringId));
         }
 
         public override void Dispose()
