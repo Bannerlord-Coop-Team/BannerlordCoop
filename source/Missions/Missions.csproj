@@ -158,6 +158,7 @@
     <Compile Include="Services\Agents\Messages\WeaponDropInternal.cs" />
     <Compile Include="Services\Agents\Messages\WeaponPickupExternal.cs" />
     <Compile Include="Services\Agents\Messages\WeaponPickupInternal.cs" />
+    <Compile Include="MissionModule.cs" />
     <Compile Include="Services\Agents\Messages\AgentShoot.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamageData.cs" />
