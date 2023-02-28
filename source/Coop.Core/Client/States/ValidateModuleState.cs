@@ -57,11 +57,12 @@ namespace Coop.Core.Client.States
 
         public override void LoadSavedData()
         {
+#if DEBUG
             Logic.NetworkMessageBroker.Publish(this, new LoadDebugGame());
-
-            // TODO reenable debug code
-            //Logic.State = new LoadingState(Logic);
+            Logic.State = new LoadingState(Logic);
+#else
             Logic.State = new ReceivingSavedDataState(Logic);
+#endif
         }
 
         public override void Connect()

@@ -11,6 +11,7 @@ using Serilog;
 using Serilog.Core;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Interfaces
@@ -19,6 +20,7 @@ namespace GameInterface.Services.Heroes.Interfaces
     {
         void PackageMainHero();
         void ResolveHero(ResolveHero message);
+        Hero SwitchMainHero(string heroId);
         Hero UnpackMainHero(byte[] bytes);
     }
 
@@ -52,6 +54,19 @@ namespace GameInterface.Services.Heroes.Interfaces
         {
             // TODO implement
             messageBroker.Publish(this, new ResolveDebugHero(message.TransactionId, message.PlayerId));
+        }
+
+        public Hero SwitchMainHero(string heroId)
+        {
+            Hero resolvedHero = Campaign.Current?.CampaignObjectManager?.Find<Hero>(heroId);
+
+            if (resolvedHero == default) return default;
+
+            Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
+
+            ChangePlayerCharacterAction.Apply(resolvedHero);
+
+            return resolvedHero;
         }
     }
 }

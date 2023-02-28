@@ -15,7 +15,12 @@ namespace Coop.Core.Client.States
             Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
             Logic.NetworkMessageBroker.Subscribe<NetworkGuidsResolved>(Handle);
 
+#if DEBUG
+            EnterCampaignState();
+#else
             Logic.NetworkMessageBroker.Publish(this, new ResolveNetworkGuids());
+#endif
+
         }
 
         public override void Dispose()
