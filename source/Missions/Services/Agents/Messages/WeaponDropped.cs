@@ -5,12 +5,12 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
 {
-    public readonly struct WeaponDropInternal : IEvent
+    public readonly struct WeaponDropped : IEvent
     {
         public Agent Agent { get; }
         public EquipmentIndex EquipmentIndex { get; }
 
-        public WeaponDropInternal(Agent agent, EquipmentIndex equipmentIndex)
+        public WeaponDropped(Agent agent, EquipmentIndex equipmentIndex)
         {
             Agent = agent;
             EquipmentIndex = equipmentIndex;

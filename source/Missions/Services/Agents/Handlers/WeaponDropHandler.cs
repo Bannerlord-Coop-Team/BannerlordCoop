@@ -16,35 +16,32 @@ namespace Missions.Services.Agents.Handlers
 {
     public class WeaponDropHandler
     {
+        public WeaponDropHandler()
+        {
+            NetworkMessageBroker.Instance.Subscribe<WeaponDropped>(WeaponDropSend);
+            NetworkMessageBroker.Instance.Subscribe<NetworkWeaponDropped>(WeaponDropRecieve);
+        }
 
-        public static void WeaponDropSend(MessagePayload<WeaponDropInternal> obj)
+        ~WeaponDropHandler()
+        {
+            NetworkMessageBroker.Instance.Unsubscribe<WeaponDropped>(WeaponDropSend);
+            NetworkMessageBroker.Instance.Unsubscribe<NetworkWeaponDropped>(WeaponDropRecieve);
+        }
+
+        public void WeaponDropSend(MessagePayload<WeaponDropped> obj)
         {
             NetworkAgentRegistry.Instance.TryGetAgentId(obj.What.Agent, out Guid agentId);
 
-            WeaponDropExternal message = new WeaponDropExternal(agentId, obj.What.EquipmentIndex);
+            NetworkWeaponDropped message = new NetworkWeaponDropped(agentId, obj.What.EquipmentIndex);
 
             NetworkMessageBroker.Instance.PublishNetworkEvent(message);
         }
 
-        public static void WeaponDropRecieve(MessagePayload<WeaponDropExternal> obj)
+        public void WeaponDropRecieve(MessagePayload<NetworkWeaponDropped> obj)
         { 
             NetworkAgentRegistry.Instance.TryGetAgent(obj.What.AgentGuid, out Agent agent);
 
             agent.RemoveEquippedWeapon(obj.What.EquipmentIndex);
         }
     }
-
-    [HarmonyPatch(typeof(Agent), "DropItem")]
-    public class WeaponDropHandlerPatch
-    {
-        static void Postfix(ref Agent __instance, EquipmentIndex itemIndex, WeaponClass pickedUpItemType)
-        {
-            WeaponDropInternal message = new WeaponDropInternal(__instance, itemIndex);
-
-            //Commented out as missiles are not functional yet
-            MessageBroker.Instance.Publish(__instance, message);
-        }
-    }
-
-
 }

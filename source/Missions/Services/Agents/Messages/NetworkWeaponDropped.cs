@@ -7,7 +7,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Services.Agents.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct WeaponDropExternal : INetworkEvent
+    public readonly struct NetworkWeaponDropped : INetworkEvent
     {
         [ProtoMember(1)]
         public Guid AgentGuid { get; }
@@ -15,7 +15,7 @@ namespace Missions.Services.Agents.Messages
         [ProtoMember(2)]
         public EquipmentIndex EquipmentIndex { get; }
 
-        public WeaponDropExternal(Guid agentGuid, EquipmentIndex equipmentIndex)
+        public NetworkWeaponDropped(Guid agentGuid, EquipmentIndex equipmentIndex)
         {
             AgentGuid = agentGuid;
             EquipmentIndex = equipmentIndex;

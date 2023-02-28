@@ -154,10 +154,10 @@
   <ItemGroup>
     <Compile Include="Services\Agents\Handlers\WeaponDropHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponPickupHandler.cs" />
-    <Compile Include="Services\Agents\Messages\WeaponDropExternal.cs" />
-    <Compile Include="Services\Agents\Messages\WeaponDropInternal.cs" />
-    <Compile Include="Services\Agents\Messages\WeaponPickupExternal.cs" />
-    <Compile Include="Services\Agents\Messages\WeaponPickupInternal.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkWeaponDropped.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkWeaponPickedup.cs" />
+    <Compile Include="Services\Agents\Messages\WeaponPickedup.cs" />
+    <Compile Include="Services\Agents\Messages\WeaponDropped.cs" />
     <Compile Include="MissionModule.cs" />
     <Compile Include="Services\Agents\Messages\AgentShoot.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />

@@ -11,7 +11,7 @@ using TaleWorlds.Core;
 namespace Missions.Services.Agents.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    public class WeaponPickupExternal : INetworkEvent
+    public class NetworkWeaponPickedup : INetworkEvent
     {
         [ProtoMember(1)]
         public Guid AgentId { get; }
@@ -46,7 +46,7 @@ namespace Missions.Services.Agents.Messages
         private byte[] _packedBanner;
         private Banner _banner;
 
-        public WeaponPickupExternal(Guid agentId, EquipmentIndex equipmentIndex, ItemObject weaponObject, ItemModifier itemModifier, Banner banner)
+        public NetworkWeaponPickedup(Guid agentId, EquipmentIndex equipmentIndex, ItemObject weaponObject, ItemModifier itemModifier, Banner banner)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
@@ -55,7 +55,7 @@ namespace Missions.Services.Agents.Messages
             Banner = banner;
         }
 
-        public WeaponPickupExternal() { }
+        public NetworkWeaponPickedup() { }
 
         private byte[] PackItemObject(ItemObject itemObject)
         {

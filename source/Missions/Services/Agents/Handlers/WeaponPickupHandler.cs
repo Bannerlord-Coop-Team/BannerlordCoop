@@ -16,19 +16,31 @@ namespace Missions.Services.Agents.Handlers
 {
     public class WeaponPickupHandler
     {
+
+        public WeaponPickupHandler()
+        {
+            NetworkMessageBroker.Instance.Subscribe<WeaponPickedup>(WeaponPickupSend);
+            NetworkMessageBroker.Instance.Subscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
+        }
+        ~WeaponPickupHandler()
+        {
+            NetworkMessageBroker.Instance.Unsubscribe<WeaponPickedup>(WeaponPickupSend);
+            NetworkMessageBroker.Instance.Unsubscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
+        }
+
         private static MethodInfo WeaponEquippedMethod = typeof(Agent).GetMethod("WeaponEquipped", BindingFlags.NonPublic | BindingFlags.Instance);
 
-        public static void WeaponPickupSend(MessagePayload<WeaponPickupInternal> obj)
+        public void WeaponPickupSend(MessagePayload<WeaponPickedup> obj)
         {
             Agent agent = obj.Who as Agent;
 
             NetworkAgentRegistry.Instance.TryGetAgentId(agent, out Guid agentId);
 
-            WeaponPickupExternal message = new WeaponPickupExternal(agentId, obj.What.EquipmentIndex, obj.What.WeaponObject, obj.What.WeaponModifier, obj.What.Banner);
+            NetworkWeaponPickedup message = new NetworkWeaponPickedup(agentId, obj.What.EquipmentIndex, obj.What.WeaponObject, obj.What.WeaponModifier, obj.What.Banner);
 
             NetworkMessageBroker.Instance.PublishNetworkEvent(message);
         }
-        public static void WeaponPickupReceive(MessagePayload<WeaponPickupExternal> obj)
+        public void WeaponPickupReceive(MessagePayload<NetworkWeaponPickedup> obj)
         {
             //ItemObject - ItemModifier - Banner creates MissionWeapon
             MissionWeapon missionWeapon = new MissionWeapon(obj.What.ItemObject, obj.What.ItemModifier, obj.What.Banner);
@@ -47,17 +59,6 @@ namespace Missions.Services.Agents.Handlers
                 false,
                 false
                 });
-        }
-    }
-
-    [HarmonyPatch(typeof(Agent), "EquipWeaponFromSpawnedItemEntity")]
-    public class WeaponPickupHandlerPatch
-    {
-        static void Postfix(ref Agent __instance, EquipmentIndex slotIndex, SpawnedItemEntity spawnedItemEntity, bool removeWeapon)
-        {
-            WeaponPickupInternal message = new WeaponPickupInternal(__instance, slotIndex, spawnedItemEntity.WeaponCopy.Item, spawnedItemEntity.WeaponCopy.ItemModifier, spawnedItemEntity.WeaponCopy.Banner);
-
-            MessageBroker.Instance.Publish(__instance, message);
         }
     }
 }

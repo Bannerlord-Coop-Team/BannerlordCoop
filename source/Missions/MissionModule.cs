@@ -4,6 +4,7 @@ using Common.Network;
 using Common.PacketHandlers;
 using IntroServer.Config;
 using Missions.Services;
+using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Arena;
 using Missions.Services.Network;
@@ -26,6 +27,8 @@ namespace Missions
             builder.RegisterType<CoopArenaController>().AsSelf();
             builder.RegisterType<NetworkConfiguration>().AsSelf();
             builder.RegisterType<MovementHandler>().AsSelf();
+            builder.RegisterType<WeaponDropHandler>().AsSelf().AutoActivate();
+            builder.RegisterType<WeaponPickupHandler>().AsSelf().AutoActivate();
 
             // Singletons
             builder.RegisterInstance(NetworkMessageBroker.Instance)
