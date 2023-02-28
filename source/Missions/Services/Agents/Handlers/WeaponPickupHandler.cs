@@ -27,7 +27,6 @@ namespace Missions.Services.Agents.Handlers
             WeaponPickupExternal message = new WeaponPickupExternal(agentId, obj.What.EquipmentIndex, obj.What.WeaponObject, obj.What.WeaponModifier, obj.What.Banner);
 
             NetworkMessageBroker.Instance.PublishNetworkEvent(message);
-
         }
         public static void WeaponPickupReceive(MessagePayload<WeaponPickupExternal> obj)
         {
