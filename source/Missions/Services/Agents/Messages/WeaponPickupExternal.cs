@@ -3,13 +3,14 @@ using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using ProtoBuf;
+using Serilog.Core;
 using System;
 using System.Diagnostics;
 using TaleWorlds.Core;
 
 namespace Missions.Services.Agents.Patches
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public class WeaponPickupExternal : INetworkEvent
     {
         [ProtoMember(1)]
@@ -18,36 +19,32 @@ namespace Missions.Services.Agents.Patches
         [ProtoMember(2)]
         public EquipmentIndex EquipmentIndex { get; }
 
-        [ProtoMember(3)]
-        private byte[] _packedItemObject;
-
-        [ProtoMember(4)]
-        private byte[] _packedItemModifier;
-
-        [ProtoMember(5)]
-        private byte[] _packedBanner;
-
-        private ItemObject _itemObject; 
-        private ItemModifier _itemModifier;
-        private Banner _banner;
-
         public ItemObject ItemObject
         {
             get { return UnpackItemObject(); }
             set { _packedItemObject = PackItemObject(value); }
         }
+        [ProtoMember(3)]
+        private byte[] _packedItemObject;
+        private ItemObject _itemObject;
 
         public ItemModifier ItemModifier
         {
             get { return UnpackItemModifier(); }
             set { _packedItemModifier = PackItemModifier(value); }
         }
+        [ProtoMember(4)]
+        private byte[] _packedItemModifier;
+        private ItemModifier _itemModifier;
 
         public Banner Banner
         {
             get { return UnpackBanner(); }
             set { _packedBanner = PackBanner(value); }    
         }
+        [ProtoMember(5)]
+        private byte[] _packedBanner;
+        private Banner _banner;
 
         public WeaponPickupExternal(Guid agentId, EquipmentIndex equipmentIndex, ItemObject weaponObject, ItemModifier itemModifier, Banner banner)
         {
@@ -63,19 +60,18 @@ namespace Missions.Services.Agents.Patches
             var factory = new BinaryPackageFactory();
             var itemObjectPackage = new ItemObjectBinaryPackage(itemObject, factory);
             itemObjectPackage.Pack();
-            System.Diagnostics.Debug.WriteLine("packedItemObject");
             return BinaryFormatterSerializer.Serialize(itemObjectPackage);
         }
 
         private ItemObject UnpackItemObject()
         {
+            if (_itemObject != null) return _itemObject;
+
             var factory = new BinaryPackageFactory();
             var itemObject = BinaryFormatterSerializer.Deserialize<ItemObjectBinaryPackage>(_packedItemObject);
             itemObject.BinaryPackageFactory = factory;
 
             _itemObject = itemObject.Unpack<ItemObject>();
-
-            System.Diagnostics.Debug.WriteLine("UnpackedItemObject");
             return _itemObject;
         }
 
@@ -85,21 +81,20 @@ namespace Missions.Services.Agents.Patches
             var itemModifierPackage = new ItemModifierBinaryPackage(itemModifier, factory);
             itemModifierPackage.Pack();
 
-            System.Diagnostics.Debug.WriteLine("packedItemMod");
             return BinaryFormatterSerializer.Serialize(itemModifierPackage);
         }
 
         private ItemModifier UnpackItemModifier()
         {
+            if (_itemModifier != null) return _itemModifier;
+
             var factory = new BinaryPackageFactory();
             var itemModifier = BinaryFormatterSerializer.Deserialize<ItemModifierBinaryPackage>(_packedItemModifier);
             itemModifier.BinaryPackageFactory = factory;
 
             _itemModifier = itemModifier.Unpack<ItemModifier>();
-            System.Diagnostics.Debug.WriteLine("unpackedItemMod");
             return _itemModifier;
         }
-
 
         private byte[] PackBanner(Banner banner)
         {
@@ -107,19 +102,19 @@ namespace Missions.Services.Agents.Patches
             var bannerPackage = new BannerBinaryPackage(banner, factory);
             bannerPackage.Pack();
 
-            System.Diagnostics.Debug.WriteLine("packedBanner");
             return BinaryFormatterSerializer.Serialize(bannerPackage);
         }
 
         private Banner UnpackBanner()
         {
+            if(_banner != null) return _banner;
+
             var factory = new BinaryPackageFactory();
             var banner = BinaryFormatterSerializer.Deserialize<BannerBinaryPackage>(_packedBanner);
             banner.BinaryPackageFactory = factory;
 
             _banner = banner.Unpack<Banner>();
 
-            System.Diagnostics.Debug.WriteLine("unpackedBanner");
             return _banner;
         }
     }

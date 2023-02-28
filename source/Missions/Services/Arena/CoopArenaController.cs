@@ -124,7 +124,7 @@ namespace Missions.Services
                 _agentRegistry.ControlledAgents.TryGetValue(agentDamaData.AttackerAgentId, out effectorAgent);
             }
 
-            if (effectedAgent == null) return;
+            if (effectorAgent == null) return;
             if (effectedAgent == null) return;
 
             // extract the blow
