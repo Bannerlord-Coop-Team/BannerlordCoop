@@ -4,7 +4,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 
-namespace Missions.Services.Agents.Patches
+namespace Missions.Services.Agents.Messages
 {
     public readonly struct WeaponPickupInternal : IEvent
     {

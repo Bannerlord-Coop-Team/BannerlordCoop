@@ -3,7 +3,7 @@ using System;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
-namespace Missions.Services.Agents.Patches
+namespace Missions.Services.Agents.Messages
 {
     public readonly struct WeaponDropInternal : IEvent
     {

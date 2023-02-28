@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using HarmonyLib;
-using Missions.Services.Agents.Patches;
+using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
 using System;
 using System.Collections.Generic;
@@ -33,8 +33,11 @@ namespace Missions.Services.Agents.Handlers
         {
             //ItemObject - ItemModifier - Banner creates MissionWeapon
             MissionWeapon missionWeapon = new MissionWeapon(obj.What.ItemObject, obj.What.ItemModifier, obj.What.Banner);
-            (obj.Who as Agent).Equipment[obj.What.EquipmentIndex] = missionWeapon;
-            WeaponEquippedMethod.Invoke(obj.Who, new object[]
+
+            NetworkAgentRegistry.Instance.TryGetAgent(obj.What.AgentId, out Agent agent);
+            
+            agent.Equipment[obj.What.EquipmentIndex] = missionWeapon;
+            WeaponEquippedMethod.Invoke(agent, new object[]
                 {
                 obj.What.EquipmentIndex,
                 missionWeapon.GetWeaponData(true),

@@ -7,7 +7,7 @@ using System;
 using System.Diagnostics;
 using TaleWorlds.Core;
 
-namespace Missions.Services.Agents.Patches
+namespace Missions.Services.Agents.Messages
 {
     [ProtoContract]
     public class WeaponPickupExternal : INetworkEvent
@@ -57,6 +57,8 @@ namespace Missions.Services.Agents.Patches
             ItemModifier = itemModifier;
             Banner = banner;
         }
+
+        public WeaponPickupExternal() { }
 
         private byte[] PackItemObject(ItemObject itemObject)
         {

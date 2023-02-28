@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using HarmonyLib;
+using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Patches;
 using Missions.Services.Network;
 using System;
@@ -41,7 +42,7 @@ namespace Missions.Services.Agents.Handlers
             WeaponDropInternal message = new WeaponDropInternal(__instance, itemIndex, pickedUpItemType);
 
             //Commented out as missiles are not functional yet
-            //MessageBroker.Instance.Publish(__instance, message);
+            MessageBroker.Instance.Publish(__instance, message);
         }
     }
 
