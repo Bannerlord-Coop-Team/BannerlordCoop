@@ -9,13 +9,11 @@ namespace Missions.Services.Agents.Messages
     {
         public Agent Agent { get; }
         public EquipmentIndex EquipmentIndex { get; }
-        public WeaponClass WeaponClass { get; }
 
-        public WeaponDropInternal(Agent agent, EquipmentIndex equipmentIndex, WeaponClass weaponClass)
+        public WeaponDropInternal(Agent agent, EquipmentIndex equipmentIndex)
         {
             Agent = agent;
             EquipmentIndex = equipmentIndex;
-            WeaponClass = weaponClass;
         }
     }
 }

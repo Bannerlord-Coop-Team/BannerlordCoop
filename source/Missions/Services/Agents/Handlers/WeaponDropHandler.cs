@@ -21,7 +21,7 @@ namespace Missions.Services.Agents.Handlers
         {
             NetworkAgentRegistry.Instance.TryGetAgentId(obj.What.Agent, out Guid agentId);
 
-            WeaponDropExternal message = new WeaponDropExternal(agentId, obj.What.EquipmentIndex, obj.What.WeaponClass);
+            WeaponDropExternal message = new WeaponDropExternal(agentId, obj.What.EquipmentIndex);
 
             NetworkMessageBroker.Instance.PublishNetworkEvent(message);
         }
@@ -30,7 +30,7 @@ namespace Missions.Services.Agents.Handlers
         { 
             NetworkAgentRegistry.Instance.TryGetAgent(obj.What.AgentGuid, out Agent agent);
 
-            agent.DropItem(obj.What.EquipmentIndex, obj.What.WeaponClass);
+            agent.RemoveEquippedWeapon(obj.What.EquipmentIndex);
         }
     }
 
@@ -39,7 +39,7 @@ namespace Missions.Services.Agents.Handlers
     {
         static void Postfix(ref Agent __instance, EquipmentIndex itemIndex, WeaponClass pickedUpItemType)
         {
-            WeaponDropInternal message = new WeaponDropInternal(__instance, itemIndex, pickedUpItemType);
+            WeaponDropInternal message = new WeaponDropInternal(__instance, itemIndex);
 
             //Commented out as missiles are not functional yet
             MessageBroker.Instance.Publish(__instance, message);
