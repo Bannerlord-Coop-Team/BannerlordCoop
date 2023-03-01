@@ -52,12 +52,14 @@ namespace Missions.Services.Agents.Packets
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
-        public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
+        public MovementHandler(LiteNetP2PClient client, 
+            IMessageBroker messageBroker,
+            INetworkAgentRegistry agentRegistry, 
+            IPacketManager packetManager)
         {
-            Logger.Verbose("Creating {name}", this.GetType().Name);
+            Logger.Verbose("Creating {name}", GetType().Name);
 
-            // TODO DI
-            _packetManager = client.PacketManager;
+            _packetManager = packetManager;
             _client = client;
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;

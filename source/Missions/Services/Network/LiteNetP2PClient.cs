@@ -30,7 +30,6 @@ namespace Missions.Services.Network
         public NetPeer PeerServer { get; private set; }
         public int Priority => 2;
 
-        public IPacketManager PacketManager { get; } = new PacketManager();
         public INetworkConfiguration Configuration { get; }
 
         private string _instance;
@@ -41,16 +40,16 @@ namespace Missions.Services.Network
         private readonly NetworkConfiguration _networkConfig;
         private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
         private readonly IMessageBroker _messageBroker;
+        private readonly IPacketManager _packetManager;
         private readonly Poller _poller;
         
-        public LiteNetP2PClient(NetworkConfiguration config)
+        public LiteNetP2PClient(NetworkConfiguration config, 
+            IMessageBroker messageBroker,
+            IPacketManager packetManager)
         {
             _networkConfig = config;
-            // Assigns singleton, to be replaced with DI
-            _messageBroker = new NetworkMessageBroker()
-            {
-                Network = this,
-            };
+            _messageBroker = messageBroker;
+            _packetManager = packetManager;
 
 
             _netManager = new NetManager(this)
@@ -221,7 +220,7 @@ namespace Missions.Services.Network
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
-            PacketManager.HandleRecieve(peer, packet);
+            _packetManager.HandleRecieve(peer, packet);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
