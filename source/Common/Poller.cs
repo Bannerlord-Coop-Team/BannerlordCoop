@@ -28,7 +28,7 @@ namespace Common
 
         public void Start()
         {
-            if (_pollingTask != null) return;
+            if (_isRunning) return;
 
             _pollingTask = Task.Factory.StartNew(StartAsync);
         }

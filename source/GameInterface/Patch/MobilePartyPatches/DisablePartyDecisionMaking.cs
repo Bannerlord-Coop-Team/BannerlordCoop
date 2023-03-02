@@ -1,18 +1,19 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 
 namespace Coop.Mod.Patch.MobilePartyPatches
 {
     [HarmonyPatch()]
     static class DisablePartyDecisionMaking
     {
-        static readonly AccessTools.FieldRef<PartyAi, MobileParty> m_MobilePartyField = 
-            AccessTools.FieldRefAccess<PartyAi, MobileParty>("_mobileParty");
+        static readonly AccessTools.FieldRef<MobilePartyAi, MobileParty> m_MobilePartyField = 
+            AccessTools.FieldRefAccess<MobilePartyAi, MobileParty>("_mobileParty");
         
         [HarmonyPrefix]
-        [HarmonyPatch(typeof(PartyAi), nameof(PartyAi.DoNotMakeNewDecisions), MethodType.Setter)]
-        static bool PrefixDoNotMakeNewDecisionsSetter(PartyAi __instance, ref bool value)
+        [HarmonyPatch(typeof(MobilePartyAi), nameof(MobilePartyAi.DoNotMakeNewDecisions), MethodType.Setter)]
+        static bool PrefixDoNotMakeNewDecisionsSetter(MobilePartyAi __instance, ref bool value)
         {
             //MobileParty party = m_MobilePartyField(__instance);
             //if (party != null && !Coop.IsController(party))

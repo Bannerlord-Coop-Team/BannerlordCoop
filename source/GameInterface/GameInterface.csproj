@@ -308,13 +308,13 @@
     <Compile Include="Serialization\External\MBBodyPropertyBinaryPackage.cs" />
     <Compile Include="Serialization\External\MBCharacterSkillsBinaryPackage.cs" />
     <Compile Include="Serialization\External\KingdomBinaryPackage.cs" />
-    <Compile Include="Serialization\External\CommonAreaPartyComponentBinaryPackage.cs" />
+    <Compile Include="Serialization\External\CustomPartyComponentBinaryPackage.cs" />
     <Compile Include="Serialization\External\CharacterAttributeBinaryPackage.cs" />
     <Compile Include="Serialization\External\LordPartyComponentBinaryPackage.cs" />
     <Compile Include="Serialization\External\BannerComponentBinaryPackage.cs" />
     <Compile Include="Serialization\External\ArmorComponentSerializationTest.cs" />
     <Compile Include="Serialization\External\CharacterPerksBinaryPackage.cs" />
-    <Compile Include="Serialization\External\CommonAreaBinaryPackage.cs" />
+    <Compile Include="Serialization\External\AlleyBinaryPackage.cs" />
     <Compile Include="Serialization\External\MobilePartyBinaryPackage.cs" />
     <Compile Include="Serialization\External\PathFaceRecordBinaryPackage.cs" />
     <Compile Include="Serialization\External\StanceLinkBinaryPackage.cs" />
@@ -378,7 +378,6 @@
     <Compile Include="Serialization\External\CampaignTimeBinaryPackage.cs" />
     <Compile Include="Serialization\External\ClanBinaryPackage.cs" />
     <Compile Include="Serialization\External\HeroBinaryPackage.cs" />
-    <Compile Include="Serialization\External\HeroLastSeenInfoBinaryPackage.cs" />
     <Compile Include="Serialization\Native\IEnumerableBinaryPackage.cs" />
     <Compile Include="Serialization\Native\KeyValuePairBinaryPackage.cs" />
     <Compile Include="Serialization\Native\NativeBinaryPackageCollection.cs" />

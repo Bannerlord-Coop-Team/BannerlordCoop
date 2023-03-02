@@ -37,9 +37,7 @@ namespace GameInterface.Serialization.External
             "_father",
             "_mother",
             "<Issue>k__BackingField",
-            "_cachedLastSeenInformation",
             "_exSpouses",
-            "ExSpouses",
             "_spouse",
             "_children",
         };
@@ -96,12 +94,9 @@ namespace GameInterface.Serialization.External
             Hero_Mother.SetValue(Object, ResolveId<Hero>(motherId));
             Hero_Spouse.SetValue(Object, ResolveId<Hero>(spouseId));
 
-            List<Hero> exSpouses = ResolveIds<Hero>(exSpousesIds).ToList();
+            MBList<Hero> exSpouses = new MBList<Hero>(ResolveIds<Hero>(exSpousesIds));
             Hero_ExSpouses.SetValue(Object, exSpouses);
             Hero_Children.SetValue(Object, ResolveIds<Hero>(childrenIds).ToList());
-
-            // Set the object's ex-spouses list as read-only
-            Object.ExSpouses = exSpouses.GetReadOnlyList();
         }
     }
 }

@@ -10,9 +10,9 @@ namespace GameInterface.Serialization.External
     /// Binary package for PartyAI
     /// </summary>
     [Serializable]
-    public class PartyAIBinaryPackage : BinaryPackageBase<PartyAi>
+    public class PartyAIBinaryPackage : BinaryPackageBase<MobilePartyAi>
     {
-        public PartyAIBinaryPackage(PartyAi obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public PartyAIBinaryPackage(MobilePartyAi obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

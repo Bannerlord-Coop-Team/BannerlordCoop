@@ -175,6 +175,7 @@
     <Compile Include="Services\Agents\Messages\IMovementEvent.cs" />
     <Compile Include="Services\Agents\Messages\MovementInputVectorChanged.cs" />
     <Compile Include="Services\Agents\Messages\AgentMovement.cs" />
+    <Compile Include="MissionModule.cs" />
     <Compile Include="Services\Agents\Messages\AgentShoot.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamageData.cs" />

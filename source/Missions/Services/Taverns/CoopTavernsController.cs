@@ -15,7 +15,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Taverns
 {
-    internal class CoopTavernsController : MissionBehavior
+    public class CoopTavernsController : MissionBehavior, IDisposable
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
@@ -25,19 +25,27 @@ namespace Missions.Services.Taverns
 
         private readonly BoardGameManager _boardGameManager;
 
-        public CoopTavernsController(LiteNetP2PClient client, INetworkMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
+        public CoopTavernsController(LiteNetP2PClient client, 
+            INetworkMessageBroker messageBroker, 
+            INetworkAgentRegistry agentRegistry,
+            BoardGameManager boardGameManager)
         {
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
-
-            _boardGameManager = new BoardGameManager(client, _messageBroker, _agentRegistry);
+            _boardGameManager = boardGameManager;
 
             messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
         }
 
-        ~CoopTavernsController()
+        public void Dispose()
         {
             _messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+        }
+
+        protected override void OnEndMission()
+        {
+            base.OnEndMission();
+            Dispose();
         }
 
         private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)

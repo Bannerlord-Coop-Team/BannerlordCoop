@@ -27,7 +27,7 @@ namespace IntroductionServerTests
             }
 
             var character = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
-            NetworkMissionJoinInfo missionJoinInfo = new NetworkMissionJoinInfo(character, true, default(Guid), default(Vec3), default(Guid[]), default(Vec3[]), Array.Empty<string>());
+            NetworkMissionJoinInfo missionJoinInfo = new NetworkMissionJoinInfo(character, default(bool), default(Guid), default(Vec3), default(Guid[]), default(Vec3[]), Array.Empty<string>());
             EventPacket eventPacket = new EventPacket(missionJoinInfo);
             byte[] bytes = ProtoBufSerializer.Serialize(eventPacket);
 

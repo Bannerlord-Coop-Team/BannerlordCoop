@@ -26,7 +26,7 @@ namespace Missions.Services
     /// <summary>
     /// Mission Controller that does all the logic in the Coop Arena
     /// </summary>
-    internal class CoopArenaController : MissionBehavior, IDisposable
+    public class CoopArenaController : MissionBehavior, IDisposable
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
 
@@ -37,7 +37,7 @@ namespace Missions.Services
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
 
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
-        private readonly CharacterObject[] _gameCharacters;
+        private CharacterObject[] _gameCharacters;
         private readonly Guid _playerId;
 
         public CoopArenaController(
@@ -48,11 +48,6 @@ namespace Missions.Services
             _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
-            
-            _gameCharacters = CharacterObject.All.Where(x => !x.IsHero && x.Age > 18 
-                && !x.BattleEquipments.Any(y => y.HasWeaponOfClass(WeaponClass.Bow) || y.HasWeaponOfClass(WeaponClass.Dagger) || 
-                y.HasWeaponOfClass(WeaponClass.Crossbow) || y.HasWeaponOfClass(WeaponClass.Javelin) || y.HasWeaponOfClass(WeaponClass.ThrowingAxe)
-                || y.HasWeaponOfClass(WeaponClass.ThrowingKnife))).ToArray(); //Remove all HasWeaponOfClass when bows are needed
             _playerId = Guid.NewGuid();
 
             _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
@@ -69,6 +64,8 @@ namespace Missions.Services
 
         public void Dispose()
         {
+            _agentRegistry.Clear();
+
             _networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
             _networkMessageBroker.Unsubscribe<AgentDamageData>(Handle_AgentDamage);
@@ -79,8 +76,11 @@ namespace Missions.Services
         public override void AfterStart()
         {
             AddPlayerToArena();
+            _gameCharacters = CharacterObject.All?.Where(x => !x.IsHero && x.Age > 18
+                && !x.BattleEquipments.Any(y => y.HasWeaponOfClass(WeaponClass.Bow) || y.HasWeaponOfClass(WeaponClass.Dagger) ||
+                y.HasWeaponOfClass(WeaponClass.Crossbow) || y.HasWeaponOfClass(WeaponClass.Javelin) || y.HasWeaponOfClass(WeaponClass.ThrowingAxe)
+                || y.HasWeaponOfClass(WeaponClass.ThrowingKnife))).ToArray(); //Remove all HasWeaponOfClass when bows are needed
         }
-
 
         /// <summary>
         /// A network damage handler for an agent
@@ -369,12 +369,6 @@ namespace Missions.Services
         protected override void OnEndMission()
         {
             base.OnEndMission();
-            _agentRegistry.Clear();
-        }
-
-        public override void HandleOnCloseMission()
-        {
-            base.HandleOnCloseMission();
             Dispose();
         }
     }

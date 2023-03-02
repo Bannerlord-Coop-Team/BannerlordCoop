@@ -18,6 +18,7 @@ namespace GameInterface.Serialization.Native
                 { typeof(KeyValuePair<,>), typeof(KeyValuePairBinaryPackage) },
 
                 { typeof(MBReadOnlyList<>), typeof(MBReadOnlyListBinaryPackage) },
+                { typeof(MBList<>), typeof(MBReadOnlyListBinaryPackage) },
             };
 
             return types;
