@@ -6,7 +6,9 @@ using IntroServer.Config;
 using Missions.Services;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Arena;
+using Missions.Services.BoardGames;
 using Missions.Services.Network;
+using Missions.Services.Taverns;
 
 namespace Missions
 {
@@ -22,9 +24,15 @@ namespace Missions
             }
 
             // Non interface classes
-            builder.RegisterType<CoopMissionNetworkBehavior>().AsSelf();
+            builder.RegisterType<NetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
+
+            // TODO create handler collector
+            builder.RegisterType<ArenaTestGameManager>().AsSelf();
+            builder.RegisterType<TavernsGameManager>().AsSelf();
             builder.RegisterType<CoopArenaController>().AsSelf();
-            builder.RegisterType<NetworkConfiguration>().AsSelf();
+            builder.RegisterType<CoopTavernsController>().AsSelf();
+            builder.RegisterType<BoardGameManager>().AsSelf();
+            builder.RegisterType<CoopMissionNetworkBehavior>().AsSelf();
             builder.RegisterType<MovementHandler>().AsSelf();
 
             // Singletons
@@ -35,9 +43,13 @@ namespace Missions
                 .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
 
 
+            builder.RegisterInstance(NetworkAgentRegistry.Instance)
+                .As<INetworkAgentRegistry>()
+                .SingleInstance();
+
             // Interface classes
-            builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf();
-            builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().SingleInstance();
+            builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
             builder.RegisterType<EventPacketHandler>().As<IPacketHandler>().AsSelf();
             builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();

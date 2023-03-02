@@ -64,6 +64,8 @@ namespace Missions.Services
 
         public void Dispose()
         {
+            _agentRegistry.Clear();
+
             _networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
             _networkMessageBroker.Unsubscribe<AgentDamageData>(Handle_AgentDamage);
@@ -369,12 +371,6 @@ namespace Missions.Services
         protected override void OnEndMission()
         {
             base.OnEndMission();
-            _agentRegistry.Clear();
-        }
-
-        public override void HandleOnCloseMission()
-        {
-            base.HandleOnCloseMission();
             Dispose();
         }
     }

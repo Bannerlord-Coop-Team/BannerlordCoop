@@ -18,23 +18,19 @@ namespace Missions.Services.Agents.Messages
         public Guid VictimAgentId { get; }
 
         [ProtoMember(3)]
-        private byte[] _packedAttackCollisionData;
-
-        [ProtoMember(4)]
         private byte[] _packedBlow;
-
         private Blow _blowObject;
-        private AttackCollisionData _attackCollisionDataObject;
         private bool isBlowUnpacked = false;
-        private bool isAttackCollisionDataUnpacked = false;
-
-
         public Blow Blow
         {
             get { return UnpackBlow(); }
             set { _packedBlow = PackBlow(value); }
         }
 
+        [ProtoMember(4)]
+        private byte[] _packedAttackCollisionData;
+        private AttackCollisionData _attackCollisionDataObject;
+        private bool isAttackCollisionDataUnpacked = false;
         public AttackCollisionData AttackCollisionData
         {
             get { return UnpackAttackCollisionData(); }

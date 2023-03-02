@@ -29,25 +29,23 @@ namespace Missions.Services.Taverns
     public class TavernsGameManager : SandBoxGameManager, IMissionGameManager
     {
         private static readonly ILogger Logger = LogManager.GetLogger<TavernsGameManager>();
-        private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
-        private IContainer _container;
-        private LiteNetP2PClient _client;
+        private readonly LiteNetP2PClient _client;
+        private readonly CoopMissionNetworkBehavior _networkBehavior;
+        private readonly CoopTavernsController _tavernsController;
 
-        public TavernsGameManager(LoadResult loadedGameResult) : base(loadedGameResult)
+        public TavernsGameManager(
+            LoadResult loadedGameResult, 
+            LiteNetP2PClient client,
+            CoopMissionNetworkBehavior networkBehavior,
+            CoopTavernsController tavernsController) : base(loadedGameResult)
         {
-            harmony.PatchAll();
+            _client = client;
+            _networkBehavior = networkBehavior;
+            _tavernsController = tavernsController;
         }
 
         public void StartGame()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<MissionModule>();
-
-            _container = builder.Build();
-
-            _client = _container.Resolve<LiteNetP2PClient>();
-
             if (_client.ConnectToP2PServer())
             {
                 StartNewGame(this);
@@ -76,8 +74,8 @@ namespace Missions.Services.Taverns
             Location tavern = LocationComplex.Current.GetLocationWithId("tavern");
             string scene = tavern.GetSceneName(upgradeLevel);
             Mission mission = SandBoxMissions.OpenIndoorMission(scene, tavern);
-            mission.AddMissionBehavior(_container.Resolve<CoopMissionNetworkBehavior>());
-            mission.AddMissionBehavior(_container.Resolve<CoopTavernsController>());
+            mission.AddMissionBehavior(_networkBehavior);
+            mission.AddMissionBehavior(_tavernsController);
         }
 
         [CommandLineFunctionality.CommandLineArgumentFunction("spawn_tavern_agent", "test")]
@@ -115,12 +113,6 @@ namespace Missions.Services.Taverns
             List<GameEntity> entities = new List<GameEntity>();
             scene.GetEntities(ref entities);
             return entities.Where(entity => entity.Tags.Any(tag => tag.StartsWith("sp_"))).Select(entity => entity.Name).ToArray();
-        }
-
-        public override void OnGameEnd(Game game)
-        {
-            harmony.UnpatchAll();
-            base.OnGameEnd(game);
         }
     }
 }

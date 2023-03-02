@@ -22,12 +22,17 @@ using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.ScreenSystem;
+using Autofac;
+using Missions.Services.Network;
+using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace MissionTestMod
 {
     public class TestMod : MBSubModuleBase
     {
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
+
+        public static IContainer Container { get; private set; }
 
         private static ILogger Logger;
         private static UpdateableList Updateables { get; } = new UpdateableList();
@@ -62,7 +67,9 @@ namespace MissionTestMod
                     .MinimumLevel.Verbose();
             }
 
-            harmony.PatchAll();
+            BuildContainer();
+
+            harmony.PatchAll(typeof(MissionModule).Assembly);
 
             Logger = LogManager.GetLogger<TestMod>();
             RegisterSurrogates();
@@ -88,9 +95,17 @@ namespace MissionTestMod
             Module.CurrentModule.AddInitialStateOption(JoinTavern);
             Module.CurrentModule.AddInitialStateOption(JoinArena);
 
-
             base.OnSubModuleLoad();
             Logger.Verbose("Bannerlord Coop Mod loaded");
+        }
+
+        private void BuildContainer()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<MissionModule>();
+
+            Container = builder.Build();
         }
 
         protected override void OnSubModuleUnloaded()
@@ -145,13 +160,13 @@ namespace MissionTestMod
 
         private static void StartGameTavern(LoadResult loadResult)
         {
-            _gameManager = new TavernsGameManager(loadResult);
+            _gameManager = Container.Resolve<TavernsGameManager>(new NamedParameter("loadedGameResult", loadResult));
             _gameManager.StartGame();
         }
 
         private static void StartGameArena(LoadResult loadResult)
         {
-            _gameManager = new ArenaTestGameManager(loadResult);
+            _gameManager = Container.Resolve<ArenaTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
             _gameManager.StartGame();
         }
     }

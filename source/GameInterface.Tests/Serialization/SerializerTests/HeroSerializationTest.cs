@@ -98,7 +98,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             AssertValuesSame(heroData.Children, newHero.Children);
             AssertValuesSame(heroData.ExSpouses, newHero.ExSpouses);
             AssertValuesSame(heroData.OwnedCaravans.Select(pc => pc.MobileParty), newHero.OwnedCaravans.Select(pc => pc.MobileParty));
-            AssertValuesSame(heroData.OwnedCommonAreas.Select(pc => pc.MobileParty), newHero.OwnedCommonAreas.Select(pc => pc.MobileParty));
+            AssertValuesSame(heroData.OwnedAlleys.Select(pc => pc.Owner), newHero.OwnedAlleys.Select(pc => pc.Owner));
             AssertValuesSame(heroData.OwnedWorkshops, newHero.OwnedWorkshops);
             AssertValuesSame(heroData.SpecialItems, newHero.SpecialItems);
 
@@ -110,7 +110,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Same(heroData.HeroParty, newHero.PartyBelongedTo);
             Assert.Same(heroData.CharacterObject, newHero.CharacterObject);
             Assert.Same(heroData.HomeSettlement, newHero.HomeSettlement);
-            Assert.Same(heroData.LastSeenSettlement, newHero.LastSeenPlace);
             Assert.Same(heroData.Mother, newHero.Mother);
             Assert.Same(heroData.Spouse, newHero.Spouse);
 
@@ -118,6 +117,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(heroData.HeroDeveloper.ToString(), newHero.HeroDeveloper.ToString());
             Assert.Equal(heroData.StaticBodyProperties, newHero.BodyProperties.StaticProperties);
             Assert.Equal(heroData.PartyBelongedToAsPrisoner.ToString(), newHero.PartyBelongedToAsPrisoner.ToString());
+            Assert.Equal(heroData.LastMeetingTimeWithPlayer, newHero.LastMeetingTimeWithPlayer);
             AssertValuesEqual(heroData.VolunteerTypes, newHero.VolunteerTypes);
         }
 
@@ -237,7 +237,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         private static readonly FieldInfo Hero_supporterOf = typeof(Hero).GetField("_supporterOf", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_governorOf = typeof(Hero).GetField("_governorOf", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_ownedWorkshops = typeof(Hero).GetField("_ownedWorkshops", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_OwnedCommonAreas = typeof(Hero).GetField("<OwnedCommonAreas>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        private static readonly FieldInfo Hero_OwnedAlleys = typeof(Hero).GetField("<OwnedAlleys>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_Culture = typeof(Hero).GetField("Culture", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_OwnedCaravans = typeof(Hero).GetField("<OwnedCaravans>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_partyBelongedTo = typeof(Hero).GetField("_partyBelongedTo", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -245,7 +245,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         private static readonly FieldInfo Hero_stayingInSettlement = typeof(Hero).GetField("_stayingInSettlement", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_SpecialItems = typeof(Hero).GetField("SpecialItems", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_hasMet = typeof(Hero).GetField("_hasMet", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_LastMeetingTimeWithPlayer = typeof(Hero).GetField("<LastMeetingTimeWithPlayer>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        private static readonly PropertyInfo Hero_LastMeetingTimeWithPlayer = typeof(Hero).GetProperty(nameof(Hero.LastMeetingTimeWithPlayer));
         private static readonly FieldInfo Hero_bornSettlement = typeof(Hero).GetField("_bornSettlement", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_homeSettlement = typeof(Hero).GetField("_homeSettlement", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_gold = typeof(Hero).GetField("_gold", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -299,7 +299,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hero_Occupation.SetRandom(hero);
             Hero_DeathMark.SetRandom(hero);
             Hero_DeathMarkKillerHero.SetValue(hero, (Hero)FormatterServices.GetUninitializedObject(typeof(Hero)));
-            Hero_lastSeenInformationKnownToPlayer.SetValue(hero, heroData.LastSeenInformation);
+            Hero_lastSeenInformationKnownToPlayer.SetValue(hero, heroData.LastMeetingTimeWithPlayer);
             Hero_SpcDaysInLocation.SetRandom(hero);
             Hero_health.SetRandom(hero);
             Hero_defaultAge.SetRandom(hero);
@@ -311,7 +311,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hero_supporterOf.SetValue(hero, heroData.Clan);
             Hero_governorOf.SetValue(hero, heroData.GoverningTown);
             Hero_ownedWorkshops.SetValue(hero, heroData.OwnedWorkshops);
-            Hero_OwnedCommonAreas.SetValue(hero, heroData.OwnedCommonAreas);
+            Hero_OwnedAlleys.SetValue(hero, heroData.OwnedAlleys);
             Hero_Culture.SetValue(hero, heroData.Culture);
             Hero_OwnedCaravans.SetValue(hero, heroData.OwnedCaravans);
             Hero_partyBelongedTo.SetValue(hero, heroData.HeroParty);
@@ -347,7 +347,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             public CharacterObject CharacterObject { get; private set; }
             public Settlement HomeSettlement { get; private set; }
             public Settlement LastSeenSettlement { get; private set; }
-            public HeroLastSeenInformation LastSeenInformation;
+            public CampaignTime LastMeetingTimeWithPlayer { get; private set; }
             public CharacterTraits CharacterTraits { get; private set; } = new CharacterTraits();
             public CharacterPerks CharacterPerks { get; private set; } = new CharacterPerks();
             public CharacterSkills CharacterSkills { get; private set; } = new CharacterSkills();
@@ -356,7 +356,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             public Clan Clan { get; private set; }
             public Town GoverningTown { get; private set; }
             public List<Workshop> OwnedWorkshops { get; private set; }
-            public List<CommonAreaPartyComponent> OwnedCommonAreas { get; private set; }
+            public List<Alley> OwnedAlleys { get; private set; }
             public CultureObject Culture { get; private set; }
             public List<CaravanPartyComponent> OwnedCaravans { get; private set; }
             public PartyBase PartyBelongedToAsPrisoner { get; private set; }
@@ -420,10 +420,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 LastSeenSettlement.StringId = "Last Seen Settlement";
                 MBObjectManager.Instance.RegisterObject(LastSeenSettlement);
 
-                LastSeenInformation = new HeroLastSeenInformation();
-                LastSeenInformation.LastSeenDate = new CampaignTime();
-                LastSeenInformation.LastSeenPlace = LastSeenSettlement;
-                LastSeenInformation.IsNearbySettlement = true;
+                LastMeetingTimeWithPlayer = new CampaignTime();
             }
 
             static readonly FieldInfo CharacterObject_basicName = typeof(CharacterObject).GetField("_basicName", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -492,10 +489,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                     Workshop_tag.SetValue(workshop, "My Tag");
                 }
 
-                OwnedCommonAreas = new List<CommonAreaPartyComponent>
+                OwnedAlleys = new List<Alley>
                 {
-                    (CommonAreaPartyComponent)FormatterServices.GetUninitializedObject(typeof(CommonAreaPartyComponent)),
-                    (CommonAreaPartyComponent)FormatterServices.GetUninitializedObject(typeof(CommonAreaPartyComponent)),
+                    (Alley)FormatterServices.GetUninitializedObject(typeof(Alley)),
+                    (Alley)FormatterServices.GetUninitializedObject(typeof(Alley)),
                 };
 
                 OwnedCaravans = new List<CaravanPartyComponent>

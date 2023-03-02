@@ -17,7 +17,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.BoardGames
 {
-    public class BoardGameManager
+    public class BoardGameManager : IDisposable
     {
         private readonly ILogger m_Logger = LogManager.GetLogger<BoardGameManager>();
 
@@ -28,15 +28,23 @@ namespace Missions.Services.BoardGames
 
         private BoardGameLogic BoardGameLogic;
 
-        public BoardGameManager(LiteNetP2PClient P2PClient, INetworkMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
+        public BoardGameManager(LiteNetP2PClient P2PClient, 
+            INetworkMessageBroker messageBroker, 
+            INetworkAgentRegistry agentRegistry)
         {
             _P2PClient = P2PClient;
             _networkMessageBroker = messageBroker;
             _agentRegistry = agentRegistry;
 
             _networkMessageBroker.Subscribe<AgentInteraction>(Handle_OnAgentInteraction);
-
             _networkMessageBroker.Subscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
+        }
+
+        public void Dispose()
+        {
+            _networkMessageBroker.Unsubscribe<AgentInteraction>(Handle_OnAgentInteraction);
+            _networkMessageBroker.Unsubscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
+            _networkMessageBroker.Unsubscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
         }
 
         private void Handle_OnAgentInteraction(MessagePayload<AgentInteraction> payload)
@@ -45,7 +53,6 @@ namespace Missions.Services.BoardGames
             {
                 SendGameRequest(payload.What.reqAgent, payload.What.tarAgent);
             }
-
         }
 
         private void SendGameRequest(Agent sender, Agent other)
@@ -54,6 +61,7 @@ namespace Missions.Services.BoardGames
                 _agentRegistry.TryGetAgentId(other, out Guid otherGuid))
             {
                 BoardGameChallengeRequest request = new BoardGameChallengeRequest(senderGuid, otherGuid);
+                // TODO associate a client id so we don't have to subscribe here
                 _networkMessageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
                 _networkMessageBroker.PublishNetworkEvent(request);
             }

@@ -61,11 +61,10 @@ namespace Missions.Services.Network
                 //ReconnectDelay = config.ReconnectDelay.Milliseconds,
             };
 
+            _poller = new Poller(Update, TimeSpan.FromMilliseconds(1000 / 60));
             _netManager.NatPunchModule.Init(this);
 
             _netManager.Start();
-
-            _poller = new Poller(Update, TimeSpan.FromMilliseconds(1000/60));
             _poller.Start();
         }
 
@@ -80,6 +79,22 @@ namespace Missions.Services.Network
             Stop();
         }
 
+        public void Start()
+        {
+            if (_netManager.IsRunning == false)
+            {
+                _netManager.Start();
+                _poller.Start();
+            }
+        }
+
+        public void Stop()
+        {
+            _poller.Stop();
+            _netManager.DisconnectAll();
+            _netManager.Stop();
+        }
+
         public void Update(TimeSpan frameTime)
         {
             _netManager.PollEvents();
@@ -88,6 +103,8 @@ namespace Missions.Services.Network
 
         public bool ConnectToP2PServer()
         {
+            Start();
+
             Logger.Information("Connecting to P2P Server");
             string connectionAddress;
             int port;
@@ -132,18 +149,6 @@ namespace Missions.Services.Network
             {
                 _netManager.NatPunchModule.SendNatIntroduceRequest(_networkConfig.WanAddress.ToString(), _networkConfig.WanPort, token);
             }
-        }
-
-        public void Start()
-        {
-            throw new NotImplementedException();   
-        }
-
-        public void Stop()
-        {
-            _poller.Stop();
-            _netManager.DisconnectAll();
-            _netManager.Stop();
         }
 
         public void Send(NetPeer netPeer, IPacket packet)

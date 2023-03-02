@@ -142,7 +142,7 @@ namespace Missions.Services.Agents.Packets
                     {
                         if(agent.Health > 0)
                         {
-                            agent.MakeDead(false, ActionIndexCache.act_none);
+                            agent.MakeDead(false, ActionIndexValueCache.act_none);
                             agent.FadeOut(false, true);
                         }
                     });

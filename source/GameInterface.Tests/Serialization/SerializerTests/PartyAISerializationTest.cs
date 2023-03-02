@@ -21,7 +21,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void PartyAI_Serialize()
         {
-            PartyAi PartyAI = (PartyAi)FormatterServices.GetUninitializedObject(typeof(PartyAi));
+            MobilePartyAi PartyAI = (MobilePartyAi)FormatterServices.GetUninitializedObject(typeof(MobilePartyAi));
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             PartyAIBinaryPackage package = new PartyAIBinaryPackage(PartyAI, factory);
@@ -33,14 +33,14 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        private static readonly FieldInfo _mobileParty = typeof(PartyAi).GetField("_mobileParty", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly FieldInfo _isDisabled = typeof(PartyAi).GetField("_isDisabled", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly PropertyInfo AiState = typeof(PartyAi).GetProperty(nameof(PartyAi.AiState));
-        private static readonly PropertyInfo DefaultBehavior = typeof(PartyAi).GetProperty("DefaultBehavior", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly PropertyInfo DefaultPosition = typeof(PartyAi).GetProperty("DefaultPosition", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly PropertyInfo DoNotMakeNewDecisions = typeof(PartyAi).GetProperty(nameof(PartyAi.DoNotMakeNewDecisions));
-        private static readonly PropertyInfo Initiative = typeof(PartyAi).GetProperty("Initiative", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly PropertyInfo _enableAgainAtHour = typeof(PartyAi).GetProperty("_enableAgainAtHour", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo _mobileParty = typeof(MobilePartyAi).GetField("_mobileParty", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo _isDisabled = typeof(MobilePartyAi).GetField("_isDisabled", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly PropertyInfo AiState = typeof(MobilePartyAi).GetProperty(nameof(MobilePartyAi.DefaultBehavior));
+        private static readonly PropertyInfo DefaultBehavior = typeof(MobilePartyAi).GetProperty("DefaultBehavior", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly PropertyInfo DefaultPosition = typeof(MobilePartyAi).GetProperty("DefaultPosition", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly PropertyInfo DoNotMakeNewDecisions = typeof(MobilePartyAi).GetProperty(nameof(MobilePartyAi.DoNotMakeNewDecisions));
+        private static readonly PropertyInfo Initiative = typeof(MobilePartyAi).GetProperty("Initiative", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly PropertyInfo _enableAgainAtHour = typeof(MobilePartyAi).GetProperty("_enableAgainAtHour", BindingFlags.NonPublic | BindingFlags.Instance);
         [Fact]
         public void PartyAI_Full_Serialization()
         {
@@ -51,12 +51,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             MBObjectManager.Instance.RegisterObject(party);
 
             // Class setup
-            PartyAi PartyAI = (PartyAi)FormatterServices.GetUninitializedObject(typeof(PartyAi));
+            MobilePartyAi PartyAI = (MobilePartyAi)FormatterServices.GetUninitializedObject(typeof(MobilePartyAi));
 
             _mobileParty.SetValue(PartyAI, party);
             _isDisabled.SetValue(PartyAI, true);
-            AiState.SetValue(PartyAI, AIState.PatrollingAroundCenter);
-            DefaultBehavior.SetValue(PartyAI, AIState.Raiding);
+            AiState.SetValue(PartyAI, AiBehavior.PatrolAroundPoint);
+            DefaultBehavior.SetValue(PartyAI, AiBehavior.RaidSettlement);
             DefaultPosition.SetValue(PartyAI, new Vec2(2, 3));
             DoNotMakeNewDecisions.SetValue(PartyAI, true);
             Initiative.SetValue(PartyAI, 0.99f);
@@ -81,7 +81,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             PartyAIBinaryPackage returnedPackage = (PartyAIBinaryPackage)obj;
 
-            PartyAi newPartyAI = returnedPackage.Unpack<PartyAi>();
+            MobilePartyAi newPartyAI = returnedPackage.Unpack<MobilePartyAi>();
 
             
             Assert.Equal(_isDisabled.GetValue(PartyAI), _isDisabled.GetValue(newPartyAI));

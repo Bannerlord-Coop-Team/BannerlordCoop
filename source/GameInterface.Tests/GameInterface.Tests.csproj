@@ -145,9 +145,8 @@
     <Compile Include="Serialization\SerializerTests\BlowSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\BlowWeaponRecordSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterAttributesSerializationTest.cs" />
-    <Compile Include="Serialization\SerializerTests\CommonAreaPartyComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\AlleySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterPerksSerializationTest.cs" />
-    <Compile Include="Serialization\SerializerTests\CommonAreaSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ItemModifierGroupSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\CharacterObjectSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\KingdomSerializationTest.cs" />
@@ -155,6 +154,7 @@
     <Compile Include="Serialization\SerializerTests\BannerComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ArmorComponentSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\HorseComponentSerializationTest.cs" />
+    <Compile Include="Serialization\SerializerTests\MBListSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\PathFaceRecordSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\AttackCollisionDataSerilizationTest.cs" />
     <Compile Include="Serialization\SerializerTests\StanceLinkSerializationTest.cs" />
@@ -202,7 +202,6 @@
     <Compile Include="Serialization\SerializerTests\BasicCultureObjectSerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\ItemCategorySerializerTest.cs" />
     <Compile Include="Serialization\SerializerTests\DictionarySerializerTest.cs" />
-    <Compile Include="Serialization\SerializerTests\HeroLastSeenInfoSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ClanSerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\ArraySerializationTest.cs" />
     <Compile Include="Serialization\SerializerTests\HashSetSerializationTest.cs" />
