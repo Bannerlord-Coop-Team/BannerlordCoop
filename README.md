@@ -12,7 +12,7 @@ Mod to enjoy the original Mount & Blade II: Bannerlord campaign with other playe
 [Reddit](https://www.reddit.com/r/BannerlordCoop/)
 
 ## Current State
-***There's is absolutely no gameplay so far***.
+***There is absolutely no gameplay so far***.
 
 Currently working with Bannerlord v1.9.0.
 
