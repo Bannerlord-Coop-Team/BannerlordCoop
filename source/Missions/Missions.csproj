@@ -221,14 +221,6 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
-      <Name>Common</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\GameInterface\GameInterface.csproj">
-      <Project>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</Project>
-      <Name>GameInterface</Name>
-    </ProjectReference>
     <ProjectReference Include="..\IntroServer\IntroServer.csproj">
       <Project>{5FF39DA3-DBFC-4C2D-BD03-CD765EE9984B}</Project>
       <Name>IntroServer</Name>
