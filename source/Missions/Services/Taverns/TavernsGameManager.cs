@@ -23,6 +23,7 @@ using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.ScreenSystem;
 
 namespace Missions.Services.Taverns
 {
@@ -52,6 +53,7 @@ namespace Missions.Services.Taverns
             }
             else
             {
+                ScreenManager.PopScreen();
                 Logger.Error("Server Unreachable");
             }
         }

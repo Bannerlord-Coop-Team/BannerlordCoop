@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using Version = System.Version;
 
@@ -61,11 +62,8 @@ namespace Missions.Services.Network
                 //ReconnectDelay = config.ReconnectDelay.Milliseconds,
             };
 
-            _poller = new Poller(Update, TimeSpan.FromMilliseconds(1000 / 60));
+            _poller = new Poller(Update, TimeSpan.FromMilliseconds(1000 / 120));
             _netManager.NatPunchModule.Init(this);
-
-            _netManager.Start();
-            _poller.Start();
         }
 
         ~LiteNetP2PClient()
@@ -129,7 +127,17 @@ namespace Missions.Services.Network
                                             port,
                                             clientInfo.ToString());
 
-            return PeerServer != null;
+            Task connectionTask = Task.Run(WaitForConnection);
+
+            return connectionTask.Wait(TimeSpan.FromSeconds(5));
+        }
+
+        private async Task WaitForConnection()
+        {
+            while (PeerServer.ConnectionState != ConnectionState.Connected)
+            {
+                await Task.Delay(100);
+            }
         }
 
         public void NatPunch(string instance)
