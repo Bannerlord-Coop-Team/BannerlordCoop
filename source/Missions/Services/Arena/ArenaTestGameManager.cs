@@ -51,6 +51,7 @@ namespace Missions.Services.Arena
             else
             {
                 ScreenManager.PopScreen();
+                // TODO add popup message
                 Logger.Error("Server Unreachable");
             }
         }

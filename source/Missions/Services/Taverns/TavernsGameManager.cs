@@ -1,15 +1,9 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
-using Common.Network;
-using HarmonyLib;
-using IntroServer.Config;
 using Missions.Services.Network;
-using Missions.Services.Network.Surrogates;
-using ProtoBuf.Meta;
 using SandBox;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -18,7 +12,6 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
-using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -54,6 +47,7 @@ namespace Missions.Services.Taverns
             else
             {
                 ScreenManager.PopScreen();
+                // TODO add popup message
                 Logger.Error("Server Unreachable");
             }
         }
