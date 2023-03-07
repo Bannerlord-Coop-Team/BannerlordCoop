@@ -22,16 +22,12 @@ using TaleWorlds.SaveSystem;
 
 namespace Missions.Services.Network
 {
-    public class CoopMissionNetworkBehavior : MissionBehavior
+    public class CoopMissionNetworkBehavior : MissionBehavior, IDisposable
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CoopMissionNetworkBehavior>();
 
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
-
         private readonly LiteNetP2PClient _client;
-        private readonly Guid _playerId;
-
-        private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
 
         private readonly INetworkMessageBroker _networkMessageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
@@ -52,20 +48,29 @@ namespace Missions.Services.Network
             _eventPacketHandler = eventPacketHandler;
         }
 
-        public override void OnRenderingStarted()
+        public void Dispose()
         {
-            string sceneName = Mission.SceneName;
-            _client.NatPunch(sceneName);
+            _agentRegistry.Clear();
+            _client.Dispose();
         }
 
-        
+        protected override void OnEndMission()
+        {
+            base.OnEndMission();
+            MBGameManager.EndGame();
+            Dispose();
+        }
 
         public override void OnRemoveBehavior()
         {
             base.OnRemoveBehavior();
+            Dispose();
+        }
 
-            _agentRegistry.Clear();
-            _client.Stop();
+        public override void OnRenderingStarted()
+        {
+            string sceneName = Mission.SceneName;
+            _client.NatPunch(sceneName);
         }
 
         public override void OnAgentDeleted(Agent affectedAgent)
@@ -73,13 +78,6 @@ namespace Missions.Services.Network
             _networkMessageBroker.Publish(this, new AgentDeleted(affectedAgent));
             
             base.OnAgentDeleted(affectedAgent);
-        }
-
-        protected override void OnEndMission()
-        {
-            _client.Dispose();
-            MBGameManager.EndGame();
-            base.OnEndMission();
         }
     }
 }

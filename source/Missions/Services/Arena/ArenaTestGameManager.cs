@@ -1,18 +1,11 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
-using Common.Messaging;
-using Common.Network;
-using HarmonyLib;
-using IntroServer.Config;
 using Missions.Services.Network;
-using Missions.Services.Network.Surrogates;
-using ProtoBuf.Meta;
 using SandBox;
 using SandBox.Missions.MissionLogics;
 using SandBox.Missions.MissionLogics.Arena;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -21,14 +14,13 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
-using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
-using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.ScreenSystem;
 
 namespace Missions.Services.Arena
 {
@@ -36,32 +28,30 @@ namespace Missions.Services.Arena
     {
         private static readonly ILogger Logger = LogManager.GetLogger<ArenaTestGameManager>();
         
-        private LiteNetP2PClient _client;
-        private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
+        private readonly LiteNetP2PClient _client;
+        private readonly CoopArenaController _arenaController;
+        private readonly CoopMissionNetworkBehavior _networkBehavior;
 
-        private IContainer _container;
-
-        public ArenaTestGameManager(LoadResult loadedGameResult) : base(loadedGameResult)
+        public ArenaTestGameManager(LoadResult loadedGameResult, 
+            LiteNetP2PClient client,
+            CoopArenaController arenaController,
+            CoopMissionNetworkBehavior networkBehavior) : base(loadedGameResult)
         {
-            harmony.PatchAll();
+            _client = client;
+            _arenaController = arenaController;
+            _networkBehavior = networkBehavior;
         }
 
         public void StartGame()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<MissionModule>();
-
-            _container = builder.Build();
-
-            _client = _container.Resolve<LiteNetP2PClient>();
-
             if (_client.ConnectToP2PServer())
             {
                 StartNewGame(this);
             }
             else
             {
+                ScreenManager.PopScreen();
+                // TODO add popup message
                 Logger.Error("Server Unreachable");
             }
         }
@@ -109,34 +99,10 @@ namespace Missions.Services.Arena
                 new CampaignMissionComponent(),
                 new EquipmentControllerLeaveLogic(),
                 new MissionAgentHandler(location),
-                _container.Resolve<CoopMissionNetworkBehavior>(),
-                _container.Resolve<CoopArenaController>(),
-                //new CoopMissionNetworkBehavior(_client, NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance),
-                //new CoopArenaController(NetworkMessageBroker.Instance, NetworkAgentRegistry.Instance, new RandomEquipmentGenerator()),
+                _networkBehavior,
+                _arenaController,
                 //ViewCreator.CreateMissionOrderUIHandler(),
             }, true, true);
-        }
-
-        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool isEnemy)
-        {
-            AgentBuildData agentBuildData = new AgentBuildData(character);
-            agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
-            agentBuildData.InitialPosition(startingPos);
-            agentBuildData.Team(isEnemy ? Mission.Current.DefenderTeam : Mission.Current.AttackerTeam);
-            agentBuildData.InitialDirection(Vec2.Forward);
-            agentBuildData.NoHorses(true);
-            agentBuildData.Equipment(character.FirstCivilianEquipment);
-            agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-            agentBuildData.Controller(Agent.ControllerType.None);
-
-            Agent agent = default;
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                agent = Mission.Current.SpawnAgent(agentBuildData);
-                agent.FadeIn();
-            }, true);
-
-            return agent;
         }
 
         public static string[] GetAllSpawnPoints(Scene scene)

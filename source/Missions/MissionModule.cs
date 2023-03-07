@@ -7,7 +7,9 @@ using Missions.Services;
 using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Arena;
+using Missions.Services.BoardGames;
 using Missions.Services.Network;
+using Missions.Services.Taverns;
 
 namespace Missions
 {
@@ -29,7 +31,16 @@ namespace Missions
             builder.RegisterType<MovementHandler>().AsSelf();
             builder.RegisterType<WeaponDropHandler>().AsSelf().AutoActivate();
             builder.RegisterType<WeaponPickupHandler>().AsSelf().AutoActivate();
+            builder.RegisterType<NetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
 
+            // TODO create handler collector
+            builder.RegisterType<ArenaTestGameManager>().AsSelf();
+            builder.RegisterType<TavernsGameManager>().AsSelf();
+            builder.RegisterType<CoopArenaController>().AsSelf();
+            builder.RegisterType<CoopTavernsController>().AsSelf();
+            builder.RegisterType<BoardGameManager>().AsSelf();
+            builder.RegisterType<CoopMissionNetworkBehavior>().AsSelf();
+            
             // Singletons
             builder.RegisterInstance(NetworkMessageBroker.Instance)
                 .As<INetworkMessageBroker>()
@@ -38,12 +49,17 @@ namespace Missions
                 .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
 
 
+            builder.RegisterInstance(NetworkAgentRegistry.Instance)
+                .As<INetworkAgentRegistry>()
+                .SingleInstance();
+
             // Interface classes
-            builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf().SingleInstance();
-            builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().SingleInstance();
-            builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
+            builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
+            
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
-            builder.RegisterType<EventPacketHandler>().As<IPacketHandler>().AsSelf();
+            builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
+            builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<MovementHandler>().AsSelf().InstancePerLifetimeScope();
 
             base.Load(builder);
         }

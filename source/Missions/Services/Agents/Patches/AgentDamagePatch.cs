@@ -26,13 +26,11 @@ namespace Missions.Services.Agents.Patches
             // next, check if the attacker is one of ours, if not, no networking is needed (not our agent dealing damage)
             if (NetworkAgentRegistry.Instance.IsControlled(attackerId) == false) return true;
 
-            AgentDamageData _agentDamageData;
-
             // get the victim GUI
             NetworkAgentRegistry.Instance.AgentToId.TryGetValue(victim, out Guid victimId);
 
             // construct a agent damage data
-            _agentDamageData = new AgentDamageData(attackerId, victimId, collisionData, b);
+            AgentDamageData _agentDamageData = new AgentDamageData(attackerId, victimId, collisionData, b);
 
             // publish the event
             NetworkMessageBroker.Instance.PublishNetworkEvent(_agentDamageData);

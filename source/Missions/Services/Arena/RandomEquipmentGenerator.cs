@@ -25,7 +25,6 @@ namespace Missions.Services.Arena
         //Here im harcoding the elements that are causing the arrows not to spawn and the same for the throwing weapons
         private static readonly HashSet<string> ExcludedItems = new HashSet<string>{"ballista_projectile_burning", "ballista_projectile", "throwing_stone", "boulder",
             "pot", "grapeshot_stack", "grapeshot_fire_stack", "grapeshot_projectile", "grapeshot_fire_projectile" };
-        private static readonly IDictionary<ItemTypeEnum, List<ItemObject>> ExistingItems = InitializeItemDictionary();
         private static readonly ItemTypeEnum[] ArmorLoadout = new ItemTypeEnum[] { ItemTypeEnum.HeadArmor, ItemTypeEnum.Cape, ItemTypeEnum.BodyArmor, ItemTypeEnum.HandArmor, ItemTypeEnum.LegArmor };
         private static readonly ItemTypeEnum[] HorseLoadout = new ItemTypeEnum[] { ItemTypeEnum.Horse, ItemTypeEnum.HorseHarness };
         private static readonly ItemTypeEnum[][] WeaponLoadouts = new ItemTypeEnum[][]
@@ -37,6 +36,7 @@ namespace Missions.Services.Arena
             new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Shield },
         };
 
+        private static IDictionary<ItemTypeEnum, List<ItemObject>> ExistingItems;
 
         private readonly Random Random = new Random();
 
@@ -46,6 +46,8 @@ namespace Missions.Services.Arena
         /// <returns>A dictionary</returns>
         private static IDictionary<ItemTypeEnum, List<ItemObject>> InitializeItemDictionary()
         {
+            if (ExistingItems?.Count > 0) return ExistingItems;
+
             if (Game.Current?.ObjectManager == null) return new Dictionary<ItemTypeEnum, List<ItemObject>>();
 
             IEnumerable<ItemObject> allItems = Game.Current.ObjectManager.GetObjectTypeList<ItemObject>();
@@ -67,7 +69,10 @@ namespace Missions.Services.Arena
             return result;
         }
 
-
+        public RandomEquipmentGenerator()
+        {
+            
+        }
 
         /// <summary>
         /// Creates random equipment for characters
@@ -76,6 +81,8 @@ namespace Missions.Services.Arena
         /// <returns>Equipment object for the character</returns>
         public Equipment CreateRandomEquipment(bool noHorse)
         {
+            ExistingItems = InitializeItemDictionary();
+
             Equipment equipment = new Equipment();
 
             GenerateRandomWeaponEquipment(equipment);

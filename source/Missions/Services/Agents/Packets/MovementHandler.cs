@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Common.PacketHandlers;
 using LiteNetLib;
 using Missions.Services.Network;
@@ -48,17 +49,16 @@ namespace Missions.Services.Agents.Packets
         private readonly CancellationTokenSource m_AgentPollingCancelToken = new CancellationTokenSource();
         private readonly Task m_AgentPollingTask;
         private readonly IPacketManager _packetManager;
-        private readonly LiteNetP2PClient _client;
+        private readonly INetwork _client;
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
-        public MovementHandler(LiteNetP2PClient client, 
-            IMessageBroker messageBroker,
-            INetworkAgentRegistry agentRegistry, 
-            IPacketManager packetManager)
+        public MovementHandler(
+            INetwork client, 
+            IPacketManager packetManager, 
+            IMessageBroker messageBroker, 
+            INetworkAgentRegistry agentRegistry)
         {
-            Logger.Verbose("Creating {name}", GetType().Name);
-
             _packetManager = packetManager;
             _client = client;
             _messageBroker = messageBroker;
@@ -69,7 +69,7 @@ namespace Missions.Services.Agents.Packets
 
             _packetManager.RegisterPacketHandler(this);
 
-            m_AgentPollingTask = Task.Run(PollAgents);
+            m_AgentPollingTask = Task.Factory.StartNew(PollAgents);
         }
 
         ~MovementHandler()
@@ -102,9 +102,12 @@ namespace Missions.Services.Agents.Packets
 
         private async void PollAgents()
         {
-            while (m_AgentPollingCancelToken.IsCancellationRequested == false &&
-                   CurrentMission != null)
+            while (m_AgentPollingCancelToken.IsCancellationRequested == false)
             {
+                await Task.Delay(10);
+
+                if (CurrentMission == null) continue;
+
                 foreach (Guid guid in _agentRegistry.ControlledAgents.Keys)
                 {
                     Agent agent = _agentRegistry.ControlledAgents[guid];
@@ -114,8 +117,6 @@ namespace Missions.Services.Agents.Packets
                         _client.SendAll(packet);
                     }
                 }
-
-                await Task.Delay(10);
             }
         }
 
@@ -144,7 +145,7 @@ namespace Missions.Services.Agents.Packets
                     {
                         if(agent.Health > 0)
                         {
-                            agent.MakeDead(false, ActionIndexCache.act_none);
+                            agent.MakeDead(false, ActionIndexValueCache.act_none);
                             agent.FadeOut(false, true);
                         }
                     });

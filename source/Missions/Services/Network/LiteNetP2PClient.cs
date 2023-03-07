@@ -9,6 +9,7 @@ using IntroServer.Data;
 using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Missions.Services.Agents.Packets;
 using Missions.Services.Network.Messages;
 using Serilog;
 using Serilog.Events;
@@ -17,6 +18,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using Version = System.Version;
 
@@ -24,12 +26,13 @@ namespace Missions.Services.Network
 {
     public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable, INetwork
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
+        private static readonly ILogger _logger = LogManager.GetLogger<LiteNetP2PClient>();
         public int ConnectedPeersCount => _netManager.ConnectedPeersCount;
 
         public NetPeer PeerServer { get; private set; }
         public int Priority => 2;
 
+        public IPacketManager PacketManager { get; private set; }
         public INetworkConfiguration Configuration { get; }
 
         private string _instance;
@@ -43,14 +46,13 @@ namespace Missions.Services.Network
         private readonly IPacketManager _packetManager;
         private readonly Poller _poller;
         
-        public LiteNetP2PClient(NetworkConfiguration config, 
-            IMessageBroker messageBroker,
-            IPacketManager packetManager)
+        public LiteNetP2PClient(NetworkConfiguration config, INetworkMessageBroker messageBroker, IPacketManager packetManager)
         {
+            NetworkMessageBroker.Instance.Network = this;
+
+            PacketManager = packetManager;
             _networkConfig = config;
             _messageBroker = messageBroker;
-            _packetManager = packetManager;
-
 
             _netManager = new NetManager(this)
             {
@@ -60,12 +62,8 @@ namespace Missions.Services.Network
                 //ReconnectDelay = config.ReconnectDelay.Milliseconds,
             };
 
+            _poller = new Poller(Update, TimeSpan.FromMilliseconds(1000 / 120));
             _netManager.NatPunchModule.Init(this);
-
-            _netManager.Start();
-
-            _poller = new Poller(Update, TimeSpan.FromMilliseconds(1000/60));
-            _poller.Start();
         }
 
         ~LiteNetP2PClient()
@@ -79,6 +77,24 @@ namespace Missions.Services.Network
             Stop();
         }
 
+        public void Start()
+        {
+            if (_netManager.IsRunning == false)
+            {
+                _logger.Debug("Starting Client");
+                _netManager.Start();
+                _poller.Start();
+            }
+        }
+
+        public void Stop()
+        {
+            _logger.Debug("Stopping Client");
+            _poller.Stop();
+            _netManager.DisconnectAll();
+            _netManager.Stop();
+        }
+
         public void Update(TimeSpan frameTime)
         {
             _netManager.PollEvents();
@@ -87,7 +103,9 @@ namespace Missions.Services.Network
 
         public bool ConnectToP2PServer()
         {
-            Logger.Information("Connecting to P2P Server");
+            Start();
+
+            _logger.Information("Connecting to P2P Server");
             string connectionAddress;
             int port;
             if (_networkConfig.NATType == NatAddressType.Internal)
@@ -101,7 +119,7 @@ namespace Missions.Services.Network
                 port = _networkConfig.WanPort;
             }
 
-            Logger.Information($"Connecting to {connectionAddress}:{port}");
+            _logger.Information($"Connecting to {connectionAddress}:{port}");
 
             ClientInfo clientInfo = new ClientInfo(
                 id,
@@ -111,7 +129,17 @@ namespace Missions.Services.Network
                                             port,
                                             clientInfo.ToString());
 
-            return PeerServer != null;
+            Task connectionTask = Task.Run(WaitForConnection);
+
+            return connectionTask.Wait(TimeSpan.FromSeconds(1));
+        }
+
+        private async Task WaitForConnection()
+        {
+            while (PeerServer.ConnectionState != ConnectionState.Connected)
+            {
+                await Task.Delay(100);
+            }
         }
 
         public void NatPunch(string instance)
@@ -133,18 +161,6 @@ namespace Missions.Services.Network
             }
         }
 
-        public void Start()
-        {
-            throw new NotImplementedException();   
-        }
-
-        public void Stop()
-        {
-            _poller.Stop();
-            _netManager.DisconnectAll();
-            _netManager.Stop();
-        }
-
         public void Send(NetPeer netPeer, IPacket packet)
         {
             NetDataWriter writer = new NetDataWriter();
@@ -156,7 +172,7 @@ namespace Missions.Services.Network
             }
             catch(Exception ex)
             {
-                Logger.Error("Serialization failed: {ErrMessage}", ex.Message);
+                _logger.Error("Serialization failed: {ErrMessage}", ex.Message);
             }
         }
 
@@ -184,14 +200,14 @@ namespace Missions.Services.Network
         {
             if (type == _networkConfig.NATType)
             {
-                Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
+                _logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
                 _netManager.Connect(targetEndPoint, token);
             }
         }
 
         public void OnPeerConnected(NetPeer peer)
         {
-            if (PeerServer != null && peer != PeerServer)
+            if (PeerServer != null && peer.EndPoint != PeerServer.EndPoint)
             {
                 Task.Factory.StartNew(async () =>
                 {
@@ -200,7 +216,7 @@ namespace Missions.Services.Network
                     _messageBroker.Publish(this, peerConnectedEvent);
                 });
             }
-            Logger.Information("{LocalPort} received connection from {peer}", _netManager.LocalPort, peer.EndPoint);
+            _logger.Information("{LocalPort} received connection from {peer}", _netManager.LocalPort, peer.EndPoint);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
@@ -220,7 +236,8 @@ namespace Missions.Services.Network
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
-            _packetManager.HandleRecieve(peer, packet);
+            _batchLogger.Log(packet.PacketType);
+            PacketManager.HandleRecieve(peer, packet);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)

@@ -227,11 +227,11 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
+    <ProjectReference Include="..\Common\Common\Common.csproj">
+      <Project>{EDD0902C-0E94-4DA4-ADD9-61FD7872E5E5}</Project>
       <Name>Common</Name>
     </ProjectReference>
-    <ProjectReference Include="..\GameInterface\GameInterface.csproj">
+    <ProjectReference Include="..\GameInterface\GameInterface\GameInterface.csproj">
       <Project>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</Project>
       <Name>GameInterface</Name>
     </ProjectReference>
