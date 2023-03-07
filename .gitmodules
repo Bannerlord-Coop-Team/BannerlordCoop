@@ -1,9 +1,3 @@
 [submodule "source/BannerlordTestingEssentials"]
 	path = source/BannerlordTestingEssentials
 	url = git@github.com:Bannerlord-Coop-Team/BannerlordTestingEssentials.git
-[submodule "source/GameInterface"]
-	path = source/GameInterface
-	url = https://github.com/Bannerlord-Coop-Team/GameInterface.git
-[submodule "source/Common"]
-	path = source/Common
-	url = https://github.com/Bannerlord-Coop-Team/Common.git
