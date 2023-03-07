@@ -20,6 +20,7 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
 using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.ScreenSystem;
 
 namespace Missions.Services.Arena
 {
@@ -49,6 +50,8 @@ namespace Missions.Services.Arena
             }
             else
             {
+                ScreenManager.PopScreen();
+                // TODO add popup message
                 Logger.Error("Server Unreachable");
             }
         }

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Common.PacketHandlers;
 using LiteNetLib;
 using Missions.Services.Agents.Messages;
@@ -26,7 +27,7 @@ namespace Missions.Services.Agents.Packets
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
 
         private readonly IPacketManager _packetManager;
-        private readonly LiteNetP2PClient _client;
+        private readonly INetwork _client;
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
@@ -38,10 +39,7 @@ namespace Missions.Services.Agents.Packets
 
         public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
         {
-            Logger.Verbose("Creating {name}", this.GetType().Name);
-
-            // TODO DI
-            _packetManager = client.PacketManager;
+            _packetManager = packetManager;
             _client = client;
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;

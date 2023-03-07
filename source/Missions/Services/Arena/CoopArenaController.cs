@@ -75,11 +75,17 @@ namespace Missions.Services
 
         public override void AfterStart()
         {
+            _gameCharacters = CharacterObject.All?.Where(x => 
+            x.IsHero == false && 
+            x.Age > 18 && 
+            x.BattleEquipments.Any(y => 
+                y.HasWeaponOfClass(WeaponClass.Bow) || 
+                y.HasWeaponOfClass(WeaponClass.Dagger) ||
+                y.HasWeaponOfClass(WeaponClass.Crossbow) || 
+                y.HasWeaponOfClass(WeaponClass.Javelin) || 
+                y.HasWeaponOfClass(WeaponClass.ThrowingAxe) || 
+                y.HasWeaponOfClass(WeaponClass.ThrowingKnife)) == false).ToArray(); //Remove all HasWeaponOfClass when bows are needed
             AddPlayerToArena();
-            _gameCharacters = CharacterObject.All?.Where(x => !x.IsHero && x.Age > 18
-                && !x.BattleEquipments.Any(y => y.HasWeaponOfClass(WeaponClass.Bow) || y.HasWeaponOfClass(WeaponClass.Dagger) ||
-                y.HasWeaponOfClass(WeaponClass.Crossbow) || y.HasWeaponOfClass(WeaponClass.Javelin) || y.HasWeaponOfClass(WeaponClass.ThrowingAxe)
-                || y.HasWeaponOfClass(WeaponClass.ThrowingKnife))).ToArray(); //Remove all HasWeaponOfClass when bows are needed
         }
 
         /// <summary>

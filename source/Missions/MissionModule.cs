@@ -33,8 +33,7 @@ namespace Missions
             builder.RegisterType<CoopTavernsController>().AsSelf();
             builder.RegisterType<BoardGameManager>().AsSelf();
             builder.RegisterType<CoopMissionNetworkBehavior>().AsSelf();
-            builder.RegisterType<MovementHandler>().AsSelf();
-
+            
             // Singletons
             builder.RegisterInstance(NetworkMessageBroker.Instance)
                 .As<INetworkMessageBroker>()
@@ -49,10 +48,11 @@ namespace Missions
 
             // Interface classes
             builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
+            
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
-            builder.RegisterType<EventPacketHandler>().As<IPacketHandler>().AsSelf();
-            builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
+            builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
+            builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<MovementHandler>().AsSelf().InstancePerLifetimeScope();
 
             base.Load(builder);
         }
