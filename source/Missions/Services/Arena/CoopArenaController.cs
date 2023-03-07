@@ -21,6 +21,7 @@ using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.ObjectSystem;
 
 namespace Missions.Services
 {
@@ -77,16 +78,9 @@ namespace Missions.Services
 
         public override void AfterStart()
         {
-            _gameCharacters = CharacterObject.All?.Where(x => 
-            x.IsHero == false && 
-            x.Age > 18 && 
-            x.BattleEquipments.Any(y => 
-                y.HasWeaponOfClass(WeaponClass.Bow) || 
-                y.HasWeaponOfClass(WeaponClass.Dagger) ||
-                y.HasWeaponOfClass(WeaponClass.Crossbow) || 
-                y.HasWeaponOfClass(WeaponClass.Javelin) || 
-                y.HasWeaponOfClass(WeaponClass.ThrowingAxe) || 
-                y.HasWeaponOfClass(WeaponClass.ThrowingKnife)) == false).ToArray(); //Remove all HasWeaponOfClass when bows are needed
+            _gameCharacters = CharacterObject.All?.Where(x =>
+            x.IsHero == false &&
+            x.Age > 18).ToArray();
             AddPlayerToArena();
         }
 
@@ -212,31 +206,31 @@ namespace Missions.Services
 
         public override void OnAgentShootMissile(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
         {
-            if (Agent.Main.Team.TeamAgents.Contains(shooterAgent))
+            if (_agentRegistry.IsControlled(shooterAgent))
             {
+                base.OnAgentShootMissile(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
                 _agentRegistry.TryGetAgentId(shooterAgent, out Guid shooterAgentGuid);
                 AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
-
                 _networkMessageBroker.PublishNetworkEvent(message);
             }
         }
 
-        private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static FieldInfo Mission_missiles = typeof(Mission).GetField("_missiles", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
         private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
         {
             _agentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
 
             AgentShoot shot = payload.What;
+            _agentRegistry.TryGetAgent(shot.AgentGuid, out Agent shooter);
 
-            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { 
-                agentGroupController.ControlledAgents[shot.AgentGuid], 
-                shot.WeaponIndex, 
+            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] {
+                shooter,
+                shot.WeaponIndex,
                 shot.Position,
-                shot.Velocity, 
-                shot.Orientation, 
-                shot.HasRigidBody, 
-                true, 
+                shot.Velocity,
+                shot.Orientation,
+                shot.HasRigidBody,
+                true,
                 shot.ForcedMissileIndex });
         }
 
