@@ -209,7 +209,8 @@ namespace Missions.Services
             if (_agentRegistry.IsControlled(shooterAgent))
             {
                 base.OnAgentShootMissile(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
-                _agentRegistry.TryGetAgentId(shooterAgent, out Guid shooterAgentGuid);
+                Guid shooterAgentGuid = _agentRegistry.AgentToId[shooterAgent];
+                InformationManager.DisplayMessage(new InformationMessage(shooterAgentGuid.ToString()));
                 AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
                 _networkMessageBroker.PublishNetworkEvent(message);
             }
@@ -221,7 +222,8 @@ namespace Missions.Services
             _agentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
 
             AgentShoot shot = payload.What;
-            _agentRegistry.TryGetAgent(shot.AgentGuid, out Agent shooter);
+            //_agentRegistry.TryGetAgent(shot.AgentGuid, out Agent shooter);
+            Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
 
             OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] {
                 shooter,

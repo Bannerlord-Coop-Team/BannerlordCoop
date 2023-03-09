@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Missions.Services.Network;
 using System;
+using LiteNetLib;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
@@ -34,6 +35,27 @@ namespace MissionTests
             Assert.Equal(guid, testId);
             Assert.Equal(newAgent.Age, testAgent.Age);
             Assert.Equal(newAgent, testAgent);
+        }
+
+        [Fact]
+        public void FullTestRemote()
+        {
+            Agent localAgent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+            localAgent.Age = 11;
+            Guid localGuid = Guid.NewGuid();
+            networkAgentRegistry.RegisterControlledAgent(localGuid, localAgent);
+
+            Agent remoteAgent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+            remoteAgent.Age = 10;
+            Guid remoteGuid = Guid.NewGuid();
+            NetPeer netPeer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+            networkAgentRegistry.RegisterNetworkControlledAgent(netPeer, remoteGuid, remoteAgent);
+
+            networkAgentRegistry.TryGetAgent(remoteGuid, out Agent remoteTestAgent);
+            networkAgentRegistry.TryGetAgentId(remoteTestAgent, out Guid remoteTestId);
+
+            Assert.Equal(remoteAgent, remoteTestAgent);
+            Assert.Equal(remoteAgent.Age, remoteTestAgent.Age);
         }
     }
 }
