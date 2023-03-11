@@ -4,7 +4,6 @@ using GameInterface.Tests.Serialization;
 using System.Collections.Generic;
 using System.Globalization;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
 using Xunit.Sdk;
@@ -91,8 +90,6 @@ namespace GameInterface.Tests
         [Fact]
         public void CompatibleWithTest()
         {
-            IEnumerable<ItemObject> allItems = Game.Current.ObjectManager.GetObjectTypeList<ItemObject>();
-
             CompatibilityInfo.ModuleProvider = new TestModuleProvider();
             var compatInfo1 = CompatibilityInfo.Get();
             CompatibilityInfo.ModuleProvider = new TestModuleProvider2();

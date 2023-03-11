@@ -2,8 +2,11 @@
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 
@@ -16,10 +19,14 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             GameBootStrap.Initialize();
         }
 
+        private static readonly FieldInfo BasicCharacterObject_basicName = typeof(BasicCharacterObject).GetField("_basicName", BindingFlags.NonPublic | BindingFlags.Instance);
+
         [Fact]
         public void CharacterObject_Serialize()
         {
             CharacterObject CharacterObject = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
+
+            BasicCharacterObject_basicName.SetValue(CharacterObject, new TextObject("Test Name"));
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             CharacterObjectBinaryPackage package = new CharacterObjectBinaryPackage(CharacterObject, factory);
@@ -35,6 +42,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void CharacterObject_Full_Serialization()
         {
             CharacterObject CharacterObject = new CharacterObject();
+
+            BasicCharacterObject_basicName.SetValue(CharacterObject, new TextObject("Test Name"));
 
             CharacterObject[] characterMembers = new CharacterObject[]
             {
@@ -88,6 +97,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void CharacterObject_StringId_Serialization()
         {
             CharacterObject CharacterObject = MBObjectManager.Instance.CreateObject<CharacterObject>();
+
+            BasicCharacterObject_basicName.SetValue(CharacterObject, new TextObject("Test Name"));
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             CharacterObjectBinaryPackage package = new CharacterObjectBinaryPackage(CharacterObject, factory);

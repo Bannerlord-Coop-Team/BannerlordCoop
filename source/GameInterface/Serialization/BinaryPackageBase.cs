@@ -1,7 +1,4 @@
-﻿using Common.Logging;
-using Serilog;
-using Serilog.Core;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -26,8 +23,6 @@ namespace GameInterface.Serialization
     [Serializable]
     public abstract class BinaryPackageBase<T> : IBinaryPackage
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<BinaryPackageBase<T>>();
-
         [NonSerialized]
         private bool IsUnpacked = false;
 

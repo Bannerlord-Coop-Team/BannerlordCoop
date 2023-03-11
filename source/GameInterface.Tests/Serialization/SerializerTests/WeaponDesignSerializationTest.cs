@@ -11,6 +11,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class WeaponDesignSerializationTest
     {
+
+        private static readonly PropertyInfo BuildOrders = typeof(CraftingTemplate).GetProperty(nameof(CraftingTemplate.BuildOrders));
         public WeaponDesignSerializationTest()
         {
             GameBootStrap.Initialize();
@@ -33,7 +35,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             };
 
             CraftingTemplate craftingTemplate = new CraftingTemplate();
-            typeof(CraftingTemplate).GetField("_buildOrders", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(craftingTemplate, buildOrders);
+            BuildOrders.SetValue(craftingTemplate, buildOrders);
             WeaponDesign WeaponDesign = new WeaponDesign(craftingTemplate, new TextObject("testValue"), elements);
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
@@ -63,7 +65,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             };
 
             CraftingTemplate craftingTemplate = MBObjectManager.Instance.CreateObject<CraftingTemplate>();
-            typeof(CraftingTemplate).GetField("_buildOrders", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(craftingTemplate, buildOrders);
+            BuildOrders.SetValue(craftingTemplate, buildOrders);
             WeaponDesign WeaponDesign = new WeaponDesign(craftingTemplate, new TextObject("testValue"), elements);
 
             BinaryPackageFactory factory = new BinaryPackageFactory();

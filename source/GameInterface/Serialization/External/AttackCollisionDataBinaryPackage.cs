@@ -1,17 +1,16 @@
 ﻿using Common.Extensions;
 using System;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Serialization.External
 {
     [Serializable]
-    public class HeroLastSeenInfoBinaryPackage : BinaryPackageBase<Hero.HeroLastSeenInformation>
+    public class AttackCollisionDataBinaryPackage : BinaryPackageBase<AttackCollisionData>
     {
-        public HeroLastSeenInfoBinaryPackage(Hero.HeroLastSeenInformation obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public AttackCollisionDataBinaryPackage(AttackCollisionData obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
-
         protected override void PackInternal()
         {
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields())

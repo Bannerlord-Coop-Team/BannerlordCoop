@@ -6,8 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
-using GameInterface.Extentions;
-using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.External
 {
@@ -49,13 +48,6 @@ namespace GameInterface.Serialization.External
             "_settlementsCache",
             "_villagesCache",
             "_fiefsCache",
-            "<Armies>k__BackingField",
-            "<Fiefs>k__BackingField",
-            "<Villages>k__BackingField",
-            "<Settlements>k__BackingField",
-            "<Heroes>k__BackingField",
-            "<Lords>k__BackingField",
-            "<WarPartyComponents>k__BackingField",
         };
 
         protected override void PackInternal()
@@ -102,16 +94,12 @@ namespace GameInterface.Serialization.External
             // Cached WarPartyComponents are handed in the
             // BanditComponentBinaryPackage and LordPartyComponentBinaryPackage
 
-            Kingdom_Clans.SetValue(Object, ResolveIds<Clan>(clanIds).ToList());
-            Kingdom_Fiefs.SetValue(Object, ResolveIds<Town>(fiefIds).ToList());
-            Kingdom_Heroes.SetValue(Object, ResolveIds<Hero>(heroIds).ToList());
-            Kingdom_Lords.SetValue(Object, ResolveIds<Hero>(lordIds).ToList());
-            Kingdom_Settlements.SetValue(Object, ResolveIds<Settlement>(settlementIds).ToList());
-            Kingdom_Villages.SetValue(Object, ResolveIds<Village>(villageIds).ToList());
-
-            Object.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Kingdom>("TransferredKingdom");
-
-            Campaign.Current?.CampaignObjectManager?.AddKingdom(Object);
+            Kingdom_Clans.SetValue(Object, ResolveIds<Clan>(clanIds).ToMBList());
+            Kingdom_Fiefs.SetValue(Object, ResolveIds<Town>(fiefIds).ToMBList());
+            Kingdom_Heroes.SetValue(Object, ResolveIds<Hero>(heroIds).ToMBList());
+            Kingdom_Lords.SetValue(Object, ResolveIds<Hero>(lordIds).ToMBList());
+            Kingdom_Settlements.SetValue(Object, ResolveIds<Settlement>(settlementIds).ToMBList());
+            Kingdom_Villages.SetValue(Object, ResolveIds<Village>(villageIds).ToMBList());
         }
     }
 }

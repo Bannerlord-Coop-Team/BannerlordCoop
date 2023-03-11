@@ -2,24 +2,20 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Serialization.External
 {
-    /// <summary>
-    /// Binary package for PartyAI
-    /// </summary>
     [Serializable]
-    public class PartyAIBinaryPackage : BinaryPackageBase<PartyAi>
+    public class CustomPartyComponentBinaryPackage : BinaryPackageBase<CustomPartyComponent>
     {
-        public PartyAIBinaryPackage(PartyAi obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CustomPartyComponentBinaryPackage(CustomPartyComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
-        private static readonly HashSet<string> excludes = new HashSet<string>
+        static readonly HashSet<string> excludes = new HashSet<string>
         {
-            "<DefaultBehaviorTarget>k__BackingField",
-            "<AiStateObject>k__BackingField",
+            "_cachedName",
         };
 
         protected override void PackInternal()

@@ -4,7 +4,6 @@ using Common.PacketHandlers;
 using LiteNetLib;
 using Moq;
 using ProtoBuf;
-using Xunit;
 
 namespace Common.Tests.Messaging
 {

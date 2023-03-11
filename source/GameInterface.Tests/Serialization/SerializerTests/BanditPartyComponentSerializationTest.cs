@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 using GameInterface.Tests.Bootstrap;
+using TaleWorlds.Library;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -47,9 +48,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void BanditPartyComponent_Full_Serialization()
         {
             Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
-            List<Hideout> allhideouts = new List<Hideout>();
-            Hideout hideout = new Hideout();
-            allhideouts.Add(hideout);
+
+            Hideout hideout = (Hideout)FormatterServices.GetUninitializedObject(typeof(Hideout));
+            var allhideouts = new MBList<Hideout>
+            {
+                hideout
+            };
+
             Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
 
             MobileParty mobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));

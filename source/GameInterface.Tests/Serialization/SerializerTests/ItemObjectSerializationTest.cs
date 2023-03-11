@@ -66,6 +66,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void ItemObject_StringId_Serialization()
         {
             ItemObject itemObject = MBObjectManager.Instance.CreateObject<ItemObject>();
+            itemObject.StringId = "My Item";
+
+            MBObjectManager.Instance.RegisterObject(itemObject);
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             ItemObjectBinaryPackage package = new ItemObjectBinaryPackage(itemObject, factory);
