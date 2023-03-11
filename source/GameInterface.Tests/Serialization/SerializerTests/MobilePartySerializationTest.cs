@@ -1,12 +1,9 @@
-﻿using Coop.Mod.Extentions;
-using GameInterface.Extentions;
-using GameInterface.Serialization;
+﻿using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit;
@@ -39,18 +36,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void MobileParty_Full_Serialization()
         {
             MobileParty mobilePartyObject = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
-            LordPartyComponent partyComponent = (LordPartyComponent)FormatterServices.GetUninitializedObject(typeof(LordPartyComponent));
-
-            
 
             // Assign non default values to mobile party
             mobilePartyObject.SetCustomName(new TextObject("Custom Name"));
             mobilePartyObject.Aggressiveness = 56;
             mobilePartyObject.IsActive = true;
-            mobilePartyObject.SetPartyComponent(partyComponent);
-
-            // Assign non default values to partyComponent
-            partyComponent.SetMobileParty(mobilePartyObject);
 
             Hero surgeon = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
             surgeon.StringId = "My Surgeon";
@@ -81,8 +71,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(mobilePartyObject.Aggressiveness, newMobilePartyObject.Aggressiveness);
             Assert.Equal(mobilePartyObject.IsActive, newMobilePartyObject.IsActive);
             Assert.Same(mobilePartyObject.EffectiveSurgeon, newMobilePartyObject.EffectiveSurgeon);
-
-            Assert.NotNull(newMobilePartyObject.PartyComponent.MobileParty);
         }
     }
 }

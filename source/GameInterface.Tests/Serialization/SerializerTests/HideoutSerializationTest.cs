@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -17,7 +18,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void Hideout_Serialize()
         {
             Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
-            List<Hideout> allhideouts = new List<Hideout>();
+            MBList<Hideout> allhideouts = new MBList<Hideout>();
             Hideout item = new Hideout();
             allhideouts.Add(item);
             Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
@@ -36,11 +37,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Hideout_Full_Serialization()
         {
-            List<Hideout> allhideouts = new List<Hideout>();
-
-            Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
-            Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
-
             Hideout hideout = new Hideout
             {
                 IsSpotted = true
@@ -49,8 +45,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hideout_nextPossibleAttackTime.SetValue(hideout, new CampaignTime());
             Hideout_SceneName.SetValue(hideout, "something");
 
-            allhideouts.Add(hideout);
-            
+            MBList<Hideout> allhideouts = new MBList<Hideout> { hideout };
+
+            Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
+            Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
+
             BinaryPackageFactory factory = new BinaryPackageFactory();
             HideoutBinaryPackage package = new HideoutBinaryPackage(hideout, factory);
 

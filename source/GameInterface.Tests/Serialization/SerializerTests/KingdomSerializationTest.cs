@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 
@@ -23,7 +24,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Kingdom_Serialize()
         {
-            Kingdom kingdomObject = new Kingdom();           
+            Kingdom kingdomObject = (Kingdom)FormatterServices.GetUninitializedObject(typeof(Kingdom));
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             KingdomBinaryPackage package = new KingdomBinaryPackage(kingdomObject, factory);
@@ -40,7 +41,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Kingdom_Full_Serialization()
         {
-            Kingdom kingdomObject = new Kingdom();
+            Kingdom kingdomObject = (Kingdom)FormatterServices.GetUninitializedObject(typeof(Kingdom));
             // StringId is required as unpack throws exception if null
             kingdomObject.StringId = "My Kingdom";
 

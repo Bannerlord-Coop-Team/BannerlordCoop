@@ -4,6 +4,7 @@ using GameInterface.Tests.Bootstrap;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 
@@ -57,7 +58,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Monster monster = MBObjectManager.Instance.CreateObject<Monster>();
             Monster.SetValue(HorseComponent, monster);
 
-            _monsterMaterialNames.SetValue(HorseComponent, new List<HorseComponent.MaterialProperty>
+            _monsterMaterialNames.SetValue(HorseComponent, new MBList<HorseComponent.MaterialProperty>
             {
                 new HorseComponent.MaterialProperty("mat1"),
                 new HorseComponent.MaterialProperty("mat2"),

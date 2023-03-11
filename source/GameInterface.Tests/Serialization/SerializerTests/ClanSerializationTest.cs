@@ -6,6 +6,7 @@ using System.Runtime.Serialization;
 using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;
 using System.Collections.Generic;
+using TaleWorlds.Library;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -49,7 +50,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             testClan.LastFactionChangeTime = time;
             testClan.AutoRecruitmentExpenses = 68;
 
-            List<Hero> heroes = new List<Hero>
+            var heroes = new MBList<Hero>
             {
                 hero1,
                 hero2

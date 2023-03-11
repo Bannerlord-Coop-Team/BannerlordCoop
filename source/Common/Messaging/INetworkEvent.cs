@@ -1,6 +1,4 @@
-﻿using ProtoBuf;
-
-namespace Common.Messaging
+﻿namespace Common.Messaging
 {
     /// <summary>
     /// Events that occur over a network

@@ -4,15 +4,15 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches
 {
-    [HarmonyPatch(typeof(PartyAi))]
+    [HarmonyPatch(typeof(MobilePartyAi))]
     static class DisablePartyDecisionMaking
     {
-        static readonly AccessTools.FieldRef<PartyAi, MobileParty> m_MobilePartyField =
-            AccessTools.FieldRefAccess<PartyAi, MobileParty>("_mobileParty");
+        static readonly AccessTools.FieldRef<MobilePartyAi, MobileParty> m_MobilePartyField =
+            AccessTools.FieldRefAccess<MobilePartyAi, MobileParty>("_mobileParty");
 
         [HarmonyPrefix]
-        [HarmonyPatch(nameof(PartyAi.DoNotMakeNewDecisions), MethodType.Setter)]
-        static bool PrefixDoNotMakeNewDecisionsSetter(PartyAi __instance, ref bool value)
+        [HarmonyPatch(nameof(MobilePartyAi.DoNotMakeNewDecisions), MethodType.Setter)]
+        static bool PrefixDoNotMakeNewDecisionsSetter(MobilePartyAi __instance, ref bool value)
         {
             //MobileParty party = m_MobilePartyField(__instance);
             //if (party != null && !Coop.IsController(party))

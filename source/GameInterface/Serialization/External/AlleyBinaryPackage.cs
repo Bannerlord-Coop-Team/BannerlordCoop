@@ -8,12 +8,12 @@ namespace GameInterface.Serialization.External
     /// Binary package for CommonArea
     /// </summary>
     [Serializable]
-    public class CommonAreaBinaryPackage : BinaryPackageBase<CommonArea>
+    public class AlleyBinaryPackage : BinaryPackageBase<Alley>
     {
         private string settlementStringId;
         private int commonAreaIndex;
 
-        public CommonAreaBinaryPackage(CommonArea obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public AlleyBinaryPackage(Alley obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -23,7 +23,7 @@ namespace GameInterface.Serialization.External
 
             // CommonArea is generated once per campaign so we can resolve it by
             // Using the index of that common area in it's settlement
-            commonAreaIndex = Object.Settlement.CommonAreas.FindIndex(i => i == Object);
+            commonAreaIndex = Object.Settlement.Alleys.FindIndex(i => i == Object);
         }
 
         protected override void UnpackInternal()
@@ -32,7 +32,7 @@ namespace GameInterface.Serialization.External
 
             // CommonArea is generated once per campaign so we can resolve it by
             // Using the index of that common area in it's settlement
-            Object = settlement.CommonAreas[commonAreaIndex];
+            Object = settlement.Alleys[commonAreaIndex];
         }
     }
 }

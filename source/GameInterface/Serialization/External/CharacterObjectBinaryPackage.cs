@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.External
 {
@@ -17,6 +19,8 @@ namespace GameInterface.Serialization.External
         public static readonly FieldInfo CharacterObject_civilianEquipmentTemplate = typeof(CharacterObject).GetField("_civilianEquipmentTemplate", BindingFlags.NonPublic | BindingFlags.Instance);
         public static readonly FieldInfo CharacterObject_originCharacter = typeof(CharacterObject).GetField("_originCharacter", BindingFlags.NonPublic | BindingFlags.Instance);
         public static readonly PropertyInfo CharacterObject_UpgradeTargets = typeof(CharacterObject).GetProperty(nameof(CharacterObject.UpgradeTargets));
+
+        string stringId;
 
         string battleEquipmentTemplateId;
         string civilianEquipmentTemplateId;
@@ -37,6 +41,8 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
+            stringId = Object.StringId ?? string.Empty;
+
             // Iterate through all of the instance fields of the object's type, excluding any fields that are specified in the Excludes collection
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields(Excludes))
             {
@@ -64,6 +70,13 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
+            CharacterObject characterObject = MBObjectManager.Instance.GetObject<CharacterObject>(stringId);
+            if (characterObject != null)
+            {
+                Object = characterObject;
+                return;
+            }
+
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {

@@ -3,6 +3,7 @@ using GameInterface.Serialization.External;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
@@ -30,7 +31,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             ItemModifierGroup ItemModifierGroup = new ItemModifierGroup();
 
-            List<ItemModifier> _modifiers = new List<ItemModifier>
+            var _modifiers = new MBList<ItemModifier>
             {
                 new ItemModifier { StringId = "im1" },
                 new ItemModifier { StringId = "im2"},
