@@ -35,18 +35,18 @@ namespace Common.Serialization
 
         public static byte[] Serialize(object obj)
         {
+            ProtoMessageWrapper wrapper;
             using (MemoryStream WrapperStream = new MemoryStream())
             {
                 Serializer.Serialize(WrapperStream, obj);
-                ProtoMessageWrapper wrapper = new ProtoMessageWrapper(obj.GetType(), WrapperStream.ToArray());
-
-                using (MemoryStream InternalStream = new MemoryStream())
-                {
-                    Serializer.Serialize(InternalStream, wrapper);
-                    return InternalStream.ToArray();
-                }
+                wrapper = new ProtoMessageWrapper(obj.GetType(), WrapperStream.ToArray());
             }
 
+            using (MemoryStream InternalStream = new MemoryStream())
+            {
+                Serializer.Serialize(InternalStream, wrapper);
+                return InternalStream.ToArray();
+            }
         }
     }
 }

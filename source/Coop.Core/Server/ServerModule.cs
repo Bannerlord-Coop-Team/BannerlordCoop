@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.LogicStates;
 using Common.Network;
+using Coop.Core.Common.Services.PartyMovement;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.States;
 using LiteNetLib;
@@ -18,6 +19,9 @@ namespace Coop.Core.Server
             builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().SingleInstance();
             builder.RegisterType<InitialServerState>().As<IServerState>();
             builder.RegisterType<ClientRegistry>().As<IClientRegistry>().SingleInstance();
+
+            builder.RegisterType<PartyMovementHandler>().As<IPartyMovementHandler>().SingleInstance().AutoActivate();
+
             base.Load(builder);
         }
     }

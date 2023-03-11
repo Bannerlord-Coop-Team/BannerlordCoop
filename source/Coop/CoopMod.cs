@@ -1,9 +1,9 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Serialization;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
 using Coop.UI;
-using Coop.UI.LoadGameUI;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -50,6 +50,8 @@ namespace Coop
         private bool isServer = false;
         public override void NoHarmonyInit() 
         {
+            ProtoBufSerializer.Serialize(1);
+
             var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
             
             if (args.Contains("/server"))

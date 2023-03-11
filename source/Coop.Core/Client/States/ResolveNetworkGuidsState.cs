@@ -20,7 +20,6 @@ namespace Coop.Core.Client.States
 #else
             Logic.NetworkMessageBroker.Publish(this, new ResolveNetworkGuids());
 #endif
-
         }
 
         public override void Dispose()
