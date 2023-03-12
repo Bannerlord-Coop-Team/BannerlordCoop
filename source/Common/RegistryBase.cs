@@ -15,7 +15,15 @@ namespace Common
         /// </summary>
         /// <param name="item">Object to register with Guid</param>
         /// <returns>True if registration was successful, otherwise false</returns>
-        public virtual bool Register(T item) => _dictionary.Add(Guid.NewGuid(), item);
+        public virtual bool RegisterNewObject(T item) => _dictionary.Add(Guid.NewGuid(), item);
+
+        /// <summary>
+        /// Register an object with an existing Guid
+        /// </summary>
+        /// <param name="item">Id to associate object with</param>
+        /// <param name="item">Object to register with Guid</param>
+        /// <returns>True if registration was successful, otherwise false</returns>
+        public virtual bool RegisterExistingObject(Guid id, T item) => _dictionary.Add(id, item);
 
         /// <summary>
         /// Remove a registered object from the registry.
