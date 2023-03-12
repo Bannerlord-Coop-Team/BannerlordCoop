@@ -126,7 +126,7 @@ namespace Missions.Services
             }
 
             if (effectedAgent == null) return;
-            if (effectedAgent == null) return;
+            if (effectorAgent == null) return;
 
             // extract the blow
             Blow b = agentDamaData.Blow;
