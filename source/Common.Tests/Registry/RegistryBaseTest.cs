@@ -5,7 +5,7 @@
         [Fact]
         public void Register()
         {
-            var registry = new RegistryBase<TestClass>();
+            var registry = new TestClassRegistry();
 
             Assert.True(registry.Register(new TestClass()));
             Assert.Equal(1, registry.Count);
@@ -16,7 +16,7 @@
         {
             var testClass = new TestClass();
 
-            var registry = new RegistryBase<TestClass>();
+            var registry = new TestClassRegistry();
 
             Assert.True(registry.Register(testClass));
             Assert.False(registry.Register(testClass));
@@ -27,7 +27,7 @@
         {
             var testClass = new TestClass();
 
-            var registry = new RegistryBase<TestClass>();
+            var registry = new TestClassRegistry();
 
             Assert.True(registry.Register(testClass));
             Assert.Equal(1, registry.Count);
@@ -42,7 +42,7 @@
         {
             var testClass = new TestClass();
 
-            var registry = new RegistryBase<TestClass>();
+            var registry = new TestClassRegistry();
 
             Assert.True(registry.Register(testClass));
             Assert.Equal(1, registry.Count);
@@ -54,6 +54,8 @@
             Assert.Equal(0, registry.Count);
         }
     }
+
+    internal class TestClassRegistry : RegistryBase<TestClass> { }
 
     internal class TestClass
     {
