@@ -52,8 +52,20 @@ namespace Common.PacketHandlers
 
         public PacketType PacketType => PacketType.Event;
 
+        public INetworkEvent Event
+        {
+            get
+            {
+                return (INetworkEvent)ProtoBufSerializer.Deserialize(_event);
+            }
+            set
+            {
+                _event = ProtoBufSerializer.Serialize(value);
+            }
+        }
+
         [ProtoMember(1)]
-        public INetworkEvent Event { get; }
+        private byte[] _event;
 
         public EventPacket(INetworkEvent @event)
         {

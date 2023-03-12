@@ -27,7 +27,7 @@ namespace GameInterface.Services.Heroes.Interfaces
     {
         private readonly ILogger Logger = LogManager.GetLogger<SaveInterface>();
 
-        private static readonly MethodInfo SaveHandler_GetSaveMetaData = typeof(SaveHandler).GetMethod("GetSaveMetaData", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly MethodInfo SaveHandler_GetSaveMetaData = typeof(SaveHandler).GetMethod(nameof(SaveHandler.GetSaveMetaData));
         private static readonly MethodInfo MBSaveLoad_GetSaveMetaData = typeof(MBSaveLoad).GetMethod("GetSaveMetaData", BindingFlags.NonPublic | BindingFlags.Static);
         public byte[] SaveCurrentGame()
         {

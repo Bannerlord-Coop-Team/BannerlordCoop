@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Serialization;
 using Coop.Core;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Lib.NoHarmony;
 using Coop.UI;
 using HarmonyLib;
@@ -50,7 +51,7 @@ namespace Coop
         private bool isServer = false;
         public override void NoHarmonyInit() 
         {
-            ProtoBufSerializer.Serialize(1);
+            ProtoBufSerializer.Serialize(new NetworkClientValidate("test"));
 
             var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
             

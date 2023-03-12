@@ -271,7 +271,9 @@
     <Compile Include="Serialization\External\MobilePartyAIBinaryPackage.cs" />
     <Compile Include="Services\Heroes\ControlledHeroRegistry.cs" />
     <Compile Include="Services\Heroes\Handlers\SwitchHeroHandler.cs" />
+    <Compile Include="Services\Heroes\HeroRegistry.cs" />
     <Compile Include="Services\Heroes\Messages\SwitchToParty.cs" />
+    <Compile Include="Services\Heroes\Patches\ChangePlayerCharacterActionPatches.cs" />
     <Compile Include="Services\MobileParties\Data\TargetPositionData.cs" />
     <Compile Include="Services\MobileParties\Handlers\MobilePartyMovementHandler.cs" />
     <Compile Include="Services\MobileParties\Messages\ControlledPartyTargetPositionUpdated.cs" />

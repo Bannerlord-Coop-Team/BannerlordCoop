@@ -36,7 +36,6 @@ namespace Coop.Core.Communication.Network
 
         public virtual void Send(NetPeer netPeer, IPacket packet)
         {
-            PacketWrapper wrapper = new PacketWrapper(packet);
             NetDataWriter writer = new NetDataWriter();
 
             // Serialize and put data in writer (with length is important on receive end)
@@ -44,7 +43,7 @@ namespace Coop.Core.Communication.Network
             writer.PutBytesWithLength(data);
 
             // Send data
-            netPeer.Send(writer.Data, wrapper.DeliveryMethod);
+            netPeer.Send(writer.Data, packet.DeliveryMethod);
         }
 
         public abstract void Start();
