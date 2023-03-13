@@ -25,12 +25,8 @@ namespace Missions
             }
 
             // Non interface classes
-            builder.RegisterType<CoopMissionNetworkBehavior>().AsSelf();
-            builder.RegisterType<CoopArenaController>().AsSelf();
-            builder.RegisterType<NetworkConfiguration>().AsSelf();
-            builder.RegisterType<MovementHandler>().AsSelf();
-            builder.RegisterType<WeaponDropHandler>().AsSelf().AutoActivate();
-            builder.RegisterType<WeaponPickupHandler>().AsSelf().AutoActivate();
+            builder.RegisterType<WeaponDropHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType<WeaponPickupHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
             builder.RegisterType<NetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
 
             // TODO create handler collector

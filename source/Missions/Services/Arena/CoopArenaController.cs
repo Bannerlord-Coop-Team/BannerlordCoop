@@ -192,7 +192,7 @@ namespace Missions.Services
 
             if(joinInfo.IsPlayerAlive)
             {
-                Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true);
+                Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true, joinInfo.Equipment);
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
             }
 
@@ -225,15 +225,21 @@ namespace Missions.Services
             //_agentRegistry.TryGetAgent(shot.AgentGuid, out Agent shooter);
             Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
 
-            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] {
-                shooter,
-                shot.WeaponIndex,
-                shot.Position,
-                shot.Velocity,
-                shot.Orientation,
-                shot.HasRigidBody,
-                true,
-                shot.ForcedMissileIndex });
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                OnAgentShootMissileMethod.Invoke(
+                    Mission.Current, 
+                    new object[] {
+                        shooter,
+                        shot.WeaponIndex,
+                        shot.Position,
+                        shot.Velocity,
+                        shot.Orientation,
+                        shot.HasRigidBody,
+                        true,
+                        shot.ForcedMissileIndex });
+            });
+            
         }
 
         private void Handler_AgentDeath(MessagePayload<AgentDied> obj)
@@ -315,7 +321,7 @@ namespace Missions.Services
             return agent;
         }
 
-        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool isEnemy)
+        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool isEnemy, Equipment equipment = null)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
@@ -323,7 +329,7 @@ namespace Missions.Services
             agentBuildData.Team(isEnemy ? Mission.Current.PlayerEnemyTeam : Mission.Current.PlayerTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
-            agentBuildData.Equipment(character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment);
+            agentBuildData.Equipment(equipment ?? (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment));
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(isEnemy ? Agent.ControllerType.None : Agent.ControllerType.AI);
 

@@ -5,6 +5,7 @@ using GameInterface.Serialization.External;
 using ProtoBuf;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -40,6 +41,16 @@ namespace Missions.Messages
         [ProtoMember(7)]
         public readonly bool IsPlayerAlive;
 
+        public Equipment Equipment
+        {
+            get { return UnpackEquipment(); }
+            set { _packedEquipment = PackEquipment(value); }
+        }
+        private Equipment _equipment;
+
+        [ProtoMember(8)]
+        private byte[] _packedEquipment;
+
         public NetworkMissionJoinInfo(CharacterObject characterObject, bool isPlayerAlive, Guid playerId, Vec3 startingPosition, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString)
         {
             PlayerId = playerId;
@@ -49,6 +60,7 @@ namespace Missions.Messages
             UnitStartingPosition = unitStartingPosition;
             UnitIdString = unitIdString;
             IsPlayerAlive = isPlayerAlive;
+            Equipment = characterObject.Equipment;
         }
 
         private byte[] PackCharacter(CharacterObject characterObject)
@@ -71,6 +83,28 @@ namespace Missions.Messages
             _characterObject = character.Unpack<CharacterObject>();
 
             return _characterObject;
+        }
+
+        private byte[] PackEquipment(Equipment equipment)
+        {
+            var factory = new BinaryPackageFactory();
+            var character = new EquipmentBinaryPackage(equipment, factory);
+            character.Pack();
+
+            return BinaryFormatterSerializer.Serialize(character);
+        }
+
+        private Equipment UnpackEquipment()
+        {
+            if (_equipment != null) return _equipment;
+
+            var factory = new BinaryPackageFactory();
+            var character = BinaryFormatterSerializer.Deserialize<EquipmentBinaryPackage>(_packedEquipment);
+            character.BinaryPackageFactory = factory;
+
+            _equipment = character.Unpack<Equipment>();
+
+            return _equipment;
         }
     }
 }
