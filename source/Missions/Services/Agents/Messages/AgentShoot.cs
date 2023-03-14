@@ -43,7 +43,37 @@ namespace Missions.Services.Agents.Messages
         [ProtoMember(7)]
         public int ForcedMissileIndex { get; }
 
-        public AgentShoot(Guid agentGuid, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
+        public ItemObject ItemObject
+        {
+            get { return UnpackItemObject(); }
+            set { _packedItemObject = PackItemObject(value); }
+        }
+        private ItemObject _itemObject;
+        [ProtoMember(8)]
+        private byte[] _packedItemObject;
+
+        public ItemModifier ItemModifier
+        {
+            get { return UnpackItemModifier(); }
+            set { _packedItemModifier = PackItemModifier(value); }
+        }
+        private ItemModifier _itemModifier;
+        [ProtoMember(9)]
+        private byte[] _packedItemModifier;
+
+        public Banner Banner
+        {
+            get { return UnpackBanner(); }
+            set { _packedBanner = PackBanner(value); }
+        }
+        private Banner _banner;
+        [ProtoMember(10)]
+        private byte[] _packedBanner;
+
+        [ProtoMember(11)]
+        public int MissileIndex { get; }
+
+        public AgentShoot(Guid agentGuid, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex)
         {
             AgentGuid = agentGuid;
             WeaponIndex = weaponIndex;
@@ -52,6 +82,10 @@ namespace Missions.Services.Agents.Messages
             Orientation = orientation;
             HasRigidBody = hasRigidBody;
             ForcedMissileIndex = forcedMissileIndex;
+            ItemObject = itemObject;
+            ItemModifier = itemModifier;
+            Banner = banner;
+            MissileIndex = missileIndex;
         }
 
 
@@ -60,7 +94,7 @@ namespace Missions.Services.Agents.Messages
             if (_orientation != null) return _orientation;
 
             var factory = new BinaryPackageFactory();
-            var orientation = BinaryFormatterSerializer.Deserialize<CharacterObjectBinaryPackage>(_packedOrientation);
+            var orientation = BinaryFormatterSerializer.Deserialize<Mat3BinaryPackage>(_packedOrientation);
             orientation.BinaryPackageFactory = factory;
 
             _orientation = orientation.Unpack<Mat3>();
@@ -75,6 +109,74 @@ namespace Missions.Services.Agents.Messages
             orientation.Pack();
 
             return BinaryFormatterSerializer.Serialize(orientation);
+        }
+
+        private ItemObject UnpackItemObject()
+        {
+            if (_itemObject != null) return _itemObject;
+
+            var factory = new BinaryPackageFactory();
+            var itemObject = BinaryFormatterSerializer.Deserialize<ItemObjectBinaryPackage>(_packedItemObject);
+            itemObject.BinaryPackageFactory = factory;
+
+            _itemObject = itemObject.Unpack<ItemObject>();
+
+            return _itemObject;
+        }
+
+        private byte[] PackItemObject(ItemObject value)
+        {
+            var factory = new BinaryPackageFactory();
+            var itemObject = new ItemObjectBinaryPackage(value, factory);
+            itemObject.Pack();
+
+            return BinaryFormatterSerializer.Serialize(itemObject);
+        }
+
+        private ItemModifier UnpackItemModifier()
+        {
+            if (_itemModifier != null) return _itemModifier;
+
+            var factory = new BinaryPackageFactory();
+            var ItemModifier = BinaryFormatterSerializer.Deserialize<ItemModifierBinaryPackage>(_packedItemModifier);
+            ItemModifier.BinaryPackageFactory = factory;
+
+            _itemModifier = ItemModifier.Unpack<ItemModifier>();
+
+            return _itemModifier;
+        }
+
+        private byte[] PackItemModifier(ItemModifier value)
+        {
+            if (value == null) { value = new ItemModifier(); }
+            var factory = new BinaryPackageFactory();
+            var ItemModifier = new ItemModifierBinaryPackage(value, factory);
+            ItemModifier.Pack();
+
+            return BinaryFormatterSerializer.Serialize(ItemModifier);
+        }
+
+        private Banner UnpackBanner()
+        {
+            if (_banner != null) return _banner;
+
+            var factory = new BinaryPackageFactory();
+            var Banner = BinaryFormatterSerializer.Deserialize<BannerBinaryPackage>(_packedBanner);
+            Banner.BinaryPackageFactory = factory;
+
+            _banner = Banner.Unpack<Banner>();
+
+            return _banner;
+        }
+
+        private byte[] PackBanner(Banner value)
+        {
+            if (value == null) { value = new Banner(); }
+            var factory = new BinaryPackageFactory();
+            var Banner = new BannerBinaryPackage(value, factory);
+            Banner.Pack();
+
+            return BinaryFormatterSerializer.Serialize(Banner);
         }
     }
 }

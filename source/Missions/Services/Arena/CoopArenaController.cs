@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using HarmonyLib;
 using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Agents.Handlers;
@@ -19,6 +20,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
@@ -210,13 +212,28 @@ namespace Missions.Services
             {
                 base.OnAgentShootMissile(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
                 Guid shooterAgentGuid = _agentRegistry.AgentToId[shooterAgent];
-                InformationManager.DisplayMessage(new InformationMessage(shooterAgentGuid.ToString()));
-                AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
+                MissionWeapon missionWeapon = shooterAgent.Equipment[weaponIndex];
+                AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, num3);
                 _networkMessageBroker.PublishNetworkEvent(message);
             }
         }
 
+        private static readonly MethodInfo AddMissileAuxMethod = typeof(Mission).GetMethod("AddMissileAux", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        [HarmonyPatch(typeof(Mission), "AddMissileAux")]
+        public class AddMissileAuxPatch
+        {
+            public static void Postfix(int __result, Vec3 direction)
+            {
+                InformationManager.DisplayMessage(new InformationMessage(__result.ToString()));
+                num3 = __result;
+                //OnAgentShootMissilePatch.direction = direction;
+            }
+        }
+
+        private static int num3;
+
         private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
         {
             _agentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
@@ -224,11 +241,15 @@ namespace Missions.Services
             AgentShoot shot = payload.What;
             //_agentRegistry.TryGetAgent(shot.AgentGuid, out Agent shooter);
             Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
+            MissionWeapon missionWeapon = new MissionWeapon(payload.What.ItemObject, payload.What.ItemModifier, payload.What.Banner);
+
+
 
             GameLoopRunner.RunOnMainThread(() =>
             {
+                InformationManager.DisplayMessage(new InformationMessage(payload.What.MissileIndex.ToString()));
                 OnAgentShootMissileMethod.Invoke(
-                    Mission.Current, 
+                    Mission.Current,
                     new object[] {
                         shooter,
                         shot.WeaponIndex,
@@ -237,7 +258,54 @@ namespace Missions.Services
                         shot.Orientation,
                         shot.HasRigidBody,
                         true,
-                        shot.ForcedMissileIndex });
+                        payload.What.MissileIndex });
+
+                //foreach (MissionBehavior missionBehavior in Mission.Current.MissionBehaviors)
+                //{
+                //    missionBehavior.OnAgentShootMissile(shooter, shot.WeaponIndex, shot.Position, shot.Velocity, shot.Orientation, shot.HasRigidBody, shot.ForcedMissileIndex);
+                //}
+
+                //Mission.Current.AddCustomMissile(shooter, missionWeapon, shot.Position, shot.Velocity, shot.Orientation, 10, 10, true, null, shot.ForcedMissileIndex);
+
+
+                //MissionWeapon weapon;
+                //if (shooter.Equipment[weaponIndex].CurrentUsageItem.IsRangedWeapon && shooter.Equipment[weaponIndex].CurrentUsageItem.IsConsumable)
+                //{
+                //    weapon = shooter.Equipment[weaponIndex];
+                //}
+                //else
+                //{
+                //    weapon = shooter.Equipment[weaponIndex].AmmoWeapon;
+                //}
+                //weapon.Amount = 1;
+                //WeaponData weaponData = weapon.GetWeaponData(true);
+                //WeaponStatsData[] weaponStatsData = weapon.GetWeaponStatsData();
+                //Vec3 direction = shot.Velocity;
+                //float num = direction.Normalize();
+                //WeaponComponentData currentUsageItem = shooter.Equipment[shooter.GetWieldedItemIndex(Agent.HandIndex.MainHand)].CurrentUsageItem;
+                //num = MissionGameModels.Current.AgentApplyDamageModel.CalculateEffectiveMissileSpeed(shooter, currentUsageItem, ref direction, num);
+                //float num2 = (float)shooter.Equipment[shooter.GetWieldedItemIndex(Agent.HandIndex.MainHand)].GetModifiedMissileSpeedForCurrentUsage();
+
+                //AddMissileAuxMethod.Invoke(
+                //    Mission.Current,
+                //    new object[] {
+                //    shot.ForcedMissileIndex,
+                //    true,
+                //    shooter,
+                //    missionWeapon.GetWeaponData(false),
+                //    missionWeapon.GetWeaponStatsData(),
+                //    0,
+                //    shot.Position,
+                //    shot.Velocity,
+                //    shot.Orientation,
+                //    10,
+                //    10,
+                //    shot.HasRigidBody,
+                //    null,
+                //    true,
+                //    null
+                //    });
+
             });
             
         }
