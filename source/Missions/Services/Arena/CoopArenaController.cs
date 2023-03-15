@@ -3,9 +3,9 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using HarmonyLib;
+using JetBrains.Annotations;
 using LiteNetLib;
 using Missions.Messages;
-using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Agents.Patches;
@@ -20,10 +20,8 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.ObjectSystem;
 
 namespace Missions.Services
 {
@@ -46,7 +44,7 @@ namespace Missions.Services
 
         public CoopArenaController(
             INetworkMessageBroker networkMessageBroker,
-            INetworkAgentRegistry agentRegistry, 
+            INetworkAgentRegistry agentRegistry,
             IRandomEquipmentGenerator equipmentGenerator)
         {
             _networkMessageBroker = networkMessageBroker;
@@ -95,7 +93,7 @@ namespace Missions.Services
         {
             AgentDamageData agentDamaData = payload.What;
             NetPeer netPeer = payload.Who as NetPeer;
-            
+
 
             Agent effectedAgent = null;
             Agent effectorAgent = null;
@@ -104,7 +102,8 @@ namespace Missions.Services
 
             // start with the attack receiver
             // first check if the receiver of the damage is one the sender's agents
-            if(agentGroupController != null && agentGroupController.ControlledAgents.ContainsKey(agentDamaData.VictimAgentId)) {
+            if (agentGroupController != null && agentGroupController.ControlledAgents.ContainsKey(agentDamaData.VictimAgentId))
+            {
                 agentGroupController.ControlledAgents.TryGetValue(agentDamaData.VictimAgentId, out effectedAgent);
             }
             // otherwise next, check if it is one of our agents
@@ -139,7 +138,7 @@ namespace Missions.Services
             {
                 // register a blow on the effected agent
                 effectedAgent.RegisterBlow(b, collisionData);
-            });            
+            });
         }
 
         private void Handle_PeerConnected(MessagePayload<PeerConnected> payload)
@@ -188,11 +187,11 @@ namespace Missions.Services
 
             Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer} with {ControlledAgentCount} controlled agents",
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
-                joinInfo.CharacterObject.Name, newAgentId, 
+                joinInfo.CharacterObject.Name, newAgentId,
                 netPeer.EndPoint,
                 joinInfo.UnitIdString?.Length);
 
-            if(joinInfo.IsPlayerAlive)
+            if (joinInfo.IsPlayerAlive)
             {
                 Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true, joinInfo.Equipment);
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
@@ -201,7 +200,7 @@ namespace Missions.Services
             for (int i = 0; i < joinInfo.UnitIdString?.Length; i++)
             {
                 Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
-                
+
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
         }
@@ -210,13 +209,44 @@ namespace Missions.Services
         {
             if (_agentRegistry.IsControlled(shooterAgent))
             {
-                base.OnAgentShootMissile(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
+                //base.OnAgentShootMissile(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
+                InformationManager.DisplayMessage(new InformationMessage("ShootMissile"));
                 Guid shooterAgentGuid = _agentRegistry.AgentToId[shooterAgent];
                 MissionWeapon missionWeapon = shooterAgent.Equipment[weaponIndex];
                 AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, num3);
                 _networkMessageBroker.PublishNetworkEvent(message);
+                //GameLoopRunner.RunOnMainThread(() =>
+                //{
+                //    InformationManager.DisplayMessage(new InformationMessage("ShootMissileMain"));
+                //    Mission.Current.AddCustomMissile(shooterAgent, missionWeapon, position, velocity, orientation, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, hasRigidBody, null);
+                //});
             }
         }
+
+        //[HarmonyPatch(typeof(Mission), "OnAgentShootMissile")]
+        //public static class OnAgentShootMissilePatch
+        //{
+        //    [UsedImplicitly]
+        //    [HarmonyPostfix]
+        //    public static void Postfix(
+        //        ref Agent shooterAgent,
+        //        ref EquipmentIndex weaponIndex,
+        //        ref Vec3 position,
+        //        ref Vec3 velocity,
+        //        ref Mat3 orientation,
+        //        ref bool hasRigidBody,
+        //        ref bool isPrimaryWeaponShot,
+        //        ref int forcedMissileIndex)
+        //    {
+
+        //        MissionWeapon missionWeapon = shooterAgent.Equipment[weaponIndex];
+        //        Guid shooterAgentGuid = NetworkAgentRegistry.Instance.AgentToId[shooterAgent];
+        //        AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, num3);
+        //        NetworkMessageBroker.Instance.PublishNetworkEvent(message);
+        //        //Mission.Current.AddCustomMissile(shooterAgent, missionWeapon, position, velocity, orientation, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, hasRigidBody, null);
+        //        InformationManager.DisplayMessage(new InformationMessage("ShootMissileLocal"));
+        //    }
+        //}
 
         private static readonly MethodInfo AddMissileAuxMethod = typeof(Mission).GetMethod("AddMissileAux", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -226,9 +256,16 @@ namespace Missions.Services
         {
             public static void Postfix(int __result, Vec3 direction)
             {
-                InformationManager.DisplayMessage(new InformationMessage(__result.ToString()));
                 num3 = __result;
-                //OnAgentShootMissilePatch.direction = direction;
+            }
+        }
+
+        [HarmonyPatch(typeof(Mission), "AddMissileSingleUsageAux")]
+        public class AddMissileSingleUsageAuxPatch
+        {
+            public static void Postfix(int __result, Vec3 direction)
+            {
+                num3 = __result;
             }
         }
 
@@ -247,25 +284,25 @@ namespace Missions.Services
 
             GameLoopRunner.RunOnMainThread(() =>
             {
-                InformationManager.DisplayMessage(new InformationMessage(payload.What.MissileIndex.ToString()));
-                OnAgentShootMissileMethod.Invoke(
-                    Mission.Current,
-                    new object[] {
-                        shooter,
-                        shot.WeaponIndex,
-                        shot.Position,
-                        shot.Velocity,
-                        shot.Orientation,
-                        shot.HasRigidBody,
-                        true,
-                        payload.What.MissileIndex });
+                //InformationManager.DisplayMessage(new InformationMessage(payload.What.MissileIndex.ToString()));
+                //OnAgentShootMissileMethod.Invoke(
+                //    Mission.Current,
+                //    new object[] {
+                //        shooter,
+                //        shot.WeaponIndex,
+                //        shot.Position,
+                //        shot.Velocity,
+                //        shot.Orientation,
+                //        shot.HasRigidBody,
+                //        true,
+                //        payload.What.MissileIndex });
 
                 //foreach (MissionBehavior missionBehavior in Mission.Current.MissionBehaviors)
                 //{
                 //    missionBehavior.OnAgentShootMissile(shooter, shot.WeaponIndex, shot.Position, shot.Velocity, shot.Orientation, shot.HasRigidBody, shot.ForcedMissileIndex);
                 //}
 
-                //Mission.Current.AddCustomMissile(shooter, missionWeapon, shot.Position, shot.Velocity, shot.Orientation, 10, 10, true, null, shot.ForcedMissileIndex);
+                Mission.Current.AddCustomMissile(shooter, missionWeapon, shot.Position, shot.Velocity, shot.Orientation, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, true, null, payload.What.MissileIndex);
 
 
                 //MissionWeapon weapon;
@@ -307,13 +344,13 @@ namespace Missions.Services
                 //    });
 
             });
-            
+
         }
 
         private void Handler_AgentDeath(MessagePayload<AgentDied> obj)
         {
             Agent agent = obj.What.Agent;
-            if(_agentRegistry.TryGetAgentId(agent, out Guid agentId))
+            if (_agentRegistry.TryGetAgentId(agent, out Guid agentId))
             {
                 _agentRegistry.RemoveControlledAgent(agentId);
                 _agentRegistry.RemoveNetworkControlledAgent(agentId);
@@ -332,7 +369,7 @@ namespace Missions.Services
             Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;
 
             spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
-                                             select e.GetGlobalFrame()).ToList();
+                           select e.GetGlobalFrame()).ToList();
             for (int i = 0; i < spawnFrames.Count; i++)
             {
                 MatrixFrame value = spawnFrames[i];
@@ -342,7 +379,7 @@ namespace Missions.Services
 
             // get a random spawn point
             Random rand = new Random();
-            MatrixFrame randomElement = spawnFrames[rand.Next(spawnFrames.Count)];  
+            MatrixFrame randomElement = spawnFrames[rand.Next(spawnFrames.Count)];
 
 
             // spawn an instance of the player (controlled by default)
@@ -373,7 +410,7 @@ namespace Missions.Services
             vec = vec.Normalized();
             Equipment generatedEquipment = _equipmentGenerator.CreateRandomEquipment(true);
             agentBuildData.Equipment(generatedEquipment);
-            Hero_BattleEquipment.SetValue(character.HeroObject, generatedEquipment); 
+            Hero_BattleEquipment.SetValue(character.HeroObject, generatedEquipment);
             agentBuildData.InitialDirection(vec);
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.Player);
@@ -383,6 +420,9 @@ namespace Missions.Services
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
+
+
+
             }, true);
             agent.FadeIn();
 
