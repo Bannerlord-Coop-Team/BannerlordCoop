@@ -205,52 +205,6 @@ namespace Missions.Services
             }
         }
 
-        public override void OnAgentShootMissile(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
-        {
-            if (_agentRegistry.IsControlled(shooterAgent))
-            {
-                //base.OnAgentShootMissile(shooterAgent, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
-                InformationManager.DisplayMessage(new InformationMessage("ShootMissile"));
-                Guid shooterAgentGuid = _agentRegistry.AgentToId[shooterAgent];
-                MissionWeapon missionWeapon = shooterAgent.Equipment[weaponIndex];
-                AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, num3);
-                _networkMessageBroker.PublishNetworkEvent(message);
-                //GameLoopRunner.RunOnMainThread(() =>
-                //{
-                //    InformationManager.DisplayMessage(new InformationMessage("ShootMissileMain"));
-                //    Mission.Current.AddCustomMissile(shooterAgent, missionWeapon, position, velocity, orientation, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, hasRigidBody, null);
-                //});
-            }
-        }
-
-        //[HarmonyPatch(typeof(Mission), "OnAgentShootMissile")]
-        //public static class OnAgentShootMissilePatch
-        //{
-        //    [UsedImplicitly]
-        //    [HarmonyPostfix]
-        //    public static void Postfix(
-        //        ref Agent shooterAgent,
-        //        ref EquipmentIndex weaponIndex,
-        //        ref Vec3 position,
-        //        ref Vec3 velocity,
-        //        ref Mat3 orientation,
-        //        ref bool hasRigidBody,
-        //        ref bool isPrimaryWeaponShot,
-        //        ref int forcedMissileIndex)
-        //    {
-
-        //        MissionWeapon missionWeapon = shooterAgent.Equipment[weaponIndex];
-        //        Guid shooterAgentGuid = NetworkAgentRegistry.Instance.AgentToId[shooterAgent];
-        //        AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, num3);
-        //        NetworkMessageBroker.Instance.PublishNetworkEvent(message);
-        //        //Mission.Current.AddCustomMissile(shooterAgent, missionWeapon, position, velocity, orientation, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, hasRigidBody, null);
-        //        InformationManager.DisplayMessage(new InformationMessage("ShootMissileLocal"));
-        //    }
-        //}
-
-        private static readonly MethodInfo AddMissileAuxMethod = typeof(Mission).GetMethod("AddMissileAux", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
-
         [HarmonyPatch(typeof(Mission), "AddMissileAux")]
         public class AddMissileAuxPatch
         {
@@ -271,77 +225,41 @@ namespace Missions.Services
 
         private static int num3;
 
+        public override void OnAgentShootMissile(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
+        {
+            if (_agentRegistry.IsControlled(shooterAgent))
+            {
+
+                Guid shooterAgentGuid = _agentRegistry.AgentToId[shooterAgent];
+                MissionWeapon missionWeapon;
+
+                if (shooterAgent.Equipment[weaponIndex].CurrentUsageItem.IsRangedWeapon && shooterAgent.Equipment[weaponIndex].CurrentUsageItem.IsConsumable)
+                {
+                    missionWeapon = shooterAgent.Equipment[weaponIndex];
+                }
+                else
+                {
+                    missionWeapon = shooterAgent.Equipment[weaponIndex].AmmoWeapon;
+                }
+
+                AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, num3);
+                _networkMessageBroker.PublishNetworkEvent(message);
+            }
+        }
+
         private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
         {
             _agentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
 
             AgentShoot shot = payload.What;
-            //_agentRegistry.TryGetAgent(shot.AgentGuid, out Agent shooter);
+
             Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
             MissionWeapon missionWeapon = new MissionWeapon(payload.What.ItemObject, payload.What.ItemModifier, payload.What.Banner);
 
-
-
             GameLoopRunner.RunOnMainThread(() =>
             {
-                //InformationManager.DisplayMessage(new InformationMessage(payload.What.MissileIndex.ToString()));
-                //OnAgentShootMissileMethod.Invoke(
-                //    Mission.Current,
-                //    new object[] {
-                //        shooter,
-                //        shot.WeaponIndex,
-                //        shot.Position,
-                //        shot.Velocity,
-                //        shot.Orientation,
-                //        shot.HasRigidBody,
-                //        true,
-                //        payload.What.MissileIndex });
-
-                //foreach (MissionBehavior missionBehavior in Mission.Current.MissionBehaviors)
-                //{
-                //    missionBehavior.OnAgentShootMissile(shooter, shot.WeaponIndex, shot.Position, shot.Velocity, shot.Orientation, shot.HasRigidBody, shot.ForcedMissileIndex);
-                //}
 
                 Mission.Current.AddCustomMissile(shooter, missionWeapon, shot.Position, shot.Velocity, shot.Orientation, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, true, null, payload.What.MissileIndex);
-
-
-                //MissionWeapon weapon;
-                //if (shooter.Equipment[weaponIndex].CurrentUsageItem.IsRangedWeapon && shooter.Equipment[weaponIndex].CurrentUsageItem.IsConsumable)
-                //{
-                //    weapon = shooter.Equipment[weaponIndex];
-                //}
-                //else
-                //{
-                //    weapon = shooter.Equipment[weaponIndex].AmmoWeapon;
-                //}
-                //weapon.Amount = 1;
-                //WeaponData weaponData = weapon.GetWeaponData(true);
-                //WeaponStatsData[] weaponStatsData = weapon.GetWeaponStatsData();
-                //Vec3 direction = shot.Velocity;
-                //float num = direction.Normalize();
-                //WeaponComponentData currentUsageItem = shooter.Equipment[shooter.GetWieldedItemIndex(Agent.HandIndex.MainHand)].CurrentUsageItem;
-                //num = MissionGameModels.Current.AgentApplyDamageModel.CalculateEffectiveMissileSpeed(shooter, currentUsageItem, ref direction, num);
-                //float num2 = (float)shooter.Equipment[shooter.GetWieldedItemIndex(Agent.HandIndex.MainHand)].GetModifiedMissileSpeedForCurrentUsage();
-
-                //AddMissileAuxMethod.Invoke(
-                //    Mission.Current,
-                //    new object[] {
-                //    shot.ForcedMissileIndex,
-                //    true,
-                //    shooter,
-                //    missionWeapon.GetWeaponData(false),
-                //    missionWeapon.GetWeaponStatsData(),
-                //    0,
-                //    shot.Position,
-                //    shot.Velocity,
-                //    shot.Orientation,
-                //    10,
-                //    10,
-                //    shot.HasRigidBody,
-                //    null,
-                //    true,
-                //    null
-                //    });
 
             });
 
