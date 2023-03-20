@@ -181,8 +181,8 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Common\Common\Common.csproj">
-      <Project>{edd0902c-0e94-4da4-add9-61fd7872e5e5}</Project>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{3858a037-3216-4606-8849-5cc47fe121da}</Project>
       <Name>Common</Name>
     </ProjectReference>
     <ProjectReference Include="..\Missions\Missions.csproj">
