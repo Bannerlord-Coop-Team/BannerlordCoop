@@ -159,7 +159,9 @@
     <Compile Include="Services\Agents\Messages\WeaponPickedup.cs" />
     <Compile Include="Services\Agents\Messages\WeaponDropped.cs" />
     <Compile Include="MissionModule.cs" />
-    <Compile Include="Services\Agents\Messages\AgentShoot.cs" />
+    <Compile Include="Services\Missiles\Handlers\MissileHandler.cs" />
+    <Compile Include="Services\Missiles\Message\NetworkAgentShoot.cs" />
+    <Compile Include="Services\Missiles\Message\AgentShoot.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamageData.cs" />
     <Compile Include="Services\Agents\Messages\AgentDied.cs" />
@@ -167,6 +169,7 @@
     <Compile Include="Services\Agents\Patches\AgentKilledPatch.cs" />
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
+    <Compile Include="Services\Missiles\Patches\MissileAuxPatches.cs" />
     <Compile Include="View\MissionsLoadUI.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />

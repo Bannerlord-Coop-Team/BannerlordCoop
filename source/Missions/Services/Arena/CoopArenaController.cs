@@ -10,6 +10,8 @@ using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Agents.Patches;
 using Missions.Services.Arena;
+using Missions.Services.Missiles.Message;
+using Missions.Services.Missiles.Patches;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
 using Serilog;
@@ -55,7 +57,6 @@ namespace Missions.Services
             _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
             _networkMessageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
-            _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
             _networkMessageBroker.Subscribe<AgentDied>(Handler_AgentDeath);
 
         }
@@ -72,7 +73,6 @@ namespace Missions.Services
             _networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
             _networkMessageBroker.Unsubscribe<AgentDamageData>(Handle_AgentDamage);
-            _networkMessageBroker.Unsubscribe<AgentShoot>(Handle_AgentShoot);
             _networkMessageBroker.Unsubscribe<AgentDied>(Handler_AgentDeath);
         }
 
@@ -203,66 +203,6 @@ namespace Missions.Services
 
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
-        }
-
-        [HarmonyPatch(typeof(Mission), "AddMissileAux")]
-        public class AddMissileAuxPatch
-        {
-            public static void Postfix(int __result, Vec3 direction)
-            {
-                num3 = __result;
-            }
-        }
-
-        [HarmonyPatch(typeof(Mission), "AddMissileSingleUsageAux")]
-        public class AddMissileSingleUsageAuxPatch
-        {
-            public static void Postfix(int __result, Vec3 direction)
-            {
-                num3 = __result;
-            }
-        }
-
-        private static int num3;
-
-        public override void OnAgentShootMissile(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
-        {
-            if (_agentRegistry.IsControlled(shooterAgent))
-            {
-
-                Guid shooterAgentGuid = _agentRegistry.AgentToId[shooterAgent];
-                MissionWeapon missionWeapon;
-
-                if (shooterAgent.Equipment[weaponIndex].CurrentUsageItem.IsRangedWeapon && shooterAgent.Equipment[weaponIndex].CurrentUsageItem.IsConsumable)
-                {
-                    missionWeapon = shooterAgent.Equipment[weaponIndex];
-                }
-                else
-                {
-                    missionWeapon = shooterAgent.Equipment[weaponIndex].AmmoWeapon;
-                }
-
-                AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, num3);
-                _networkMessageBroker.PublishNetworkEvent(message);
-            }
-        }
-
-        private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
-        {
-            _agentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
-
-            AgentShoot shot = payload.What;
-
-            Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
-            MissionWeapon missionWeapon = new MissionWeapon(payload.What.ItemObject, payload.What.ItemModifier, payload.What.Banner);
-
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-
-                Mission.Current.AddCustomMissile(shooter, missionWeapon, shot.Position, shot.Velocity, shot.Orientation, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, missionWeapon.GetWeaponComponentDataForUsage(0).MissileSpeed, true, null, payload.What.MissileIndex);
-
-            });
-
         }
 
         private void Handler_AgentDeath(MessagePayload<AgentDied> obj)

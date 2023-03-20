@@ -13,18 +13,16 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Common.Serialization;
 
-namespace Missions.Services.Agents.Messages
+namespace Missions.Services.Missiles.Message
 {
     [ProtoContract(SkipConstructor = true)]
-    public class AgentShoot : INetworkEvent
+    public class NetworkAgentShoot : INetworkEvent
     {
         [ProtoMember(1)]
         public Guid AgentGuid { get; }
         [ProtoMember(2)]
-        public EquipmentIndex WeaponIndex { get; }
-        [ProtoMember(3)]
         public Vec3 Position { get; }
-        [ProtoMember(4)]
+        [ProtoMember(3)]
         public Vec3 Velocity { get; }
 
         public Mat3 Orientation
@@ -35,12 +33,12 @@ namespace Missions.Services.Agents.Messages
 
         private Mat3 _orientation;
 
-        [ProtoMember(5)]
+        [ProtoMember(4)]
         private byte[] _packedOrientation;
 
-        [ProtoMember(6)]
+        [ProtoMember(5)]
         public bool HasRigidBody { get; }
-        [ProtoMember(7)]
+        [ProtoMember(6)]
         public int ForcedMissileIndex { get; }
 
         public ItemObject ItemObject
@@ -49,7 +47,7 @@ namespace Missions.Services.Agents.Messages
             set { _packedItemObject = PackItemObject(value); }
         }
         private ItemObject _itemObject;
-        [ProtoMember(8)]
+        [ProtoMember(7)]
         private byte[] _packedItemObject;
 
         public ItemModifier ItemModifier
@@ -58,7 +56,7 @@ namespace Missions.Services.Agents.Messages
             set { _packedItemModifier = PackItemModifier(value); }
         }
         private ItemModifier _itemModifier;
-        [ProtoMember(9)]
+        [ProtoMember(8)]
         private byte[] _packedItemModifier;
 
         public Banner Banner
@@ -67,16 +65,15 @@ namespace Missions.Services.Agents.Messages
             set { _packedBanner = PackBanner(value); }
         }
         private Banner _banner;
-        [ProtoMember(10)]
+        [ProtoMember(9)]
         private byte[] _packedBanner;
 
-        [ProtoMember(11)]
+        [ProtoMember(10)]
         public int MissileIndex { get; }
 
-        public AgentShoot(Guid agentGuid, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex)
+        public NetworkAgentShoot(Guid agentGuid, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex)
         {
             AgentGuid = agentGuid;
-            WeaponIndex = weaponIndex;
             Position = position;
             Velocity = velocity;
             Orientation = orientation;
