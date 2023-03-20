@@ -10,8 +10,8 @@ using Missions.Services.Network.Messages;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Packets
@@ -37,7 +37,7 @@ namespace Missions.Services.Agents.Packets
 
         private AgentPublisher _agentPublisher;
 
-        public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry)
+        public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry, IPacketManager packetManager)
         {
             _packetManager = packetManager;
             _client = client;
@@ -50,7 +50,7 @@ namespace Missions.Services.Agents.Packets
             _messageBroker.Subscribe<MountDataChanged>(Handle_MountDataChanged);
             _messageBroker.Subscribe<MovementInputVectorChanged>(Handle_MovementInputVectorChanged);
 
-            _agentPublisher = new AgentPublisher(messageBroker, PACKET_UPDATE_RATE);
+            _agentPublisher = new AgentPublisher(messageBroker, PACKET_UPDATE_RATE, agentRegistry);
 
             _packetManager.RegisterPacketHandler(this);
 

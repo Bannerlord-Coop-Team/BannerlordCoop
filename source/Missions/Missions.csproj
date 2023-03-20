@@ -169,12 +169,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Services\Agents\Messages\ActionDataChanged.cs" />
-    <Compile Include="Services\Agents\Messages\AgentPublisher.cs" />
+    <Compile Include="Services\Agents\AgentPublisher.cs" />
     <Compile Include="Services\Agents\Messages\LookDirectionChanged.cs" />
     <Compile Include="Services\Agents\Messages\MountDataChanged.cs" />
     <Compile Include="Services\Agents\Messages\IMovementEvent.cs" />
     <Compile Include="Services\Agents\Messages\MovementInputVectorChanged.cs" />
-    <Compile Include="Services\Agents\Messages\AgentMovement.cs" />
+    <Compile Include="Services\Agents\Packets\AgentMovement.cs" />
     <Compile Include="MissionModule.cs" />
     <Compile Include="Services\Agents\Messages\AgentShoot.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />

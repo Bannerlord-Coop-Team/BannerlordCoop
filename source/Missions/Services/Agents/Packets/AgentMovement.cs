@@ -1,14 +1,12 @@
 ﻿using Common.PacketHandlers;
 using LiteNetLib;
-using Missions.Services.Agents.Packets;
+using Missions.Services.Agents.Messages;
 using ProtoBuf;
-using SandBox.Missions.MissionLogics;
 using System;
-using System.Security.AccessControl;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
-namespace Missions.Services.Agents.Messages
+namespace Missions.Services.Agents.Packets
 {
     /// <summary>
     /// Represents the delta of an <see cref="Agent"/>'s movement between the time it was created and the time it was last updated.
