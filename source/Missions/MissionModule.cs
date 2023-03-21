@@ -8,6 +8,7 @@ using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Arena;
 using Missions.Services.BoardGames;
+using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Services.Taverns;
 
@@ -28,6 +29,7 @@ namespace Missions
             builder.RegisterType<WeaponDropHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
             builder.RegisterType<WeaponPickupHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
             builder.RegisterType<NetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<MissileHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
 
             // TODO create handler collector
             builder.RegisterType<ArenaTestGameManager>().AsSelf();

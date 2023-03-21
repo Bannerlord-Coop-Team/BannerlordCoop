@@ -1,4 +1,4 @@
-﻿    using Common.Messaging;
+﻿using Common.Messaging;
 using HarmonyLib;
 using TaleWorlds.MountAndBlade;
 

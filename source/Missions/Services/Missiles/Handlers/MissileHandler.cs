@@ -14,6 +14,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Missiles.Handlers
@@ -46,7 +47,8 @@ namespace Missions.Services.Missiles.Handlers
 
             Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
             MissionWeapon missionWeapon = new MissionWeapon(payload.What.ItemObject, payload.What.ItemModifier, payload.What.Banner);
-
+            float baseSpeed = shooter.Equipment[shooter.GetWieldedItemIndex(Agent.HandIndex.MainHand)].GetModifiedMissileSpeedForCurrentUsage();
+            float speed = shot.Velocity.Normalize();
 
             GameLoopRunner.RunOnMainThread(() =>
             {
@@ -66,8 +68,8 @@ namespace Missions.Services.Missiles.Handlers
                         shot.Position,
                         shot.Velocity,
                         shot.Orientation,
-                        10f,
-                        10f,
+                        baseSpeed,
+                        speed,
                         shot.HasRigidBody,
                         null,
                         true,
@@ -75,7 +77,7 @@ namespace Missions.Services.Missiles.Handlers
                     };
 
                     AddMissileSingleUsageAuxMethod.Invoke(Mission.Current, args);
-                    newMissile = (GameEntity)args[13];
+                    newMissile = (GameEntity)args[14];
                 }
                 else
                 {
@@ -90,8 +92,8 @@ namespace Missions.Services.Missiles.Handlers
                         shot.Position,
                         shot.Velocity,
                         shot.Orientation,
-                        10f,
-                        10f,
+                        baseSpeed,
+                        speed,
                         shot.HasRigidBody,
                         null,
                         true,
@@ -99,7 +101,7 @@ namespace Missions.Services.Missiles.Handlers
                     };
 
                     AddMissileAuxMethod.Invoke(Mission.Current, args);
-                    newMissile = (GameEntity)args[13];
+                    newMissile = (GameEntity)args[14];
                 }
 
                 Mission.Missile missile = new Mission.Missile(Mission.Current, newMissile)
@@ -117,6 +119,13 @@ namespace Missions.Services.Missiles.Handlers
 
                 _missiles.SetValue(Mission.Current, missiles);
 
+                foreach(MissionBehavior missionBehavior in Mission.Current.MissionBehaviors)
+                {
+                    missionBehavior.OnAgentShootMissile(shooter, shooter.GetWieldedItemIndex(Agent.HandIndex.MainHand), shot.Position, shot.Velocity, shot.Orientation, shot.HasRigidBody, shot.ForcedMissileIndex);
+                }
+
+                InformationManager.DisplayMessage(new InformationMessage(_missiles.ToString()));
+
             });
         }
 
@@ -125,7 +134,7 @@ namespace Missions.Services.Missiles.Handlers
 
             if (NetworkAgentRegistry.Instance.IsControlled(payload.What.Agent))
             {
-
+                InformationManager.DisplayMessage(new InformationMessage("Fired"));
                 Guid shooterAgentGuid = NetworkAgentRegistry.Instance.AgentToId[payload.What.Agent];
                 MissionWeapon missionWeapon;
 

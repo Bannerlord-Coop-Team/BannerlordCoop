@@ -2,6 +2,7 @@
 using Common.Network;
 using HarmonyLib;
 using Missions.Services.Missiles.Message;
+using Missions.Services.Network;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +18,11 @@ namespace Missions.Services.Missiles.Patches
     {
         private static void Postfix(int __result, Agent shooterAgent, ref Vec3 direction, ref Vec3 position, ref Mat3 orientation, bool addRigidBody, int forcedMissileIndex)
         {
-            NetworkMessageBroker.Instance.Publish(Mission.Current, new AgentShoot(shooterAgent, position, direction, orientation, addRigidBody, forcedMissileIndex, __result));
+            if (NetworkAgentRegistry.Instance.IsControlled(shooterAgent))
+            {
+                NetworkMessageBroker.Instance.Publish(shooterAgent, new AgentShoot(shooterAgent, position, direction, orientation, addRigidBody, forcedMissileIndex, __result));
+                InformationManager.DisplayMessage(new InformationMessage("MissileAux"));
+            }
         }
     }
 
@@ -26,7 +31,11 @@ namespace Missions.Services.Missiles.Patches
     {
         private static void Postfix(int __result, Agent shooterAgent, ref Vec3 direction, ref Vec3 position, ref Mat3 orientation, bool addRigidBody, int forcedMissileIndex)
         {
-            NetworkMessageBroker.Instance.Publish(Mission.Current, new AgentShoot(shooterAgent, position, direction, orientation, addRigidBody, forcedMissileIndex, __result));
+            if (NetworkAgentRegistry.Instance.IsControlled(shooterAgent))
+            {
+                NetworkMessageBroker.Instance.Publish(shooterAgent, new AgentShoot(shooterAgent, position, direction, orientation, addRigidBody, forcedMissileIndex, __result));
+                InformationManager.DisplayMessage(new InformationMessage("SingleMissileAux"));
+            }
         }
     }
 }
