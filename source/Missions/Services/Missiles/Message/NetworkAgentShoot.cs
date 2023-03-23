@@ -24,22 +24,10 @@ namespace Missions.Services.Missiles.Message
         public Vec3 Position { get; }
         [ProtoMember(3)]
         public Vec3 Velocity { get; }
-
-        public Mat3 Orientation
-        {
-            get { return UnpackMat3(); }
-            set { _packedOrientation = PackOrientation(value); }
-        }
-
-        private Mat3 _orientation;
-
         [ProtoMember(4)]
-        private byte[] _packedOrientation;
-
+        public Mat3 Orientation{ get; }
         [ProtoMember(5)]
         public bool HasRigidBody { get; }
-        [ProtoMember(6)]
-        public int ForcedMissileIndex { get; }
 
         public ItemObject ItemObject
         {
@@ -47,7 +35,7 @@ namespace Missions.Services.Missiles.Message
             set { _packedItemObject = PackItemObject(value); }
         }
         private ItemObject _itemObject;
-        [ProtoMember(7)]
+        [ProtoMember(6)]
         private byte[] _packedItemObject;
 
         public ItemModifier ItemModifier
@@ -56,7 +44,7 @@ namespace Missions.Services.Missiles.Message
             set { _packedItemModifier = PackItemModifier(value); }
         }
         private ItemModifier _itemModifier;
-        [ProtoMember(8)]
+        [ProtoMember(7)]
         private byte[] _packedItemModifier;
 
         public Banner Banner
@@ -65,47 +53,23 @@ namespace Missions.Services.Missiles.Message
             set { _packedBanner = PackBanner(value); }
         }
         private Banner _banner;
-        [ProtoMember(9)]
+        [ProtoMember(8)]
         private byte[] _packedBanner;
 
-        [ProtoMember(10)]
+        [ProtoMember(9)]
         public int MissileIndex { get; }
 
-        public NetworkAgentShoot(Guid agentGuid, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex)
+        public NetworkAgentShoot(Guid agentGuid, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex)
         {
             AgentGuid = agentGuid;
             Position = position;
             Velocity = velocity;
             Orientation = orientation;
             HasRigidBody = hasRigidBody;
-            ForcedMissileIndex = forcedMissileIndex;
             ItemObject = itemObject;
             ItemModifier = itemModifier;
             Banner = banner;
             MissileIndex = missileIndex;
-        }
-
-
-        private Mat3 UnpackMat3()
-        {
-            if (_orientation != null) return _orientation;
-
-            var factory = new BinaryPackageFactory();
-            var orientation = BinaryFormatterSerializer.Deserialize<Mat3BinaryPackage>(_packedOrientation);
-            orientation.BinaryPackageFactory = factory;
-
-            _orientation = orientation.Unpack<Mat3>();
-
-            return _orientation;
-        }
-
-        private byte[] PackOrientation(Mat3 value)
-        {
-            var factory = new BinaryPackageFactory();
-            var orientation = new Mat3BinaryPackage(value, factory);
-            orientation.Pack();
-
-            return BinaryFormatterSerializer.Serialize(orientation);
         }
 
         private ItemObject UnpackItemObject()

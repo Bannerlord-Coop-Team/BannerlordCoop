@@ -52,79 +52,8 @@ namespace Missions.Services.Missiles.Handlers
 
             GameLoopRunner.RunOnMainThread(() =>
             {
-                WeaponData weaponData = missionWeapon.GetWeaponData(true);
-                GameEntity newMissile;
-
-                if (missionWeapon.WeaponsCount == 1)
-                {
-                    WeaponStatsData weaponStatsData = missionWeapon.GetWeaponStatsDataForUsage(0);
-
-                    object[] args = new object[] { shot.ForcedMissileIndex,
-                        false,
-                        shooter,
-                        weaponData,
-                        weaponStatsData,
-                        0f,
-                        shot.Position,
-                        shot.Velocity,
-                        shot.Orientation,
-                        baseSpeed,
-                        speed,
-                        shot.HasRigidBody,
-                        null,
-                        true,
-                        null
-                    };
-
-                    AddMissileSingleUsageAuxMethod.Invoke(Mission.Current, args);
-                    newMissile = (GameEntity)args[14];
-                }
-                else
-                {
-                    WeaponStatsData[] weaponStatsData = missionWeapon.GetWeaponStatsData();
-
-                    object[] args = new object[] { shot.ForcedMissileIndex,
-                        false,
-                        shooter,
-                        weaponData,
-                        weaponStatsData,
-                        0f,
-                        shot.Position,
-                        shot.Velocity,
-                        shot.Orientation,
-                        baseSpeed,
-                        speed,
-                        shot.HasRigidBody,
-                        null,
-                        true,
-                        null
-                    };
-
-                    AddMissileAuxMethod.Invoke(Mission.Current, args);
-                    newMissile = (GameEntity)args[14];
-                }
-
-                Mission.Missile missile = new Mission.Missile(Mission.Current, newMissile)
-                {
-                    ShooterAgent = shooter,
-                    Weapon = missionWeapon,
-                    Index = payload.What.MissileIndex
-                };
-
-                newMissile.ManualInvalidate();
-
-                Dictionary<int, Mission.Missile> missiles = (Dictionary<int, Mission.Missile>)_missiles.GetValue(Mission.Current);
-
-                missiles.Add(missile.Index, missile);
-
-                _missiles.SetValue(Mission.Current, missiles);
-
-                foreach(MissionBehavior missionBehavior in Mission.Current.MissionBehaviors)
-                {
-                    missionBehavior.OnAgentShootMissile(shooter, shooter.GetWieldedItemIndex(Agent.HandIndex.MainHand), shot.Position, shot.Velocity, shot.Orientation, shot.HasRigidBody, shot.ForcedMissileIndex);
-                }
-
-                InformationManager.DisplayMessage(new InformationMessage(_missiles.ToString()));
+                InformationManager.DisplayMessage(new InformationMessage(shot.MissileIndex.ToString()));
+                Mission.Current.AddCustomMissile(shooter, missionWeapon, shot.Position, shot.Velocity, shot.Orientation, speed, speed, shot.HasRigidBody, null, shot.MissileIndex);
 
             });
         }
@@ -138,17 +67,17 @@ namespace Missions.Services.Missiles.Handlers
                 Guid shooterAgentGuid = NetworkAgentRegistry.Instance.AgentToId[payload.What.Agent];
                 MissionWeapon missionWeapon;
 
-                if (payload.What.Agent.WieldedWeapon.CurrentUsageItem.IsRangedWeapon && payload.What.Agent.WieldedWeapon.CurrentUsageItem.IsConsumable)
+                if (payload.What.MissionWeapon.CurrentUsageItem.IsRangedWeapon && payload.What.MissionWeapon.CurrentUsageItem.IsConsumable)
                 {
                     missionWeapon = payload.What.Agent.WieldedWeapon;
 
                 }
                 else
                 {
-                    missionWeapon = payload.What.Agent.WieldedWeapon.AmmoWeapon;
+                    missionWeapon = payload.What.MissionWeapon.AmmoWeapon;
                 }
 
-                NetworkAgentShoot message = new NetworkAgentShoot(shooterAgentGuid, payload.What.Position, payload.What.Direction, payload.What.Orientation, payload.What.HasRigidBody, payload.What.ForcedMissileIndex, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, payload.What.MissileIndex);
+                NetworkAgentShoot message = new NetworkAgentShoot(shooterAgentGuid, payload.What.Position, payload.What.Direction, payload.What.Orientation, payload.What.HasRigidBody, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, payload.What.MissileIndex);
                 NetworkMessageBroker.Instance.PublishNetworkEvent(message);
             }
         }

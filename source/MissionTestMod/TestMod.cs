@@ -120,6 +120,7 @@ namespace MissionTestMod
 
             RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
             RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<Mat3, Mat3Surrogate>();
         }
 
         private bool m_IsFirstTick = true;

@@ -170,6 +170,7 @@
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
     <Compile Include="Services\Missiles\Patches\MissileAuxPatches.cs" />
+    <Compile Include="Services\Network\Surrogates\Mat3Surrogate.cs" />
     <Compile Include="View\MissionsLoadUI.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />
