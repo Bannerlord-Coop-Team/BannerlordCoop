@@ -47,14 +47,11 @@ namespace Missions.Services.Missiles.Handlers
 
             Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
             MissionWeapon missionWeapon = new MissionWeapon(payload.What.ItemObject, payload.What.ItemModifier, payload.What.Banner);
-            float baseSpeed = shooter.Equipment[shooter.GetWieldedItemIndex(Agent.HandIndex.MainHand)].GetModifiedMissileSpeedForCurrentUsage();
-            float speed = shot.Velocity.Normalize();
+            Mat3 orientation = new Mat3(shot.Orientationf, shot.Orientationf, shot.Orientationu);
 
             GameLoopRunner.RunOnMainThread(() =>
             {
-                InformationManager.DisplayMessage(new InformationMessage(shot.MissileIndex.ToString()));
-                Mission.Current.AddCustomMissile(shooter, missionWeapon, shot.Position, shot.Velocity, shot.Orientation, speed, speed, shot.HasRigidBody, null, shot.MissileIndex);
-
+                Mission.Current.AddCustomMissile(shooter, missionWeapon, shot.Position, shot.Velocity, orientation, shot.BaseSpeed, shot.Speed, shot.HasRigidBody, null, shot.MissileIndex);
             });
         }
 
@@ -63,13 +60,12 @@ namespace Missions.Services.Missiles.Handlers
 
             if (NetworkAgentRegistry.Instance.IsControlled(payload.What.Agent))
             {
-                InformationManager.DisplayMessage(new InformationMessage("Fired"));
                 Guid shooterAgentGuid = NetworkAgentRegistry.Instance.AgentToId[payload.What.Agent];
                 MissionWeapon missionWeapon;
 
                 if (payload.What.MissionWeapon.CurrentUsageItem.IsRangedWeapon && payload.What.MissionWeapon.CurrentUsageItem.IsConsumable)
                 {
-                    missionWeapon = payload.What.Agent.WieldedWeapon;
+                    missionWeapon = payload.What.MissionWeapon;
 
                 }
                 else
@@ -77,7 +73,7 @@ namespace Missions.Services.Missiles.Handlers
                     missionWeapon = payload.What.MissionWeapon.AmmoWeapon;
                 }
 
-                NetworkAgentShoot message = new NetworkAgentShoot(shooterAgentGuid, payload.What.Position, payload.What.Direction, payload.What.Orientation, payload.What.HasRigidBody, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, payload.What.MissileIndex);
+                NetworkAgentShoot message = new NetworkAgentShoot(shooterAgentGuid, payload.What.Position, payload.What.Direction, payload.What.Orientation.s, payload.What.Orientation.f, payload.What.Orientation.u, payload.What.HasRigidBody, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, payload.What.MissileIndex, payload.What.BaseSpeed, payload.What.Speed);
                 NetworkMessageBroker.Instance.PublishNetworkEvent(message);
             }
         }

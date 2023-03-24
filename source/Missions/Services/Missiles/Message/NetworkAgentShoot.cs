@@ -25,8 +25,12 @@ namespace Missions.Services.Missiles.Message
         [ProtoMember(3)]
         public Vec3 Velocity { get; }
         [ProtoMember(4)]
-        public Mat3 Orientation{ get; }
+        public Vec3 Orientations{ get; }
         [ProtoMember(5)]
+        public Vec3 Orientationf { get; }
+        [ProtoMember(6)]
+        public Vec3 Orientationu { get; }
+        [ProtoMember(7)]
         public bool HasRigidBody { get; }
 
         public ItemObject ItemObject
@@ -35,7 +39,7 @@ namespace Missions.Services.Missiles.Message
             set { _packedItemObject = PackItemObject(value); }
         }
         private ItemObject _itemObject;
-        [ProtoMember(6)]
+        [ProtoMember(8)]
         private byte[] _packedItemObject;
 
         public ItemModifier ItemModifier
@@ -44,7 +48,7 @@ namespace Missions.Services.Missiles.Message
             set { _packedItemModifier = PackItemModifier(value); }
         }
         private ItemModifier _itemModifier;
-        [ProtoMember(7)]
+        [ProtoMember(9)]
         private byte[] _packedItemModifier;
 
         public Banner Banner
@@ -53,23 +57,32 @@ namespace Missions.Services.Missiles.Message
             set { _packedBanner = PackBanner(value); }
         }
         private Banner _banner;
-        [ProtoMember(8)]
+        [ProtoMember(10)]
         private byte[] _packedBanner;
 
-        [ProtoMember(9)]
+        [ProtoMember(11)]
         public int MissileIndex { get; }
 
-        public NetworkAgentShoot(Guid agentGuid, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex)
+        [ProtoMember(12)]
+        public float BaseSpeed { get; }
+        [ProtoMember(13)]
+        public float Speed { get; }
+
+        public NetworkAgentShoot(Guid agentGuid, Vec3 position, Vec3 velocity, Vec3 orientationS, Vec3 orientationF, Vec3 orientationU, bool hasRigidBody, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex, float baseSpeed, float speed)
         {
             AgentGuid = agentGuid;
             Position = position;
             Velocity = velocity;
-            Orientation = orientation;
+            Orientations = orientationS;
+            Orientationf = orientationF;
+            Orientationu = orientationU;
             HasRigidBody = hasRigidBody;
             ItemObject = itemObject;
             ItemModifier = itemModifier;
             Banner = banner;
             MissileIndex = missileIndex;
+            BaseSpeed = baseSpeed;
+            Speed = speed;
         }
 
         private ItemObject UnpackItemObject()
