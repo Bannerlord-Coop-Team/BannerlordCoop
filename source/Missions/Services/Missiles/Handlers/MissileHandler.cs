@@ -47,7 +47,7 @@ namespace Missions.Services.Missiles.Handlers
 
             Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
             MissionWeapon missionWeapon = new MissionWeapon(payload.What.ItemObject, payload.What.ItemModifier, payload.What.Banner);
-            Mat3 orientation = new Mat3(shot.Orientationf, shot.Orientationf, shot.Orientationu);
+            Mat3 orientation = new Mat3(shot.Orientations, shot.Orientationf, shot.Orientationu);
 
             GameLoopRunner.RunOnMainThread(() =>
             {
