@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Serialization;
 using Coop.Core.Server.Services.Save.Data;
-using Coop.Core.Server.Services.Save.Messages;
 using System.IO;
 
 namespace Coop.Core.Server.Services.Save
@@ -15,13 +14,6 @@ namespace Coop.Core.Server.Services.Save
     internal class CoopSaveManager : ICoopSaveManager
     {
         private const string SAVE_PATH = "./Saves/";
-
-        private readonly IMessageBroker _messageBroker;
-
-        public CoopSaveManager(IMessageBroker messageBroker)
-        {
-            _messageBroker = messageBroker;
-        }
 
         public ICoopSession LoadCoopSession(string saveName)
         {

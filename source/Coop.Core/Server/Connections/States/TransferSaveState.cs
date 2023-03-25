@@ -37,7 +37,9 @@ namespace Coop.Core.Server.Connections.States
             {
                 var saveData = obj.What.GameSaveData;
                 var peer = ConnectionLogic.PlayerId;
-                ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(peer, new NetworkGameSaveDataRecieved(saveData));
+                ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(
+                    peer,
+                    new NetworkGameSaveDataRecieved(saveData));
 
                 ConnectionLogic.Load();
             }

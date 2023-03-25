@@ -38,7 +38,7 @@ namespace Coop.Core.Client.States
             var commandLoad = new LoadGameSave(Guid.NewGuid(), saveData);
             Logic.NetworkMessageBroker.Publish(this, commandLoad);
 
-            Logic.State = new LoadingState(Logic);
+            Logic.LoadSavedData();
         }
 
         public override void EnterMainMenu()
@@ -62,6 +62,7 @@ namespace Coop.Core.Client.States
 
         public override void LoadSavedData()
         {
+            Logic.State = new LoadingState(Logic);
         }
 
         public override void StartCharacterCreation()
@@ -73,10 +74,6 @@ namespace Coop.Core.Client.States
         }
 
         public override void EnterMissionState()
-        {
-        }
-
-        public override void ResolveNetworkGuids()
         {
         }
 

@@ -3,7 +3,7 @@ using System;
 
 namespace GameInterface.Services.Heroes.Messages
 {
-    public readonly struct HeroesRegistered : IEvent
+    public readonly struct HeroesRegistered : IResponse
     {
         public Guid TransactionID { get; }
 

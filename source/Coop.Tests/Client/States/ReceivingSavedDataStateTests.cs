@@ -145,9 +145,6 @@ namespace Coop.Tests.Client.States
             clientLogic.ExitGame();
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
 
-            clientLogic.LoadSavedData();
-            Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
-
             clientLogic.StartCharacterCreation();
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
 
@@ -155,9 +152,6 @@ namespace Coop.Tests.Client.States
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
 
             clientLogic.EnterMissionState();
-            Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
-
-            clientLogic.ResolveNetworkGuids();
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
 
             clientLogic.ValidateModules();

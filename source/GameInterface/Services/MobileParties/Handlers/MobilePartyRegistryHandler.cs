@@ -1,7 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages;
-using GameInterface.Services.Registry;
 using Serilog;
 using System;
 using System.Collections.Generic;

@@ -96,10 +96,6 @@ namespace Coop.Core.Client.States
             Logic.State = new CharacterCreationState(Logic);
         }
 
-        public override void ResolveNetworkGuids()
-        {
-        }
-
         public override void ValidateModules()
         {
         }

@@ -119,9 +119,6 @@ namespace Coop.Tests.Client.States
             clientLogic.EnterMissionState();
             Assert.IsType<CharacterCreationState>(clientLogic.State);
 
-            clientLogic.ResolveNetworkGuids();
-            Assert.IsType<CharacterCreationState>(clientLogic.State);
-
             clientLogic.ValidateModules();
             Assert.IsType<CharacterCreationState>(clientLogic.State);
         }

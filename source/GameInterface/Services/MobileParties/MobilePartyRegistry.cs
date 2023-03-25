@@ -1,7 +1,7 @@
 ﻿using Common;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.Registry
+namespace GameInterface.Services.MobileParties
 {
     internal interface IMobilePartyRegistry : IRegistryBase<MobileParty>
     {

@@ -123,9 +123,6 @@ namespace Coop.Tests.Client.States
             clientLogic.EnterCampaignState();
             Assert.IsType<CampaignState>(clientLogic.State);
 
-            clientLogic.ResolveNetworkGuids();
-            Assert.IsType<CampaignState>(clientLogic.State);
-
             clientLogic.ValidateModules();
             Assert.IsType<CampaignState>(clientLogic.State);
         }

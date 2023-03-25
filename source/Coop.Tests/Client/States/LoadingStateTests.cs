@@ -50,19 +50,11 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void GameLoaded_Transitions_ResolveNetworkGuidsState()
+        public void GameLoaded_Transitions_CampaignState()
         {
             StubMessageBroker.Publish(this, new CampaignLoaded());
 
-            Assert.IsType<ResolveNetworkGuidsState>(clientLogic.State);
-        }
-
-        [Fact]
-        public void ResolveNetworkGuids_Transitions_ResolveNetworkGuidsState()
-        {
-            clientLogic.ResolveNetworkGuids();
-
-            Assert.IsType<ResolveNetworkGuidsState>(clientLogic.State);
+            Assert.IsType<CampaignState>(clientLogic.State);
         }
 
         [Fact]
@@ -95,9 +87,6 @@ namespace Coop.Tests.Client.States
             Assert.IsType<LoadingState>(clientLogic.State);
 
             clientLogic.StartCharacterCreation();
-            Assert.IsType<LoadingState>(clientLogic.State);
-
-            clientLogic.EnterCampaignState();
             Assert.IsType<LoadingState>(clientLogic.State);
 
             clientLogic.EnterMissionState();

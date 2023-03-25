@@ -2,7 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes;
-using GameInterface.Services.Registry;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.Save.Messages;
 using System;
 using System.Runtime.Serialization;

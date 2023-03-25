@@ -12,8 +12,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit;
 using System.IO.Ports;
-using GameInterface.Services.Registry;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.MobileParties;
 
 namespace GameInterface.Tests.Services.Heroes
 {
@@ -79,61 +79,6 @@ namespace GameInterface.Tests.Services.Heroes
         }
 
         [Fact]
-        public void RetrieveHeroAssociations_Full()
-        {
-            // Setup
-            GameBootStrap.SetupCampaignObjectManager();
-
-            var autoResetEvent = new AutoResetEvent(false);
-            var heroRegistry = _container.Resolve<IHeroRegistry>();
-            var heroes = new Hero[NUM_HEROES];
-
-            for (int i = 0; i < NUM_HEROES; i++)
-            {
-                var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
-                hero.StringId = $"Hero {i}";
-
-                Campaign.Current.CampaignObjectManager.AddHero(hero);
-
-                heroRegistry.RegisterNewObject(hero);
-
-                heroes[i] = hero;
-            }
-
-            // Setup Callback
-            HeroAssociationsPackaged collectedHeroes = default;
-            _messageBroker.Subscribe<HeroAssociationsPackaged>((payload) =>
-            {
-                autoResetEvent.Set();
-                collectedHeroes = payload.What;
-            });
-
-            // Execution
-            Guid transactionId = Guid.NewGuid();
-            _messageBroker.Publish(this, new RetrieveHeroAssociations(transactionId));
-
-            // Verification
-            // Wait for callback with 1 sec timeout
-            Assert.True(autoResetEvent.WaitOne(TimeSpan.FromSeconds(1)));
-
-            Assert.Equal(transactionId, collectedHeroes.TransactionID);
-
-            var packagedHeroes = collectedHeroes.GuidToHeroStringId;
-
-            Assert.NotEmpty(packagedHeroes);
-            Assert.Equal(NUM_HEROES, packagedHeroes.Count);
-
-            foreach(var kvp in packagedHeroes)
-            {
-                var heroStringId = kvp.Key;
-                var heroId = kvp.Value;
-
-                Assert.True(heroRegistry.TryGetValue(heroId, out Hero hero));
-                Assert.Equal(hero.StringId, heroStringId);
-            }
-        }
-
-        [Fact]
         public void RegisterHeroesFromAssociations()
         {
             // Setup
@@ -162,7 +107,7 @@ namespace GameInterface.Tests.Services.Heroes
             }
 
             // Setup Callback
-            _messageBroker.Subscribe<HereosRegistered>((payload) =>
+            _messageBroker.Subscribe<HeroesRegistered>((payload) =>
             {
                 _autoResetEvent.Set();
             });

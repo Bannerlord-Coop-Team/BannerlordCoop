@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Save;
 using System;
+using System.Collections.Generic;
 
 namespace GameInterface.Services.GameState.Messages
 {
@@ -18,15 +19,28 @@ namespace GameInterface.Services.GameState.Messages
     {
         public Guid TransactionID { get; }
         public byte[] GameSaveData { get; }
+        public string CampaignID { get; }
+        public HashSet<Guid> ControlledHeros { get; }
+        public Dictionary<string, Guid> PartyIds { get; }
+        public Dictionary<string, Guid> HeroIds { get; }
 
         /// <summary>
         /// GameSaveData will only be created internally as it requires game access
         /// </summary>
-        /// <param name="gameSaveData">Game Save Data</param>
-        public GameSaveDataPackaged(Guid transactionID, byte[] gameSaveData)
+        public GameSaveDataPackaged(
+            Guid transactionID, 
+            byte[] gameSaveData, 
+            string campaignID,
+            HashSet<Guid> controlledHeros,
+            Dictionary<string, Guid> partyIds,
+            Dictionary<string, Guid> heroIds)
         {
             TransactionID = transactionID;
             GameSaveData = gameSaveData;
+            CampaignID = campaignID;
+            ControlledHeros = controlledHeros;
+            PartyIds = partyIds;
+            HeroIds = heroIds;
         }
-    }
+}
 }

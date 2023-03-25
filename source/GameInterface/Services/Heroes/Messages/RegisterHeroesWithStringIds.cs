@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace GameInterface.Services.Heroes.Messages
 {
-    public readonly struct RegisterHeroesWithStringIds
+    internal readonly struct RegisterHeroesWithStringIds
     {
         public Guid TransactionID { get; }
         public IReadOnlyDictionary<string, Guid> AssociatedStringIdValues { get; }

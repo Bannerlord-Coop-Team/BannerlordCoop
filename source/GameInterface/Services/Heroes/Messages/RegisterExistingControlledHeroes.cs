@@ -7,16 +7,15 @@ using System.Threading.Tasks;
 
 namespace GameInterface.Services.Heroes.Messages
 {
-    /// <summary>
-    /// Command to start packaging heroes, <seealso cref="HeroAssociationsPackaged"/>
-    /// </summary>
-    public readonly struct RetrieveHeroAssociations : ICommand
+    internal readonly struct RegisterExistingControlledHeroes : ICommand
     {
         public Guid TransactionID { get; }
+        public IEnumerable<Guid> ControlledHeroIds { get; }
 
-        public RetrieveHeroAssociations(Guid transactionID)
+        public RegisterExistingControlledHeroes(Guid transactionID, IEnumerable<Guid> controlledHeroIds)
         {
             TransactionID = transactionID;
+            ControlledHeroIds = controlledHeroIds;
         }
     }
 }

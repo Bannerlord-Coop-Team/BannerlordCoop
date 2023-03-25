@@ -34,12 +34,7 @@ namespace Coop.Core.Client.States
 
         private void Handle(MessagePayload<CampaignLoaded> obj)
         {
-            Logic.ResolveNetworkGuids();
-        }
-
-        public override void ResolveNetworkGuids()
-        {
-            Logic.State = new ResolveNetworkGuidsState(Logic);
+            Logic.EnterCampaignState();
         }
 
         public override void Connect()
@@ -65,6 +60,7 @@ namespace Coop.Core.Client.States
 
         public override void EnterCampaignState()
         {
+            Logic.State = new CampaignState(Logic);
         }
 
         public override void EnterMissionState()

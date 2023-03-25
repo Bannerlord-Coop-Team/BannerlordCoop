@@ -19,7 +19,7 @@ namespace GameInterface.Services.Heroes.Handlers
         private readonly IHeroInterface heroInterface;
         private readonly IMessageBroker messageBroker;
         private readonly IHeroRegistry heroRegistry;
-        private readonly IControlledHeroRegistry controlledHeroesRegistry;
+        private readonly IControlledHeroRegistry controlledHeroRegistry;
 
         public HeroRegistryHandler(
             IHeroInterface heroInterface,
@@ -30,14 +30,15 @@ namespace GameInterface.Services.Heroes.Handlers
             this.heroInterface = heroInterface;
             this.messageBroker = messageBroker;
             this.heroRegistry = heroRegistry;
-            this.controlledHeroesRegistry = controlledHeroesRegistry;
+            this.controlledHeroRegistry = controlledHeroesRegistry;
 
             messageBroker.Subscribe<RegisterHeroes>(Handle_RegisterHeroes);
             messageBroker.Subscribe<RegisterHeroesWithStringIds>(Handle_RegisterHeroesWithStringIds);
+            messageBroker.Subscribe<RegisterExistingControlledHeroes>(Handle_RegisterExistingControlledHeroes);
             messageBroker.Subscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
-            messageBroker.Subscribe<RetrieveHeroAssociations>(Handle_RetrieveHeroAssociations);
-            messageBroker.Subscribe<RetrieveControlledHeroes>(Handle_RetrieveControlledHeroes);
         }
+
+        
 
         private void Handle_RegisterHeroes(MessagePayload<RegisterHeroes> obj)
         {
@@ -104,41 +105,32 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Publish(this, new HeroesRegistered(transactionId));
         }
 
+        private void Handle_RegisterExistingControlledHeroes(MessagePayload<RegisterExistingControlledHeroes> obj)
+        {
+            var controlledHeros = obj.What.ControlledHeroIds;
+
+            foreach (var id in controlledHeros)
+            {
+                if (controlledHeroRegistry.RegisterAsControlled(id) == false)
+                {
+                    Logger.Error($"Unable to add {id} to ControlledHeroRegistry");
+                }
+            }
+        }
         private void Handle_PlayerHeroChanged(MessagePayload<PlayerHeroChanged> obj)
         {
             var previousHero = obj.What.PreviousHero;
             var newHero = obj.What.NewHero;
 
-            if(heroRegistry.TryGetValue(previousHero, out Guid previousHeroId))
+            if (heroRegistry.TryGetValue(previousHero, out Guid previousHeroId))
             {
-                controlledHeroesRegistry.RemoveAsControlled(previousHeroId);
+                controlledHeroRegistry.RemoveAsControlled(previousHeroId);
             }
 
             if (heroRegistry.TryGetValue(newHero, out Guid newHeroId))
             {
-                controlledHeroesRegistry.RemoveAsControlled(newHeroId);
+                controlledHeroRegistry.RemoveAsControlled(newHeroId);
             }
-        }
-
-        private void Handle_RetrieveHeroAssociations(MessagePayload<RetrieveHeroAssociations> payload)
-        {
-            Dictionary<string, Guid> heroIdToStringId = new Dictionary<string, Guid>();
-            foreach(var kvp in heroRegistry)
-            {
-                var key = kvp.Key;
-                var value = kvp.Value;
-                heroIdToStringId.Add(value.StringId, key);
-            }
-
-            var transactionId = payload.What.TransactionID;
-            messageBroker.Publish(this, new HeroAssociationsPackaged(transactionId, heroIdToStringId));
-        }
-
-        private void Handle_RetrieveControlledHeroes(MessagePayload<RetrieveControlledHeroes> payload)
-        {
-            var transactionId = payload.What.TransactionID;
-            var controlledHeroes = controlledHeroesRegistry.ControlledHeros;
-            messageBroker.Publish(this, new ControlledHeroesPackaged(transactionId, controlledHeroes));
         }
     }
 }

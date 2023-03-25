@@ -3,7 +3,7 @@ using Common.Messaging;
 using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Heroes;
-using GameInterface.Services.Registry;
+using GameInterface.Services.MobileParties;
 
 namespace GameInterface
 {

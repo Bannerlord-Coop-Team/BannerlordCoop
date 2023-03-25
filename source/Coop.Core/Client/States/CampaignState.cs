@@ -82,10 +82,6 @@ namespace Coop.Core.Client.States
         {
         }
 
-        public override void ResolveNetworkGuids()
-        {
-        }
-
         public override void ValidateModules()
         {
         }

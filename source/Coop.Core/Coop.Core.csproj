@@ -107,7 +107,6 @@
     <Compile Include="Client\Messages\NetworkGameSaveDataRecieved.cs" />
     <Compile Include="Client\Messages\NetworkDisconnected.cs" />
     <Compile Include="Client\Messages\NetworkConnected.cs" />
-    <Compile Include="Client\Messages\NetworkObjectGuidsResolved.cs" />
     <Compile Include="Client\Packets\NewHeroPacket.cs" />
     <Compile Include="Common\Services\PartyMovement\Messages\NetworkUpdatePartyTargetPosition.cs" />
     <Compile Include="Common\Services\PartyMovement\PartyMovementHandler.cs" />
@@ -120,7 +119,6 @@
     <Compile Include="Client\States\MainMenuState.cs" />
     <Compile Include="Client\States\MissionState.cs" />
     <Compile Include="Client\States\ReceivingSavedDataState.cs" />
-    <Compile Include="Client\States\ResolveNetworkGuidsState.cs" />
     <Compile Include="Client\States\ValidateModuleState.cs" />
     <Compile Include="CoopModule.cs" />
     <Compile Include="Server\Connections\ClientRegistry.cs" />
@@ -153,7 +151,6 @@
     <Compile Include="Server\Config\ServerConfig.cs" />
     <Compile Include="Server\ServerLogic.cs" />
     <Compile Include="Client\Data\ClientData.cs" />
-    <Compile Include="Server\Services\Save\CoopSessionManager.cs" />
     <Compile Include="Server\Services\Save\Handlers\SaveGameHandler.cs" />
     <Compile Include="Server\Services\Save\CoopSaveManager.cs" />
     <Compile Include="Server\Services\Save\Data\CoopSession.cs" />

@@ -1,7 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Messages;
-using GameInterface.Services.Registry;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Extensions;
 using System;
@@ -37,7 +37,7 @@ namespace GameInterface.Tests.Services.Parties
             _messageBroker = _container.Resolve<IMessageBroker>();
         }
 
-        
+
         [Fact]
         public void RegisterParties()
         {
@@ -74,63 +74,6 @@ namespace GameInterface.Tests.Services.Parties
 
             Assert.True(partyRegistry.TryGetValue(party1, out Guid _));
             Assert.True(partyRegistry.TryGetValue(party2, out Guid _));
-        }
-
-        [Fact]
-        public void RetrievePartyAssociations()
-        {
-            // Setup
-            AutoResetEvent autoResetEvent = new AutoResetEvent(false);
-
-            Guid transactionId = Guid.NewGuid();
-
-            var partyRegistry = _container.Resolve<IMobilePartyRegistry>();
-            var partys = new MobileParty[NUM_PARTIES];
-
-            for (int i = 0; i < NUM_PARTIES; i++)
-            {
-                var party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
-                party.StringId = $"Party {i}";
-
-                Campaign.Current.CampaignObjectManager.AddMobileParty(party);
-
-                partyRegistry.RegisterNewObject(party);
-
-                partys[i] = party;
-            }
-
-            // Setup Callback
-            PartyAssociationsPackaged returnedPayload = default;
-            _messageBroker.Subscribe<PartyAssociationsPackaged>((payload) => 
-            {
-                returnedPayload = payload.What;
-                autoResetEvent.Set();
-            });
-
-            // Execution
-            _messageBroker.Publish(this, new RetrievePartyAssociations(transactionId));
-
-            // Verification
-            // Wait for callback with 1 sec timeout
-            Assert.True(autoResetEvent.WaitOne(TimeSpan.FromSeconds(1)));
-
-            Assert.Equal(transactionId, returnedPayload.TransactionID);
-
-            var resovledDict = returnedPayload.AssociatedStringIdValues;
-
-            for (int i = 0; i < NUM_PARTIES; i++)
-            {
-                var party = partys[i];
-
-                // Assert that the party can be found in the party registry and retrieve its ID
-                Assert.True(partyRegistry.TryGetValue(party, out Guid partyId));
-
-                // Assert that the party's string ID can be found in the resolved dictionary and retrieve its GUID
-                Assert.True(resovledDict.TryGetValue(party.StringId, out var resolvedGuid));
-
-                // Assert that the party's ID matches the GUID retrieved from the resolved dictionary
-                Assert.Equal(partyId, resolvedGuid);
-            }
         }
 
         [Fact]

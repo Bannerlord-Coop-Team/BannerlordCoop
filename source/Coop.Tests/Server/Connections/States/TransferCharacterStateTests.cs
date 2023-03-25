@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Time.Messages;
 using LiteNetLib;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using Xunit;
@@ -117,7 +118,15 @@ namespace Coop.Tests.Server.Connections.States
             });
 
             // Publish hero resolved, this would be from game interface
-            StubMessageBroker.Publish(_playerId, new GameSaveDataPackaged(transactionId, Array.Empty<byte>()));
+            var message = new GameSaveDataPackaged(
+                transactionId,
+                Array.Empty<byte>(),
+                "TestCampaingId",
+                null,
+                null,
+                null);
+
+            StubMessageBroker.Publish(_playerId, message);
 
             Assert.Equal(1, networkGameSaveDataRecievedCount);
             Assert.IsType<LoadingState>(_connectionLogic.State);
@@ -135,7 +144,15 @@ namespace Coop.Tests.Server.Connections.States
             });
 
             // Publish hero resolved, this would be from game interface
-            StubMessageBroker.Publish(_playerId, new GameSaveDataPackaged(Guid.NewGuid(), Array.Empty<byte>()));
+            var message = new GameSaveDataPackaged(
+                Guid.NewGuid(),
+                Array.Empty<byte>(),
+                "TestCampaingId",
+                null,
+                null,
+                null);
+
+            StubMessageBroker.Publish(_playerId, message);
 
             Assert.Equal(0, networkGameSaveDataRecievedCount);
             Assert.IsType<TransferSaveState>(_connectionLogic.State);

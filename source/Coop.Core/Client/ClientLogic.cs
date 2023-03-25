@@ -76,8 +76,6 @@ namespace Coop.Core.Client
 
         public void LoadSavedData() => State.LoadSavedData();
 
-        public void ResolveNetworkGuids() => State.ResolveNetworkGuids();
-
         public void ExitGame() => State.ExitGame();
 
         public void EnterMainMenu() => State.EnterMainMenu();

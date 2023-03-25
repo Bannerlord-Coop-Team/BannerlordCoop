@@ -162,9 +162,6 @@ namespace Coop.Tests.Client.States
             clientLogic.StartCharacterCreation();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
 
-            clientLogic.ResolveNetworkGuids();
-            Assert.IsType<ValidateModuleState>(clientLogic.State);
-
             clientLogic.ValidateModules();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
         }

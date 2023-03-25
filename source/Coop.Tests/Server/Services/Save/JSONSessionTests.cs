@@ -29,7 +29,6 @@ namespace Coop.Tests.Server.Services.Save
             ICoopSession sessionData = new CoopSession()
             {
                 UniqueGameId = "TestId",
-                SessionId = Guid.NewGuid(),
                 HeroStringIdToGuid = new Dictionary<string, Guid>
                 {
                     { "Hero 1", Guid.NewGuid() },
@@ -60,7 +59,6 @@ namespace Coop.Tests.Server.Services.Save
             ICoopSession sessionData = new CoopSession()
             {
                 UniqueGameId = "TestId",
-                SessionId = Guid.NewGuid(),
                 HeroStringIdToGuid = new Dictionary<string, Guid>
                 {
                     { "Hero 1", Guid.NewGuid() },
