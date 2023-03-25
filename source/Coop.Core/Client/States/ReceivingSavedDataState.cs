@@ -35,7 +35,7 @@ namespace Coop.Core.Client.States
             if (saveData == null) return;
             if (saveData.Length == 0) return;
 
-            var commandLoad = new LoadGameSave(saveData);
+            var commandLoad = new LoadGameSave(Guid.NewGuid(), saveData);
             Logic.NetworkMessageBroker.Publish(this, commandLoad);
 
             Logic.State = new LoadingState(Logic);

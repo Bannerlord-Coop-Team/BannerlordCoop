@@ -1,39 +1,28 @@
-﻿using System.Collections.Generic;
-using TaleWorlds.CampaignSystem;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace GameInterface.Services.Heroes
 {
-    /// <summary>
-    /// Registry that contains all controlled Heros
-    /// </summary>
-    internal class ControlledHeroRegistry
+    internal interface IControlledHeroRegistry
     {
-        public static readonly HashSet<Hero> ControlledHeros = new HashSet<Hero>();
+        HashSet<Guid> ControlledHeros { get; }
 
-        /// <summary>
-        /// Registers a hero as controlled
-        /// </summary>
-        /// <param name="hero">Hero to register</param>
-        /// <returns><see langword="true"/> if successfully added, 
-        /// otherwise <see langword="false"/></returns>
-        public static bool RegisterControlledHero(Hero hero)
-        {
-            if (ControlledHeros.Contains(hero)) return false;
+        bool IsControlled(Guid heroId);
+        bool RegisterAsControlled(Guid heroId);
+        bool RemoveAsControlled(Guid heroId);
+    }
 
-            return ControlledHeros.Add(hero);
-        }
+    internal class ControlledHeroRegistry : IControlledHeroRegistry
+    {
+        public HashSet<Guid> ControlledHeros { get; } = new HashSet<Guid>();
 
-        /// <summary>
-        /// Removes a hero from the registry
-        /// </summary>
-        /// <param name="hero">Hero to remove</param>
-        /// <returns><see langword="true"/> if successfully removed, 
-        /// otherwise <see langword="false"/></returns>
-        public static bool RemoveControlledHero(Hero hero)
-        {
-            if (ControlledHeros.Contains(hero) == false) return false;
+        public bool RegisterAsControlled(Guid heroId) => ControlledHeros.Add(heroId);
 
-            return ControlledHeros.Remove(hero);
-        }
+        public bool IsControlled(Guid heroId) => ControlledHeros.Contains(heroId);
+
+        public bool RemoveAsControlled(Guid heroId) => ControlledHeros.Remove(heroId);
     }
 }

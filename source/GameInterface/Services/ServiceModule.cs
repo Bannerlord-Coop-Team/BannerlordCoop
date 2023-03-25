@@ -8,18 +8,12 @@ using System.Linq;
 
 namespace GameInterface.Services
 {
-    internal interface IServiceModule
-    {
-    }
-
-    internal class ServiceModule : Module, IServiceModule
+    internal class ServiceModule : Module
     {
         private static readonly ILogger Logger = LogManager.GetLogger<ServiceModule>();
 
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterType<ServiceModule>().As<IServiceModule>().SingleInstance();
-
             foreach (var type in GetHandlers())
             {
                 builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();

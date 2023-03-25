@@ -39,8 +39,8 @@
     <Reference Include="Autofac, Version=6.4.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
       <HintPath>..\packages\Autofac.6.4.0\lib\netstandard2.0\Autofac.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=7.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.7.0.0\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
       <HintPath>..\packages\protobuf-net.Core.3.1.33\lib\net462\protobuf-net.Core.dll</HintPath>
@@ -86,11 +86,20 @@
     <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
     </Reference>
-    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.4.5.3\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.6.0.0\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Encodings.Web, Version=7.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Encodings.Web.7.0.0\lib\net462\System.Text.Encodings.Web.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Json, Version=7.0.0.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Json.7.0.2\lib\net462\System.Text.Json.dll</HintPath>
     </Reference>
     <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.4\lib\net461\System.Threading.Tasks.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="System.ValueTuple, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.ValueTuple.4.5.0\lib\net47\System.ValueTuple.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -270,19 +279,31 @@
     <Compile Include="Serialization\External\CustomPartyComponentBinaryPackage.cs" />
     <Compile Include="Serialization\External\MobilePartyAIBinaryPackage.cs" />
     <Compile Include="Services\Heroes\ControlledHeroRegistry.cs" />
+    <Compile Include="Services\MobileParties\Messages\PartiesRegistered.cs" />
+    <Compile Include="Services\MobileParties\Messages\PartyAssociationsPackaged.cs" />
+    <Compile Include="Services\MobileParties\MobilePartyRegistry.cs" />
+    <Compile Include="Services\Heroes\HeroRegistry.cs" />
+    <Compile Include="Services\Heroes\Handlers\HeroRegistryHandler.cs" />
     <Compile Include="Services\Heroes\Handlers\SwitchHeroHandler.cs" />
-    <Compile Include="Services\Heroes\Messages\SwitchToParty.cs" />
-    <Compile Include="Services\Heroes\ControlledHeroRegistry.cs" />
-    <Compile Include="Services\Heroes\Handlers\SwitchHeroHandler.cs" />
+    <Compile Include="Services\Heroes\Messages\ControlledHeroesPackaged.cs" />
+    <Compile Include="Services\Heroes\Messages\HereosRegistered.cs" />
+    <Compile Include="Services\Heroes\Messages\HeroesRegistered.cs" />
+    <Compile Include="Services\Heroes\Messages\RegisterHeroes.cs" />
+    <Compile Include="Services\Heroes\Messages\RegisterHeroesWithStringIds.cs" />
+    <Compile Include="Services\Heroes\Messages\RetrieveControlledHeroes.cs" />
+    <Compile Include="Services\Heroes\Messages\RetrieveHeroAssociations.cs" />
+    <Compile Include="Services\Heroes\Messages\HeroAssociationsPackaged.cs" />
+    <Compile Include="Services\Heroes\Messages\PlayerHeroChanged.cs" />
     <Compile Include="Services\Heroes\Messages\SwitchToParty.cs" />
     <Compile Include="Services\Heroes\Patches\ChangePlayerCharacterActionPatches.cs" />
     <Compile Include="Services\MobileParties\Data\TargetPositionData.cs" />
     <Compile Include="Services\MobileParties\Handlers\MobilePartyMovementHandler.cs" />
+    <Compile Include="Services\MobileParties\Handlers\MobilePartyRegistryHandler.cs" />
     <Compile Include="Services\MobileParties\Messages\ControlledPartyTargetPositionUpdated.cs" />
     <Compile Include="Services\MobileParties\Messages\RegisterParties.cs" />
     <Compile Include="Services\MobileParties\Messages\RegisterPartiesWithStringIds.cs" />
+    <Compile Include="Services\MobileParties\Messages\RetrievePartyAssociations.cs" />
     <Compile Include="Services\MobileParties\Messages\UpdatePartyTargetPosition.cs" />
-    <Compile Include="Services\MobileParties\MobilePartyRegistry.cs" />
     <Compile Include="Services\MobileParties\Patches\PartyMovementPatch.cs" />
     <Compile Include="Services\Modules\CompatibilityInfo.cs" />
     <Compile Include="Exceptions\Exceptions.cs" />
@@ -320,9 +341,14 @@
     <Compile Include="Services\Modules\Handlers\NewHeroHandler.cs" />
     <Compile Include="Services\Modules\Interfaces\ModuleInterface.cs" />
     <Compile Include="Services\Save\CoopInMemSaveDriver.cs" />
+    <Compile Include="Services\Save\Handlers\PackageGuidsHandler.cs" />
     <Compile Include="Services\Save\Handlers\SaveHandler.cs" />
     <Compile Include="Services\Save\Interfaces\SaveInterface.cs" />
+    <Compile Include="Services\Save\Messages\GameLoaded.cs" />
+    <Compile Include="Services\Save\Messages\GameSaved.cs" />
     <Compile Include="Services\Save\Messages\PackageGameSaveData.cs" />
+    <Compile Include="Services\Save\Messages\PackageObjectGuids.cs" />
+    <Compile Include="Services\Save\Patches\LoadPatches.cs" />
     <Compile Include="Services\Time\Handlers\TimeControlHandler.cs" />
     <Compile Include="Services\Time\Interaces\TimeControlInterface.cs" />
     <Compile Include="Services\Time\Messages\EnableGameTimeControls.cs" />
@@ -345,7 +371,7 @@
     <Compile Include="Services\MobileParties\Patches\PartiesSellPrisonerCampaignBehavior.cs" />
     <Compile Include="Services\MobileParties\Patches\RecruitmentCampaignBehavior.cs" />
     <Compile Include="Services\Misc\Patches\TemporaryTypesPatch.cs" />
-    <Compile Include="Services\Save\Patches\SaveManager.cs" />
+    <Compile Include="Services\Save\Patches\SavePatches.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Helpers\SaveLoadHelper.cs" />
     <Compile Include="Serialization\BinaryPackageBase.cs" />
@@ -450,12 +476,11 @@
     <Compile Include="Services\GameState\Handlers\EnterMissionHandler.cs" />
     <Compile Include="Services\GameState\Messages\Connect.cs" />
     <Compile Include="Services\GameState\Messages\EnterMissionState.cs" />
-    <Compile Include="Services\GameState\Messages\ResolveNetworkGuids.cs" />
     <Compile Include="Services\Modules\Messages\ValidateModule.cs" />
     <Compile Include="Services\ServiceModule.cs" />
     <Compile Include="Services\GameState\Interfaces\GameStateInterface.cs" />
     <Compile Include="Services\GameState\Messages\EnterMainMenu.cs" />
-    <Compile Include="Services\GameState\Messages\GameLoaded.cs" />
+    <Compile Include="Services\GameState\Messages\CampaignLoaded.cs" />
     <Compile Include="Services\GameState\Messages\LoadGameSave.cs" />
     <Compile Include="Utils\ReflectionUtils.cs" />
   </ItemGroup>

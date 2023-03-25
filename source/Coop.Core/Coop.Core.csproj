@@ -15,7 +15,7 @@
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>TRACE;DEBUG;</DefineConstants>
@@ -33,7 +33,7 @@
   <PropertyGroup>
     <RuntimeIdentifiers>win10-arm;win10-arm-aot;win10-arm64-aot;win10-x86;win10-x86-aot;win10-x64;win10-x64-aot</RuntimeIdentifiers>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <Optimize>true</Optimize>
@@ -107,6 +107,7 @@
     <Compile Include="Client\Messages\NetworkGameSaveDataRecieved.cs" />
     <Compile Include="Client\Messages\NetworkDisconnected.cs" />
     <Compile Include="Client\Messages\NetworkConnected.cs" />
+    <Compile Include="Client\Messages\NetworkObjectGuidsResolved.cs" />
     <Compile Include="Client\Packets\NewHeroPacket.cs" />
     <Compile Include="Common\Services\PartyMovement\Messages\NetworkUpdatePartyTargetPosition.cs" />
     <Compile Include="Common\Services\PartyMovement\PartyMovementHandler.cs" />
@@ -152,6 +153,10 @@
     <Compile Include="Server\Config\ServerConfig.cs" />
     <Compile Include="Server\ServerLogic.cs" />
     <Compile Include="Client\Data\ClientData.cs" />
+    <Compile Include="Server\Services\Save\CoopSessionManager.cs" />
+    <Compile Include="Server\Services\Save\Handlers\SaveGameHandler.cs" />
+    <Compile Include="Server\Services\Save\CoopSaveManager.cs" />
+    <Compile Include="Server\Services\Save\Data\CoopSession.cs" />
     <Compile Include="Server\States\InitialServerState.cs" />
     <Compile Include="Server\States\IServerState.cs" />
     <Compile Include="Server\States\ServerRunningState.cs" />
@@ -177,7 +182,9 @@
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Server\Services\Save\Messages\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>

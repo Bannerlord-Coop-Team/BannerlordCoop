@@ -40,7 +40,7 @@ namespace GameInterface.Services.Heroes.Handlers
 
         private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
         {
-            var registrationId = obj.What.PeerId;
+            var transactionId = obj.What.TransactionID;
             byte[] bytes = obj.What.Bytes;
 
             try
@@ -49,7 +49,7 @@ namespace GameInterface.Services.Heroes.Handlers
 
                 Logger.Information("New Hero ID: {id}", hero.Id.InternalValue);
 
-                var registerMessage = new NewPlayerHeroRegistered(registrationId, hero);
+                var registerMessage = new NewPlayerHeroRegistered(transactionId, hero);
 
                 messageBroker.Publish(this, registerMessage);
             }

@@ -14,18 +14,18 @@ namespace Coop.Tests.Client.States
         public ResolveNetworkGuidsStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, NetworkMessageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
             clientLogic.State = new ResolveNetworkGuidsState(clientLogic);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
 
             clientLogic.State.Dispose();
 
-            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
@@ -33,7 +33,7 @@ namespace Coop.Tests.Client.States
         {
             // Setup event callbacks
             var resolveNetworkGuidsCount = 0;
-            MessageBroker.Subscribe<ResolveNetworkGuids>((payload) =>
+            StubMessageBroker.Subscribe<ResolveObjectGuids>((payload) =>
             {
                 resolveNetworkGuidsCount += 1;
             });
@@ -48,7 +48,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void NetworkGuidsResolved_Transitions_CampaignState()
         {
-            MessageBroker.Publish(this, new NetworkGuidsResolved());
+            StubMessageBroker.Publish(this, new ObjectGuidsResolved());
 
             Assert.IsType<CampaignState>(clientLogic.State);
         }
@@ -65,7 +65,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -78,7 +78,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void EnterMainMenu_Transitions_MainMenuState()
         {
-            MessageBroker.Publish(this, new MainMenuEntered());
+            StubMessageBroker.Publish(this, new MainMenuEntered());
 
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
@@ -87,7 +87,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });

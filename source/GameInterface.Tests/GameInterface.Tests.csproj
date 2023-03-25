@@ -135,6 +135,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Bootstrap\Extensions\CampaignObjectManagerExtensions.cs" />
     <Compile Include="Bootstrap\Patches\GamePatches.cs" />
     <Compile Include="Bootstrap\TestDebugger.cs" />
     <Compile Include="CompatibilityInfo_Test.cs" />
@@ -223,6 +224,9 @@
     <Compile Include="Serialization\SerializerTests\ProofOfConcept\EdgeCaseClasses.cs" />
     <Compile Include="Serialization\SerializerTests\ProofOfConcept\EdgeCaseSerializers.cs" />
     <Compile Include="Serialization\SerializerTests\ProofOfConcept\GenericSerializationTests.cs" />
+    <Compile Include="Services\Heroes\PackageHeroesTests.cs" />
+    <Compile Include="Services\Parties\GuidRegistrationTests.cs" />
+    <Compile Include="Services\Save\PackageObjectGuidsTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

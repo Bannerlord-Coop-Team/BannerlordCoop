@@ -53,7 +53,7 @@ namespace GameInterface.Services.Heroes.Interfaces
         public void ResolveHero(ResolveHero message)
         {
             // TODO implement
-            messageBroker.Publish(this, new ResolveDebugHero(message.TransactionId, message.PlayerId));
+            messageBroker.Publish(this, new ResolveDebugHero(message.TransactionID, message.PlayerId));
         }
 
         public Hero SwitchMainHero(string heroId)

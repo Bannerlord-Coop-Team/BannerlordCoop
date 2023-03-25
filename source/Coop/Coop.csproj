@@ -294,7 +294,7 @@
       <Name>Common</Name>
     </ProjectReference>
     <ProjectReference Include="..\Coop.Core\Coop.Core.csproj">
-      <Project>{442B73F2-B103-4EF6-8B4B-A2F36F169515}</Project>
+      <Project>{442b73f2-b103-4ef6-8b4b-a2f36f169515}</Project>
       <Name>Coop.Core</Name>
     </ProjectReference>
     <ProjectReference Include="..\GameInterface\GameInterface.csproj">

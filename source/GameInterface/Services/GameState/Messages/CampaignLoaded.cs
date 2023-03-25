@@ -2,7 +2,7 @@
 
 namespace GameInterface.Services.GameState.Messages
 {
-    public readonly struct GameLoaded : IEvent
+    public readonly struct CampaignLoaded : IEvent
     {
     }
 }

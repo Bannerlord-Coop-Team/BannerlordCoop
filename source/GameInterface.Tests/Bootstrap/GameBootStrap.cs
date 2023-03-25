@@ -43,6 +43,17 @@ namespace GameInterface.Tests.Bootstrap
             }
         }
 
+        private static readonly MethodInfo InitializeManagerObjectLists =
+            typeof(CampaignObjectManager).GetMethod("InitializeManagerObjectLists", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static void SetupCampaignObjectManager()
+        {
+            if(Campaign.Current == null)
+            {
+                Campaign_Current.SetValue(null, new Campaign(CampaignGameMode.Campaign));
+                InitializeManagerObjectLists.Invoke(Campaign.Current.CampaignObjectManager, null);
+            }
+        }
+
         private static void InitializeMBObjectManager()
         {
             if (MBObjectManager.Instance != null) return;

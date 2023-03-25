@@ -6,26 +6,26 @@ namespace GameInterface.Services.GameState.Messages
 {
     public readonly struct PackageGameSaveData : ICommand
     {
-        public int PeerId { get; }
+        public Guid TransactionID { get; }
 
-        public PackageGameSaveData(int peerId)
+        public PackageGameSaveData(Guid transactionID)
         {
-            PeerId = peerId;
+            TransactionID = transactionID;
         }
     }
 
-    public readonly struct GameSaveDataPackaged : IEvent
+    public readonly struct GameSaveDataPackaged : IResponse
     {
-        public int PeerId { get; }
+        public Guid TransactionID { get; }
         public byte[] GameSaveData { get; }
 
         /// <summary>
         /// GameSaveData will only be created internally as it requires game access
         /// </summary>
         /// <param name="gameSaveData">Game Save Data</param>
-        public GameSaveDataPackaged(int peerId, byte[] gameSaveData)
+        public GameSaveDataPackaged(Guid transactionID, byte[] gameSaveData)
         {
-            PeerId = peerId;
+            TransactionID = transactionID;
             GameSaveData = gameSaveData;
         }
     }

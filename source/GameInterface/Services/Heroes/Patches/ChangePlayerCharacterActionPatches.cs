@@ -1,4 +1,6 @@
-﻿using HarmonyLib;
+﻿using Common.Messaging;
+using GameInterface.Services.Heroes.Messages;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 
@@ -10,11 +12,7 @@ namespace GameInterface.Services.Heroes.Patches
         [HarmonyPatch("Apply")]
         private static void Prefix(Hero hero)
         {
-            // Remove previous controlled hero if there was one
-            ControlledHeroRegistry.RemoveControlledHero(Hero.MainHero);
-
-            // Register new hero as controlled
-            ControlledHeroRegistry.RegisterControlledHero(hero);
+            MessageBroker.Instance.Publish(null, new PlayerHeroChanged(Hero.MainHero, hero));
         }
     }
 }

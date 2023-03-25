@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace Common
 {
-    public interface IRegistryBase<T>
+    public interface IRegistryBase<T> : IEnumerable<KeyValuePair<Guid, T>>
     {
         /// <summary>
         /// Count of registered objects
@@ -85,5 +87,11 @@ namespace Common
 
         /// <inheritdoc/>
         public virtual bool TryGetValue(Guid id, out T obj) => _dictionary.TryGetValue(id, out obj);
+
+        /// <inheritdoc/>
+        public IEnumerator<KeyValuePair<Guid, T>> GetEnumerator() => _dictionary.GetEnumerator();
+
+        /// <inheritdoc/>
+        IEnumerator IEnumerable.GetEnumerator() => _dictionary.GetEnumerator();
     }
 }

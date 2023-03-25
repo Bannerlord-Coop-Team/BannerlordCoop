@@ -25,7 +25,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Mat3_Full_Serialization()
         {
-            Mat3 Mat3 = new Mat3(new Vec3(11, 2, 3), new Vec3(4, 5, 6), new Vec3(7, 8, 0));
+            Mat3 Mat3 = new Mat3(new Vec3(11.001f, 2.001f, 3.001f), new Vec3(4.001f, 5.001f, 6.001f), new Vec3(7.001f, 8.001f, 0));
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
             Mat3BinaryPackage package = new Mat3BinaryPackage(Mat3, factory);

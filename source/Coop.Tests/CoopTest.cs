@@ -7,15 +7,15 @@ namespace Coop.Tests
 {
     public class CoopTest
     {
-        public readonly MessageBrokerStub MessageBroker;
-        public readonly NetworkMessageBrokerStub NetworkMessageBroker;
+        public readonly MessageBrokerStub StubMessageBroker;
+        public readonly NetworkMessageBrokerStub StubNetworkMessageBroker;
         public readonly ITestOutputHelper Output;
 
         public CoopTest(ITestOutputHelper output)
         {
             Output = output;
-            NetworkMessageBroker = new NetworkMessageBrokerStub();
-            MessageBroker = NetworkMessageBroker;
+            StubNetworkMessageBroker = new NetworkMessageBrokerStub();
+            StubMessageBroker = StubNetworkMessageBroker;
         }
     }
 }

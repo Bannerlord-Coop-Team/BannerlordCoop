@@ -25,19 +25,19 @@ namespace GameInterface.Services.MobileParties.Patches
         [HarmonyPatch(MethodType.Setter)]
         private static bool MovementPrefix(ref MobileParty __instance, ref Vec2 value)
         {
-            if (ControlledHeroRegistry.ControlledHeros.Contains(__instance.LeaderHero))
-            {
-                // If controlled parties position is allowed to be change
-                // Allow setting
-                if(__instance == AllowedChangeParty) return true;
+            //if (ControlledHeroRegistry.ControlledHeros.Contains(__instance.LeaderHero))
+            //{
+            //    // If controlled parties position is allowed to be change
+            //    // Allow setting
+            //    if(__instance == AllowedChangeParty) return true;
 
-                string heroStringId = __instance.LeaderHero.StringId;
-                var message = new ControlledPartyTargetPositionUpdated(heroStringId, value);
-                MessageBroker.Instance.Publish(__instance, message);
+            //    string heroStringId = __instance.LeaderHero.StringId;
+            //    var message = new ControlledPartyTargetPositionUpdated(heroStringId, value);
+            //    MessageBroker.Instance.Publish(__instance, message);
 
-                // If party is not allowed, do not allow setting
-                return false;
-            }
+            //    // If party is not allowed, do not allow setting
+            //    return false;
+            //}
 
             // Allow if party is not controlled
             return true;

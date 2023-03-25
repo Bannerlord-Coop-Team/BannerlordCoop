@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Modules.Messages;
 using System;
@@ -10,27 +11,31 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class ResolveNetworkGuidsState : ClientStateBase
     {
+        private Guid transactionId;
+
         public ResolveNetworkGuidsState(IClientLogic logic) : base(logic)
         {
             Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
-            Logic.NetworkMessageBroker.Subscribe<NetworkGuidsResolved>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<ObjectGuidsResolved>(Handle);
 
-#if DEBUG
-            EnterCampaignState();
-#else
-            Logic.NetworkMessageBroker.Publish(this, new ResolveNetworkGuids());
-#endif
+            transactionId = Guid.NewGuid();
+            Logic.NetworkMessageBroker.Publish(this, new ResolveObjectGuids(transactionId));
         }
 
         public override void Dispose()
         {
             Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            Logic.NetworkMessageBroker.Unsubscribe<NetworkGuidsResolved>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<ObjectGuidsResolved>(Handle);
         }
 
-        private void Handle(MessagePayload<NetworkGuidsResolved> obj)
+        private void Handle(MessagePayload<ObjectGuidsResolved> obj)
         {
-            Logic.EnterCampaignState();
+            if(obj.What.TransactionID == transactionId)
+            {
+                var evnt = new NetworkObjectGuidsResolved();
+                Logic.NetworkMessageBroker.PublishNetworkEvent(evnt);
+                Logic.EnterCampaignState();
+            }
         }
 
         public override void EnterCampaignState()

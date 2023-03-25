@@ -16,30 +16,30 @@ namespace Coop.Tests.Client.States
         public ReceivingSavedDataStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, NetworkMessageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
             clientLogic.State = new ReceivingSavedDataState(clientLogic);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
 
             clientLogic.State.Dispose();
 
-            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
         public void NetworkGameSaveDataRecieved_Publishes_EnterMainMenuEvent()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
 
-            NetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkGameSaveDataRecieved());
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkGameSaveDataRecieved());
 
             Assert.True(isEventPublished);
         }
@@ -48,13 +48,13 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Publishes_LoadGameSave()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<LoadGameSave>((payload) =>
+            StubMessageBroker.Subscribe<LoadGameSave>((payload) =>
             {
                 isEventPublished = true;
             });
 
-            NetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkGameSaveDataRecieved(new byte[] { 1 }));
-            MessageBroker.Publish(this, new MainMenuEntered());
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkGameSaveDataRecieved(new byte[] { 1 }));
+            StubMessageBroker.Publish(this, new MainMenuEntered());
 
             Assert.True(isEventPublished);
         }
@@ -62,8 +62,8 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void MainMenuEntered_Transitions_LoadingState()
         {
-            NetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkGameSaveDataRecieved(new byte[] { 1 }));
-            MessageBroker.Publish(this, new MainMenuEntered());
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkGameSaveDataRecieved(new byte[] { 1 }));
+            StubMessageBroker.Publish(this, new MainMenuEntered());
 
             Assert.IsType<LoadingState>(clientLogic.State);
         }
@@ -72,13 +72,13 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Handles_NullData()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<LoadGameSave>((payload) =>
+            StubMessageBroker.Subscribe<LoadGameSave>((payload) =>
             {
                 isEventPublished = true;
             });
 
-            NetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkGameSaveDataRecieved(null));
-            MessageBroker.Publish(this, new MainMenuEntered());
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkGameSaveDataRecieved(null));
+            StubMessageBroker.Publish(this, new MainMenuEntered());
 
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
             Assert.False(isEventPublished);
@@ -88,13 +88,13 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Handles_ZeroLenArray()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<LoadGameSave>((payload) =>
+            StubMessageBroker.Subscribe<LoadGameSave>((payload) =>
             {
                 isEventPublished = true;
             });
 
-            NetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkGameSaveDataRecieved(Array.Empty<byte>()));
-            MessageBroker.Publish(this, new MainMenuEntered());
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkGameSaveDataRecieved(Array.Empty<byte>()));
+            StubMessageBroker.Publish(this, new MainMenuEntered());
 
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
             Assert.False(isEventPublished);
@@ -104,7 +104,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -118,7 +118,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });

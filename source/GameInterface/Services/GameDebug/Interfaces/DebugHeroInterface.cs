@@ -40,12 +40,12 @@ namespace GameInterface.Services.GameDebug.Interfaces
         { 
             if(Player_To_HeroID.TryGetValue(message.PlayerId, out string heroStringId))
             {
-                messageBroker.Publish(this, new HeroResolved(message.TransactionId, heroStringId));
+                messageBroker.Publish(this, new HeroResolved(message.TransactionID, heroStringId));
             }
             else
             {
                 Logger.Error("Could not resolve debug hero with id: {id}", message.PlayerId);
-                messageBroker.Publish(this, new ResolveHeroNotFound(message.TransactionId));  
+                messageBroker.Publish(this, new ResolveHeroNotFound(message.TransactionID));  
             }
         }
     }

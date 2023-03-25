@@ -51,7 +51,7 @@ namespace Coop
         private bool isServer = false;
         public override void NoHarmonyInit() 
         {
-            ProtoBufSerializer.Serialize(new NetworkClientValidate("test"));
+            ProtoBufSerializer.Serialize(1);
 
             var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
             
