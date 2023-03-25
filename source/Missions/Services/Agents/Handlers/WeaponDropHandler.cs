@@ -41,7 +41,7 @@ namespace Missions.Services.Agents.Handlers
         { 
             NetworkAgentRegistry.Instance.TryGetAgent(obj.What.AgentGuid, out Agent agent);
 
-            agent.RemoveEquippedWeapon(obj.What.EquipmentIndex);
+            agent.DropItem(obj.What.EquipmentIndex);
         }
     }
 }

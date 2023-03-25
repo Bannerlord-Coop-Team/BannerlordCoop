@@ -159,6 +159,8 @@
     <Compile Include="Services\Agents\Messages\WeaponPickedup.cs" />
     <Compile Include="Services\Agents\Messages\WeaponDropped.cs" />
     <Compile Include="MissionModule.cs" />
+    <Compile Include="Services\Agents\Patches\AgentDropPatch.cs" />
+    <Compile Include="Services\Agents\Patches\AgentPickupPatch.cs" />
     <Compile Include="Services\Missiles\Handlers\MissileHandler.cs" />
     <Compile Include="Services\Missiles\Message\NetworkAgentShoot.cs" />
     <Compile Include="Services\Missiles\Message\AgentShoot.cs" />

@@ -58,7 +58,7 @@ namespace Missions.Services
             _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
             _networkMessageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
-            _networkMessageBroker.Subscribe<AgentDied>(Handler_AgentDeath);
+            _networkMessageBroker.Subscribe<AgentDied>(Handle_AgentDeath);
 
         }
 
@@ -74,7 +74,7 @@ namespace Missions.Services
             _networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
             _networkMessageBroker.Unsubscribe<AgentDamageData>(Handle_AgentDamage);
-            _networkMessageBroker.Unsubscribe<AgentDied>(Handler_AgentDeath);
+            _networkMessageBroker.Unsubscribe<AgentDied>(Handle_AgentDeath);
         }
 
         public override void AfterStart()
@@ -206,7 +206,7 @@ namespace Missions.Services
             }
         }
 
-        private void Handler_AgentDeath(MessagePayload<AgentDied> obj)
+        private void Handle_AgentDeath(MessagePayload<AgentDied> obj)
         {
             Agent agent = obj.What.Agent;
             if (_agentRegistry.TryGetAgentId(agent, out Guid agentId))

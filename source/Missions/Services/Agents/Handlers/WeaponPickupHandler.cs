@@ -46,19 +46,8 @@ namespace Missions.Services.Agents.Handlers
             MissionWeapon missionWeapon = new MissionWeapon(obj.What.ItemObject, obj.What.ItemModifier, obj.What.Banner);
 
             NetworkAgentRegistry.Instance.TryGetAgent(obj.What.AgentId, out Agent agent);
-            
-            agent.Equipment[obj.What.EquipmentIndex] = missionWeapon;
-            WeaponEquippedMethod.Invoke(agent, new object[]
-                {
-                obj.What.EquipmentIndex,
-                missionWeapon.GetWeaponData(true),
-                missionWeapon.GetWeaponStatsData(),
-                missionWeapon.GetAmmoWeaponData(true),
-                missionWeapon.GetAmmoWeaponStatsData(),
-                null,
-                false,
-                false
-                });
+
+            agent.EquipWeaponWithNewEntity(obj.What.EquipmentIndex, ref missionWeapon);
         }
     }
 }
