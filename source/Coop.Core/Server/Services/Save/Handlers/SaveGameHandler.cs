@@ -60,7 +60,13 @@ namespace Coop.Core.Server.Services.Save.Handlers
             // TODO an event is needed to generate ids since they don't exist
             if (session == null) return;
 
-            
+            var message = new LoadExistingObjectGuids(
+                Guid.Empty, /* Transaction Id not required */
+                session.ControlledHeroes,
+                session.PartyStringIdToGuid,
+                session.HeroStringIdToGuid);
+
+            messageBroker.Publish(this, message);
         }
     }
 }

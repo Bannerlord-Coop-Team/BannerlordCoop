@@ -29,8 +29,6 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<LoadExistingObjectGuids>(Handle);
         }
 
-        
-
         private void Handle(MessagePayload<PackageGameSaveData> obj)
         {
             var transactionId = obj.What.TransactionID;

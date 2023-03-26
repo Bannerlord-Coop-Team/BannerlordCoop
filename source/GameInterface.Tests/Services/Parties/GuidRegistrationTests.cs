@@ -66,7 +66,7 @@ namespace GameInterface.Tests.Services.Parties
             });
 
             // Execution
-            _messageBroker.Publish(this, new RegisterParties());
+            _messageBroker.Publish(this, new RegisterAllParties());
 
             // Verification
             // Wait for callback with 1 sec timeout
@@ -82,11 +82,7 @@ namespace GameInterface.Tests.Services.Parties
             // Setup
             GameBootStrap.SetupCampaignObjectManager();
 
-            AutoResetEvent autoResetEvent = new AutoResetEvent(false);
-
             var partyRegistry = _container.Resolve<IMobilePartyRegistry>();
-
-            
 
             var partyGuids = new (MobileParty, Guid)[NUM_PARTIES];
             var partyAssociations = new Dictionary<string, Guid>();
@@ -104,23 +100,10 @@ namespace GameInterface.Tests.Services.Parties
                 partyAssociations.Add(party.StringId, partyId);
             }
 
-            // Setup Callback
-            PartiesRegistered partiesRegistered = default;
-            _messageBroker.Subscribe<PartiesRegistered>((payload) =>
-            {
-                partiesRegistered = payload.What;
-                autoResetEvent.Set();
-            });
-
             // Execution
-            Guid transactionId = Guid.NewGuid();
-            _messageBroker.Publish(this, new RegisterPartiesWithStringIds(transactionId, partyAssociations));
+            partyRegistry.RegisterPartiesWithStringIds(partyAssociations);
 
             // Verification
-            // Wait for callback with 1 sec timeout
-            Assert.True(autoResetEvent.WaitOne(TimeSpan.FromSeconds(1)));
-
-            Assert.Equal(transactionId, partiesRegistered.TransactionID);
             Assert.NotEmpty(partyGuids);
 
             for (int i = 0; i < NUM_PARTIES; i++)

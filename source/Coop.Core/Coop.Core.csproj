@@ -104,7 +104,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Client\Messages\NetworkGameSaveDataRecieved.cs" />
+    <Compile Include="Client\Messages\NetworkGameSaveDataReceived.cs" />
     <Compile Include="Client\Messages\NetworkDisconnected.cs" />
     <Compile Include="Client\Messages\NetworkConnected.cs" />
     <Compile Include="Client\Packets\NewHeroPacket.cs" />

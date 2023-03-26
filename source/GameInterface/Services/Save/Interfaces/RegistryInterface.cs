@@ -21,11 +21,11 @@ namespace GameInterface.Services.Save.Interfaces
 {
     internal interface IRegistryInterface : IGameAbstraction
     {
-        HashSet<Guid> GetControlledHeroIds();
-        Dictionary<string, Guid> GetHeroIds();
-        Dictionary<string, Guid> GetPartyIds();
+        ISet<Guid> GetControlledHeroIds();
+        IReadOnlyDictionary<string, Guid> GetHeroIds();
+        IReadOnlyDictionary<string, Guid> GetPartyIds();
         void LoadObjectGuids(
-            IReadOnlyCollection<Guid> controlledHeros,
+            ISet<Guid> controlledHeros,
             IReadOnlyDictionary<string, Guid> heroIds,
             IReadOnlyDictionary<string, Guid> partyIds);
     }
@@ -48,26 +48,26 @@ namespace GameInterface.Services.Save.Interfaces
             this.controlledHeroRegistry = controlledHeroRegistry;
         }
 
-        public Dictionary<string, Guid> GetPartyIds()
+        public IReadOnlyDictionary<string, Guid> GetPartyIds()
         {
             return partyRegistry.ToDictionary(kvp => kvp.Value.StringId, kvp => kvp.Key);
         }
 
-        public Dictionary<string, Guid> GetHeroIds()
+        public IReadOnlyDictionary<string, Guid> GetHeroIds()
         {
             return heroRegistry.ToDictionary(kvp => kvp.Value.StringId, kvp => kvp.Key);
         }
 
-        public HashSet<Guid> GetControlledHeroIds() => controlledHeroRegistry.ControlledHeros;
+        public ISet<Guid> GetControlledHeroIds() => controlledHeroRegistry.ControlledHeros;
 
         public void LoadObjectGuids(
-            IReadOnlyCollection<Guid> controlledHeros, 
+            ISet<Guid> controlledHeros, 
             IReadOnlyDictionary<string, Guid> heroIds,
             IReadOnlyDictionary<string, Guid> partyIds)
         {
-            messageBroker.Publish(this, new RegisterExistingControlledHeroes(Guid.Empty, controlledHeros));
-            messageBroker.Publish(this, new RegisterHeroesWithStringIds(Guid.Empty, heroIds));
-            messageBroker.Publish(this, new RegisterPartiesWithStringIds(Guid.Empty, partyIds));
+            controlledHeroRegistry.RegisterExistingHeroes(controlledHeros);
+            heroRegistry.RegisterHeroesWithStringIds(heroIds);
+            partyRegistry.RegisterPartiesWithStringIds(partyIds);
         }
     }
 }

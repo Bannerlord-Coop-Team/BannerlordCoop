@@ -1,46 +1,36 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Save;
-using System;
+using ProtoBuf;
 using System.Collections.Generic;
+using System;
 
-namespace GameInterface.Services.GameState.Messages
+namespace Coop.Core.Client.Messages
 {
-    public readonly struct PackageGameSaveData : ICommand
+    [ProtoContract]
+    public readonly struct NetworkGameSaveDataReceived : INetworkEvent
     {
-        public Guid TransactionID { get; }
-
-        public PackageGameSaveData(Guid transactionID)
-        {
-            TransactionID = transactionID;
-        }
-    }
-
-    public readonly struct GameSaveDataPackaged : IResponse
-    {
-        public Guid TransactionID { get; }
+        [ProtoMember(1)]
         public byte[] GameSaveData { get; }
+        [ProtoMember(2)]
         public string CampaignID { get; }
+        [ProtoMember(3)]
         public ISet<Guid> ControlledHeros { get; }
+        [ProtoMember(4)]
         public IReadOnlyDictionary<string, Guid> PartyIds { get; }
+        [ProtoMember(5)]
         public IReadOnlyDictionary<string, Guid> HeroIds { get; }
 
-        /// <summary>
-        /// GameSaveData will only be created internally as it requires game access
-        /// </summary>
-        public GameSaveDataPackaged(
-            Guid transactionID, 
-            byte[] gameSaveData, 
+        public NetworkGameSaveDataReceived(
+            byte[] gameSaveData,
             string campaignID,
             ISet<Guid> controlledHeros,
             IReadOnlyDictionary<string, Guid> partyIds,
             IReadOnlyDictionary<string, Guid> heroIds)
         {
-            TransactionID = transactionID;
             GameSaveData = gameSaveData;
             CampaignID = campaignID;
             ControlledHeros = controlledHeros;
             PartyIds = partyIds;
             HeroIds = heroIds;
         }
-}
+    }
 }

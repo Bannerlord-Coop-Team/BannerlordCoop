@@ -32,14 +32,19 @@ namespace Coop.Core.Server.Connections.States
         
         private void Handle(MessagePayload<GameSaveDataPackaged> obj)
         {
-            var transactionId = obj.What.TransactionID;
-            if(PackageGameTransactionId == transactionId)
+            var payload = obj.What;
+            if(PackageGameTransactionId == payload.TransactionID)
             {
-                var saveData = obj.What.GameSaveData;
                 var peer = ConnectionLogic.PlayerId;
-                ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(
-                    peer,
-                    new NetworkGameSaveDataRecieved(saveData));
+                var networkEvent = new NetworkGameSaveDataReceived(
+                    payload.GameSaveData,
+                    payload.CampaignID,
+                    payload.ControlledHeros,
+                    partyIds: payload.PartyIds,
+                    heroIds: payload.HeroIds
+                    );
+
+                ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(peer, networkEvent);
 
                 ConnectionLogic.Load();
             }

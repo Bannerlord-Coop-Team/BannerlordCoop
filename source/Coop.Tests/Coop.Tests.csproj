@@ -130,6 +130,7 @@
     <Compile Include="Server\Connections\States\LoadingStateTests.cs" />
     <Compile Include="Server\Connections\States\MissionStateTests.cs" />
     <Compile Include="Server\Services\Save\JSONSessionTests.cs" />
+    <Compile Include="Server\Services\Save\SaveLoadCoopSessionTests.cs" />
     <Compile Include="Server\States\InitialStateTests.cs" />
     <Compile Include="Server\States\RunningStateTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

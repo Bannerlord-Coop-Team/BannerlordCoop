@@ -112,7 +112,7 @@ namespace Coop.Tests.Server.Connections.States
             Assert.NotEqual(default, transactionId);
 
             var networkGameSaveDataRecievedCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkGameSaveDataRecieved>((payload) =>
+            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkGameSaveDataReceived>((payload) =>
             {
                 networkGameSaveDataRecievedCount += 1;
             });
@@ -138,7 +138,7 @@ namespace Coop.Tests.Server.Connections.States
             _connectionLogic.State = new TransferSaveState(_connectionLogic);
 
             var networkGameSaveDataRecievedCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkGameSaveDataRecieved>((payload) =>
+            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkGameSaveDataReceived>((payload) =>
             {
                 networkGameSaveDataRecievedCount += 1;
             });

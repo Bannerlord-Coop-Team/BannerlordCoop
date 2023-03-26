@@ -279,16 +279,11 @@
     <Compile Include="Serialization\External\CustomPartyComponentBinaryPackage.cs" />
     <Compile Include="Serialization\External\MobilePartyAIBinaryPackage.cs" />
     <Compile Include="Services\Heroes\ControlledHeroRegistry.cs" />
-    <Compile Include="Services\Heroes\Messages\RegisterExistingControlledHeroes.cs" />
-    <Compile Include="Services\Heroes\Messages\RegisterHeroesWithStringIds.cs" />
-    <Compile Include="Services\MobileParties\Messages\PartiesRegistered.cs" />
-    <Compile Include="Services\MobileParties\Messages\RegisterPartiesWithStringIds.cs" />
     <Compile Include="Services\MobileParties\MobilePartyRegistry.cs" />
     <Compile Include="Services\Heroes\HeroRegistry.cs" />
     <Compile Include="Services\Heroes\Handlers\HeroRegistryHandler.cs" />
     <Compile Include="Services\Heroes\Handlers\SwitchHeroHandler.cs" />
-    <Compile Include="Services\Heroes\Messages\HeroesRegistered.cs" />
-    <Compile Include="Services\Heroes\Messages\RegisterHeroes.cs" />
+    <Compile Include="Services\Heroes\Messages\RegisterAllHeroes.cs" />
     <Compile Include="Services\Heroes\Messages\PlayerHeroChanged.cs" />
     <Compile Include="Services\Heroes\Messages\SwitchToParty.cs" />
     <Compile Include="Services\Heroes\Patches\ChangePlayerCharacterActionPatches.cs" />
@@ -296,7 +291,7 @@
     <Compile Include="Services\MobileParties\Handlers\MobilePartyMovementHandler.cs" />
     <Compile Include="Services\MobileParties\Handlers\MobilePartyRegistryHandler.cs" />
     <Compile Include="Services\MobileParties\Messages\ControlledPartyTargetPositionUpdated.cs" />
-    <Compile Include="Services\MobileParties\Messages\RegisterParties.cs" />
+    <Compile Include="Services\MobileParties\Messages\RegisterAllParties.cs" />
     <Compile Include="Services\MobileParties\Messages\UpdatePartyTargetPosition.cs" />
     <Compile Include="Services\MobileParties\Patches\PartyMovementPatch.cs" />
     <Compile Include="Services\Modules\CompatibilityInfo.cs" />

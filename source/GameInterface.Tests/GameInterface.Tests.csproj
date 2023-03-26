@@ -226,6 +226,7 @@
     <Compile Include="Serialization\SerializerTests\ProofOfConcept\GenericSerializationTests.cs" />
     <Compile Include="Services\Heroes\PackageHeroesTests.cs" />
     <Compile Include="Services\Parties\GuidRegistrationTests.cs" />
+    <Compile Include="Services\Save\LoadExistingObjectGuidsTests.cs" />
     <Compile Include="Services\Save\PackageObjectGuidsTests.cs" />
   </ItemGroup>
   <ItemGroup>

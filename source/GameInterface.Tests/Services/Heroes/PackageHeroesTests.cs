@@ -66,7 +66,7 @@ namespace GameInterface.Tests.Services.Heroes
 
             // Execution
             Guid transactionId = Guid.NewGuid();
-            _messageBroker.Publish(this, new RegisterParties());
+            _messageBroker.Publish(this, new RegisterAllParties());
 
             // Verification
             // Wait for callback with 1 sec timeout
@@ -84,9 +84,6 @@ namespace GameInterface.Tests.Services.Heroes
             // Setup
             GameBootStrap.SetupCampaignObjectManager();
 
-            AutoResetEvent _autoResetEvent = new AutoResetEvent(false);
-
-            var autoResetEvent = new AutoResetEvent(false);
             var heroRegistry = _container.Resolve<IHeroRegistry>();
             var heroGuids = new (Hero, Guid)[NUM_HEROES];
             var heroAssociations = new Dictionary<string, Guid>();
@@ -106,20 +103,11 @@ namespace GameInterface.Tests.Services.Heroes
                 heroAssociations.Add(hero.StringId, heroId);
             }
 
-            // Setup Callback
-            _messageBroker.Subscribe<HeroesRegistered>((payload) =>
-            {
-                _autoResetEvent.Set();
-            });
-
             // Execution
-            Guid transactionId = Guid.NewGuid();
-            _messageBroker.Publish(this, new RegisterHeroesWithStringIds(transactionId, heroAssociations));
+            heroRegistry.RegisterHeroesWithStringIds(heroAssociations);
 
             // Verification
             // Wait for callback with 1 sec timeout
-            Assert.True(_autoResetEvent.WaitOne(TimeSpan.FromSeconds(1)));
-
             Assert.NotEmpty(heroGuids);
 
             for (int i = 0; i < NUM_HEROES; i++)
