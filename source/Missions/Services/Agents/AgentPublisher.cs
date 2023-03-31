@@ -27,13 +27,11 @@ namespace Missions.Services.Agents
 
         private IMessageBroker _messageBroker;
 
-        private readonly CancellationTokenSource _agentPollingTaskCancellationTokenSource = new CancellationTokenSource();
-
-        private readonly Task _agentPollingTask;
-
         private readonly int _packetUpdateRate;
 
         private readonly INetworkAgentRegistry _networkAgentRegistry;
+
+        private Timer _pollAndUpdateAgentMovementTimer;
 
         /// <summary>
         /// Constructor
@@ -42,45 +40,38 @@ namespace Missions.Services.Agents
         {
             _agentMovement = new AgentMovement(_agentId);
             _messageBroker = messageBroker;
-
-            _agentPollingTask = Task.Run(PollAndUpdateAgentMovement, _agentPollingTaskCancellationTokenSource.Token);
             _packetUpdateRate = packetUpdateRate;
+
+            _pollAndUpdateAgentMovementTimer = new Timer(PollAndUpdateAgentMovement, null, 0, _packetUpdateRate);
 
             _networkAgentRegistry = networkAgentRegistry;
         }
 
         ~AgentPublisher()
         {
-            _agentPollingTaskCancellationTokenSource.Cancel();
-            _agentPollingTask.Wait();
+            _pollAndUpdateAgentMovementTimer?.Dispose();
         }
 
-        private async Task PollAndUpdateAgentMovement()
+        private void PollAndUpdateAgentMovement(object obj)
         {
-            while (!_agentPollingTaskCancellationTokenSource.IsCancellationRequested && Mission.Current != null)
+            // TODO: also add all player agents
+            var agents = _networkAgentRegistry.ControlledAgents.Values;
+
+            foreach (var agent in agents)
             {
-                // TODO: also add all player agents
-                var agents = _networkAgentRegistry.ControlledAgents.Values.ToList();
+                var movementChanges = new List<IMovementEvent>();
 
-                foreach (var agent in agents) 
+                CheckAndUpdateLookDirection(movementChanges, agent);
+                CheckAndUpdateInputVector(movementChanges, agent);
+                CheckAndUpdateAgentActionData(movementChanges, agent);
+                CheckAndUpdateAgentMountData(movementChanges, agent);
+
+                // sending all changes down the broker
+                // the handlers will handle them however they see fit
+                foreach (var movement in movementChanges)
                 {
-                    var movementChanges = new List<IMovementEvent>();
-
-                    CheckAndUpdateLookDirection(movementChanges, agent);
-                    CheckAndUpdateInputVector(movementChanges, agent);
-                    CheckAndUpdateAgentActionData(movementChanges, agent);
-                    CheckAndUpdateAgentMountData(movementChanges, agent);
-
-                    // sending all changes down the broker
-                    // the handlers will handle them however they see fit
-                    foreach (var movement in movementChanges)
-                    {
-                        _messageBroker.Publish(this, movement);
-                    }
+                    _messageBroker.Publish(this, movement);
                 }
-
-                // wait a bit and then start over
-                await Task.Delay(_packetUpdateRate / 3);
             }
         }
 
