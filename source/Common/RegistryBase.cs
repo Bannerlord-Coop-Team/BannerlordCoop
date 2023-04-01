@@ -71,19 +71,39 @@ namespace Common
         public int Count => _dictionary.Count;
 
         /// <inheritdoc/>
-        public virtual bool RegisterNewObject(T item) => _dictionary.Add(Guid.NewGuid(), item);
+        public virtual bool RegisterNewObject(T item)
+        {
+            if (item == null) return false;
+
+            return _dictionary.Add(Guid.NewGuid(), item);
+        }
 
         /// <inheritdoc/>
-        public virtual bool RegisterExistingObject(Guid id, T item) => _dictionary.Add(id, item);
+        public virtual bool RegisterExistingObject(Guid id, T item) 
+        {
+            if (item == null) return false;
+
+           return _dictionary.Add(id, item); 
+        }
 
         /// <inheritdoc/>
-        public virtual bool Remove(T item) => _dictionary.Remove(item);
+        public virtual bool Remove(T item) 
+        {
+            if (item == null) return false;
+
+            return _dictionary.Remove(item); 
+        }
 
         /// <inheritdoc/>
         public virtual bool Remove(Guid id) => _dictionary.Remove(id);
 
         /// <inheritdoc/>
-        public virtual bool TryGetValue(T obj, out Guid id) => _dictionary.TryGetValue(obj, out id);
+        public virtual bool TryGetValue(T obj, out Guid id)
+        {
+            if (obj == null) return false;
+
+            return _dictionary.TryGetValue(obj, out id);
+        }
 
         /// <inheritdoc/>
         public virtual bool TryGetValue(Guid id, out T obj) => _dictionary.TryGetValue(id, out obj);

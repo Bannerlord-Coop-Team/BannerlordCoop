@@ -55,7 +55,7 @@ namespace GameInterface.Services.MobileParties.Handlers
             }
             else
             {
-                Logger.Error("Unable to find HeroId for {hero}", payload.Party.Owner.Name);
+                Logger.Error("Unable to find HeroId for {party}", payload.Party.Name);
             }
         }
 
