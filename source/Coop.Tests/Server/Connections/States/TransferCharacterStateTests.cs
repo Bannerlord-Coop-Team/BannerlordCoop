@@ -1,10 +1,12 @@
-﻿using Coop.Core.Client.Messages;
+﻿using Common.Serialization;
+using Coop.Core.Client.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Extensions;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Save.Data;
 using GameInterface.Services.Time.Messages;
 using LiteNetLib;
 using System;
@@ -118,13 +120,16 @@ namespace Coop.Tests.Server.Connections.States
             });
 
             // Publish hero resolved, this would be from game interface
+            var gameObjectGuids = new GameObjectGuids(
+                new Guid[] { Guid.NewGuid() },
+                new Dictionary<string, Guid> { { "TestParty 1", Guid.NewGuid() } },
+                new Dictionary<string, Guid> { { "TestHero 1", Guid.NewGuid() } });
+
             var message = new GameSaveDataPackaged(
                 transactionId,
                 Array.Empty<byte>(),
                 "TestCampaingId",
-                null,
-                null,
-                null);
+                gameObjectGuids);
 
             StubMessageBroker.Publish(_playerId, message);
 
@@ -148,9 +153,7 @@ namespace Coop.Tests.Server.Connections.States
                 Guid.NewGuid(),
                 Array.Empty<byte>(),
                 "TestCampaingId",
-                null,
-                null,
-                null);
+                default);
 
             StubMessageBroker.Publish(_playerId, message);
 

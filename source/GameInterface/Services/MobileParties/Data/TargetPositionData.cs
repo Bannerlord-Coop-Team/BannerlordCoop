@@ -1,4 +1,5 @@
 ﻿using ProtoBuf;
+using System;
 
 namespace GameInterface.Services.MobileParties.Data
 {
@@ -6,15 +7,15 @@ namespace GameInterface.Services.MobileParties.Data
     public readonly struct TargetPositionData
     {
         [ProtoMember(1)]
-        public string ControlledHeroStringId { get; }
+        public Guid ControlledHeroId { get; }
         [ProtoMember(2)]
         public float TargetPositionX { get; }
         [ProtoMember(3)]
         public float TargetPositionY { get; }
 
-        public TargetPositionData(string controlledHeroStringId, float targetPositionX, float targetPositionY)
+        public TargetPositionData(Guid controlledHeroId, float targetPositionX, float targetPositionY)
         {
-            ControlledHeroStringId = controlledHeroStringId;
+            ControlledHeroId = controlledHeroId;
             TargetPositionX = targetPositionX;
             TargetPositionY = targetPositionY;
         }

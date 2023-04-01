@@ -47,7 +47,7 @@ namespace GameInterface.Services.Heroes.Handlers
 
             if (heroRegistry.TryGetValue(newHero, out Guid newHeroId))
             {
-                controlledHeroRegistry.RemoveAsControlled(newHeroId);
+                controlledHeroRegistry.RegisterAsControlled(newHeroId);
             }
         }
     }

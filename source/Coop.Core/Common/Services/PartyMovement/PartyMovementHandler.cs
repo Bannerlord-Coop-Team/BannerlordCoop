@@ -34,7 +34,8 @@ namespace Coop.Core.Common.Services.PartyMovement
 
         private void HandleNetworkPartyMovement(MessagePayload<NetworkUpdatePartyTargetPosition> obj)
         {
-            _messageBroker.Publish(this, new UpdatePartyTargetPosition(obj.What.TargetPositionData));
+            var message = new UpdatePartyTargetPosition(Guid.Empty, obj.What.TargetPositionData);
+            _messageBroker.Publish(this, message);
         }
     }
 }

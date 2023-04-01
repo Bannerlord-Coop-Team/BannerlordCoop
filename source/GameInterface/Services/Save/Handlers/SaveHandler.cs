@@ -9,6 +9,8 @@ using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using System.Threading.Tasks;
 using GameInterface.Services.MobileParties.Messages;
+using TaleWorlds.ObjectSystem;
+using GameInterface.Services.Save.Data;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
@@ -38,13 +40,16 @@ namespace GameInterface.Services.Heroes.Handlers
             var transactionId = obj.What.TransactionID;
             var gameData = saveInterface.SaveCurrentGame();
 
+            var gameObjectGuids = new GameObjectGuids(
+                registryInterface.GetControlledHeroIds(),
+                partyIds: registryInterface.GetPartyIds(),
+                heroIds: registryInterface.GetHeroIds());
+
             var packagedMessage = new GameSaveDataPackaged(
                 transactionId,
                 gameData,
                 Campaign.Current?.UniqueGameId,
-                registryInterface.GetControlledHeroIds(),
-                partyIds: registryInterface.GetPartyIds(),
-                heroIds: registryInterface.GetHeroIds());
+                gameObjectGuids);
 
             messageBroker.Publish(this, packagedMessage);
         }
@@ -52,12 +57,15 @@ namespace GameInterface.Services.Heroes.Handlers
         private void Handle(MessagePayload<PackageObjectGuids> obj)
         {
             var transactionId = obj.What.TransactionID;
+            var gameObjectGuids = new GameObjectGuids(
+                registryInterface.GetControlledHeroIds(),
+                registryInterface.GetPartyIds(),
+                registryInterface.GetHeroIds());
+
             var packagedMessage = new ObjectGuidsPackaged(
                 transactionId,
                 Campaign.Current?.UniqueGameId,
-                registryInterface.GetControlledHeroIds(),
-                partyIds: registryInterface.GetPartyIds(),
-                heroIds: registryInterface.GetHeroIds());
+                gameObjectGuids);
 
             messageBroker.Publish(this, packagedMessage);
         }
@@ -65,10 +73,7 @@ namespace GameInterface.Services.Heroes.Handlers
         private void Handle(MessagePayload<LoadExistingObjectGuids> obj)
         {
             var payload = obj.What;
-            registryInterface.LoadObjectGuids(
-                payload.ControlledHeros,
-                payload.HeroIds,
-                payload.PartyIds);
+            registryInterface.LoadObjectGuids(payload.GameObjectGuids);
 
             messageBroker.Publish(this, new ExistingObjectGuidsLoaded(payload.TransactionID));
         }

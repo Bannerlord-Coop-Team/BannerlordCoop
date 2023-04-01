@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Save.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,22 +22,16 @@ namespace GameInterface.Services.Save.Messages
     {
         public Guid TransactionID { get; }
         public string UniqueGameId { get; }
-        public ISet<Guid> ControlledHeros { get; }
-        public IReadOnlyDictionary<string, Guid> PartyIds { get; }
-        public IReadOnlyDictionary<string, Guid> HeroIds { get; }
+        public GameObjectGuids GameObjectGuids { get; }
 
         public ObjectGuidsPackaged(
             Guid transactionID,
             string uniqueGameId,
-            ISet<Guid> controlledHeros,
-            IReadOnlyDictionary<string, Guid> partyIds,
-            IReadOnlyDictionary<string, Guid> heroIds)
+            GameObjectGuids gameObjectGuids)
         {
             TransactionID = transactionID;
             UniqueGameId = uniqueGameId;
-            ControlledHeros = controlledHeros;
-            PartyIds = partyIds;
-            HeroIds = heroIds;
+            GameObjectGuids = gameObjectGuids;
         }
     }
 }

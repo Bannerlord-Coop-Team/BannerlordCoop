@@ -2,6 +2,7 @@
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Save.Data;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -60,12 +61,15 @@ namespace Coop.Tests.Client.States
                 isEventPublished = true;
             });
 
+            var gameObjectGuids = new GameObjectGuids(
+                new Guid[] { Guid.NewGuid() },
+                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
+                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+
             var networkMessage = new NetworkGameSaveDataReceived(
                 new byte[] { 1 },
                 "TestData",
-                new HashSet<Guid> { Guid.NewGuid() },
-                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
-                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+                gameObjectGuids);
 
             // Execution
             StubNetworkMessageBroker.ReceiveNetworkEvent(null, networkMessage);
@@ -79,12 +83,15 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Transitions_LoadingState()
         {
             // Setup
+            var gameObjectGuids = new GameObjectGuids(
+                new Guid[] { Guid.NewGuid() },
+                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
+                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+
             var networkMessage = new NetworkGameSaveDataReceived(
                 new byte[] { 1 },
                 "TestData",
-                new HashSet<Guid> { Guid.NewGuid() },
-                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
-                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+                gameObjectGuids);
 
             // Execution
             StubNetworkMessageBroker.ReceiveNetworkEvent(null, networkMessage);
@@ -123,12 +130,15 @@ namespace Coop.Tests.Client.States
                 isEventPublished = true;
             });
 
+            var gameObjectGuids = new GameObjectGuids(
+                new Guid[] { Guid.NewGuid() },
+                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
+                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+
             var networkMessage = new NetworkGameSaveDataReceived(
                 null,
                 "TestData",
-                new HashSet<Guid> { Guid.NewGuid() },
-                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
-                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+                gameObjectGuids);
 
             // Execution
             StubNetworkMessageBroker.ReceiveNetworkEvent(null, networkMessage);
@@ -149,12 +159,15 @@ namespace Coop.Tests.Client.States
                 isEventPublished = true;
             });
 
+            var gameObjectGuids = new GameObjectGuids(
+                new Guid[] { Guid.NewGuid() },
+                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
+                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+
             var networkMessage = new NetworkGameSaveDataReceived(
                 Array.Empty<byte>(),
                 "TestData",
-                new HashSet<Guid> { Guid.NewGuid() },
-                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
-                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+                gameObjectGuids);
 
             // Execution
             StubNetworkMessageBroker.ReceiveNetworkEvent(null, networkMessage);

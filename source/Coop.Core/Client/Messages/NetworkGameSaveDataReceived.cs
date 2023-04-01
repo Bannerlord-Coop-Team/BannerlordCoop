@@ -2,10 +2,11 @@
 using ProtoBuf;
 using System.Collections.Generic;
 using System;
+using GameInterface.Services.Save.Data;
 
 namespace Coop.Core.Client.Messages
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public readonly struct NetworkGameSaveDataReceived : INetworkEvent
     {
         [ProtoMember(1)]
@@ -13,24 +14,16 @@ namespace Coop.Core.Client.Messages
         [ProtoMember(2)]
         public string CampaignID { get; }
         [ProtoMember(3)]
-        public ISet<Guid> ControlledHeros { get; }
-        [ProtoMember(4)]
-        public IReadOnlyDictionary<string, Guid> PartyIds { get; }
-        [ProtoMember(5)]
-        public IReadOnlyDictionary<string, Guid> HeroIds { get; }
+        public GameObjectGuids GameObjectGuids { get; }
 
         public NetworkGameSaveDataReceived(
             byte[] gameSaveData,
             string campaignID,
-            ISet<Guid> controlledHeros,
-            IReadOnlyDictionary<string, Guid> partyIds,
-            IReadOnlyDictionary<string, Guid> heroIds)
+            GameObjectGuids gameObjectGuids)
         {
             GameSaveData = gameSaveData;
             CampaignID = campaignID;
-            ControlledHeros = controlledHeros;
-            PartyIds = partyIds;
-            HeroIds = heroIds;
+            GameObjectGuids = gameObjectGuids;
         }
     }
 }

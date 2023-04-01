@@ -11,15 +11,15 @@ namespace GameInterface.Services.Time.Patches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<TimePatches>();
 
-        [HarmonyPatch("TimeControlMode")]
-        [HarmonyPatch(MethodType.Setter)]
-        static bool Prefix()
-        {
-            bool isAllowed = !TimeControlInterface.TimeLock;
+        //[HarmonyPatch("TimeControlMode")]
+        //[HarmonyPatch(MethodType.Setter)]
+        //static bool Prefix()
+        //{
+        //    bool isAllowed = !TimeControlInterface.TimeLock;
 
-            Logger.Verbose("Attempting to change time mode. Allowed: {allowed}", isAllowed && !Campaign.Current.TimeControlModeLock);
+        //    Logger.Verbose("Attempting to change time mode. Allowed: {allowed}", isAllowed && !Campaign.Current.TimeControlModeLock);
             
-            return isAllowed;
-        }
+        //    return isAllowed;
+        //}
     }
 }

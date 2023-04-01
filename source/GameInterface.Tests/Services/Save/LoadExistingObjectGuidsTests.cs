@@ -12,6 +12,8 @@ using GameInterface.Tests.Bootstrap.Extensions;
 using GameInterface.Services.Save.Messages;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Save.Data;
+using System.Linq;
 
 namespace GameInterface.Tests.Services.Save
 {
@@ -69,11 +71,15 @@ namespace GameInterface.Tests.Services.Save
 
             // Execution
             var transactionId = Guid.NewGuid();
-            var message = new LoadExistingObjectGuids(
-                transactionId,
-                controlledHeroes,
+
+            var objectGuids = new GameObjectGuids(
+                controlledHeroes.ToArray(),
                 partyAssociations,
                 heroAssociations);
+
+            var message = new LoadExistingObjectGuids(
+                transactionId,
+                objectGuids);
 
             _messageBroker.Publish(this, message);
 

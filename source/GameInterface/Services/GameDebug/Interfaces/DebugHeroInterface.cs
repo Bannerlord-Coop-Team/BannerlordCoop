@@ -4,6 +4,7 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 
 namespace GameInterface.Services.GameDebug.Interfaces
@@ -20,10 +21,10 @@ namespace GameInterface.Services.GameDebug.Interfaces
         public static readonly string Player1_Id = "Player 1";
         public static readonly string Player2_Id = "Player 2";
 
-        private static string Hero1_Id = "TransferredHero2862"; // TODO
-        private static string Hero2_Id = string.Empty; // TODO
+        private static Guid Hero1_Id = Guid.Parse("ed122845-8743-449f-bc3c-4adf6fd9060c");
+        private static Guid Hero2_Id = Guid.Empty; // TODO
 
-        private static Dictionary<string, string> Player_To_HeroID = new Dictionary<string, string>
+        private static Dictionary<string, Guid> Player_To_HeroID = new Dictionary<string, Guid>
         {
             { Player1_Id, Hero1_Id },
             { Player2_Id, Hero2_Id },
@@ -38,9 +39,9 @@ namespace GameInterface.Services.GameDebug.Interfaces
 
         public void ResolveHero(ResolveDebugHero message)
         { 
-            if(Player_To_HeroID.TryGetValue(message.PlayerId, out string heroStringId))
+            if(Player_To_HeroID.TryGetValue(message.PlayerId, out Guid heroId))
             {
-                messageBroker.Publish(this, new HeroResolved(message.TransactionID, heroStringId));
+                messageBroker.Publish(this, new HeroResolved(message.TransactionID, heroId));
             }
             else
             {

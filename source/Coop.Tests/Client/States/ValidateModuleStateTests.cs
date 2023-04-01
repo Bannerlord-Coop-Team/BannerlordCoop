@@ -9,6 +9,7 @@ using GameInterface.Services.Modules.Messages;
 using GameInterface.Services.Time.Messages;
 using LiteNetLib.Utils;
 using Moq;
+using System;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -54,7 +55,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void NetworkClientValidated_Tranitions_ReceivingSavedDataState()
         {
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(true, string.Empty));
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(true, Guid.Empty));
 
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
@@ -68,7 +69,7 @@ namespace Coop.Tests.Client.States
                 startCharacterCreationCount += 1;
             });
 
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(false, string.Empty));
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(false, Guid.Empty));
 
             Assert.Equal(1, startCharacterCreationCount);
         }

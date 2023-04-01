@@ -102,6 +102,8 @@
     <Compile Include="Client\Messages\NetworkDisconnected.cs" />
     <Compile Include="Client\Messages\NetworkConnected.cs" />
     <Compile Include="Client\Packets\NewHeroPacket.cs" />
+    <Compile Include="Client\Services\Heroes\Handler\SwitchHeroHandler.cs" />
+    <Compile Include="Client\Services\Save\Handler\SaveDataHandler.cs" />
     <Compile Include="Common\Services\PartyMovement\Messages\NetworkUpdatePartyTargetPosition.cs" />
     <Compile Include="Common\Services\PartyMovement\PartyMovementHandler.cs" />
     <Compile Include="Common\Network\CoopNetworkBase.cs" />

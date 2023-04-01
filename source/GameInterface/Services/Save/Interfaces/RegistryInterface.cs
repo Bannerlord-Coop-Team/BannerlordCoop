@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Heroes;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.Save.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,13 +9,10 @@ namespace GameInterface.Services.Save.Interfaces
 {
     internal interface IRegistryInterface : IGameAbstraction
     {
-        ISet<Guid> GetControlledHeroIds();
+        Guid[] GetControlledHeroIds();
         IReadOnlyDictionary<string, Guid> GetHeroIds();
         IReadOnlyDictionary<string, Guid> GetPartyIds();
-        void LoadObjectGuids(
-            ISet<Guid> controlledHeros,
-            IReadOnlyDictionary<string, Guid> heroIds,
-            IReadOnlyDictionary<string, Guid> partyIds);
+        void LoadObjectGuids(GameObjectGuids gameObjectGuids);
         void RegisterAllGameObjects();
     }
     internal class RegistryInterface : IRegistryInterface
@@ -43,16 +41,13 @@ namespace GameInterface.Services.Save.Interfaces
             return heroRegistry.ToDictionary(kvp => kvp.Value.StringId, kvp => kvp.Key);
         }
 
-        public ISet<Guid> GetControlledHeroIds() => controlledHeroRegistry.ControlledHeros;
+        public Guid[] GetControlledHeroIds() => controlledHeroRegistry.ControlledHeros.ToArray();
 
-        public void LoadObjectGuids(
-            ISet<Guid> controlledHeros, 
-            IReadOnlyDictionary<string, Guid> heroIds,
-            IReadOnlyDictionary<string, Guid> partyIds)
+        public void LoadObjectGuids(GameObjectGuids gameObjectGuids)
         {
-            controlledHeroRegistry.RegisterExistingHeroes(controlledHeros);
-            heroRegistry.RegisterHeroesWithStringIds(heroIds);
-            partyRegistry.RegisterPartiesWithStringIds(partyIds);
+            controlledHeroRegistry.RegisterExistingHeroes(gameObjectGuids.ControlledHeros);
+            heroRegistry.RegisterHeroesWithStringIds(gameObjectGuids.HeroIds);
+            partyRegistry.RegisterPartiesWithStringIds(gameObjectGuids.PartyIds);
         }
 
         public void RegisterAllGameObjects()

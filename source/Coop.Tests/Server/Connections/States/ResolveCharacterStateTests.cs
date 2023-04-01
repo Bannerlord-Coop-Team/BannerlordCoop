@@ -127,7 +127,7 @@ namespace Coop.Tests.Server.Connections.States
                 Assert.True(msg.What.HeroExists);
             });
 
-            StubMessageBroker.Publish(this, new HeroResolved(transactionId, string.Empty));
+            StubMessageBroker.Publish(this, new HeroResolved(transactionId, Guid.Empty));
 
             // A single message is sent
             Assert.Equal(1, networkClientValidatedCount);
@@ -148,7 +148,7 @@ namespace Coop.Tests.Server.Connections.States
                 networkClientValidatedCount += 1;
             });
 
-            StubMessageBroker.Publish(this, new HeroResolved(Guid.NewGuid(), string.Empty));
+            StubMessageBroker.Publish(this, new HeroResolved(Guid.NewGuid(), Guid.Empty));
 
             // No message is sent due to this logic is not responsible for this player
             Assert.Equal(0, networkClientValidatedCount);

@@ -36,7 +36,7 @@ namespace Coop.Core.Client.States
         {
             if (obj.What.HeroExists)
             {
-                Logic.HeroStringId = obj.What.HeroStringId;
+                Logic.ControlledHeroId = obj.What.HeroId;
                 Logic.LoadSavedData();
             }
             else

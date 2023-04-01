@@ -4,6 +4,7 @@ using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Handlers;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.Save.Data;
 using GameInterface.Services.Save.Messages;
 using System;
 
@@ -50,9 +51,7 @@ namespace Coop.Core.Server.Services.Save.Handlers
                 CoopSession session = new CoopSession()
                 {
                     UniqueGameId = payload.UniqueGameId,
-                    ControlledHeroes = payload.ControlledHeros,
-                    PartyStringIdToGuid = payload.PartyIds,
-                    HeroStringIdToGuid = payload.HeroIds,
+                    GameObjectGuids = payload.GameObjectGuids,
                 };
 
                 saveManager.SaveCoopSession(saveName, session);
@@ -65,7 +64,7 @@ namespace Coop.Core.Server.Services.Save.Handlers
 
             ICoopSession session = saveManager.LoadCoopSession(saveName);
 
-            Action<MessagePayload<CampaignStateEntered>> postLoadHandler = null;
+            Action<MessagePayload<CampaignLoaded>> postLoadHandler = null;
 
             if (session == null)
             {
@@ -79,9 +78,7 @@ namespace Coop.Core.Server.Services.Save.Handlers
             {
                 var message = new LoadExistingObjectGuids(
                     Guid.Empty, /* Transaction Id not required */
-                    session.ControlledHeroes,
-                    session.PartyStringIdToGuid,
-                    session.HeroStringIdToGuid);
+                    session.GameObjectGuids);
 
                 postLoadHandler = (payload) =>
                 {

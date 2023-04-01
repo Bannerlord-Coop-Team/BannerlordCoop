@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.MobileParties.Data;
 using System;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Messages
@@ -10,10 +9,10 @@ namespace GameInterface.Services.MobileParties.Messages
     {
         public TargetPositionData TargetPositionData { get; }
 
-        public ControlledPartyTargetPositionUpdated(string controlledHeroStringId, Vec2 targetPostion)
+        public ControlledPartyTargetPositionUpdated(Guid controlledHeroId, Vec2 targetPostion)
         {
             TargetPositionData = new TargetPositionData(
-                controlledHeroStringId, 
+                controlledHeroId, 
                 targetPostion.X, 
                 targetPostion.Y);
         }

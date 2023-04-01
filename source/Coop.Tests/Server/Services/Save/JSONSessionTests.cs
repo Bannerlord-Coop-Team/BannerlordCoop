@@ -1,7 +1,9 @@
 ﻿using Common.Serialization;
 using Coop.Core.Server.Services.Save.Data;
+using GameInterface.Services.Save.Data;
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Xunit;
 using Xunit.Abstractions;
@@ -22,15 +24,25 @@ namespace Coop.Tests.Server.Services.Save
         [Fact]
         public void SaveSessions()
         {
-            ICoopSession sessionData = new CoopSession()
-            {
-                UniqueGameId = "TestId",
-                HeroStringIdToGuid = new Dictionary<string, Guid>
+            var gameObjectGuids = new GameObjectGuids(
+                new Guid[] { Guid.NewGuid() },
+                new Dictionary<string, Guid>
+                {
+                    { "Party 1", Guid.NewGuid() },
+                    { "Party 2", Guid.NewGuid() },
+                    { "Party 3", Guid.NewGuid() },
+                },
+                new Dictionary<string, Guid>
                 {
                     { "Hero 1", Guid.NewGuid() },
                     { "Hero 2", Guid.NewGuid() },
                     { "Hero 3", Guid.NewGuid() },
-                }
+                });
+
+            ICoopSession sessionData = new CoopSession()
+            {
+                UniqueGameId = "TestId",
+                GameObjectGuids = gameObjectGuids,
             };
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
@@ -52,15 +64,25 @@ namespace Coop.Tests.Server.Services.Save
         [Fact]
         public void SaveLoadSessions()
         {
-            ICoopSession sessionData = new CoopSession()
-            {
-                UniqueGameId = "TestId",
-                HeroStringIdToGuid = new Dictionary<string, Guid>
+            var gameObjectGuids = new GameObjectGuids(
+                new Guid[] { Guid.NewGuid() },
+                new Dictionary<string, Guid>
+                {
+                    { "Party 1", Guid.NewGuid() },
+                    { "Party 2", Guid.NewGuid() },
+                    { "Party 3", Guid.NewGuid() },
+                },
+                new Dictionary<string, Guid>
                 {
                     { "Hero 1", Guid.NewGuid() },
                     { "Hero 2", Guid.NewGuid() },
                     { "Hero 3", Guid.NewGuid() },
-                }
+                });
+
+            ICoopSession sessionData = new CoopSession()
+            {
+                UniqueGameId = "TestId",
+                GameObjectGuids = gameObjectGuids,
             };
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";

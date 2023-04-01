@@ -273,12 +273,13 @@
     <Compile Include="Serialization\External\CustomPartyComponentBinaryPackage.cs" />
     <Compile Include="Serialization\External\MobilePartyAIBinaryPackage.cs" />
     <Compile Include="Services\Heroes\ControlledHeroRegistry.cs" />
+    <Compile Include="Services\MobileParties\Messages\PartyTargetPositionChanged.cs" />
     <Compile Include="Services\MobileParties\MobilePartyRegistry.cs" />
     <Compile Include="Services\Heroes\HeroRegistry.cs" />
     <Compile Include="Services\Heroes\Handlers\HeroRegistryHandler.cs" />
     <Compile Include="Services\Heroes\Handlers\SwitchHeroHandler.cs" />
     <Compile Include="Services\Heroes\Messages\PlayerHeroChanged.cs" />
-    <Compile Include="Services\Heroes\Messages\SwitchToParty.cs" />
+    <Compile Include="Services\Heroes\Messages\SwitchToHero.cs" />
     <Compile Include="Services\Heroes\Patches\ChangePlayerCharacterActionPatches.cs" />
     <Compile Include="Services\MobileParties\Data\TargetPositionData.cs" />
     <Compile Include="Services\MobileParties\Handlers\MobilePartyMovementHandler.cs" />
@@ -322,6 +323,7 @@
     <Compile Include="Services\Modules\Handlers\NewHeroHandler.cs" />
     <Compile Include="Services\Modules\Interfaces\ModuleInterface.cs" />
     <Compile Include="Services\Save\CoopInMemSaveDriver.cs" />
+    <Compile Include="Services\Save\Data\GameObjectGuids.cs" />
     <Compile Include="Services\Save\Messages\RegisterAllGameObjects.cs" />
     <Compile Include="Services\Save\Handlers\SaveHandler.cs" />
     <Compile Include="Services\Save\Interfaces\RegistryInterface.cs" />

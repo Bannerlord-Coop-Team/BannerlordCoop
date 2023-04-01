@@ -3,6 +3,7 @@ using Coop.Core;
 using Coop.Core.Server;
 using Coop.Core.Server.Services.Save;
 using Coop.Core.Server.Services.Save.Data;
+using GameInterface.Services.Save.Data;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -33,20 +34,29 @@ namespace Coop.Tests.Server.Services.Save
         {
             // Setup
             var saveManager = container.Resolve<ICoopSaveManager>();
-            
 
-            ICoopSession sessionData = new CoopSession()
-            {
-                UniqueGameId = "SaveManagerTest",
-                HeroStringIdToGuid = new Dictionary<string, Guid>
+            var gameObjectGuids = new GameObjectGuids(
+                new Guid[] { Guid.NewGuid() },
+                new Dictionary<string, Guid>
+                {
+                    { "Party 1", Guid.NewGuid() },
+                    { "Party 2", Guid.NewGuid() },
+                    { "Party 3", Guid.NewGuid() },
+                },
+                new Dictionary<string, Guid>
                 {
                     { "Hero 1", Guid.NewGuid() },
                     { "Hero 2", Guid.NewGuid() },
                     { "Hero 3", Guid.NewGuid() },
-                }
+                });
+
+            ICoopSession sessionData = new CoopSession()
+            {
+                UniqueGameId = "SaveManagerTest",
+                GameObjectGuids = gameObjectGuids
             };
 
-            string saveFile = sessionData.UniqueGameId + ".json";
+            string saveFile = sessionData.UniqueGameId;
 
             string savePath = saveManager.DefaultPath + saveFile;
 
@@ -62,7 +72,7 @@ namespace Coop.Tests.Server.Services.Save
             saveManager.SaveCoopSession(saveFile, sessionData);
 
             // Verification
-            Assert.True(File.Exists(savePath));
+            Assert.True(File.Exists(savePath + saveManager.FileType));
         }
 
         [Fact]
@@ -71,19 +81,28 @@ namespace Coop.Tests.Server.Services.Save
             // Setup
             var saveManager = container.Resolve<ICoopSaveManager>();
 
-
-            ICoopSession sessionData = new CoopSession()
-            {
-                UniqueGameId = "SaveLoadManagerTest",
-                HeroStringIdToGuid = new Dictionary<string, Guid>
+            var gameObjectGuids = new GameObjectGuids(
+                new Guid[] { Guid.NewGuid() },
+                new Dictionary<string, Guid>
+                {
+                    { "Party 1", Guid.NewGuid() },
+                    { "Party 2", Guid.NewGuid() },
+                    { "Party 3", Guid.NewGuid() },
+                },
+                new Dictionary<string, Guid>
                 {
                     { "Hero 1", Guid.NewGuid() },
                     { "Hero 2", Guid.NewGuid() },
                     { "Hero 3", Guid.NewGuid() },
-                }
+                });
+
+            ICoopSession sessionData = new CoopSession()
+            {
+                UniqueGameId = "SaveLoadManagerTest",
+                GameObjectGuids = gameObjectGuids,
             };
 
-            string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
+            string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 
             // Execution
             saveManager.SaveCoopSession(saveFile, sessionData);

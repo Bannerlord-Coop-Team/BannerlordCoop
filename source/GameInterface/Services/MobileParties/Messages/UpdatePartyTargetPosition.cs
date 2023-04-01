@@ -8,10 +8,11 @@ namespace GameInterface.Services.MobileParties.Messages
     {
         public TargetPositionData TargetPositionData { get; }
 
-        public Guid TransactionID => throw new NotImplementedException();
+        public Guid TransactionID { get; }
 
-        public UpdatePartyTargetPosition(TargetPositionData targetPositionData)
+        public UpdatePartyTargetPosition(Guid transactionId, TargetPositionData targetPositionData)
         {
+            TransactionID = transactionId;
             TargetPositionData = targetPositionData;
         }
     }
