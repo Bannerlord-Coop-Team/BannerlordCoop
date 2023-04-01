@@ -21,22 +21,6 @@ namespace GameInterface.Services.MobileParties.Handlers
         {
             _messageBroker = messageBroker;
             _registry = registry;
-
-            _messageBroker.Subscribe<RegisterAllParties>(HandleRegisterParties);
-        }
-
-        private void HandleRegisterParties(MessagePayload<RegisterAllParties> obj)
-        {
-            var objectManager = Campaign.Current?.CampaignObjectManager;
-
-            if(objectManager == null) return;
-
-            foreach(var party in objectManager.MobileParties)
-            {
-                _registry.RegisterNewObject(party);
-            }
-
-            _messageBroker.Publish(this, new PartiesRegistered());
         }
     }
 }

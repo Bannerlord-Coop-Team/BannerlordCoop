@@ -1,18 +1,11 @@
 ﻿using Autofac;
 using Common.Messaging;
 using GameInterface.Services.MobileParties;
-using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Extensions;
 using System;
 using System.Collections.Generic;
-using System.IO.Ports;
-using System.Linq;
-using System.Reflection;
 using System.Runtime.Serialization;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit;
@@ -44,36 +37,29 @@ namespace GameInterface.Tests.Services.Parties
             // Setup
             GameBootStrap.SetupCampaignObjectManager();
 
-            AutoResetEvent autoResetEvent = new AutoResetEvent(false);
+            var parties = new MobileParty[NUM_PARTIES];
 
-            Guid transactionId = Guid.NewGuid();
+            for (int i = 0; i < NUM_PARTIES; i++)
+            {
+                var party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+                party.StringId = $"Hero {i}";
 
-            var party1 = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
-            var party2 = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+                Campaign.Current.CampaignObjectManager.AddMobileParty(party);
 
-            party1.StringId = "Party 1";
-            party2.StringId = "Party 2";
-
-            Campaign.Current.CampaignObjectManager.AddMobileParty(party1);
-            Campaign.Current.CampaignObjectManager.AddMobileParty(party2);
+                parties[i] = party;
+            }
 
             var partyRegistry = _container.Resolve<IMobilePartyRegistry>();
 
-            // Setup Callback
-            _messageBroker.Subscribe<PartiesRegistered>((payload) =>
-            {
-                autoResetEvent.Set();
-            });
-
             // Execution
-            _messageBroker.Publish(this, new RegisterAllParties());
+            partyRegistry.RegisterAllParties();
 
             // Verification
-            // Wait for callback with 1 sec timeout
-            Assert.True(autoResetEvent.WaitOne(TimeSpan.FromSeconds(1)));
-
-            Assert.True(partyRegistry.TryGetValue(party1, out Guid _));
-            Assert.True(partyRegistry.TryGetValue(party2, out Guid _));
+            for (int i = 0; i < NUM_PARTIES; i++)
+            {
+                var party = parties[i];
+                Assert.True(partyRegistry.TryGetValue(party, out Guid _));
+            }
         }
 
         [Fact]

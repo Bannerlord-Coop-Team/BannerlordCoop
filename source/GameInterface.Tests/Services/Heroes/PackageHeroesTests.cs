@@ -1,19 +1,13 @@
 ﻿using Autofac;
 using Common.Messaging;
-using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.Heroes;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
-using System.Threading;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using Xunit;
-using System.IO.Ports;
-using GameInterface.Services.Heroes;
-using GameInterface.Services.MobileParties;
 
 namespace GameInterface.Tests.Services.Heroes
 {
@@ -24,15 +18,12 @@ namespace GameInterface.Tests.Services.Heroes
         private const int NUM_HEROES = 2;
 
         readonly IContainer _container;
-        readonly IMessageBroker _messageBroker;
         public RetrieveHeroAssociationsTests()
         {
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
             builder.RegisterModule<GameInterfaceModule>();
             _container = builder.Build();
-
-            _messageBroker = _container.Resolve<IMessageBroker>();
         }
 
         [Fact]
@@ -41,7 +32,6 @@ namespace GameInterface.Tests.Services.Heroes
             // Setup
             GameBootStrap.SetupCampaignObjectManager();
 
-            var autoResetEvent = new AutoResetEvent(false);
             var heroRegistry = _container.Resolve<IHeroRegistry>();
             var heroes = new Hero[NUM_HEROES];
 
@@ -52,26 +42,13 @@ namespace GameInterface.Tests.Services.Heroes
 
                 Campaign.Current.CampaignObjectManager.AddHero(hero);
 
-                heroRegistry.RegisterNewObject(hero);
-
                 heroes[i] = hero;
             }
-            var partyRegistry = _container.Resolve<IMobilePartyRegistry>();
-
-            // Setup Callback
-            _messageBroker.Subscribe<PartiesRegistered>((payload) =>
-            {
-                autoResetEvent.Set();
-            });
 
             // Execution
-            Guid transactionId = Guid.NewGuid();
-            _messageBroker.Publish(this, new RegisterAllParties());
+            heroRegistry.RegisterAllHeroes();
 
             // Verification
-            // Wait for callback with 1 sec timeout
-            Assert.True(autoResetEvent.WaitOne(TimeSpan.FromSeconds(1)));
-
             foreach (var hero in heroes)
             {
                 Assert.True(heroRegistry.TryGetValue(hero, out Guid _));
@@ -94,8 +71,6 @@ namespace GameInterface.Tests.Services.Heroes
                 hero.StringId = $"Hero {i}";
 
                 Campaign.Current.CampaignObjectManager.AddHero(hero);
-
-                heroRegistry.RegisterNewObject(hero);
 
                 var heroId = Guid.NewGuid();
 

@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Serialization;
 using Coop.Core.Server.Services.Save.Data;
+using System;
 using System.IO;
 
 namespace Coop.Core.Server.Services.Save
@@ -45,7 +46,7 @@ namespace Coop.Core.Server.Services.Save
         /// <param name="session">Session to save</param>
         public void SaveCoopSession(string saveName, ICoopSession session)
         {
-            string filePath = string.Concat(DefaultPath, saveName);
+            string filePath = string.Concat(DefaultPath, saveName, ".json");
 
             var fileIO = new JsonFileIO();
 

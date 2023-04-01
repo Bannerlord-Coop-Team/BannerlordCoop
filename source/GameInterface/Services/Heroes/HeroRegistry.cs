@@ -13,12 +13,30 @@ namespace GameInterface.Services.Heroes
 {
     internal interface IHeroRegistry : IRegistryBase<Hero>
     {
+        void RegisterAllHeroes();
         void RegisterHeroesWithStringIds(IReadOnlyDictionary<string, Guid> stringIdToGuids);
     }
 
     internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
     {
         private static readonly ILogger Logger = LogManager.GetLogger<HeroRegistry>();
+
+        public void RegisterAllHeroes()
+        {
+            var objectManager = Campaign.Current?.CampaignObjectManager;
+
+            if (objectManager == null)
+            {
+                Logger.Error("Unable to register objects when CampaignObjectManager is null");
+                return;
+            }
+
+            IEnumerable<Hero> heroes = Enumerable.Concat(objectManager.AliveHeroes, objectManager.DeadOrDisabledHeroes);
+            foreach (var hero in heroes)
+            {
+                RegisterNewObject(hero);
+            }
+        }
 
         public void RegisterHeroesWithStringIds(IReadOnlyDictionary<string, Guid> stringIdToGuids)
         {

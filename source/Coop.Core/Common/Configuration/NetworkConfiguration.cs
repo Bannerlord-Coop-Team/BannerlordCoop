@@ -1,7 +1,7 @@
 ﻿using Common.Network;
 using System;
 
-namespace Coop.Core.Configuration
+namespace Coop.Core.Common.Configuration
 {
     public class NetworkConfiguration : INetworkConfiguration
     {

@@ -15,12 +15,29 @@ namespace GameInterface.Services.MobileParties
 {
     internal interface IMobilePartyRegistry : IRegistryBase<MobileParty>
     {
+        void RegisterAllParties();
         void RegisterPartiesWithStringIds(IReadOnlyDictionary<string, Guid> stringIdToGuids);
     }
 
     internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegistry
     {
         private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyRegistry>();
+
+        public void RegisterAllParties()
+        {
+            var objectManager = Campaign.Current?.CampaignObjectManager;
+
+            if (objectManager == null)
+            {
+                Logger.Error("Unable to register objects when CampaignObjectManager is null");
+                return;
+            }
+
+            foreach (var party in objectManager.MobileParties)
+            {
+                RegisterNewObject(party);
+            }
+        }
 
         public void RegisterPartiesWithStringIds(IReadOnlyDictionary<string, Guid> stringIdToGuids)
         {

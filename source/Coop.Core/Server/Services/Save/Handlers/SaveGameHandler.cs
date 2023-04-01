@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Services.Save.Data;
+using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Handlers;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.Save.Messages;
@@ -7,22 +9,28 @@ using System;
 
 namespace Coop.Core.Server.Services.Save.Handlers
 {
-    internal class SaveGameHandler
+    internal class SaveGameHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
         private readonly ICoopSaveManager saveManager;
+        private readonly ICoopServer coopServer;
 
-        public SaveGameHandler(IMessageBroker messageBroker, 
-            ICoopSaveManager saveManager) 
+        public SaveGameHandler(
+            IMessageBroker messageBroker, 
+            ICoopSaveManager saveManager,
+            ICoopServer coopServer) 
         {
             this.messageBroker = messageBroker;
             this.saveManager = saveManager;
+            this.coopServer = coopServer;
 
             messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
             messageBroker.Subscribe<ObjectGuidsPackaged>(Handle_ObjectGuidsPackaged);
             messageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
-        }
 
+            messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+            messageBroker.Subscribe<ExistingObjectGuidsLoaded>(Handle_ExistingObjectGuidsLoaded);
+        }
 
         private string saveName;
         private Guid packageObjectsTransactionId;
@@ -57,16 +65,42 @@ namespace Coop.Core.Server.Services.Save.Handlers
 
             ICoopSession session = saveManager.LoadCoopSession(saveName);
 
-            // TODO an event is needed to generate ids since they don't exist
-            if (session == null) return;
+            Action<MessagePayload<CampaignStateEntered>> postLoadHandler = null;
 
-            var message = new LoadExistingObjectGuids(
-                Guid.Empty, /* Transaction Id not required */
-                session.ControlledHeroes,
-                session.PartyStringIdToGuid,
-                session.HeroStringIdToGuid);
+            if (session == null)
+            {
+                postLoadHandler = (payload) =>
+                {
+                    messageBroker.Publish(this, new RegisterAllGameObjects());
+                    messageBroker.Unsubscribe(postLoadHandler);
+                };
+            }
+            else
+            {
+                var message = new LoadExistingObjectGuids(
+                    Guid.Empty, /* Transaction Id not required */
+                    session.ControlledHeroes,
+                    session.PartyStringIdToGuid,
+                    session.HeroStringIdToGuid);
 
-            messageBroker.Publish(this, message);
+                postLoadHandler = (payload) =>
+                {
+                    messageBroker.Publish(this, message);
+                    messageBroker.Unsubscribe(postLoadHandler);
+                };
+            }
+
+            messageBroker.Subscribe(postLoadHandler);
+        }
+
+        private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
+        {
+            coopServer.AllowJoining();
+        }
+
+        private void Handle_ExistingObjectGuidsLoaded(MessagePayload<ExistingObjectGuidsLoaded> obj)
+        {
+            coopServer.AllowJoining();
         }
     }
 }

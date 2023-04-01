@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using GameInterface.Services;
 using HarmonyLib;
+using System.Reflection;
 
 namespace GameInterface
 {
@@ -14,7 +15,7 @@ namespace GameInterface
         public GameInterface()
         {
             harmony = new Harmony("com.Coop.GameInterface");
-            harmony.PatchAll();
+            harmony.PatchAll(Assembly.GetExecutingAssembly());
         }
     }
 }

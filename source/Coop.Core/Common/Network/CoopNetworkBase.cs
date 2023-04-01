@@ -6,7 +6,7 @@ using LiteNetLib.Utils;
 using System;
 using System.Linq;
 
-namespace Coop.Core.Communication.Network
+namespace Coop.Core.Common.Network
 {
     public abstract class CoopNetworkBase : INetwork
     {

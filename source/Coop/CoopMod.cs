@@ -2,12 +2,12 @@
 using Common.Logging;
 using Common.Serialization;
 using Coop.Core;
-using Coop.Core.Server.Connections.Messages;
 using Coop.Lib.NoHarmony;
 using Coop.UI;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -51,7 +51,7 @@ namespace Coop
         private bool isServer = false;
         public override void NoHarmonyInit() 
         {
-            ProtoBufSerializer.Serialize(1);
+            AssemblyHellscape.CreateAssemblyBindingRedirects();
 
             var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
             
@@ -96,6 +96,8 @@ namespace Coop
             Logger.Verbose("Coop Mod Module Started");
         }
 
+        
+
         public override void NoHarmonyLoad()
         {
             Updateables.Add(GameLoopRunner.Instance);
@@ -112,9 +114,9 @@ namespace Coop
                                 BindingFlags.Instance | BindingFlags.NonPublic)
                             .SetValue(Module.CurrentModule, true);
 #else
-            ScreenManager.PushScreen(
-                ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                    new object[] { }));
+            //ScreenManager.PushScreen(
+            //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+            //        new object[] { }));
 #endif
             #region ButtonAssignment
             CoopCampaign =
@@ -136,9 +138,9 @@ namespace Coop
                             Coop.StartAsClient();
                         }
 #else
-                        ScreenManager.PushScreen(
-                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                                new object[] { }));
+                        //ScreenManager.PushScreen(
+                        //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                        //        new object[] { }));
 #endif
                     },
 

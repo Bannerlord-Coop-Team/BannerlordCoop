@@ -48,8 +48,8 @@
     <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Lib.Harmony.2.2.2\lib\net472\0Harmony.dll</HintPath>
     </Reference>
-    <Reference Include="Autofac, Version=6.4.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
-      <HintPath>..\packages\Autofac.6.4.0\lib\netstandard2.0\Autofac.dll</HintPath>
+    <Reference Include="Autofac, Version=7.0.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autofac.7.0.0\lib\netstandard2.0\Autofac.dll</HintPath>
     </Reference>
     <Reference Include="DistributedLock, Version=1.5.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\DistributedLock.1.5.0\lib\net45\DistributedLock.dll</HintPath>
@@ -60,11 +60,8 @@
     <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
-    <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.3.1.26\lib\net462\protobuf-net.dll</HintPath>
-    </Reference>
     <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.Core.3.1.26\lib\net462\protobuf-net.Core.dll</HintPath>
+      <HintPath>..\packages\protobuf-net.Core.3.1.33\lib\net462\protobuf-net.Core.dll</HintPath>
     </Reference>
     <Reference Include="Serilog, Version=2.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
       <HintPath>..\packages\Serilog.2.12.0\lib\net47\Serilog.dll</HintPath>
@@ -85,9 +82,6 @@
     <Reference Include="System.Numerics" />
     <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.4.5.3\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
     </Reference>
     <Reference Include="System.Runtime.InteropServices.RuntimeInformation" />
     <Reference Include="System.Runtime.Serialization" />
@@ -110,7 +104,7 @@
     <Compile Include="Client\Packets\NewHeroPacket.cs" />
     <Compile Include="Common\Services\PartyMovement\Messages\NetworkUpdatePartyTargetPosition.cs" />
     <Compile Include="Common\Services\PartyMovement\PartyMovementHandler.cs" />
-    <Compile Include="Communication\Network\CoopNetworkBase.cs" />
+    <Compile Include="Common\Network\CoopNetworkBase.cs" />
     <Compile Include="Client\States\CampaignState.cs" />
     <Compile Include="Client\States\CharacterCreationState.cs" />
     <Compile Include="Client\States\ClientStateBase.cs" />
@@ -144,13 +138,14 @@
     <Compile Include="Server\Messages\Events\ClientJoinRequested.cs" />
     <Compile Include="Server\ServerModule.cs" />
     <Compile Include="Client\ClientModule.cs" />
-    <Compile Include="Configuration\NetworkConfiguration.cs" />
+    <Compile Include="Common\Configuration\NetworkConfiguration.cs" />
     <Compile Include="CoopartiveMultiplayerExperience.cs" />
     <Compile Include="Client\ClientLogic.cs" />
     <Compile Include="Client\Config\ClientConfig.cs" />
     <Compile Include="Server\Config\ServerConfig.cs" />
     <Compile Include="Server\ServerLogic.cs" />
     <Compile Include="Client\Data\ClientData.cs" />
+    <Compile Include="Server\Services\Save\Messages\CreateNewSession.cs" />
     <Compile Include="Server\Services\Save\Handlers\SaveGameHandler.cs" />
     <Compile Include="Server\Services\Save\CoopSaveManager.cs" />
     <Compile Include="Server\Services\Save\Data\CoopSession.cs" />
@@ -168,7 +163,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
+      <Project>{9a045658-9a0c-47e5-a1d9-e1b45e85fd0d}</Project>
       <Name>Common</Name>
     </ProjectReference>
     <ProjectReference Include="..\GameInterface\GameInterface.csproj">
@@ -179,9 +174,7 @@
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Server\Services\Save\Messages\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>

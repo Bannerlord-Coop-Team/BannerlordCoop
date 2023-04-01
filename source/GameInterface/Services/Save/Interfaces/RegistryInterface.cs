@@ -1,21 +1,8 @@
-﻿using Common;
-using Common.Logging;
-using Common.Messaging;
-using GameInterface.Services.Heroes;
-using GameInterface.Services.Heroes.Messages;
+﻿using GameInterface.Services.Heroes;
 using GameInterface.Services.MobileParties;
-using GameInterface.Services.MobileParties.Messages;
-using Serilog;
-using Serilog.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.ViewModelCollection;
-using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Save.Interfaces
 {
@@ -28,21 +15,19 @@ namespace GameInterface.Services.Save.Interfaces
             ISet<Guid> controlledHeros,
             IReadOnlyDictionary<string, Guid> heroIds,
             IReadOnlyDictionary<string, Guid> partyIds);
+        void RegisterAllGameObjects();
     }
     internal class RegistryInterface : IRegistryInterface
     {
-        private readonly IMessageBroker messageBroker;
         private readonly IMobilePartyRegistry partyRegistry;
         private readonly IHeroRegistry heroRegistry;
         private readonly IControlledHeroRegistry controlledHeroRegistry;
 
         public RegistryInterface(
-            IMessageBroker messageBroker,
             IMobilePartyRegistry partyRegistry,
             IHeroRegistry heroRegistry,
             IControlledHeroRegistry controlledHeroRegistry) 
         {
-            this.messageBroker = messageBroker;
             this.partyRegistry = partyRegistry;
             this.heroRegistry = heroRegistry;
             this.controlledHeroRegistry = controlledHeroRegistry;
@@ -68,6 +53,12 @@ namespace GameInterface.Services.Save.Interfaces
             controlledHeroRegistry.RegisterExistingHeroes(controlledHeros);
             heroRegistry.RegisterHeroesWithStringIds(heroIds);
             partyRegistry.RegisterPartiesWithStringIds(partyIds);
+        }
+
+        public void RegisterAllGameObjects()
+        {
+            partyRegistry.RegisterAllParties();
+            heroRegistry.RegisterAllHeroes();
         }
     }
 }

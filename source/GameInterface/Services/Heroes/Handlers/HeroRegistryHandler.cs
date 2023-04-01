@@ -25,31 +25,16 @@ namespace GameInterface.Services.Heroes.Handlers
             IHeroInterface heroInterface,
             IMessageBroker messageBroker,
             IHeroRegistry heroRegistry,
-            IControlledHeroRegistry controlledHeroesRegistry)
+            IControlledHeroRegistry controlledHeroRegistry)
         {
             this.heroInterface = heroInterface;
             this.messageBroker = messageBroker;
             this.heroRegistry = heroRegistry;
-            this.controlledHeroRegistry = controlledHeroesRegistry;
+            this.controlledHeroRegistry = controlledHeroRegistry;
 
-            messageBroker.Subscribe<RegisterAllHeroes>(Handle_RegisterHeroes);
             messageBroker.Subscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
         }
 
-        private void Handle_RegisterHeroes(MessagePayload<RegisterAllHeroes> obj)
-        {
-            var objectManager = Campaign.Current?.CampaignObjectManager;
-
-            if (objectManager == null) return;
-
-            IEnumerable<Hero> heroes = Enumerable.Concat(objectManager.AliveHeroes, objectManager.DeadOrDisabledHeroes);
-            foreach (var hero in heroes)
-            {
-                heroRegistry.RegisterNewObject(hero);
-            }
-
-            messageBroker.Publish(this, new PartiesRegistered());
-        }
         private void Handle_PlayerHeroChanged(MessagePayload<PlayerHeroChanged> obj)
         {
             var previousHero = obj.What.PreviousHero;

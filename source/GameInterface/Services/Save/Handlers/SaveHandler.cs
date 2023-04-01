@@ -6,6 +6,9 @@ using System.Collections.Generic;
 using System;
 using TaleWorlds.CampaignSystem;
 using GameInterface.Services.Save.Interfaces;
+using GameInterface.Services.Heroes.Messages;
+using System.Threading.Tasks;
+using GameInterface.Services.MobileParties.Messages;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
@@ -27,6 +30,7 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<PackageGameSaveData>(Handle);
             messageBroker.Subscribe<PackageObjectGuids>(Handle);
             messageBroker.Subscribe<LoadExistingObjectGuids>(Handle);
+            messageBroker.Subscribe<RegisterAllGameObjects>(Handle);
         }
 
         private void Handle(MessagePayload<PackageGameSaveData> obj)
@@ -67,6 +71,15 @@ namespace GameInterface.Services.Heroes.Handlers
                 payload.PartyIds);
 
             messageBroker.Publish(this, new ExistingObjectGuidsLoaded(payload.TransactionID));
+        }
+
+        private void Handle(MessagePayload<RegisterAllGameObjects> obj)
+        {
+            var payload = obj.What;
+
+            registryInterface.RegisterAllGameObjects();
+
+            messageBroker.Publish(this, new AllGameObjectsRegistered(payload.TransactionID));
         }
     }
 }

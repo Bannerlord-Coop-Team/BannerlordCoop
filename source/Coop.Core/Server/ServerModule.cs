@@ -4,6 +4,7 @@ using Common.Network;
 using Coop.Core.Common.Services.PartyMovement;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Save;
+using Coop.Core.Server.Services.Save.Handlers;
 using Coop.Core.Server.States;
 using LiteNetLib;
 
@@ -21,6 +22,9 @@ namespace Coop.Core.Server
             builder.RegisterType<InitialServerState>().As<IServerState>();
             builder.RegisterType<ClientRegistry>().As<IClientRegistry>().InstancePerLifetimeScope();
             builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
+
+            // TODO create collector
+            builder.RegisterType<SaveGameHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
 
             builder.RegisterType<PartyMovementHandler>().As<IPartyMovementHandler>().InstancePerLifetimeScope().AutoActivate();
 
