@@ -135,7 +135,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Bootstrap\Patches\GameMenuCallbackManagerPatches.cs" />
     <Compile Include="Bootstrap\Patches\GamePatches.cs" />
     <Compile Include="Bootstrap\TestDebugger.cs" />
     <Compile Include="CompatibilityInfo_Test.cs" />
