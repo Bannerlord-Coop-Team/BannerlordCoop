@@ -1,5 +1,8 @@
 ﻿using Common.Extensions;
+using Common.Logging;
 using GameInterface.Serialization.Native;
+using Serilog;
+using Serilog.Core;
 using System;
 using System.Collections.Generic;
 using System.Data.Linq;
@@ -15,8 +18,12 @@ namespace GameInterface.Serialization
 
     public class BinaryPackageFactory : IBinaryPackageFactory
     {
-        readonly Dictionary<ObjectAndType, IBinaryPackage> InstantiatedPackages = new Dictionary<ObjectAndType, IBinaryPackage>();
-        static readonly Dictionary<Type, Type> PackagesTypes = new Dictionary<Type, Type>();
+        private static readonly ILogger Logger = LogManager.GetLogger<BinaryPackageFactory>();
+
+        private static readonly Dictionary<Type, Type> PackagesTypes = new Dictionary<Type, Type>();
+
+        private readonly Dictionary<ObjectAndType, IBinaryPackage> InstantiatedPackages = new Dictionary<ObjectAndType, IBinaryPackage>();
+        
 
         static BinaryPackageFactory()
         {
@@ -41,6 +48,8 @@ namespace GameInterface.Serialization
 
         private static void RegisterNormalBinaryPackage(Type type)
         {
+            Logger.Debug("Registering {type}", type.Name);
+
             Type coveredType = type.BaseType.GenericTypeArguments.Single();
 
             if (PackagesTypes.ContainsKey(coveredType)) throw new Exception(
