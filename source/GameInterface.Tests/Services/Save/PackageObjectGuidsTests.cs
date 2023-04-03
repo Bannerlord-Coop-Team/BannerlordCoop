@@ -92,9 +92,9 @@ namespace GameInterface.Tests.Services.Save
 
             Assert.Equal(transactionId, payload.TransactionID);
 
-            Assert.Equal(partyRegistry.Count, payload.PartyIds.Count);
-            Assert.Equal(heroRegistry.Count, payload.HeroIds.Count);
-            Assert.Equal(controlledHeros.ControlledHeros.Count, payload.ControlledHeros.Count);
+            Assert.Equal(partyRegistry.Count, payload.GameObjectGuids.PartyIds.Count);
+            Assert.Equal(heroRegistry.Count, payload.GameObjectGuids.HeroIds.Count);
+            Assert.Equal(controlledHeros.ControlledHeros.Count, payload.GameObjectGuids.ControlledHeros.Length);
         }
     }
 }

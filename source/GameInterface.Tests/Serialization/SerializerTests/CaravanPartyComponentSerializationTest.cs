@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -13,12 +16,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CaravanPartyComponentSerializationTest
     {
+        IContainer container;
         public CaravanPartyComponentSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<Settlement>("Settlement", "Settlements", 4U, true, false);
-            MBObjectManager.Instance.RegisterType<Hero>("Hero", "Heros", 5U, true, false);
-            MBObjectManager.Instance.RegisterType<MobileParty>("MobileParty", "MobilePartys", 5U, true, false);
+            GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -26,7 +33,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             CaravanPartyComponent CaravanPartyComponent = (CaravanPartyComponent)FormatterServices.GetUninitializedObject(typeof(CaravanPartyComponent));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CaravanPartyComponentBinaryPackage package = new CaravanPartyComponentBinaryPackage(CaravanPartyComponent, factory);
 
             package.Pack();
@@ -65,7 +72,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Settlement.SetValue(CaravanPartyComponent, settlement);
 
             // Setup package and dependencies
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CaravanPartyComponentBinaryPackage package = new CaravanPartyComponentBinaryPackage(CaravanPartyComponent, factory);
 
             package.Pack();

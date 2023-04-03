@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     {
         public string StringId;
 
-        public TownBinaryPackage(Town obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public TownBinaryPackage(Town obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
 
         }
@@ -19,7 +19,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<Town>(StringId);
+            Object = ResolveId<Town>(StringId);
         }
     }
 }

@@ -1,5 +1,7 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
 using TaleWorlds.Library;
 using Xunit;
 
@@ -7,12 +9,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class Mat3SerializationTest
     {
+        IContainer container;
+        public Mat3SerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void Mat3_Serialize()
         {
             Mat3 Mat3 = new Mat3(new Vec3(1,2,3), new Vec3(4,5,6), new Vec3(7,8,9));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             Mat3BinaryPackage package = new Mat3BinaryPackage(Mat3, factory);
 
             package.Pack();
@@ -27,7 +39,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Mat3 Mat3 = new Mat3(new Vec3(11.001f, 2.001f, 3.001f), new Vec3(4.001f, 5.001f, 6.001f), new Vec3(7.001f, 8.001f, 0));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             Mat3BinaryPackage package = new Mat3BinaryPackage(Mat3, factory);
 
             package.Pack();

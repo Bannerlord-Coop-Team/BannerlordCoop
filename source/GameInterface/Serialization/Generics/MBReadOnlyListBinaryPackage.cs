@@ -17,13 +17,13 @@ namespace GameInterface.Serialization.Generics
         object Object;
 
         [NonSerialized]
-        BinaryPackageFactory BinaryPackageFactory;
+        IBinaryPackageFactory BinaryPackageFactory;
 
         protected Dictionary<FieldInfo, IBinaryPackage> StoredFields = new Dictionary<FieldInfo, IBinaryPackage>();
 
         Type ObjectType;
 
-        public MBReadOnlyListBinaryPackage(object obj, BinaryPackageFactory binaryPackageFactory)
+        public MBReadOnlyListBinaryPackage(object obj, IBinaryPackageFactory binaryPackageFactory)
         {
             BinaryPackageFactory = binaryPackageFactory;
             ObjectType = obj.GetType();

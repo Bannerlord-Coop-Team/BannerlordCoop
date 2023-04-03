@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class PieceDataBinaryPackage : BinaryPackageBase<PieceData>
     {
-        public PieceDataBinaryPackage(PieceData obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public PieceDataBinaryPackage(PieceData obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

@@ -11,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class Mat3BinaryPackage : BinaryPackageBase<Mat3>
     {
-        public Mat3BinaryPackage(Mat3 obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public Mat3BinaryPackage(Mat3 obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

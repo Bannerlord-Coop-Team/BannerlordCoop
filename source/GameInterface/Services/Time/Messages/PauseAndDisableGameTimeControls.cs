@@ -5,6 +5,11 @@ namespace GameInterface.Services.Time.Messages
 {
     public readonly struct PauseAndDisableGameTimeControls : ICommand
     {
-        public Guid TransactionID => throw new NotImplementedException();
+        public Guid TransactionID { get; }
+
+        public PauseAndDisableGameTimeControls(Guid transactionID)
+        {
+            TransactionID = transactionID;
+        }
     }
 }

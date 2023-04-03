@@ -1,17 +1,30 @@
 ﻿using GameInterface.Serialization;
 using Xunit;
 using GameInterface.Serialization.Native;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ArraySerializationTest
     {
+        IContainer container;
+        public ArraySerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void Array_Serialize()
         {
             int[] arr = new int[] { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             EnumerableBinaryPackage package = new EnumerableBinaryPackage(arr, factory);
 
             package.Pack();
@@ -26,7 +39,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             int[] arr = new int[] { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             EnumerableBinaryPackage package = new EnumerableBinaryPackage(arr, factory);
 
             package.Pack();
@@ -54,7 +67,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             arr[0] = new int[] { 1, 2, 3, 4, 5, 6, 7, 8 };
             arr[1] = new int[] { 5, 6, 7 };
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             EnumerableBinaryPackage package = new EnumerableBinaryPackage(arr, factory);
 
             package.Pack();
@@ -72,7 +85,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             arr[0] = new int[] { 1, 2, 3, 4, 5, 6, 7, 8 };
             arr[1] = new int[] { 5, 6, 7 };
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             EnumerableBinaryPackage package = new EnumerableBinaryPackage(arr, factory);
 
             package.Pack();

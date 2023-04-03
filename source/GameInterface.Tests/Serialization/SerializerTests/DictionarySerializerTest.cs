@@ -3,11 +3,24 @@ using System.Collections.Generic;
 using Xunit;
 using TaleWorlds.CampaignSystem;
 using GameInterface.Serialization.Native;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class DictionarySerializerTest
     {
+        IContainer container;
+        public DictionarySerializerTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void Dictionary_Serialize()
         {
@@ -18,7 +31,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 { "3", new CampaignTime() },
             };
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             DictionaryBinaryPackage package = new DictionaryBinaryPackage(Dict, factory);
 
             package.Pack();
@@ -40,7 +53,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Dictionary<string, CampaignTime> Dict2 = new Dictionary<string, CampaignTime>(Dict);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             DictionaryBinaryPackage package = new DictionaryBinaryPackage(Dict, factory);
 
             package.Pack();

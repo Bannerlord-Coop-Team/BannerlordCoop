@@ -11,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class SkeletonScaleBinaryPackage : BinaryPackageBase<SkeletonScale>
     {
-        public SkeletonScaleBinaryPackage(SkeletonScale obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public SkeletonScaleBinaryPackage(SkeletonScale obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

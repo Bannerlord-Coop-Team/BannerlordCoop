@@ -4,6 +4,7 @@ using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.ObjectManager;
 
 namespace GameInterface
 {
@@ -13,6 +14,7 @@ namespace GameInterface
         {
             base.Load(builder);
             builder.RegisterType<GameInterface>().As<IGameInterface>().SingleInstance().AutoActivate();
+            builder.RegisterType<MBObjectManagerAdapter>().As<IObjectManagerAdapter<string>>().InstancePerLifetimeScope();
             builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();
             builder.RegisterModule<ServiceModule>();
 

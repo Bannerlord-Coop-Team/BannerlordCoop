@@ -11,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class Vec3BinaryPackage : BinaryPackageBase<Vec3>
     {
-        public Vec3BinaryPackage(Vec3 obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public Vec3BinaryPackage(Vec3 obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

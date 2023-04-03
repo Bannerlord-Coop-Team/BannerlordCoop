@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using TaleWorlds.Core;
 using Xunit;
 
@@ -7,12 +10,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BodyPropertiesSerializationTest
     {
+        IContainer container;
+        public BodyPropertiesSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void BodyProperties_Serialize()
         {
             BodyProperties BodyProperties = new BodyProperties(new DynamicBodyProperties(1f, 2f, 3f), new StaticBodyProperties(1, 2, 3, 4, 5, 6, 7, 8));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BodyPropertiesBinaryPackage package = new BodyPropertiesBinaryPackage(BodyProperties, factory);
 
             package.Pack();
@@ -27,7 +40,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             BodyProperties BodyProperties = new BodyProperties(new DynamicBodyProperties(1f, 2f, 3f), new StaticBodyProperties(1, 2, 3, 4, 5, 6, 7, 8));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BodyPropertiesBinaryPackage package = new BodyPropertiesBinaryPackage(BodyProperties, factory);
 
             package.Pack();

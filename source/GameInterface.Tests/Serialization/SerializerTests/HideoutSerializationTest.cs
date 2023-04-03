@@ -7,11 +7,24 @@ using Xunit;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class HideoutSerializationTest
     {
+        IContainer container;
+        public HideoutSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         private static readonly PropertyInfo Campaign_Current = typeof(Campaign).GetProperty("Current");
         private static readonly FieldInfo Campaign_hideouts = typeof(Campaign).GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         [Fact]
@@ -22,7 +35,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hideout item = new Hideout();
             allhideouts.Add(item);
             Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             HideoutBinaryPackage package = new HideoutBinaryPackage(item, factory);
 
             package.Pack();
@@ -50,7 +63,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
             Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             HideoutBinaryPackage package = new HideoutBinaryPackage(hideout, factory);
 
             package.Pack();

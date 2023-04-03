@@ -1,6 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -14,9 +16,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CharacterObjectSerializationTest
     {
+        IContainer container;
         public CharacterObjectSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         private static readonly FieldInfo BasicCharacterObject_basicName = typeof(BasicCharacterObject).GetField("_basicName", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -28,7 +37,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BasicCharacterObject_basicName.SetValue(CharacterObject, new TextObject("Test Name"));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterObjectBinaryPackage package = new CharacterObjectBinaryPackage(CharacterObject, factory);
 
             package.Pack();
@@ -65,7 +74,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             CharacterObjectBinaryPackage.CharacterObject_originCharacter.SetValue(CharacterObject, characterMembers[2]);
             CharacterObjectBinaryPackage.CharacterObject_UpgradeTargets.SetValue(CharacterObject, characterMembers);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
 
             byte[] bytes = BinaryFormatterSerializer.Serialize(factory.GetBinaryPackage(CharacterObject));
 
@@ -100,7 +109,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BasicCharacterObject_basicName.SetValue(CharacterObject, new TextObject("Test Name"));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterObjectBinaryPackage package = new CharacterObjectBinaryPackage(CharacterObject, factory);
 
             package.Pack();

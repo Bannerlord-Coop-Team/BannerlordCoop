@@ -322,6 +322,7 @@
     <Compile Include="Services\MobileParties\Interfaces\MobilePartyInterface.cs" />
     <Compile Include="Services\Modules\Handlers\NewHeroHandler.cs" />
     <Compile Include="Services\Modules\Interfaces\ModuleInterface.cs" />
+    <Compile Include="Services\ObjectManager\MBObjectManagerAdapter.cs" />
     <Compile Include="Services\Save\CoopInMemSaveDriver.cs" />
     <Compile Include="Services\Save\Data\GameObjectGuids.cs" />
     <Compile Include="Services\Save\Messages\RegisterAllGameObjects.cs" />
@@ -334,10 +335,13 @@
     <Compile Include="Services\Save\Messages\PackageGameSaveData.cs" />
     <Compile Include="Services\Save\Messages\PackageObjectGuids.cs" />
     <Compile Include="Services\Save\Patches\LoadPatches.cs" />
+    <Compile Include="Services\Time\Enum\TimeControlEnum.cs" />
     <Compile Include="Services\Time\Handlers\TimeControlHandler.cs" />
     <Compile Include="Services\Time\Interaces\TimeControlInterface.cs" />
     <Compile Include="Services\Time\Messages\EnableGameTimeControls.cs" />
     <Compile Include="Services\Time\Messages\PauseAndDisableGameTimeControls.cs" />
+    <Compile Include="Services\Time\Messages\SetTimeControlMode.cs" />
+    <Compile Include="Services\Time\Messages\TimeSpeedChanged.cs" />
     <Compile Include="Services\Time\Patches\TimePatches.cs" />
     <Compile Include="Services\UI\Handlers\LoadingScreenHandler.cs" />
     <Compile Include="Services\UI\Interfaces\UIInterface.cs" />
@@ -435,7 +439,6 @@
     <Compile Include="Serialization\External\CampaignTimeBinaryPackage.cs" />
     <Compile Include="Serialization\External\ClanBinaryPackage.cs" />
     <Compile Include="Serialization\External\HeroBinaryPackage.cs" />
-    <Compile Include="Serialization\Native\IEnumerableBinaryPackage.cs" />
     <Compile Include="Serialization\Native\KeyValuePairBinaryPackage.cs" />
     <Compile Include="Serialization\Native\NativeBinaryPackageCollection.cs" />
     <Compile Include="Serialization\Native\NullBinaryPackage.cs" />

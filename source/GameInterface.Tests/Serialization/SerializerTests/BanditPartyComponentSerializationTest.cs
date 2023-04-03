@@ -10,14 +10,23 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 using GameInterface.Tests.Bootstrap;
 using TaleWorlds.Library;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BanditPartyComponentSerializationTest
     {
+        IContainer container;
         public BanditPartyComponentSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -25,7 +34,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             BanditPartyComponent item = (BanditPartyComponent)FormatterServices.GetUninitializedObject(typeof(BanditPartyComponent));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BanditPartyComponentBinaryPackage package = new BanditPartyComponentBinaryPackage(item, factory);
 
             package.Pack();
@@ -73,7 +82,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             BanditPartyComponent_IsBossParty.SetValue(item, true);
             PartyComponent_MobileParty.SetValue(item, mobileParty);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BanditPartyComponentBinaryPackage package = new BanditPartyComponentBinaryPackage(item, factory);
 
             package.Pack();

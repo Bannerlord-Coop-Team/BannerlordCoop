@@ -27,7 +27,7 @@ namespace GameInterface.Serialization.External
         string originCharacterId;
         string[] UpgradeTargetIds;
 
-        public CharacterObjectBinaryPackage(CharacterObject obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CharacterObjectBinaryPackage(CharacterObject obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -70,7 +70,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            CharacterObject characterObject = MBObjectManager.Instance.GetObject<CharacterObject>(stringId);
+            CharacterObject characterObject = ResolveId<CharacterObject>(stringId);
             if (characterObject != null)
             {
                 Object = characterObject;

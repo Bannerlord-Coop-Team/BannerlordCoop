@@ -6,6 +6,10 @@ using System.Reflection;
 
 namespace GameInterface.Serialization.Native
 {
+    public interface IEnumerableBinaryPackage : IBinaryPackage
+    {
+    }
+
     [Serializable]
     public class EnumerableBinaryPackage : IEnumerableBinaryPackage
     {

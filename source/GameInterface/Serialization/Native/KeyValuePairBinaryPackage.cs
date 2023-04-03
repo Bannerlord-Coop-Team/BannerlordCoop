@@ -10,7 +10,7 @@ namespace GameInterface.Serialization.Native
     public class KeyValuePairBinaryPackage : IBinaryPackage
     {
         [NonSerialized]
-        private readonly BinaryPackageFactory BinaryPackageFactory;
+        private readonly IBinaryPackageFactory BinaryPackageFactory;
         [NonSerialized]
         private object Object;
         [NonSerialized]
@@ -20,7 +20,7 @@ namespace GameInterface.Serialization.Native
 
         private Type ObjectType;
 
-        public KeyValuePairBinaryPackage(object kvp, BinaryPackageFactory binaryPackageFactory)
+        public KeyValuePairBinaryPackage(object kvp, IBinaryPackageFactory binaryPackageFactory)
         {
             ObjectType = kvp.GetType();
             Object = kvp;

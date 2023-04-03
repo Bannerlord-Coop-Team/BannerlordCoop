@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,12 +16,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class AttackCollisionDataSerilizationTest
     {
+        IContainer container;
+        public AttackCollisionDataSerilizationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void AttackCollisionData_Serialize()
         {
             AttackCollisionData attackCollisionData = new AttackCollisionData();
-            
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
             AttackCollisionDataBinaryPackage package = new AttackCollisionDataBinaryPackage(attackCollisionData, factory);
 
             package.Pack();
@@ -36,7 +49,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 , 30, CombatHitResultFlags.HitWithArm, 0.5f, 0.8f, 0.7f, 1.1f, 50.0f, 20.0f, 0.2f, 
                 0.3f, randomLocation, randomLocation, randomLocation, randomLocation, randomLocation, randomLocation, randomLocation);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             AttackCollisionDataBinaryPackage package = new AttackCollisionDataBinaryPackage(acd, factory);
 
             package.Pack();
@@ -45,7 +58,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.NotEmpty(bytes);
 
-            var deserilizationFactory = new BinaryPackageFactory();
+            var deserilizationFactory = container.Resolve<IBinaryPackageFactory>();
             var bf = BinaryFormatterSerializer.Deserialize<AttackCollisionDataBinaryPackage>(bytes);
             bf.BinaryPackageFactory = deserilizationFactory;
 

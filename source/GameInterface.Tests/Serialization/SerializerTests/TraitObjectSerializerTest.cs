@@ -3,17 +3,30 @@ using GameInterface.Serialization;
 using Xunit;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class TraitObjectSerializationTest
     {
+        IContainer container;
+        public TraitObjectSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void TraitObject_Serialize()
         {
             TraitObject testTraitObject = (TraitObject)FormatterServices.GetUninitializedObject(typeof(TraitObject));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             TraitObjectBinaryPackage package = new TraitObjectBinaryPackage(testTraitObject, factory);
 
             package.Pack();
@@ -28,7 +41,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             TraitObject testTraitObject = (TraitObject)FormatterServices.GetUninitializedObject(typeof(TraitObject));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             TraitObjectBinaryPackage package = new TraitObjectBinaryPackage(testTraitObject, factory);
 
             package.Pack();

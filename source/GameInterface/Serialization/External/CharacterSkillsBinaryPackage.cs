@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class CharacterSkillsBinaryPackage : BinaryPackageBase<CharacterSkills>
     {
-        public CharacterSkillsBinaryPackage(CharacterSkills obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CharacterSkillsBinaryPackage(CharacterSkills obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

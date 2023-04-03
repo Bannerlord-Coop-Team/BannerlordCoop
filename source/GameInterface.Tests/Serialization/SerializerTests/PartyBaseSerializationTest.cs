@@ -3,17 +3,30 @@ using System.Runtime.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Serialization;
 using TaleWorlds.CampaignSystem.Party;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class PartyBaseSerializationTest
     {
+        IContainer container;
+        public PartyBaseSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void PartyBase_Serialize()
         {
             PartyBase testPartyObject = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             PartyBaseBinaryPackage package = new PartyBaseBinaryPackage(testPartyObject, factory);
 
             package.Pack();
@@ -31,7 +44,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             testPartyObject.RemainingFoodPercentage = 5;
             testPartyObject.GetType().GetProperty("Index", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public).SetValue(testPartyObject, 5);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             PartyBaseBinaryPackage package = new PartyBaseBinaryPackage(testPartyObject, factory);
 
             package.Pack();

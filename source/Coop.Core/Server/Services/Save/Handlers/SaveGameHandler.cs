@@ -2,10 +2,8 @@
 using Coop.Core.Server.Services.Save.Data;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Handlers;
-using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.MobileParties.Messages;
-using GameInterface.Services.Save.Data;
 using GameInterface.Services.Save.Messages;
+using GameInterface.Services.Time.Messages;
 using System;
 
 namespace Coop.Core.Server.Services.Save.Handlers
@@ -17,7 +15,7 @@ namespace Coop.Core.Server.Services.Save.Handlers
         private readonly ICoopServer coopServer;
 
         public SaveGameHandler(
-            IMessageBroker messageBroker, 
+            IMessageBroker messageBroker,
             ICoopSaveManager saveManager,
             ICoopServer coopServer) 
         {
@@ -92,11 +90,13 @@ namespace Coop.Core.Server.Services.Save.Handlers
 
         private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
         {
+            messageBroker.Publish(this, new EnableGameTimeControls());
             coopServer.AllowJoining();
         }
 
         private void Handle_ExistingObjectGuidsLoaded(MessagePayload<ExistingObjectGuidsLoaded> obj)
         {
+            messageBroker.Publish(this, new EnableGameTimeControls());
             coopServer.AllowJoining();
         }
     }

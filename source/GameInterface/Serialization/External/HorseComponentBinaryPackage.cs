@@ -11,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class HorseComponentBinaryPackage : BinaryPackageBase<HorseComponent>
     {
-        public HorseComponentBinaryPackage(HorseComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public HorseComponentBinaryPackage(HorseComponent obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

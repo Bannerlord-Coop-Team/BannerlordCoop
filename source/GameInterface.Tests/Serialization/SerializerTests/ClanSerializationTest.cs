@@ -7,14 +7,23 @@ using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;
 using System.Collections.Generic;
 using TaleWorlds.Library;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ClanSerializationTest
     {
+        IContainer container;
         public ClanSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -22,7 +31,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Clan testClan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ClanBinaryPackage package = new ClanBinaryPackage(testClan, factory);
 
             package.Pack();
@@ -61,7 +70,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             ClanBinaryPackage.Clan_lordsCache.SetValue(testClan, heroes);
             ClanBinaryPackage.Clan_supporterNotablesCache.SetValue(testClan, heroes);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ClanBinaryPackage package = new ClanBinaryPackage(testClan, factory);
 
             package.Pack();
@@ -94,7 +103,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             clan.StringId = "My Clan";
             MBObjectManager.Instance.RegisterObject(clan);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ClanBinaryPackage package = new ClanBinaryPackage(clan, factory);
 
             package.Pack();

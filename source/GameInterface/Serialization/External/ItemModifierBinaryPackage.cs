@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class ItemModifierBinaryPackage : BinaryPackageBase<ItemModifier>
     {
-        public ItemModifierBinaryPackage(ItemModifier obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public ItemModifierBinaryPackage(ItemModifier obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

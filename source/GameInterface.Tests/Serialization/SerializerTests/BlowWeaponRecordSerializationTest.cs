@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,13 +18,23 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     /// </summary>
     public class BlowWeaponRecordSerializationTest
     {
+        IContainer container;
+        public BlowWeaponRecordSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void BlowWeaponRecord_Serialize()
         {
             BlowWeaponRecord blowWeaponRecord = new BlowWeaponRecord();
 
             blowWeaponRecord.CurrentPosition = new TaleWorlds.Library.Vec3(1, 1, 1);
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BlowWeaponRecordBinaryPackage package = new BlowWeaponRecordBinaryPackage(blowWeaponRecord, factory);
 
             package.Pack();
@@ -44,7 +57,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             blowWeaponRecord.Velocity = new TaleWorlds.Library.Vec3(13, 14, 15);
             blowWeaponRecord.WeaponFlags = TaleWorlds.Core.WeaponFlags.AffectsAreaBig;
             blowWeaponRecord.Weight = 0.5f;
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BlowWeaponRecordBinaryPackage package = new BlowWeaponRecordBinaryPackage(blowWeaponRecord, factory);
 
             package.Pack();
@@ -53,7 +66,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.NotEmpty(bytes);
 
-            var deseriliazedFactory = new BinaryPackageFactory();
+            var deseriliazedFactory = container.Resolve<IBinaryPackageFactory>();
             var deserialzedlowWeaponRecordBinaryPackage = BinaryFormatterSerializer.Deserialize<BlowWeaponRecordBinaryPackage>(bytes);
             deserialzedlowWeaponRecordBinaryPackage.BinaryPackageFactory = deseriliazedFactory;
 

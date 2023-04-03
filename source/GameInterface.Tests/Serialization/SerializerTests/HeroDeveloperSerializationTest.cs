@@ -1,6 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -12,9 +14,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class HeroDeveloperSerializationTest
     {
+        IContainer container;
         public HeroDeveloperSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         private readonly static FieldInfo _totalXp = typeof(HeroDeveloper).GetField("_totalXp", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -26,7 +35,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             HeroDeveloper HeroDeveloper = (HeroDeveloper)FormatterServices.GetUninitializedObject(typeof(HeroDeveloper));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             HeroDeveloperBinaryPackage package = new HeroDeveloperBinaryPackage(HeroDeveloper, factory);
 
             package.Pack();
@@ -53,7 +62,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             UnspentFocusPoints.SetValue(HeroDeveloper, 54);
             UnspentAttributePoints.SetValue(HeroDeveloper, 68);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             HeroDeveloperBinaryPackage package = new HeroDeveloperBinaryPackage(HeroDeveloper, factory);
 
             package.Pack();

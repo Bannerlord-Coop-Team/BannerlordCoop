@@ -11,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class TroopRosterElementBinaryPackage : BinaryPackageBase<TroopRosterElement>
     {
-        public TroopRosterElementBinaryPackage(TroopRosterElement obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public TroopRosterElementBinaryPackage(TroopRosterElement obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

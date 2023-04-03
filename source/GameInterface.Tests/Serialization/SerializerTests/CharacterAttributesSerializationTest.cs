@@ -7,21 +7,31 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using System.Collections.Generic;
 using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CharacterAttributesSerializationTest
     {
+        IContainer container;
         public CharacterAttributesSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
+
         [Fact]
         public void CharacterAttributes_Serialize()
         {
             CharacterAttributes CharacterAttributes = new CharacterAttributes();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterAttributesBinaryPackage package = new CharacterAttributesBinaryPackage(CharacterAttributes, factory);
 
             package.Pack();
@@ -52,7 +62,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             _attributes.SetValue(characterAttributes, Attributes);
 
             // Setup serialization for characterAttributes
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterAttributesBinaryPackage package = new CharacterAttributesBinaryPackage(characterAttributes, factory);
 
             package.Pack();

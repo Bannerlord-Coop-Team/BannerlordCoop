@@ -5,14 +5,23 @@ using Xunit;
 using TaleWorlds.ObjectSystem;
 using System.Reflection;
 using GameInterface.Tests.Bootstrap;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class EquipmentElementSerializationTest
     {
+        IContainer container;
         public EquipmentElementSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -20,7 +29,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             EquipmentElement equipmentElement = new EquipmentElement();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             EquipmentElementBinaryPackage package = new EquipmentElementBinaryPackage(equipmentElement, factory);
 
             package.Pack();
@@ -43,7 +52,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             ItemModifier.ModifyArmor(15);
 
             EquipmentElement equipmentElement = new EquipmentElement(itemobj,ItemModifier,itemobj2);
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             EquipmentElementBinaryPackage package = new EquipmentElementBinaryPackage(equipmentElement, factory);
 
             package.Pack();

@@ -4,15 +4,24 @@ using Xunit;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.ObjectSystem;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class WorkshopTypeSerializationTest
     {
+        IContainer container;
         public WorkshopTypeSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<WorkshopType>("WorkshopType", "WorkshopTypes", 4U, true, false);
+            GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -20,7 +29,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             WorkshopType testWorkshopType = (WorkshopType)FormatterServices.GetUninitializedObject(typeof(WorkshopType));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WorkshopTypeBinaryPackage package = new WorkshopTypeBinaryPackage(testWorkshopType, factory);
 
             package.Pack();
@@ -39,7 +48,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MBObjectManager.Instance.RegisterObject(workshopType);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WorkshopTypeBinaryPackage package = new WorkshopTypeBinaryPackage(workshopType, factory);
 
             package.Pack();

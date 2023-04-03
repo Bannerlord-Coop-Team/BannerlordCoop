@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class AttackCollisionDataBinaryPackage : BinaryPackageBase<AttackCollisionData>
     {
-        public AttackCollisionDataBinaryPackage(AttackCollisionData obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public AttackCollisionDataBinaryPackage(AttackCollisionData obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
         protected override void PackInternal()

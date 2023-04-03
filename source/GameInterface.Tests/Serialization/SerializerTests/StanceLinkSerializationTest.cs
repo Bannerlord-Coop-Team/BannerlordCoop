@@ -1,6 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
@@ -10,9 +12,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class StanceLinkSerializationTest
     {
+        IContainer container;
         public StanceLinkSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -20,7 +29,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             StanceLink stanceLink = (StanceLink)FormatterServices.GetUninitializedObject(typeof(StanceLink));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             StanceLinkBinaryPackage package = new StanceLinkBinaryPackage(stanceLink, factory);
 
             package.Pack();
@@ -49,7 +58,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             StanceLinkBinaryPackage.StanceLink_Faction2.SetValue(stanceLink, clan2);
 
             // Serialize stanceLink
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             StanceLinkBinaryPackage package = new StanceLinkBinaryPackage(stanceLink, factory);
 
             package.Pack();

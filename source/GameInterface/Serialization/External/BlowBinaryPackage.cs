@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     public class BlowBinaryPackage : BinaryPackageBase<Blow>
     {
 
-        public BlowBinaryPackage(Blow obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public BlowBinaryPackage(Blow obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
         protected override void PackInternal()

@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class ItemRosterBinaryPackage : BinaryPackageBase<ItemRoster>
     {
-        public ItemRosterBinaryPackage(ItemRoster obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public ItemRosterBinaryPackage(ItemRoster obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

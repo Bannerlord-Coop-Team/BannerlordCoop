@@ -1,6 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit;
@@ -9,9 +11,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CharacterAttributeSerializationTest
     {
+        IContainer container;
         public CharacterAttributeSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -19,7 +28,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             CharacterAttribute testCharacterAttribute = new CharacterAttribute("test");
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterAttributeBinaryPackage package = new CharacterAttributeBinaryPackage(testCharacterAttribute, factory);
 
             package.Pack();
@@ -36,7 +45,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MBObjectManager.Instance.RegisterObject(characterAttribute);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterAttributeBinaryPackage package = new CharacterAttributeBinaryPackage(characterAttribute, factory);
 
             package.Pack();

@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class CustomPartyComponentBinaryPackage : BinaryPackageBase<CustomPartyComponent>
     {
-        public CustomPartyComponentBinaryPackage(CustomPartyComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CustomPartyComponentBinaryPackage(CustomPartyComponent obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

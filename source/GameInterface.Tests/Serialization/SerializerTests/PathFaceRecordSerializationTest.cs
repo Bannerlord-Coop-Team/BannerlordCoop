@@ -1,5 +1,7 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
 using TaleWorlds.Library;
 using Xunit;
 
@@ -7,13 +9,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class PathFaceRecordSerializationTest
     {
+        IContainer container;
+        public PathFaceRecordSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
 
         [Fact]
         public void PathFaceRecord_Serialize()
         {
             PathFaceRecord pfrObject = new PathFaceRecord();      
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             PathFaceRecordBinaryPackage package = new PathFaceRecordBinaryPackage(pfrObject, factory);
 
             package.Pack();
@@ -28,7 +39,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             PathFaceRecord pfrObject = new PathFaceRecord(7,12,13);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             PathFaceRecordBinaryPackage package = new PathFaceRecordBinaryPackage(pfrObject, factory);
 
             package.Pack();

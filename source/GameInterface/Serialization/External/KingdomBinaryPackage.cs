@@ -33,7 +33,7 @@ namespace GameInterface.Serialization.External
         private string[] settlementIds;
         private string[] villageIds;
 
-        public KingdomBinaryPackage(Kingdom obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public KingdomBinaryPackage(Kingdom obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -73,7 +73,7 @@ namespace GameInterface.Serialization.External
         {
             if(stringId != null)
             {
-                Kingdom kingdom = MBObjectManager.Instance.GetObject<Kingdom>(stringId);
+                Kingdom kingdom = ResolveId<Kingdom>(stringId);
                 if (kingdom != null)
                 {
                     Object = kingdom;

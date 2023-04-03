@@ -1,6 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
@@ -11,9 +13,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CharacterSkillsSerializationTest
     {
+        IContainer container;
         public CharacterSkillsSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -21,7 +30,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             CharacterSkills CharacterSkills = new CharacterSkills();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterSkillsBinaryPackage package = new CharacterSkillsBinaryPackage(CharacterSkills, factory);
 
             package.Pack();
@@ -51,7 +60,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             _attributes.SetValue(CharacterSkills, skills);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterSkillsBinaryPackage package = new CharacterSkillsBinaryPackage(CharacterSkills, factory);
 
             package.Pack();

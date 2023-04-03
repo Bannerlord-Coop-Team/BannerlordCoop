@@ -3,17 +3,30 @@ using GameInterface.Serialization;
 using Xunit;
 using TaleWorlds.Core;
 using System.Reflection;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ItemRosterElementSerializationTest
     {
+        IContainer container;
+        public ItemRosterElementSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void ItemRosterElement_Serialize()
         {
             ItemRosterElement itemRosterElement = new ItemRosterElement();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemRosterElementBinaryPackage package = new ItemRosterElementBinaryPackage(itemRosterElement, factory);
 
             package.Pack();
@@ -30,7 +43,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             ItemRosterElement itemRosterElement = new ItemRosterElement();
             _amount.SetValue(itemRosterElement, 5);
             EquipmentElementProperty.SetValue(itemRosterElement, new EquipmentElement());
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemRosterElementBinaryPackage package = new ItemRosterElementBinaryPackage(itemRosterElement, factory);
 
             package.Pack();

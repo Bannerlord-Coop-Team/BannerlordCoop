@@ -1,7 +1,9 @@
-﻿using Common.Extensions;
+﻿using Autofac;
+using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -13,9 +15,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BannerComponentSerializationTest
     {
+        IContainer container;
         public BannerComponentSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -29,7 +38,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 property.SetRandom(BannerComponent);
             }
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BannerComponentBinaryPackage package = new BannerComponentBinaryPackage(BannerComponent, factory);
 
             package.Pack();
@@ -58,7 +67,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             BannerEffect.SetValue(BannerComponent, effect);
 
             // Setup binary package with dependencies 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BannerComponentBinaryPackage package = new BannerComponentBinaryPackage(BannerComponent, factory);
 
             package.Pack();

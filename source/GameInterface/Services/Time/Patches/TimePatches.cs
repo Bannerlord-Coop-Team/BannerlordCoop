@@ -1,5 +1,7 @@
 ﻿using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Time.Messages;
 using HarmonyLib;
 using Serilog;
 using System.Reflection;
@@ -21,14 +23,20 @@ namespace GameInterface.Services.Time.Patches
 
             Logger.Verbose("Attempting to change time mode. Allowed: {allowed}", isAllowed);
 
-            if (TimeControlInterface.TimeLock == false && 
+            if (TimeControlInterface.TimeLock == false &&
                 __instance.TimeControlModeLock == false &&
                 value != (CampaignTimeControlMode)_timeControlMode.GetValue(__instance))
             {
+                MessageBroker.Instance.Publish(__instance, new TimeSpeedChanged(value));
                 _timeControlMode.SetValue(__instance, value);
             }
 
             return false;
+        }
+
+        public static void OverrideTimeControlMode(Campaign campaign, CampaignTimeControlMode value)
+        {
+            _timeControlMode.SetValue(campaign, value);
         }
     }
 }

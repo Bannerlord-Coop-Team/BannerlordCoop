@@ -13,7 +13,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class PartyBaseBinaryPackage : BinaryPackageBase<PartyBase>
     {
-        public PartyBaseBinaryPackage(PartyBase obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public PartyBaseBinaryPackage(PartyBase obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

@@ -1,6 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -12,9 +14,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class WorkshopSerializationTest
     {
+        IContainer container;
         public WorkshopSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -36,7 +45,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Town_Workshops.SetValue(town, new Workshop[] { Workshop });
 
             // Setup serialization
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WorkshopBinaryPackage package = new WorkshopBinaryPackage(Workshop, factory);
 
             package.Pack();
@@ -66,7 +75,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Town_Workshops.SetValue(town, new Workshop[] { Workshop });
 
             // Setup serialization
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WorkshopBinaryPackage package = new WorkshopBinaryPackage(Workshop, factory);
 
             package.Pack();

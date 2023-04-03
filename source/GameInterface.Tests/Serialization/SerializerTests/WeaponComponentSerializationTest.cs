@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using TaleWorlds.Core;
 using Xunit;
 
@@ -7,12 +10,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class WeaponComponentSerializationTest
     {
+        IContainer container;
+        public WeaponComponentSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void WeaponComponent_Serialize()
         {
             WeaponComponent weaponComponent = new WeaponComponent(new ItemObject());
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WeaponComponentBinaryPackage package = new WeaponComponentBinaryPackage(weaponComponent, factory);
 
             package.Pack();
@@ -27,7 +40,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             WeaponComponent weaponComponent = new WeaponComponent(new ItemObject());
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WeaponComponentBinaryPackage package = new WeaponComponentBinaryPackage(weaponComponent, factory);
 
             package.Pack();

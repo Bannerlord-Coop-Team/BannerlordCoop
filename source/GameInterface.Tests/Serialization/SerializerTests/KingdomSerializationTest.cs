@@ -1,7 +1,9 @@
-﻿using Common.Extensions;
+﻿using Autofac;
+using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -16,9 +18,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class KingdomSerializationTest
     {
+        IContainer container;
         public KingdomSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -26,7 +35,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Kingdom kingdomObject = (Kingdom)FormatterServices.GetUninitializedObject(typeof(Kingdom));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             KingdomBinaryPackage package = new KingdomBinaryPackage(kingdomObject, factory);
 
             package.Pack();
@@ -72,7 +81,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             stances.Add(stance);
 
             // Setup serialization
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             KingdomBinaryPackage package = new KingdomBinaryPackage(kingdomObject, factory);
 
             package.Pack();
@@ -108,7 +117,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             kingdom.StringId = "My Kingdom";
             MBObjectManager.Instance.RegisterObject(kingdom);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             KingdomBinaryPackage package = new KingdomBinaryPackage(kingdom, factory);
 
             package.Pack();

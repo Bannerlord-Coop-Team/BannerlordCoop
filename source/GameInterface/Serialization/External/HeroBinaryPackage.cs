@@ -28,7 +28,7 @@ namespace GameInterface.Serialization.External
         private string spouseId;
         private string[] childrenIds;
 
-        public HeroBinaryPackage(Hero obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public HeroBinaryPackage(Hero obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -72,7 +72,7 @@ namespace GameInterface.Serialization.External
             // Otherwise, create a new object and initialize it
             if (stringId != null)
             {
-                var newObject = MBObjectManager.Instance.GetObject<Hero>(stringId);
+                var newObject = ResolveId<Hero>(stringId);
                 if (newObject != null)
                 {
                     Object = newObject;
