@@ -19,25 +19,21 @@ namespace Missions.Services.Agents.Packets
 
     public class MovementHandler : IPacketHandler, IDisposable
     {
-        private const int PACKETS = 30;
-        private readonly static TimeSpan TIME_BETWEEN_PACKETS = TimeSpan.FromSeconds(1);
-
-        private static int PACKET_UPDATE_RATE = (int)Math.Round(TIME_BETWEEN_PACKETS.TotalMilliseconds / PACKETS);
-
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
 
         private readonly IPacketManager _packetManager;
         private readonly INetwork _client;
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
+        private readonly IAgentPublisherConfig _agentPublisherConfig;
+
+        private readonly AgentPublisher _agentPublisher;
 
         private Dictionary<Guid, AgentMovement> _agentMovementDeltas = new Dictionary<Guid, AgentMovement>();
 
         private Timer _senderTimer;
 
-        private AgentPublisher _agentPublisher;
-
-        public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry, IPacketManager packetManager)
+        public MovementHandler(LiteNetP2PClient client, IMessageBroker messageBroker, INetworkAgentRegistry agentRegistry, IPacketManager packetManager, AgentPublisher agentPublisher, IAgentPublisherConfig agentPublisherConfig)
         {
             _packetManager = packetManager;
             _client = client;
@@ -50,12 +46,13 @@ namespace Missions.Services.Agents.Packets
             _messageBroker.Subscribe<MountDataChanged>(Handle_MountDataChanged);
             _messageBroker.Subscribe<MovementInputVectorChanged>(Handle_MovementInputVectorChanged);
 
-            _agentPublisher = new AgentPublisher(messageBroker, PACKET_UPDATE_RATE, agentRegistry);
+            _agentPublisher = agentPublisher;
+            _agentPublisherConfig = agentPublisherConfig;
 
             _packetManager.RegisterPacketHandler(this);
 
-            // start the SendMessage every PACKET_UPDATE_RATE milliseconds, TIME_BETWEEN_PACKETS.Seconds after it was initialized
-            _senderTimer = new Timer(SendMessage, null, TIME_BETWEEN_PACKETS.Seconds, PACKET_UPDATE_RATE);
+            // start the SendMessage every PACKET_UPDATE_RATE milliseconds, 0
+            _senderTimer = new Timer(SendMessage, null, 0, _agentPublisherConfig.PacketUpdateRate);
         }
 
         ~MovementHandler()

@@ -4,16 +4,19 @@ using Common.Network;
 using Common.PacketHandlers;
 using IntroServer.Config;
 using Missions.Services;
+using Missions.Services.Agents;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Arena;
 using Missions.Services.BoardGames;
 using Missions.Services.Network;
 using Missions.Services.Taverns;
+using System;
 
 namespace Missions
 {
     public class MissionModule : Module
     {
+
         protected override void Load(ContainerBuilder builder)
         {
             // TODO find how to make this not disgusting
@@ -46,6 +49,10 @@ namespace Missions
                 .As<INetworkAgentRegistry>()
                 .SingleInstance();
 
+            builder.RegisterInstance(new AgentPublisherConfig())
+                .As<IAgentPublisherConfig>()
+                .SingleInstance();
+
             // Interface classes
             builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
             
@@ -53,6 +60,7 @@ namespace Missions
             builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
             builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<MovementHandler>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<AgentPublisher>().AsSelf().InstancePerLifetimeScope();
 
             base.Load(builder);
         }
