@@ -1,15 +1,12 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using HarmonyLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents
@@ -27,7 +24,7 @@ namespace Missions.Services.Agents
 
         private IMessageBroker _messageBroker;
 
-        private readonly int _packetUpdateRate;
+        private readonly IAgentPublisherConfig _agentPublisherConfig;
 
         private readonly INetworkAgentRegistry _networkAgentRegistry;
 
@@ -36,13 +33,13 @@ namespace Missions.Services.Agents
         /// <summary>
         /// Constructor
         /// </summary>
-        public AgentPublisher(IMessageBroker messageBroker, int packetUpdateRate, INetworkAgentRegistry networkAgentRegistry)
+        public AgentPublisher(IMessageBroker messageBroker, IAgentPublisherConfig agentPublisherConfig, INetworkAgentRegistry networkAgentRegistry)
         {
             _agentMovement = new AgentMovement(_agentId);
             _messageBroker = messageBroker;
-            _packetUpdateRate = packetUpdateRate;
+            _agentPublisherConfig = agentPublisherConfig;
 
-            _pollAndUpdateAgentMovementTimer = new Timer(PollAndUpdateAgentMovement, null, 0, _packetUpdateRate);
+            _pollAndUpdateAgentMovementTimer = new Timer(PollAndUpdateAgentMovement, null, 0, _agentPublisherConfig.PacketUpdateRate);
 
             _networkAgentRegistry = networkAgentRegistry;
         }
