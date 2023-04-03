@@ -42,6 +42,8 @@ namespace MissionTestMod
 
         protected override void OnSubModuleLoad()
         {
+            AssemblyHellscape.CreateAssemblyBindingRedirects();
+
             if (Debugger.IsAttached)
             {
                 var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}";
