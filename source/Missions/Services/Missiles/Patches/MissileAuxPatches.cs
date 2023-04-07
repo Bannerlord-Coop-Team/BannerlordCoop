@@ -22,7 +22,16 @@ namespace Missions.Services.Missiles.Patches
         {
             __state = shooterAgent.WieldedWeapon;
         }
-        private static void Postfix(int __result, Agent shooterAgent, ref Vec3 direction, ref Vec3 position, ref Mat3 orientation, float baseSpeed, float speed, bool addRigidBody, int forcedMissileIndex, ref MissionWeapon __state)
+        private static void Postfix(
+            int __result,
+            Agent shooterAgent,
+            ref Vec3 direction,
+            ref Vec3 position,
+            ref Mat3 orientation,
+            float baseSpeed,
+            float speed, 
+            bool addRigidBody, 
+            ref MissionWeapon __state)
         {
             if (NetworkAgentRegistry.Instance.IsControlled(shooterAgent))
             {
@@ -52,16 +61,9 @@ namespace Missions.Services.Missiles.Patches
     [HarmonyPatch(typeof(Mission), "OnAgentShootMissile")]
     public static class BlockMissileIfNative
     {
-        [UsedImplicitly]
         [HarmonyPrefix]
         public static bool OnAgentShootMissile(
             ref Agent shooterAgent,
-            ref EquipmentIndex weaponIndex,
-            ref Vec3 position,
-            ref Vec3 velocity,
-            ref Mat3 orientation,
-            ref bool hasRigidBody,
-            ref bool isPrimaryWeaponShot,
             ref int forcedMissileIndex)
         {
             if (!NetworkAgentRegistry.Instance.IsControlled(shooterAgent) && forcedMissileIndex == -1)
@@ -70,7 +72,6 @@ namespace Missions.Services.Missiles.Patches
             }
 
             return true;
-
         }
     }
 }
