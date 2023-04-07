@@ -19,10 +19,8 @@ namespace Missions.Services.Agents.Messages
             Agent = agent;
             EquipmentIndex = equipmentIndex;
             WeaponObject = weaponObject;
-            if (itemModifier == null) WeaponModifier = new ItemModifier();
-            else WeaponModifier = itemModifier;
-            if (banner == null) Banner = new Banner();
-            else Banner = banner;
+            WeaponModifier = itemModifier;
+            Banner = banner;
         }
     }
 }

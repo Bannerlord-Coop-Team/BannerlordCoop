@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Patches
@@ -34,6 +35,17 @@ namespace Missions.Services.Agents.Patches
 
             // publish the event
             NetworkMessageBroker.Instance.PublishNetworkEvent(_agentDamageData);
+
+            return true;
+        }
+    }
+    [HarmonyPatch(typeof(Mission), "OnAgentHit")]
+    internal static class OnAgentHitPatch
+    {
+        private static bool Prefix(ref Agent affectorAgent)
+        {
+            // Only allow damage from controlled agents
+            if (!NetworkAgentRegistry.Instance.IsControlled(affectorAgent)) return false;
 
             return true;
         }

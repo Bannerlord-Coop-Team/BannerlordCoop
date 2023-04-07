@@ -161,7 +161,6 @@
     <Compile Include="MissionModule.cs" />
     <Compile Include="Services\Agents\Patches\AgentDropPatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentPickupPatch.cs" />
-    <Compile Include="Services\Agents\Patches\OnAgentHitPatch.cs" />
     <Compile Include="Services\Missiles\Handlers\MissileHandler.cs" />
     <Compile Include="Services\Missiles\Message\NetworkAgentShoot.cs" />
     <Compile Include="Services\Missiles\Message\AgentShoot.cs" />
