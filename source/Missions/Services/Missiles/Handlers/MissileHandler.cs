@@ -35,11 +35,6 @@ namespace Missions.Services.Missiles.Handlers
             NetworkMessageBroker.Instance.Unsubscribe<NetworkAgentShoot>(AgentShootRecieve);
         }
 
-        private static readonly MethodInfo AddMissileAuxMethod = typeof(Mission).GetMethod("AddMissileAux", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly MethodInfo AddMissileSingleUsageAuxMethod = typeof(Mission).GetMethod("AddMissileSingleUsageAux", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly FieldInfo _missiles = typeof(Mission).GetField("_missiles", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly PropertyInfo missileDamage = typeof(WeaponComponentData).GetProperty(nameof(WeaponComponentData.ThrustDamage));
-
         private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
         {
             NetworkAgentRegistry.Instance.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
@@ -53,7 +48,6 @@ namespace Missions.Services.Missiles.Handlers
 
             GameLoopRunner.RunOnMainThread(() =>
             {
-                missileDamage.SetValue(missionWeapon.CurrentUsageItem, 0);
                 Mission.Current.AddCustomMissile(shooter, missionWeapon, shot.Position, shot.Velocity, orientation, shot.BaseSpeed, shot.Speed, shot.HasRigidBody, null, shot.MissileIndex);
             });
         }

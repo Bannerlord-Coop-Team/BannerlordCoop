@@ -14,6 +14,7 @@ namespace Missions.Services.Agents.Patches
     {
         private static bool Prefix(ref Agent affectorAgent)
         {
+            // Only allow damage from controlled agents
             if (!NetworkAgentRegistry.Instance.IsControlled(affectorAgent)) return false;
 
             return true;
