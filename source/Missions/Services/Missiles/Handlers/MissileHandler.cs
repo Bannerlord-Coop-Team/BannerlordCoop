@@ -13,6 +13,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -37,6 +38,7 @@ namespace Missions.Services.Missiles.Handlers
         private static readonly MethodInfo AddMissileAuxMethod = typeof(Mission).GetMethod("AddMissileAux", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly MethodInfo AddMissileSingleUsageAuxMethod = typeof(Mission).GetMethod("AddMissileSingleUsageAux", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly FieldInfo _missiles = typeof(Mission).GetField("_missiles", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly PropertyInfo missileDamage = typeof(WeaponComponentData).GetProperty(nameof(WeaponComponentData.ThrustDamage));
 
         private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
         {
@@ -51,6 +53,7 @@ namespace Missions.Services.Missiles.Handlers
 
             GameLoopRunner.RunOnMainThread(() =>
             {
+                missileDamage.SetValue(missionWeapon.CurrentUsageItem, 0);
                 Mission.Current.AddCustomMissile(shooter, missionWeapon, shot.Position, shot.Velocity, orientation, shot.BaseSpeed, shot.Speed, shot.HasRigidBody, null, shot.MissileIndex);
             });
         }
